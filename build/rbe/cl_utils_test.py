@@ -3,7 +3,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import pathlib
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import cl_utils
@@ -164,6 +166,26 @@ class KeyedFlagsToValuesDictTests(unittest.TestCase):
             },
         )
 
+    def test_convert_values_to_int(self):
+        self.assertEqual(
+            cl_utils.keyed_flags_to_values_dict(
+                ['a=7', 'c=8'], convert_type=int),
+            {
+                'a': [7],
+                'c': [8],
+            },
+        )
+
+    def test_convert_values_to_path(self):
+        self.assertEqual(
+            cl_utils.keyed_flags_to_values_dict(
+                ['a=/foo/bar', 'c=bar/foo.quux'], convert_type=Path),
+            {
+                'a': [Path('/foo/bar')],
+                'c': [Path('bar/foo.quux')],
+            },
+        )
+
 
 class LastValueOrDefaultTests(unittest.TestCase):
 
@@ -212,6 +234,7 @@ class LastValueOfDictFlagTests(unittest.TestCase):
             'h',
         )
 
+
 class SubprocessCallTests(unittest.TestCase):
 
     def test_success(self):
@@ -243,6 +266,7 @@ class SubprocessCallTests(unittest.TestCase):
         self.assertIn('No such file or directory', result.stderr[0])
         self.assertIn('/does/not/exist', result.stderr[0])
         self.assertGreater(result.pid, 0)
+
 
 if __name__ == '__main__':
     unittest.main()

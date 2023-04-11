@@ -19,16 +19,25 @@ For full usage, see `rustc_remote_wrapper.py -h`.
 import argparse
 import glob
 import os
+import pathlib
 import subprocess
 import sys
 
+import cl_utils
 import fuchsia
 import rustc
 import remote_action
 
-from typing import Iterable, Sequence
+from pathlib import Path
+from typing import Any, Iterable, Optional, Sequence
 
-_SCRIPT_BASENAME = os.path.basename(__file__)
+_SCRIPT_BASENAME = Path(__file__).name
+
+def _relpath(path: Path, start: Path) -> Path:
+    # Path.relative_to() requires self to be a subpath of the argument,
+    # but here, the argument is often the subpath of self.
+    # Hence, we need os.path.relpath() in the general case.
+    return Path(os.path.relpath(path, start=start))
 
 
 def msg(text: str):
@@ -55,7 +64,7 @@ def remove_suffix(text: str, suffix: str) -> str:
 
 
 # Defined for convenient mocking.
-def _readlines_from_file(path: str) -> Sequence[str]:
+def _readlines_from_file(path: Path) -> Sequence[str]:
     with open(path) as f:
         return f.readlines()
 
@@ -66,18 +75,23 @@ def _make_local_depfile(command: Sequence[str]) -> int:
 
 
 # Defined for convenient mocking.
-def _tool_is_executable(tool: str) -> bool:
+def _tool_is_executable(tool: Path) -> bool:
     return os.access(tool, os.X_OK)
 
 
 # Defined for convenient mocking.
-def _libcxx_isfile(libcxx: str) -> bool:
-    return os.path.isfile(libcxx)
+def _libcxx_isfile(libcxx: Path) -> bool:
+    return libcxx.is_file()
 
 
 # Defined for convenient mocking.
-def _env_file_exists(path: str) -> bool:
-    return os.path.exists(path)
+def _env_file_exists(path: Path) -> bool:
+    return path.exists()
+
+
+def _flatten_comma_list_to_paths(items: Iterable[str]) -> Iterable[Path]:
+    for item in cl_utils.flatten_comma_list(items):
+        yield Path(item)
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -94,7 +108,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 _MAIN_ARG_PARSER = _main_arg_parser()
 
 
-def depfile_inputs_by_line(lines: Iterable[str]) -> Iterable[str]:
+def depfile_inputs_by_line(lines: Iterable[str]) -> Iterable[Path]:
     """Crude parsing to look at the phony deps of a depfile.
 
     Phony deps look like:
@@ -106,18 +120,18 @@ def depfile_inputs_by_line(lines: Iterable[str]) -> Iterable[str]:
     for line in lines:
         s_line = line.rstrip()  # remove trailing '\n'
         if s_line.endswith(':'):
-            yield remove_suffix(s_line, ':')
+            yield Path(remove_suffix(s_line, ':'))
 
 
-def relativize_paths(paths: Iterable[str], start: str) -> Iterable[str]:
+def relativize_paths(paths: Iterable[Path], start: Path) -> Iterable[Path]:
     for p in paths:
-        if os.path.isabs(p):
-            yield os.path.relpath(p, start=start)
+        if p.is_absolute():
+            yield _relpath(p, start=start)
         else:
-            yield os.path.normpath(p)
+            yield p  # Paths are already normalized upon construction
 
 
-def accompany_rlib_with_so(deps: Iterable[str]) -> Iterable[str]:
+def accompany_rlib_with_so(deps: Iterable[Path]) -> Iterable[Path]:
     """Expand list to include .so files.
 
     Some Rust libraries come with both .rlib and .so (like libstd), however,
@@ -133,9 +147,9 @@ def accompany_rlib_with_so(deps: Iterable[str]) -> Iterable[str]:
     """
     for dep in deps:
         yield dep
-        if dep.endswith('.rlib'):
-            so_file = remove_suffix(dep, '.rlib') + '.so'
-            if os.path.isfile(so_file):
+        if dep.suffix == '.rlib':
+            so_file = dep.with_suffix('.so')  # replaces .rlib with .so
+            if so_file.is_file():
                 yield so_file
 
 
@@ -144,13 +158,12 @@ class RustRemoteAction(object):
     def __init__(
         self,
         argv: Sequence[str],
-        exec_root: str = None,
-        working_dir: str = None,
+        exec_root: Optional[Path] = None,
+        working_dir: Optional[Path] = None,
         host_platform: str = None,
     ):
-        self._working_dir = os.path.abspath(working_dir or os.curdir)
-        self._exec_root = os.path.abspath(
-            exec_root or remote_action.PROJECT_ROOT)
+        self._working_dir = (working_dir or Path(os.curdir)).absolute()
+        self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
         try:
@@ -202,8 +215,16 @@ class RustRemoteAction(object):
             msg(f'{desc}: {value}')
         return value
 
-    def yield_verbose(self, desc: str, items: Iterable[str]) -> Iterable[str]:
-        """In verbose mode, print and forward items."""
+    def yield_verbose(self, desc: str, items: Iterable[Any]) -> Iterable[Any]:
+        """In verbose mode, print and forward items.
+
+        Args:
+          desc: text description of what is being printed.
+          items: stream of any type of object that is str-able.
+
+        Yields:
+          items, unchanged
+        """
         if self.verbose:
             msg(f'{desc}: {{')
             for item in items:
@@ -214,11 +235,11 @@ class RustRemoteAction(object):
             yield from items
 
     @property
-    def working_dir(self) -> str:
+    def working_dir(self) -> Path:
         return self._working_dir
 
     @property
-    def exec_root(self) -> str:
+    def exec_root(self) -> Path:
         return self._exec_root
 
     @property
@@ -226,8 +247,9 @@ class RustRemoteAction(object):
         return self._host_platform
 
     @property
-    def exec_root_rel(self) -> str:
-        return os.path.relpath(self.exec_root, start=self.working_dir)
+    def exec_root_rel(self) -> Path:
+        # relpath can handle cases that Path.relative_to() cannot.
+        return _relpath(self.exec_root, start=self.working_dir)
 
     @property
     def crate_type(self) -> rustc.CrateType:
@@ -238,30 +260,29 @@ class RustRemoteAction(object):
         return self._rust_action.target
 
     @property
-    def sysroot(self) -> str:
+    def sysroot(self) -> Optional[Path]:
         return self._rust_action.sysroot
 
     @property
-    def linker(self) -> str:
+    def linker(self) -> Optional[Path]:
         return self._rust_action.linker
 
     @property
-    def depfile(self) -> str:
+    def depfile(self) -> Optional[Path]:
         return self._rust_action.depfile
 
     @property
-    def remote_compiler(self) -> str:
+    def remote_compiler(self) -> Path:
         return fuchsia.remote_executable(self._rust_action.compiler)
 
     def _cleanup(self):
         for f in self._cleanup_files:
-            if os.path.exists(f):
-                os.remove(f)
+            f.unlink(missing_ok=True)  # does remove or rmdir
 
-    def _local_depfile_inputs(self) -> Iterable[str]:
+    def _local_depfile_inputs(self) -> Iterable[Path]:
         # Generate a local depfile for the purposes of discovering
         # all transitive inputs.
-        local_depfile = self.depfile + '.nolink'
+        local_depfile = Path(str(self.depfile) + '.nolink')
         self._cleanup_files.append(local_depfile)
 
         dep_only_command = remote_action.auto_env_prefix_command(
@@ -284,7 +305,7 @@ class RustRemoteAction(object):
                 accompany_rlib_with_so(remote_depfile_inputs),
                 self.working_dir))
 
-    def _remote_compiler_inputs(self) -> Iterable[str]:
+    def _remote_compiler_inputs(self) -> Iterable[Path]:
         # remote compiler is an input
         remote_compiler = self.remote_compiler
         if not _tool_is_executable(remote_compiler):
@@ -294,7 +315,7 @@ class RustRemoteAction(object):
         yield self.value_verbose('remote compiler', remote_compiler)
         yield from self._remote_rustc_shlibs()
 
-    def _remote_rustc_shlibs(self) -> Iterable[str]:
+    def _remote_rustc_shlibs(self) -> Iterable[Path]:
         """Find remote compiler shared libraries.
 
         Yields:
@@ -310,27 +331,26 @@ class RustRemoteAction(object):
         else:
             yield from self._assumed_remote_rustc_shlibs()
 
-    def _assumed_remote_rustc_shlibs(self) -> Iterable[str]:
+    def _assumed_remote_rustc_shlibs(self) -> Iterable[Path]:
         # KLUDGE: the host's binutils may not be able to analyze the remote
         # executable (ELF), so hardcode what we think the shlibs are.
-        for d in fuchsia.REMOTE_RUSTC_SHLIB_GLOBS:
-            yield from self.yield_verbose(
-                'remote compiler shlibs (guessed)',
-                glob.glob(os.path.join(self.exec_root_rel, d)))
+        yield from self.yield_verbose(
+            'remote compiler shlibs (guessed)',
+            fuchsia.remote_rustc_shlibs(self.exec_root_rel))
 
-    def _rust_stdlib_libunwind_inputs(self) -> Iterable[str]:
+    def _rust_stdlib_libunwind_inputs(self) -> Iterable[Path]:
         # The majority of stdlibs already appear in dep-info and are uploaded
         # as needed.  However, libunwind.a is not listed, but is directly
         # needed by code emitted by rustc.  Listing this here works around a
         # missing upload issue, and adheres to the guidance of listing files
         # instead of whole directories.
-        libunwind_a = os.path.join(
+        libunwind_a = Path(
             self.exec_root_rel, fuchsia.rust_stdlib_dir(self.target),
             'libunwind.a')
-        if os.path.exists(libunwind_a):
+        if libunwind_a.exists():
             yield self.value_verbose('libunwind', libunwind_a)
 
-    def _inputs_from_env(self) -> Iterable[str]:
+    def _inputs_from_env(self) -> Iterable[Path]:
         """Scan command environment variables for references to inputs files.
 
         If a variable value looks like a path and it points to something
@@ -339,10 +359,14 @@ class RustRemoteAction(object):
         for e in self._rust_action.env:
             key, sep, value = e.partition('=')
             if sep == '=':
-                if _env_file_exists(value):
-                    yield os.path.relpath(value, start=self.working_dir)
+                try:
+                    p = Path(value)
+                    if _env_file_exists(p):
+                        yield _relpath(p, start=self.working_dir)
+                except ValueError:  # value is not a Path, ignore it
+                    pass
 
-    def _remote_inputs(self) -> Iterable[str]:
+    def _remote_inputs(self) -> Iterable[Path]:
         """Remote inputs are relative to current working dir."""
         yield self.value_verbose(
             'top source', self._rust_action.direct_sources[0])
@@ -371,9 +395,10 @@ class RustRemoteAction(object):
             yield from self._remote_linker_inputs()
 
         yield from self.yield_verbose(
-            'forwarded inputs', self._forwarded_remote_args.inputs)
+            'forwarded inputs',
+            _flatten_comma_list_to_paths(self._forwarded_remote_args.inputs))
 
-    def _remote_output_files(self) -> Iterable[str]:
+    def _remote_output_files(self) -> Iterable[Path]:
         """Remote output files are relative to current working dir."""
         yield self.value_verbose('main output', self._rust_action.output_file)
 
@@ -385,11 +410,15 @@ class RustRemoteAction(object):
             'extra compiler outputs', self._rust_action.extra_output_files())
 
         yield from self.yield_verbose(
-            'forwarded output files', self._forwarded_remote_args.output_files)
+            'forwarded output files',
+            _flatten_comma_list_to_paths(
+                self._forwarded_remote_args.output_files))
 
-    def _remote_output_dirs(self) -> Iterable[str]:
+    def _remote_output_dirs(self) -> Iterable[Path]:
         yield from self.yield_verbose(
-            'forwarded output dirs', self._forwarded_remote_args.output_dirs)
+            'forwarded output dirs',
+            _flatten_comma_list_to_paths(
+                self._forwarded_remote_args.output_dirs))
 
     @property
     def remote_options(self) -> Sequence[str]:
@@ -444,7 +473,7 @@ class RustRemoteAction(object):
     def remote_action(self) -> remote_action.RemoteAction:
         return self._remote_action
 
-    def _remote_linker_executables(self) -> Iterable[str]:
+    def _remote_linker_executables(self) -> Iterable[Path]:
         if self.linker:
             remote_linker = fuchsia.remote_executable(self.linker)
             yield self.value_verbose('remote linker', remote_linker)
@@ -452,21 +481,20 @@ class RustRemoteAction(object):
             # ld.lld -> lld, but the symlink is required for the clang
             # linker driver to be able to use lld.
             yield self.value_verbose(
-                'remote rust lld',
-                os.path.join(os.path.dirname(remote_linker), 'ld.lld'))
+                'remote rust lld', remote_linker.parent / 'ld.lld')
 
-    def _remote_libcxx(self, clang_lib_triple: str) -> Iterable[str]:
-        libcxx_remote = os.path.join(
-            self.exec_root_rel,
-            fuchsia.remote_clang_libcxx_static(clang_lib_triple))
+    def _remote_libcxx(self, clang_lib_triple: str) -> Iterable[Path]:
+        libcxx_remote = self.exec_root_rel / fuchsia.remote_clang_libcxx_static(
+            clang_lib_triple)
         if _libcxx_isfile(libcxx_remote):
             yield self.value_verbose('remote libc++', libcxx_remote)
 
     def _remote_clang_runtime_libs(self,
-                                   clang_lib_triple: str) -> Iterable[str]:
+                                   clang_lib_triple: str) -> Iterable[Path]:
         # clang runtime lib dir
-        rt_libdir_remote = fuchsia.remote_clang_runtime_libdirs(
-            self.exec_root_rel, clang_lib_triple)
+        rt_libdir_remote = list(
+            fuchsia.remote_clang_runtime_libdirs(
+                self.exec_root_rel, clang_lib_triple))
         # if none found, that's ok.
         if len(rt_libdir_remote) == 1:
             yield self.value_verbose(
@@ -476,7 +504,7 @@ class RustRemoteAction(object):
                 f"Found more than one clang runtime lib dir (don't know which one to use): {rt_libdir_remote}"
             )
 
-    def _sysroot_files(self) -> Iterable[str]:
+    def _sysroot_files(self) -> Iterable[Path]:
         # sysroot files
         sysroot_dir = self.sysroot
         sysroot_triple = fuchsia.rustc_target_to_sysroot_triple(self.target)
@@ -489,7 +517,7 @@ class RustRemoteAction(object):
                     with_libgcc=self._rust_action.want_sysroot_libgcc,
                 ))
 
-    def _remote_linker_inputs(self) -> Iterable[str]:
+    def _remote_linker_inputs(self) -> Iterable[Path]:
         if self.linker:
             yield from self._remote_linker_executables()
 
@@ -509,7 +537,7 @@ class RustRemoteAction(object):
 
     def _depfile_exists(self) -> bool:
         # Defined for easy mocking.
-        return os.path.isfile(self.depfile)
+        return self.depfile and self.depfile.exists()
 
     def _rewrite_depfile(self):
         """Rewrite depfile without working dir absolute paths.
@@ -550,7 +578,7 @@ def main(argv: Sequence[str]) -> int:
     rust_remote_action = RustRemoteAction(
         argv,  # [remote options] -- rustc-compile-command...
         exec_root=remote_action.PROJECT_ROOT,
-        working_dir=os.curdir,
+        working_dir=Path(os.curdir),
         host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
     )
     return rust_remote_action.run()

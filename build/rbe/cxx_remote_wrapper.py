@@ -13,6 +13,7 @@ Usage:
 import argparse
 import enum
 import os
+import pathlib
 import shlex
 import subprocess
 import sys
@@ -21,18 +22,18 @@ import cxx
 import fuchsia
 import remote_action
 
-from typing import Iterable, Sequence
+from pathlib import Path
+from typing import Iterable, Optional, Sequence
 
-_SCRIPT_BASENAME = os.path.basename(__file__)
-_SCRIPT_DIR = os.path.dirname(__file__)
+_SCRIPT_BASENAME = Path(__file__).name
+_SCRIPT_DIR = Path(__file__).parent
 
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
 
 
-REMOTE_COMPILER_SWAPPER = os.path.join(
-    _SCRIPT_DIR, "cxx-swap-remote-compiler.sh")
+REMOTE_COMPILER_SWAPPER = _SCRIPT_DIR / "cxx-swap-remote-compiler.sh"
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -61,7 +62,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 _MAIN_ARG_PARSER = _main_arg_parser()
 
 
-def check_missing_remote_tools(compiler_type: cxx.Compiler) -> Iterable[str]:
+def check_missing_remote_tools(compiler_type: cxx.Compiler) -> Iterable[Path]:
     required_remote_tools = []
     if compiler_type == cxx.Compiler.CLANG:
         required_remote_tools.append(fuchsia.REMOTE_CLANG_SUBDIR)
@@ -69,7 +70,7 @@ def check_missing_remote_tools(compiler_type: cxx.Compiler) -> Iterable[str]:
         required_remote_tools.append(fuchsia.REMOTE_GCC_SUBDIR)
 
     for d in required_remote_tools:
-        if not os.path.exists(os.path.join(remote_action.PROJECT_ROOT_REL, d)):
+        if not (remote_action.PROJECT_ROOT_REL / d).exists():
             yield d
 
 
@@ -82,13 +83,12 @@ class CxxRemoteAction(object):
     def __init__(
         self,
         argv: Sequence[str],
-        exec_root: str = None,
-        working_dir: str = None,
+        exec_root: Path = None,
+        working_dir: Path = None,
         host_platform: str = None,
     ):
-        self._working_dir = os.path.abspath(working_dir or os.curdir)
-        self._exec_root = os.path.abspath(
-            exec_root or remote_action.PROJECT_ROOT)
+        self._working_dir = (working_dir or Path(os.curdir)).absolute()
+        self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
         try:
@@ -119,7 +119,7 @@ class CxxRemoteAction(object):
         # Determine whether this action can be done remotely.
         self._local_only = False
         if self._cxx_action.sources and self._cxx_action.sources[
-                0].file.endswith('.S'):
+                0].file.name.endswith('.S'):
             # Compiling un-preprocessed assembly is not supported remotely.
             self._local_only = True
 
@@ -193,7 +193,7 @@ class CxxRemoteAction(object):
         if self.host_platform != fuchsia.REMOTE_PLATFORM:
             # compiler path is relative to current working dir
             compiler_swapper_rel = os.path.relpath(
-                REMOTE_COMPILER_SWAPPER, self.working_dir)
+                REMOTE_COMPILER_SWAPPER, start=self.working_dir)
             remote_inputs.append(self.remote_compiler)
             remote_options.append(f'--remote_wrapper={compiler_swapper_rel}')
             remote_command = [compiler_swapper_rel] + remote_command
@@ -213,11 +213,11 @@ class CxxRemoteAction(object):
         return self._prepare_status
 
     @property
-    def working_dir(self) -> str:
+    def working_dir(self) -> Path:
         return self._working_dir
 
     @property
-    def exec_root(self) -> str:
+    def exec_root(self) -> Path:
         return self._exec_root
 
     @property
@@ -268,7 +268,7 @@ class CxxRemoteAction(object):
         return self._remote_action
 
     @property
-    def remote_compiler(self) -> str:
+    def remote_compiler(self) -> Path:
         return fuchsia.remote_executable(self._cxx_action.compiler.tool)
 
     def _run_locally(self) -> int:
@@ -313,7 +313,7 @@ def main(argv: Sequence[str]) -> int:
     cxx_remote_action = CxxRemoteAction(
         argv,  # [remote options] -- C-compile-command...
         exec_root=remote_action.PROJECT_ROOT,
-        working_dir=os.curdir,
+        working_dir=Path(os.curdir),
         host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
     )
     return cxx_remote_action.run()

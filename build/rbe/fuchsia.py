@@ -11,28 +11,31 @@ This includes information like:
 
 import glob
 import os
+import pathlib
 import platform
 import sys
+from pathlib import Path
 from typing import Iterable, Sequence
 
-_SCRIPT_BASENAME = os.path.basename(__file__)
-_SCRIPT_DIR = os.path.dirname(__file__)
-_SCRIPT_DIR_REL = os.path.relpath(_SCRIPT_DIR, start=os.curdir)
+_SCRIPT_PATH = Path(__file__)
+_SCRIPT_BASENAME = _SCRIPT_PATH.name
+_SCRIPT_DIR = _SCRIPT_PATH.parent
+_SCRIPT_DIR_REL = Path(os.path.relpath(_SCRIPT_DIR, start=os.curdir))
 
 _EXPECTED_ROOT_SUBDIRS = ('boards', 'bundles', 'prebuilt', 'zircon')
 
 
-def _dir_is_fuchsia_root(path) -> bool:
+def _dir_is_fuchsia_root(path: Path) -> bool:
     # Look for the presence of certain files and dirs.
     # Cannot always expect .git dir at the root, in the case of
     # a copy or unpacking from archive.
     for d in _EXPECTED_ROOT_SUBDIRS:
-        if not os.path.isdir(os.path.join(path, d)):
+        if not (path / d).is_dir():
             return False
     return True
 
 
-def project_root_dir() -> str:
+def project_root_dir() -> Path:
     """Returns the root location of the source tree.
 
     This works as expected when this module is loaded from the
@@ -41,16 +44,16 @@ def project_root_dir() -> str:
     for `python_host_test` (GN)), it may no longer reside somewhere inside
     the Fuchsia source tree after it is unpacked.
     """
-    d = os.path.abspath(_SCRIPT_DIR)
+    d = _SCRIPT_DIR.absolute()
     while True:
-        if d.endswith('.pyz'):
+        if d.name.endswith('.pyz'):
             # If this point is reached, we are NOT operating in the original
             # location in the source tree as intended.  Treat this like a test
             # and return a fake value.
-            return '/FAKE/PROJECT/ROOT/FOR/TESTING'
+            return Path('/FAKE/PROJECT/ROOT/FOR/TESTING')
         elif _dir_is_fuchsia_root(d):
             return d
-        next = os.path.dirname(d)
+        next = d.parent
         if next == d:
             raise Exception(
                 f'Unable to find project root searching upward from {_SCRIPT_DIR}.'
@@ -59,7 +62,7 @@ def project_root_dir() -> str:
 
 
 # This script starts/stops reproxy around a command.
-REPROXY_WRAP = os.path.join(_SCRIPT_DIR_REL, "fuchsia-reproxy-wrap.sh")
+REPROXY_WRAP = _SCRIPT_DIR_REL / "fuchsia-reproxy-wrap.sh"
 
 ##########################################################################
 ### Prebuilt tools
@@ -82,26 +85,21 @@ HOST_PREBUILT_PLATFORM_SUBDIR = HOST_PREBUILT_PLATFORM
 REMOTE_PLATFORM = 'linux-x64'
 
 
-def _path_components(path: str) -> Iterable[str]:
-    for d in path.split(os.path.sep):
-        yield d
-
-
 def _path_component_is_platform_subdir(dirname: str) -> bool:
     os, sep, arch = dirname.partition('-')
     return sep == '-' and os in {'linux', 'mac'} and arch in {'x64', 'arm64'}
 
 
-def _remote_executable_components(host_tool: str) -> Iterable[str]:
+def _remote_executable_components(host_tool: Path) -> Iterable[str]:
     """Change the path component that correpsonds to the platform."""
-    for d in _path_components(host_tool):
+    for d in host_tool.parts:
         if _path_component_is_platform_subdir(d):
             yield REMOTE_PLATFORM
         else:
             yield d
 
 
-def remote_executable(host_tool: str) -> str:
+def remote_executable(host_tool: Path) -> Path:
     """Locate a corresponding tool for remote execution.
 
     This assumes that 'linux-x64' is the only available remote execution
@@ -114,44 +112,36 @@ def remote_executable(host_tool: str) -> str:
       path to the corresponding executable for the remote execution platform,
       which is currently only linux-x64.
     """
-    return os.path.join(*list(_remote_executable_components(host_tool)))
+    return Path(*list(_remote_executable_components(host_tool)))
 
 
-RECLIENT_BINDIR = os.path.join(
+RECLIENT_BINDIR = Path(
     'prebuilt', 'proprietary', 'third_party', 'reclient',
     HOST_PREBUILT_PLATFORM_SUBDIR)
 
-REMOTE_RUSTC_SUBDIR = os.path.join(
-    'prebuilt', 'third_party', 'rust', REMOTE_PLATFORM)
-REMOTE_CLANG_SUBDIR = os.path.join(
-    'prebuilt', 'third_party', 'clang', REMOTE_PLATFORM)
+REMOTE_RUSTC_SUBDIR = Path('prebuilt', 'third_party', 'rust', REMOTE_PLATFORM)
+REMOTE_CLANG_SUBDIR = Path('prebuilt', 'third_party', 'clang', REMOTE_PLATFORM)
+
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
-REMOTE_RUSTC_SHLIB_GLOBS = [
-    os.path.join(REMOTE_RUSTC_SUBDIR, 'lib', d)
-    for d in ('librustc_driver-*.so', 'libstd-*.so', 'libLLVM-*-rust-*.so')
-]
+def remote_rustc_shlibs(root_rel: Path) -> Iterable[Path]:
+    for g in ('librustc_driver-*.so', 'libstd-*.so', 'libLLVM-*-rust-*.so'):
+        yield from (root_rel / REMOTE_RUSTC_SUBDIR / 'lib').glob(g)
 
 
-def remote_clang_runtime_libdirs(root_rel: str,
-                                 target_triple: str) -> Sequence[str]:
+def remote_clang_runtime_libdirs(root_rel: Path,
+                                 target_triple: str) -> Sequence[Path]:
     """Locate clang runtime libdir from the current directory."""
-    pattern = os.path.join(
-        root_rel,
-        REMOTE_CLANG_SUBDIR,
-        'lib',
-        'clang',
-        '*',  # a clang version number, like '14.0.0' or '17'
-        'lib',
-        target_triple,
-    )
-    return glob.glob(pattern)
+    return (root_rel / REMOTE_CLANG_SUBDIR / 'lib' / 'clang').glob(
+        os.path.join(
+            '*',  # a clang version number, like '14.0.0' or '17'
+            'lib',
+            target_triple))
 
 
 def remote_clang_libcxx_static(clang_lib_triple: str) -> str:
     """Location of libc++.a"""
-    return os.path.join(
-        REMOTE_CLANG_SUBDIR, 'lib', clang_lib_triple, 'libc++.a')
+    return REMOTE_CLANG_SUBDIR / 'lib' / clang_lib_triple / 'libc++.a'
 
 
 def rust_stdlib_dir(target_triple: str) -> str:
@@ -161,8 +151,7 @@ def rust_stdlib_dir(target_triple: str) -> str:
     It is possible that the target libdirs may move to a location separate
     from where the host tools reside.  See https://fxbug.dev/111727.
     """
-    return os.path.join(
-        REMOTE_RUSTC_SUBDIR, 'lib', 'rustlib', target_triple, 'lib')
+    return REMOTE_RUSTC_SUBDIR / 'lib' / 'rustlib' / target_triple / 'lib'
 
 
 def rustc_target_to_sysroot_triple(target: str) -> str:
@@ -201,12 +190,10 @@ def rustc_target_to_clang_target(target: str) -> str:
         f"Unhandled case for mapping to clang lib target dir: {target}")
 
 
-def remote_rustc_to_rust_lld_path(rustc: str) -> str:
-    rust_lld = os.path.join(
-        os.path.dirname(rustc),
-        # remote is only linux-64
-        '../lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld')
-    return os.path.normpath(rust_lld)
+def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
+    # remote is only linux-64
+    rust_lld = rustc.parent / '../lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld'
+    return rust_lld  # already normalized by Path construction
 
 
 # Built lib/{sysroot_triple}/... files
@@ -244,8 +231,8 @@ _SYSROOT_USR_LIB_FILES = (
 )
 
 
-def sysroot_files(sysroot_dir: str, sysroot_triple: str,
-                  with_libgcc: bool) -> Iterable[str]:
+def sysroot_files(sysroot_dir: Path, sysroot_triple: str,
+                  with_libgcc: bool) -> Iterable[Path]:
     """Expanded list of sysroot files under the Fuchsia build output dir.
 
     Args:
@@ -259,36 +246,37 @@ def sysroot_files(sysroot_dir: str, sysroot_triple: str,
     """
     if sysroot_triple:
         if sysroot_triple.startswith('aarch64-linux'):
-            yield f'{sysroot_dir}/lib/{sysroot_triple}/ld-linux-aarch64.so.1'
+            yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-aarch64.so.1'
         elif sysroot_triple.startswith('x86_64-linux'):
-            yield f'{sysroot_dir}/lib/{sysroot_triple}/ld-linux-x86-64.so.2'
+            yield sysroot_dir / 'lib' / sysroot_triple / 'ld-linux-x86-64.so.2'
 
         for f in _SYSROOT_LIB_FILES:
-            yield f"{sysroot_dir}/lib/{sysroot_triple}/{f}"
+            yield sysroot_dir / 'lib' / sysroot_triple / f
         for f in _SYSROOT_USR_LIB_FILES:
-            yield f"{sysroot_dir}/usr/lib/{sysroot_triple}/{f}"
+            yield sysroot_dir / 'usr/lib' / sysroot_triple / f
 
         if with_libgcc:
             yield from [
-                f"{sysroot_dir}/usr/lib/gcc/{sysroot_triple}/4.9/libgcc.a",
-                f"{sysroot_dir}/usr/lib/gcc/{sysroot_triple}/4.9/libgcc_eh.a",
+                sysroot_dir / 'usr/lib/gcc' / sysroot_triple / '4.9/libgcc.a',
+                sysroot_dir / 'usr/lib/gcc' / sysroot_triple /
+                '4.9/libgcc_eh.a',
                 # The toolchain probes (stat) for the existence of crtbegin.o
-                f"{sysroot_dir}/usr/lib/gcc/{sysroot_triple}/4.9/crtbegin.o",
+                sysroot_dir / 'usr/lib/gcc' / sysroot_triple / '4.9/crtbegin.o',
                 # libgcc also needs sysroot libc.a,
                 # although this might be coming from -Cdefault-linker-libraries.
-                f"{sysroot_dir}/usr/lib/{sysroot_triple}/libc.a",
+                sysroot_dir / 'usr/lib' / sysroot_triple / 'libc.a',
             ]
     else:
         yield from [
-            f'{sysroot_dir}/lib/libc.so',
-            f'{sysroot_dir}/lib/libdl.so',
-            f'{sysroot_dir}/lib/libm.so',
-            f'{sysroot_dir}/lib/libpthread.so',
-            f'{sysroot_dir}/lib/librt.so',
-            f'{sysroot_dir}/lib/Scrt1.o',
+            sysroot_dir / 'lib/libc.so',
+            sysroot_dir / 'lib/libdl.so',
+            sysroot_dir / 'lib/libm.so',
+            sysroot_dir / 'lib/libpthread.so',
+            sysroot_dir / 'lib/librt.so',
+            sysroot_dir / 'lib/Scrt1.o',
         ]
 
         # Not every sysroot dir has a libzircon.
-        libzircon_so = f"{sysroot_dir}/lib/libzircon.so"
-        if os.path.isfile(libzircon_so):
+        libzircon_so = sysroot_dir / 'lib/libzircon.so'
+        if libzircon_so.is_file():
             yield libzircon_so

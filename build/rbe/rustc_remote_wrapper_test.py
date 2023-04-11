@@ -7,20 +7,37 @@
 import contextlib
 import io
 import os
-import parameterized
+import pathlib
 import subprocess
 import sys
 import unittest
 
-from parameterized import parameterized
+from pathlib import Path
 from unittest import mock
 
 import rustc_remote_wrapper
+from rustc_remote_wrapper import _relpath
 
 import fuchsia
 import remote_action
 
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
+
+
+def _strs(items: Sequence[Any]) -> Sequence[str]:
+    return [str(i) for i in items]
+
+
+def _paths(items: Sequence[Any]) -> Sequence[Path]:
+    if isinstance(items, list):
+        return [Path(i) for i in items]
+    elif isinstance(items, set):
+        return {Path(i) for i in items}
+    elif isinstance(items, tuple):
+        return tuple(Path(i) for i in items)
+
+    t = type(items)
+    raise TypeError("Unhandled sequence type: {t}")
 
 
 class DepfileInputsByLineTests(unittest.TestCase):
@@ -42,19 +59,19 @@ class DepfileInputsByLineTests(unittest.TestCase):
         ]
         self.assertEqual(
             list(rustc_remote_wrapper.depfile_inputs_by_line(lines)),
-            ['a', 'd'])
+            _paths(['a', 'd']))
 
 
 class TestAccompanyRlibWithSo(unittest.TestCase):
 
     def test_not_rlib(self):
-        deps = '../path/to/foo.rs'
+        deps = Path('../path/to/foo.rs')
         self.assertEqual(
             list(rustc_remote_wrapper.accompany_rlib_with_so([deps])), [deps])
 
     def test_rlib_without_so(self):
-        deps = 'obj/build/foo.rlib'
-        with mock.patch.object(os.path, 'isfile',
+        deps = Path('obj/build/foo.rlib')
+        with mock.patch.object(Path, 'is_file',
                                return_value=False) as mock_isfile:
             self.assertEqual(
                 list(rustc_remote_wrapper.accompany_rlib_with_so([deps])),
@@ -62,12 +79,12 @@ class TestAccompanyRlibWithSo(unittest.TestCase):
         mock_isfile.assert_called_once()
 
     def test_rlib_with_so(self):
-        deps = 'obj/build/foo.rlib'
-        with mock.patch.object(os.path, 'isfile',
+        deps = Path('obj/build/foo.rlib')
+        with mock.patch.object(Path, 'is_file',
                                return_value=True) as mock_isfile:
             self.assertEqual(
                 list(rustc_remote_wrapper.accompany_rlib_with_so([deps])),
-                [deps, 'obj/build/foo.so'])
+                [deps, Path('obj/build/foo.so')])
             mock_isfile.assert_called_once()
 
 
@@ -76,9 +93,9 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
     def generate_prepare_mocks(
         self,
         depfile_contents: Sequence[str] = None,
-        compiler_shlibs: Sequence[str] = None,
-        clang_rt_libdir: str = None,
-        libcxx_static: str = None,
+        compiler_shlibs: Sequence[Path] = None,
+        clang_rt_libdir: Path = None,
+        libcxx_static: Path = None,
     ) -> Iterable[mock.patch.object]:
         """common mocks needed for RustRemoteAction.prepare()"""
         # depfile only command
@@ -117,17 +134,17 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 return_value=libcxx_static or '')
 
     def test_prepare_basic(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_contents = [d + ':' for d in deps]
-        command = [compiler, source, '-o', rlib]
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        command = _strs([compiler, source, '-o', rlib])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -152,20 +169,19 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(remote_output_files, {rlib})
 
     def test_prepare_depfile(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_path = 'obj/foo.rlib.d'
-        depfile_contents = [d + ':' for d in deps]
-        command = [
-            compiler, source, '-o', rlib, f'--emit=dep-info={depfile_path}'
-        ]
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_path = Path('obj/foo.rlib.d')
+        depfile_contents = [str(d) + ':' for d in deps]
+        command = _strs(
+            [compiler, source, '-o', rlib, f'--emit=dep-info={depfile_path}'])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -190,27 +206,27 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(remote_output_files, {rlib, depfile_path})
 
     def test_prepare_externs(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_contents = [d + ':' for d in deps]
-        externs = [
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        externs = _paths([
             'obj/path/to/this.rlib',
             'obj/path/to/that.rlib',
-        ]
+        ])
         extern_flags = [
             '--extern',
             f'this={externs[0]}',
             '--extern',
             f'that={externs[1]}',
         ]
-        command = [compiler, source, '-o', rlib] + extern_flags
+        command = _strs([compiler, source, '-o', rlib]) + extern_flags
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -235,18 +251,19 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(remote_output_files, {rlib})
 
     def test_prepare_link_arg_files(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_contents = [d + ':' for d in deps]
-        link_arg = 'obj/some/random.a'
-        command = [compiler, source, '-o', rlib, f'-Clink-arg={link_arg}']
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        link_arg = Path('obj/some/random.a')
+        command = _strs(
+            [compiler, source, '-o', rlib, f'-Clink-arg={link_arg}'])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -272,26 +289,27 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(remote_output_files, {rlib})
 
     def test_prepare_needs_linker(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        exec_root_rel = os.path.relpath(exec_root, start=working_dir)
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        linker = '../tools/bin/linker'
-        lld = '../tools/bin/ld.lld'
-        clang_rt_libdir = '../fake/lib/clang/x86_64-unknown-linux'
-        libcxx = 'fake/clang/libc++.a'
-        source = '../foo/src/lib.rs'
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        exec_root_rel = _relpath(exec_root, start=working_dir)
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        linker = Path('../tools/bin/linker')
+        lld = Path('../tools/bin/ld.lld')
+        clang_rt_libdir = Path('../fake/lib/clang/x86_64-unknown-linux')
+        libcxx = Path('fake/clang/libc++.a')
+        source = Path('../foo/src/lib.rs')
         target = 'x86_64-unknown-linux-gnu'
-        exe = 'obj/foo.exe'
-        deps = ['../foo/src/other.rs']
-        depfile_contents = [d + ':' for d in deps]
-        command = [
-            compiler, source, '-o', exe, '--crate-type', 'bin',
-            f'-Clinker={linker}', f'--target={target}'
-        ]
+        exe = Path('obj/foo.exe')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        command = _strs(
+            [
+                compiler, source, '-o', exe, '--crate-type', 'bin',
+                f'-Clinker={linker}', f'--target={target}'
+            ])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -316,25 +334,25 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(
             remote_inputs,
             set(
-                [compiler, shlib_rel, source] + deps + [
-                    linker, lld, clang_rt_libdir,
-                    os.path.join(exec_root_rel, libcxx)
-                ]))
+                _paths(
+                    [compiler, shlib_rel, source] + deps +
+                    [linker, lld, clang_rt_libdir, exec_root_rel / libcxx])))
         self.assertEqual(remote_output_files, {exe})
 
     def test_prepare_remote_option_forwarding(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_contents = [d + ':' for d in deps]
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
         remote_flag = '--some_forwarded_rewrapper_flag=value'  # not real
-        command = [compiler, source, '-o', rlib, f'--remote-flag={remote_flag}']
+        command = _strs(
+            [compiler, source, '-o', rlib, f'--remote-flag={remote_flag}'])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -362,21 +380,22 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(r.remote_options[-1], remote_flag)
 
     def test_prepare_environment_names_input_file(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_contents = [d + ':' for d in deps]
-        env_file = '../path/to/config.json'
-        command = [
-            f'CONFIGURE_THINGY={env_file}', compiler, source, '-o', rlib,
-            f'--remote-inputs={env_file}'
-        ]
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        env_file = Path('../path/to/config.json')
+        command = _strs(
+            [
+                f'CONFIGURE_THINGY={env_file}', compiler, source, '-o', rlib,
+                f'--remote-inputs={env_file}'
+            ])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -403,24 +422,24 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
-            remote_inputs, set([compiler, shlib_rel, source, env_file] + deps))
+            remote_inputs,
+            set(_paths([compiler, shlib_rel, source, env_file] + deps)))
         self.assertEqual(remote_output_files, {rlib})
 
     def test_post_run_actions(self):
-        exec_root = '/home/project'
-        working_dir = os.path.join(exec_root, 'build-here')
-        compiler = '../tools/bin/rustc'
-        shlib = 'tools/lib/librusteze.so'
-        shlib_abs = os.path.join(exec_root, shlib)
-        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
-        source = '../foo/src/lib.rs'
-        rlib = 'obj/foo.rlib'
-        deps = ['../foo/src/other.rs']
-        depfile_path = 'obj/foo.rlib.d'
-        depfile_contents = [d + ':' for d in deps]
-        command = [
-            compiler, source, '-o', rlib, f'--emit=dep-info={depfile_path}'
-        ]
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_path = Path('obj/foo.rlib.d')
+        depfile_contents = [str(d) + ':' for d in deps]
+        command = _strs(
+            [compiler, source, '-o', rlib, f'--emit=dep-info={depfile_path}'])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
@@ -464,13 +483,14 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 run_status = r.run()
             mock_rewrite.assert_called_with()
 
+
 class MainTests(unittest.TestCase):
 
     def test_help_implicit(self):
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
-        with mock.patch.object(sys, 'stdout',
-                               new_callable=io.StringIO) as mock_stdout:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
             with mock.patch.object(sys, 'exit') as mock_exit:
                 # Normally, the following would not be reached due to exit(),
                 # but for testing it needs to be mocked out.
@@ -482,8 +502,8 @@ class MainTests(unittest.TestCase):
     def test_help_flag(self):
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
-        with mock.patch.object(sys, 'stdout',
-                               new_callable=io.StringIO) as mock_stdout:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
             with mock.patch.object(sys, 'exit') as mock_exit:
                 # Normally, the following would not be reached due to exit(),
                 # but for testing it needs to be mocked out.
@@ -491,6 +511,7 @@ class MainTests(unittest.TestCase):
                                        'run', return_value=0):
                     self.assertEqual(rustc_remote_wrapper.main(['--help']), 0)
             mock_exit.assert_called_with(0)
+
 
 if __name__ == '__main__':
     unittest.main()

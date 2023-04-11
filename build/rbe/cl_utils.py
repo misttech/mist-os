@@ -14,7 +14,7 @@ import shlex
 import sys
 import platform
 
-from typing import Callable, Dict, FrozenSet, Iterable, Sequence
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence
 
 
 def command_quoted_str(command: Iterable[str]) -> str:
@@ -94,7 +94,8 @@ def fuse_expanded_flags(command: Iterable[str],
 
 
 def keyed_flags_to_values_dict(
-        flags: Iterable[str]) -> Dict[str, Sequence[str]]:
+        flags: Iterable[str],
+        convert_type: Callable[[str], Any] = None) -> Dict[str, Sequence[str]]:
     """Convert a series of key[=value]s into a dictionary.
 
     All dictionary values are accumulated sequences of 'value's,
@@ -109,6 +110,7 @@ def keyed_flags_to_values_dict(
         'key' -> key: (no value)
         'key=' -> key: "" (empty string)
         'key=value' -> key: value
+      convert_type: type to convert string to, e.g. int, Path
 
     Returns:
       Strings dictionary of key and (possibly multiple) values.
@@ -118,7 +120,7 @@ def keyed_flags_to_values_dict(
     d = collections.defaultdict(list)
     for (key, sep, value) in partitions:
         if sep == '=':
-            d[key].append(value)
+            d[key].append(convert_type(value) if convert_type else value)
         else:
             d[key]
     return d
@@ -138,6 +140,7 @@ def last_value_of_dict_flag(
 
 # The following code implements subprocess 'tee' behavior based on:
 # https://stackoverflow.com/questions/2996887/how-to-replicate-tee-behavior-in-python-when-using-subprocess
+
 
 class SubprocessResult(object):
 

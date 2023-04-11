@@ -3,118 +3,148 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import pathlib
 import unittest
+from pathlib import Path
 from unittest import mock
+from typing import Any, Sequence
 
 import cxx
+
+
+def _strs(items: Sequence[Any]) -> Sequence[str]:
+    return [str(i) for i in items]
+
+
+def _paths(items: Sequence[Any]) -> Sequence[Path]:
+    if isinstance(items, list):
+        return [Path(i) for i in items]
+    elif isinstance(items, set):
+        return {Path(i) for i in items}
+    elif isinstance(items, tuple):
+        return tuple(Path(i) for i in items)
+
+    t = type(items)
+    raise TypeError("Unhandled sequence type: {t}")
 
 
 class CxxActionTests(unittest.TestCase):
 
     def test_simple_clang_cxx(self):
-        c = cxx.CxxAction(['clang++', '-c', 'hello.cc', '-o', 'hello.o'])
-        self.assertEqual(c.output_file, 'hello.o')
+        source = Path('hello.cc')
+        ii_file = Path('hello.ii')
+        output = Path('hello.o')
+        c = cxx.CxxAction(_strs(['clang++', '-c', source, '-o', output]))
+        self.assertEqual(c.output_file, output)
         self.assertEqual(
             c.compiler,
-            cxx.CompilerTool(tool='clang++', type=cxx.Compiler.CLANG))
+            cxx.CompilerTool(tool=Path('clang++'), type=cxx.Compiler.CLANG))
         self.assertTrue(c.compiler_is_clang)
         self.assertFalse(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
         self.assertEqual(
             c.sources,
-            [cxx.Source(file='hello.cc', dialect=cxx.SourceLanguage.CXX)])
+            [cxx.Source(file=source, dialect=cxx.SourceLanguage.CXX)])
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
-        self.assertEqual(c.sysroot, '')
+        self.assertIsNone(c.sysroot)
         self.assertFalse(c.uses_macos_sdk)
-        self.assertEqual(c.crash_diagnostics_dir, '')
-        self.assertEqual(c.preprocessed_output, 'hello.ii')
+        self.assertIsNone(c.crash_diagnostics_dir)
+        self.assertEqual(c.preprocessed_output, ii_file)
         preprocess, compile = c.split_preprocessing()
         self.assertEqual(
             preprocess,
-            [
-                'clang++', '-c', 'hello.cc', '-o', 'hello.ii', '-E',
-                '-fno-blocks'
-            ],
+            _strs(
+                ['clang++', '-c', source, '-o', ii_file, '-E', '-fno-blocks']),
         )
         self.assertEqual(
             compile,
-            ['clang++', '-c', 'hello.ii', '-o', 'hello.o'],
+            _strs(['clang++', '-c', ii_file, '-o', output]),
         )
 
     def test_simple_clang_c(self):
-        c = cxx.CxxAction(['clang', '-c', 'hello.c', '-o', 'hello.o'])
-        self.assertEqual(c.output_file, 'hello.o')
+        source = Path('hello.c')
+        i_file = Path('hello.i')
+        output = Path('hello.o')
+        c = cxx.CxxAction(_strs(['clang', '-c', source, '-o', output]))
+        self.assertEqual(c.output_file, output)
         self.assertEqual(
-            c.compiler, cxx.CompilerTool(tool='clang', type=cxx.Compiler.CLANG))
+            c.compiler,
+            cxx.CompilerTool(tool=Path('clang'), type=cxx.Compiler.CLANG))
         self.assertTrue(c.compiler_is_clang)
         self.assertFalse(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
         self.assertEqual(
-            c.sources,
-            [cxx.Source(file='hello.c', dialect=cxx.SourceLanguage.C)])
+            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertTrue(c.dialect_is_c)
-        self.assertEqual(c.crash_diagnostics_dir, '')
-        self.assertEqual(c.preprocessed_output, 'hello.i')
+        self.assertIsNone(c.crash_diagnostics_dir)
+        self.assertEqual(c.preprocessed_output, i_file)
         preprocess, compile = c.split_preprocessing()
         self.assertEqual(
             preprocess,
-            ['clang', '-c', 'hello.c', '-o', 'hello.i', '-E', '-fno-blocks'],
+            _strs(['clang', '-c', source, '-o', i_file, '-E', '-fno-blocks']),
         )
         self.assertEqual(
             compile,
-            ['clang', '-c', 'hello.i', '-o', 'hello.o'],
+            _strs(['clang', '-c', i_file, '-o', output]),
         )
 
     def test_simple_gcc_cxx(self):
-        c = cxx.CxxAction(['g++', '-c', 'hello.cc', '-o', 'hello.o'])
-        self.assertEqual(c.output_file, 'hello.o')
+        source = Path('hello.cc')
+        output = Path('hello.o')
+        ii_file = Path('hello.ii')
+        c = cxx.CxxAction(_strs(['g++', '-c', source, '-o', output]))
+        self.assertEqual(c.output_file, output)
         self.assertEqual(
-            c.compiler, cxx.CompilerTool(tool='g++', type=cxx.Compiler.GCC))
+            c.compiler,
+            cxx.CompilerTool(tool=Path('g++'), type=cxx.Compiler.GCC))
         self.assertFalse(c.compiler_is_clang)
         self.assertTrue(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
         self.assertEqual(
             c.sources,
-            [cxx.Source(file='hello.cc', dialect=cxx.SourceLanguage.CXX)])
+            [cxx.Source(file=source, dialect=cxx.SourceLanguage.CXX)])
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
-        self.assertEqual(c.crash_diagnostics_dir, '')
-        self.assertEqual(c.preprocessed_output, 'hello.ii')
+        self.assertIsNone(c.crash_diagnostics_dir)
+        self.assertEqual(c.preprocessed_output, ii_file)
         preprocess, compile = c.split_preprocessing()
         self.assertEqual(
             preprocess,
-            ['g++', '-c', 'hello.cc', '-o', 'hello.ii', '-E'],
+            _strs(['g++', '-c', source, '-o', ii_file, '-E']),
         )
         self.assertEqual(
             compile,
-            ['g++', '-c', 'hello.ii', '-o', 'hello.o'],
+            _strs(['g++', '-c', ii_file, '-o', output]),
         )
 
     def test_simple_gcc_c(self):
-        c = cxx.CxxAction(['gcc', '-c', 'hello.c', '-o', 'hello.o'])
-        self.assertEqual(c.output_file, 'hello.o')
+        source = Path('hello.c')
+        i_file = Path('hello.i')
+        output = Path('hello.o')
+        c = cxx.CxxAction(_strs(['gcc', '-c', source, '-o', output]))
+        self.assertEqual(c.output_file, output)
         self.assertEqual(
-            c.compiler, cxx.CompilerTool(tool='gcc', type=cxx.Compiler.GCC))
+            c.compiler,
+            cxx.CompilerTool(tool=Path('gcc'), type=cxx.Compiler.GCC))
         self.assertFalse(c.compiler_is_clang)
         self.assertTrue(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
         self.assertEqual(
-            c.sources,
-            [cxx.Source(file='hello.c', dialect=cxx.SourceLanguage.C)])
+            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertTrue(c.dialect_is_c)
-        self.assertEqual(c.crash_diagnostics_dir, '')
-        self.assertEqual(c.preprocessed_output, 'hello.i')
+        self.assertIsNone(c.crash_diagnostics_dir)
+        self.assertEqual(c.preprocessed_output, i_file)
         preprocess, compile = c.split_preprocessing()
         self.assertEqual(
             preprocess,
-            ['gcc', '-c', 'hello.c', '-o', 'hello.i', '-E'],
+            _strs(['gcc', '-c', source, '-o', i_file, '-E']),
         )
         self.assertEqual(
             compile,
-            ['gcc', '-c', 'hello.i', '-o', 'hello.o'],
+            _strs(['gcc', '-c', i_file, '-o', output]),
         )
 
     def test_clang_target(self):
@@ -126,40 +156,47 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.target, 'powerpc-apple-darwin8')
 
     def test_clang_crash_diagnostics_dir(self):
+        crash_dir = Path('/tmp/graveyard')
         c = cxx.CxxAction(
             [
-                'clang++', '-fcrash-diagnostics-dir=/tmp/graveyard', '-c',
+                'clang++', f'-fcrash-diagnostics-dir={crash_dir}', '-c',
                 'hello.cc', '-o', 'hello.o'
             ])
-        self.assertEqual(c.crash_diagnostics_dir, '/tmp/graveyard')
+        self.assertEqual(c.crash_diagnostics_dir, crash_dir)
 
     def test_uses_macos_sdk(self):
+        sysroot = Path('/Library/Developer/blah')
         c = cxx.CxxAction(
             [
-                'clang++', '--sysroot=/Library/Developer/blah', '-c',
-                'hello.cc', '-o', 'hello.o'
+                'clang++', f'--sysroot={sysroot}', '-c', 'hello.cc', '-o',
+                'hello.o'
             ])
-        self.assertEqual(c.sysroot, '/Library/Developer/blah')
+        self.assertEqual(c.sysroot, sysroot)
         self.assertTrue(c.uses_macos_sdk)
 
     def test_split_preprocessing(self):
+        source = Path('hello.cc')
+        ii_file = Path('hello.ii')
+        output = Path('hello.o')
         c = cxx.CxxAction(
-            [
-                'clang++', '-DNDEBUG', '-I/opt/include', '-stdlib=libc++', '-M',
-                '-MF', 'hello.d', '-c', 'hello.cc', '-o', 'hello.o'
-            ])
+            _strs(
+                [
+                    'clang++', '-DNDEBUG', '-I/opt/include', '-stdlib=libc++',
+                    '-M', '-MF', 'hello.d', '-c', source, '-o', output
+                ]))
         preprocess, compile = c.split_preprocessing()
         self.assertEqual(
             preprocess,
-            [
-                'clang++', '-DNDEBUG', '-I/opt/include', '-stdlib=libc++', '-M',
-                '-MF', 'hello.d', '-c', 'hello.cc', '-o', 'hello.ii', '-E',
-                '-fno-blocks'
-            ],
+            _strs(
+                [
+                    'clang++', '-DNDEBUG', '-I/opt/include', '-stdlib=libc++',
+                    '-M', '-MF', 'hello.d', '-c', source, '-o', ii_file, '-E',
+                    '-fno-blocks'
+                ]),
         )
         self.assertEqual(
             compile,
-            ['clang++', '-c', 'hello.ii', '-o', 'hello.o'],
+            _strs(['clang++', '-c', ii_file, '-o', output]),
         )
 
 

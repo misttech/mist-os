@@ -8,15 +8,18 @@
 import argparse
 import dataclasses
 import enum
+import pathlib
 
 import cl_utils
 
-from typing import Iterable, Sequence, Tuple
+from pathlib import Path
+from typing import Iterable, Optional, Sequence, Tuple
+
 
 def _remove_suffix(text: str, suffix: str) -> str:
     """string.removesuffix is in Python 3.9+"""
     if text.endswith(suffix):
-      return text[:-len(suffix)]
+        return text[:-len(suffix)]
     return text
 
 
@@ -27,39 +30,38 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-o",
-        type=str,
+        type=Path,
         dest="output",
+        default=None,
         metavar="FILE",
         help="compiler output",
         required=True,
     )
     parser.add_argument(
         "--sysroot",
-        type=str,
-        dest="sysroot",
-        default="",
+        type=Path,
+        default=None,
         help="compiler sysroot",
     )
     parser.add_argument(
         "--target",
         type=str,
-        dest="target",
         default="",
         help="target platform",
     )
     parser.add_argument(
         "-fprofile-list",
-        type=str,
+        type=Path,
         dest="profile_list",
-        default="",
+        default=None,
         metavar="FILE",
         help="profile list",
     )
     parser.add_argument(
         "-fcrash-diagnostics-dir",
-        type=str,
+        type=Path,
         dest="crash_diagnostics_dir",
-        default="",
+        default=None,
         metavar="DIR",
         help="additional directory where clang produces crash reports",
     )
@@ -84,18 +86,18 @@ class SourceLanguage(enum.Enum):
 
 @dataclasses.dataclass
 class Source(object):
-    file: str
+    file: Path
     dialect: SourceLanguage
 
 
 def _compile_action_sources(command: Iterable[str]) -> Iterable[Source]:
     for tok in command:
         if tok.endswith('.c'):
-            yield Source(file=tok, dialect=SourceLanguage.C)
+            yield Source(file=Path(tok), dialect=SourceLanguage.C)
         if tok.endswith('.cc') or tok.endswith('.cxx') or tok.endswith('.cpp'):
-            yield Source(file=tok, dialect=SourceLanguage.CXX)
+            yield Source(file=Path(tok), dialect=SourceLanguage.CXX)
         if tok.endswith('.s') or tok.endswith('.S'):
-            yield Source(file=tok, dialect=SourceLanguage.ASM)
+            yield Source(file=Path(tok), dialect=SourceLanguage.ASM)
 
 
 def _infer_dialect_from_sources(sources: Iterable[Source]) -> SourceLanguage:
@@ -108,16 +110,17 @@ def _infer_dialect_from_sources(sources: Iterable[Source]) -> SourceLanguage:
 
 @dataclasses.dataclass
 class CompilerTool(object):
-    tool: str
+    tool: Path
     type: Compiler
 
 
-def _find_compiler_from_command(command: Iterable[str]) -> str:
+def _find_compiler_from_command(command: Iterable[str]) -> Optional[Path]:
     for tok in command:
         if 'clang' in tok:  # matches clang++
-            return CompilerTool(tool=tok, type=Compiler.CLANG)
+            return CompilerTool(tool=Path(tok), type=Compiler.CLANG)
+        # 'g++' matches 'clang++', so this clause must come second:
         if 'gcc' in tok or 'g++' in tok:
-            return CompilerTool(tool=tok, type=Compiler.GCC)
+            return CompilerTool(tool=Path(tok), type=Compiler.GCC)
     return None  # or raise error
 
 
@@ -140,7 +143,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-I",
-        type=str,
+        type=Path,
         dest="includes",
         action='append',
         default=[],
@@ -149,7 +152,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-L",
-        type=str,
+        type=Path,
         dest="libdirs",
         action='append',
         default=[],
@@ -166,7 +169,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-isystem",
-        type=str,
+        type=Path,
         action='append',
         default=[],
         metavar="DIR",
@@ -174,7 +177,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--sysroot",
-        type=str,
+        type=Path,
         help="compiler sysroot",
     )
     parser.add_argument(
@@ -184,7 +187,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-include",
-        type=str,
+        type=Path,
         action='append',
         default=[],
         metavar="FILE",
@@ -228,18 +231,18 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-MF",
-        type=str,
+        type=Path,
         help="name depfile",
         metavar="DEPFILE",
     )
     parser.add_argument(
         "-MT",
-        type=str,
+        type=Path,
         help="rename dependency target",
     )
     parser.add_argument(
         "-MQ",
-        type=str,
+        type=Path,
         help="rename dependency target (quoted)",
     )
     parser.add_argument(
@@ -249,6 +252,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         help="no predefined macros",
     )
     return parser
+
 
 _C_PREPROCESS_ARG_PARSER = _c_preprocess_arg_parser()
 
@@ -270,11 +274,11 @@ class CxxAction(object):
         return self._command
 
     @property
-    def output_file(self) -> str:
+    def output_file(self) -> Optional[Path]:
         return self._attributes.output  # usually this is the -o file
 
     @property
-    def crash_diagnostics_dir(self) -> str:
+    def crash_diagnostics_dir(self) -> Optional[Path]:
         return self._attributes.crash_diagnostics_dir
 
     @property
@@ -286,7 +290,7 @@ class CxxAction(object):
         return self._attributes.target
 
     @property
-    def sysroot(self) -> str:
+    def sysroot(self) -> Path:
         return self._attributes.sysroot
 
     @property
@@ -310,17 +314,18 @@ class CxxAction(object):
         return self._dialect == SourceLanguage.CXX
 
     @property
-    def preprocessed_output(self) -> str:
+    def preprocessed_output(self) -> Path:
         if self._dialect == SourceLanguage.CXX:
             pp_ext = '.ii'
         else:
             pp_ext = '.i'
 
-        return _remove_suffix(self.output_file, '.o') + pp_ext
+        # replaces .o with .i or .ii
+        return self.output_file.with_suffix(pp_ext)
 
     @property
     def uses_macos_sdk(self) -> bool:
-        return self.sysroot.startswith('/Library/Developer/')
+        return str(self.sysroot).startswith('/Library/Developer/')
 
     # TODO: scan command for absolute paths (C++-specific)
 
@@ -328,8 +333,8 @@ class CxxAction(object):
     def _preprocess_only_command(self) -> Iterable[str]:
         # replace the output with a preprocessor output
         for tok in self._command:
-            if tok == self.output_file:
-                yield self.preprocessed_output
+            if tok == str(self.output_file):
+                yield str(self.preprocessed_output)
             else:
                 # TODO: discard irrelevant flags, like linker flags
                 yield tok
@@ -344,8 +349,10 @@ class CxxAction(object):
 
     @property
     def _compile_with_preprocessed_input_command(self) -> Iterable[str]:
-        canonical_command = cl_utils.expand_fused_flags(self._command, _CPP_FUSED_FLAGS)
-        unused_cpp_attributes, remaining_command = _C_PREPROCESS_ARG_PARSER.parse_known_args(canonical_command)
+        canonical_command = cl_utils.expand_fused_flags(
+            self._command, _CPP_FUSED_FLAGS)
+        unused_cpp_attributes, remaining_command = _C_PREPROCESS_ARG_PARSER.parse_known_args(
+            canonical_command)
 
         # replace the first named source file with the preprocessed output
         used_preprocessed_input = False
@@ -354,7 +361,7 @@ class CxxAction(object):
                     '.cxx') or tok.endswith('.cpp'):
                 if used_preprocessed_input:  # ignore other sources after the first
                     continue
-                yield self.preprocessed_output
+                yield str(self.preprocessed_output)
                 used_preprocessed_input = True
                 continue
 
@@ -368,7 +375,9 @@ class CxxAction(object):
           C-preprocessing command, and
           modified compile command using preprocessed input
         """
-        return list(self._preprocess_only_command), list(self._compile_with_preprocessed_input_command)
+        return list(self._preprocess_only_command), list(
+            self._compile_with_preprocessed_input_command)
+
 
 # TODO: write a main() routine just for printing debug info about a compile
 # command

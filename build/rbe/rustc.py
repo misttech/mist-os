@@ -10,10 +10,12 @@ import collections
 import dataclasses
 import enum
 import os
+import pathlib
 
 import cl_utils
 
-from typing import Dict, Iterable, Sequence, Tuple
+from pathlib import Path
+from typing import Dict, Iterable, Optional, Sequence, Tuple
 
 _RUSTC_FUSED_FLAGS = {'-C', '-L', '-Z'}
 
@@ -43,7 +45,7 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-o",  # required
-        type=str,
+        type=Path,
         dest="output",
         default="",
         metavar="FILE",
@@ -58,7 +60,7 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--sysroot",
-        type=str,
+        type=Path,
         default="",
         help="compiler sysroot",
     )
@@ -125,11 +127,12 @@ class InputType(enum.Enum):
 
 @dataclasses.dataclass
 class RustcInput(object):
-    file: str
+    file: Path
     type: InputType
 
 
 def is_linkable(f: str) -> bool:
+    # f might not be a Path
     return any(
         f.endswith(suffix)
         for suffix in ('.a', '.o', '.so', '.dylib', '.so.debug', '.ld'))
@@ -138,15 +141,15 @@ def is_linkable(f: str) -> bool:
 def find_direct_inputs(command: Iterable[str]) -> Iterable[RustcInput]:
     for tok in command:
         if tok.endswith('.rs'):
-            yield RustcInput(file=tok, type=InputType.SOURCE)
+            yield RustcInput(file=Path(tok), type=InputType.SOURCE)
         elif is_linkable(tok):
-            yield RustcInput(file=tok, type=InputType.LINKABLE)
+            yield RustcInput(file=Path(tok), type=InputType.LINKABLE)
 
 
-def find_compiler_from_command(command: Iterable[str]) -> str:
+def find_compiler_from_command(command: Iterable[str]) -> Path:
     for tok in command:
         if 'rustc' in tok:
-            return tok
+            return Path(tok)
     return None  # or raise error
 
 
@@ -162,7 +165,8 @@ class RustAction(object):
                 cl_utils.expand_fused_flags(self._command, _RUSTC_FUSED_FLAGS)))
         self._compiler = find_compiler_from_command(remaining_args)
         self._env = [
-            tok for tok in remaining_args[:remaining_args.index(self._compiler)]
+            tok for tok in
+            remaining_args[:remaining_args.index(str(self._compiler))]
             if '=' in tok
         ]
         self._crate_type = parse_crate_type(self._attributes.crate_type)
@@ -176,7 +180,8 @@ class RustAction(object):
         self._emit = cl_utils.keyed_flags_to_values_dict(
             cl_utils.flatten_comma_list(self._attributes.emit))
         self._extern = cl_utils.keyed_flags_to_values_dict(
-            cl_utils.flatten_comma_list(self._attributes.extern))
+            cl_utils.flatten_comma_list(self._attributes.extern),
+            convert_type=Path)
 
         # post-process some flags
         self._sysroot = ''
@@ -188,7 +193,7 @@ class RustAction(object):
                 continue
             left, sep, right = arg.partition('=')
             if left == '--sysroot':
-                self._sysroot = right
+                self._sysroot = Path(right)
                 continue
             if is_linkable(arg):
                 self._link_arg_files.append(arg)
@@ -203,11 +208,11 @@ class RustAction(object):
         return self._command
 
     @property
-    def output_file(self) -> str:
+    def output_file(self) -> Path:
         return self._attributes.output  # usually this is the -o file
 
     @property
-    def compiler(self) -> str:
+    def compiler(self) -> Path:
         return self._compiler
 
     @property
@@ -230,7 +235,7 @@ class RustAction(object):
         return self._attributes.target
 
     @property
-    def direct_sources(self) -> Sequence[str]:
+    def direct_sources(self) -> Sequence[Path]:
         return [
             s.file for s in self._direct_inputs if s.type == InputType.SOURCE
         ]
@@ -261,84 +266,91 @@ class RustAction(object):
         return cl_utils.last_value_of_dict_flag(self._C_flags, 'extra-filename')
 
     @property
-    def depfile(self) -> str:
-        # TODO: removeprefix './'
-        return cl_utils.last_value_of_dict_flag(self.emit, 'dep-info', '')
+    def depfile(self) -> Optional[Path]:
+        d = cl_utils.last_value_of_dict_flag(self.emit, 'dep-info', '')
+        return Path(d) if d else None
 
     @property
-    def linker(self) -> str:
-        return cl_utils.last_value_of_dict_flag(self._C_flags, 'linker')
+    def linker(self) -> Optional[Path]:
+        d = cl_utils.last_value_of_dict_flag(self._C_flags, 'linker')
+        return Path(d) if d else None
 
     @property
     def _link_arg_flags(self) -> Sequence[str]:
         return self._C_flags.get('link-arg', [])
 
     @property
-    def link_arg_files(self) -> Sequence[str]:
-        return self._link_arg_files
+    def link_arg_files(self) -> Sequence[Path]:
+        return [Path(p) for p in self._link_arg_files]
 
     @property
-    def link_map_output(self) -> str:
+    def link_map_output(self) -> Optional[Path]:
         # The linker can produce a .map output file.
         for arg in self._C_flags.get('link-args', []):
             if arg.startswith('--Map='):
-                return _remove_prefix(_remove_prefix(arg, '--Map='), './')
+                return Path(_remove_prefix(arg, '--Map='))
         return None
 
     @property
-    def sysroot(self) -> str:
+    def sysroot(self) -> Path:
         return self._sysroot
 
     @property
-    def native(self) -> Sequence[str]:
-        return self._L_flags.get('native', [])
+    def native(self) -> Sequence[Path]:
+        return [Path(p) for p in self._L_flags.get('native', [])]
 
     @property
-    def native_link_arg_files(self) -> Iterable[str]:
+    def native_link_arg_files(self) -> Iterable[Path]:
         for path in self.native:
-            if os.path.isdir(path):
+            if path.is_dir():
                 # TODO: debug print
                 pass
-            elif os.path.isfile(path):
+            elif path.is_file():
                 yield path
                 # caller might need to prepend $build_dir
 
     @property
-    def explicit_link_arg_files(self) -> Sequence[str]:
+    def explicit_link_arg_files(self) -> Sequence[Path]:
         return [
             s.file for s in self._direct_inputs if s.type == InputType.LINKABLE
         ]
 
     @property
-    def externs(self) -> Dict[str, Sequence[str]]:
+    def externs(self) -> Dict[str, Sequence[Path]]:
         return self._extern
 
-    def extern_paths(self) -> Iterable[str]:
+    def extern_paths(self) -> Iterable[Path]:
         for lib, paths in self.externs.items():
             if paths:  # ignore any empty lists
                 yield paths[-1]  # last value wins
 
     @property
     def _output_file_base(self) -> str:
-        return _remove_suffix(self.output_file, '.rlib')
+        """Removes any .rlib or .exe suffix to get the stem name."""
+        # Returning str instead of Path because caller most likely
+        # wants to append something to the result to form a Path name.
+        return str(self.output_file.parent / self.output_file.stem)
 
     @property
     def _auxiliary_output_path(self) -> str:
+        # Returning str instead of Path because caller most likely
+        # wants to append something to the result to form a Path name.
         return self._output_file_base + self.extra_filename
 
-    def extra_output_files(self) -> Iterable[str]:
+    def extra_output_files(self) -> Iterable[Path]:
         base = self._auxiliary_output_path
         if self.emit_llvm_ir:
-            yield base + '.ll'
+            yield Path(base + '.ll')
         if self.emit_llvm_bc:
-            yield base + '.bc'
+            yield Path(base + '.bc')
         if self.save_analysis:
-            analysis_file = os.path.join(
+            # Path() construction already normalizes away any leading './'
+            analysis_file = Path(
                 'save-analysis-temp',
-                os.path.basename(self._auxiliary_output_path) + '.json')
-            yield _remove_prefix(analysis_file, './')
+                Path(self._auxiliary_output_path + '.json').name)
+            yield analysis_file
         if self.llvm_time_trace:
-            trace_file = self._output_file_base + '.llvm_timings.json'
+            trace_file = Path(self._output_file_base + '.llvm_timings.json')
             yield trace_file
         link_map = self.link_map_output
         if link_map:

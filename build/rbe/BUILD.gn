@@ -35,7 +35,7 @@ if (is_host) {
   _rustc_sources = [ "rustc.py" ] + _cl_utils_sources
   _rustc_remote_wrapper_sources =
       [ "rustc_remote_wrapper.py" ] + _rustc_sources + _remote_action_sources +
-      _fuchsia_sources
+      _fuchsia_sources + _cl_utils_sources
 
   python_library("cl_utils") {
     sources = _cl_utils_sources
@@ -99,6 +99,5 @@ if (is_host) {
   python_host_test("rustc_remote_wrapper_test") {
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
-    libraries = [ "//third_party/parameterized" ]
   }
 }

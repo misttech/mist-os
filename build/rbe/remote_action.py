@@ -16,6 +16,7 @@ import dataclasses
 import filecmp
 import glob
 import os
+import pathlib
 import re
 import subprocess
 import shlex
@@ -24,12 +25,24 @@ import sys
 import fuchsia
 import cl_utils
 
+from pathlib import Path
 from typing import AbstractSet, Callable, Iterable, Optional, Sequence, Tuple
 
-_SCRIPT_BASENAME = os.path.basename(__file__)
+_SCRIPT_BASENAME = Path(__file__).name
 
 PROJECT_ROOT = fuchsia.project_root_dir()
-PROJECT_ROOT_REL = os.path.relpath(PROJECT_ROOT, start=os.curdir)
+
+
+def _relpath(path: Path, start: Path) -> Path:
+    # Path.relative_to() requires self to be a subpath of the argument,
+    # but here, the argument is often the subpath of self.
+    # Hence, we need os.path.relpath() in the general case.
+    return Path(os.path.relpath(path, start=start))
+
+
+# Needs to be computed with os.path.relpath instead of Path.relative_to
+# to support testing a fake (test-only) value of PROJECT_ROOT.
+PROJECT_ROOT_REL = _relpath(PROJECT_ROOT, start=os.curdir)
 
 # Local subprocess and remote environment calls need this when a
 # command is prefixed with an X=Y environment variable.
@@ -37,12 +50,12 @@ _ENV = '/usr/bin/env'
 
 # This is a known path where remote execution occurs.
 # This should only be used for workarounds as a last resort.
-_REMOTE_PROJECT_ROOT = '/b/f/w'
+_REMOTE_PROJECT_ROOT = Path('/b/f/w')
 
 # Wrapper script to capture remote stdout/stderr, co-located with this script.
-_REMOTE_LOG_SCRIPT = os.path.join('build', 'rbe', 'log-it.sh')
+_REMOTE_LOG_SCRIPT = Path('build', 'rbe', 'log-it.sh')
 
-_DETAIL_DIFF_SCRIPT = os.path.join('build', 'rbe', 'detail-diff.sh')
+_DETAIL_DIFF_SCRIPT = Path('build', 'rbe', 'detail-diff.sh')
 
 _RECLIENT_ERROR_STATUS = 35
 _RBE_SERVER_ERROR_STATUS = 45
@@ -59,43 +72,54 @@ def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
 
 
-def _files_match(file1: str, file2: str) -> bool:
+def _path_or_default(path_or_none, default: Path) -> Path:
+    """Expressions like 'arg or DEFAULT' worked if arg is a string,
+    but Path('') is not false-y in Python.
+
+    Where one could write 'arg or DEFAULT', you should use
+    '_path_or_default(arg, DEFAULT)' for clairty.
+    """
+    return default if path_or_none is None else path_or_none
+
+
+def _files_match(file1: Path, file2: Path) -> bool:
     """Compares two files, returns True if they both exist and match."""
     # filecmp.cmp does not invoke any subprocesses.
     return filecmp.cmp(file1, file2, shallow=False)
 
 
-def _detail_diff(file1: str, file2: str, project_root_rel: str = None) -> int:
-    return subprocess.call(
-        [
-            os.path.join(
-                project_root_rel or PROJECT_ROOT_REL, _DETAIL_DIFF_SCRIPT),
-            file1,
-            file2,
-        ])
+def _detail_diff(
+        file1: Path, file2: Path, project_root_rel: Path = None) -> int:
+    command = [
+        _path_or_default(project_root_rel, PROJECT_ROOT_REL) /
+        _DETAIL_DIFF_SCRIPT,
+        file1,
+        file2,
+    ]
+    return subprocess.call([str(x) for x in command])
 
 
-def _text_diff(file1: str, file2: str) -> int:
+def _text_diff(file1: Path, file2: Path) -> int:
     """Display textual differences to stdout."""
-    return subprocess.call(['diff', '-u', file1, file2])
+    return subprocess.call(['diff', '-u', str(file1), str(file2)])
 
 
-def _files_under_dir(path: str) -> Iterable[str]:
+def _files_under_dir(path: Path) -> Iterable[Path]:
     """'ls -R DIR' listing files relative to DIR."""
     yield from (
-        os.path.relpath(os.path.join(root, file), start=path)
-        for root, unused_dirs, files in os.walk(path)
+        Path(root, file).relative_to(path)
+        for root, unused_dirs, files in os.walk(str(path))
         for file in files)
 
 
-def _common_files_under_dirs(path1: str, path2: str) -> AbstractSet[str]:
+def _common_files_under_dirs(path1: Path, path2: Path) -> AbstractSet[Path]:
     files1 = set(_files_under_dir(path1))
     files2 = set(_files_under_dir(path2))
     return files1 & files2  # set intersection
 
 
 def _expand_common_files_between_dirs(
-        path_pairs: Iterable[Tuple[str, str]]) -> Iterable[Tuple[str, str]]:
+        path_pairs: Iterable[Tuple[Path, Path]]) -> Iterable[Tuple[Path, Path]]:
     """Expands two directories into paths to their common files.
 
     Args:
@@ -107,7 +131,7 @@ def _expand_common_files_between_dirs(
     """
     for left, right in path_pairs:
         for f in sorted(_common_files_under_dirs(left, right)):
-            yield os.path.join(left, f), os.path.join(right, f)
+            yield left / f, right / f
 
 
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
@@ -120,7 +144,7 @@ def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
     return command
 
 
-def resolved_shlibs_from_ldd(lines: Iterable[str]) -> Iterable[str]:
+def resolved_shlibs_from_ldd(lines: Iterable[str]) -> Iterable[Path]:
     """Parse 'ldd' output.
 
     Args:
@@ -135,10 +159,10 @@ def resolved_shlibs_from_ldd(lines: Iterable[str]) -> Iterable[str]:
     for line in lines:
         lib, sep, resolved = line.strip().partition('=>')
         if sep == '=>':
-            yield resolved.strip().split(' ')[0]
+            yield Path(resolved.strip().split(' ')[0])
 
 
-def host_tool_shlibs(executable: str) -> Iterable[str]:
+def host_tool_shlibs(executable: Path) -> Iterable[Path]:
     """Identify shared libraries of an executable.
 
     This only works on platforms with `ldd`.
@@ -149,7 +173,7 @@ def host_tool_shlibs(executable: str) -> Iterable[str]:
     # TODO: do this once in the entire build, as early as GN time
     # TODO: support Mac OS using `otool -L`
     ldd_output = subprocess.run(
-        ['ldd', executable], capture_output=True, text=True)
+        ['ldd', str(executable)], capture_output=True, text=True)
     if ldd_output.returncode != 0:
         raise Exception(
             f"Failed to determine shared libraries of '{executable}'.")
@@ -157,7 +181,7 @@ def host_tool_shlibs(executable: str) -> Iterable[str]:
     yield from resolved_shlibs_from_ldd(ldd_output.stdout.splitlines())
 
 
-def host_tool_nonsystem_shlibs(executable: str) -> Iterable[str]:
+def host_tool_nonsystem_shlibs(executable: Path) -> Iterable[Path]:
     """Identify non-system shared libraries of a host tool.
 
     The host tool's shared libraries will need to be uploaded
@@ -171,13 +195,13 @@ def host_tool_nonsystem_shlibs(executable: str) -> Iterable[str]:
       paths to non-system shared libraries
     """
     for lib in host_tool_shlibs(executable):
-        if any(lib.startswith(prefix) for prefix in ('/usr/lib', '/lib')):
+        if any(str(lib).startswith(prefix) for prefix in ('/usr/lib', '/lib')):
             continue  # filter out system libs
         yield lib
 
 
-def relativize_to_exec_root(path: str, start=None) -> str:
-    return os.path.relpath(path, start=start or PROJECT_ROOT)
+def relativize_to_exec_root(path: Path, start: Path = None) -> Path:
+    return _relpath(path, start=(_path_or_default(start, PROJECT_ROOT)))
 
 
 def _reclient_canonical_working_dir_components(
@@ -204,26 +228,25 @@ def _reclient_canonical_working_dir_components(
         yield 'a'
 
 
-def reclient_canonical_working_dir(build_subdir: str) -> str:
+def reclient_canonical_working_dir(build_subdir: Path) -> Path:
     new_components = list(
-        _reclient_canonical_working_dir_components(
-            iter(build_subdir.split(os.sep))))
-    return os.path.join(*new_components) if new_components else ''
+        _reclient_canonical_working_dir_components(iter(build_subdir.parts)))
+    return Path(*new_components) if new_components else Path('')
 
 
-def remove_working_dir_abspaths(line: str, build_subdir: str) -> str:
+def remove_working_dir_abspaths(line: str, build_subdir: Path) -> str:
     # Two substutions are necesssary to accommodate both cases
     # of rewrapper --canonicalize_working_dir={true,false}.
     # TODO: if the caller knows whether which case applies, then
     # you only need to apply one of the following substitutions.
-    local_working_dir_abs = os.path.join(_REMOTE_PROJECT_ROOT, build_subdir)
-    canonical_working_dir = os.path.join(
-        _REMOTE_PROJECT_ROOT, reclient_canonical_working_dir(build_subdir))
-    return line.replace(local_working_dir_abs + os.path.sep,
-                        '').replace(canonical_working_dir + os.path.sep, '')
+    local_working_dir_abs = _REMOTE_PROJECT_ROOT / build_subdir
+    canonical_working_dir = _REMOTE_PROJECT_ROOT / reclient_canonical_working_dir(
+        build_subdir)
+    return line.replace(str(local_working_dir_abs) + os.path.sep, '').replace(
+        str(canonical_working_dir) + os.path.sep, '')
 
 
-def _file_lines_matching(path: str, substr: str) -> Iterable[str]:
+def _file_lines_matching(path: Path, substr: str) -> Iterable[str]:
     with open(path) as f:
         for line in f:
             if substr in line:
@@ -231,7 +254,7 @@ def _file_lines_matching(path: str, substr: str) -> Iterable[str]:
 
 
 def _transform_file_by_lines(
-        src: str, dest: str, line_transform: Callable[[str], str]):
+        src: Path, dest: Path, line_transform: Callable[[str], str]):
     with open(src) as f:
         new_lines = [line_transform(line) for line in f]
 
@@ -241,12 +264,12 @@ def _transform_file_by_lines(
 
 
 def _rewrite_file_by_lines_in_place(
-        path: str, line_transform: Callable[[str], str]):
+        path: Path, line_transform: Callable[[str], str]):
     _transform_file_by_lines(path, path, line_transform)
 
 
 def remove_working_dir_abspaths_from_depfile_in_place(
-        depfile: str, build_subdir: str):
+        depfile: Path, build_subdir: Path):
     # TODO(http://fxbug.dev/124714): This transformation would be more robust
     # if we properly lexed a depfile and operated on tokens instead of lines.
     _rewrite_file_by_lines_in_place(
@@ -337,7 +360,7 @@ def _parse_reproxy_log_record_lines(lines: Iterable[str]) -> ReproxyLogEntry:
     )
 
 
-def _parse_rewrapper_action_log(log: str) -> ReproxyLogEntry:
+def _parse_rewrapper_action_log(log: Path) -> ReproxyLogEntry:
     with open(log) as f:
         return _parse_reproxy_log_record_lines(f.readlines())
 
@@ -398,7 +421,7 @@ def _diagnose_reproxy_error_line(line: str):
         check(line)
 
 
-def analyze_rbe_logs(rewrapper_pid: int, action_log: str = None):
+def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
     """Attempt to explain failure by examining various logs.
 
     Prints additional diagnostics to stdout.
@@ -413,28 +436,30 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: str = None):
     reproxy_logdir = _reproxy_log_dir()
     if not reproxy_logdir:
         return  # give up
+    reproxy_logdir = Path(reproxy_logdir)
 
     rewrapper_logdir = _rewrapper_log_dir()
     if not rewrapper_logdir:
         return  # give up
+    rewrapper_logdir = Path(rewrapper_logdir)
 
     # The reproxy.ERROR symlink is stable during a build.
-    reproxy_errors = os.path.join(reproxy_logdir, "reproxy.ERROR")
+    reproxy_errors = reproxy_logdir / "reproxy.ERROR"
 
     # Logs are named:
     #   rewrapper.{host}.{user}.log.{severity}.{date}-{time}.{pid}
     # The "rewrapper.{severity}" symlinks are useless because
     # the link destination is constantly being updated during a build.
-    rewrapper_log_glob = os.path.join(
-        rewrapper_logdir, f"rewrapper.*.{rewrapper_pid}")
-    rewrapper_logs = glob.glob(rewrapper_log_glob)
+    rewrapper_logs = rewrapper_logdir.glob(f"rewrapper.*.{rewrapper_pid}")
     if rewrapper_logs:
         msg("See rewrapper logs:")
         for log in rewrapper_logs:
-            print("  " + log)
+            print("  " + str(log))
         print()  # blank line
 
-    if not os.path.isfile(action_log):
+    if not action_log:
+        return
+    if not action_log.is_file():
         return
 
     msg(f"Action log: {action_log}")
@@ -445,7 +470,7 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: str = None):
     print(f"  action_digest: {action_digest}")
     print()  # blank line
 
-    if not os.path.isfile(reproxy_errors):
+    if not reproxy_errors.is_file():
         return
 
     msg(f"Scanning {reproxy_errors} for clues:")
@@ -461,20 +486,20 @@ class RemoteAction(object):
 
     def __init__(
         self,
-        rewrapper: str,
+        rewrapper: Path,
         command: Sequence[str],
         options: Sequence[str] = None,
-        exec_root: Optional[str] = None,
-        working_dir: Optional[str] = None,
-        cfg: Optional[str] = None,
+        exec_root: Optional[Path] = None,
+        working_dir: Optional[Path] = None,
+        cfg: Optional[Path] = None,
         exec_strategy: Optional[str] = None,
-        inputs: Sequence[str] = None,
-        output_files: Sequence[str] = None,
-        output_dirs: Sequence[str] = None,
+        inputs: Sequence[Path] = None,
+        output_files: Sequence[Path] = None,
+        output_dirs: Sequence[Path] = None,
         save_temps: bool = False,
         auto_reproxy: bool = False,
         remote_log: str = "",
-        fsatrace_path: str = "",
+        fsatrace_path: Optional[Path] = None,
         diagnose_nonzero: bool = False,
     ):
         """RemoteAction constructor.
@@ -521,8 +546,8 @@ class RemoteAction(object):
         self._save_temps = save_temps
         self._auto_reproxy = auto_reproxy
         self._diagnose_nonzero = diagnose_nonzero
-        self._working_dir = os.path.abspath(working_dir or os.curdir)
-        self._exec_root = os.path.abspath(exec_root or PROJECT_ROOT)
+        self._working_dir = (working_dir or Path(os.curdir)).absolute()
+        self._exec_root = (exec_root or PROJECT_ROOT).absolute()
         # Parse and strip out --remote-* flags from command.
         remote_args, self._remote_command = REMOTE_FLAG_ARG_PARSER.parse_known_args(
             command)
@@ -532,12 +557,17 @@ class RemoteAction(object):
         # but they will be relativized to exec_root for rewrapper.
         # It is more natural to copy input/output paths that are relative to the
         # current working directory.
-        self._inputs = (inputs or []) + list(
-            cl_utils.flatten_comma_list(remote_args.inputs))
-        self._output_files = (output_files or []) + list(
-            cl_utils.flatten_comma_list(remote_args.output_files))
-        self._output_dirs = (output_dirs or []) + list(
-            cl_utils.flatten_comma_list(remote_args.output_dirs))
+        self._inputs = (inputs or []) + [
+            Path(p) for p in cl_utils.flatten_comma_list(remote_args.inputs)
+        ]
+        self._output_files = (output_files or []) + [
+            Path(p)
+            for p in cl_utils.flatten_comma_list(remote_args.output_files)
+        ]
+        self._output_dirs = (output_dirs or []) + [
+            Path(p)
+            for p in cl_utils.flatten_comma_list(remote_args.output_dirs)
+        ]
 
         # Amend input/outputs when logging remotely.
         self._remote_log_name = self._name_remote_log(remote_log)
@@ -567,44 +597,46 @@ class RemoteAction(object):
 
     @property
     def _default_auxiliary_file_basename(self) -> str:
+        # Return a str instead of Path because most callers will want to
+        # append a suffix (str + str).
         if self._output_files:
-            return self._output_files[0]
+            return str(self._output_files[0])
         else:  # pick something arbitrary, but deterministic
             return 'rbe-action-output'
 
-    def _name_remote_log(self, remote_log) -> str:
+    def _name_remote_log(self, remote_log: str) -> Path:
         if remote_log == '<AUTO>':
-            return self._default_auxiliary_file_basename + '.remote-log'
+            return Path(self._default_auxiliary_file_basename + '.remote-log')
 
         if remote_log:
-            return remote_log + '.remote-log'
+            return Path(remote_log + '.remote-log')
 
         return None
 
     @property
-    def _remote_log_script_path(self) -> str:
-        return os.path.join(self.exec_root_rel, _REMOTE_LOG_SCRIPT)
+    def _remote_log_script_path(self) -> Path:
+        return self.exec_root_rel / _REMOTE_LOG_SCRIPT
 
     @property
-    def _fsatrace_local_log(self) -> str:
-        return self._default_auxiliary_file_basename + '.local-fsatrace'
+    def _fsatrace_local_log(self) -> Path:
+        return Path(self._default_auxiliary_file_basename + '.local-fsatrace')
 
     @property
-    def _fsatrace_remote_log(self) -> str:
-        return self._default_auxiliary_file_basename + '.remote-fsatrace'
+    def _fsatrace_remote_log(self) -> Path:
+        return Path(self._default_auxiliary_file_basename + '.remote-fsatrace')
 
     @property
-    def _fsatrace_so(self) -> str:
+    def _fsatrace_so(self) -> Path:
         # fsatrace needs the corresponding .so to work
-        return self._fsatrace_path + '.so'
+        return self._fsatrace_path.with_suffix('.so')
 
     @property
-    def _action_log(self) -> str:
+    def _action_log(self) -> Path:
         # The --action_log is a single entry of the cumulative log
         # of remote actions in the reproxy_*.rrpl file.
         # The information contained in this log is the same,
         # but is much easier to find than in the cumulative log.
-        return self._default_auxiliary_file_basename + '.rrpl'
+        return Path(self._default_auxiliary_file_basename + '.rrpl')
 
     @property
     def local_command(self) -> Sequence[str]:
@@ -616,7 +648,7 @@ class RemoteAction(object):
     def _generate_options(self) -> Iterable[str]:
         if self.config:
             yield '--cfg'
-            yield self.config
+            yield str(self.config)
 
         if self.exec_strategy:
             yield f'--exec_strategy={self.exec_strategy}'
@@ -636,7 +668,7 @@ class RemoteAction(object):
         return self._save_temps
 
     @property
-    def working_dir(self) -> str:
+    def working_dir(self) -> Path:
         return self._working_dir
 
     @property
@@ -647,60 +679,61 @@ class RemoteAction(object):
     def diagnose_nonzero(self) -> bool:
         return self._diagnose_nonzero
 
-    def _relativize_path_to_exec_root(self, path: str) -> str:
+    def _relativize_path_to_exec_root(self, path: Path) -> Path:
         return relativize_to_exec_root(
-            os.path.normpath(os.path.join(self.working_dir, path)),
-            start=self.exec_root)
+            self.working_dir / path, start=self.exec_root)
 
     def _relativize_paths_to_exec_root(self,
-                                       paths: Sequence[str]) -> Sequence[str]:
+                                       paths: Sequence[Path]) -> Sequence[Path]:
         return [self._relativize_path_to_exec_root(path) for path in paths]
 
     @property
-    def exec_root_rel(self) -> str:
-        return os.path.relpath(self.exec_root, start=self.working_dir)
+    def exec_root_rel(self) -> Path:
+        return _relpath(self.exec_root, start=self.working_dir)
 
     @property
-    def build_subdir(self) -> str:
+    def build_subdir(self) -> Path:
         """This is the relative path from the exec_root to the current working dir."""
-        return os.path.relpath(self.working_dir, start=self.exec_root)
+        return self.working_dir.relative_to(self.exec_root)
 
     @property
-    def inputs_relative_to_working_dir(self) -> Sequence[str]:
+    def inputs_relative_to_working_dir(self) -> Sequence[Path]:
         return self._inputs
 
     @property
-    def output_files_relative_to_working_dir(self) -> Sequence[str]:
+    def output_files_relative_to_working_dir(self) -> Sequence[Path]:
         return self._output_files
 
     @property
-    def output_dirs_relative_to_working_dir(self) -> Sequence[str]:
+    def output_dirs_relative_to_working_dir(self) -> Sequence[Path]:
         return self._output_dirs
 
     @property
-    def inputs_relative_to_project_root(self) -> Sequence[str]:
+    def inputs_relative_to_project_root(self) -> Sequence[Path]:
         return self._relativize_paths_to_exec_root(
             self.inputs_relative_to_working_dir)
 
     @property
-    def output_files_relative_to_project_root(self) -> Sequence[str]:
+    def output_files_relative_to_project_root(self) -> Sequence[Path]:
         return self._relativize_paths_to_exec_root(
             self.output_files_relative_to_working_dir)
 
     @property
-    def output_dirs_relative_to_project_root(self) -> Sequence[str]:
+    def output_dirs_relative_to_project_root(self) -> Sequence[Path]:
         return self._relativize_paths_to_exec_root(
             self.output_dirs_relative_to_working_dir)
 
-    def _inputs_list_file(self) -> str:
-        inputs_list_file = self._output_files[0] + '.inputs'
-        contents = '\n'.join(self.inputs_relative_to_project_root) + '\n'
+    def _inputs_list_file(self) -> Path:
+        inputs_list_file = Path(
+            self._default_auxiliary_file_basename + '.inputs')
+        contents = '\n'.join(
+            str(x) for x in self.inputs_relative_to_project_root) + '\n'
         with open(inputs_list_file, 'w') as f:
             f.write(contents)
         return inputs_list_file
 
     def _generate_rewrapper_command_prefix(self) -> Iterable[str]:
-        yield self._rewrapper
+        yield str(self._rewrapper)
         yield f"--exec_root={self.exec_root}"
 
         if self.diagnose_nonzero:
@@ -719,36 +752,38 @@ class RemoteAction(object):
         # outputs (files and dirs) need to be relative to the exec_root,
         # even as we run from inside the build_dir under exec_root.
         if self._output_files:
-            output_files = ','.join(self.output_files_relative_to_project_root)
+            output_files = ','.join(
+                str(x) for x in self.output_files_relative_to_project_root)
             yield f"--output_files={output_files}"
 
         if self._output_dirs:
-            output_dirs = ','.join(self.output_dirs_relative_to_project_root)
+            output_dirs = ','.join(
+                str(x) for x in self.output_dirs_relative_to_project_root)
             yield f"--output_directories={output_dirs}"
 
     @property
     def _remote_log_command_prefix(self) -> Sequence[str]:
         return [
-            self._remote_log_script_path,
+            str(self._remote_log_script_path),
             '--log',
-            self._remote_log_name,
+            str(self._remote_log_name),
             '--',
         ]
 
-    def _fsatrace_command_prefix(self, log: str) -> Sequence[str]:
+    def _fsatrace_command_prefix(self, log: Path) -> Sequence[str]:
         return [
             _ENV,
             'FSAT_BUF_SIZE=5000000',
-            self._fsatrace_path,
+            str(self._fsatrace_path),
             'erwdtmq',
-            log,
+            str(log),
             '--',
         ]
 
     def _generate_remote_launch_command(self) -> Iterable[str]:
         # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment
         if self._auto_reproxy:
-            yield fuchsia.REPROXY_WRAP
+            yield str(fuchsia.REPROXY_WRAP)
             yield '--'
 
         yield from self._generate_rewrapper_command_prefix()
@@ -796,8 +831,8 @@ class RemoteAction(object):
 
     def _cleanup(self):
         for f in self._cleanup_files:
-            if os.path.exists(f):
-                os.remove(f)
+            if f.exists():
+                f.unlink()  # does os.remove for files, rmdir for dirs
 
     def _run_maybe_remotely(self) -> cl_utils.SubprocessResult:
         return cl_utils.subprocess_call(
@@ -873,7 +908,7 @@ class RemoteAction(object):
         # TODO: tag each output with information about its type,
         # rather than inferring it based on file extension.
         for f in self.output_files_relative_to_working_dir:
-            if f.endswith('.map'):  # intended for linker map files
+            if f.suffix == '.map':  # intended for linker map files
                 # Workaround https://fxbug.dev/89245: relative-ize absolute path of
                 # current working directory in linker map files.
                 _rewrite_file_by_lines_in_place(
@@ -881,7 +916,7 @@ class RemoteAction(object):
                     lambda line: line.replace(
                         self.exec_root, self.exec_root_rel),
                 )
-            if f.endswith('.d'):  # intended for depfiles
+            if f.suffix == '.d':  # intended for depfiles
                 # TEMPORARY WORKAROUND until upstream fix lands:
                 #   https://github.com/pest-parser/pest/pull/522
                 # Remove redundant occurrences of the current working dir absolute path.
@@ -889,25 +924,26 @@ class RemoteAction(object):
                 _rewrite_file_by_lines_in_place(
                     f,
                     lambda line: line.replace(
-                        self.working_dir + os.path.sep, ''),
+                        str(self.working_dir) + os.path.sep, ''),
                 )
 
     def _compare_fsatraces(self) -> int:
         msg("Comparing local (-) vs. remote (+) file access traces.")
         # Normalize absolute paths.
+        local_norm = Path(str(self._fsatrace_local_log) + '.norm')
+        remote_norm = Path(str(self._fsatrace_remote_log) + '.norm')
         _transform_file_by_lines(
             self._fsatrace_local_log,
-            self._fsatrace_local_log + '.norm',
-            lambda line: line.replace(self.exec_root + os.path.sep, ''),
+            local_norm,
+            lambda line: line.replace(str(self.exec_root) + os.path.sep, ''),
         )
         _transform_file_by_lines(
             self._fsatrace_remote_log,
-            self._fsatrace_remote_log + '.norm',
-            lambda line: line.replace(_REMOTE_PROJECT_ROOT + os.path.sep, ''),
+            remote_norm,
+            lambda line: line.replace(
+                str(_REMOTE_PROJECT_ROOT) + os.path.sep, ''),
         )
-        return _text_diff(
-            self._fsatrace_local_log + '.norm',
-            self._fsatrace_remote_log + '.norm')
+        return _text_diff(local_norm, remote_norm)
 
     def _run_locally(self) -> int:
         # Run the job locally.
@@ -928,9 +964,9 @@ class RemoteAction(object):
         # The fsatrace files will be handled separately because they are
         # already named differently between their local/remote counterparts.
         direct_compare_output_files = [
-            (f, f + '.remote')
+            (f, Path(str(f) + '.remote'))
             for f in self.output_files_relative_to_working_dir
-            if os.path.isfile(f) and not f.endswith('.remote-fsatrace')
+            if f.is_file() and f.suffix != '.remote-fsatrace'
         ]
 
         # We have the option to keep the remote or local outputs in-place.
@@ -940,9 +976,9 @@ class RemoteAction(object):
             os.rename(f, bkp)
 
         compare_output_dirs = [
-            (d, d + '.remote')
+            (d, Path(str(d) + '.remote'))
             for d in self.output_dirs_relative_to_working_dir
-            if os.path.isdir(d)
+            if d.is_dir()
         ]
         for d, bkp in compare_output_dirs:
             os.rename(d, bkp)
@@ -1027,6 +1063,7 @@ def _remote_flag_arg_parser() -> argparse.ArgumentParser:
         "--remote-inputs",
         dest='inputs',
         action='append',
+        # leave the type as [str], so commas can be processed downstream
         default=[],
         metavar="PATHS",
         help=
@@ -1036,6 +1073,7 @@ def _remote_flag_arg_parser() -> argparse.ArgumentParser:
         "--remote-outputs",  # TODO: rename this to --remote-output-files
         dest='output_files',
         action='append',
+        # leave the type as [str], so commas can be processed downstream
         default=[],
         metavar="FILE",
         help="Specify additional remote output files, comma-separated, relative to the current working dir (repeatable, cumulative).",
@@ -1044,6 +1082,7 @@ def _remote_flag_arg_parser() -> argparse.ArgumentParser:
         "--remote-output-dirs",
         action='append',
         dest='output_dirs',
+        # leave the type as [str], so commas can be processed downstream
         default=[],
         metavar="DIR",
         help=
@@ -1065,21 +1104,21 @@ REMOTE_FLAG_ARG_PARSER = _remote_flag_arg_parser()
 
 def inherit_main_arg_parser_flags(
     parser: argparse.ArgumentParser,
-    default_cfg: str = None,
-    default_bindir: str = None,
+    default_cfg: Path = None,
+    default_bindir: Path = None,
 ):
     """Extend an existing argparser with standard flags.
 
     These flags are available for tool-specific remote command wrappers to use.
     """
-    default_cfg = default_cfg or os.path.join(
+    default_cfg = default_cfg or Path(
         PROJECT_ROOT_REL, 'build', 'rbe', 'fuchsia-rewrapper.cfg')
-    default_bindir = default_bindir or os.path.join(
+    default_bindir = default_bindir or Path(
         PROJECT_ROOT_REL, fuchsia.RECLIENT_BINDIR)
     group = parser.add_argument_group("Generic remote action options")
     group.add_argument(
         "--cfg",
-        type=str,
+        type=Path,
         default=default_cfg,
         help="rewrapper config file.",
     )
@@ -1091,7 +1130,7 @@ def inherit_main_arg_parser_flags(
     )
     group.add_argument(
         "--bindir",
-        type=str,
+        type=Path,
         default=default_bindir,
         metavar="PATH",
         help="Path to reclient tools like rewrapper, reproxy.",
@@ -1140,8 +1179,8 @@ Otherwise, BASE will default to the first output file named.""",
     )
     group.add_argument(
         "--fsatrace-path",
-        type=str,
-        default="",  # blank means do not trace
+        type=Path,
+        default=None,  # None means do not trace
         metavar="PATH",
         help="""Given a path to an fsatrace tool (located under exec_root), this will trace a remote execution's file accesses.  This is useful for diagnosing unexpected differences between local and remote builds.  The trace file will be named '{output_files[0]}.remote-fsatrace' (if there is at least one output), otherwise 'remote-action-output.remote-fsatrace'.""",
     )
@@ -1185,7 +1224,7 @@ def remote_action_from_args(
 ) -> RemoteAction:
     """Construct a remote action based on argparse parameters."""
     return RemoteAction(
-        rewrapper=os.path.join(main_args.bindir, "rewrapper"),
+        rewrapper=main_args.bindir / "rewrapper",
         options=(remote_options or []),
         command=command or main_args.command,
         cfg=main_args.cfg,

@@ -5,31 +5,49 @@
 
 import argparse
 import contextlib
-import glob
 import io
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import fuchsia
 import remote_action
 import cl_utils
 
+from typing import Any, Sequence
 
-def _write_file_contents(path: str, contents: str):
+
+def _write_file_contents(path: Path, contents: str):
     with open(path, 'w') as f:
         f.write(contents)
+
+
+def _strs(items: Sequence[Any]) -> Sequence[str]:
+    return [str(i) for i in items]
+
+
+def _paths(items: Sequence[Any]) -> Sequence[Path]:
+    if isinstance(items, list):
+        return [Path(i) for i in items]
+    elif isinstance(items, set):
+        return {Path(i) for i in items}
+    elif isinstance(items, tuple):
+        return tuple(Path(i) for i in items)
+
+    t = type(items)
+    raise TypeError("Unhandled sequence type: {t}")
 
 
 class FileMatchTests(unittest.TestCase):
 
     def test_match(self):
         with tempfile.TemporaryDirectory() as td:
-            f1path = os.path.join(td, 'left.txt')
-            f2path = os.path.join(td, 'right.txt')
+            f1path = Path(td, 'left.txt')
+            f2path = Path(td, 'right.txt')
             _write_file_contents(f1path, 'a\n')
             _write_file_contents(f2path, 'a\n')
             self.assertTrue(remote_action._files_match(f1path, f2path))
@@ -37,8 +55,8 @@ class FileMatchTests(unittest.TestCase):
 
     def test_not_match(self):
         with tempfile.TemporaryDirectory() as td:
-            f1path = os.path.join(td, 'left.txt')
-            f2path = os.path.join(td, 'right.txt')
+            f1path = Path(td, 'left.txt')
+            f2path = Path(td, 'right.txt')
             _write_file_contents(f1path, 'a\n')
             _write_file_contents(f2path, 'b\n')
             self.assertFalse(remote_action._files_match(f1path, f2path))
@@ -50,12 +68,14 @@ class DetailDiffTests(unittest.TestCase):
     def test_called(self):
         with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
             self.assertEqual(
-                remote_action._detail_diff('file1.txt', 'file2.txt'), 0)
+                remote_action._detail_diff(
+                    Path('file1.txt'), Path('file2.txt')), 0)
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
         args, unused_kwargs = first_call
-        command = args[0]
-        self.assertTrue(command[0].endswith(remote_action._DETAIL_DIFF_SCRIPT))
+        command = args[0]  # list
+        self.assertTrue(
+            command[0].endswith(str(remote_action._DETAIL_DIFF_SCRIPT)))
 
 
 class TextDiffTests(unittest.TestCase):
@@ -67,7 +87,7 @@ class TextDiffTests(unittest.TestCase):
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
         args, unused_kwargs = first_call
-        command = args[0]
+        command = args[0]  # list
         self.assertEqual(command[0], 'diff')
         self.assertEqual(command[-2:], ['file1.txt', 'file2.txt'])
 
@@ -76,15 +96,15 @@ class FilesUnderDirTests(unittest.TestCase):
 
     def test_walk(self):
         with tempfile.TemporaryDirectory() as td:
-            f1path = os.path.join(td, 'left.txt')
-            subdir = os.path.join(td, 'sub')
+            f1path = Path(td) / 'left.txt'
+            subdir = Path(td) / 'sub'
             os.mkdir(subdir)
-            f2path = os.path.join(subdir, 'right.txt')
+            f2path = subdir / 'right.txt'
             _write_file_contents(f1path, '\n')
             _write_file_contents(f2path, '\n')
             self.assertEqual(
                 set(remote_action._files_under_dir(td)),
-                {'left.txt', 'sub/right.txt'})
+                _paths({'left.txt', 'sub/right.txt'}))
 
 
 class CommonFilesUnderDirsTests(unittest.TestCase):
@@ -99,12 +119,12 @@ class CommonFilesUnderDirsTests(unittest.TestCase):
 
     def test_some_in_common(self):
         with mock.patch.object(remote_action, '_files_under_dir',
-                               side_effect=[iter(['a', 'b/x', 'c']),
-                                            iter(['d', 'c',
-                                                  'b/x'])]) as mock_lsr:
+                               side_effect=[iter(_paths(['a', 'b/x', 'c'])),
+                                            iter(_paths(['d', 'c',
+                                                         'b/x']))]) as mock_lsr:
             self.assertEqual(
-                remote_action._common_files_under_dirs('foo-dir', 'bar-dir'),
-                {'b/x', 'c'})
+                remote_action._common_files_under_dirs(
+                    Path('foo-dir'), Path('bar-dir')), _paths({'b/x', 'c'}))
 
 
 class ExpandCommonFilesBetweenDirs(unittest.TestCase):
@@ -113,16 +133,17 @@ class ExpandCommonFilesBetweenDirs(unittest.TestCase):
         # Normally returns a set, but mock-return a list for deterministic
         # ordering.
         with mock.patch.object(remote_action, '_common_files_under_dirs',
-                               return_value=['y/z', 'x']) as mock_ls:
+                               return_value=_paths(['y/z', 'x'])) as mock_ls:
             self.assertEqual(
                 list(
                     remote_action._expand_common_files_between_dirs(
-                        [('c', 'd'), ('a', 'b')])), [
-                            ('c/x', 'd/x'),
-                            ('c/y/z', 'd/y/z'),
-                            ('a/x', 'b/x'),
-                            ('a/y/z', 'b/y/z'),
-                        ])
+                        [_paths(('c', 'd')),
+                         _paths(('a', 'b'))])), [
+                             _paths(('c/x', 'd/x')),
+                             _paths(('c/y/z', 'd/y/z')),
+                             _paths(('a/x', 'b/x')),
+                             _paths(('a/y/z', 'b/y/z')),
+                         ])
 
 
 class FileLinesMatchingTests(unittest.TestCase):
@@ -149,22 +170,23 @@ class FileLinesMatchingTests(unittest.TestCase):
 class ReclientCanonicalWorkingDirTests(unittest.TestCase):
 
     def test_empty(self):
-        self.assertEqual(remote_action.reclient_canonical_working_dir(''), '')
+        self.assertEqual(
+            remote_action.reclient_canonical_working_dir(Path('')), Path(''))
 
     def test_one_level(self):
         self.assertEqual(
-            remote_action.reclient_canonical_working_dir('build-here'),
-            'set_by_reclient')
+            remote_action.reclient_canonical_working_dir(Path('build-here')),
+            Path('set_by_reclient'))
 
     def test_two_levels(self):
         self.assertEqual(
-            remote_action.reclient_canonical_working_dir('build/there'),
-            'set_by_reclient/a')
+            remote_action.reclient_canonical_working_dir(Path('build/there')),
+            Path('set_by_reclient/a'))
 
     def test_three_levels(self):
         self.assertEqual(
-            remote_action.reclient_canonical_working_dir('build/inside/there'),
-            'set_by_reclient/a/a')
+            remote_action.reclient_canonical_working_dir(
+                Path('build/inside/there')), Path('set_by_reclient/a/a'))
 
 
 class RemoveWorkingDirAbspathsTests(unittest.TestCase):
@@ -172,13 +194,14 @@ class RemoveWorkingDirAbspathsTests(unittest.TestCase):
     def test_blank_no_change(self):
         for t in ('', '\n'):
             self.assertEqual(
-                remote_action.remove_working_dir_abspaths(t, 'build-out'), t)
+                remote_action.remove_working_dir_abspaths(t, Path('build-out')),
+                t)
 
     def test_phony_dep_with_local_build_dir(self):
         self.assertEqual(
             remote_action.remove_working_dir_abspaths(
                 f'{remote_action._REMOTE_PROJECT_ROOT}/out/foo/path/to/thing.txt:\n',
-                'out/foo'),
+                Path('out/foo')),
             'path/to/thing.txt:\n',
         )
 
@@ -186,14 +209,14 @@ class RemoveWorkingDirAbspathsTests(unittest.TestCase):
         self.assertEqual(
             remote_action.remove_working_dir_abspaths(
                 f'{remote_action._REMOTE_PROJECT_ROOT}/set_by_reclient/a/path/to/somethingelse.txt:\n',
-                'out/foo'),
+                Path('out/foo')),
             'path/to/somethingelse.txt:\n',
         )
 
     def test_typical_dep_line_multiple_occurrences(self):
         root = remote_action._REMOTE_PROJECT_ROOT
-        subdir = 'out/inside/here'
-        wd = os.path.join(root, subdir)
+        subdir = Path('out/inside/here')
+        wd = root / subdir
         self.assertEqual(
             remote_action.remove_working_dir_abspaths(
                 f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n', subdir),
@@ -220,6 +243,23 @@ class ResolvedShlibsFromLddTests(unittest.TestCase):
             list(
                 remote_action.resolved_shlibs_from_ldd(
                     ldd_output.splitlines())),
+            _paths(
+                [
+                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
+                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
+                    '/lib/x86_64-linux-gnu/libdl.so.2',
+                    '/lib/x86_64-linux-gnu/librt.so.1',
+                    '/lib/x86_64-linux-gnu/libpthread.so.0',
+                    '/lib/x86_64-linux-gnu/libc.so.6',
+                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
+                    '/lib/x86_64-linux-gnu/libm.so.6',
+                ]))
+
+
+class HostToolNonsystemShlibsTests(unittest.TestCase):
+
+    def test_sample(self):
+        unfiltered_shlibs = _paths(
             [
                 '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
                 '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
@@ -229,23 +269,8 @@ class ResolvedShlibsFromLddTests(unittest.TestCase):
                 '/lib/x86_64-linux-gnu/libc.so.6',
                 '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
                 '/lib/x86_64-linux-gnu/libm.so.6',
+                '/usr/lib/something_else.so',
             ])
-
-
-class HostToolNonsystemShlibsTests(unittest.TestCase):
-
-    def test_sample(self):
-        unfiltered_shlibs = [
-            '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
-            '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
-            '/lib/x86_64-linux-gnu/libdl.so.2',
-            '/lib/x86_64-linux-gnu/librt.so.1',
-            '/lib/x86_64-linux-gnu/libpthread.so.0',
-            '/lib/x86_64-linux-gnu/libc.so.6',
-            '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
-            '/lib/x86_64-linux-gnu/libm.so.6',
-            '/usr/lib/something_else.so',
-        ]
         with mock.patch.object(
                 remote_action, 'host_tool_shlibs',
                 return_value=unfiltered_shlibs) as mock_host_tool_shlibs:
@@ -253,11 +278,12 @@ class HostToolNonsystemShlibsTests(unittest.TestCase):
                 list(
                     remote_action.host_tool_nonsystem_shlibs(
                         '../path/to/rustc')),
-                [
-                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
-                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
-                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
-                ])
+                _paths(
+                    [
+                        '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
+                        '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
+                        '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
+                    ]))
         mock_host_tool_shlibs.assert_called_once()
 
 
@@ -271,43 +297,53 @@ class RewrapperArgParserTests(unittest.TestCase):
 
 class RemoteActionMainParserTests(unittest.TestCase):
 
+    @property
+    def default_cfg(self):
+        return Path('default.cfg')
+
+    @property
+    def default_bindir(self):
+        return Path('/opt/reclient/bin')
+
     def _make_main_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser()
         remote_action.inherit_main_arg_parser_flags(
             parser,
-            default_cfg='default.cfg',
-            default_bindir='/opt/reclient/bin')
+            default_cfg=self.default_cfg,
+            default_bindir=self.default_bindir)
         return parser
 
     def test_defaults(self):
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(['--', 'echo', 'hello'])
-        self.assertEqual(main_args.cfg, 'default.cfg')
-        self.assertEqual(main_args.bindir, '/opt/reclient/bin')
+        self.assertEqual(main_args.cfg, self.default_cfg)
+        self.assertEqual(main_args.bindir, self.default_bindir)
         self.assertFalse(main_args.dry_run)
         self.assertFalse(main_args.verbose)
         self.assertEqual(main_args.label, '')
         self.assertEqual(main_args.remote_log, '')
         self.assertFalse(main_args.save_temps)
         self.assertFalse(main_args.auto_reproxy)
-        self.assertEqual(main_args.fsatrace_path, '')
+        self.assertIsNone(main_args.fsatrace_path)
         self.assertFalse(main_args.compare)
         self.assertFalse(main_args.diagnose_nonzero)
         self.assertEqual(main_args.command, ['echo', 'hello'])
 
     def test_cfg(self):
         p = self._make_main_parser()
-        main_args, other = p.parse_known_args(['--cfg=other.cfg', '--', 'echo'])
-        self.assertEqual(main_args.cfg, 'other.cfg')
+        cfg = Path('other.cfg')
+        main_args, other = p.parse_known_args([f'--cfg={cfg}', '--', 'echo'])
+        self.assertEqual(main_args.cfg, cfg)
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(action.local_command, ['echo'])
-        self.assertEqual(action.options, ['--cfg', 'other.cfg'])
+        self.assertEqual(action.options, ['--cfg', str(cfg)])
 
     def test_bindir(self):
         p = self._make_main_parser()
+        bindir = Path('/usr/local/bin')
         main_args, other = p.parse_known_args(
-            ['--bindir', '/usr/local/bin', '--', 'echo'])
-        self.assertEqual(main_args.bindir, '/usr/local/bin')
+            ['--bindir', str(bindir), '--', 'echo'])
+        self.assertEqual(main_args.bindir, bindir)
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(action.local_command, ['echo'])
 
@@ -378,12 +414,13 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(main_args.remote_log, '<AUTO>')
 
     def test_remote_log_from_main_args_auto_named(self):
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
         p = self._make_main_parser()
-        main_args, other = p.parse_known_args(['--log', '--', 'touch', output])
+        main_args, other = p.parse_known_args(
+            ['--log', '--', 'touch', str(output)])
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -395,10 +432,8 @@ class RemoteActionMainParserTests(unittest.TestCase):
             [remote_action._REMOTE_LOG_SCRIPT],
             action.inputs_relative_to_project_root)
         self.assertEqual(
-            {
-                os.path.join(build_dir, output),
-                os.path.join(build_dir, output + '.remote-log')
-            }, set(action.output_files_relative_to_project_root))
+            {build_dir / output, build_dir / (str(output) + '.remote-log')},
+            set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.launch_command
         first_ddash = full_command.index('--')
@@ -406,20 +441,23 @@ class RemoteActionMainParserTests(unittest.TestCase):
         remote_command = full_command[first_ddash + 1:]
         next_ddash = remote_command.index('--')
         self.assertEqual(
-            remote_command[:next_ddash], [
-                os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
-                output + '.remote-log'
-            ])
+            remote_command[:next_ddash],
+            _strs(
+                [
+                    Path('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
+                    str(output) + '.remote-log'
+                ]))
 
     def test_remote_log_from_main_args_explicitly_named(self):
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
         log_base = 'debug'
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
-            ['--log', log_base, '--', 'touch', output])
+            ['--log', log_base, '--', 'touch',
+             str(output)])
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -432,8 +470,8 @@ class RemoteActionMainParserTests(unittest.TestCase):
             action.inputs_relative_to_project_root)
         self.assertEqual(
             {
-                os.path.join(build_dir, output),
-                os.path.join(build_dir, log_base + '.remote-log')
+                build_dir / output,
+                build_dir / (log_base + '.remote-log'),
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.launch_command
@@ -442,21 +480,24 @@ class RemoteActionMainParserTests(unittest.TestCase):
         remote_command = full_command[first_ddash + 1:]
         next_ddash = remote_command.index('--')
         self.assertEqual(
-            remote_command[:next_ddash], [
-                os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
-                log_base + '.remote-log'
-            ])
+            remote_command[:next_ddash],
+            _strs(
+                [
+                    Path('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
+                    log_base + '.remote-log'
+                ]))
 
     def test_remote_fsatrace_from_main_args(self):
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
-        fake_fsatrace = 'tools/debug/fsatrace'
-        fake_fsatrace_rel = f'../{fake_fsatrace}'
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        fake_fsatrace = Path('tools/debug/fsatrace')
+        fake_fsatrace_rel = Path(f'../{fake_fsatrace}')
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
-            ['--fsatrace-path', fake_fsatrace_rel, '--', 'touch', output])
+            _strs(
+                ['--fsatrace-path', fake_fsatrace_rel, '--', 'touch', output]))
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -465,12 +506,12 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            {fake_fsatrace, fake_fsatrace + '.so'},
+            {fake_fsatrace, fake_fsatrace.with_suffix('.so')},
             set(action.inputs_relative_to_project_root))
         self.assertEqual(
             {
-                os.path.join(build_dir, output),
-                os.path.join(build_dir, output + '.remote-fsatrace')
+                build_dir / output, build_dir /
+                (str(output) + '.remote-fsatrace')
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.launch_command
@@ -478,25 +519,28 @@ class RemoteActionMainParserTests(unittest.TestCase):
         # Confirm that the remote command is wrapped with fsatrace
         remote_command = full_command[first_ddash + 1:]
         next_ddash = remote_command.index('--')
-        self.assertIn(fake_fsatrace_rel, remote_command[:next_ddash])
+        self.assertIn(str(fake_fsatrace_rel), remote_command[:next_ddash])
         self.assertEqual(
             remote_command[:next_ddash + 1],
-            action._fsatrace_command_prefix(output + '.remote-fsatrace'))
-        self.assertEqual(remote_command[next_ddash + 1:], ['touch', output])
+            action._fsatrace_command_prefix(
+                Path(str(output) + '.remote-fsatrace')))
+        self.assertEqual(
+            remote_command[next_ddash + 1:], ['touch', str(output)])
 
     def test_remote_log_and_fsatrace_from_main_args(self):
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
-        fake_fsatrace = 'tools/debug/fsatrace'
-        fake_fsatrace_rel = f'../{fake_fsatrace}'
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        fake_fsatrace = Path('tools/debug/fsatrace')
+        fake_fsatrace_rel = Path('..', fake_fsatrace)
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
-            [
-                '--fsatrace-path', fake_fsatrace_rel, '--log', '--', 'touch',
-                output
-            ])
+            _strs(
+                [
+                    '--fsatrace-path', fake_fsatrace_rel, '--log', '--',
+                    'touch', output
+                ]))
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -508,13 +552,13 @@ class RemoteActionMainParserTests(unittest.TestCase):
             {
                 remote_action._REMOTE_LOG_SCRIPT,
                 fake_fsatrace,
-                fake_fsatrace + '.so',
+                fake_fsatrace.with_suffix('.so'),
             }, set(action.inputs_relative_to_project_root))
         self.assertEqual(
             {
-                os.path.join(build_dir, output),
-                os.path.join(build_dir, output + '.remote-log'),
-                os.path.join(build_dir, output + '.remote-fsatrace'),
+                build_dir / output,
+                build_dir / (str(output) + '.remote-log'),
+                build_dir / (str(output) + '.remote-fsatrace'),
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.launch_command
@@ -523,25 +567,29 @@ class RemoteActionMainParserTests(unittest.TestCase):
         remote_command = full_command[first_ddash + 1:]
         second_ddash = remote_command.index('--')
         self.assertEqual(
-            remote_command[:second_ddash], [
-                os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
-                output + '.remote-log'
-            ])
+            remote_command[:second_ddash],
+            _strs(
+                [
+                    Path('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
+                    str(output) + '.remote-log'
+                ]))
         # Confirm that the inner wrapper is for fsatrace
         logged_command = remote_command[second_ddash + 1:]
         third_ddash = logged_command.index('--')
         self.assertEqual(
             logged_command[:third_ddash + 1],
-            action._fsatrace_command_prefix(output + '.remote-fsatrace'))
-        self.assertEqual(logged_command[third_ddash + 1:], ['touch', output])
+            action._fsatrace_command_prefix(
+                Path(str(output) + '.remote-fsatrace')))
+        self.assertEqual(
+            logged_command[third_ddash + 1:], ['touch', str(output)])
 
     def test_local_remote_compare_no_diffs_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
-        base_command = ['touch', output]
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        base_command = ['touch', str(output)]
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             ['--compare', '--'] + base_command)
@@ -555,7 +603,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
             mock.patch.object(os, 'rename'),
-            mock.patch.object(os.path, 'isfile', return_value=True),
+            mock.patch.object(Path, 'is_file', return_value=True),
             # Pretend comparison finds no differences
             mock.patch.object(remote_action, '_files_match', return_value=True),
         ]
@@ -582,15 +630,15 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_local_launch.assert_called_once()
         mock_remote_launch.assert_called_once()
         self.assertEqual(remote_command[-2:], base_command)
-        mock_cleanup.assert_called_with(output + '.remote')
+        mock_cleanup.assert_called_with(Path(str(output) + '.remote'))
 
     def test_local_remote_compare_found_diffs_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
-        base_command = ['touch', output]
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        base_command = ['touch', str(output)]
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             ['--compare', '--'] + base_command)
@@ -604,7 +652,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
             mock.patch.object(os, 'rename'),
-            mock.patch.object(os.path, 'isfile', return_value=True),
+            mock.patch.object(Path, 'is_file', return_value=True),
             # Pretend comparison finds differences
             mock.patch.object(
                 remote_action, '_files_match', return_value=False),
@@ -635,18 +683,19 @@ class RemoteActionMainParserTests(unittest.TestCase):
 
     def test_local_remote_compare_with_fsatrace_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
-        exec_root = '/home/project'
-        build_dir = 'build-out'
-        working_dir = os.path.join(exec_root, build_dir)
-        output = 'hello.txt'
-        fake_fsatrace = 'tools/debug/fsatrace'
-        fake_fsatrace_rel = f'../{fake_fsatrace}'
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        fake_fsatrace = Path('tools/debug/fsatrace')
+        fake_fsatrace_rel = Path('..', fake_fsatrace)
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
-            [
-                '--compare', '--fsatrace-path', fake_fsatrace_rel, '--',
-                'touch', output
-            ])
+            _strs(
+                [
+                    '--compare', '--fsatrace-path', fake_fsatrace_rel, '--',
+                    'touch', output
+                ]))
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -660,7 +709,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
             mock.patch.object(os, 'rename'),
-            mock.patch.object(os.path, 'isfile', return_value=True),
+            mock.patch.object(Path, 'is_file', return_value=True),
             # Pretend comparison finds differences
             mock.patch.object(
                 remote_action, '_files_match', return_value=False),
@@ -689,14 +738,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)  # remote success, but compare failure
         mock_remote_launch.assert_called_once()
         mock_local_launch.assert_called_once()
-        self.assertIn(fake_fsatrace_rel, remote_command)
-        self.assertIn(fake_fsatrace_rel, local_command)
-        remote_trace = output + '.remote-fsatrace'
-        local_trace = output + '.local-fsatrace'
+        self.assertIn(str(fake_fsatrace_rel), remote_command)
+        self.assertIn(str(fake_fsatrace_rel), local_command)
+        remote_trace = str(output) + '.remote-fsatrace'
+        local_trace = str(output) + '.local-fsatrace'
         self.assertIn(remote_trace, remote_command)
         self.assertIn(local_trace, local_command)
         mock_trace_diff.assert_called_with(
-            local_trace + '.norm', remote_trace + '.norm')
+            Path(local_trace + '.norm'), Path(remote_trace + '.norm'))
 
 
 class RemoteActionFlagParserTests(unittest.TestCase):
@@ -792,8 +841,8 @@ class RemoteActionFlagParserTests(unittest.TestCase):
 
 class RemoteActionConstructionTests(unittest.TestCase):
 
-    _PROJECT_ROOT = '/my/project/root'
-    _WORKING_DIR = os.path.join(_PROJECT_ROOT, 'build_dir')
+    _PROJECT_ROOT = Path('/my/project/root')
+    _WORKING_DIR = _PROJECT_ROOT / 'build_dir'
 
     def test_minimal(self):
         rewrapper = '/path/to/rewrapper'
@@ -806,20 +855,20 @@ class RemoteActionConstructionTests(unittest.TestCase):
         )
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
-        self.assertEqual(action.exec_root_rel, '..')
+        self.assertEqual(action.exec_root_rel, Path('..'))
         self.assertFalse(action.save_temps)
         self.assertFalse(action.auto_reproxy)
         self.assertFalse(action.remote_disable)
-        self.assertEqual(action.build_subdir, 'build_dir')
+        self.assertEqual(action.build_subdir, Path('build_dir'))
         self.assertEqual(
             action.launch_command,
             [rewrapper, f'--exec_root={self._PROJECT_ROOT}', '--'] + command)
 
     def test_path_setup_implicit(self):
         command = ['beep', 'boop']
-        fake_root = '/home/project'
-        fake_builddir = 'out/not-default'
-        fake_cwd = os.path.join(fake_root, fake_builddir)
+        fake_root = Path('/home/project')
+        fake_builddir = Path('out/not-default')
+        fake_cwd = fake_root / fake_builddir
         with mock.patch.object(os, 'curdir', fake_cwd):
             with mock.patch.object(remote_action, 'PROJECT_ROOT', fake_root):
                 action = remote_action.RemoteAction(
@@ -827,14 +876,14 @@ class RemoteActionConstructionTests(unittest.TestCase):
                     command=command,
                 )
                 self.assertEqual(action.exec_root, fake_root)
-                self.assertEqual(action.exec_root_rel, '../..')
+                self.assertEqual(action.exec_root_rel, Path('../..'))
                 self.assertEqual(action.build_subdir, fake_builddir)
 
     def test_path_setup_explicit(self):
         command = ['beep', 'boop']
-        fake_root = '/home/project'
-        fake_builddir = 'out/not-default'
-        fake_cwd = os.path.join(fake_root, fake_builddir)
+        fake_root = Path('/home/project')
+        fake_builddir = Path('out/not-default')
+        fake_cwd = fake_root / fake_builddir
         with mock.patch.object(os, 'curdir', fake_cwd):
             action = remote_action.RemoteAction(
                 rewrapper='/path/to/rewrapper',
@@ -842,7 +891,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 exec_root=fake_root,
             )
             self.assertEqual(action.exec_root, fake_root)
-            self.assertEqual(action.exec_root_rel, '../..')
+            self.assertEqual(action.exec_root_rel, Path('../..'))
             self.assertEqual(action.build_subdir, fake_builddir)
 
     def test_inputs_outputs(self):
@@ -852,21 +901,23 @@ class RemoteActionConstructionTests(unittest.TestCase):
             command=command,
             exec_root=self._PROJECT_ROOT,
             working_dir=self._WORKING_DIR,
-            inputs=['../src/meow.txt'],
-            output_files=['obj/woof.txt'],
-            output_dirs=['.debug'],
+            inputs=_paths(['../src/meow.txt']),
+            output_files=_paths(['obj/woof.txt']),
+            output_dirs=_paths(['.debug']),
         )
-        self.assertEqual(action.build_subdir, 'build_dir')
+        self.assertEqual(action.build_subdir, Path('build_dir'))
         self.assertEqual(
-            action.inputs_relative_to_project_root, ['src/meow.txt'])
+            action.inputs_relative_to_project_root, _paths(['src/meow.txt']))
         self.assertEqual(
             action.output_files_relative_to_project_root,
-            ['build_dir/obj/woof.txt'])
+            _paths(['build_dir/obj/woof.txt']))
         self.assertEqual(
-            action.output_dirs_relative_to_project_root, ['build_dir/.debug'])
+            action.output_dirs_relative_to_project_root,
+            _paths(['build_dir/.debug']))
         with mock.patch.object(
                 remote_action.RemoteAction, '_inputs_list_file',
-                return_value='obj/woof.txt.inputs') as mock_input_list_file:
+                return_value=Path(
+                    'obj/woof.txt.inputs')) as mock_input_list_file:
             self.assertEqual(
                 action.launch_command, [
                     '/path/to/rewrapper',
@@ -891,7 +942,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
     def test_save_temps(self):
         command = ['echo', 'hello']
         action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
+            rewrapper=Path('/path/to/rewrapper'),
             command=command,
             exec_root=self._PROJECT_ROOT,
             save_temps=True,
@@ -1028,11 +1079,13 @@ class RbeDiagnosticsTests(unittest.TestCase):
 
     def _make_action(self, **kwargs):
         command = ['echo', 'hello']
+        exec_root = Path('/path/to/project/root')
+        working_dir = exec_root / 'build/stuff/here'
         return remote_action.RemoteAction(
             rewrapper='/path/to/rewrapper',
             command=command,
-            exec_root='/path/to/project/root',
-            working_dir='/path/to/project/root/build/stuff/here',
+            exec_root=exec_root,
+            working_dir=working_dir,
             **kwargs,
         )
 
@@ -1104,7 +1157,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
 
     def test_analyze_flow(self):
         pid = 6789
-        action_log = 'obj/my_action.rrpl'
+        action_log = Path('obj/my_action.rrpl')
         fake_rewrapper_logs = [
             f'/noisy/log/rewrapper.where.who.log.INFO.when.{pid}',
             f'/noisy/log/rewrapper.where.who.log.ERROR.when.{pid}',
@@ -1118,14 +1171,14 @@ class RbeDiagnosticsTests(unittest.TestCase):
                 remote_action,
                 '_rewrapper_log_dir',
                 return_value='/path/to/tmp/reproxy.999999/wrapper/logz'),
-            mock.patch.object(os.path, 'isfile', return_value=True),
+            mock.patch.object(Path, 'is_file', return_value=True),
         ]
         with contextlib.ExitStack() as stack:
             for m in unnamed_mocks:
                 stack.enter_context(m)
 
             with mock.patch.object(
-                    glob, 'glob',
+                    Path, 'glob',
                     return_value=fake_rewrapper_logs) as mock_glob:
                 with mock.patch.object(
                         remote_action,
@@ -1204,10 +1257,10 @@ remote_metadata:  {{
 class MainTests(unittest.TestCase):
 
     def test_help_flag(self):
+        stdout = io.StringIO()
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
-        with mock.patch.object(sys, 'stdout',
-                               new_callable=io.StringIO) as mock_stdout:
+        with contextlib.redirect_stdout(stdout):
             with mock.patch.object(sys, 'exit') as mock_exit:
                 # Normally, the following would not be reached due to exit(),
                 # but for testing it needs to be mocked out.
