@@ -12,7 +12,10 @@ use rand::Rng;
 
 /// Provides access to random number generation.
 pub trait RngProvider {
+    /// The random number generator being provided.
     type RNG: Rng + ?Sized;
+
+    /// Get access to a random number generator.
     fn get_rng(&mut self) -> &mut Self::RNG;
 }
 
@@ -24,19 +27,28 @@ impl RngProvider for rand::rngs::StdRng {
 }
 
 #[derive(Clone, Copy, PartialEq)]
+/// Contains information about a datagram received on a socket.
 pub struct DatagramInfo<T> {
+    /// The length in bytes of the datagram received on the socket.
     pub length: usize,
+    /// The address associated with the datagram received on the socket
+    /// (usually, the address from which the datagram was received).
     pub address: T,
 }
 
 #[derive(thiserror::Error, Debug)]
+/// Errors encountered while performing a socket operation.
 pub enum SocketError {
+    /// Failure while attempting to open a socket.
     #[error("failed to open socket: {0}")]
     FailedToOpen(anyhow::Error),
+    /// Tried to bind a socket on a nonexistent interface.
     #[error("tried to bind socket on nonexistent interface")]
     NoInterface,
+    /// The hardware type of the interface is unsupported.
     #[error("unsupported hardware type")]
     UnsupportedHardwareType,
+    /// Other IO errors observed on socket operations.
     #[error("socket error: {0}")]
     Other(std::io::Error),
 }
@@ -65,6 +77,7 @@ pub trait Socket<T> {
 #[async_trait(?Send)]
 /// Provides access to AF_PACKET sockets.
 pub trait PacketSocketProvider {
+    /// The type of sockets provided by this `PacketSocketProvider`.
     type Sock: Socket<net_types::ethernet::Mac>;
 
     /// Gets a packet socket bound to the device on which the DHCP client

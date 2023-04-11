@@ -17,7 +17,7 @@ pub(crate) enum Error {
     Exit(ClientExitReason),
 
     #[error("error observed by DHCP client core: {0:?}")]
-    Core(dhcp_client_core::Error),
+    Core(dhcp_client_core::client::Error),
 
     #[error("fidl error: {0}")]
     Fidl(fidl::Error),
@@ -82,7 +82,7 @@ pub(crate) async fn serve_client(
 struct Clock;
 
 #[async_trait(?Send)]
-impl dhcp_client_core::Clock for Clock {
+impl dhcp_client_core::deps::Clock for Clock {
     type Instant = fuchsia_async::Time;
 
     fn now(&self) -> Self::Instant {
@@ -96,8 +96,8 @@ impl dhcp_client_core::Clock for Clock {
 
 /// Encapsulates all DHCP client state.
 struct Client {
-    config: dhcp_client_core::ClientConfig,
-    core: dhcp_client_core::State<fuchsia_async::Time>,
+    config: dhcp_client_core::client::ClientConfig,
+    core: dhcp_client_core::client::State<fuchsia_async::Time>,
     rng: rand::rngs::StdRng,
     stop_receiver: mpsc::UnboundedReceiver<()>,
 }
@@ -116,7 +116,7 @@ impl Client {
         let ConfigurationToRequest { routers, dns_servers, .. } =
             configuration_to_request.unwrap_or(ConfigurationToRequest::EMPTY);
 
-        let config = dhcp_client_core::ClientConfig {
+        let config = dhcp_client_core::client::ClientConfig {
             client_hardware_address: mac,
             client_identifier: None,
             parameter_request_list: Some(
@@ -136,7 +136,7 @@ impl Client {
             preferred_lease_time_secs: None,
             requested_ip_address: None,
         };
-        Ok(Self { core: dhcp_client_core::State::default(), rng, config, stop_receiver })
+        Ok(Self { core: dhcp_client_core::client::State::default(), rng, config, stop_receiver })
     }
 
     async fn watch_configuration(
@@ -150,9 +150,9 @@ impl Client {
             {
                 Err(e) => return Err(Error::Core(e)),
                 Ok(step) => match step {
-                    dhcp_client_core::Step::NextState(core) => core,
-                    dhcp_client_core::Step::Exit(reason) => match reason {
-                        dhcp_client_core::ExitReason::GracefulShutdown => {
+                    dhcp_client_core::client::Step::NextState(core) => core,
+                    dhcp_client_core::client::Step::Exit(reason) => match reason {
+                        dhcp_client_core::client::ExitReason::GracefulShutdown => {
                             return Err(Error::Exit(ClientExitReason::GracefulShutdown))
                         }
                     },

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use dhcp_client_core::PacketSocketProvider;
+use dhcp_client_core::deps::PacketSocketProvider;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use fuchsia_async as fasync;
@@ -14,10 +14,10 @@ pub(crate) struct PacketSocket {
     inner: fasync::net::DatagramSocket,
 }
 
-fn translate_io_error(e: std::io::Error) -> dhcp_client_core::SocketError {
+fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError {
     use fposix::Errno as E;
     match e.raw_os_error().and_then(fposix::Errno::from_primitive) {
-        None => dhcp_client_core::SocketError::Other(e),
+        None => dhcp_client_core::deps::SocketError::Other(e),
         // TODO(https://fxbug.dev/124593): better indicate recoverable
         // vs. non-recoverable error types.
         Some(errno) => match errno {
@@ -30,14 +30,14 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::SocketError {
             ),
             E::Efault => panic!("passed invalid memory address to socket call"),
             E::Enobufs => panic!("out of memory: {:?}", e),
-            E::Enodev => dhcp_client_core::SocketError::NoInterface,
+            E::Enodev => dhcp_client_core::deps::SocketError::NoInterface,
             E::Einval
             | E::Emsgsize
             | E::Enetdown
             | E::Enoent
             | E::Enotconn
             | E::Enxio
-            | E::Eperm => dhcp_client_core::SocketError::Other(e),
+            | E::Eperm => dhcp_client_core::deps::SocketError::Other(e),
 
             // ============
             // These errors are documented in `man bind`.
@@ -47,7 +47,7 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::SocketError {
             E::Ebadf => {
                 panic!("tried to perform socket operation with bad file descriptor: {:?}", e)
             }
-            E::Eacces | E::Eaddrinuse => dhcp_client_core::SocketError::Other(e),
+            E::Eacces | E::Eaddrinuse => dhcp_client_core::deps::SocketError::Other(e),
 
             // ============
             // These errors can be returned from `sendto()` at the socket layer.
@@ -65,7 +65,7 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::SocketError {
                 panic!("got EPIPE, but we aren't using connection-mode sockets: {:?}", e)
             }
             E::Enomem => panic!("out of memory: {:?}", e),
-            E::Eopnotsupp => dhcp_client_core::SocketError::Other(e),
+            E::Eopnotsupp => dhcp_client_core::deps::SocketError::Other(e),
 
             // ============
             // These errors are documented in `man recvfrom`.
@@ -228,12 +228,12 @@ impl From<SockaddrLl> for libc::sockaddr_ll {
 const ARPHRD_ETHER: libc::c_ushort = 1;
 
 #[async_trait(?Send)]
-impl dhcp_client_core::Socket<net_types::ethernet::Mac> for PacketSocket {
+impl dhcp_client_core::deps::Socket<net_types::ethernet::Mac> for PacketSocket {
     async fn send_to(
         &self,
         buf: &[u8],
         addr: net_types::ethernet::Mac,
-    ) -> Result<(), dhcp_client_core::SocketError> {
+    ) -> Result<(), dhcp_client_core::deps::SocketError> {
         let Self { interface_id, inner } = self;
 
         let sockaddr_ll = libc::sockaddr_ll::from(SockaddrLl { interface_id: *interface_id, addr });
@@ -249,8 +249,8 @@ impl dhcp_client_core::Socket<net_types::ethernet::Mac> for PacketSocket {
         &self,
         buf: &mut [u8],
     ) -> Result<
-        dhcp_client_core::DatagramInfo<net_types::ethernet::Mac>,
-        dhcp_client_core::SocketError,
+        dhcp_client_core::deps::DatagramInfo<net_types::ethernet::Mac>,
+        dhcp_client_core::deps::SocketError,
     > {
         let Self { interface_id: _, inner } = self;
         let (length, sock_addr) = inner.recv_from(buf).await.map_err(translate_io_error)?;
@@ -266,7 +266,7 @@ impl dhcp_client_core::Socket<net_types::ethernet::Mac> for PacketSocket {
 
         if sll_hatype != ARPHRD_ETHER {
             tracing::error!("unsupported sll_hatype: {}", sll_hatype);
-            return Err(dhcp_client_core::SocketError::UnsupportedHardwareType);
+            return Err(dhcp_client_core::deps::SocketError::UnsupportedHardwareType);
         }
 
         assert_eq!(usize::from(sll_halen), net_types::ethernet::Mac::BYTES);
@@ -275,7 +275,7 @@ impl dhcp_client_core::Socket<net_types::ethernet::Mac> for PacketSocket {
             address.as_mut().copy_from_slice(&sll_addr[..net_types::ethernet::Mac::BYTES]);
             address
         };
-        Ok(dhcp_client_core::DatagramInfo { length, address })
+        Ok(dhcp_client_core::deps::DatagramInfo { length, address })
     }
 }
 
@@ -291,7 +291,7 @@ impl PacketSocketProviderImpl {
 
     pub(crate) async fn get_mac(
         &self,
-    ) -> Result<net_types::ethernet::Mac, dhcp_client_core::SocketError> {
+    ) -> Result<net_types::ethernet::Mac, dhcp_client_core::deps::SocketError> {
         let PacketSocket { interface_id: _, inner } = self.get_packet_socket().await?;
         let sock_addr = inner.local_addr().map_err(translate_io_error)?;
         let libc::sockaddr_ll {
@@ -305,7 +305,7 @@ impl PacketSocketProviderImpl {
         } = sock_addr.try_to_sockaddr_ll().expect("addr from packet socket must be sockaddr_ll");
         if sll_hatype != ARPHRD_ETHER {
             tracing::error!("unsupported sll_hatype: {}", sll_hatype);
-            return Err(dhcp_client_core::SocketError::UnsupportedHardwareType);
+            return Err(dhcp_client_core::deps::SocketError::UnsupportedHardwareType);
         }
 
         assert_eq!(usize::from(sll_halen), net_types::ethernet::Mac::BYTES);
@@ -316,16 +316,16 @@ impl PacketSocketProviderImpl {
 }
 
 #[async_trait(?Send)]
-impl dhcp_client_core::PacketSocketProvider for PacketSocketProviderImpl {
+impl PacketSocketProvider for PacketSocketProviderImpl {
     type Sock = PacketSocket;
 
-    async fn get_packet_socket(&self) -> Result<Self::Sock, dhcp_client_core::SocketError> {
+    async fn get_packet_socket(&self) -> Result<Self::Sock, dhcp_client_core::deps::SocketError> {
         let PacketSocketProviderImpl { provider, interface_id } = self;
 
         let sock = provider
             .socket(fpacket::Kind::Network)
             .await
-            .map_err(|e: fidl::Error| dhcp_client_core::SocketError::FailedToOpen(e.into()))?
+            .map_err(|e: fidl::Error| dhcp_client_core::deps::SocketError::FailedToOpen(e.into()))?
             .map_err(|errno| {
                 translate_io_error(std::io::Error::from_raw_os_error(errno.into_primitive()))
             })?;
@@ -346,7 +346,7 @@ impl dhcp_client_core::PacketSocketProvider for PacketSocketProviderImpl {
 #[cfg(test)]
 mod test {
     use super::*;
-    use dhcp_client_core::{DatagramInfo, Socket as _};
+    use dhcp_client_core::deps::{DatagramInfo, Socket as _};
     use fidl_fuchsia_net_ext as fnet_ext;
     use fidl_fuchsia_netemul_network as fnetemul_network;
     use fidl_fuchsia_posix_socket_packet as fpacket;

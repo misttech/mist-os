@@ -110,12 +110,12 @@ pub(crate) async fn serve_client_provider(
                             control_handle
                                 .send_on_exit({
                                     match e {
-                                        dhcp_client_core::SocketError::UnsupportedHardwareType
-                                        | dhcp_client_core::SocketError::NoInterface => {
+                                        dhcp_client_core::deps::SocketError::UnsupportedHardwareType
+                                        | dhcp_client_core::deps::SocketError::NoInterface => {
                                             ClientExitReason::InvalidInterface
                                         }
-                                        dhcp_client_core::SocketError::FailedToOpen(_)
-                                        | dhcp_client_core::SocketError::Other(_) => {
+                                        dhcp_client_core::deps::SocketError::FailedToOpen(_)
+                                        | dhcp_client_core::deps::SocketError::Other(_) => {
                                             ClientExitReason::UnableToOpenSocket
                                         }
                                     }

@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod client;
-mod deps;
-mod parse;
+#![deny(missing_docs)]
+//! Defines the platform-agnostic "core" of a DHCP client, including a state
+//! machine and abstractions for sockets and time.
 
-pub use client::{
-    ClientConfig, Error, ExitReason, Init, Requesting, Selecting, SelectingOutcome, State, Step,
-};
-pub use deps::{Clock, DatagramInfo, Instant, PacketSocketProvider, Socket, SocketError};
+/// Defines the client core state machine.
+pub mod client;
+
+/// Defines abstractions for platform dependencies such as sockets and time.
+pub mod deps;
+
+mod parse;

@@ -10,35 +10,50 @@ use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
 use futures::{
     channel::mpsc, pin_mut, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _,
 };
+use net_types::Witness as _;
 use rand::Rng as _;
 use std::{net::Ipv4Addr, num::NonZeroU32};
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// Error encountered while performing a socket operation.
     #[error("error while using socket: {0:?}")]
     Socket(deps::SocketError),
 }
 
 /// The reason the DHCP client exited.
 pub enum ExitReason {
+    /// Executed due to a request for graceful shutdown.
     GracefulShutdown,
 }
 
-/// All possible core state machine states.
+/// All possible core state machine states from the state-transition diagram in
+/// [RFC 2131].
+///
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
 pub enum State<I> {
+    /// The default initial state of the state machine (no known
+    /// currently-assigned IP address or DHCP server).
     Init(Init),
+    /// The Selecting state (broadcasting DHCPDISCOVERs and receiving
+    /// DHCPOFFERs).
     Selecting(Selecting<I>),
+    /// The Requesting state (broadcasting DHCPREQUESTs and receiving DHCPACKs
+    /// and DHCPNAKs).
     Requesting(Requesting<I>),
 }
 
 /// The next step to take after running the core state machine for one step.
 pub enum Step<I> {
+    /// Transition to another state.
     NextState(State<I>),
+    /// Exit the client.
     Exit(ExitReason),
 }
 
 impl<I: deps::Instant> State<I> {
+    /// Run the client state machine for one "step".
     pub async fn run<C: deps::Clock<Instant = I>>(
         &self,
         config: &ClientConfig,
@@ -58,8 +73,21 @@ impl<I: deps::Instant> State<I> {
                     Ok(Step::NextState(State::Requesting(requesting)))
                 }
             },
-            State::Requesting(_requesting) => {
-                todo!("TODO(https://fxbug.dev/123609): implement requesting state");
+            State::Requesting(requesting) => {
+                match requesting
+                    .do_requesting(config, packet_socket_provider, rng, clock, stop_receiver)
+                    .await?
+                {
+                    RequestingOutcome::RanOutOfRetransmits => {
+                        tracing::info!(
+                            "Returning to Init due to running out of DHCPREQUEST retransmits"
+                        );
+                        Ok(Step::NextState(State::Init(Init::default())))
+                    }
+                    RequestingOutcome::GracefulShutdown => {
+                        Ok(Step::Exit(ExitReason::GracefulShutdown))
+                    }
+                }
             }
         }
     }
@@ -102,7 +130,7 @@ struct DiscoverOptions {
 /// by the client and server to associate messages and responses between a
 /// client and a server."
 ///
-/// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.3.1
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.3.1
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct TransactionId(
     // While the DHCP RFC does not require that the XID be nonzero, it's helpful
@@ -112,14 +140,14 @@ struct TransactionId(
 );
 
 /// The initial state as depicted in the state-transition diagram in [RFC 2131].
-/// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.4
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
 #[derive(Default)]
 pub struct Init {}
 
 impl Init {
     /// Generates a random transaction ID, records the starting time, and
     /// transitions to Selecting.
-    pub fn do_init<C: deps::Clock>(
+    fn do_init<C: deps::Clock>(
         &self,
         rng: &mut impl deps::RngProvider,
         clock: &C,
@@ -199,7 +227,16 @@ fn recv_stream<'a, T, U: Send>(
     })
 }
 
-fn build_discover(
+struct OutgoingOptions {
+    offered_ip_address_lease_time_secs: Option<NonZeroU32>,
+    offered_ip_address: Option<Ipv4Addr>,
+    server_identifier: Option<Ipv4Addr>,
+    message_type: dhcp_protocol::MessageType,
+}
+
+// Populates fields that don't differ between outgoing client messages in the
+// same DHCP transaction while the client is not assigned an address.
+fn build_outgoing_message_while_not_assigned_address(
     ClientConfig {
         client_hardware_address,
         client_identifier,
@@ -208,16 +245,25 @@ fn build_discover(
         requested_ip_address,
     }: &ClientConfig,
     DiscoverOptions { xid: TransactionId(xid) }: &DiscoverOptions,
+    OutgoingOptions {
+        offered_ip_address_lease_time_secs,
+        offered_ip_address,
+        server_identifier,
+        message_type,
+    }: OutgoingOptions,
 ) -> dhcp_protocol::Message {
     use dhcp_protocol::DhcpOption;
-
-    // The following fields are set according to
-    // https://www.rfc-editor.org/rfc/rfc2131#section-4.4.1.
     dhcp_protocol::Message {
+        // The following fields are set according to
+        // https://www.rfc-editor.org/rfc/rfc2131#section-4.4.1.
         op: dhcp_protocol::OpCode::BOOTREQUEST,
-        xid: u32::from(*xid),
+        xid: xid.get(),
         // Must be 0, or the number of seconds since the DHCP process started.
-        // Since it has to be the same as in DHCPREQUEST, it's easiest to have it be 0.
+        // Since it has to be the same in DHCPDISCOVER and DHCPREQUEST, it's
+        // easiest to have it be 0.
+        // TODO(https://fxbug.dev/125232): consider setting this to something
+        // else to help DHCP servers prioritize our requests when they're close
+        // to expiring.
         secs: 0,
         // Because packet sockets are available to us, the DHCP client is
         // assumed to be able to receive unicast datagrams without having an IP
@@ -231,28 +277,47 @@ fn build_discover(
         sname: String::new(),
         file: String::new(),
         options: [
-            preferred_lease_time_secs.map(|n| DhcpOption::IpAddressLeaseTime(n.into())),
-            requested_ip_address.map(DhcpOption::RequestedIpAddress),
+            offered_ip_address_lease_time_secs
+                .or(*preferred_lease_time_secs)
+                .map(|n| DhcpOption::IpAddressLeaseTime(n.get())),
+            offered_ip_address.or(*requested_ip_address).map(DhcpOption::RequestedIpAddress),
             // TODO(https://fxbug.dev/122602): Avoid cloning
             parameter_request_list.clone().map(DhcpOption::ParameterRequestList),
             client_identifier.clone().map(DhcpOption::ClientIdentifier),
+            server_identifier.map(DhcpOption::ServerIdentifier),
         ]
         .into_iter()
         .flatten()
-        .chain([DhcpOption::DhcpMessageType(dhcp_protocol::MessageType::DHCPDISCOVER)])
+        .chain([DhcpOption::DhcpMessageType(message_type)])
         .collect(),
     }
 }
 
+fn build_discover(
+    client_config: &ClientConfig,
+    discover_options: &DiscoverOptions,
+) -> dhcp_protocol::Message {
+    build_outgoing_message_while_not_assigned_address(
+        client_config,
+        discover_options,
+        OutgoingOptions {
+            offered_ip_address_lease_time_secs: None,
+            offered_ip_address: None,
+            server_identifier: None,
+            message_type: dhcp_protocol::MessageType::DHCPDISCOVER,
+        },
+    )
+}
+
 #[derive(Debug)]
-pub enum SelectingOutcome<I> {
+pub(crate) enum SelectingOutcome<I> {
     GracefulShutdown,
     Requesting(Requesting<I>),
 }
 
 /// The Selecting state as depicted in the state-transition diagram in [RFC 2131].
 ///
-/// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.4
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
 pub struct Selecting<I> {
     discover_options: DiscoverOptions,
     // The time at which the DHCP transaction was initiated (used as the offset
@@ -266,7 +331,7 @@ impl<I: deps::Instant> Selecting<I> {
     /// Transmits (and retransmits, if necessary) DHCPDISCOVER messages, and
     /// receives DHCPOFFER messages, on a packet socket. Tries to select a
     /// DHCPOFFER. If successful, transitions to Requesting.
-    pub async fn do_selecting<C: deps::Clock<Instant = I>>(
+    async fn do_selecting<C: deps::Clock<Instant = I>>(
         &self,
         client_config: &ClientConfig,
         packet_socket_provider: &impl deps::PacketSocketProvider,
@@ -391,11 +456,98 @@ fn validate_message(
     Ok(())
 }
 
+#[derive(Debug)]
+pub(crate) enum RequestingOutcome {
+    RanOutOfRetransmits,
+    GracefulShutdown,
+}
+
+/// The Requesting state as depicted in the state-transition diagram in [RFC 2131].
+///
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
 #[derive(Debug, PartialEq)]
 pub struct Requesting<I> {
     discover_options: DiscoverOptions,
     fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest,
     start_time: I,
+}
+
+// Per RFC 2131, section 3.1: "a client retransmitting as described in section
+// 4.1 might retransmit the DHCPREQUEST message four times, for a total delay of
+// 60 seconds, before restarting the initialization procedure".
+const NUM_REQUEST_RETRANSMITS: usize = 4;
+
+impl<I: deps::Instant> Requesting<I> {
+    /// Executes the Requesting state.
+    ///
+    /// Transmits (and retransmits, if necessary) DHCPREQUEST messages, and
+    /// receives DHCPACK and DHCPNAK messages, on a packet socket. Upon
+    /// receiving a DHCPACK, transitions to Bound.
+    async fn do_requesting<C: deps::Clock<Instant = I>>(
+        &self,
+        client_config: &ClientConfig,
+        packet_socket_provider: &impl deps::PacketSocketProvider,
+        rng: &mut impl deps::RngProvider,
+        time: &C,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+    ) -> Result<RequestingOutcome, Error> {
+        let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
+        let Requesting { discover_options, fields_from_offer_to_use_in_request, start_time: _ } =
+            self;
+        let message =
+            build_request(client_config, discover_options, fields_from_offer_to_use_in_request);
+
+        let message = crate::parse::serialize_dhcp_message_to_ip_packet(
+            message,
+            Ipv4Addr::UNSPECIFIED, // src_ip
+            CLIENT_PORT,
+            Ipv4Addr::BROADCAST, // dst_ip
+            SERVER_PORT,
+        );
+
+        let send_fut = send_with_retransmits(
+            time,
+            default_retransmit_schedule(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
+            message.as_ref(),
+            &socket,
+            net_types::ethernet::Mac::BROADCAST,
+        )
+        .fuse();
+
+        pin_mut!(send_fut);
+
+        select! {
+            send_requests_result = send_fut => {
+                send_requests_result?;
+                Ok(RequestingOutcome::RanOutOfRetransmits)
+            },
+            () = stop_receiver.select_next_some() => {
+                Ok(RequestingOutcome::GracefulShutdown)
+            }
+            // TODO(https://fxbug.dev/123609): Implement receiving ACKs/NAKs.
+        }
+    }
+}
+
+fn build_request(
+    client_config: &ClientConfig,
+    discover_options: &DiscoverOptions,
+    crate::parse::FieldsFromOfferToUseInRequest {
+        server_identifier,
+        ip_address_lease_time_secs,
+        ip_address_to_request,
+    }: &crate::parse::FieldsFromOfferToUseInRequest,
+) -> dhcp_protocol::Message {
+    build_outgoing_message_while_not_assigned_address(
+        client_config,
+        discover_options,
+        OutgoingOptions {
+            offered_ip_address_lease_time_secs: *ip_address_lease_time_secs,
+            offered_ip_address: Some(ip_address_to_request.get().into()),
+            server_identifier: Some(server_identifier.get().into()),
+            message_type: dhcp_protocol::MessageType::DHCPREQUEST,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -409,8 +561,10 @@ mod test {
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
-    use futures::join;
+    use futures::{join, Future};
     use net_declare::{net_mac, std_ip_v4};
+    use std::cell::RefCell;
+    use std::rc::Rc;
     use test_case::test_case;
 
     fn initialize_logging() {
@@ -470,6 +624,22 @@ mod test {
         assert_eq!(start_time_b, arbitrary_start_time);
     }
 
+    fn run_with_accelerated_time<F>(
+        executor: &mut fasync::TestExecutor,
+        time: &Rc<RefCell<FakeTimeController>>,
+        main_future: &mut F,
+    ) -> F::Output
+    where
+        F: Future + Unpin,
+    {
+        loop {
+            match run_until_next_timers_fire(executor, time, main_future) {
+                std::task::Poll::Ready(result) => break result,
+                std::task::Poll::Pending => (),
+            }
+        }
+    }
+
     #[test]
     fn do_selecting_obeys_graceful_shutdown() {
         initialize_logging();
@@ -519,12 +689,7 @@ mod test {
         };
         pin_mut!(main_future);
 
-        loop {
-            match run_until_next_timers_fire(&mut executor, time, &mut main_future) {
-                std::task::Poll::Ready(()) => break,
-                std::task::Poll::Pending => (),
-            }
-        }
+        run_with_accelerated_time(&mut executor, time, &mut main_future);
 
         stop_sender.unbounded_send(()).expect("sending stop signal should succeed");
 
@@ -567,16 +732,21 @@ mod test {
 
         let time = &time;
 
+        // These are the time ranges in which we expect to see messages from the
+        // DHCP client. They are ranges in order to account for randomized
+        // delays.
         const EXPECTED_RANGES: [(u64, u64); 7] =
             [(0, 0), (3, 5), (7, 9), (15, 17), (31, 33), (63, 65), (63, 65)];
 
-        let receive_fut = async_stream::stream! {
-            loop {
+        let receive_fut = async {
+            let mut previous_time = std::time::Duration::from_secs(0);
+
+            for (start, end) in EXPECTED_RANGES {
                 let mut recv_buf = [0u8; BUFFER_SIZE];
-                let DatagramInfo { length, address } =
-                    server_end.recv_from(&mut recv_buf)
-                        .await
-                        .expect("recv_from on test socket should succeed");
+                let DatagramInfo { length, address } = server_end
+                    .recv_from(&mut recv_buf)
+                    .await
+                    .expect("recv_from on test socket should succeed");
 
                 assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
 
@@ -610,11 +780,16 @@ mod test {
                         ],
                     }
                 );
-                yield time.now();
+
+                let received_time = time.now();
+
+                let duration_range =
+                    std::time::Duration::from_secs(start)..=std::time::Duration::from_secs(end);
+                assert!(duration_range.contains(&(received_time - previous_time)));
+
+                previous_time = received_time;
             }
         }
-        .take(EXPECTED_RANGES.len())
-        .collect::<Vec<_>>()
         .fuse();
 
         pin_mut!(selecting_fut, receive_fut);
@@ -622,25 +797,12 @@ mod test {
         let main_future = async {
             select! {
                 _ = selecting_fut => unreachable!("should keep retransmitting DHCPDISCOVER forever"),
-                received = receive_fut => received,
+                () = receive_fut => (),
             }
         };
         pin_mut!(main_future);
 
-        let received = loop {
-            match run_until_next_timers_fire(&mut executor, time, &mut main_future) {
-                std::task::Poll::Ready(received) => break received,
-                std::task::Poll::Pending => (),
-            }
-        };
-
-        let mut previous_time = std::time::Duration::from_secs(0);
-        for ((start, end), received_time) in EXPECTED_RANGES.into_iter().zip(received) {
-            let duration_range =
-                std::time::Duration::from_secs(start)..=std::time::Duration::from_secs(end);
-            assert!(duration_range.contains(&(received_time - previous_time)));
-            previous_time = received_time;
-        }
+        run_with_accelerated_time(&mut executor, time, &mut main_future);
     }
 
     const XID: NonZeroU32 = nonzero_ext::nonzero!(1u32);
@@ -844,12 +1006,7 @@ mod test {
         .fuse();
         pin_mut!(main_future);
         let mut executor = fasync::TestExecutor::new();
-        let selecting_result = loop {
-            match run_until_next_timers_fire(&mut executor, &time, &mut main_future) {
-                std::task::Poll::Ready(result) => break result,
-                std::task::Poll::Pending => (),
-            }
-        };
+        let selecting_result = run_with_accelerated_time(&mut executor, &time, &mut main_future);
 
         let requesting = assert_matches!(
             selecting_result,
@@ -875,5 +1032,167 @@ mod test {
                 start_time: arbitrary_start_time,
             }
         );
+    }
+
+    fn build_test_requesting_state() -> Requesting<std::time::Duration> {
+        Requesting {
+            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            start_time: std::time::Duration::from_secs(0),
+            fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest {
+                server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                    .try_into()
+                    .expect("should be specified"),
+                ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(
+                    DEFAULT_LEASE_LENGTH_SECONDS
+                )),
+                ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
+                    .try_into()
+                    .expect("should be specified"),
+            },
+        }
+    }
+
+    #[test]
+    fn do_requesting_obeys_graceful_shutdown() {
+        initialize_logging();
+
+        let time = FakeTimeController::new();
+
+        let requesting = build_test_requesting_state();
+        let mut rng = FakeRngProvider::new(0);
+
+        let (_server_end, client_end) = FakeSocket::new_pair();
+        let test_socket_provider = FakeSocketProvider::new(client_end);
+
+        let client_config = test_client_config();
+
+        let (stop_sender, mut stop_receiver) = mpsc::unbounded();
+
+        let requesting_fut = requesting
+            .do_requesting(
+                &client_config,
+                &test_socket_provider,
+                &mut rng,
+                &time,
+                &mut stop_receiver,
+            )
+            .fuse();
+        pin_mut!(requesting_fut);
+
+        let mut executor = fasync::TestExecutor::new();
+        assert_matches!(executor.run_until_stalled(&mut requesting_fut), std::task::Poll::Pending);
+
+        stop_sender.unbounded_send(()).expect("sending stop signal should succeed");
+
+        let requesting_result = requesting_fut.now_or_never().expect(
+            "requesting_fut should complete after single poll after stop signal has been sent",
+        );
+
+        assert_matches!(requesting_result, Ok(RequestingOutcome::GracefulShutdown));
+    }
+
+    #[test]
+    fn do_requesting_sends_requests() {
+        initialize_logging();
+
+        let mut executor = fasync::TestExecutor::new();
+        let time = FakeTimeController::new();
+
+        let requesting = build_test_requesting_state();
+        let mut rng = FakeRngProvider::new(0);
+
+        let (server_end, client_end) = FakeSocket::new_pair();
+        let test_socket_provider = FakeSocketProvider::new(client_end);
+
+        let client_config = test_client_config();
+
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+
+        let requesting_fut = requesting
+            .do_requesting(
+                &client_config,
+                &test_socket_provider,
+                &mut rng,
+                &time,
+                &mut stop_receiver,
+            )
+            .fuse();
+
+        let time = &time;
+
+        // These are the time ranges in which we expect to see messages from the
+        // DHCP client. They are ranges in order to account for randomized
+        // delays.
+        const EXPECTED_RANGES: [(u64, u64); NUM_REQUEST_RETRANSMITS + 1] =
+            [(0, 0), (3, 5), (7, 9), (15, 17), (31, 33)];
+
+        let receive_fut = async {
+            let mut previous_time = std::time::Duration::from_secs(0);
+
+            for (start, end) in EXPECTED_RANGES {
+                let mut recv_buf = [0u8; BUFFER_SIZE];
+                let DatagramInfo { length, address } = server_end
+                    .recv_from(&mut recv_buf)
+                    .await
+                    .expect("recv_from on test socket should succeed");
+
+                assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+
+                let msg = crate::parse::parse_dhcp_message_from_ip_packet(
+                    &recv_buf[..length],
+                    dhcp_protocol::SERVER_PORT,
+                )
+                .expect("received packet should parse as DHCP message");
+
+                assert_eq!(
+                    msg,
+                    dhcp_protocol::Message {
+                        op: dhcp_protocol::OpCode::BOOTREQUEST,
+                        xid: msg.xid,
+                        secs: 0,
+                        bdcast_flag: false,
+                        ciaddr: Ipv4Addr::UNSPECIFIED,
+                        yiaddr: Ipv4Addr::UNSPECIFIED,
+                        siaddr: Ipv4Addr::UNSPECIFIED,
+                        giaddr: Ipv4Addr::UNSPECIFIED,
+                        chaddr: TEST_MAC_ADDRESS,
+                        sname: String::new(),
+                        file: String::new(),
+                        options: vec![
+                            dhcp_protocol::DhcpOption::IpAddressLeaseTime(
+                                DEFAULT_LEASE_LENGTH_SECONDS
+                            ),
+                            dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
+                            dhcp_protocol::DhcpOption::ParameterRequestList(
+                                TEST_PARAMETER_REQUEST_LIST.into()
+                            ),
+                            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+                            dhcp_protocol::DhcpOption::DhcpMessageType(
+                                dhcp_protocol::MessageType::DHCPREQUEST
+                            ),
+                        ],
+                    }
+                );
+
+                let received_time = time.now();
+
+                let duration_range =
+                    std::time::Duration::from_secs(start)..=std::time::Duration::from_secs(end);
+                assert!(duration_range.contains(&(received_time - previous_time)));
+
+                previous_time = received_time;
+            }
+        }
+        .fuse();
+
+        pin_mut!(requesting_fut, receive_fut);
+
+        let main_future = async { join!(requesting_fut, receive_fut) };
+        pin_mut!(main_future);
+
+        let (requesting_result, ()) =
+            run_with_accelerated_time(&mut executor, time, &mut main_future);
+
+        assert_matches!(requesting_result, Ok(RequestingOutcome::RanOutOfRetransmits));
     }
 }
