@@ -20,6 +20,7 @@ group("drivers") {
     "drivers/ramdisk",
     "drivers/sdhci",
     "drivers/sdmmc",
+    "drivers/ufs",
     "drivers/ums-function",
     "drivers/usb-mass-storage",
     "drivers/virtio:virtio_block",

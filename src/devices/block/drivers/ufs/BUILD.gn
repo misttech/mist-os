@@ -1,0 +1,69 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/test.gni")
+
+driver_bind_rules("ufs_bind") {
+  rules = "ufs.bind"
+  header_output = "ufs_bind.h"
+  tests = "bind_tests.json"
+  deps = [
+    "//src/devices/bind/fuchsia.driver.framework",
+    "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.pci.massstorage",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ufs_bind_test" ]
+}
+
+source_set("shared") {
+  sources = [
+    "ufs.cc",
+    "ufs.h",
+  ]
+  configs += [ "//build/config:all_source" ]
+  deps = [
+    ":ufs_bind",
+    "//src/devices/block/lib/common",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/mmio",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//src/devices/lib/dev-operation",
+    "//src/devices/pci/lib/device-protocol-pci",
+    "//src/devices/pci/lib/pci",
+    "//zircon/system/ulib/hwreg",
+  ]
+}
+
+fuchsia_driver("ufs-driver") {
+  output_name = "ufs"
+  deps = [ ":shared" ]
+}
+
+fuchsia_driver_component("ufs") {
+  component_name = "ufs"
+  deps = [ ":ufs-driver" ]
+  info = "ufs-info.json"
+  manifest = "meta/ufs.cml"
+}
+
+fuchsia_driver_package("pkg") {
+  package_name = "ufs"
+  driver_components = [ ":ufs" ]
+}

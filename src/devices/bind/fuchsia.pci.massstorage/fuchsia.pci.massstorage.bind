@@ -14,5 +14,6 @@ extend uint fuchsia.BIND_PCI_SUBCLASS {
   SATA         =  0x06,
   SERIAL_SCSI  =  0x07,
   NVMEM        =  0x08,
+  UFS          =  0x09,
   MASS_STORAGE =  0x80,
 };

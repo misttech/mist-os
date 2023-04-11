@@ -117,6 +117,7 @@ __BEGIN_CDECLS
 #define PCI_SUBCLASS_SATA           0x06
 #define PCI_SUBCLASS_SERIAL_SCSI    0x07
 #define PCI_SUBCLASS_NVMEM          0x08
+#define PCI_SUBCLASS_UFS            0x09
 #define PCI_SUBCLASS_MASS_STORAGE   0x80
 // Network
 #define PCI_SUBCLASS_ETHERNET       0x00
