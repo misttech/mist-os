@@ -309,7 +309,7 @@ class Device final
   }
 
   const fbl::String& name() const { return name_; }
-  const fbl::String& url() const { return url_; }
+  const std::string& url() const { return url_; }
 
   Coordinator* coordinator;
   uint32_t flags = 0;
@@ -417,7 +417,7 @@ class Device final
   std::optional<fidl::ServerBindingRef<fuchsia_device_manager::Coordinator>> coordinator_binding_;
 
   const fbl::String name_;
-  const fbl::String url_;
+  const std::string url_;
 
   // The device's parent in the device tree. If this is a composite device, its
   // parent will be null.

@@ -67,15 +67,12 @@ class DriverLoader {
       std::string_view name, fidl::VectorView<fdf::wire::NodeProperty> props,
       const MatchDeviceConfig& config);
 
-  const Driver* UrlToDriver(std::string_view url) const;
-
   const Driver* LoadDriverUrl(const std::string& manifest_url, bool use_universe_resolver = false);
   const Driver* LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info);
 
-  // This API is used for debugging, for GetDriverInfo and DumpDrivers.
-  std::vector<const Driver*> GetAllDriverIndexDrivers();
-
  private:
+  const Driver* UrlToDriver(std::string_view url) const;
+
   // Drivers we cached from the DriverIndex.
   fbl::DoublyLinkedList<std::unique_ptr<Driver>> driver_index_drivers_;
 

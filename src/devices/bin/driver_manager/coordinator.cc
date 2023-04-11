@@ -120,8 +120,8 @@ zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
   return zx::ok(std::move(vmo));
 }
 
-zx::result<zx::vmo> UrlToVmo(DriverLoader& driver_loader, const fbl::String& url) {
-  const Driver* driver = driver_loader.UrlToDriver(url);
+zx::result<zx::vmo> UrlToVmo(DriverLoader& driver_loader, const std::string& url) {
+  const Driver* driver = driver_loader.LoadDriverUrl(url);
   if (!driver) {
     LOGF(ERROR, "Cannot find driver '%s'", url.data());
     return zx::error(ZX_ERR_NOT_FOUND);
