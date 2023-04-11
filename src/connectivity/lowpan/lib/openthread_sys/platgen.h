@@ -40,6 +40,7 @@
 #include <openthread/logging.h>
 #include <openthread/message.h>
 #include <openthread/multi_radio.h>
+#include <openthread/nat64.h>
 #include <openthread/ncp.h>
 #include <openthread/netdata.h>
 #include <openthread/netdiag.h>

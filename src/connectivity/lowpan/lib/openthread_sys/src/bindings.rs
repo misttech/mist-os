@@ -80,12 +80,13 @@ pub const OT_LOG_LEVEL_WARN: u32 = 2;
 pub const OT_LOG_LEVEL_NOTE: u32 = 3;
 pub const OT_LOG_LEVEL_INFO: u32 = 4;
 pub const OT_LOG_LEVEL_DEBG: u32 = 5;
-pub const OPENTHREAD_API_VERSION: u32 = 265;
+pub const OPENTHREAD_API_VERSION: u32 = 306;
 pub const OT_UPTIME_STRING_SIZE: u32 = 24;
 pub const OT_CRYPTO_SHA256_HASH_SIZE: u32 = 32;
 pub const OT_CRYPTO_ECDSA_MAX_DER_SIZE: u32 = 125;
 pub const OT_CRYPTO_ECDSA_PUBLIC_KEY_SIZE: u32 = 64;
 pub const OT_CRYPTO_ECDSA_SIGNATURE_SIZE: u32 = 64;
+pub const OT_CRYPTO_PBDKF2_MAX_SALT_SIZE: u32 = 30;
 pub const OT_PANID_BROADCAST: u32 = 65535;
 pub const OT_EXT_ADDRESS_SIZE: u32 = 8;
 pub const OT_MAC_KEY_SIZE: u32 = 16;
@@ -150,10 +151,11 @@ pub const OT_DNS_MAX_LABEL_SIZE: u32 = 64;
 pub const OT_DNS_TXT_KEY_MIN_LENGTH: u32 = 1;
 pub const OT_DNS_TXT_KEY_MAX_LENGTH: u32 = 9;
 pub const OT_ICMP6_HEADER_DATA_SIZE: u32 = 4;
-pub const OT_US_PER_TEN_SYMBOLS: u32 = 160;
 pub const OT_MAC_FILTER_FIXED_RSS_DISABLED: u32 = 127;
 pub const OT_MAC_FILTER_ITERATOR_INIT: u32 = 0;
-pub const OT_NCP_LEGACY_ULA_PREFIX_LENGTH: u32 = 8;
+pub const OT_IP4_ADDRESS_SIZE: u32 = 4;
+pub const OT_IP4_ADDRESS_STRING_SIZE: u32 = 17;
+pub const OT_IP4_CIDR_STRING_SIZE: u32 = 20;
 pub const OT_NETWORK_BASE_TLV_MAX_LENGTH: u32 = 254;
 pub const OT_NETWORK_MAX_ROUTER_ID: u32 = 62;
 pub const OT_NEIGHBOR_INFO_ITERATOR_INIT: u32 = 0;
@@ -525,6 +527,8 @@ pub const OT_CHANGED_JOINER_STATE: _bindgen_ty_1 = 134217728;
 pub const OT_CHANGED_ACTIVE_DATASET: _bindgen_ty_1 = 268435456;
 #[doc = "< Pending Operational Dataset changed"]
 pub const OT_CHANGED_PENDING_DATASET: _bindgen_ty_1 = 536870912;
+#[doc = "< The state of NAT64 translator changed"]
+pub const OT_CHANGED_NAT64_TRANSLATOR_STATE: _bindgen_ty_1 = 1073741824;
 #[doc = " This enumeration defines flags that are passed as part of `otStateChangedCallback`."]
 #[doc = ""]
 pub type _bindgen_ty_1 = ::std::os::raw::c_uint;
@@ -900,6 +904,10 @@ pub struct otBufferInfo {
     pub mTotalBuffers: u16,
     #[doc = "< The number of free buffers (0xffff if unknown)."]
     pub mFreeBuffers: u16,
+    #[doc = " The maximum number of used buffers at the same time since OT stack initialization or last call to"]
+    #[doc = " `otMessageResetBufferInfo()`."]
+    #[doc = ""]
+    pub mMaxUsedBuffers: u16,
     #[doc = "< Info about 6LoWPAN send queue."]
     pub m6loSendQueue: otMessageQueueInfo,
     #[doc = "< Info about 6LoWPAN reassembly queue."]
@@ -982,6 +990,15 @@ extern "C" {
     #[doc = " @param[out]  aBufferInfo  A pointer where the message buffer information is written."]
     #[doc = ""]
     pub fn otMessageGetBufferInfo(aInstance: *mut otInstance, aBufferInfo: *mut otBufferInfo);
+}
+extern "C" {
+    #[doc = " Reset the Message Buffer information counter tracking the maximum number buffers in use at the same time."]
+    #[doc = ""]
+    #[doc = " This resets `mMaxUsedBuffers` in `otBufferInfo`."]
+    #[doc = ""]
+    #[doc = " @param[in]   aInstance    A pointer to the OpenThread instance."]
+    #[doc = ""]
+    pub fn otMessageResetBufferInfo(aInstance: *mut otInstance);
 }
 #[doc = "< Key Type: Raw Data."]
 pub const OT_CRYPTO_KEY_TYPE_RAW: otCryptoKeyType = 0;
@@ -1252,7 +1269,7 @@ extern "C" {
     #[doc = " Start HMAC operation."]
     #[doc = ""]
     #[doc = " @param[in]  aContext           Context for HMAC operation."]
-    #[doc = " @param[in]  aKey               Key material to be used for for HMAC operation."]
+    #[doc = " @param[in]  aKey               Key material to be used for HMAC operation."]
     #[doc = ""]
     #[doc = " @retval OT_ERROR_NONE          Successfully started HMAC operation."]
     #[doc = " @retval OT_ERROR_FAILED        Failed to start HMAC operation."]
@@ -1579,6 +1596,27 @@ extern "C" {
         aSignature: *const otPlatCryptoEcdsaSignature,
     ) -> otError;
 }
+extern "C" {
+    #[doc = " Perform PKCS#5 PBKDF2 using CMAC (AES-CMAC-PRF-128)."]
+    #[doc = ""]
+    #[doc = " @param[in]     aPassword          Password to use when generating key."]
+    #[doc = " @param[in]     aPasswordLen       Length of password."]
+    #[doc = " @param[in]     aSalt              Salt to use when generating key."]
+    #[doc = " @param[in]     aSaltLen           Length of salt."]
+    #[doc = " @param[in]     aIterationCounter  Iteration count."]
+    #[doc = " @param[in]     aKeyLen            Length of generated key in bytes."]
+    #[doc = " @param[out]    aKey               A pointer to the generated key."]
+    #[doc = ""]
+    pub fn otPlatCryptoPbkdf2GenerateKey(
+        aPassword: *const u8,
+        aPasswordLen: u16,
+        aSalt: *const u8,
+        aSaltLen: u16,
+        aIterationCounter: u32,
+        aKeyLen: u16,
+        aKey: *mut u8,
+    );
+}
 #[doc = "< aMaxPHYPacketSize (IEEE 802.15.4-2006)"]
 pub const OT_RADIO_FRAME_MAX_SIZE: _bindgen_ty_3 = 127;
 #[doc = "< Minimal size of frame FCS + CONTROL"]
@@ -1589,7 +1627,12 @@ pub const OT_RADIO_SYMBOLS_PER_OCTET: _bindgen_ty_3 = 2;
 pub const OT_RADIO_BIT_RATE: _bindgen_ty_3 = 250000;
 #[doc = "< Number of bits per octet"]
 pub const OT_RADIO_BITS_PER_OCTET: _bindgen_ty_3 = 8;
+#[doc = "< The O-QPSK PHY symbol rate when operating in the 780MHz, 915MHz, 2380MHz, 2450MHz"]
+pub const OT_RADIO_SYMBOL_RATE: _bindgen_ty_3 = 62500;
+#[doc = "< Symbol duration time in unit of microseconds"]
 pub const OT_RADIO_SYMBOL_TIME: _bindgen_ty_3 = 16;
+#[doc = "< Time for 10 symbols in unit of microseconds"]
+pub const OT_RADIO_TEN_SYMBOLS_TIME: _bindgen_ty_3 = 160;
 #[doc = "< LQI measurement not supported"]
 pub const OT_RADIO_LQI_NONE: _bindgen_ty_3 = 0;
 #[doc = "< Invalid or unknown RSSI value"]
@@ -1786,9 +1829,27 @@ pub struct otRadioFrame__bindgen_ty_1__bindgen_ty_1 {
     pub mMaxCsmaBackoffs: u8,
     #[doc = "< Maximum number of retries allowed after a transmission failure."]
     pub mMaxFrameRetries: u8,
+    #[doc = " The RX channel after frame TX is done (after all frame retries - ack received, or timeout, or abort)."]
+    #[doc = ""]
+    #[doc = " Radio platforms can choose to fully ignore this. OT stack will make sure to call `otPlatRadioReceive()`"]
+    #[doc = " with the desired RX channel after a frame TX is done and signaled in `otPlatRadioTxDone()` callback."]
+    #[doc = " Radio platforms that don't provide `OT_RADIO_CAPS_TRANSMIT_RETRIES` must always ignore this."]
+    #[doc = ""]
+    #[doc = " This is intended for situations where there may be delay in interactions between OT stack and radio, as"]
+    #[doc = " an example this is used in RCP/host architecture to make sure RCP switches to PAN channel more quickly."]
+    #[doc = " In particular, this can help with CSL tx to a sleepy child, where the child may use a different channel"]
+    #[doc = " for CSL than the PAN channel. After frame tx, we want the radio/RCP to go back to the PAN channel"]
+    #[doc = " quickly to ensure that parent does not miss tx from child afterwards, e.g., child responding to the"]
+    #[doc = " earlier CSL transmitted frame from parent using PAN channel while radio still staying on CSL channel."]
+    #[doc = ""]
+    #[doc = " The switch to the RX channel MUST happen after the frame TX is fully done, i.e., after all retries and"]
+    #[doc = " when ack is received (when \"Ack Request\" flag is set on the TX frame) or ack timeout. Note that ack is"]
+    #[doc = " expected on the same channel that frame is sent on."]
+    #[doc = ""]
+    pub mRxChannelAfterTxDone: u8,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 5usize],
+    pub __bindgen_padding_0: u32,
 }
 impl Default for otRadioFrame__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -1893,8 +1954,7 @@ impl otRadioFrame__bindgen_ty_1__bindgen_ty_1 {
 pub struct otRadioFrame__bindgen_ty_1__bindgen_ty_2 {
     #[doc = " The timestamp when the frame was received in microseconds."]
     #[doc = ""]
-    #[doc = " The value SHALL be the time when the SFD was received when TIME_SYNC or CSL is enabled."]
-    #[doc = " Otherwise, the time when the MAC frame was fully received is also acceptable."]
+    #[doc = " The value SHALL be the time when the SFD was received."]
     #[doc = ""]
     pub mTimestamp: u64,
     #[doc = "< ACK security frame counter (applicable when `mAckedWithSecEnhAck` is set)."]
@@ -2313,6 +2373,16 @@ extern "C" {
     #[doc = " @param[in]   aMacFrameCounter  The MAC frame counter value."]
     #[doc = ""]
     pub fn otPlatRadioSetMacFrameCounter(aInstance: *mut otInstance, aMacFrameCounter: u32);
+}
+extern "C" {
+    #[doc = " This method sets the current MAC frame counter value only if the new given value is larger than the current value."]
+    #[doc = ""]
+    #[doc = " This function is used when radio provides `OT_RADIO_CAPS_TRANSMIT_SEC` capability."]
+    #[doc = ""]
+    #[doc = " @param[in]   aInstance         A pointer to an OpenThread instance."]
+    #[doc = " @param[in]   aMacFrameCounter  The MAC frame counter value."]
+    #[doc = ""]
+    pub fn otPlatRadioSetMacFrameCounterIfLarger(aInstance: *mut otInstance, aMacFrameCounter: u32);
 }
 extern "C" {
     #[doc = " Get the current estimated time (in microseconds) of the radio chip."]
@@ -2838,6 +2908,104 @@ extern "C" {
         aLinkMetrics: otLinkMetrics,
         aShortAddress: otShortAddress,
         aExtAddress: *const otExtAddress,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Add a calibrated power of the specified channel to the power calibration table."]
+    #[doc = ""]
+    #[doc = " @note This API is an optional radio platform API. It's up to the platform layer to implement it."]
+    #[doc = ""]
+    #[doc = " The @p aActualPower is the actual measured output power when the parameters of the radio hardware modules"]
+    #[doc = " are set to the @p aRawPowerSetting."]
+    #[doc = ""]
+    #[doc = " The raw power setting is an opaque byte array. OpenThread doesn't define the format of the raw power setting."]
+    #[doc = " Its format is radio hardware related and it should be defined by the developers in the platform radio driver."]
+    #[doc = " For example, if the radio hardware contains both the radio chip and the FEM chip, the raw power setting can be"]
+    #[doc = " a combination of the radio power register and the FEM gain value."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance               The OpenThread instance structure."]
+    #[doc = " @param[in] aChannel                The radio channel."]
+    #[doc = " @param[in] aActualPower            The actual power in 0.01dBm."]
+    #[doc = " @param[in] aRawPowerSetting        A pointer to the raw power setting byte array."]
+    #[doc = " @param[in] aRawPowerSettingLength  The length of the @p aRawPowerSetting."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             Successfully added the calibrated power to the power calibration table."]
+    #[doc = " @retval OT_ERROR_NO_BUFS          No available entry in the power calibration table."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS     The @p aChannel, @p aActualPower or @p aRawPowerSetting is invalid or the"]
+    #[doc = "                                   @p aActualPower already exists in the power calibration table."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This feature is not implemented."]
+    #[doc = ""]
+    pub fn otPlatRadioAddCalibratedPower(
+        aInstance: *mut otInstance,
+        aChannel: u8,
+        aActualPower: i16,
+        aRawPowerSetting: *const u8,
+        aRawPowerSettingLength: u16,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Clear all calibrated powers from the power calibration table."]
+    #[doc = ""]
+    #[doc = " @note This API is an optional radio platform API. It's up to the platform layer to implement it."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance   The OpenThread instance structure."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             Successfully cleared all calibrated powers from the power calibration table."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This feature is not implemented."]
+    #[doc = ""]
+    pub fn otPlatRadioClearCalibratedPowers(aInstance: *mut otInstance) -> otError;
+}
+extern "C" {
+    #[doc = " Set the target power for the given channel."]
+    #[doc = ""]
+    #[doc = " @note This API is an optional radio platform API. It's up to the platform layer to implement it."]
+    #[doc = "       If this API is implemented, the function `otPlatRadioSetTransmitPower()` should be disabled."]
+    #[doc = ""]
+    #[doc = " The radio driver should set the actual output power to be less than or equal to the target power and as close"]
+    #[doc = " as possible to the target power."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance     The OpenThread instance structure."]
+    #[doc = " @param[in]  aChannel      The radio channel."]
+    #[doc = " @param[in]  aTargetPower  The target power in 0.01dBm. Passing `INT16_MAX` will disable this channel to use the"]
+    #[doc = "                           target power."]
+    #[doc = ""]
+    #[doc = " @retval  OT_ERROR_NONE             Successfully set the target power."]
+    #[doc = " @retval  OT_ERROR_INVALID_ARGS     The @p aChannel or @p aTargetPower is invalid."]
+    #[doc = " @retval  OT_ERROR_NOT_IMPLEMENTED  The feature is not implemented."]
+    #[doc = ""]
+    pub fn otPlatRadioSetChannelTargetPower(
+        aInstance: *mut otInstance,
+        aChannel: u8,
+        aTargetPower: i16,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Get the raw power setting for the given channel."]
+    #[doc = ""]
+    #[doc = " @note OpenThread `src/core/utils` implements a default implementation of the API `otPlatRadioAddCalibratedPower()`,"]
+    #[doc = "       `otPlatRadioClearCalibratedPowers()` and `otPlatRadioSetChannelTargetPower()`. This API is provided by"]
+    #[doc = "       the default implementation to get the raw power setting for the given channel. If the platform doesn't"]
+    #[doc = "       use the default implementation, it can ignore this API."]
+    #[doc = ""]
+    #[doc = " Platform radio layer should parse the raw power setting based on the radio layer defined format and set the"]
+    #[doc = " parameters of each radio hardware module."]
+    #[doc = ""]
+    #[doc = " @param[in]      aInstance               The OpenThread instance structure."]
+    #[doc = " @param[in]      aChannel                The radio channel."]
+    #[doc = " @param[out]     aRawPowerSetting        A pointer to the raw power setting byte array."]
+    #[doc = " @param[in,out]  aRawPowerSettingLength  On input, a pointer to the size of @p aRawPowerSetting."]
+    #[doc = "                                         On output, a pointer to the length of the raw power setting data."]
+    #[doc = ""]
+    #[doc = " @retval  OT_ERROR_NONE          Successfully got the target power."]
+    #[doc = " @retval  OT_ERROR_INVALID_ARGS  The @p aChannel is invalid, @p aRawPowerSetting or @p aRawPowerSettingLength is NULL"]
+    #[doc = "                                 or @aRawPowerSettingLength is too short."]
+    #[doc = " @retval  OT_ERROR_NOT_FOUND     The raw power setting for the @p aChannel was not found."]
+    #[doc = ""]
+    pub fn otPlatRadioGetRawPowerSetting(
+        aInstance: *mut otInstance,
+        aChannel: u8,
+        aRawPowerSetting: *mut u8,
+        aRawPowerSettingLength: *mut u16,
     ) -> otError;
 }
 #[doc = " @struct otIp6InterfaceIdentifier"]
@@ -4160,6 +4328,27 @@ impl otBorderRouterConfig {
         __bindgen_bitfield_unit
     }
 }
+#[doc = " This structure represents 6LoWPAN Context ID information associated with a prefix in Network Data."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct otLowpanContextInfo {
+    #[doc = "< The 6LoWPAN Context ID."]
+    pub mContextId: u8,
+    #[doc = "< The compress flag."]
+    pub mCompressFlag: bool,
+    #[doc = "< The associated IPv6 prefix."]
+    pub mPrefix: otIp6Prefix,
+}
+impl Default for otLowpanContextInfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 #[doc = " This structure represents an External Route configuration."]
 #[doc = ""]
 #[repr(C)]
@@ -4335,13 +4524,16 @@ impl Default for otServiceConfig {
     }
 }
 extern "C" {
-    #[doc = " This method provides a full or stable copy of the Partition's Thread Network Data."]
+    #[doc = " Provide full or stable copy of the Partition's Thread Network Data."]
     #[doc = ""]
     #[doc = " @param[in]      aInstance    A pointer to an OpenThread instance."]
     #[doc = " @param[in]      aStable      TRUE when copying the stable version, FALSE when copying the full version."]
     #[doc = " @param[out]     aData        A pointer to the data buffer."]
     #[doc = " @param[in,out]  aDataLength  On entry, size of the data buffer pointed to by @p aData."]
     #[doc = "                              On exit, number of copied bytes."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE    Successfully copied the Thread Network Data into @p aData and updated @p aDataLength."]
+    #[doc = " @retval OT_ERROR_NO_BUFS Not enough space in @p aData to fully copy the Thread Network Data."]
     #[doc = ""]
     pub fn otNetDataGet(
         aInstance: *mut otInstance,
@@ -4351,7 +4543,35 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next On Mesh Prefix in the partition's Network Data."]
+    #[doc = " Get the current length (number of bytes) of Partition's Thread Network Data."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance    A pointer to an OpenThread instance."]
+    #[doc = ""]
+    #[doc = " @return The length of the Network Data."]
+    #[doc = ""]
+    pub fn otNetDataGetLength(aInstance: *mut otInstance) -> u8;
+}
+extern "C" {
+    #[doc = " Get the maximum observed length of the Thread Network Data since OT stack initialization or since the last call to"]
+    #[doc = " `otNetDataResetMaxLength()`."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance    A pointer to an OpenThread instance."]
+    #[doc = ""]
+    #[doc = " @return The maximum length of the Network Data (high water mark for Network Data length)."]
+    #[doc = ""]
+    pub fn otNetDataGetMaxLength(aInstance: *mut otInstance) -> u8;
+}
+extern "C" {
+    #[doc = " Reset the tracked maximum length of the Thread Network Data."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance    A pointer to an OpenThread instance."]
+    #[doc = ""]
+    #[doc = " @sa otNetDataGetMaxLength"]
+    #[doc = ""]
+    pub fn otNetDataResetMaxLength(aInstance: *mut otInstance);
+}
+extern "C" {
+    #[doc = " Get the next On Mesh Prefix in the partition's Network Data."]
     #[doc = ""]
     #[doc = " @param[in]      aInstance  A pointer to an OpenThread instance."]
     #[doc = " @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first on-mesh entry"]
@@ -4368,7 +4588,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next external route in the partition's Network Data."]
+    #[doc = " Get the next external route in the partition's Network Data."]
     #[doc = ""]
     #[doc = " @param[in]      aInstance  A pointer to an OpenThread instance."]
     #[doc = " @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first external route entry"]
@@ -4385,7 +4605,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the next service in the partition's Network Data."]
+    #[doc = " Get the next service in the partition's Network Data."]
     #[doc = ""]
     #[doc = " @param[in]      aInstance  A pointer to an OpenThread instance."]
     #[doc = " @param[in,out]  aIterator  A pointer to the Network Data iterator context. To get the first service entry"]
@@ -4399,6 +4619,23 @@ extern "C" {
         aInstance: *mut otInstance,
         aIterator: *mut otNetworkDataIterator,
         aConfig: *mut otServiceConfig,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Get the next 6LoWPAN Context ID info in the partition's Network Data."]
+    #[doc = ""]
+    #[doc = " @param[in]      aInstance     A pointer to an OpenThread instance."]
+    #[doc = " @param[in,out]  aIterator     A pointer to the Network Data iterator. To get the first service entry"]
+    #[doc = "it should be set to OT_NETWORK_DATA_ITERATOR_INIT."]
+    #[doc = " @param[out]     aContextInfo  A pointer to where the retrieved 6LoWPAN Context ID information will be placed."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE       Successfully found the next 6LoWPAN Context ID info."]
+    #[doc = " @retval OT_ERROR_NOT_FOUND  No subsequent 6LoWPAN Context info exists in the partition's Network Data."]
+    #[doc = ""]
+    pub fn otNetDataGetNextLowpanContextInfo(
+        aInstance: *mut otInstance,
+        aIterator: *mut otNetworkDataIterator,
+        aContextInfo: *mut otLowpanContextInfo,
     ) -> otError;
 }
 extern "C" {
@@ -4450,8 +4687,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function checks whether a given Prefix can act as a valid OMR prefix and also the Leader's Network Data contains"]
-    #[doc = " this prefix."]
+    #[doc = " Check whether a given Prefix can act as a valid OMR prefix and also the Leader's Network Data contains this prefix."]
     #[doc = ""]
     #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
     #[doc = " @param[in]  aPrefix    A pointer to the IPv6 prefix."]
@@ -4945,6 +5181,17 @@ impl Default for otBorderRoutingPrefixTableEntry {
         }
     }
 }
+#[doc = "< Routing Manager is uninitialized."]
+pub const OT_BORDER_ROUTING_STATE_UNINITIALIZED: otBorderRoutingState = 0;
+#[doc = "< Routing Manager is initialized but disabled."]
+pub const OT_BORDER_ROUTING_STATE_DISABLED: otBorderRoutingState = 1;
+#[doc = "< Routing Manager in initialized and enabled but currently stopped."]
+pub const OT_BORDER_ROUTING_STATE_STOPPED: otBorderRoutingState = 2;
+#[doc = "< Routing Manager is initialized, enabled, and running."]
+pub const OT_BORDER_ROUTING_STATE_RUNNING: otBorderRoutingState = 3;
+#[doc = " This enumeration represents the state of Border Routing Manager."]
+#[doc = ""]
+pub type otBorderRoutingState = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = " This method initializes the Border Routing Manager on given infrastructure interface."]
     #[doc = ""]
@@ -4982,24 +5229,37 @@ extern "C" {
     pub fn otBorderRoutingSetEnabled(aInstance: *mut otInstance, aEnabled: bool) -> otError;
 }
 extern "C" {
-    #[doc = " This function gets the preference used when advertising Route Info Options (e.g., for discovered OMR prefixes) in"]
-    #[doc = " Router Advertisement messages sent over the infrastructure link."]
+    #[doc = " Gets the current state of Border Routing Manager."]
     #[doc = ""]
-    #[doc = " @param[in] aInstance A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
     #[doc = ""]
-    #[doc = " @returns The OMR prefix advertisement preference."]
+    #[doc = " @returns The current state of Border Routing Manager."]
+    #[doc = ""]
+    pub fn otBorderRoutingGetState(aInstance: *mut otInstance) -> otBorderRoutingState;
+}
+extern "C" {
+    #[doc = " This function gets the current preference used when advertising Route Info Options (RIO) in Router Advertisement"]
+    #[doc = " messages sent over the infrastructure link."]
+    #[doc = ""]
+    #[doc = " The RIO preference is determined as follows:"]
+    #[doc = ""]
+    #[doc = " - If explicitly set by user by calling `otBorderRoutingSetRouteInfoOptionPreference()`, the given preference is"]
+    #[doc = "   used."]
+    #[doc = " - Otherwise, it is determined based on device's current role: Medium preference when in router/leader role and"]
+    #[doc = "   low preference when in child role."]
+    #[doc = ""]
+    #[doc = " @returns The current Route Info Option preference."]
     #[doc = ""]
     pub fn otBorderRoutingGetRouteInfoOptionPreference(
         aInstance: *mut otInstance,
     ) -> otRoutePreference;
 }
 extern "C" {
-    #[doc = " This function sets the preference to use when advertising Route Info Options in Router Advertisement messages sent"]
-    #[doc = " over the infrastructure link, for example for discovered OMR prefixes."]
+    #[doc = " This function explicitly sets the preference to use when advertising Route Info Options (RIO) in Router"]
+    #[doc = " Advertisement messages sent over the infrastructure link."]
     #[doc = ""]
-    #[doc = " By default BR will use `medium` preference level, but this function allows the default value to be changed. As an"]
-    #[doc = " example, it can be set to `low` preference in the case where device is a temporary BR (a mobile BR or a"]
-    #[doc = " battery-powered BR) to indicate that other BRs (if any) should be preferred over this BR on the infrastructure link."]
+    #[doc = " After a call to this function, BR will use the given preference for all its advertised RIOs. The preference can be"]
+    #[doc = " cleared by calling `otBorderRoutingClearRouteInfoOptionPreference()`."]
     #[doc = ""]
     #[doc = " @param[in] aInstance     A pointer to an OpenThread instance."]
     #[doc = " @param[in] aPreference   The route preference to use."]
@@ -5008,6 +5268,16 @@ extern "C" {
         aInstance: *mut otInstance,
         aPreference: otRoutePreference,
     );
+}
+extern "C" {
+    #[doc = " This function clears a previously set preference value for advertised Route Info Options."]
+    #[doc = ""]
+    #[doc = " After a call to this function, BR will use device's role to determine the RIO preference: Medium preference when"]
+    #[doc = " in router/leader role and low preference when in child role."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance     A pointer to an OpenThread instance."]
+    #[doc = ""]
+    pub fn otBorderRoutingClearRouteInfoOptionPreference(aInstance: *mut otInstance);
 }
 extern "C" {
     #[doc = " Gets the local Off-Mesh-Routable (OMR) Prefix, for example `fdfc:1ff5:1512:5622::/64`."]
@@ -5036,7 +5306,7 @@ extern "C" {
     #[doc = " @param[out]  aPrefix      A pointer to output the favored OMR prefix."]
     #[doc = " @param[out]  aPreference  A pointer to output the preference associated the favored prefix."]
     #[doc = ""]
-    #[doc = " @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet."]
+    #[doc = " @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not running yet."]
     #[doc = " @retval  OT_ERROR_NONE           Successfully retrieved the favored OMR prefix."]
     #[doc = ""]
     pub fn otBorderRoutingGetFavoredOmrPrefix(
@@ -5046,18 +5316,34 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " Gets the On-Link Prefix for the adjacent infrastructure link, for example `fd41:2650:a6f5:0::/64`."]
+    #[doc = " Gets the local On-Link Prefix for the adjacent infrastructure link."]
     #[doc = ""]
-    #[doc = " An On-Link Prefix is a 64-bit prefix that's advertised on the infrastructure link if there isn't already a usable"]
-    #[doc = " on-link prefix being advertised on the link."]
+    #[doc = " The local On-Link Prefix is a 64-bit prefix that's advertised on the infrastructure link if there isn't already a"]
+    #[doc = " usable on-link prefix being advertised on the link."]
     #[doc = ""]
     #[doc = " @param[in]   aInstance  A pointer to an OpenThread instance."]
     #[doc = " @param[out]  aPrefix    A pointer to where the prefix will be output to."]
     #[doc = ""]
     #[doc = " @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet."]
-    #[doc = " @retval  OT_ERROR_NONE           Successfully retrieved the on-link prefix."]
+    #[doc = " @retval  OT_ERROR_NONE           Successfully retrieved the local on-link prefix."]
     #[doc = ""]
     pub fn otBorderRoutingGetOnLinkPrefix(
+        aInstance: *mut otInstance,
+        aPrefix: *mut otIp6Prefix,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Gets the currently favored On-Link Prefix."]
+    #[doc = ""]
+    #[doc = " The favored prefix is either a discovered on-link prefix on the infrastructure link or the local on-link prefix."]
+    #[doc = ""]
+    #[doc = " @param[in]   aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @param[out]  aPrefix    A pointer to where the prefix will be output to."]
+    #[doc = ""]
+    #[doc = " @retval  OT_ERROR_INVALID_STATE  The Border Routing Manager is not initialized yet."]
+    #[doc = " @retval  OT_ERROR_NONE           Successfully retrieved the favored on-link prefix."]
+    #[doc = ""]
+    pub fn otBorderRoutingGetFavoredOnLinkPrefix(
         aInstance: *mut otInstance,
         aPrefix: *mut otIp6Prefix,
     ) -> otError;
@@ -5518,28 +5804,28 @@ extern "C" {
     pub fn otChannelMonitorGetChannelOccupancy(aInstance: *mut otInstance, aChannel: u8) -> u16;
 }
 extern "C" {
-    #[doc = " Gets the child supervision interval (in seconds)."]
+    #[doc = " Gets the child supervision interval (in seconds) on a child."]
     #[doc = ""]
-    #[doc = " Child supervision feature provides a mechanism for parent to ensure that a message is sent to each sleepy child"]
-    #[doc = " within the supervision interval. If there is no transmission to the child within the supervision interval,"]
-    #[doc = " OpenThread enqueues and sends a supervision message (a data message with empty payload) to the child."]
+    #[doc = " Child supervision feature provides a mechanism for a sleepy child to ask its parent to ensure to send a message to"]
+    #[doc = " it within the supervision interval. If there is no transmission to the child within the supervision interval,"]
+    #[doc = " parent sends a supervision message (a data message with empty payload) to the child."]
     #[doc = ""]
     #[doc = " @param[in]  aInstance       A pointer to an OpenThread instance."]
     #[doc = ""]
-    #[doc = " @returns  The child supervision interval. Zero indicates that child supervision is disabled."]
+    #[doc = " @returns  The child supervision interval. Zero indicates that supervision is disabled."]
     #[doc = ""]
     pub fn otChildSupervisionGetInterval(aInstance: *mut otInstance) -> u16;
 }
 extern "C" {
-    #[doc = " Sets the child supervision interval (in seconds)."]
+    #[doc = " Sets the child supervision interval (in seconds) on the child."]
     #[doc = ""]
     #[doc = " @param[in]  aInstance       A pointer to an OpenThread instance."]
-    #[doc = " @param[in]  aInterval       The supervision interval (in seconds). Zero to disable supervision on parent."]
+    #[doc = " @param[in]  aInterval       The supervision interval (in seconds). Zero to disable supervision."]
     #[doc = ""]
     pub fn otChildSupervisionSetInterval(aInstance: *mut otInstance, aInterval: u16);
 }
 extern "C" {
-    #[doc = " Gets the supervision check timeout interval (in seconds)."]
+    #[doc = " Gets the supervision check timeout interval (in seconds) on the child."]
     #[doc = ""]
     #[doc = " If the device is a sleepy child and it does not hear from its parent within the specified check timeout, it initiates"]
     #[doc = " the re-attach process (MLE Child Update Request/Response exchange with its parent)."]
@@ -5557,6 +5843,19 @@ extern "C" {
     #[doc = " @param[in]  aTimeout        The check timeout (in seconds). Zero to disable supervision check on the child."]
     #[doc = ""]
     pub fn otChildSupervisionSetCheckTimeout(aInstance: *mut otInstance, aTimeout: u16);
+}
+extern "C" {
+    #[doc = " Get the value of supervision check timeout failure counter."]
+    #[doc = ""]
+    #[doc = " The counter tracks the number of supervision check failures on the child. It is incremented when the child does"]
+    #[doc = " not hear from its parent within the specified check timeout interval."]
+    #[doc = ""]
+    pub fn otChildSupervisionGetCheckFailureCounter(aInstance: *mut otInstance) -> u16;
+}
+extern "C" {
+    #[doc = " Reset the supervision check timeout failure counter to zero."]
+    #[doc = ""]
+    pub fn otChildSupervisionResetCheckFailureCounter(aInstance: *mut otInstance);
 }
 #[doc = " This structure represents a CLI command."]
 #[doc = ""]
@@ -7834,7 +8133,7 @@ extern "C" {
     ) -> otError;
 }
 extern "C" {
-    #[doc = " This function parses an Operational Dataset from a `otOperationalDatasetTlvs`."]
+    #[doc = " Parses an Operational Dataset from a given `otOperationalDatasetTlvs`."]
     #[doc = ""]
     #[doc = " @param[in]  aDatasetTlvs  A pointer to dataset TLVs."]
     #[doc = " @param[out] aDataset      A pointer to where the dataset will be placed."]
@@ -7845,6 +8144,37 @@ extern "C" {
     pub fn otDatasetParseTlvs(
         aDatasetTlvs: *const otOperationalDatasetTlvs,
         aDataset: *mut otOperationalDataset,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Converts a given Operational Dataset to `otOperationalDatasetTlvs`."]
+    #[doc = ""]
+    #[doc = " @param[in]  aDataset      An Operational dataset to convert to TLVs."]
+    #[doc = " @param[out] aDatasetTlvs  A pointer to dataset TLVs to return the result."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE          Successfully converted @p aDataset and updated @p aDatasetTlvs."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS  @p aDataset is invalid, does not contain active or pending timestamps."]
+    #[doc = ""]
+    pub fn otDatasetConvertToTlvs(
+        aDataset: *const otOperationalDataset,
+        aDatasetTlvs: *mut otOperationalDatasetTlvs,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Updates a given Operational Dataset."]
+    #[doc = ""]
+    #[doc = " @p aDataset contains the fields to be updated and their new value."]
+    #[doc = ""]
+    #[doc = " @param[in]     aDataset      Specifies the set of types and values to update."]
+    #[doc = " @param[in,out] aDatasetTlvs  A pointer to dataset TLVs to update."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE          Successfully updated @p aDatasetTlvs."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS  @p aDataset contains invalid values."]
+    #[doc = " @retval OT_ERROR_NO_BUFS       Not enough space space in @p aDatasetTlvs to apply the update."]
+    #[doc = ""]
+    pub fn otDatasetUpdateTlvs(
+        aDataset: *const otOperationalDataset,
+        aDatasetTlvs: *mut otOperationalDatasetTlvs,
     ) -> otError;
 }
 pub const OT_JOINER_STATE_IDLE: otJoinerState = 0;
@@ -8818,6 +9148,16 @@ pub const OT_DNS_NAT64_DISALLOW: otDnsNat64Mode = 2;
 #[doc = " This mode is only used when `OPENTHREAD_CONFIG_DNS_CLIENT_NAT64_ENABLE` is enabled."]
 #[doc = ""]
 pub type otDnsNat64Mode = ::std::os::raw::c_uint;
+pub const OT_DNS_TRANSPORT_UNSPECIFIED: otDnsTransportProto = 0;
+#[doc = " DNS transport is unspecified."]
+pub const OT_DNS_TRANSPORT_UDP: otDnsTransportProto = 1;
+#[doc = " DNS query should be sent via UDP."]
+pub const OT_DNS_TRANSPORT_TCP: otDnsTransportProto = 2;
+#[doc = " This enumeration type represents the DNS transport protocol in an `otDnsQueryConfig`."]
+#[doc = ""]
+#[doc = " This `OT_DNS_TRANSPORT_TCP` is only supported when `OPENTHREAD_CONFIG_DNS_CLIENT_OVER_TCP_ENABLE` is enabled."]
+#[doc = ""]
+pub type otDnsTransportProto = ::std::os::raw::c_uint;
 #[doc = " This structure represents a DNS query configuration."]
 #[doc = ""]
 #[doc = " Any of the fields in this structure can be set to zero to indicate that it is not specified. How the unspecified"]
@@ -8836,6 +9176,8 @@ pub struct otDnsQueryConfig {
     pub mRecursionFlag: otDnsRecursionFlag,
     #[doc = "< Allow/Disallow NAT64 address translation during address resolution."]
     pub mNat64Mode: otDnsNat64Mode,
+    #[doc = "< Select default transport protocol."]
+    pub mTransportProto: otDnsTransportProto,
 }
 impl Default for otDnsQueryConfig {
     fn default() -> Self {
@@ -9595,6 +9937,33 @@ extern "C" {
     #[doc = " @returns  A pointer to the counters of the DNS-SD server."]
     #[doc = ""]
     pub fn otDnssdGetCounters(aInstance: *mut otInstance) -> *const otDnssdCounters;
+}
+extern "C" {
+    #[doc = " Enable or disable forwarding DNS queries to platform DNS upstream API."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aEnabled   A boolean to enable/disable forwarding DNS queries to upstream."]
+    #[doc = ""]
+    #[doc = " @sa otPlatDnsStartUpstreamQuery"]
+    #[doc = " @sa otPlatDnsCancelUpstreamQuery"]
+    #[doc = " @sa otPlatDnsUpstreamQueryDone"]
+    #[doc = ""]
+    pub fn otDnssdUpstreamQuerySetEnabled(aInstance: *mut otInstance, aEnabled: bool);
+}
+extern "C" {
+    #[doc = " Returns whether the DNSSD server will forward DNS queries to the platform DNS upstream API."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_DNS_UPSTREAM_QUERY_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @retval     TRUE       If the DNSSD server will forward DNS queries."]
+    #[doc = " @retval     FALSE      If the DNSSD server will not forward DNS queries."]
+    #[doc = ""]
+    #[doc = " @sa otDnssdUpstreamQuerySetEnabled"]
+    #[doc = ""]
+    pub fn otDnssdUpstreamQueryIsEnabled(aInstance: *mut otInstance) -> bool;
 }
 extern "C" {
     #[doc = " @note This API is deprecated and use of it is discouraged."]
@@ -11284,6 +11653,9 @@ extern "C" {
 extern "C" {
     #[doc = " Sets the current MAC frame counter value."]
     #[doc = ""]
+    #[doc = " This function always sets the MAC counter to the new given value @p aMacFrameCounter independent of the current"]
+    #[doc = " value."]
+    #[doc = ""]
     #[doc = " @param[in]   aInstance         A pointer to an OpenThread instance."]
     #[doc = " @param[in]   aMacFrameCounter  The MAC frame counter value."]
     #[doc = ""]
@@ -11291,6 +11663,20 @@ extern "C" {
     #[doc = " @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled."]
     #[doc = ""]
     pub fn otLinkRawSetMacFrameCounter(
+        aInstance: *mut otInstance,
+        aMacFrameCounter: u32,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Sets the current MAC frame counter value only if the new value is larger than the current one."]
+    #[doc = ""]
+    #[doc = " @param[in]   aInstance         A pointer to an OpenThread instance."]
+    #[doc = " @param[in]   aMacFrameCounter  The MAC frame counter value."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             If successful."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE    If the raw link-layer isn't enabled."]
+    #[doc = ""]
+    pub fn otLinkRawSetMacFrameCounterIfLarger(
         aInstance: *mut otInstance,
         aMacFrameCounter: u32,
     ) -> otError;
@@ -11551,6 +11937,477 @@ extern "C" {
         aNeighborInfo: *mut otMultiRadioNeighborInfo,
     ) -> otError;
 }
+#[doc = " @struct otIp4Address"]
+#[doc = ""]
+#[doc = " This structure represents an IPv4 address."]
+#[doc = ""]
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub struct otIp4Address {
+    pub mFields: otIp4Address__bindgen_ty_1,
+}
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub union otIp4Address__bindgen_ty_1 {
+    #[doc = "< 8-bit fields"]
+    pub m8: [u8; 4usize],
+    #[doc = "< 32-bit representation"]
+    pub m32: u32,
+}
+impl Default for otIp4Address__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for otIp4Address {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[doc = " @struct otIp4Cidr"]
+#[doc = ""]
+#[doc = " This structure represents an IPv4 CIDR block."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct otIp4Cidr {
+    pub mAddress: otIp4Address,
+    pub mLength: u8,
+}
+impl Default for otIp4Cidr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[doc = " Represents the counters for NAT64."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct otNat64Counters {
+    #[doc = "< Number of packets translated from IPv4 to IPv6."]
+    pub m4To6Packets: u64,
+    #[doc = "< Sum of size of packets translated from IPv4 to IPv6."]
+    pub m4To6Bytes: u64,
+    #[doc = "< Number of packets translated from IPv6 to IPv4."]
+    pub m6To4Packets: u64,
+    #[doc = "< Sum of size of packets translated from IPv6 to IPv4."]
+    pub m6To4Bytes: u64,
+}
+#[doc = " Represents the counters for the protocols supported by NAT64."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct otNat64ProtocolCounters {
+    #[doc = "< Counters for sum of all protocols."]
+    pub mTotal: otNat64Counters,
+    #[doc = "< Counters for ICMP and ICMPv6."]
+    pub mIcmp: otNat64Counters,
+    #[doc = "< Counters for UDP."]
+    pub mUdp: otNat64Counters,
+    #[doc = "< Counters for TCP."]
+    pub mTcp: otNat64Counters,
+}
+#[doc = "< Packet drop for unknown reasons."]
+pub const OT_NAT64_DROP_REASON_UNKNOWN: otNat64DropReason = 0;
+#[doc = "< Packet drop due to failed to parse the datagram."]
+pub const OT_NAT64_DROP_REASON_ILLEGAL_PACKET: otNat64DropReason = 1;
+#[doc = "< Packet drop due to unsupported IP protocol."]
+pub const OT_NAT64_DROP_REASON_UNSUPPORTED_PROTO: otNat64DropReason = 2;
+#[doc = "< Packet drop due to no mappings found or mapping pool exhausted."]
+pub const OT_NAT64_DROP_REASON_NO_MAPPING: otNat64DropReason = 3;
+pub const OT_NAT64_DROP_REASON_COUNT: otNat64DropReason = 4;
+#[doc = " Packet drop reasons."]
+#[doc = ""]
+pub type otNat64DropReason = ::std::os::raw::c_uint;
+#[doc = " Represents the counters of dropped packets due to errors when handling NAT64 packets."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct otNat64ErrorCounters {
+    #[doc = "< Errors translating IPv4 packets."]
+    pub mCount4To6: [u64; 4usize],
+    #[doc = "< Errors translating IPv6 packets."]
+    pub mCount6To4: [u64; 4usize],
+}
+extern "C" {
+    #[doc = " Gets NAT64 translator counters."]
+    #[doc = ""]
+    #[doc = " The counter is counted since the instance initialized."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance A pointer to an OpenThread instance."]
+    #[doc = " @param[out] aCounters A pointer to an `otNat64Counters` where the counters of NAT64 translator will be placed."]
+    #[doc = ""]
+    pub fn otNat64GetCounters(aInstance: *mut otInstance, aCounters: *mut otNat64ProtocolCounters);
+}
+extern "C" {
+    #[doc = " Gets the NAT64 translator error counters."]
+    #[doc = ""]
+    #[doc = " The counters are initialized to zero when the OpenThread instance is initialized."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance A pointer to an OpenThread instance."]
+    #[doc = " @param[out] aCounters A pointer to an `otNat64Counters` where the counters of NAT64 translator will be placed."]
+    #[doc = ""]
+    pub fn otNat64GetErrorCounters(
+        aInstance: *mut otInstance,
+        aCounters: *mut otNat64ErrorCounters,
+    );
+}
+#[doc = " Represents an address mapping record for NAT64."]
+#[doc = ""]
+#[doc = " @note The counters will be reset for each mapping session even for the same address pair. Applications can use `mId`"]
+#[doc = " to identify different sessions to calculate the packets correctly."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct otNat64AddressMapping {
+    #[doc = "< The unique id for a mapping session."]
+    pub mId: u64,
+    #[doc = "< The IPv4 address of the mapping."]
+    pub mIp4: otIp4Address,
+    #[doc = "< The IPv6 address of the mapping."]
+    pub mIp6: otIp6Address,
+    #[doc = "< Remaining time before expiry in milliseconds."]
+    pub mRemainingTimeMs: u32,
+    pub mCounters: otNat64ProtocolCounters,
+}
+impl Default for otNat64AddressMapping {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[doc = " Used to iterate through NAT64 address mappings."]
+#[doc = ""]
+#[doc = " The fields in this type are opaque (intended for use by OpenThread core only) and therefore should not be"]
+#[doc = " accessed or used by caller."]
+#[doc = ""]
+#[doc = " Before using an iterator, it MUST be initialized using `otNat64AddressMappingIteratorInit()`."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct otNat64AddressMappingIterator {
+    pub mPtr: *mut ::std::os::raw::c_void,
+}
+impl Default for otNat64AddressMappingIterator {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+extern "C" {
+    #[doc = " Initializes an `otNat64AddressMappingIterator`."]
+    #[doc = ""]
+    #[doc = " An iterator MUST be initialized before it is used."]
+    #[doc = ""]
+    #[doc = " An iterator can be initialized again to restart from the beginning of the mapping info."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance  The OpenThread instance."]
+    #[doc = " @param[out] aIterator  A pointer to the iterator to initialize."]
+    #[doc = ""]
+    pub fn otNat64InitAddressMappingIterator(
+        aInstance: *mut otInstance,
+        aIterator: *mut otNat64AddressMappingIterator,
+    );
+}
+extern "C" {
+    #[doc = " Gets the next AddressMapping info (using an iterator)."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]      aInstance      A pointer to an OpenThread instance."]
+    #[doc = " @param[in,out]  aIterator      A pointer to the iterator. On success the iterator will be updated to point to next"]
+    #[doc = "                                NAT64 address mapping record. To get the first entry the iterator should be set to"]
+    #[doc = "                                OT_NAT64_ADDRESS_MAPPING_ITERATOR_INIT."]
+    #[doc = " @param[out]     aMapping       A pointer to an `otNat64AddressMapping` where information of next NAT64 address"]
+    #[doc = "                                mapping record is placed (on success)."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE       Successfully found the next NAT64 address mapping info (@p aMapping was successfully"]
+    #[doc = "                             updated)."]
+    #[doc = " @retval OT_ERROR_NOT_FOUND  No subsequent NAT64 address mapping info was found."]
+    #[doc = ""]
+    pub fn otNat64GetNextAddressMapping(
+        aInstance: *mut otInstance,
+        aIterator: *mut otNat64AddressMappingIterator,
+        aMapping: *mut otNat64AddressMapping,
+    ) -> otError;
+}
+#[doc = "< NAT64 is disabled."]
+pub const OT_NAT64_STATE_DISABLED: otNat64State = 0;
+#[doc = "< NAT64 is enabled, but one or more dependencies of NAT64 are not running."]
+pub const OT_NAT64_STATE_NOT_RUNNING: otNat64State = 1;
+#[doc = "< NAT64 is enabled, but this BR is not an active NAT64 BR."]
+pub const OT_NAT64_STATE_IDLE: otNat64State = 2;
+#[doc = "< The BR is publishing a NAT64 prefix and/or translating packets."]
+pub const OT_NAT64_STATE_ACTIVE: otNat64State = 3;
+#[doc = " States of NAT64."]
+#[doc = ""]
+pub type otNat64State = ::std::os::raw::c_uint;
+extern "C" {
+    #[doc = " Gets the state of NAT64 translator."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance          A pointer to an OpenThread instance."]
+    #[doc = ""]
+    #[doc = " @retval OT_NAT64_STATE_DISABLED    NAT64 translator is disabled."]
+    #[doc = " @retval OT_NAT64_STATE_NOT_RUNNING NAT64 translator is enabled, but the translator is not configured with a valid"]
+    #[doc = "                                    NAT64 prefix and a CIDR."]
+    #[doc = " @retval OT_NAT64_STATE_ACTIVE      NAT64 translator is enabled, and is translating packets."]
+    #[doc = ""]
+    pub fn otNat64GetTranslatorState(aInstance: *mut otInstance) -> otNat64State;
+}
+extern "C" {
+    #[doc = " Gets the state of NAT64 prefix manager."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance          A pointer to an OpenThread instance."]
+    #[doc = ""]
+    #[doc = " @retval OT_NAT64_STATE_DISABLED    NAT64 prefix manager is disabled."]
+    #[doc = " @retval OT_NAT64_STATE_NOT_RUNNING NAT64 prefix manager is enabled, but is not running (because the routing manager"]
+    #[doc = "                                    is not running)."]
+    #[doc = " @retval OT_NAT64_STATE_IDLE        NAT64 prefix manager is enabled, but is not publishing a NAT64 prefix. Usually"]
+    #[doc = "                                    when there is another border router publishing a NAT64 prefix with higher"]
+    #[doc = "                                    priority."]
+    #[doc = " @retval OT_NAT64_STATE_ACTIVE      NAT64 prefix manager is enabled, and is publishing NAT64 prefix to the Thread"]
+    #[doc = "                                    network."]
+    #[doc = ""]
+    pub fn otNat64GetPrefixManagerState(aInstance: *mut otInstance) -> otNat64State;
+}
+extern "C" {
+    #[doc = " Enable or disable NAT64 functions."]
+    #[doc = ""]
+    #[doc = " Note: This includes the NAT64 Translator (when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled) and the NAT64"]
+    #[doc = " Prefix Manager (when `OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` is enabled)."]
+    #[doc = ""]
+    #[doc = " When `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled, setting disabled to true resets the"]
+    #[doc = " mapping table in the translator."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` or `OPENTHREAD_CONFIG_NAT64_BORDER_ROUTING_ENABLE` is"]
+    #[doc = " enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aEnabled   A boolean to enable/disable the NAT64 functions"]
+    #[doc = ""]
+    #[doc = " @sa otNat64GetTranslatorState"]
+    #[doc = " @sa otNat64GetPrefixManagerState"]
+    #[doc = ""]
+    pub fn otNat64SetEnabled(aInstance: *mut otInstance, aEnable: bool);
+}
+extern "C" {
+    #[doc = " Allocate a new message buffer for sending an IPv4 message to the NAT64 translator."]
+    #[doc = ""]
+    #[doc = " Message buffers allocated by this function will have 20 bytes (difference between the size of IPv6 headers"]
+    #[doc = " and IPv4 header sizes) reserved."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @note If @p aSettings is `NULL`, the link layer security is enabled and the message priority is set to"]
+    #[doc = " OT_MESSAGE_PRIORITY_NORMAL by default."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aSettings  A pointer to the message settings or NULL to set default settings."]
+    #[doc = ""]
+    #[doc = " @returns A pointer to the message buffer or NULL if no message buffers are available or parameters are invalid."]
+    #[doc = ""]
+    #[doc = " @sa otNat64Send"]
+    #[doc = ""]
+    pub fn otIp4NewMessage(
+        aInstance: *mut otInstance,
+        aSettings: *const otMessageSettings,
+    ) -> *mut otMessage;
+}
+extern "C" {
+    #[doc = " Sets the CIDR used when setting the source address of the outgoing translated IPv4 packets."]
+    #[doc = ""]
+    #[doc = " This function is available only when OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE is enabled."]
+    #[doc = ""]
+    #[doc = " @note A valid CIDR must have a non-zero prefix length. The actual addresses pool is limited by the size of the"]
+    #[doc = " mapping pool and the number of addresses available in the CIDR block."]
+    #[doc = ""]
+    #[doc = " @note This function can be called at any time, but the NAT64 translator will be reset and all existing sessions will"]
+    #[doc = " be expired when updating the configured CIDR."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @param[in] aCidr      A pointer to an otIp4Cidr for the IPv4 CIDR block for NAT64."]
+    #[doc = ""]
+    #[doc = " @retval  OT_ERROR_INVALID_ARGS   The given CIDR is not a valid IPv4 CIDR for NAT64."]
+    #[doc = " @retval  OT_ERROR_NONE           Successfully set the CIDR for NAT64."]
+    #[doc = ""]
+    #[doc = " @sa otBorderRouterSend"]
+    #[doc = " @sa otBorderRouterSetReceiveCallback"]
+    #[doc = ""]
+    pub fn otNat64SetIp4Cidr(aInstance: *mut otInstance, aCidr: *const otIp4Cidr) -> otError;
+}
+extern "C" {
+    #[doc = " Translates an IPv4 datagram to an IPv6 datagram and sends via the Thread interface."]
+    #[doc = ""]
+    #[doc = " The caller transfers ownership of @p aMessage when making this call. OpenThread will free @p aMessage when"]
+    #[doc = " processing is complete, including when a value other than `OT_ERROR_NONE` is returned."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aMessage  A pointer to the message buffer containing the IPv4 datagram."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE                    Successfully processed the message."]
+    #[doc = " @retval OT_ERROR_DROP                    Message was well-formed but not fully processed due to packet processing"]
+    #[doc = "                                          rules."]
+    #[doc = " @retval OT_ERROR_NO_BUFS                 Could not allocate necessary message buffers when processing the datagram."]
+    #[doc = " @retval OT_ERROR_NO_ROUTE                No route to host."]
+    #[doc = " @retval OT_ERROR_INVALID_SOURCE_ADDRESS  Source address is invalid, e.g. an anycast address or a multicast address."]
+    #[doc = " @retval OT_ERROR_PARSE                   Encountered a malformed header when processing the message."]
+    #[doc = ""]
+    pub fn otNat64Send(aInstance: *mut otInstance, aMessage: *mut otMessage) -> otError;
+}
+#[doc = " This function pointer is called when an IPv4 datagram (translated by NAT64 translator) is received."]
+#[doc = ""]
+#[doc = " @param[in]  aMessage  A pointer to the message buffer containing the received IPv6 datagram. This function transfers"]
+#[doc = "                       the ownership of the @p aMessage to the receiver of the callback. The message should be"]
+#[doc = "                       freed by the receiver of the callback after it is processed."]
+#[doc = " @param[in]  aContext  A pointer to application-specific context."]
+#[doc = ""]
+pub type otNat64ReceiveIp4Callback = ::std::option::Option<
+    unsafe extern "C" fn(aMessage: *mut otMessage, aContext: *mut ::std::os::raw::c_void),
+>;
+extern "C" {
+    #[doc = " Registers a callback to provide received IPv4 datagrams."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance         A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aCallback         A pointer to a function that is called when an IPv4 datagram is received or"]
+    #[doc = "                               NULL to disable the callback."]
+    #[doc = " @param[in]  aCallbackContext  A pointer to application-specific context."]
+    #[doc = ""]
+    pub fn otNat64SetReceiveIp4Callback(
+        aInstance: *mut otInstance,
+        aCallback: otNat64ReceiveIp4Callback,
+        aContext: *mut ::std::os::raw::c_void,
+    );
+}
+extern "C" {
+    #[doc = " Gets the IPv4 CIDR configured in the NAT64 translator."]
+    #[doc = ""]
+    #[doc = " Available when `OPENTHREAD_CONFIG_NAT64_TRANSLATOR_ENABLE` is enabled."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance         A pointer to an OpenThread instance."]
+    #[doc = " @param[out] aCidr             A pointer to an otIp4Cidr. Where the CIDR will be filled."]
+    #[doc = ""]
+    pub fn otNat64GetCidr(aInstance: *mut otInstance, aCidr: *mut otIp4Cidr) -> otError;
+}
+extern "C" {
+    #[doc = " Test if two IPv4 addresses are the same."]
+    #[doc = ""]
+    #[doc = " @param[in]  aFirst   A pointer to the first IPv4 address to compare."]
+    #[doc = " @param[in]  aSecond  A pointer to the second IPv4 address to compare."]
+    #[doc = ""]
+    #[doc = " @retval TRUE   The two IPv4 addresses are the same."]
+    #[doc = " @retval FALSE  The two IPv4 addresses are not the same."]
+    #[doc = ""]
+    pub fn otIp4IsAddressEqual(aFirst: *const otIp4Address, aSecond: *const otIp4Address) -> bool;
+}
+extern "C" {
+    #[doc = " Set @p aIp4Address by performing NAT64 address translation from @p aIp6Address as specified"]
+    #[doc = " in RFC 6052."]
+    #[doc = ""]
+    #[doc = " The NAT64 @p aPrefixLength MUST be one of the following values: 32, 40, 48, 56, 64, or 96, otherwise the behavior"]
+    #[doc = " of this method is undefined."]
+    #[doc = ""]
+    #[doc = " @param[in]  aPrefixLength  The prefix length to use for IPv4/IPv6 translation."]
+    #[doc = " @param[in]  aIp6Address    A pointer to an IPv6 address."]
+    #[doc = " @param[out] aIp4Address    A pointer to output the IPv4 address."]
+    #[doc = ""]
+    pub fn otIp4ExtractFromIp6Address(
+        aPrefixLength: u8,
+        aIp6Address: *const otIp6Address,
+        aIp4Address: *mut otIp4Address,
+    );
+}
+extern "C" {
+    #[doc = " Converts the address to a string."]
+    #[doc = ""]
+    #[doc = " The string format uses quad-dotted notation of four bytes in the address (e.g., \"127.0.0.1\")."]
+    #[doc = ""]
+    #[doc = " If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be"]
+    #[doc = " truncated but the outputted string is always null-terminated."]
+    #[doc = ""]
+    #[doc = " @param[in]  aAddress  A pointer to an IPv4 address (MUST NOT be NULL)."]
+    #[doc = " @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be `nullptr`)."]
+    #[doc = " @param[in]  aSize     The size of @p aBuffer (in bytes)."]
+    #[doc = ""]
+    pub fn otIp4AddressToString(
+        aAddress: *const otIp4Address,
+        aBuffer: *mut ::std::os::raw::c_char,
+        aSize: u16,
+    );
+}
+extern "C" {
+    #[doc = " Converts the IPv4 CIDR to a string."]
+    #[doc = ""]
+    #[doc = " The string format uses quad-dotted notation of four bytes in the address with the length of prefix (e.g.,"]
+    #[doc = " \"127.0.0.1/32\")."]
+    #[doc = ""]
+    #[doc = " If the resulting string does not fit in @p aBuffer (within its @p aSize characters), the string will be"]
+    #[doc = " truncated but the outputted string is always null-terminated."]
+    #[doc = ""]
+    #[doc = " @param[in]  aCidr     A pointer to an IPv4 CIDR (MUST NOT be NULL)."]
+    #[doc = " @param[out] aBuffer   A pointer to a char array to output the string (MUST NOT be `nullptr`)."]
+    #[doc = " @param[in]  aSize     The size of @p aBuffer (in bytes)."]
+    #[doc = ""]
+    pub fn otIp4CidrToString(
+        aCidr: *const otIp4Cidr,
+        aBuffer: *mut ::std::os::raw::c_char,
+        aSize: u16,
+    );
+}
+extern "C" {
+    #[doc = " Converts a human-readable IPv4 address string into a binary representation."]
+    #[doc = ""]
+    #[doc = " @param[in]   aString   A pointer to a NULL-terminated string."]
+    #[doc = " @param[out]  aAddress  A pointer to an IPv4 address."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE          Successfully parsed the string."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS  Failed to parse the string."]
+    #[doc = ""]
+    pub fn otIp4AddressFromString(
+        aString: *const ::std::os::raw::c_char,
+        aAddress: *mut otIp4Address,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Sets the IPv6 address by performing NAT64 address translation from the preferred NAT64 prefix and the given IPv4"]
+    #[doc = " address as specified in RFC 6052."]
+    #[doc = ""]
+    #[doc = " @param[in]   aInstance    A pointer to an OpenThread instance."]
+    #[doc = " @param[in]   aIp4Address  A pointer to the IPv4 address to translate to IPv6."]
+    #[doc = " @param[out]  aIp6Address  A pointer to the synthesized IPv6 address."]
+    #[doc = ""]
+    #[doc = " @returns  OT_ERROR_NONE           Successfully synthesized the IPv6 address from NAT64 prefix and IPv4 address."]
+    #[doc = " @returns  OT_ERROR_INVALID_STATE  No valid NAT64 prefix in the network data."]
+    #[doc = ""]
+    pub fn otNat64SynthesizeIp6Address(
+        aInstance: *mut otInstance,
+        aIp4Address: *const otIp4Address,
+        aIp6Address: *mut otIp6Address,
+    ) -> otError;
+}
 #[doc = " This function pointer is called to send HDLC encoded NCP data."]
 #[doc = ""]
 #[doc = " @param[in]  aBuf        A pointer to a buffer with an output."]
@@ -11656,75 +12513,6 @@ extern "C" {
         aAllowPokeDelegate: otNcpDelegateAllowPeekPoke,
     );
 }
-#[doc = " Defines handler (function pointer) type for starting legacy network"]
-#[doc = ""]
-#[doc = " Invoked to start the legacy network."]
-#[doc = ""]
-pub type otNcpHandlerStartLegacy = ::std::option::Option<unsafe extern "C" fn()>;
-#[doc = " Defines handler (function pointer) type for stopping legacy network"]
-#[doc = ""]
-#[doc = " Invoked to stop the legacy network."]
-#[doc = ""]
-pub type otNcpHandlerStopLegacy = ::std::option::Option<unsafe extern "C" fn()>;
-#[doc = " Defines handler (function pointer) type for initiating joining process."]
-#[doc = ""]
-#[doc = " @param[in] aExtAddress   A pointer to the extended address for the node to join"]
-#[doc = "                          or NULL if desired to join any neighboring node."]
-#[doc = ""]
-#[doc = " Invoked to initiate a legacy join procedure to any or a specific node."]
-#[doc = ""]
-pub type otNcpHandlerJoinLegacyNode =
-    ::std::option::Option<unsafe extern "C" fn(aExtAddress: *const otExtAddress)>;
-#[doc = " Defines handler (function pointer) type for setting the legacy ULA prefix."]
-#[doc = ""]
-#[doc = " @param[in] aUlaPrefix   A pointer to buffer containing the legacy ULA prefix."]
-#[doc = ""]
-#[doc = " Invoked to set the legacy ULA prefix."]
-#[doc = ""]
-pub type otNcpHandlerSetLegacyUlaPrefix =
-    ::std::option::Option<unsafe extern "C" fn(aUlaPrefix: *const u8)>;
-#[doc = " Defines a struct containing all the legacy handlers (function pointers)."]
-#[doc = ""]
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct otNcpLegacyHandlers {
-    #[doc = "< Start handler"]
-    pub mStartLegacy: otNcpHandlerStartLegacy,
-    #[doc = "< Stop handler"]
-    pub mStopLegacy: otNcpHandlerStopLegacy,
-    #[doc = "< Join handler"]
-    pub mJoinLegacyNode: otNcpHandlerJoinLegacyNode,
-    #[doc = "< Set ULA handler"]
-    pub mSetLegacyUlaPrefix: otNcpHandlerSetLegacyUlaPrefix,
-}
-extern "C" {
-    #[doc = " This callback is invoked by the legacy stack to notify that a new"]
-    #[doc = " legacy node did join the network."]
-    #[doc = ""]
-    #[doc = " @param[in]   aExtAddr    A pointer to the extended address of the joined node."]
-    #[doc = ""]
-    pub fn otNcpHandleLegacyNodeDidJoin(aExtAddr: *const otExtAddress);
-}
-extern "C" {
-    #[doc = " This callback is invoked by the legacy stack to notify that the"]
-    #[doc = " legacy ULA prefix has changed."]
-    #[doc = ""]
-    #[doc = " @param[in]    aUlaPrefix  A pointer to the received ULA prefix."]
-    #[doc = ""]
-    pub fn otNcpHandleDidReceiveNewLegacyUlaPrefix(aUlaPrefix: *const u8);
-}
-extern "C" {
-    #[doc = " This method registers a set of legacy handlers with NCP."]
-    #[doc = ""]
-    #[doc = " The set of handlers provided by the struct @p aHandlers are used by"]
-    #[doc = " NCP code to start/stop legacy network."]
-    #[doc = " The @p aHandlers can be NULL to disable legacy support on NCP."]
-    #[doc = " Individual handlers in the given handlers struct can also be NULL."]
-    #[doc = ""]
-    #[doc = " @param[in] aHandlers    A pointer to a handler struct."]
-    #[doc = ""]
-    pub fn otNcpRegisterLegacyHandlers(aHandlers: *const otNcpLegacyHandlers);
-}
 #[doc = "< The Thread stack is disabled."]
 pub const OT_DEVICE_ROLE_DISABLED: otDeviceRole = 0;
 #[doc = "< Not currently participating in a Thread network/partition."]
@@ -11822,6 +12610,8 @@ pub struct otNeighborInfo {
     pub mAverageRssi: i8,
     #[doc = "< Last observed RSSI"]
     pub mLastRssi: i8,
+    #[doc = "< Link Margin"]
+    pub mLinkMargin: u8,
     #[doc = "< Frame error rate (0xffff->100%). Requires error tracking feature."]
     pub mFrameErrorRate: u16,
     #[doc = "< (IPv6) msg error rate (0xffff->100%). Requires error tracking feature."]
@@ -12109,6 +12899,8 @@ extern "C" {
 }
 extern "C" {
     #[doc = " This function starts a Thread Discovery scan."]
+    #[doc = ""]
+    #[doc = " @note A successful call to this function enables the rx-on-when-idle mode for the entire scan procedure."]
     #[doc = ""]
     #[doc = " @param[in]  aInstance              A pointer to an OpenThread instance."]
     #[doc = " @param[in]  aScanChannels          A bit vector indicating which channels to scan (e.g. OT_CHANNEL_11_MASK)."]
@@ -12994,6 +13786,8 @@ pub const OT_NETWORK_DIAGNOSTIC_TLV_CHANNEL_PAGES: _bindgen_ty_11 = 17;
 pub const OT_NETWORK_DIAGNOSTIC_TLV_TYPE_LIST: _bindgen_ty_11 = 18;
 #[doc = "< Max Child Timeout TLV"]
 pub const OT_NETWORK_DIAGNOSTIC_TLV_MAX_CHILD_TIMEOUT: _bindgen_ty_11 = 19;
+#[doc = "< Version TLV"]
+pub const OT_NETWORK_DIAGNOSTIC_TLV_VERSION: _bindgen_ty_11 = 24;
 pub type _bindgen_ty_11 = ::std::os::raw::c_uint;
 pub type otNetworkDiagIterator = u16;
 #[doc = " This structure represents a Network Diagnostic Connectivity value."]
@@ -13148,24 +13942,43 @@ impl otNetworkDiagChildEntry {
         }
     }
     #[inline]
+    pub fn mLinkQuality(&self) -> u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 2u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mLinkQuality(&mut self, val: u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(5usize, 2u8, val as u64)
+        }
+    }
+    #[inline]
     pub fn mChildId(&self) -> u16 {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 9u8) as u16) }
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(7usize, 9u8) as u16) }
     }
     #[inline]
     pub fn set_mChildId(&mut self, val: u16) {
         unsafe {
             let val: u16 = ::std::mem::transmute(val);
-            self._bitfield_1.set(5usize, 9u8, val as u64)
+            self._bitfield_1.set(7usize, 9u8, val as u64)
         }
     }
     #[inline]
-    pub fn new_bitfield_1(mTimeout: u16, mChildId: u16) -> __BindgenBitfieldUnit<[u8; 2usize]> {
+    pub fn new_bitfield_1(
+        mTimeout: u16,
+        mLinkQuality: u8,
+        mChildId: u16,
+    ) -> __BindgenBitfieldUnit<[u8; 2usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 2usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 5u8, {
             let mTimeout: u16 = unsafe { ::std::mem::transmute(mTimeout) };
             mTimeout as u64
         });
-        __bindgen_bitfield_unit.set(5usize, 9u8, {
+        __bindgen_bitfield_unit.set(5usize, 2u8, {
+            let mLinkQuality: u8 = unsafe { ::std::mem::transmute(mLinkQuality) };
+            mLinkQuality as u64
+        });
+        __bindgen_bitfield_unit.set(7usize, 9u8, {
             let mChildId: u16 = unsafe { ::std::mem::transmute(mChildId) };
             mChildId as u64
         });
@@ -13195,6 +14008,7 @@ pub union otNetworkDiagTlv__bindgen_ty_1 {
     pub mBatteryLevel: u8,
     pub mSupplyVoltage: u16,
     pub mMaxChildTimeout: u32,
+    pub mVersion: u16,
     pub mNetworkData: otNetworkDiagTlv__bindgen_ty_1__bindgen_ty_1,
     pub mIp6AddrList: otNetworkDiagTlv__bindgen_ty_1__bindgen_ty_2,
     pub mChildTable: otNetworkDiagTlv__bindgen_ty_1__bindgen_ty_3,
@@ -13823,8 +14637,10 @@ extern "C" {
     #[doc = " @param[in]  aValue  true to set the gpio to high level, or false otherwise."]
     #[doc = ""]
     #[doc = " @retval OT_ERROR_NONE             Successfully set the gpio."]
+    #[doc = " @retval OT_ERROR_FAILED           A platform error occurred while setting the gpio."]
     #[doc = " @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported."]
-    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on the platform."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled or @p aGpio is not configured as output."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform."]
     #[doc = ""]
     pub fn otPlatDiagGpioSet(aGpio: u32, aValue: bool) -> otError;
 }
@@ -13835,8 +14651,10 @@ extern "C" {
     #[doc = " @param[out]  aValue  A pointer where to put gpio value."]
     #[doc = ""]
     #[doc = " @retval OT_ERROR_NONE             Successfully got the gpio value."]
+    #[doc = " @retval OT_ERROR_FAILED           A platform error occurred while getting the gpio value."]
     #[doc = " @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported or @p aValue is NULL."]
-    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on the platform."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled or @p aGpio is not configured as input."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform."]
     #[doc = ""]
     pub fn otPlatDiagGpioGet(aGpio: u32, aValue: *mut bool) -> otError;
 }
@@ -13847,8 +14665,10 @@ extern "C" {
     #[doc = " @param[out]  aMode   The gpio mode."]
     #[doc = ""]
     #[doc = " @retval OT_ERROR_NONE             Successfully set the gpio mode."]
-    #[doc = " @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported."]
-    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on the platform."]
+    #[doc = " @retval OT_ERROR_FAILED           A platform error occurred while setting the gpio mode."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS     @p aGpio or @p aMode is not supported."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform."]
     #[doc = ""]
     pub fn otPlatDiagGpioSetMode(aGpio: u32, aMode: otGpioMode) -> otError;
 }
@@ -13856,15 +14676,105 @@ extern "C" {
     #[doc = " This function gets the gpio mode."]
     #[doc = ""]
     #[doc = " @param[in]   aGpio   The gpio number."]
-    #[doc = " @param[out]  aValue  A pointer where to put gpio value."]
+    #[doc = " @param[out]  aMode   A pointer where to put gpio mode."]
     #[doc = ""]
-    #[doc = " @retval OT_ERROR_NONE             Successfully got the gpio value."]
-    #[doc = " @retval OT_ERROR_FAILED           The gpio is neither in input nor output mode. For example, if the gpio is in"]
-    #[doc = "                                   analog mode."]
+    #[doc = " @retval OT_ERROR_NONE             Successfully got the gpio mode."]
+    #[doc = " @retval OT_ERROR_FAILED           Mode returned by the platform is not implemented in OpenThread or a platform error"]
+    #[doc = "                                   occurred while getting the gpio mode."]
     #[doc = " @retval OT_ERROR_INVALID_ARGS     @p aGpio is not supported or @p aMode is NULL."]
-    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented on the platform."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE    Diagnostic mode was not enabled."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This function is not implemented or configured on the platform."]
     #[doc = ""]
     pub fn otPlatDiagGpioGetMode(aGpio: u32, aMode: *mut otGpioMode) -> otError;
+}
+extern "C" {
+    #[doc = " Set the radio raw power setting for diagnostics module."]
+    #[doc = ""]
+    #[doc = " @param[in] aInstance               The OpenThread instance structure."]
+    #[doc = " @param[in] aRawPowerSetting        A pointer to the raw power setting byte array."]
+    #[doc = " @param[in] aRawPowerSettingLength  The length of the @p aRawPowerSetting."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             Successfully set the raw power setting."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS     The @p aRawPowerSetting is NULL or the @p aRawPowerSettingLength is too long."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This method is not implemented."]
+    #[doc = ""]
+    pub fn otPlatDiagRadioSetRawPowerSetting(
+        aInstance: *mut otInstance,
+        aRawPowerSetting: *const u8,
+        aRawPowerSettingLength: u16,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Get the radio raw power setting for diagnostics module."]
+    #[doc = ""]
+    #[doc = " @param[in]      aInstance               The OpenThread instance structure."]
+    #[doc = " @param[out]     aRawPowerSetting        A pointer to the raw power setting byte array."]
+    #[doc = " @param[in,out]  aRawPowerSettingLength  On input, a pointer to the size of @p aRawPowerSetting."]
+    #[doc = "                                         On output, a pointer to the length of the raw power setting data."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             Successfully set the raw power setting."]
+    #[doc = " @retval OT_ERROR_INVALID_ARGS     The @p aRawPowerSetting or @p aRawPowerSettingLength is NULL or"]
+    #[doc = "                                   @aRawPowerSettingLength is too short."]
+    #[doc = " @retval OT_ERROR_NOT_FOUND        The raw power setting is not set."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This method is not implemented."]
+    #[doc = ""]
+    pub fn otPlatDiagRadioGetRawPowerSetting(
+        aInstance: *mut otInstance,
+        aRawPowerSetting: *mut u8,
+        aRawPowerSettingLength: *mut u16,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Enable/disable the platform layer to use the raw power setting set by `otPlatDiagRadioSetRawPowerSetting()`."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance The OpenThread instance structure."]
+    #[doc = " @param[in]  aEnable   TRUE to enable or FALSE to disable the raw power setting."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             Successfully enabled/disabled the raw power setting."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This method is not implemented."]
+    #[doc = ""]
+    pub fn otPlatDiagRadioRawPowerSettingEnable(
+        aInstance: *mut otInstance,
+        aEnable: bool,
+    ) -> otError;
+}
+extern "C" {
+    #[doc = " Start/stop the platform layer to transmit continuous carrier wave."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance The OpenThread instance structure."]
+    #[doc = " @param[in]  aEnable   TRUE to enable or FALSE to disable the platform layer to transmit continuous carrier wave."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE             Successfully enabled/disabled ."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE    The radio was not in the Receive state."]
+    #[doc = " @retval OT_ERROR_NOT_IMPLEMENTED  This method is not implemented."]
+    #[doc = ""]
+    pub fn otPlatDiagRadioTransmitCarrier(aInstance: *mut otInstance, aEnable: bool) -> otError;
+}
+extern "C" {
+    #[doc = " Get the power settings for the given channel."]
+    #[doc = ""]
+    #[doc = " @param[in]      aInstance               The OpenThread instance structure."]
+    #[doc = " @param[in]      aChannel                The radio channel."]
+    #[doc = " @param[out]     aTargetPower            The target power in 0.01 dBm."]
+    #[doc = " @param[out]     aActualPower            The actual power in 0.01 dBm."]
+    #[doc = " @param[out]     aRawPowerSetting        A pointer to the raw power setting byte array."]
+    #[doc = " @param[in,out]  aRawPowerSettingLength  On input, a pointer to the size of @p aRawPowerSetting."]
+    #[doc = "                                         On output, a pointer to the length of the raw power setting data."]
+    #[doc = ""]
+    #[doc = " @retval  OT_ERROR_NONE             Successfully got the target power."]
+    #[doc = " @retval  OT_ERROR_INVALID_ARGS     The @p aChannel is invalid, @aTargetPower, @p aActualPower, @p aRawPowerSetting or"]
+    #[doc = "                                    @p aRawPowerSettingLength is NULL or @aRawPowerSettingLength is too short."]
+    #[doc = " @retval  OT_ERROR_NOT_FOUND        The power settings for the @p aChannel was not found."]
+    #[doc = " @retval  OT_ERROR_NOT_IMPLEMENTED  This method is not implemented."]
+    #[doc = ""]
+    pub fn otPlatDiagRadioGetPowerSettings(
+        aInstance: *mut otInstance,
+        aChannel: u8,
+        aTargetPower: *mut i16,
+        aActualPower: *mut i16,
+        aRawPowerSetting: *mut u8,
+        aRawPowerSettingLength: *mut u16,
+    ) -> otError;
 }
 extern "C" {
     #[doc = " Fill buffer with entropy."]
@@ -17258,11 +18168,11 @@ pub type _bindgen_ty_15 = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = " Records the remote host and port for this connection."]
     #[doc = ""]
-    #[doc = " By default TCP Fast Open is used. This means that this function merely"]
-    #[doc = " records the remote host and port, and that the TCP connection establishment"]
-    #[doc = " handshake only happens on the first call to otTcpSendByReference(). TCP Fast"]
-    #[doc = " Open can be explicitly disabled using @p aFlags, in which case the TCP"]
-    #[doc = " connection establishment handshake is initiated immediately."]
+    #[doc = " Caller must wait for `otTcpEstablished` callback indicating that TCP"]
+    #[doc = " connection establishment handshake is done before it can start sending data"]
+    #[doc = " e.g., calling `otTcpSendByReference()`."]
+    #[doc = ""]
+    #[doc = " The TCP Fast Open is not yet supported and @p aFlags is ignored."]
     #[doc = ""]
     #[doc = " @param[in]  aEndpoint  A pointer to the TCP endpoint structure to connect."]
     #[doc = " @param[in]  aSockName  The IP address and port of the host to which to connect."]
@@ -17682,10 +18592,13 @@ pub struct otChildInfo {
     pub mMessageErrorRate: u16,
     #[doc = "< Number of queued messages for the child."]
     pub mQueuedMessageCnt: u16,
+    #[doc = "< Supervision interval (in seconds)."]
+    pub mSupervisionInterval: u16,
     #[doc = "< MLE version"]
     pub mVersion: u8,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub __bindgen_padding_0: u16,
 }
 impl otChildInfo {
     #[inline]
@@ -17943,6 +18856,123 @@ extern "C" {
     #[doc = ""]
     pub fn otThreadSetPreferredRouterId(aInstance: *mut otInstance, aRouterId: u8) -> otError;
 }
+#[doc = "< Battery powered."]
+pub const OT_POWER_SUPPLY_BATTERY: otPowerSupply = 0;
+#[doc = "< Externally powered (mains-powered)."]
+pub const OT_POWER_SUPPLY_EXTERNAL: otPowerSupply = 1;
+#[doc = "< Stable external power with a battery backup or UPS."]
+pub const OT_POWER_SUPPLY_EXTERNAL_STABLE: otPowerSupply = 2;
+#[doc = "< Potentially unstable ext power (e.g. light bulb powered via a switch)."]
+pub const OT_POWER_SUPPLY_EXTERNAL_UNSTABLE: otPowerSupply = 3;
+#[doc = " This enumeration represents the power supply property on a device."]
+#[doc = ""]
+#[doc = " This is used as a property in `otDeviceProperties` to calculate the leader weight."]
+#[doc = ""]
+pub type otPowerSupply = ::std::os::raw::c_uint;
+#[doc = " This structure represents the device properties which are used for calculating the local leader weight on a"]
+#[doc = " device."]
+#[doc = ""]
+#[doc = " The parameters are set based on device's capability, whether acting as border router, its power supply config, etc."]
+#[doc = ""]
+#[doc = " `mIsUnstable` indicates operational stability of device and is determined via a vendor specific mechanism. It can"]
+#[doc = " include the following cases:"]
+#[doc = "  - Device internally detects that it loses external power supply more often than usual. What is usual is"]
+#[doc = "    determined by the vendor."]
+#[doc = "  - Device internally detects that it reboots more often than usual. What is usual is determined by the vendor."]
+#[doc = ""]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct otDeviceProperties {
+    #[doc = "< Power supply config."]
+    pub mPowerSupply: otPowerSupply,
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    #[doc = "< Weight adjustment. Should be -16 to +16 (clamped otherwise)."]
+    pub mLeaderWeightAdjustment: i8,
+}
+impl Default for otDeviceProperties {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl otDeviceProperties {
+    #[inline]
+    pub fn mIsBorderRouter(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mIsBorderRouter(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mSupportsCcm(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mSupportsCcm(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(1usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mIsUnstable(&self) -> bool {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 1u8) as u8) }
+    }
+    #[inline]
+    pub fn set_mIsUnstable(&mut self, val: bool) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(2usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        mIsBorderRouter: bool,
+        mSupportsCcm: bool,
+        mIsUnstable: bool,
+    ) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 1u8, {
+            let mIsBorderRouter: u8 = unsafe { ::std::mem::transmute(mIsBorderRouter) };
+            mIsBorderRouter as u64
+        });
+        __bindgen_bitfield_unit.set(1usize, 1u8, {
+            let mSupportsCcm: u8 = unsafe { ::std::mem::transmute(mSupportsCcm) };
+            mSupportsCcm as u64
+        });
+        __bindgen_bitfield_unit.set(2usize, 1u8, {
+            let mIsUnstable: u8 = unsafe { ::std::mem::transmute(mIsUnstable) };
+            mIsUnstable as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+extern "C" {
+    #[doc = " Get the current device properties."]
+    #[doc = ""]
+    #[doc = " @returns The device properties `otDeviceProperties`."]
+    #[doc = ""]
+    pub fn otThreadGetDeviceProperties(aInstance: *mut otInstance) -> *const otDeviceProperties;
+}
+extern "C" {
+    #[doc = " Set the device properties which are then used to determine and set the Leader Weight."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance           A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aDeviceProperties   The device properties."]
+    #[doc = ""]
+    pub fn otThreadSetDeviceProperties(
+        aInstance: *mut otInstance,
+        aDeviceProperties: *const otDeviceProperties,
+    );
+}
 extern "C" {
     #[doc = " Gets the Thread Leader Weight used when operating in the Leader role."]
     #[doc = ""]
@@ -17951,11 +18981,15 @@ extern "C" {
     #[doc = " @returns The Thread Leader Weight value."]
     #[doc = ""]
     #[doc = " @sa otThreadSetLeaderWeight"]
+    #[doc = " @sa otThreadSetDeviceProperties"]
     #[doc = ""]
     pub fn otThreadGetLocalLeaderWeight(aInstance: *mut otInstance) -> u8;
 }
 extern "C" {
     #[doc = " Sets the Thread Leader Weight used when operating in the Leader role."]
+    #[doc = ""]
+    #[doc = " This function directly sets the Leader Weight to the new value, replacing its previous value (which may have been"]
+    #[doc = " determined from the current `otDeviceProperties`)."]
     #[doc = ""]
     #[doc = " @param[in]  aInstance A pointer to an OpenThread instance."]
     #[doc = " @param[in]  aWeight   The Thread Leader Weight value."]
@@ -18089,6 +19123,36 @@ extern "C" {
     #[doc = " @sa otThreadGetRouterUpgradeThreshold"]
     #[doc = ""]
     pub fn otThreadSetRouterUpgradeThreshold(aInstance: *mut otInstance, aThreshold: u8);
+}
+extern "C" {
+    #[doc = " Get the MLE_CHILD_ROUTER_LINKS parameter used in the REED role."]
+    #[doc = ""]
+    #[doc = " This parameter specifies the max number of neighboring routers with which the device (as an FED)"]
+    #[doc = "  will try to establish link."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance A pointer to an OpenThread instance."]
+    #[doc = ""]
+    #[doc = " @returns The MLE_CHILD_ROUTER_LINKS value."]
+    #[doc = ""]
+    #[doc = " @sa otThreadSetChildRouterLinks"]
+    #[doc = ""]
+    pub fn otThreadGetChildRouterLinks(aInstance: *mut otInstance) -> u8;
+}
+extern "C" {
+    #[doc = " Set the MLE_CHILD_ROUTER_LINKS parameter used in the REED role."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance         A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aChildRouterLinks The MLE_CHILD_ROUTER_LINKS value."]
+    #[doc = ""]
+    #[doc = " @retval OT_ERROR_NONE           Successfully set the value."]
+    #[doc = " @retval OT_ERROR_INVALID_STATE  Thread protocols are enabled."]
+    #[doc = ""]
+    #[doc = " @sa otThreadGetChildRouterLinks"]
+    #[doc = ""]
+    pub fn otThreadSetChildRouterLinks(
+        aInstance: *mut otInstance,
+        aChildRouterLinks: u8,
+    ) -> otError;
 }
 extern "C" {
     #[doc = " Release a Router ID that has been allocated by the device in the Leader role."]
@@ -18548,6 +19612,35 @@ extern "C" {
         aMaxRouterId: u8,
     ) -> otError;
 }
+extern "C" {
+    #[doc = " This function indicates whether or not a Router ID is currently allocated."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance     A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aRouterId     The router ID to check."]
+    #[doc = ""]
+    #[doc = " @retval TRUE  The @p aRouterId is allocated."]
+    #[doc = " @retval FALSE The @p aRouterId is not allocated."]
+    #[doc = ""]
+    pub fn otThreadIsRouterIdAllocated(aInstance: *mut otInstance, aRouterId: u8) -> bool;
+}
+extern "C" {
+    #[doc = " This function gets the next hop and path cost towards a given RLOC16 destination."]
+    #[doc = ""]
+    #[doc = " This function can be used with either @p aNextHopRloc16 or @p aPathCost being NULL indicating caller does not want"]
+    #[doc = " to get the value."]
+    #[doc = ""]
+    #[doc = " @param[in]  aInstance       A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aDesRloct16     The RLOC16 of destination."]
+    #[doc = " @param[out] aNextHopRloc16  A pointer to return RLOC16 of next hop, 0xfffe if no next hop."]
+    #[doc = " @param[out] aPathCost       A pointer to return path cost towards destination."]
+    #[doc = ""]
+    pub fn otThreadGetNextHopAndPathCost(
+        aInstance: *mut otInstance,
+        aDestRloc16: u16,
+        aNextHopRloc16: *mut u16,
+        aPathCost: *mut u8,
+    );
+}
 #[doc = " This struct represents a TREL peer."]
 #[doc = ""]
 #[repr(C)]
@@ -18573,28 +19666,22 @@ impl Default for otTrelPeer {
 #[doc = ""]
 pub type otTrelPeerIterator = u16;
 extern "C" {
-    #[doc = " This function enables TREL operation."]
+    #[doc = " Enables or disables TREL operation."]
     #[doc = ""]
-    #[doc = " This function initiates an ongoing DNS-SD browse on the service name \"_trel._udp\" within the local browsing domain"]
-    #[doc = " to discover other devices supporting TREL. Device also registers a new service to be advertised using DNS-SD,"]
-    #[doc = " with the service name is \"_trel._udp\" indicating its support for TREL. Device is then ready to receive TREL messages"]
-    #[doc = " from peers."]
+    #[doc = " When @p aEnable is true, this function initiates an ongoing DNS-SD browse on the service name \"_trel._udp\" within the"]
+    #[doc = " local browsing domain to discover other devices supporting TREL. Device also registers a new service to be advertised"]
+    #[doc = " using DNS-SD, with the service name is \"_trel._udp\" indicating its support for TREL. Device is then ready to receive"]
+    #[doc = " TREL messages from peers."]
+    #[doc = ""]
+    #[doc = " When @p aEnable is false, this function stops the DNS-SD browse on the service name \"_trel._udp\", stops advertising"]
+    #[doc = " TREL DNS-SD service, and clears the TREL peer table."]
     #[doc = ""]
     #[doc = " @note By default the OpenThread stack enables the TREL operation on start."]
     #[doc = ""]
-    #[doc = " @param[in] aInstance   The OpenThread instance."]
+    #[doc = " @param[in]  aInstance  A pointer to an OpenThread instance."]
+    #[doc = " @param[in]  aEnable    A boolean to enable/disable the TREL operation."]
     #[doc = ""]
-    pub fn otTrelEnable(aInstance: *mut otInstance);
-}
-extern "C" {
-    #[doc = " This function disables TREL operation."]
-    #[doc = ""]
-    #[doc = " This function stops the DNS-SD browse on the service name \"_trel._udp\", stops advertising TREL DNS-SD service, and"]
-    #[doc = " clears the TREL peer table."]
-    #[doc = ""]
-    #[doc = " @param[in] aInstance   The OpenThread instance."]
-    #[doc = ""]
-    pub fn otTrelDisable(aInstance: *mut otInstance);
+    pub fn otTrelSetEnabled(aInstance: *mut otInstance, aEnable: bool);
 }
 extern "C" {
     #[doc = " This function indicates whether the TREL operation is enabled."]
