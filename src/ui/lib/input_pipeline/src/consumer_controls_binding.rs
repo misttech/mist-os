@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device::{self, Handled, InputDeviceBinding},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus},
     anyhow::{format_err, Error},
     async_trait::async_trait,
     fidl_fuchsia_input_report as fidl_input_report,
@@ -51,6 +51,9 @@ pub struct ConsumerControlsBinding {
 
     /// Holds information about this device.
     device_descriptor: ConsumerControlsDeviceDescriptor,
+
+    /// The inventory of this binding's Inspect status.
+    _inspect_status: InputDeviceStatus,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -86,14 +89,17 @@ impl ConsumerControlsBinding {
     /// # Parameters
     /// - `device_proxy`: The proxy to bind the new [`InputDeviceBinding`] to.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
     pub async fn new(
         device_proxy: InputDeviceProxy,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_binding = Self::bind_device(&device_proxy, input_event_sender).await?;
+        let device_binding =
+            Self::bind_device(&device_proxy, input_event_sender, device_node).await?;
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
@@ -109,6 +115,7 @@ impl ConsumerControlsBinding {
     /// # Parameters
     /// - `device`: The device to use to initialize the binding.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If the device descriptor could not be retrieved, or the descriptor could
@@ -116,6 +123,7 @@ impl ConsumerControlsBinding {
     async fn bind_device(
         device: &InputDeviceProxy,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_descriptor: fidl_input_report::DeviceDescriptor =
             device.get_descriptor().await?;
@@ -136,7 +144,13 @@ impl ConsumerControlsBinding {
                 buttons: consumer_controls_input_descriptor.buttons.unwrap_or_default(),
             };
 
-        Ok(ConsumerControlsBinding { event_sender: input_event_sender, device_descriptor })
+        let input_device_status = InputDeviceStatus::new(device_node);
+
+        Ok(ConsumerControlsBinding {
+            event_sender: input_event_sender,
+            device_descriptor,
+            _inspect_status: input_device_status,
+        })
     }
 
     /// Parses an [`InputReport`] into one or more [`InputEvent`]s. Sends the [`InputEvent`]s

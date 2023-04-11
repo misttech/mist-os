@@ -251,7 +251,7 @@ pub struct InputPipeline {
 
     /// This node is bound to the lifetime of this InputPipeline.
     /// Inspect data will be dumped for this pipeline as long as it exists.
-    _inspect_node: fuchsia_inspect::Node,
+    inspect_node: fuchsia_inspect::Node,
 }
 
 impl InputPipeline {
@@ -285,7 +285,7 @@ impl InputPipeline {
             device_event_receiver,
             input_device_types,
             input_device_bindings,
-            _inspect_node: inspect_node,
+            inspect_node,
         }
     }
 
@@ -311,19 +311,17 @@ impl InputPipeline {
     /// # Parameters
     /// - `input_device_types`: The types of devices the new [`InputPipeline`] will support.
     /// - `assembly`: The input handlers that the [`InputPipeline`] sends InputEvents to.
+    /// - `inspect_node`: The root node for InputPipeline's Inspect tree
     pub fn new(
         input_device_types: Vec<input_device::InputDeviceType>,
         assembly: InputPipelineAssembly,
         inspect_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        // Add non-static properties to inspect node.
-        let devices_discovered = inspect_node.create_uint("devices_discovered", 0);
-        let devices_connected = inspect_node.create_uint("devices_connected", 0);
-
         let input_pipeline = Self::new_common(input_device_types, assembly, inspect_node);
         let input_device_types = input_pipeline.input_device_types.clone();
         let input_event_sender = input_pipeline.device_event_sender.clone();
         let input_device_bindings = input_pipeline.input_device_bindings.clone();
+        let devices_node = input_pipeline.inspect_node.create_child("input_devices");
         fasync::Task::local(async move {
             // Watches the input device directory for new input devices. Creates new InputDeviceBindings
             // that send InputEvents to `input_event_receiver`.
@@ -341,8 +339,7 @@ impl InputPipeline {
                     input_device_types,
                     input_event_sender,
                     input_device_bindings,
-                    &devices_discovered,
-                    &devices_connected,
+                    &devices_node,
                     false, /* break_on_idle */
                 )
                 .await
@@ -403,6 +400,7 @@ impl InputPipeline {
     /// - `device_types`: The types of devices to watch for.
     /// - `input_event_sender`: The channel new InputDeviceBindings will send InputEvents to.
     /// - `bindings`: Holds all the InputDeviceBindings
+    /// - `input_devices_node`: The parent node for all device bindings' inspect nodes.
     /// - `break_on_idle`: If true, stops watching for devices once all existing devices are handled.
     ///
     /// # Errors
@@ -413,10 +411,12 @@ impl InputPipeline {
         device_types: Vec<input_device::InputDeviceType>,
         input_event_sender: Sender<input_device::InputEvent>,
         bindings: InputDeviceBindingHashMap,
-        devices_discovered: &fuchsia_inspect::UintProperty,
-        devices_connected: &fuchsia_inspect::UintProperty,
+        input_devices_node: &fuchsia_inspect::Node,
         break_on_idle: bool,
     ) -> Result<(), Error> {
+        // Add non-static properties to inspect node.
+        let devices_discovered = input_devices_node.create_uint("devices_discovered", 0);
+        let devices_connected = input_devices_node.create_uint("devices_connected", 0);
         while let Some(msg) = device_watcher.try_next().await? {
             if let Ok(filename) = msg.filename.into_os_string().into_string() {
                 if filename == "." {
@@ -437,7 +437,8 @@ impl InputPipeline {
                             &input_event_sender,
                             &bindings,
                             filename.parse::<u32>().unwrap_or_default(),
-                            Some(devices_connected),
+                            input_devices_node,
+                            Some(&devices_connected),
                         )
                         .await;
                     }
@@ -450,7 +451,15 @@ impl InputPipeline {
                 }
             }
         }
-
+        // Ensure inspect properties persist for debugging if device watch loop ends.
+        if let Ok(devices_discovered_val) = devices_discovered.get() {
+            std::mem::drop(devices_discovered);
+            input_devices_node.record_uint("devices_discovered", devices_discovered_val);
+        }
+        if let Ok(devices_connected_val) = devices_connected.get() {
+            std::mem::drop(devices_connected);
+            input_devices_node.record_uint("devices_connected", devices_connected_val);
+        }
         Err(format_err!("Input pipeline stopped watching for new input devices."))
     }
 
@@ -467,12 +476,14 @@ impl InputPipeline {
     /// - `input_event_sender`: The channel new InputDeviceBindings will send InputEvents to.
     /// - `bindings`: Holds all the InputDeviceBindings associated with the InputPipeline.
     /// - `device_id`: The device id of the associated bindings.
+    /// - `input_devices_node`: The parent node for all injected devices' inspect nodes.
     pub async fn handle_input_device_registry_request_stream(
         mut stream: fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
         device_types: &Vec<input_device::InputDeviceType>,
         input_event_sender: &Sender<input_device::InputEvent>,
         bindings: &InputDeviceBindingHashMap,
         device_id: u32,
+        input_devices_node: &fuchsia_inspect::Node,
     ) -> Result<(), Error> {
         while let Some(request) = stream
             .try_next()
@@ -494,6 +505,7 @@ impl InputPipeline {
                         input_event_sender,
                         bindings,
                         device_id,
+                        input_devices_node,
                         None,
                     )
                     .await;
@@ -565,6 +577,7 @@ impl InputPipeline {
 /// - `input_event_sender`: The channel new InputDeviceBindings will send InputEvents to.
 /// - `bindings`: Holds all the InputDeviceBindings associated with the InputPipeline.
 /// - `device_id`: The device id of the associated bindings.
+/// - `input_devices_node`: The parent node for all device bindings' inspect nodes.
 ///
 /// # Note
 /// This will create multiple bindings, in the case where
@@ -582,6 +595,7 @@ async fn add_device_bindings(
     input_event_sender: &Sender<input_device::InputEvent>,
     bindings: &InputDeviceBindingHashMap,
     device_id: u32,
+    input_devices_node: &fuchsia_inspect::Node,
     devices_connected: Option<&fuchsia_inspect::UintProperty>,
 ) {
     let mut matched_device_types = vec![];
@@ -636,11 +650,13 @@ async fn add_device_bindings(
         // If we add additional cases where bindings share an underlying `input-report` node,
         // we might consider adding a multiplexing binding, to avoid reading duplicate reports.
         let proxy = device_proxy.clone();
+        let device_node = input_devices_node.create_child(format!("{}_{}", filename, device_type));
         match input_device::get_device_binding(
             *device_type,
             proxy,
             device_id,
             input_event_sender.clone(),
+            device_node,
         )
         .await
         {
@@ -675,7 +691,9 @@ mod tests {
             FeaturesMarker as InputConfigFeaturesMarker,
             FeaturesRequest as InputConfigFeaturesRequest,
         },
-        fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync,
+        fuchsia_inspect::AnyProperty,
+        fuchsia_zircon as zx,
         futures::channel::mpsc::Sender,
         futures::FutureExt,
         pretty_assertions::assert_eq,
@@ -804,7 +822,7 @@ mod tests {
             device_event_receiver,
             input_device_types: vec![],
             input_device_bindings: Arc::new(Mutex::new(HashMap::new())),
-            _inspect_node: test_node,
+            inspect_node: test_node,
         };
         InputPipeline::catch_unhandled(receiver);
         InputPipeline::run(tasks);
@@ -867,7 +885,7 @@ mod tests {
             device_event_receiver,
             input_device_types: vec![],
             input_device_bindings: Arc::new(Mutex::new(HashMap::new())),
-            _inspect_node: test_node,
+            inspect_node: test_node,
         };
         InputPipeline::catch_unhandled(receiver);
         InputPipeline::run(tasks);
@@ -950,14 +968,12 @@ mod tests {
             "supported_input_devices",
             supported_device_types.clone().iter().join(", "),
         );
-        let devices_discovered = test_node.create_uint("devices_discovered", 0);
-        let devices_connected = test_node.create_uint("devices_connected", 0);
+        let input_devices = test_node.create_child("input_devices");
         // Assert that inspect tree is initialized with no devices.
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Mouse",
-                devices_discovered: 0u64,
-                devices_connected: 0u64
+                input_devices: {}
             }
         });
 
@@ -967,8 +983,7 @@ mod tests {
             supported_device_types,
             input_event_sender,
             bindings.clone(),
-            &devices_discovered,
-            &devices_connected,
+            &input_devices,
             true, /* break_on_idle */
         )
         .await;
@@ -998,8 +1013,23 @@ mod tests {
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Mouse",
-                devices_discovered: 1u64,
-                devices_connected: 1u64
+                input_devices: {
+                    devices_discovered: 1u64,
+                    devices_connected: 1u64,
+                    "001_Mouse": {
+                        reports_received_count: 0u64,
+                        reports_filtered_count: 0u64,
+                        events_generated: 0u64,
+                        last_received_timestamp_ns: 0u64,
+                        last_generated_timestamp_ns: 0u64,
+                        "fuchsia.inspect.Health": {
+                            status: "STARTING_UP",
+                            // Timestamp value is unpredictable and not relevant in this context,
+                            // so we only assert that the property is present.
+                            start_timestamp_nanos: AnyProperty
+                        },
+                    }
+                }
             }
         });
     }
@@ -1066,14 +1096,12 @@ mod tests {
             "supported_input_devices",
             supported_device_types.clone().iter().join(", "),
         );
-        let devices_discovered = test_node.create_uint("devices_discovered", 0);
-        let devices_connected = test_node.create_uint("devices_connected", 0);
+        let input_devices = test_node.create_child("input_devices");
         // Assert that inspect tree is initialized with no devices.
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Keyboard",
-                devices_discovered: 0u64,
-                devices_connected: 0u64
+                input_devices: {}
             }
         });
 
@@ -1083,8 +1111,7 @@ mod tests {
             supported_device_types,
             input_event_sender,
             bindings.clone(),
-            &devices_discovered,
-            &devices_connected,
+            &input_devices,
             true, /* break_on_idle */
         )
         .await;
@@ -1097,8 +1124,10 @@ mod tests {
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Keyboard",
-                devices_discovered: 1u64,
-                devices_connected: 0u64
+                input_devices: {
+                    devices_discovered: 1u64,
+                    devices_connected: 0u64,
+                }
             }
         });
     }
@@ -1138,6 +1167,9 @@ mod tests {
         })
         .detach();
 
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("input_pipeline");
+
         // Start listening for InputDeviceRegistryRequests.
         let bindings_clone = bindings.clone();
         let _ = InputPipeline::handle_input_device_registry_request_stream(
@@ -1146,6 +1178,7 @@ mod tests {
             &input_event_sender,
             &bindings_clone,
             0,
+            &test_node,
         )
         .await;
 
@@ -1209,10 +1242,9 @@ mod tests {
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Touch, ConsumerControls",
-                devices_discovered: 0u64,
-                devices_connected: 0u64,
                 handlers_registered: 1u64,
                 handlers_healthy: 1u64,
+                input_devices: {}
             }
         });
     }

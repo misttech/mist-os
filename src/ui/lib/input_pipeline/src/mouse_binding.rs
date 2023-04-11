@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device::{self, Handled, InputDeviceBinding},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus},
     crate::mouse_model_database,
     crate::utils::Position,
     anyhow::{format_err, Error},
@@ -159,6 +159,9 @@ pub struct MouseBinding {
 
     /// Holds information about this device.
     device_descriptor: MouseDeviceDescriptor,
+
+    /// The inventory of this binding's Inspect status.
+    _inspect_status: InputDeviceStatus,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -214,6 +217,7 @@ impl MouseBinding {
     /// - `device_proxy`: The proxy to bind the new [`InputDeviceBinding`] to.
     /// - `device_id`: The id of the connected mouse device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -221,9 +225,10 @@ impl MouseBinding {
         device_proxy: InputDeviceProxy,
         device_id: u32,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_binding =
-            Self::bind_device(&device_proxy, device_id, input_event_sender).await?;
+            Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
@@ -240,6 +245,7 @@ impl MouseBinding {
     /// - `device`: The device to use to initialize the binding.
     /// - `device_id`: The id of the connected mouse device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If the device descriptor could not be retrieved, or the descriptor could
@@ -248,6 +254,7 @@ impl MouseBinding {
         device: &InputDeviceProxy,
         device_id: u32,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_descriptor: fidl_input_report::DeviceDescriptor =
             device.get_descriptor().await?;
@@ -272,7 +279,13 @@ impl MouseBinding {
             counts_per_mm: model.counts_per_mm,
         };
 
-        Ok(MouseBinding { event_sender: input_event_sender, device_descriptor })
+        let input_device_status = InputDeviceStatus::new(device_node);
+
+        Ok(MouseBinding {
+            event_sender: input_event_sender,
+            device_descriptor,
+            _inspect_status: input_device_status,
+        })
     }
 
     /// Parses an [`InputReport`] into one or more [`InputEvent`]s.

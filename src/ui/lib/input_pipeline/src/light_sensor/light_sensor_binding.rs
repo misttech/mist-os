@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use super::types::Rgbc;
-use crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceDescriptor, InputEvent};
+use crate::input_device::{
+    self, Handled, InputDeviceBinding, InputDeviceDescriptor, InputDeviceStatus, InputEvent,
+};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor, SensorType};
@@ -34,6 +36,9 @@ pub(crate) struct LightSensorBinding {
 
     /// Holds information about this device.
     device_descriptor: LightSensorDeviceDescriptor,
+
+    /// The inventory of this binding's Inspect status.
+    _inspect_status: InputDeviceStatus,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -79,6 +84,7 @@ impl LightSensorBinding {
     /// - `device_proxy`: The proxy to bind the new [`InputDeviceBinding`] to.
     /// - `device_id`: The unique identifier of this device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -86,9 +92,10 @@ impl LightSensorBinding {
         device_proxy: InputDeviceProxy,
         device_id: u32,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_binding =
-            Self::bind_device(&device_proxy, device_id, input_event_sender).await?;
+            Self::bind_device(&device_proxy, device_id, input_event_sender, device_node).await?;
         input_device::initialize_report_stream(
             device_proxy.clone(),
             device_binding.get_device_descriptor(),
@@ -113,6 +120,7 @@ impl LightSensorBinding {
     /// - `device`: The device to use to initialize the binding.
     /// - `device_id`: The device ID being bound.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If the device descriptor could not be retrieved, or the descriptor could not be parsed
@@ -121,8 +129,10 @@ impl LightSensorBinding {
         device: &InputDeviceProxy,
         device_id: u32,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let descriptor = device.get_descriptor().await?;
+        let input_device_status = InputDeviceStatus::new(device_node);
         let device_info = descriptor.device_info.ok_or_else(|| {
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
@@ -207,6 +217,7 @@ impl LightSensorBinding {
                         device_id,
                         sensor_layout,
                     },
+                    _inspect_status: input_device_status,
                 })
             }
             device_descriptor => Err(format_err!(

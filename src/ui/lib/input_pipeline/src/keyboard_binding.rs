@@ -4,7 +4,7 @@
 
 use {
     crate::autorepeater,
-    crate::input_device::{self, Handled, InputDeviceBinding},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus},
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
     fidl_fuchsia_input,
@@ -265,6 +265,9 @@ pub struct KeyboardBinding {
 
     /// Holds information about this device.
     device_descriptor: KeyboardDeviceDescriptor,
+
+    /// The inventory of this binding's Inspect status.
+    _inspect_status: InputDeviceStatus,
 }
 
 #[async_trait]
@@ -293,18 +296,20 @@ impl KeyboardBinding {
     ///
     /// # Parameters
     /// - `device_proxy`: The proxy to bind the new [`InputDeviceBinding`] to.
-    /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_id`: The unique identifier of this device.
+    /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
     pub async fn new(
         device_proxy: InputDeviceProxy,
-        input_event_sender: Sender<input_device::InputEvent>,
         device_id: u32,
+        input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_binding =
-            Self::bind_device(&device_proxy, input_event_sender, device_id).await?;
+            Self::bind_device(&device_proxy, input_event_sender, device_id, device_node).await?;
         input_device::initialize_report_stream(
             device_proxy,
             device_binding.get_device_descriptor(),
@@ -350,6 +355,7 @@ impl KeyboardBinding {
     /// - `device`: The device to use to initialize the binding.
     /// - `input_event_sender`: The channel to send new InputEvents to.
     /// - `device_id`: The device ID being bound.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If the device descriptor could not be retrieved, or the descriptor could not be parsed
@@ -358,8 +364,10 @@ impl KeyboardBinding {
         device: &InputDeviceProxy,
         input_event_sender: Sender<input_device::InputEvent>,
         device_id: u32,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let descriptor = device.get_descriptor().await?;
+        let input_device_status = InputDeviceStatus::new(device_node);
         let device_info = descriptor.device_info.ok_or({
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
@@ -378,6 +386,7 @@ impl KeyboardBinding {
                     device_info,
                     device_id,
                 },
+                _inspect_status: input_device_status,
             }),
             device_descriptor => Err(format_err!(
                 "Keyboard Device Descriptor failed to parse: \n {:?}",

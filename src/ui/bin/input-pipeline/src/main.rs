@@ -129,6 +129,9 @@ async fn main() -> Result<(), Error> {
         input_handlers.push(light_sensor_handler.clone());
     }
 
+    let input_pipeline_node = inspector.root().create_child("input_pipeline");
+    let injected_devices_node = input_pipeline_node.create_child("injected_input_devices");
+
     let input_pipeline = if std::path::Path::new(IGNORE_REAL_DEVICES_CONFIG_PATH).exists() {
         input_pipeline_lib::input_pipeline::InputPipeline::new_for_test(
             device_types.clone(),
@@ -141,7 +144,7 @@ async fn main() -> Result<(), Error> {
             input_pipeline_lib::input_pipeline::InputPipelineAssembly::new()
                 .add_all_handlers(input_handlers)
                 .add_autorepeater(),
-            inspector.root().create_child("input_pipeline"),
+            input_pipeline_node,
         )
         .expect("Failed to create input pipeline")
     };
@@ -160,6 +163,10 @@ async fn main() -> Result<(), Error> {
     // Handle incoming injection input devices. Start with u32::Max to avoid conflicting device ids.
     let mut injected_device_id = u32::MAX;
     while let Some(service_request) = fs.next().await {
+        let device_types_clone = device_types.clone();
+        let input_event_sender_clone = input_event_sender.clone();
+        let node_clone = injected_devices_node.clone_weak();
+        let bindings_clone = bindings.clone();
         match service_request {
             ExposedServices::FactoryResetCountdown(stream) => {
                 let factory_reset_countdown_fut = handle_factory_reset_countdown_request_stream(
@@ -170,15 +177,18 @@ async fn main() -> Result<(), Error> {
                 fasync::Task::local(factory_reset_countdown_fut).detach();
             }
             ExposedServices::InputDeviceRegistry(stream) => {
-                let input_device_registry_fut = handle_input_device_registry_request_stream(
-                    stream,
-                    device_types.clone(),
-                    input_event_sender.clone(),
-                    bindings.clone(),
-                    injected_device_id,
-                );
-
-                fasync::Task::local(input_device_registry_fut).detach();
+                fasync::Task::local(async move {
+                    handle_input_device_registry_request_stream(
+                        stream,
+                        device_types_clone,
+                        input_event_sender_clone,
+                        bindings_clone,
+                        injected_device_id,
+                        &node_clone,
+                    )
+                    .await;
+                })
+                .detach();
                 injected_device_id -= 1;
             }
             ExposedServices::LightSensor(stream) => {
@@ -243,6 +253,7 @@ async fn handle_input_device_registry_request_stream(
     >,
     bindings: input_pipeline_lib::input_pipeline::InputDeviceBindingHashMap,
     device_id: u32,
+    injected_devices_node: &fuchsia_inspect::Node,
 ) {
     match input_pipeline_lib::input_pipeline::InputPipeline::handle_input_device_registry_request_stream(
         stream,
@@ -250,6 +261,7 @@ async fn handle_input_device_registry_request_stream(
         &input_event_sender,
         &bindings,
         device_id,
+        injected_devices_node,
     )
     .await
     {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::input_device::{self, Handled, InputDeviceBinding, InputEvent},
+    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
     crate::mouse_binding,
     crate::utils::{Position, Size},
     anyhow::{format_err, Context, Error},
@@ -198,6 +198,9 @@ pub struct TouchBinding {
 
     /// Proxy to the device.
     device_proxy: InputDeviceProxy,
+
+    /// The inventory of this binding's Inspect status.
+    _inspect_status: InputDeviceStatus,
 }
 
 #[async_trait]
@@ -239,6 +242,7 @@ impl TouchBinding {
     /// - `device_proxy`: The proxy to bind the new [`InputDeviceBinding`] to.
     /// - `device_id`: The id of the connected touch device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If there was an error binding to the proxy.
@@ -246,9 +250,11 @@ impl TouchBinding {
         device_proxy: InputDeviceProxy,
         device_id: u32,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_binding =
-            Self::bind_device(device_proxy.clone(), device_id, input_event_sender).await?;
+            Self::bind_device(device_proxy.clone(), device_id, input_event_sender, device_node)
+                .await?;
         device_binding
             .set_touchpad_mode(true)
             .await
@@ -270,6 +276,7 @@ impl TouchBinding {
     /// - `device`: The device to use to initialize the binding.
     /// - `device_id`: The id of the connected touch device.
     /// - `input_event_sender`: The channel to send new InputEvents to.
+    /// - `device_node`: The inspect node for this device binding
     ///
     /// # Errors
     /// If the device descriptor could not be retrieved, or the descriptor could not be parsed
@@ -278,9 +285,11 @@ impl TouchBinding {
         device_proxy: InputDeviceProxy,
         device_id: u32,
         input_event_sender: Sender<input_device::InputEvent>,
+        device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
         let device_descriptor: fidl_fuchsia_input_report::DeviceDescriptor =
             device_proxy.get_descriptor().await?;
+        let input_device_status = InputDeviceStatus::new(device_node);
 
         let touch_device_type = get_device_type(&device_proxy).await;
 
@@ -321,6 +330,7 @@ impl TouchBinding {
                 },
                 touch_device_type,
                 device_proxy,
+                _inspect_status: input_device_status,
             }),
             descriptor => Err(format_err!("Touch Descriptor failed to parse: \n {:?}", descriptor)),
         }
@@ -971,10 +981,14 @@ mod tests {
         let (device_event_sender, _) =
             futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
 
+        // Create a test inspect node as required by TouchBinding::new()
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+
         // Create a `TouchBinding` to exercise its call to `SetFeatureReport`. But drop
         // the binding immediately, so that `set_feature_report_receiver.collect()`
         // does not hang.
-        TouchBinding::new(input_device_proxy, 0, device_event_sender).await.unwrap();
+        TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
         assert_matches!(
             set_feature_report_receiver.collect::<Vec<_>>().await.as_slice(),
             [fidl_input_report::FeatureReport {
@@ -1024,7 +1038,12 @@ mod tests {
         let (device_event_sender, _) =
             futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
 
-        let binding = TouchBinding::new(input_device_proxy, 0, device_event_sender).await.unwrap();
+        // Create a test inspect node as required by TouchBinding::new()
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+
+        let binding =
+            TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
         pretty_assertions::assert_eq!(binding.touch_device_type, expect_touch_device_type);
     }
 
@@ -1081,7 +1100,12 @@ mod tests {
         let (device_event_sender, _device_event_receiver) =
             futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
 
-        let binding = TouchBinding::new(input_device_proxy, 0, device_event_sender).await.unwrap();
+        // Create a test inspect node as required by TouchBinding::new()
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("test_node");
+
+        let binding =
+            TouchBinding::new(input_device_proxy, 0, device_event_sender, test_node).await.unwrap();
         let bindings: InputDeviceBindingHashMap = Arc::new(Mutex::new(HashMap::new()));
         bindings.lock().await.insert(1, vec![Box::new(binding)]);
 

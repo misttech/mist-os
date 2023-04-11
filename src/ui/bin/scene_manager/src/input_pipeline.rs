@@ -144,6 +144,10 @@ pub async fn handle_input(
     } else {
         None
     };
+
+    // Create parent node of inspect nodes for device bindings.
+    let injected_devices_node = node.create_child("injected_input_devices");
+
     let input_pipeline = InputPipeline::new(
         supported_input_devices.clone(),
         build_input_pipeline_assembly(
@@ -179,6 +183,7 @@ pub async fn handle_input(
         input_pipeline.input_device_types().clone(),
         input_pipeline.input_event_sender().clone(),
         input_pipeline.input_device_bindings().clone(),
+        injected_devices_node,
     );
     fasync::Task::local(input_device_registry_fut).detach();
 
@@ -650,6 +655,7 @@ pub async fn handle_input_device_registry_request_streams(
     input_device_types: Vec<input_device::InputDeviceType>,
     input_event_sender: futures::channel::mpsc::Sender<input_device::InputEvent>,
     input_device_bindings: InputDeviceBindingHashMap,
+    injected_devices_node: fuchsia_inspect::Node,
 ) {
     // Use a high value device id to avoid conflicting device ids.
     let mut device_id = u32::MAX;
@@ -658,6 +664,11 @@ pub async fn handle_input_device_registry_request_streams(
         let input_device_types_clone = input_device_types.clone();
         let input_event_sender_clone = input_event_sender.clone();
         let input_device_bindings_clone = input_device_bindings.clone();
+
+        // Must clone inspect node since we move it to our async task, but we want to
+        // continue to operate on this inspect tree in future iterations of the loop.
+        let node_clone = injected_devices_node.clone_weak();
+
         // TODO(fxbug.dev/109772): Push this task down to InputPipeline.
         // I didn't do that here, to keep the scope of this change small.
         fasync::Task::local(async move {
@@ -667,6 +678,7 @@ pub async fn handle_input_device_registry_request_streams(
                 &input_event_sender_clone,
                 &input_device_bindings_clone,
                 device_id,
+                &node_clone,
             )
             .await
             {

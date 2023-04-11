@@ -59,8 +59,7 @@ pub struct InputDeviceStatus {
 }
 
 impl InputDeviceStatus {
-    fn _new(parent_node: &fuchsia_inspect::Node, filename: &str, device_type: &str) -> Self {
-        let device_node = parent_node.create_child(format!("{}_{}", filename, device_type));
+    pub fn new(device_node: fuchsia_inspect::Node) -> Self {
         let mut health_node = fuchsia_inspect::health::Node::new(&device_node);
         health_node.set_starting_up();
 
@@ -301,30 +300,50 @@ pub async fn get_device_binding(
     device_proxy: fidl_input_report::InputDeviceProxy,
     device_id: u32,
     input_event_sender: Sender<InputEvent>,
+    device_node: fuchsia_inspect::Node,
 ) -> Result<Box<dyn InputDeviceBinding>, Error> {
     match device_type {
         InputDeviceType::ConsumerControls => Ok(Box::new(
             consumer_controls_binding::ConsumerControlsBinding::new(
                 device_proxy,
                 input_event_sender,
+                device_node,
             )
             .await?,
         )),
         InputDeviceType::Mouse => Ok(Box::new(
-            mouse_binding::MouseBinding::new(device_proxy, device_id, input_event_sender).await?,
+            mouse_binding::MouseBinding::new(
+                device_proxy,
+                device_id,
+                input_event_sender,
+                device_node,
+            )
+            .await?,
         )),
         InputDeviceType::Touch => Ok(Box::new(
-            touch_binding::TouchBinding::new(device_proxy, device_id, input_event_sender).await?,
+            touch_binding::TouchBinding::new(
+                device_proxy,
+                device_id,
+                input_event_sender,
+                device_node,
+            )
+            .await?,
         )),
         InputDeviceType::Keyboard => Ok(Box::new(
-            keyboard_binding::KeyboardBinding::new(device_proxy, input_event_sender, device_id)
-                .await?,
+            keyboard_binding::KeyboardBinding::new(
+                device_proxy,
+                device_id,
+                input_event_sender,
+                device_node,
+            )
+            .await?,
         )),
         InputDeviceType::LightSensor => Ok(Box::new(
             light_sensor_binding::LightSensorBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
+                device_node,
             )
             .await?,
         )),
@@ -462,21 +481,25 @@ mod tests {
     async fn input_device_status_initialized_with_correct_properties() {
         let inspector = fuchsia_inspect::Inspector::default();
         let input_pipeline_node = inspector.root().create_child("input_pipeline");
-        let _input_device_status = InputDeviceStatus::_new(&input_pipeline_node, "001", "keyboard");
+        let input_devices_node = input_pipeline_node.create_child("input_devices");
+        let device_node = input_devices_node.create_child("001_keyboard");
+        let _input_device_status = InputDeviceStatus::new(device_node);
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
-                "001_keyboard": {
-                    reports_received_count: 0u64,
-                    reports_filtered_count: 0u64,
-                    events_generated: 0u64,
-                    last_received_timestamp_ns: 0u64,
-                    last_generated_timestamp_ns: 0u64,
-                    "fuchsia.inspect.Health": {
-                        status: "STARTING_UP",
-                        // Timestamp value is unpredictable and not relevant in this context,
-                        // so we only assert that the property is present.
-                        start_timestamp_nanos: AnyProperty
-                    },
+                input_devices: {
+                    "001_keyboard": {
+                        reports_received_count: 0u64,
+                        reports_filtered_count: 0u64,
+                        events_generated: 0u64,
+                        last_received_timestamp_ns: 0u64,
+                        last_generated_timestamp_ns: 0u64,
+                        "fuchsia.inspect.Health": {
+                            status: "STARTING_UP",
+                            // Timestamp value is unpredictable and not relevant in this context,
+                            // so we only assert that the property is present.
+                            start_timestamp_nanos: AnyProperty
+                        },
+                    }
                 }
             }
         });
