@@ -5,6 +5,7 @@
 #include "src/devices/misc/drivers/compat/device.h"
 
 #include <fidl/fuchsia.device.composite/cpp/wire.h>
+#include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire_types.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_priv.h>
@@ -347,8 +348,21 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     }
   }
 
-  device->device_server_ = DeviceServer(outgoing_name, zx_args->proto_id, device->topological_path_,
-                                        std::move(service_offers));
+  device->device_server_ = DeviceServer(
+      outgoing_name, zx_args->proto_id, device->topological_path_, std::move(service_offers),
+      [device =
+           std::weak_ptr(device)](uint32_t proto_id) -> zx::result<DeviceServer::GenericProtocol> {
+        DeviceServer::GenericProtocol protocol;
+        std::shared_ptr dev = device.lock();
+        if (!dev) {
+          return zx::error(ZX_ERR_BAD_STATE);
+        }
+        zx_status_t status = dev->GetProtocol(proto_id, &protocol);
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+        return zx::ok(protocol);
+      });
 
   // Add the metadata from add_args:
   for (size_t i = 0; i < zx_args->metadata_count; i++) {
@@ -703,6 +717,15 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
   proto->ops = compat_symbol_.proto_ops.ops;
   proto->ctx = compat_symbol_.context;
   return ZX_OK;
+}
+
+zx_status_t Device::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {
+  if (driver() == nullptr) {
+    FDF_LOG(ERROR, "Driver is null");
+    return ZX_ERR_BAD_STATE;
+  }
+
+  return driver()->GetFragmentProtocol(fragment, proto_id, out);
 }
 
 zx_status_t Device::AddMetadata(uint32_t type, const void* data, size_t size) {

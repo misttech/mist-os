@@ -151,4 +151,35 @@ void DeviceServer::GetMetadata(GetMetadataCompleter::Sync& completer) {
       metadata.data(), metadata.size()));
 }
 
+void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
+                                    GetBanjoProtocolCompleter::Sync& completer) {
+  // First check that we are in the same driver host.
+  static uint64_t process_koid = []() {
+    zx_info_handle_basic_t basic;
+    ZX_ASSERT(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr,
+                                            nullptr) == ZX_OK);
+    return basic.koid;
+  }();
+
+  if (process_koid != request->process_koid) {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  // Next call the callback if it was registered.
+  if (!get_banjo_protocol_) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+
+  zx::result result = get_banjo_protocol_(request->proto_id);
+  if (result.is_error()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+
+  completer.ReplySuccess(reinterpret_cast<uint64_t>(result->ops),
+                         reinterpret_cast<uint64_t>(result->ctx));
+}
+
 }  // namespace compat

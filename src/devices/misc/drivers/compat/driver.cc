@@ -687,6 +687,42 @@ zx_status_t Driver::ServeDiagnosticsDir() {
   return ZX_OK;
 }
 
+zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {
+  auto iter = parent_clients_.find(fragment);
+  if (iter == parent_clients_.end()) {
+    FDF_LOG(ERROR, "Failed to find compat client of fragment");
+    return ZX_ERR_NOT_FOUND;
+  }
+  fidl::WireClient<fuchsia_driver_compat::Device>& client = iter->second;
+
+  static uint64_t process_koid = []() {
+    zx_info_handle_basic_t basic;
+    ZX_ASSERT(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr,
+                                            nullptr) == ZX_OK);
+    return basic.koid;
+  }();
+
+  fidl::WireResult result = client.sync()->GetBanjoProtocol(proto_id, process_koid);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to send request to get banjo protocol: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "Failed to get banjo protocol: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  struct GenericProtocol {
+    const void* ops;
+    void* ctx;
+  };
+
+  auto proto = static_cast<GenericProtocol*>(out);
+  proto->ops = reinterpret_cast<const void*>(result->value()->ops);
+  proto->ctx = reinterpret_cast<void*>(result->value()->context);
+  return ZX_OK;
+}
+
 }  // namespace compat
 
 using record = fdf::Lifecycle<compat::Driver, compat::DriverFactory>;

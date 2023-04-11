@@ -457,21 +457,20 @@ TEST_F(DeviceTest, DeviceFragmentMetadata) {
   EXPECT_EQ(sizeof(metadata), found_size);
 }
 
-TEST_F(DeviceTest, GetFragmentProtocolFromDevice) {
-  // Create a device with a get_protocol hook.
+TEST_F(DeviceTest, GetFragmentProtocolFromDeviceNoDriver) {
+  // Create a device.
   zx_protocol_device_t ops{};
-  ops.get_protocol = [](void* ctx, uint32_t proto_id, void* protocol) {
-    EXPECT_EQ(ZX_PROTOCOL_BLOCK, proto_id);
-    return ZX_OK;
-  };
   compat::Device with(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(), dispatcher());
   std::vector<std::string> fragments;
   fragments.push_back("fragment-name");
   with.set_fragments(std::move(fragments));
-  ASSERT_EQ(ZX_OK, device_get_fragment_protocol(with.ZxDevice(), "fragment-name", ZX_PROTOCOL_BLOCK,
-                                                nullptr));
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, device_get_fragment_protocol(with.ZxDevice(), "unknown-fragment",
-                                                           ZX_PROTOCOL_BLOCK, nullptr));
+
+  struct GenericProtocol {
+    const void* ops;
+    void* ctx;
+  } proto;
+  ASSERT_EQ(ZX_ERR_BAD_STATE, device_get_fragment_protocol(with.ZxDevice(), "fragment-name",
+                                                           ZX_PROTOCOL_BLOCK, &proto));
 }
 
 TEST_F(DeviceTest, GetTopologicalPath) {

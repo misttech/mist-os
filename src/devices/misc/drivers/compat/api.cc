@@ -147,21 +147,11 @@ __EXPORT zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* 
     return ZX_ERR_NOT_FOUND;
   }
 
-  // TODO(fxbug.dev/93678): Fully support composite devices.
-  FDF_LOGL(WARNING, dev->logger(),
-           "DFv2 currently only supports primary fragment. Driver requests fragment %s but we are "
-           "returning the primary",
-           name);
-  return dev->GetProtocol(proto_id, out);
+  return dev->GetFragmentProtocol(name, proto_id, out);
 }
 
 __EXPORT zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* name, uint32_t type,
                                                   void* buf, size_t buflen, size_t* actual) {
-  // TODO(fxbug.dev/93678): Fully support composite devices.
-  FDF_LOGL(WARNING, dev->logger(),
-           "DFv2 currently only supports primary fragment. Driver requests fragment %s but we are "
-           "returning the primary",
-           name);
   return dev->GetMetadata(type, buf, buflen, actual);
 }
 

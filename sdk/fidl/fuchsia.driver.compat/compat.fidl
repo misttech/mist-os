@@ -22,6 +22,17 @@ protocol Device {
     GetMetadata() -> (resource struct {
         metadata vector<Metadata>:MAX;
     }) error zx.status;
+
+    /// Connect to a banjo protocol that this device is exposing.
+    /// The caller needs to send a copy of their process koid so the callee can verify
+    /// that both drivers are in the same process.
+    GetBanjoProtocol(struct {
+        proto_id uint32;
+        process_koid zx.koid;
+    }) -> (struct {
+        ops uint64;
+        context uint64;
+    }) error zx.status;
 };
 
 /// This represents a service that the compatibility driver will offer to

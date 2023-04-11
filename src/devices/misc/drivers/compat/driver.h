@@ -50,6 +50,8 @@ class Driver : public fdf::DriverBase {
   zx::result<> SetProfileByRole(zx::unowned_thread thread, std::string_view role);
   zx::result<std::string> GetVariable(const char* name);
 
+  zx_status_t GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out);
+
   Device& GetDevice() { return device_; }
 
   // These accessors are used by other classes in the compat driver so we want to expose
