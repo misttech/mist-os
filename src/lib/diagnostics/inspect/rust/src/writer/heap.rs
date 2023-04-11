@@ -48,6 +48,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         Ok(heap)
     }
 
+    #[inline]
     fn init_header(&mut self) -> Result<(), Error> {
         let header_index =
             self.allocate_block(inspect_format::utils::order_to_size(constants::HEADER_ORDER))?;
@@ -138,6 +139,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         Ok(())
     }
 
+    #[inline]
     fn possible_to_merge(&self, buddy_index: BlockIndex, block_index: BlockIndex) -> bool {
         let buddy_block = self.container.block_at(buddy_index);
         let block = self.container.block_at(block_index);
@@ -151,6 +153,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         self.container.get_slice(self.current_size_bytes).unwrap().to_vec()
     }
 
+    #[inline]
     fn grow_heap(&mut self, requested_size: usize) -> Result<(), Error> {
         let container_size = self.container.len();
         if requested_size > container_size || requested_size > constants::MAX_VMO_SIZE {
@@ -182,6 +185,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         Ok(())
     }
 
+    #[inline]
     fn is_free_block(&self, index: BlockIndex, expected_order: u8) -> bool {
         // Safety: promoting from u32 to usize
         if (*index as usize) >= self.current_size_bytes / constants::MIN_ORDER_SIZE {
@@ -191,6 +195,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         block.block_type() == BlockType::Free && block.order() == expected_order
     }
 
+    #[inline]
     fn remove_free(&mut self, block_index: BlockIndex) -> Result<bool, Error> {
         let block = self.container.block_at(block_index);
         let free_next_index = block.free_next_index()?;
@@ -214,6 +219,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         Ok(false)
     }
 
+    #[inline]
     fn split_block(&mut self, block_index: BlockIndex) -> Result<(), Error> {
         let block_order = self.container.block_at(block_index).order();
         if block_order >= constants::NUM_ORDERS {
