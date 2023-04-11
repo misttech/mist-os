@@ -51,7 +51,7 @@ class DebugAgentLauncher : public fuchsia::debugger::DebugAgent {
 
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  syslog::SetLogSettings(syslog::LogSettings{});
+  fuchsia_logging::SetLogSettings(fuchsia_logging::LogSettings{});
 
   DebugAgentLauncher launcher;
   fidl::Binding<fuchsia::debugger::DebugAgent> binding(&launcher);

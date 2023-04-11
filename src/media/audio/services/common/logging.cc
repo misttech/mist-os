@@ -15,7 +15,8 @@ namespace {
 
 class ThrottledLoggerFromCounts : public ThrottledLogger {
  public:
-  explicit ThrottledLoggerFromCounts(std::vector<std::pair<syslog::LogSeverity, int64_t>> counts)
+  explicit ThrottledLoggerFromCounts(
+      std::vector<std::pair<fuchsia_logging::LogSeverity, int64_t>> counts)
       : counts_per_severity_(std::move(counts)) {
     // Sort with higest severity first.
     std::sort(counts_per_severity_.begin(), counts_per_severity_.end(),
@@ -34,22 +35,22 @@ class ThrottledLoggerFromCounts : public ThrottledLogger {
     return false;
   }
 
-  syslog::LogSeverity current_severity() final {
+  fuchsia_logging::LogSeverity current_severity() final {
     FX_CHECK(current_severity_);
     return *current_severity_;
   }
 
  private:
   int64_t count_{-1};
-  std::vector<std::pair<syslog::LogSeverity, int64_t>> counts_per_severity_;
-  std::optional<syslog::LogSeverity> current_severity_;
+  std::vector<std::pair<fuchsia_logging::LogSeverity, int64_t>> counts_per_severity_;
+  std::optional<fuchsia_logging::LogSeverity> current_severity_;
 };
 
 }  // namespace
 
 // static
 std::unique_ptr<ThrottledLogger> ThrottledLogger::FromCounts(
-    std::vector<std::pair<syslog::LogSeverity, int64_t>> counts) {
+    std::vector<std::pair<fuchsia_logging::LogSeverity, int64_t>> counts) {
   return std::make_unique<ThrottledLoggerFromCounts>(std::move(counts));
 }
 

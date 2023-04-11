@@ -26,7 +26,7 @@ void LogProcessLimboStatus(const ::forensics::exceptions::ProcessLimboManager& l
 }  // namespace
 
 int main() {
-  syslog::SetTags({"forensics", "exception"});
+  fuchsia_logging::SetTags({"forensics", "exception"});
 
   forensics::component::Component component;
 

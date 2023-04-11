@@ -13,7 +13,7 @@
 #include "src/lib/fxl/command_line.h"
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"mdns-util"});
+  fuchsia_logging::SetTags({"mdns-util"});
 
   mdns::CommandParser parser(argc, argv);
   mdns::Command command = parser.Parse();

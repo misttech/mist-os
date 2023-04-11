@@ -97,7 +97,7 @@ void App::DoClose(int fd) {
 
 zx_status_t App::Init() {
   zx_status_t status;
-  syslog::SetTags({"weavestack"});
+  fuchsia_logging::SetTags({"weavestack"});
 
   if (initialized_) {
     return ZX_ERR_BAD_STATE;

@@ -14,7 +14,7 @@
 
 // [START main]
 int main(int argc, const char* argv[], char* envp[]) {
-  syslog::SetTags({"echo"});
+  fuchsia_logging::SetTags({"echo"});
   // Read program arguments, and exclude the binary name in argv[0]
   std::vector<std::string> arguments;
   for (int i = 1; i < argc; i++) {

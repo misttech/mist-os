@@ -13,7 +13,7 @@
 #include "src/developer/forensics/public/fakes/crash_reporter.h"
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"forensics", "test"});
+  fuchsia_logging::SetTags({"forensics", "test"});
 
   FX_LOGS(INFO) << "Starting FakeCrashReporter";
 

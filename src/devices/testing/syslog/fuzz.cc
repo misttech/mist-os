@@ -32,10 +32,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     kBooleanField,
   };
   syslog_backend::LogBuffer buffer;
-  auto severity = provider.ConsumeIntegral<syslog::LogSeverity>();
+  auto severity = provider.ConsumeIntegral<fuchsia_logging::LogSeverity>();
   // Fatal crashes...
-  if (severity == syslog::LOG_FATAL) {
-    severity = syslog::LOG_ERROR;
+  if (severity == fuchsia_logging::LOG_FATAL) {
+    severity = fuchsia_logging::LOG_ERROR;
   }
   auto file = provider.ConsumeRandomLengthString();
   auto line = provider.ConsumeIntegral<unsigned int>();

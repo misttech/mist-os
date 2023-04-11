@@ -714,7 +714,7 @@ zx_status_t VirtioMagma::Handle_virt_connection_get_image_info(VirtioDescriptor*
 }
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"virtio_magma"});
+  fuchsia_logging::SetTags({"virtio_magma"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());

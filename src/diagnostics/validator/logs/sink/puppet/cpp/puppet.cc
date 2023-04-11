@@ -14,8 +14,8 @@
 #include "lib/syslog/cpp/logging_backend.h"
 
 namespace syslog_backend {
-void BeginRecordPrintf(LogBuffer* buffer, syslog::LogSeverity severity, const char* file_name,
-                       unsigned int line, const char* msg);
+void BeginRecordPrintf(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                       const char* file_name, unsigned int line, const char* msg);
 }
 
 zx_koid_t GetKoid(zx_handle_t handle) {
@@ -30,7 +30,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   explicit Puppet(std::unique_ptr<sys::ComponentContext> context) : context_(std::move(context)) {
     context_->outgoing()->AddPublicService(sink_bindings_.GetHandler(this));
     syslog_backend::SetInterestChangedListener(
-        +[](void* context, syslog::LogSeverity severity) {
+        +[](void* context, fuchsia_logging::LogSeverity severity) {
           syslog_backend::LogBuffer buffer;
           syslog_backend::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
                                       nullptr);
@@ -41,9 +41,9 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void StopInterestListener(StopInterestListenerCallback callback) override {
-    syslog::LogSettings settings;
+    fuchsia_logging::LogSettings settings;
     settings.disable_interest_listener = true;
-    settings.min_log_level = syslog::LOG_TRACE;
+    settings.min_log_level = fuchsia_logging::LOG_TRACE;
     syslog_backend::SetLogSettings(settings);
     callback();
   }
@@ -69,25 +69,25 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   static void EmitLog(fuchsia::validate::logs::RecordSpec& spec,
                       fuchsia::validate::logs::PrintfRecordSpec* printf_spec) {
     syslog_backend::LogBuffer buffer;
-    syslog::LogSeverity severity;
+    fuchsia_logging::LogSeverity severity;
     switch (spec.record.severity) {
       case fuchsia::diagnostics::Severity::DEBUG:
-        severity = syslog::LOG_DEBUG;
+        severity = fuchsia_logging::LOG_DEBUG;
         break;
       case fuchsia::diagnostics::Severity::ERROR:
-        severity = syslog::LOG_ERROR;
+        severity = fuchsia_logging::LOG_ERROR;
         break;
       case fuchsia::diagnostics::Severity::FATAL:
-        severity = syslog::LOG_FATAL;
+        severity = fuchsia_logging::LOG_FATAL;
         break;
       case fuchsia::diagnostics::Severity::INFO:
-        severity = syslog::LOG_INFO;
+        severity = fuchsia_logging::LOG_INFO;
         break;
       case fuchsia::diagnostics::Severity::TRACE:
-        severity = syslog::LOG_TRACE;
+        severity = fuchsia_logging::LOG_TRACE;
         break;
       case fuchsia::diagnostics::Severity::WARN:
-        severity = syslog::LOG_WARNING;
+        severity = fuchsia_logging::LOG_WARNING;
         break;
     }
     if (printf_spec) {

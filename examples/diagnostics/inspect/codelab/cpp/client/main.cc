@@ -28,7 +28,7 @@ void Usage(char* name) {
 }
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"inspect_cpp_codelab", "client"});
+  fuchsia_logging::SetTags({"inspect_cpp_codelab", "client"});
 
   // If no url is specified, print the usage information and exit.
   if (argc < 2) {

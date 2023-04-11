@@ -30,31 +30,31 @@ TEST(HeaderTest, CompileTimeAsserts) {
   constexpr int versions[] = {FX_LOG_LEGACY_API_VERSION, FUCHSIA_LOG_API_VERSION,
                               FX_LOG_INTREE_API_VERSION};
   static_assert(MultiEquals<int, 3>(versions));
-  constexpr int traces[] = {FX_LOG_TRACE, FUCHSIA_LOG_TRACE, syslog::LOG_TRACE,
+  constexpr int traces[] = {FX_LOG_TRACE, FUCHSIA_LOG_TRACE, fuchsia_logging::LOG_TRACE,
                             static_cast<uint8_t>(fuchsia::diagnostics::Severity::TRACE)};
   static_assert(MultiEquals<int, 4>(traces));
-  constexpr int debugs[] = {FX_LOG_DEBUG, FUCHSIA_LOG_DEBUG, syslog::LOG_DEBUG,
+  constexpr int debugs[] = {FX_LOG_DEBUG, FUCHSIA_LOG_DEBUG, fuchsia_logging::LOG_DEBUG,
                             static_cast<uint8_t>(fuchsia::diagnostics::Severity::DEBUG)};
   static_assert(MultiEquals<int, 4>(debugs));
-  constexpr int infos[] = {FX_LOG_INFO, FUCHSIA_LOG_INFO, syslog::LOG_INFO,
+  constexpr int infos[] = {FX_LOG_INFO, FUCHSIA_LOG_INFO, fuchsia_logging::LOG_INFO,
                            static_cast<uint8_t>(fuchsia::diagnostics::Severity::INFO)};
   static_assert(MultiEquals<int, 4>(infos));
-  constexpr int errors[] = {FX_LOG_ERROR, FUCHSIA_LOG_ERROR, syslog::LOG_ERROR,
+  constexpr int errors[] = {FX_LOG_ERROR, FUCHSIA_LOG_ERROR, fuchsia_logging::LOG_ERROR,
                             static_cast<uint8_t>(fuchsia::diagnostics::Severity::ERROR)};
   static_assert(MultiEquals<int, 4>(errors));
-  constexpr int warns[] = {FX_LOG_WARNING, FUCHSIA_LOG_WARNING, syslog::LOG_WARNING,
+  constexpr int warns[] = {FX_LOG_WARNING, FUCHSIA_LOG_WARNING, fuchsia_logging::LOG_WARNING,
                            static_cast<uint8_t>(fuchsia::diagnostics::Severity::WARN)};
   static_assert(MultiEquals<int, 4>(warns));
-  constexpr int fatals[] = {FX_LOG_FATAL, FUCHSIA_LOG_FATAL, syslog::LOG_FATAL,
+  constexpr int fatals[] = {FX_LOG_FATAL, FUCHSIA_LOG_FATAL, fuchsia_logging::LOG_FATAL,
                             static_cast<uint8_t>(fuchsia::diagnostics::Severity::FATAL)};
   static_assert(MultiEquals<int, 4>(fatals));
-  constexpr int nones[] = {FX_LOG_NONE, FUCHSIA_LOG_NONE, syslog::LOG_NONE};
+  constexpr int nones[] = {FX_LOG_NONE, FUCHSIA_LOG_NONE, fuchsia_logging::LOG_NONE};
   static_assert(MultiEquals<int, 3>(nones));
   constexpr int severity_steps[] = {FX_LOG_SEVERITY_STEP_SIZE, FUCHSIA_LOG_SEVERITY_STEP_SIZE,
-                                    syslog::LogSeverityStepSize};
+                                    fuchsia_logging::LogSeverityStepSize};
   static_assert(MultiEquals<int, 3>(severity_steps));
   constexpr int verbosity_steps[] = {FX_LOG_VERBOSITY_STEP_SIZE, FUCHSIA_LOG_VERBOSITY_STEP_SIZE,
-                                     syslog::LogVerbosityStepSize};
+                                     fuchsia_logging::LogVerbosityStepSize};
   static_assert(MultiEquals<int, 3>(verbosity_steps));
 }
 

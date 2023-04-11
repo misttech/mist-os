@@ -21,7 +21,7 @@ TEST(LogDecoder, DecodesCorrectly) {
   syslog_backend::LogBuffer buffer;
   zx::socket logger_socket, our_socket;
   zx::socket::create(ZX_SOCKET_DATAGRAM, &logger_socket, &our_socket);
-  syslog_backend::BeginRecordWithSocket(&buffer, syslog::LOG_INFO, __FILE__, __LINE__,
+  syslog_backend::BeginRecordWithSocket(&buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
                                         "test message", nullptr, logger_socket.release());
   syslog_backend::WriteKeyValue(&buffer, "tag", "some tag");
   syslog_backend::WriteKeyValue(&buffer, "tag", "some other tag");

@@ -35,9 +35,9 @@ class CodecRunnerApp {
   void Init() {
     static const std::initializer_list<std::string> kLogTags = {"vaapi_codec_runner"};
 #ifdef NDEBUG
-    syslog::SetTags(kLogTags);
+    fuchsia_logging::SetTags(kLogTags);
 #else
-    syslog::SetLogSettings({.min_log_level = syslog::LOG_DEBUG}, kLogTags);
+    fuchsia_logging::SetLogSettings({.min_log_level = fuchsia_logging::LOG_DEBUG}, kLogTags);
 #endif
 
     trace_provider_ =

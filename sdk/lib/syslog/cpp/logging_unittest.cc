@@ -40,7 +40,7 @@
 #include "src/lib/fxl/strings/string_printf.h"
 #endif
 
-namespace syslog {
+namespace fuchsia_logging {
 namespace {
 
 class LoggingFixture : public ::testing::Test {
@@ -58,19 +58,19 @@ class LoggingFixture : public ::testing::Test {
 using LoggingFixtureDeathTest = LoggingFixture;
 #ifdef __Fuchsia__
 std::string SeverityToString(const int32_t severity) {
-  if (severity == syslog::LOG_TRACE) {
+  if (severity == fuchsia_logging::LOG_TRACE) {
     return "TRACE";
-  } else if (severity == syslog::LOG_DEBUG) {
+  } else if (severity == fuchsia_logging::LOG_DEBUG) {
     return "DEBUG";
-  } else if (severity > syslog::LOG_DEBUG && severity < syslog::LOG_INFO) {
-    return fxl::StringPrintf("VLOG(%d)", syslog::LOG_INFO - severity);
-  } else if (severity == syslog::LOG_INFO) {
+  } else if (severity > fuchsia_logging::LOG_DEBUG && severity < fuchsia_logging::LOG_INFO) {
+    return fxl::StringPrintf("VLOG(%d)", fuchsia_logging::LOG_INFO - severity);
+  } else if (severity == fuchsia_logging::LOG_INFO) {
     return "INFO";
-  } else if (severity == syslog::LOG_WARNING) {
+  } else if (severity == fuchsia_logging::LOG_WARNING) {
     return "WARN";
-  } else if (severity == syslog::LOG_ERROR) {
+  } else if (severity == fuchsia_logging::LOG_ERROR) {
     return "ERROR";
-  } else if (severity == syslog::LOG_FATAL) {
+  } else if (severity == fuchsia_logging::LOG_FATAL) {
     return "FATAL";
   }
   return "INVALID";
@@ -352,11 +352,12 @@ TEST_F(LoggingFixture, BackendDirect) {
   LogState state = SetupLogs(new_settings);
 
   syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_ERROR, "foo.cc", 42, "Log message", "condition");
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
+                              "condition");
   syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
   syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_ERROR, "foo.cc", 42, "fake message",
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
                               "condition");
   syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
   syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
@@ -421,4 +422,4 @@ TEST(StructuredLogging, FlushAndReset) {
 #endif
 
 }  // namespace
-}  // namespace syslog
+}  // namespace fuchsia_logging

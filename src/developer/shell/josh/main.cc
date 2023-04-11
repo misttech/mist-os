@@ -8,7 +8,7 @@
 #include "src/developer/shell/josh/console/console.h"
 
 int main(int argc, char* argv[]) {
-  syslog::SetTags({"josh"});
+  fuchsia_logging::SetTags({"josh"});
 
   return shell::ConsoleMain(argc, const_cast<const char**>(argv));
 }

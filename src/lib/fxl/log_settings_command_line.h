@@ -31,7 +31,8 @@ class CommandLine;
 // Returns false and leaves |out_settings| unchanged if there was an
 // error parsing the options.  Otherwise updates |out_settings| with any
 // values which were overridden by the command-line.
-bool ParseLogSettings(const fxl::CommandLine& command_line, syslog::LogSettings* out_settings);
+bool ParseLogSettings(const fxl::CommandLine& command_line,
+                      fuchsia_logging::LogSettings* out_settings);
 
 // Parses and applies log settings from standard command-line options.
 // Returns false and leaves the active settings unchanged if there was an
@@ -48,7 +49,7 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
 // Do the opposite of |ParseLogSettings()|: Convert |settings| to the
 // command line arguments to pass to a program. The result is empty if
 // |settings| is the default.
-std::vector<std::string> LogSettingsToArgv(const syslog::LogSettings& settings);
+std::vector<std::string> LogSettingsToArgv(const fuchsia_logging::LogSettings& settings);
 
 }  // namespace fxl
 

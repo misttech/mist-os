@@ -20,9 +20,11 @@ namespace media_audio {
 // A macro that can be used whenever code is unreachable. This is equivalent to `FX_CHECK(false)`
 // but also tells the compiler that nothing is reachable after this statement. Like other logging
 // macros, it accepts stream operators to write a custom failure message.
-#define UNREACHABLE                            \
-  ::media_audio::LogMessageVoidifyNoReturn() & \
-      ::syslog::LogMessage(::syslog::LOG_FATAL, __FILE__, __LINE__, nullptr, nullptr).stream()
+#define UNREACHABLE                                                                            \
+  ::media_audio::LogMessageVoidifyNoReturn() &                                                 \
+      ::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_FATAL, __FILE__, __LINE__, nullptr, \
+                                    nullptr)                                                   \
+          .stream()
 
 // Implementation detail of UNREACHABLE.
 class LogMessageVoidifyNoReturn {
@@ -34,11 +36,11 @@ class LogMessageVoidifyNoReturn {
 };
 
 // A macro that logs (or not) according to a policy specified by a ThrottledLogger.
-#define THROTTLED_LOG(logger)                                                                 \
-  FX_LAZY_STREAM(                                                                             \
-      ::syslog::LogMessage((logger).current_severity(), __FILE__, __LINE__, nullptr, nullptr) \
-          .stream(),                                                                          \
-      (logger).next_enabled())
+#define THROTTLED_LOG(logger)                                                                   \
+  FX_LAZY_STREAM(::fuchsia_logging::LogMessage((logger).current_severity(), __FILE__, __LINE__, \
+                                               nullptr, nullptr)                                \
+                     .stream(),                                                                 \
+                 (logger).next_enabled())
 
 class ThrottledLogger {
  public:
@@ -51,7 +53,7 @@ class ThrottledLogger {
   // Given a list of pairs `(severity, count)`, each `count` messages are logged at `severity`.
   // If multiple severities are enabled at a specific time, the higest severity is used.
   static std::unique_ptr<ThrottledLogger> FromCounts(
-      std::vector<std::pair<syslog::LogSeverity, int64_t>> counts);
+      std::vector<std::pair<fuchsia_logging::LogSeverity, int64_t>> counts);
 
   // Returns true if the next log message should be enabled.
   // Intended to be called by THROTTLED_LOG only.
@@ -59,7 +61,7 @@ class ThrottledLogger {
 
   // Returns the severity to use for the current log message.
   // Intended to be called by THROTTLED_LOG only.
-  virtual syslog::LogSeverity current_severity() = 0;
+  virtual fuchsia_logging::LogSeverity current_severity() = 0;
 };
 
 }  // namespace media_audio

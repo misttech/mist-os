@@ -28,7 +28,7 @@
 namespace forensics::feedback {
 
 int main() {
-  syslog::SetTags({"forensics", "feedback"});
+  fuchsia_logging::SetTags({"forensics", "feedback"});
 
   const std::optional<SnapshotConfig> snapshot_config = GetSnapshotConfig();
   if (!snapshot_config) {

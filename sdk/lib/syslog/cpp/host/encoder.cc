@@ -17,7 +17,7 @@ const char* StripDots(const char* path) {
   return path;
 }
 
-void BeginRecordLegacy(LogBuffer* buffer, syslog::LogSeverity severity, const char* file,
+void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
                        unsigned int line, const char* msg, const char* condition) {
   auto header = MsgHeader::CreatePtr(buffer);
   header->buffer = buffer;

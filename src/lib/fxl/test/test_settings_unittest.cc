@@ -25,11 +25,11 @@ using ::testing::StrEq;
 class TestSettingsFixture : public ::testing::Test {
  public:
   TestSettingsFixture()
-      : old_severity_(syslog::GetMinLogLevel()),
+      : old_severity_(fuchsia_logging::GetMinLogLevel()),
         old_stderr_(dup(STDERR_FILENO)),
         random_seed_(getenv("TEST_LOOP_RANDOM_SEED")) {}
   ~TestSettingsFixture() {
-    syslog::SetLogSettings({.min_log_level = old_severity_});
+    fuchsia_logging::SetLogSettings({.min_log_level = old_severity_});
     dup2(old_stderr_.get(), STDERR_FILENO);
     if (random_seed_) {
       setenv("TEST_LOOP_RANDOM_SEED", random_seed_, /*overwrite=*/true);
@@ -39,7 +39,7 @@ class TestSettingsFixture : public ::testing::Test {
   }
 
  private:
-  syslog::LogSeverity old_severity_;
+  fuchsia_logging::LogSeverity old_severity_;
   fbl::unique_fd old_stderr_;
   char *random_seed_;
 };
@@ -59,12 +59,12 @@ TEST_F(TestSettingsFixture, RandomSeed) {
 
 TEST_F(TestSettingsFixture, LogLevel) {
   EXPECT_TRUE(SetTestSettings(CommandLineFromInitializerList({"argv0", "--verbose=10"})));
-  EXPECT_EQ(syslog::GetMinLogLevel(), 0x26);  // INFO(0x30) - 10
+  EXPECT_EQ(fuchsia_logging::GetMinLogLevel(), 0x26);  // INFO(0x30) - 10
   // The value for --quiet needs to be smaller than LOG_FATAL because
   // min_log_level is capped at LOG_FATAL.
   const char *argv[] = {"argv0", "--quiet=2", nullptr};
   EXPECT_TRUE(SetTestSettings(2, argv));
-  EXPECT_EQ(syslog::GetMinLogLevel(), syslog::LOG_ERROR);
+  EXPECT_EQ(fuchsia_logging::GetMinLogLevel(), fuchsia_logging::LOG_ERROR);
 }
 
 }  // namespace

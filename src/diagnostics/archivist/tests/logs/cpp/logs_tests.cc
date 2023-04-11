@@ -88,42 +88,42 @@ TEST_F(LoggerIntegrationTest, ListenFiltered) {
   // severities "in the wild" including both those from the
   // legacy syslog severities and the new.
   std::vector<int8_t> severities_in_use = {
-      -10,                  // Legacy "verbosity" (v=10)
-      -5,                   // Legacy "verbosity" (v=5)
-      -4,                   // Legacy "verbosity" (v=4)
-      -3,                   // Legacy "verbosity" (v=3)
-      -2,                   // Legacy "verbosity" (v=2)
-      -1,                   // Legacy "verbosity" (v=1)
-      0,                    // Legacy severity (INFO)
-      1,                    // Legacy severity (WARNING)
-      2,                    // Legacy severity (ERROR)
-      syslog::LOG_TRACE,    // 0x10
-      syslog::LOG_DEBUG,    // 0x20
-      syslog::LOG_INFO,     // 0x30
-      syslog::LOG_WARNING,  // 0x40
-      syslog::LOG_ERROR,    // 0x50
+      -10,                           // Legacy "verbosity" (v=10)
+      -5,                            // Legacy "verbosity" (v=5)
+      -4,                            // Legacy "verbosity" (v=4)
+      -3,                            // Legacy "verbosity" (v=3)
+      -2,                            // Legacy "verbosity" (v=2)
+      -1,                            // Legacy "verbosity" (v=1)
+      0,                             // Legacy severity (INFO)
+      1,                             // Legacy severity (WARNING)
+      2,                             // Legacy severity (ERROR)
+      fuchsia_logging::LOG_TRACE,    // 0x10
+      fuchsia_logging::LOG_DEBUG,    // 0x20
+      fuchsia_logging::LOG_INFO,     // 0x30
+      fuchsia_logging::LOG_WARNING,  // 0x40
+      fuchsia_logging::LOG_ERROR,    // 0x50
   };
 
   // expected severities (sorted), factoring in legacy transforms
   std::vector<int8_t> expected_severities = {
-      syslog::LOG_TRACE,      // Legacy "verbosity" (v=2)
-      syslog::LOG_TRACE,      // 0x10
-      syslog::LOG_DEBUG,      // 0x20
-      syslog::LOG_DEBUG,      // Legacy "verbosity" (v=1)
-      syslog::LOG_INFO - 10,  // Legacy "verbosity" (v=10)
-      syslog::LOG_INFO - 5,   // Legacy "verbosity" (v=5)
-      syslog::LOG_INFO - 4,   // Legacy "verbosity" (v=4)
-      syslog::LOG_INFO - 3,   // Legacy "verbosity" (v=3)
-      syslog::LOG_INFO,       // Legacy severity (INFO)
-      syslog::LOG_INFO,       // 0x30
-      syslog::LOG_WARNING,    // 0x40
-      syslog::LOG_WARNING,    // Legacy severity (WARNING)
-      syslog::LOG_ERROR,      // Legacy severity (ERROR)
-      syslog::LOG_ERROR,      // 0x50
+      fuchsia_logging::LOG_TRACE,      // Legacy "verbosity" (v=2)
+      fuchsia_logging::LOG_TRACE,      // 0x10
+      fuchsia_logging::LOG_DEBUG,      // 0x20
+      fuchsia_logging::LOG_DEBUG,      // Legacy "verbosity" (v=1)
+      fuchsia_logging::LOG_INFO - 10,  // Legacy "verbosity" (v=10)
+      fuchsia_logging::LOG_INFO - 5,   // Legacy "verbosity" (v=5)
+      fuchsia_logging::LOG_INFO - 4,   // Legacy "verbosity" (v=4)
+      fuchsia_logging::LOG_INFO - 3,   // Legacy "verbosity" (v=3)
+      fuchsia_logging::LOG_INFO,       // Legacy severity (INFO)
+      fuchsia_logging::LOG_INFO,       // 0x30
+      fuchsia_logging::LOG_WARNING,    // 0x40
+      fuchsia_logging::LOG_WARNING,    // Legacy severity (WARNING)
+      fuchsia_logging::LOG_ERROR,      // Legacy severity (ERROR)
+      fuchsia_logging::LOG_ERROR,      // 0x50
   };
 
-  syslog::LogSettings settings = {.min_log_level = severities_in_use[0]};
-  syslog::SetLogSettings(settings, {tag});
+  fuchsia_logging::LogSettings settings = {.min_log_level = severities_in_use[0]};
+  fuchsia_logging::SetLogSettings(settings, {tag});
 
   for (auto severity : severities_in_use) {
     FX_LOGS(LEVEL(severity)) << message;

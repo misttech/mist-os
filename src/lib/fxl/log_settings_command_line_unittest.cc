@@ -20,69 +20,70 @@ namespace {
 
 class LogSettingsFixture : public ::testing::Test {
  public:
-  LogSettingsFixture() : old_severity_(syslog::GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
+  LogSettingsFixture()
+      : old_severity_(fuchsia_logging::GetMinLogLevel()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LogSettingsFixture() {
-    syslog::SetLogSettings({.min_log_level = old_severity_});
+    fuchsia_logging::SetLogSettings({.min_log_level = old_severity_});
     dup2(old_stderr_.get(), STDERR_FILENO);
   }
 
  private:
-  syslog::LogSeverity old_severity_;
+  fuchsia_logging::LogSeverity old_severity_;
   fbl::unique_fd old_stderr_;
 };
 
 TEST(LogSettings, ParseValidOptions) {
-  syslog::LogSettings settings;
-  settings.min_log_level = syslog::LOG_FATAL;
+  fuchsia_logging::LogSettings settings;
+  settings.min_log_level = fuchsia_logging::LOG_FATAL;
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose"}), &settings));
   // verbosity scaled between INFO & DEBUG
-  EXPECT_EQ(syslog::LOG_INFO - 1, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_INFO - 1, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=0"}), &settings));
-  EXPECT_EQ(syslog::LOG_INFO, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=5"}), &settings));
   // verbosity scaled between INFO & DEBUG
-  EXPECT_EQ(syslog::LOG_INFO - 5, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_INFO - 5, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=0"}), &settings));
-  EXPECT_EQ(syslog::LOG_INFO, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet"}), &settings));
-  EXPECT_EQ(syslog::LOG_WARNING, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_WARNING, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=3"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=TRACE"}), &settings));
-  EXPECT_EQ(syslog::LOG_TRACE, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_TRACE, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=DEBUG"}), &settings));
-  EXPECT_EQ(syslog::LOG_DEBUG, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_DEBUG, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=INFO"}), &settings));
-  EXPECT_EQ(syslog::LOG_INFO, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=WARNING"}), &settings));
-  EXPECT_EQ(syslog::LOG_WARNING, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_WARNING, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=ERROR"}), &settings));
-  EXPECT_EQ(syslog::LOG_ERROR, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_ERROR, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=FATAL"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 #ifndef __Fuchsia__
   EXPECT_TRUE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--log-file=/tmp/custom.log"}), &settings));
@@ -91,56 +92,56 @@ TEST(LogSettings, ParseValidOptions) {
 }
 
 TEST(LogSettings, ParseInvalidOptions) {
-  syslog::LogSettings settings;
-  settings.min_log_level = syslog::LOG_FATAL;
+  fuchsia_logging::LogSettings settings;
+  settings.min_log_level = fuchsia_logging::LOG_FATAL;
 
   EXPECT_FALSE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=-1"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=123garbage"}),
                                 &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=-1"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=123garbage"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--severity=TRACEgarbage"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--severity=TRACE --verbose=1"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--severity=TRACE --quiet=1"}), &settings));
-  EXPECT_EQ(syslog::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 }
 
 TEST_F(LogSettingsFixture, SetValidOptions) {
   EXPECT_TRUE(
       SetLogSettingsFromCommandLine(CommandLineFromInitializerList({"argv0", "--verbose=20"})));
   // verbosity scaled between INFO & DEBUG, but capped at 15 levels
-  EXPECT_EQ(syslog::LOG_DEBUG + 1, syslog::GetMinLogLevel());
+  EXPECT_EQ(fuchsia_logging::LOG_DEBUG + 1, fuchsia_logging::GetMinLogLevel());
 }
 
 TEST_F(LogSettingsFixture, SetInvalidOptions) {
-  syslog::LogSeverity old_severity = syslog::GetMinLogLevel();
+  fuchsia_logging::LogSeverity old_severity = fuchsia_logging::GetMinLogLevel();
 
   EXPECT_FALSE(SetLogSettingsFromCommandLine(
       CommandLineFromInitializerList({"argv0", "--verbose=garbage"})));
 
-  EXPECT_EQ(old_severity, syslog::GetMinLogLevel());
+  EXPECT_EQ(old_severity, fuchsia_logging::GetMinLogLevel());
 }
 
 TEST_F(LogSettingsFixture, ToArgv) {
-  syslog::LogSettings settings;
+  fuchsia_logging::LogSettings settings;
   EXPECT_TRUE(LogSettingsToArgv(settings).empty());
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet"}), &settings));
@@ -182,7 +183,7 @@ TEST_F(LogSettingsFixture, ToArgv) {
   EXPECT_TRUE(LogSettingsToArgv(settings) == std::vector<std::string>{"--severity=FATAL"});
 
   // Reset |settings| back to defaults so we don't pick up previous tests.
-  settings = syslog::LogSettings{};
+  settings = fuchsia_logging::LogSettings{};
 #ifndef __Fuchsia__
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--log-file=/foo"}), &settings));

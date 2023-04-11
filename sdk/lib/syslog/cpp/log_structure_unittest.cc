@@ -17,7 +17,7 @@
 #include "src/lib/files/file.h"
 #include "src/lib/files/scoped_temp_dir.h"
 
-namespace syslog {
+namespace fuchsia_logging {
 
 TEST(StructuredLogging, Log) {
   FX_SLOG(WARNING, "test_log", KV("foo", "bar"));
@@ -51,8 +51,8 @@ TEST(StructuredLogging, ThreadInitialization) {
     while (running) {
       zx::channel temp[2];
       zx::channel::create(0, &temp[0], &temp[1]);
-      syslog_backend::SetLogSettings(
-          syslog::LogSettings{.log_sink = temp[0].release(), .wait_for_initial_interest = false});
+      syslog_backend::SetLogSettings(fuchsia_logging::LogSettings{
+          .log_sink = temp[0].release(), .wait_for_initial_interest = false});
     }
   });
   std::thread thread_b([&]() {
@@ -69,21 +69,23 @@ TEST(StructuredLogging, ThreadInitialization) {
 
     zx::channel temp[2];
     zx::channel::create(0, &temp[0], &temp[1]);
-    syslog_backend::SetLogSettings(
-        syslog::LogSettings{.log_sink = temp[0].release(), .wait_for_initial_interest = false});
+    syslog_backend::SetLogSettings(fuchsia_logging::LogSettings{
+        .log_sink = temp[0].release(), .wait_for_initial_interest = false});
     FX_SLOG(WARNING, "test_log", KV("foo", "bar"));
   }
   thread_a.join();
   thread_b.join();
-  syslog_backend::SetLogSettings(syslog::LogSettings{.wait_for_initial_interest = false});
+  syslog_backend::SetLogSettings(fuchsia_logging::LogSettings{.wait_for_initial_interest = false});
 }
 
 TEST(StructuredLogging, BackendDirect) {
   syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_WARNING, "foo.cc", 42, "fake tag", "condition");
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+                              "condition");
   syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_WARNING, "foo.cc", 42, "fake tag", "condition");
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+                              "condition");
   syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
   syslog_backend::WriteKeyValue(&buffer, "bar", true);
   syslog_backend::EndRecord(&buffer);
@@ -94,7 +96,8 @@ TEST(StructuredLogging, BackendDirect) {
 TEST(StructuredLogging, StartsAtPosition0) {
   syslog_backend::LogBuffer buffer;
   memset(&buffer, 0, sizeof(buffer));
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_WARNING, "foo.cc", 42, "fake tag", "condition");
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+                              "condition");
   syslog_backend::EndRecord(&buffer);
   ASSERT_NE(buffer.data[0], static_cast<uint64_t>(0));
 }
@@ -199,10 +202,12 @@ TEST(StructuredLogging, Overflow) {
   memset(very_large_string.data(), 5, very_large_string.size());
   very_large_string[very_large_string.size() - 1] = 0;
   syslog_backend::LogBuffer buffer;
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_WARNING, "foo.cc", 42, "fake tag", "condition");
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+                              "condition");
   syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
-  syslog_backend::BeginRecord(&buffer, syslog::LOG_WARNING, "foo.cc", 42, "fake tag", "condition");
+  syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
+                              "condition");
   syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
   syslog_backend::WriteKeyValue(&buffer, "bar", very_large_string.data());
 
@@ -218,4 +223,4 @@ TEST(StructuredLogging, LOGS) {
   FX_LOGS(INFO) << str;
 }
 
-}  // namespace syslog
+}  // namespace fuchsia_logging

@@ -11,7 +11,7 @@
 #include "src/virtualization/bin/vmm/vmm_controller.h"
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"vmm"});
+  fuchsia_logging::SetTags({"vmm"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());

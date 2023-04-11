@@ -134,7 +134,7 @@ int CreateBcacheUpdatingOptions(std::unique_ptr<block_client::RemoteBlockDevice>
 }  // namespace
 
 int main(int argc, char** argv) {
-  syslog::SetLogSettings({}, {"minfs"});
+  fuchsia_logging::SetLogSettings({}, {"minfs"});
   minfs::MountOptions options;
 
   const std::vector<Command> commands = {

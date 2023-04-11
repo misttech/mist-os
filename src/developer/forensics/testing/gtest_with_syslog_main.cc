@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
   }
 
   testing::InitGoogleTest(&argc, argv);
-  syslog::SetTags({"forensics", "test"});
+  fuchsia_logging::SetTags({"forensics", "test"});
 
   return RUN_ALL_TESTS();
 }

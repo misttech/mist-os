@@ -17,7 +17,7 @@
 const char* TAG = "integration_test";
 
 void WriteLogs() {
-  syslog::SetTags({TAG});
+  fuchsia_logging::SetTags({TAG});
   // WARNING: Test is sensitive to line numbers and file name.
   // These log lines are added to the top of the file to prevent changes to the test below from
   // changing the expected outputs.

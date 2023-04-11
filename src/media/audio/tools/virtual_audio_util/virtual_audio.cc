@@ -1287,7 +1287,7 @@ void VirtualAudioUtil::PositionCallback(fuchsia::virtualaudio::Device_GetPositio
 }  // namespace virtual_audio
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"virtual_audio_util"});
+  fuchsia_logging::SetTags({"virtual_audio_util"});
 
   fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

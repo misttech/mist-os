@@ -29,7 +29,7 @@ namespace system_log_recorder {
 constexpr zx::duration kWritePeriod = zx::sec(1);
 
 int main() {
-  syslog::SetTags({"forensics", "feedback"});
+  fuchsia_logging::SetTags({"forensics", "feedback"});
 
   // We receive a channel that we interpret as a fuchsia.feedback.DataProviderController
   // connection.

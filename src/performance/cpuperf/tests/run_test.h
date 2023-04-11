@@ -13,6 +13,6 @@
 #include <string>
 #include <vector>
 
-bool RunSpec(const std::string& spec_file_path, const syslog::LogSettings& log_settings);
+bool RunSpec(const std::string& spec_file_path, const fuchsia_logging::LogSettings& log_settings);
 
 #endif  // SRC_PERFORMANCE_CPUPERF_TESTS_RUN_TEST_H_

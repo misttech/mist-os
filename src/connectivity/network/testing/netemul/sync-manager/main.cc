@@ -12,7 +12,7 @@
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  syslog::SetTags({"sync-manager"});
+  fuchsia_logging::SetTags({"sync-manager"});
   FX_LOGS(INFO) << "started";
 
   std::unique_ptr context = sys::ComponentContext::CreateAndServeOutgoingDirectory();

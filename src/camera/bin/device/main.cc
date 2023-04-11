@@ -42,7 +42,8 @@ static zx::result<DeviceHandle> GetCameraHandle() {
 }  // namespace camera
 
 int main(int argc, char* argv[]) {
-  syslog::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL}, {"camera", "camera_device"});
+  fuchsia_logging::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL},
+                                  {"camera", "camera_device"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Executor executor(loop.dispatcher());

@@ -383,7 +383,7 @@ void Session::EventAndErrorReporter::FlushEvents() {
   }
 }
 
-void Session::EventAndErrorReporter::ReportError(syslog::LogSeverity severity,
+void Session::EventAndErrorReporter::ReportError(fuchsia_logging::LogSeverity severity,
                                                  std::string error_string) {
   // TODO(fxbug.dev/24465): Come up with a better solution to avoid children
   // calling into us during destruction.
@@ -395,13 +395,13 @@ void Session::EventAndErrorReporter::ReportError(syslog::LogSeverity severity,
   TRACE_DURATION("gfx", "scenic_impl::Session::EventAndErrorReporter::ReportError");
 
   switch (severity) {
-    case syslog::LOG_INFO:
+    case fuchsia_logging::LOG_INFO:
       FX_LOGS(INFO) << error_string;
       return;
-    case syslog::LOG_WARNING:
+    case fuchsia_logging::LOG_WARNING:
       FX_LOGS(WARNING) << error_string;
       return;
-    case syslog::LOG_ERROR:
+    case fuchsia_logging::LOG_ERROR:
       FX_LOGS(WARNING) << "Scenic session error (session_id: " << session_->id()
                        << "): " << error_string;
 
@@ -413,7 +413,7 @@ void Session::EventAndErrorReporter::ReportError(syslog::LogSeverity severity,
         session_->listener_->OnScenicError(std::move(error_string));
       }
       return;
-    case syslog::LOG_FATAL:
+    case fuchsia_logging::LOG_FATAL:
       FX_LOGS(FATAL) << error_string;
       return;
     default:

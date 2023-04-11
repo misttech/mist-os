@@ -21,7 +21,7 @@ using intl::Lookup;
 
 // [START usage_example]
 int main() {
-  syslog::SetTags({"intl-example"});
+  fuchsia_logging::SetTags({"intl-example"});
   static const uint64_t MESSAGE_ID = static_cast<uint64_t>(MessageIds::STRING_NAME);
   FX_LOGS(INFO) << "Message ID: " << MESSAGE_ID << std::endl;
 

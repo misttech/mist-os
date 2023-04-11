@@ -39,7 +39,7 @@ inspect::StringProperty AddConfigToInspect(const modular::ModularConfigReader& c
 }
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"sessionmgr"});
+  fuchsia_logging::SetTags({"sessionmgr"});
 
   auto config_reader = modular::ModularConfigReader::CreateFromNamespace();
 

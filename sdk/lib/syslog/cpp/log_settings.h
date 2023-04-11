@@ -14,7 +14,7 @@
 
 #include <string>
 
-namespace syslog {
+namespace fuchsia_logging {
 
 // Settings which control the behavior of logging.
 struct LogSettings {
@@ -72,8 +72,6 @@ void SetTags(const std::initializer_list<std::string>& tags);
 // higher than LOG_FATAL.
 LogSeverity GetMinLogLevel();
 
-}  // namespace syslog
-
-namespace fuchsia_logging = syslog;
+}  // namespace fuchsia_logging
 
 #endif  // LIB_SYSLOG_CPP_LOG_SETTINGS_H_

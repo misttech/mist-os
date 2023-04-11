@@ -16,7 +16,7 @@
 
 namespace syslog_backend {
 struct MsgHeader {
-  syslog::LogSeverity severity;
+  fuchsia_logging::LogSeverity severity;
   char* offset;
   LogBuffer* buffer;
   bool first_tag;
@@ -88,7 +88,7 @@ struct MsgHeader {
     return len;
   }
 
-  void Init(LogBuffer* buffer, syslog::LogSeverity severity) {
+  void Init(LogBuffer* buffer, fuchsia_logging::LogSeverity severity) {
     this->severity = severity;
     user_tag = nullptr;
     offset = reinterpret_cast<char*>(buffer->data);
@@ -104,13 +104,13 @@ struct MsgHeader {
 };
 
 #ifndef __Fuchsia__
-const std::string GetNameForLogSeverity(syslog::LogSeverity severity);
+const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity);
 #endif
 
 static_assert(sizeof(MsgHeader) <= sizeof(LogBuffer::record_state),
               "message header must be no larger than record_state");
 
-void BeginRecordLegacy(LogBuffer* buffer, syslog::LogSeverity severity, const char* file,
+void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
                        unsigned int line, const char* msg, const char* condition);
 
 void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value);

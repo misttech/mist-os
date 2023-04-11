@@ -16,7 +16,7 @@ TEST(DdkFirmwaretest, DriverWasLoaded) {
 }
 
 int main(int argc, char **argv) {
-  syslog::SetTags({"driver_test_realm_test"});
+  fuchsia_logging::SetTags({"driver_test_realm_test"});
 
   // Connect to DriverTestRealm.
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();

@@ -83,13 +83,13 @@ FX_LOGST(INFO, "tag") << "my message";
 ### Set tags
 
 By default, the process name is used as the tag, but this can be changed by
-calling `syslog::SetTags`.
+calling `fuchsia_logging::SetTags`.
 
 ```C++
 #include <lib/syslog/cpp/log_settings.h>
 
 int main(int argc, char** argv) {
-     syslog::SetTags({"tag1", "tag2"});
+     fuchsia_logging::SetTags({"tag1", "tag2"});
 }
 ```
 
@@ -99,8 +99,10 @@ int main(int argc, char** argv) {
 #include "<lib/syslog/cpp/log_settings.h>
 
 int main(int argc, char** argv) {
-     syslog::LogSettings settings = {.min_log_level = syslog::LOG_ERROR};
-     syslog::SetLogSettings(settings, {"tag1", "tag2"});
+     fuchsia_logging::LogSettings settings = {
+         .min_log_level = fuchsia_logging::LOG_ERROR,
+     };
+     fuchsia_logging::SetLogSettings(settings, {"tag1", "tag2"});
 }
 ```
 

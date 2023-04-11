@@ -85,7 +85,7 @@ class CalcTestFixture : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
     // Set the logging tags for filtering
-    syslog::SetTags({"calculator_tests"});
+    fuchsia_logging::SetTags({"calculator_tests"});
     // Setup the client with the helper function
     GetClient();
   }

@@ -7,7 +7,8 @@ declare_args() {
 }
 
 if (camera_debug) {
-  camera_debug_define = "CAMERA_MIN_LOG_LEVEL=(syslog::LOG_DEBUG)"
+  camera_debug_define = "CAMERA_MIN_LOG_LEVEL=(fuchsia_logging::LOG_DEBUG)"
 } else {
-  camera_debug_define = "CAMERA_MIN_LOG_LEVEL=(syslog::DefaultLogLevel)"
+  camera_debug_define =
+      "CAMERA_MIN_LOG_LEVEL=(fuchsia_logging::DefaultLogLevel)"
 }

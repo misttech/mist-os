@@ -8,7 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 int main() {
-  syslog::SetTags({"simple_driver_test_realm"});
+  fuchsia_logging::SetTags({"simple_driver_test_realm"});
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {

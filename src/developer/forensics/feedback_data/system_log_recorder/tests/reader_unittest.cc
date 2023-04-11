@@ -37,7 +37,7 @@ namespace {
 
 // Only change "X" for one character. i.e. X -> 12 is not allowed.
 const StorageSize kMaxLogLineSize =
-    StorageSize::Bytes(Format(BuildLogMessage(syslog::LOG_INFO, "line X").value()).size());
+    StorageSize::Bytes(Format(BuildLogMessage(fuchsia_logging::LOG_INFO, "line X").value()).size());
 
 const StorageSize kMaxDecompressedSize = StorageSize::Kilobytes(256);
 
@@ -156,15 +156,19 @@ TEST(ReaderTest, SortsMessages) {
                         MakeIdentityRedactor(), MakeIdentityEncoder());
   SystemLogWriter writer(temp_dir.path(), 1u, &store);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0", zx::msec(0))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 3", zx::msec(3))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2", zx::msec(2))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1", zx::msec(1))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1.1", zx::msec(1))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "duplicated line", zx::msec(5))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "duplicated line", zx::msec(6))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "duplicated line", zx::msec(7))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "multi\nline\nmessage", zx::msec(4))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0", zx::msec(0))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3", zx::msec(3))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2", zx::msec(2))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1", zx::msec(1))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1.1", zx::msec(1))));
+  EXPECT_TRUE(
+      store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "duplicated line", zx::msec(5))));
+  EXPECT_TRUE(
+      store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "duplicated line", zx::msec(6))));
+  EXPECT_TRUE(
+      store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "duplicated line", zx::msec(7))));
+  EXPECT_TRUE(
+      store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "multi\nline\nmessage", zx::msec(4))));
   writer.Write();
 
   files::ScopedTempDir output_dir;
@@ -232,17 +236,17 @@ TEST(ReaderTest, SortsMessagesMultipleFiles) {
                         MakeIdentityEncoder());
   SystemLogWriter writer(temp_dir.path(), 8u, &store);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0", zx::msec(0))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 3", zx::msec(3))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2", zx::msec(2))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1", zx::msec(1))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0", zx::msec(0))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3", zx::msec(3))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2", zx::msec(2))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1", zx::msec(1))));
   writer.Write();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line11", zx::msec(1))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "dup", zx::msec(5))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "dup", zx::msec(6))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "dup", zx::msec(7))));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line\n4", zx::msec(4))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line11", zx::msec(1))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "dup", zx::msec(5))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "dup", zx::msec(6))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "dup", zx::msec(7))));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line\n4", zx::msec(4))));
   writer.Write();
 
   files::ScopedTempDir output_dir;

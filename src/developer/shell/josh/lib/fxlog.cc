@@ -14,11 +14,11 @@
 #include "third_party/quickjs/quickjs.h"
 
 #define FX_JS_LOG_STREAM(severity, tag, file, line) \
-  ::syslog::LogMessage(severity, file, line, nullptr, tag).stream()
+  ::fuchsia_logging::LogMessage(severity, file, line, nullptr, tag).stream()
 
 #define FX_JS_LOGST(severity, tag, file, line)                \
   FX_LAZY_STREAM(FX_JS_LOG_STREAM(severity, tag, file, line), \
-                 (::syslog::ShouldCreateLogMessage(severity)))
+                 (::fuchsia_logging::ShouldCreateLogMessage(severity)))
 
 namespace shell::fxlog {
 
@@ -76,7 +76,7 @@ JSValue WriteLog(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *
       return JS_EXCEPTION;
     }
   }
-  FX_JS_LOGST(static_cast<::syslog::LogSeverity>(magic), tag, file, line) << msg;
+  FX_JS_LOGST(static_cast<::fuchsia_logging::LogSeverity>(magic), tag, file, line) << msg;
   return JS_NewInt32(ctx, strlen(msg));
 }
 
@@ -91,12 +91,12 @@ JSClassDef handle_class_ = {
 #pragma GCC diagnostic ignored "-Wc99-designator"
 const JSCFunctionListEntry funcs_[] = {
     /* Fuchsia handle operations */
-    JS_CFUNC_MAGIC_DEF("trace", 4, WriteLog, ::syslog::LOG_TRACE),
-    JS_CFUNC_MAGIC_DEF("debug", 4, WriteLog, ::syslog::LOG_DEBUG),
-    JS_CFUNC_MAGIC_DEF("info", 4, WriteLog, ::syslog::LOG_INFO),
-    JS_CFUNC_MAGIC_DEF("warn", 4, WriteLog, ::syslog::LOG_WARNING),
-    JS_CFUNC_MAGIC_DEF("error", 4, WriteLog, ::syslog::LOG_ERROR),
-    JS_CFUNC_MAGIC_DEF("fatal", 4, WriteLog, ::syslog::LOG_FATAL),
+    JS_CFUNC_MAGIC_DEF("trace", 4, WriteLog, ::fuchsia_logging::LOG_TRACE),
+    JS_CFUNC_MAGIC_DEF("debug", 4, WriteLog, ::fuchsia_logging::LOG_DEBUG),
+    JS_CFUNC_MAGIC_DEF("info", 4, WriteLog, ::fuchsia_logging::LOG_INFO),
+    JS_CFUNC_MAGIC_DEF("warn", 4, WriteLog, ::fuchsia_logging::LOG_WARNING),
+    JS_CFUNC_MAGIC_DEF("error", 4, WriteLog, ::fuchsia_logging::LOG_ERROR),
+    JS_CFUNC_MAGIC_DEF("fatal", 4, WriteLog, ::fuchsia_logging::LOG_FATAL),
 };
 #pragma GCC diagnostic pop
 

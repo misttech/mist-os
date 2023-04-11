@@ -15,7 +15,7 @@
 #include <string>
 
 int main(int argc, const char* argv[], char* envp[]) {
-  syslog::SetTags({"echo_client"});
+  fuchsia_logging::SetTags({"echo_client"});
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   // Connect to the fidl.examples.routing.Echo protocol

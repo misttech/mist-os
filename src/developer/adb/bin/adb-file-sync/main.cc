@@ -7,7 +7,7 @@
 #include "adb-file-sync.h"
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"adb"});
+  fuchsia_logging::SetTags({"adb"});
 
   return adb_file_sync::AdbFileSync::StartService(
       adb_file_sync_config::Config::TakeFromStartupHandle());

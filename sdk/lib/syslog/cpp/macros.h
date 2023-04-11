@@ -24,13 +24,14 @@ struct LogBuffer;
 #define WEAK __attribute__((weak))
 
 #ifdef __Fuchsia__
-WEAK void BeginRecordWithSocket(LogBuffer* buffer, syslog::LogSeverity severity,
+WEAK void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
                                 const char* file_name, unsigned int line, const char* msg,
                                 const char* condition, zx_handle_t socket);
-WEAK void SetInterestChangedListener(void (*callback)(void* context, syslog::LogSeverity severity),
+WEAK void SetInterestChangedListener(void (*callback)(void* context,
+                                                      fuchsia_logging::LogSeverity severity),
                                      void* context);
 #endif
-WEAK void BeginRecord(LogBuffer* buffer, syslog::LogSeverity severity, const char* file,
+WEAK void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
                       unsigned int line, const char* msg, const char* condition);
 
 WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value);
@@ -194,7 +195,7 @@ struct LogBuffer {
 };
 }  // namespace syslog_backend
 
-namespace syslog {
+namespace fuchsia_logging {
 
 template <typename... LogArgs>
 constexpr syslog_backend::Tuplet<LogArgs...> Args(LogArgs... values) {
@@ -222,8 +223,9 @@ struct LogValue {
   // both prevent this. It's still desirable to not have such a large object on the stack, so
   // until we come up with a better API for using this or figure out sanitizers and stack coloring,
   // we can temporarily work around the stack overflow by disabling inlining for this function.
-  __attribute__((__noinline__)) void LogNew(::syslog::LogSeverity severity, const char* file,
-                                            unsigned int line, const char* condition) const {
+  __attribute__((__noinline__)) void LogNew(::fuchsia_logging::LogSeverity severity,
+                                            const char* file, unsigned int line,
+                                            const char* condition) const {
     syslog_backend::LogBuffer buffer;
     syslog_backend::BeginRecord(&buffer, severity, file, line, msg, condition);
     // https://bugs.llvm.org/show_bug.cgi?id=41093 -- Clang loses constexpr
@@ -283,26 +285,30 @@ uint8_t GetVlogVerbosity();
 // LOG_FATAL and above is always true.
 bool ShouldCreateLogMessage(LogSeverity severity);
 
-}  // namespace syslog
+}  // namespace fuchsia_logging
 
-namespace fuchsia_logging = syslog;
+#define FX_LOG_STREAM(severity, tag)                                                            \
+  ::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_##severity, __FILE__, __LINE__, nullptr, \
+                                tag)                                                            \
+      .stream()
 
-#define FX_LOG_STREAM(severity, tag) \
-  ::syslog::LogMessage(::syslog::LOG_##severity, __FILE__, __LINE__, nullptr, tag).stream()
-
-#define FX_LOG_STREAM_STATUS(severity, status, tag) \
-  ::syslog::LogMessage(::syslog::LOG_##severity, __FILE__, __LINE__, nullptr, tag, status).stream()
+#define FX_LOG_STREAM_STATUS(severity, status, tag)                                             \
+  ::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_##severity, __FILE__, __LINE__, nullptr, \
+                                tag, status)                                                    \
+      .stream()
 
 #define FX_LAZY_STREAM(stream, condition) \
-  !(condition) ? (void)0 : ::syslog::LogMessageVoidify() & (stream)
+  !(condition) ? (void)0 : ::fuchsia_logging::LogMessageVoidify() & (stream)
 
-#define FX_EAT_STREAM_PARAMETERS(ignored) \
-  true || (ignored)                       \
-      ? (void)0                           \
-      : ::syslog::LogMessageVoidify() &   \
-            ::syslog::LogMessage(::syslog::LOG_FATAL, 0, 0, nullptr, nullptr).stream()
+#define FX_EAT_STREAM_PARAMETERS(ignored)                                                       \
+  true || (ignored)                                                                             \
+      ? (void)0                                                                                 \
+      : ::fuchsia_logging::LogMessageVoidify() &                                                \
+            ::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_FATAL, 0, 0, nullptr, nullptr) \
+                .stream()
 
-#define FX_LOG_IS_ON(severity) (::syslog::ShouldCreateLogMessage(::syslog::LOG_##severity))
+#define FX_LOG_IS_ON(severity) \
+  (::fuchsia_logging::ShouldCreateLogMessage(::fuchsia_logging::LOG_##severity))
 
 #define FX_LOGS(severity) FX_LOGST(severity, nullptr)
 
@@ -328,32 +334,34 @@ namespace fuchsia_logging = syslog;
 //
 // C++ does not allow us to introduce two new variables into a single for loop
 // scope and we need |do_log| so that the inner for loop doesn't execute twice.
-#define FX_FIRST_N(n, log_statement)                                                            \
-  for (bool do_log = true; do_log; do_log = false)                                              \
-    for (static ::syslog::LogFirstNState internal_state; do_log && internal_state.ShouldLog(n); \
-         do_log = false)                                                                        \
+#define FX_FIRST_N(n, log_statement)                              \
+  for (bool do_log = true; do_log; do_log = false)                \
+    for (static ::fuchsia_logging::LogFirstNState internal_state; \
+         do_log && internal_state.ShouldLog(n); do_log = false)   \
   log_statement
 #define FX_LOGS_FIRST_N(severity, n) FX_FIRST_N(n, FX_LOGS(severity))
 #define FX_LOGST_FIRST_N(severity, n, tag) FX_FIRST_N(n, FX_LOGST(severity, tag))
 
 #define FX_CHECK(condition) FX_CHECKT(condition, nullptr)
 
-#define FX_CHECKT(condition, tag)                                                              \
-  FX_LAZY_STREAM(                                                                              \
-      ::syslog::LogMessage(::syslog::LOG_FATAL, __FILE__, __LINE__, #condition, tag).stream(), \
-      !(condition))
+#define FX_CHECKT(condition, tag)                                                                \
+  FX_LAZY_STREAM(::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_FATAL, __FILE__, __LINE__, \
+                                               #condition, tag)                                  \
+                     .stream(),                                                                  \
+                 !(condition))
 
 // The VLOG macros log with translated verbosities
 
 // Get the severity corresponding to the given verbosity. Note that
 // verbosity relative to the default severity and can be thought of
 // as incrementally "more vebose than" the baseline.
-syslog::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
+fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 
-#define FX_VLOG_IS_ON(verbose_level) (verbose_level <= ::syslog::GetVlogVerbosity())
+#define FX_VLOG_IS_ON(verbose_level) (verbose_level <= ::fuchsia_logging::GetVlogVerbosity())
 
-#define FX_VLOG_STREAM(verbose_level, tag)                                                        \
-  ::syslog::LogMessage(GetSeverityFromVerbosity(verbose_level), __FILE__, __LINE__, nullptr, tag) \
+#define FX_VLOG_STREAM(verbose_level, tag)                                                   \
+  ::fuchsia_logging::LogMessage(GetSeverityFromVerbosity(verbose_level), __FILE__, __LINE__, \
+                                nullptr, tag)                                                \
       .stream()
 
 #define FX_VLOGS(verbose_level) \
@@ -378,7 +386,7 @@ syslog::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 
 template <typename Msg, typename... Args>
 static auto MakeValue(Msg msg, syslog_backend::Tuplet<Args...> args) {
-  return syslog::LogValue<Msg, Args...>(msg, args);
+  return fuchsia_logging::LogValue<Msg, Args...>(msg, args);
 }
 
 template <size_t i, size_t size, typename... Values, typename... Tuple,
@@ -394,7 +402,7 @@ static auto MakeKV(std::tuple<Values...> value, std::tuple<Tuple...> tuple) {
   // Key at index i, value at index i+1
   auto k = std::get<i>(value);
   auto v = std::get<i + 1>(value);
-  auto new_tuple = std::tuple_cat(tuple, std::make_tuple(syslog::KeyValueInternal(k, v)));
+  auto new_tuple = std::tuple_cat(tuple, std::make_tuple(fuchsia_logging::KeyValueInternal(k, v)));
   return MakeKV<i + 2, size, Values...>(value, new_tuple);
 }
 
@@ -409,18 +417,18 @@ static auto MakeKV(std::tuple<Args...> args) {
 }
 
 template <typename Msg, typename... Args>
-static void fx_slog_internal(syslog::LogSeverity flag, const char* file, int line, Msg msg,
+static void fx_slog_internal(fuchsia_logging::LogSeverity flag, const char* file, int line, Msg msg,
                              Args... args) {
   MakeValue(msg, MakeKV<Args...>(std::make_tuple(args...))).LogNew(flag, file, line, nullptr);
 }
 
-#define FX_SLOG_ETC(flag, args...)                      \
-  do {                                                  \
-    if (::syslog::ShouldCreateLogMessage(flag)) {       \
-      fx_slog_internal(flag, __FILE__, __LINE__, args); \
-    }                                                   \
+#define FX_SLOG_ETC(flag, args...)                         \
+  do {                                                     \
+    if (::fuchsia_logging::ShouldCreateLogMessage(flag)) { \
+      fx_slog_internal(flag, __FILE__, __LINE__, args);    \
+    }                                                      \
   } while (0)
 
-#define FX_SLOG(flag, msg...) FX_SLOG_ETC(::syslog::LOG_##flag, msg)
+#define FX_SLOG(flag, msg...) FX_SLOG_ETC(::fuchsia_logging::LOG_##flag, msg)
 
 #endif  // LIB_SYSLOG_CPP_MACROS_H_

@@ -40,7 +40,7 @@ int main(const std::string& process_name) {
   using Binding = fidl::Binding<forensics::exceptions::handler::CrashReporter,
                                 std::unique_ptr<fuchsia::exception::internal::CrashReporter>>;
 
-  syslog::SetTags({"forensics", "exception", ExtractHandlerIndex(process_name)});
+  fuchsia_logging::SetTags({"forensics", "exception", ExtractHandlerIndex(process_name)});
 
   // We receive a channel that we interpret as a fuchsia.exception.internal.CrashReporter
   // connection.

@@ -173,7 +173,8 @@ TEST_F(NamespaceInitTest, CreatePreviousLogsFile) {
   std::string previous_log_contents = "";
   for (const auto& filepath : CurrentLogFilePaths(logs_dir)) {
     auto encoder = feedback_data::system_log_recorder::ProductionEncoder();
-    const std::string str = Format(BuildLogMessage(syslog::LOG_INFO, "Log for file: " + filepath));
+    const std::string str =
+        Format(BuildLogMessage(fuchsia_logging::LOG_INFO, "Log for file: " + filepath));
     previous_log_contents = previous_log_contents + str;
     WriteFile(filepath, encoder.Encode(str));
   }

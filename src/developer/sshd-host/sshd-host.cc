@@ -20,7 +20,7 @@ const uint16_t kPort = 22;
 const char* kKeyGenArgs[] = {"/pkg/bin/hostkeygen", nullptr};
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"sshd-host"});
+  fuchsia_logging::SetTags({"sshd-host"});
   // We need to close PA_DIRECTORY_REQUEST otherwise clients that expect us to
   // offer services won't know that we've started and are not going to offer
   // any services.

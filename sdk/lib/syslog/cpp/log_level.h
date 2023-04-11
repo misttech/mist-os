@@ -11,7 +11,7 @@
 // file unless this number is incremented with each change.
 #define FX_LOG_INTREE_API_VERSION (0)
 
-namespace syslog {
+namespace fuchsia_logging {
 
 using LogSeverity = int8_t;
 
@@ -39,8 +39,6 @@ const LogSeverity LOG_DFATAL = LOG_FATAL;
 
 inline LogSeverity LOG_LEVEL(int8_t level) { return level; }
 
-}  // namespace syslog
-
-namespace fuchsia_logging = syslog;
+}  // namespace fuchsia_logging
 
 #endif  // LIB_SYSLOG_CPP_LOG_LEVEL_H_

@@ -20,7 +20,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   // TODO(fxbug.dev/97170): Consider migrating to async FIDL API
   // [END_EXCLUDE]
   // Set tags for logging.
-  syslog::SetTags({"echo_client"});
+  fuchsia_logging::SetTags({"echo_client"});
 
   // Connect to FIDL protocol
   fidl::examples::routing::echo::EchoSyncPtr echo_proxy;

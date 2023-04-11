@@ -292,7 +292,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
 }  // namespace
 
 int main(int argv, char** argc) {
-  syslog::SetTags({"console-launcher"});
+  fuchsia_logging::SetTags({"console-launcher"});
 
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
     FX_PLOGS(ERROR, status)

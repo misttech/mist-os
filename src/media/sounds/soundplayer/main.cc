@@ -11,7 +11,7 @@
 #include "src/media/sounds/soundplayer/sound_player_impl.h"
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"soundplayer"});
+  fuchsia_logging::SetTags({"soundplayer"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 

@@ -79,7 +79,7 @@ void ControllerDevice::GetDebugChannel(GetDebugChannelRequestView request,
 }
 
 static zx_status_t ControllerDeviceBind(void* /*ctx*/, zx_device_t* parent) {
-  syslog::SetTags({"camera-controller"});
+  fuchsia_logging::SetTags({"camera-controller"});
 
   auto result = camera::ControllerDevice::Create(parent);
   if (result.is_error()) {

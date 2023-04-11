@@ -27,7 +27,7 @@ void init(int argc, const char** argv) {
   if (!fxl::SetLogSettingsFromCommandLine(command_line)) {
     exit(EXIT_FAILURE);
   }
-  syslog::SetTags({"intl_services"});
+  fuchsia_logging::SetTags({"intl_services"});
 }
 
 }  // namespace

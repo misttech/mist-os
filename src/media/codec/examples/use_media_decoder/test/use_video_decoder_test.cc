@@ -73,7 +73,7 @@ int use_video_decoder_test(std::string input_file_path, int expected_frame_count
 
   {
     std::lock_guard<std::mutex> lock(tags_lock);
-    syslog::SetTags({"use_video_decoder_test"});
+    fuchsia_logging::SetTags({"use_video_decoder_test"});
   }
 
   async::Loop fidl_loop(&kAsyncLoopConfigAttachToCurrentThread);

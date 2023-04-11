@@ -10,7 +10,7 @@
 #include "thermal_test_control.h"
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"thermal_test_control"});
+  fuchsia_logging::SetTags({"thermal_test_control"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();

@@ -65,7 +65,7 @@ class FizzBuzz final : public fuchsia::examples::inspect::FizzBuzz {
 };
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"inspect_cpp_codelab", "fizzbuzz"});
+  fuchsia_logging::SetTags({"inspect_cpp_codelab", "fizzbuzz"});
 
   FX_LOGS(INFO) << "Starting up...";
 

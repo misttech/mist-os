@@ -17,14 +17,14 @@ namespace {
 LogBackend* log_backend = nullptr;
 bool log_enable_syslog = true;
 
-syslog::LogSeverity ConvertSeverity(LogSeverity severity) {
+fuchsia_logging::LogSeverity ConvertSeverity(LogSeverity severity) {
   switch (severity) {
     case LogSeverity::kInfo:
-      return syslog::LOG_INFO;
+      return fuchsia_logging::LOG_INFO;
     case LogSeverity::kWarn:
-      return syslog::LOG_WARNING;
+      return fuchsia_logging::LOG_WARNING;
     case LogSeverity::kError:
-      return syslog::LOG_ERROR;
+      return fuchsia_logging::LOG_ERROR;
   }
 }
 
@@ -36,9 +36,9 @@ LogStatement::~LogStatement() {
   }
   if (log_enable_syslog) {
     auto severity = ConvertSeverity(severity_);
-    if (syslog::ShouldCreateLogMessage(severity)) {
-      syslog::LogMessage(severity, location_.file(), static_cast<int>(location_.line()), nullptr,
-                         nullptr)
+    if (fuchsia_logging::ShouldCreateLogMessage(severity)) {
+      fuchsia_logging::LogMessage(severity, location_.file(), static_cast<int>(location_.line()),
+                                  nullptr, nullptr)
               .stream()
           << stream_.str();
     }

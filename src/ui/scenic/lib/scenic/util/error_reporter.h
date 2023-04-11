@@ -48,10 +48,10 @@ class ErrorReporter {
    private:
     // Only ErrorReporter can create reports.
     friend class ErrorReporter;
-    Report(ErrorReporter* owner, syslog::LogSeverity severity, const std::string& prefix);
+    Report(ErrorReporter* owner, fuchsia_logging::LogSeverity severity, const std::string& prefix);
 
     ErrorReporter* owner_ = nullptr;
-    syslog::LogSeverity severity_;
+    fuchsia_logging::LogSeverity severity_;
     std::ostringstream stream_;
 
     FXL_DISALLOW_COPY_AND_ASSIGN(Report);
@@ -59,10 +59,10 @@ class ErrorReporter {
 
   // Create a new Report which will, upon destruction, invoke ReportError()
   // upon this ErrorReporter.
-  Report INFO() { return Report(this, syslog::LOG_INFO, prefix_); }
-  Report WARN() { return Report(this, syslog::LOG_WARNING, prefix_); }
-  Report ERROR() { return Report(this, syslog::LOG_ERROR, prefix_); }
-  Report FATAL() { return Report(this, syslog::LOG_FATAL, prefix_); }
+  Report INFO() { return Report(this, fuchsia_logging::LOG_INFO, prefix_); }
+  Report WARN() { return Report(this, fuchsia_logging::LOG_WARNING, prefix_); }
+  Report ERROR() { return Report(this, fuchsia_logging::LOG_ERROR, prefix_); }
+  Report FATAL() { return Report(this, fuchsia_logging::LOG_FATAL, prefix_); }
 
   // Return a default ErrorReporter that is always available, which simply logs
   // the error using FX_LOGS(severity).
@@ -74,7 +74,7 @@ class ErrorReporter {
   void SetPrefix(const std::string& prefix) { prefix_ = prefix; }
 
  private:
-  virtual void ReportError(syslog::LogSeverity severity, std::string error_string) = 0;
+  virtual void ReportError(fuchsia_logging::LogSeverity severity, std::string error_string) = 0;
   std::string prefix_;
 };
 }  // namespace scenic_impl

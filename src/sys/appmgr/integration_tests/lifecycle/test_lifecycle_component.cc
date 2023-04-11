@@ -36,7 +36,7 @@ class TestLifecycleComponent : public fuchsia::process::lifecycle::Lifecycle {
 };
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"test_lifecycle_component"});
+  fuchsia_logging::SetTags({"test_lifecycle_component"});
 
   FX_LOGS(INFO) << "Launching TestLifecycleComponent";
 

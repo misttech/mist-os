@@ -22,7 +22,7 @@
 #include "src/performance/trace/tests/run_test.h"
 
 // Defined in gtest_main.cc
-extern syslog::LogSettings g_log_settings;
+extern fuchsia_logging::LogSettings g_log_settings;
 
 namespace tracing {
 namespace test {

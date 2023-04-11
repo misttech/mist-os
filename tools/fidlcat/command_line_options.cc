@@ -278,24 +278,26 @@ const char* const kVersionHelp = R"(  --version
 // passed to --quiet or --verbose), |multiplier| is a value by which a numerical
 // setting will be multiplied (basically, -1 for verbose and 1 for quiet), and
 // |settings| contains the output.
-bool SetLogSettings(const std::string& level, int multiplier, syslog::LogSettings* settings) {
+bool SetLogSettings(const std::string& level, int multiplier,
+                    fuchsia_logging::LogSettings* settings) {
   if (level == "trace") {
-    settings->min_log_level = syslog::LOG_TRACE;
+    settings->min_log_level = fuchsia_logging::LOG_TRACE;
   } else if (level == "debug") {
-    settings->min_log_level = syslog::LOG_DEBUG;
+    settings->min_log_level = fuchsia_logging::LOG_DEBUG;
   } else if (level == "info") {
-    settings->min_log_level = syslog::LOG_INFO;
+    settings->min_log_level = fuchsia_logging::LOG_INFO;
   } else if (level == "warning") {
-    settings->min_log_level = syslog::LOG_WARNING;
+    settings->min_log_level = fuchsia_logging::LOG_WARNING;
   } else if (level == "error") {
-    settings->min_log_level = syslog::LOG_ERROR;
+    settings->min_log_level = fuchsia_logging::LOG_ERROR;
   } else if (level == "fatal") {
-    settings->min_log_level = syslog::LOG_FATAL;
+    settings->min_log_level = fuchsia_logging::LOG_FATAL;
   } else if (fxl::StringToNumberWithError(level, &settings->min_log_level)) {
     settings->min_log_level =
-        syslog::LOG_INFO + static_cast<syslog::LogSeverity>(
-                               (multiplier * (multiplier > 0 ? syslog::LogSeverityStepSize
-                                                             : syslog::LogVerbosityStepSize)));
+        fuchsia_logging::LOG_INFO +
+        static_cast<fuchsia_logging::LogSeverity>(
+            (multiplier * (multiplier > 0 ? fuchsia_logging::LogSeverityStepSize
+                                          : fuchsia_logging::LogVerbosityStepSize)));
 
   } else {
     return false;
@@ -304,7 +306,7 @@ bool SetLogSettings(const std::string& level, int multiplier, syslog::LogSetting
 }
 
 cmdline::Status ProcessLogOptions(const CommandLineOptions* options) {
-  syslog::LogSettings settings;
+  fuchsia_logging::LogSettings settings;
   if (options->verbose) {
     if (!SetLogSettings(*options->verbose, -1, &settings)) {
       return cmdline::Status::Error("Unable to parse verbose setting \"" + *options->verbose +
@@ -319,7 +321,7 @@ cmdline::Status ProcessLogOptions(const CommandLineOptions* options) {
   if (options->log_file) {
     settings.log_file = *options->log_file;
   }
-  syslog::SetLogSettings(settings);
+  fuchsia_logging::SetLogSettings(settings);
   return cmdline::Status::Ok();
 }
 

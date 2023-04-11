@@ -26,7 +26,7 @@ constexpr char kFloatFormatSwitch[] = "float";
 }  // namespace
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"sync_sine"});
+  fuchsia_logging::SetTags({"sync_sine"});
 
   const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
 

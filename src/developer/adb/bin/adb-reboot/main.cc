@@ -12,7 +12,7 @@
 #include "adb-reboot.h"
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"adb"});
+  fuchsia_logging::SetTags({"adb"});
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 

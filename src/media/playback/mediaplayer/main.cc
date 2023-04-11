@@ -68,7 +68,7 @@ void CreateDynamicChild(fidl::InterfaceRequest<Interface> request,
       });
 }
 int main(int argc, const char** argv) {
-  syslog::SetTags({"mediaplayer"});
+  fuchsia_logging::SetTags({"mediaplayer"});
   bool transient = false;
   for (int arg_index = 0; arg_index < argc; ++arg_index) {
     if (argv[arg_index] == kIsolateArgument) {

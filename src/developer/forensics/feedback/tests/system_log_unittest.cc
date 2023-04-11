@@ -38,8 +38,8 @@ namespace {
 using testing::IsEmpty;
 using testing::UnorderedElementsAreArray;
 
-constexpr syslog::LogSeverity kLogInfo = syslog::LOG_INFO;
-constexpr syslog::LogSeverity kLogWarning = syslog::LOG_WARNING;
+constexpr fuchsia_logging::LogSeverity kLogInfo = fuchsia_logging::LOG_INFO;
+constexpr fuchsia_logging::LogSeverity kLogWarning = fuchsia_logging::LOG_WARNING;
 
 std::string MessageJson(const int id) {
   return fxl::StringPrintf(
@@ -286,7 +286,7 @@ class SimpleRedactor : public RedactorBase {
 };
 
 feedback_data::LogSink::MessageOr ToMessage(const std::string& msg,
-                                            syslog::LogSeverity severity = kLogInfo,
+                                            fuchsia_logging::LogSeverity severity = kLogInfo,
                                             std::vector<std::string> tags = {"tag1", "tag2"}) {
   return ::fpromise::ok(fuchsia::logger::LogMessage{
       .pid = 100,

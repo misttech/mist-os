@@ -30,7 +30,7 @@ using ::testing::ElementsAreArray;
 constexpr zx::duration kTimestamp = zx::sec(1234);
 
 LogSink::MessageOr BuildOutputLogMessage(const std::string& text) {
-  return ::fpromise::ok(testing::BuildLogMessage(syslog::LOG_INFO, text, kTimestamp, {}));
+  return ::fpromise::ok(testing::BuildLogMessage(fuchsia_logging::LOG_INFO, text, kTimestamp, {}));
 }
 
 std::string BuildInputLogMessage(const std::string& message) {

@@ -134,7 +134,7 @@ class SdkCppHarness : public fio_test::Io1Harness {
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  syslog::SetTags({"io_conformance_harness_sdkcpp"});
+  fuchsia_logging::SetTags({"io_conformance_harness_sdkcpp"});
 
   SdkCppHarness harness;
   fidl::BindingSet<fio_test::Io1Harness> bindings;

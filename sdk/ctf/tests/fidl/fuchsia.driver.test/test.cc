@@ -46,7 +46,7 @@ void StartDriverTestRealm() {
 }
 
 TEST(DriverTestRealmCts, DriverWasLoaded) {
-  syslog::SetTags({"driver_test_realm_test"});
+  fuchsia_logging::SetTags({"driver_test_realm_test"});
   StartDriverTestRealm();
 
   ASSERT_EQ(ZX_OK, device_watcher::RecursiveWaitForFile("/dev/sys/test").status_value());

@@ -82,9 +82,9 @@ class FakeOwner : public AmlogicVideo::Owner {
 
 // Set the min logging level so every log will display.
 static void SetMaxLogging() {
-  syslog::LogSettings settings;
+  fuchsia_logging::LogSettings settings;
   settings.min_log_level = -10;
-  syslog::SetLogSettings(settings);
+  fuchsia_logging::SetLogSettings(settings);
 }
 
 class TestH264Multi {

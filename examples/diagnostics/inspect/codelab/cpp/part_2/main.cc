@@ -15,7 +15,7 @@
 #include "reverser.h"
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"inspect_cpp_codelab", "part2"});
+  fuchsia_logging::SetTags({"inspect_cpp_codelab", "part2"});
 
   FX_LOGS(INFO) << "Starting up...";
 

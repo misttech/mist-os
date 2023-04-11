@@ -126,8 +126,8 @@ class FakeLogSink : public fuchsia::logger::LogSink {
 
 std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel remote) {
   // Close channel (reset to default Archivist)
-  syslog::LogSettings settings;
-  syslog::SetLogSettings(settings);
+  fuchsia_logging::LogSettings settings;
+  fuchsia_logging::SetLogSettings(settings);
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   std::vector<fuchsia::logger::LogMessage> ret;
   auto log_service = std::make_unique<FakeLogSink>(loop.dispatcher(), std::move(remote));
@@ -157,12 +157,12 @@ std::string RetrieveLogs(zx::channel remote) {
   return stream.str();
 }
 
-zx::channel SetupFakeLog(syslog::LogSettings settings) {
+zx::channel SetupFakeLog(fuchsia_logging::LogSettings settings) {
   zx::channel channels[2];
   zx::channel::create(0, &channels[0], &channels[1]);
   settings.wait_for_initial_interest = false;
   settings.log_sink = channels[0].release();
-  syslog::SetLogSettings(settings);
+  fuchsia_logging::SetLogSettings(settings);
   return std::move(channels[1]);
 }
 }  // namespace log_tester

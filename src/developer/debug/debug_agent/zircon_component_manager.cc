@@ -128,17 +128,17 @@ std::string to_string(fuchsia::test::manager::LaunchError err) {
 
 std::string SeverityToString(int32_t severity) {
   switch (severity) {
-    case syslog::LOG_TRACE:
+    case fuchsia_logging::LOG_TRACE:
       return "TRACE";
-    case syslog::LOG_DEBUG:
+    case fuchsia_logging::LOG_DEBUG:
       return "DEBUG";
-    case syslog::LOG_INFO:
+    case fuchsia_logging::LOG_INFO:
       return "INFO";
-    case syslog::LOG_WARNING:
+    case fuchsia_logging::LOG_WARNING:
       return "WARNING";
-    case syslog::LOG_ERROR:
+    case fuchsia_logging::LOG_ERROR:
       return "ERROR";
-    case syslog::LOG_FATAL:
+    case fuchsia_logging::LOG_FATAL:
       return "FATAL";
   }
   return "INVALID";

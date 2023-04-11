@@ -67,8 +67,8 @@ class DeviceWatcherTesterImpl : public fidl::Server<fuchsia_camera_test::DeviceW
 };
 
 int main(int argc, char* argv[]) {
-  syslog::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL},
-                         {"camera", "camera_device_watcher"});
+  fuchsia_logging::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL},
+                                  {"camera", "camera_device_watcher"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();

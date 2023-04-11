@@ -366,7 +366,7 @@ zx::result<Options> ProcessArgs(int argc, char** argv, CommandFunction* func) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  syslog::SetLogSettings({}, {"blobfs"});
+  fuchsia_logging::SetLogSettings({}, {"blobfs"});
   CommandFunction func = nullptr;
   auto options_or = ProcessArgs(argc, argv, &func);
   if (options_or.is_error()) {

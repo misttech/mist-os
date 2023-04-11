@@ -129,7 +129,7 @@ class ChildRequestManager {
 };
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"lifecycle", "example"});
+  fuchsia_logging::SetTags({"lifecycle", "example"});
 
   // Create the main async event loop and component context
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

@@ -12,7 +12,7 @@
 #include "src/lib/fxl/test/test_settings.h"
 #include "src/performance/trace/tests/component_context.h"
 
-syslog::LogSettings g_log_settings;
+fuchsia_logging::LogSettings g_log_settings;
 
 int main(int argc, char** argv) {
   auto cl = fxl::CommandLineFromArgcArgv(argc, argv);

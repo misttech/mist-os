@@ -20,37 +20,37 @@ namespace {
 
 // It's OK to keep global state here even though this file is in a source_set because on host
 // we don't use shared libraries.
-syslog::LogSettings g_log_settings;
+fuchsia_logging::LogSettings g_log_settings;
 
 }  // namespace
 
-const std::string GetNameForLogSeverity(syslog::LogSeverity severity) {
+const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity) {
   switch (severity) {
-    case syslog::LOG_TRACE:
+    case fuchsia_logging::LOG_TRACE:
       return "TRACE";
-    case syslog::LOG_DEBUG:
+    case fuchsia_logging::LOG_DEBUG:
       return "DEBUG";
-    case syslog::LOG_INFO:
+    case fuchsia_logging::LOG_INFO:
       return "INFO";
-    case syslog::LOG_WARNING:
+    case fuchsia_logging::LOG_WARNING:
       return "WARNING";
-    case syslog::LOG_ERROR:
+    case fuchsia_logging::LOG_ERROR:
       return "ERROR";
-    case syslog::LOG_FATAL:
+    case fuchsia_logging::LOG_FATAL:
       return "FATAL";
   }
 
-  if (severity > syslog::LOG_DEBUG && severity < syslog::LOG_INFO) {
+  if (severity > fuchsia_logging::LOG_DEBUG && severity < fuchsia_logging::LOG_INFO) {
     std::ostringstream stream;
-    stream << "VLOG(" << (syslog::LOG_INFO - severity) << ")";
+    stream << "VLOG(" << (fuchsia_logging::LOG_INFO - severity) << ")";
     return stream.str();
   }
 
   return "UNKNOWN";
 }
 
-void SetLogSettings(const syslog::LogSettings& settings) {
-  g_log_settings.min_log_level = std::min(syslog::LOG_FATAL, settings.min_log_level);
+void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
+  g_log_settings.min_log_level = std::min(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   if (g_log_settings.log_file != settings.log_file) {
     if (!settings.log_file.empty()) {
@@ -72,7 +72,7 @@ void SetLogSettings(const syslog::LogSettings& settings) {
   }
 }
 
-void SetLogSettings(const syslog::LogSettings& settings,
+void SetLogSettings(const fuchsia_logging::LogSettings& settings,
                     const std::initializer_list<std::string>& tags) {
   syslog_backend::SetLogSettings(settings);
 }
@@ -81,9 +81,9 @@ void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
 }
 
-syslog::LogSeverity GetMinLogLevel() { return g_log_settings.min_log_level; }
+fuchsia_logging::LogSeverity GetMinLogLevel() { return g_log_settings.min_log_level; }
 
-void BeginRecord(LogBuffer* buffer, syslog::LogSeverity severity, const char* file,
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
                  unsigned int line, const char* msg, const char* condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
@@ -125,8 +125,8 @@ bool FlushRecord(LogBuffer* buffer) {
   return true;
 }
 
-void WriteLog(syslog::LogSeverity severity, const char* file, unsigned int line, const char* tag,
-              const char* condition, const std::string& msg) {
+void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned int line,
+              const char* tag, const char* condition, const std::string& msg) {
   if (tag)
     std::cerr << "[" << tag << "] ";
 

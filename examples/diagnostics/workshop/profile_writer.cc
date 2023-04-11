@@ -24,7 +24,7 @@ void required_args() {
 }
 
 int main(int argc, const char **argv) {
-  syslog::SetTags({"workshop", "writer"});
+  fuchsia_logging::SetTags({"workshop", "writer"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 

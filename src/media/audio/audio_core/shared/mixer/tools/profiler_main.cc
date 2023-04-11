@@ -640,7 +640,7 @@ Options ParseCommandLine(int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"audio_mixer_profiler"});
+  fuchsia_logging::SetTags({"audio_mixer_profiler"});
 
   auto opt = ParseCommandLine(argc, argv);
   printf("\n\n Performance Profiling\n\n");

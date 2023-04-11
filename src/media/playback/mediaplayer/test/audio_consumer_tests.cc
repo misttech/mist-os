@@ -47,7 +47,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
  protected:
   void SetUp() override {
     using namespace component_testing;
-    syslog::SetTags({"mediaplayer"});
+    fuchsia_logging::SetTags({"mediaplayer"});
     auto realm_builder = RealmBuilder::Create();
     // Configure the realm.
     // ...

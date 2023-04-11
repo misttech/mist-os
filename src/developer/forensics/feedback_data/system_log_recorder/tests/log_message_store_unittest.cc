@@ -32,7 +32,7 @@ namespace {
 
 // Only change "X" for one character. i.e. X -> 12 is not allowed.
 const auto kMaxLogLineSize =
-    StorageSize::Bytes(Format(BuildLogMessage(syslog::LOG_INFO, "line X").value()).size());
+    StorageSize::Bytes(Format(BuildLogMessage(fuchsia_logging::LOG_INFO, "line X").value()).size());
 const auto kRepeatedFormatStrSize =
     StorageSize::Bytes(std::string("!!! MESSAGE REPEATED X MORE TIMES !!!\n").size());
 // We set the block size to an arbitrary large numbers for test cases where the block logic does
@@ -81,15 +81,15 @@ TEST(LogMessageStoreTest, UnlimitedMessages) {
   LogMessageStore store(kMaxLogLineSize * 10, kMaxLogLineSize, MakeIdentityRedactor(),
                         MakeIdentityEncoder());
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
 
   bool end_of_block;
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
@@ -109,15 +109,15 @@ TEST(LogMessageStoreTest, AppliesRedaction) {
   LogMessageStore store(kMaxLogLineSize * 10, kMaxLogLineSize,
                         MakeSimpleRedactor(/*count_calls=*/true), MakeIdentityEncoder());
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
 
   bool end_of_block;
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: R: 1
@@ -140,15 +140,15 @@ TEST(LogMessageStoreTest, RedactionCompressed) {
   LogMessageStore store(kMaxLogLineSize * 10, kMaxLogLineSize,
                         MakeSimpleRedactor(/*count_calls=*/false), MakeIdentityEncoder());
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
 
   bool end_of_block;
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: R
@@ -165,22 +165,22 @@ TEST(LogMessageStoreTest, VerifyBlock) {
   store.TurnOnRateLimiting();
   bool end_of_block;
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 1
 )");
   EXPECT_TRUE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 2
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 3
 )");
   EXPECT_TRUE(end_of_block);
@@ -193,16 +193,16 @@ TEST(LogMessageStoreTest, AddAndConsume) {
   store.TurnOnRateLimiting();
   bool end_of_block;
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 [15604.000][07559][07687][] INFO: line 1
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 2
 [15604.000][07559][07687][] INFO: line 3
@@ -217,11 +217,11 @@ TEST(LogMessageStoreTest, DropsCorrectly) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 3")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 [15604.000][07559][07687][] INFO: line 1
@@ -238,13 +238,13 @@ TEST(LogMessageStoreTest, DropsSubsequentShorterMessages) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
   EXPECT_FALSE(store.Add(BuildLogMessage(
-      syslog::LOG_INFO,
+      fuchsia_logging::LOG_INFO,
       "This is a very big message that will not fit so it should not be displayed!")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 2")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 3")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 4")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! DROPPED 4 MESSAGES !!!
@@ -260,9 +260,9 @@ TEST(LogMessageStoreTest, VerifyRepetitionMessage_AtConsume) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 2 MORE TIMES !!!
@@ -292,16 +292,16 @@ TEST(LogMessageStoreTest, VerifyRepetition_DoNotResetRepeatedWarningOnConsume) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 2 MORE TIMES !!!
 )");
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"(!!! MESSAGE REPEATED 2 MORE TIMES !!!
 )");
@@ -334,9 +334,9 @@ TEST(LogMessageStoreTest, VerifyRepetition_ResetRepeatedWarningOnConsume) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 2 MORE TIMES !!!
@@ -344,8 +344,8 @@ TEST(LogMessageStoreTest, VerifyRepetition_ResetRepeatedWarningOnConsume) {
 
   EXPECT_TRUE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
@@ -380,25 +380,25 @@ TEST(LogMessageStoreTest, VerifyRepetition_LimitRepetitionBuffers) {
                         MakeIdentityRedactor(), MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
 )");
 
   for (size_t i = 1; i < kMaxRepeatedBuffers; i++) {
-    EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+    EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
     EXPECT_EQ(store.Consume(&end_of_block), R"(!!! MESSAGE REPEATED 1 MORE TIME !!!
 )");
   }
 
   for (size_t i = 0; i < kMaxRepeatedBuffers; i++) {
-    EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+    EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
     EXPECT_EQ(store.Consume(&end_of_block), "");
   }
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
   EXPECT_EQ(store.Consume(&end_of_block),
             "!!! MESSAGE REPEATED " + std::to_string(kMaxRepeatedBuffers) + " MORE TIMES !!!\n" +
                 "[15604.000][07559][07687][] INFO: line 1\n");
@@ -414,9 +414,9 @@ TEST(LogMessageStoreTest, VerifyRepetitionMessage_WhenMessageChanges) {
                         MakeIdentityRedactor(), MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
@@ -433,9 +433,9 @@ TEST(LogMessageStoreTest, VerifyRepetitionMessage_WhenSeverityChanges) {
                         MakeIdentityRedactor(), MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_WARNING, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_WARNING, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
@@ -452,10 +452,12 @@ TEST(LogMessageStoreTest, VerifyRepetitionMessage_WhenTagsChange) {
                         MakeIdentityRedactor(), MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0", zx::duration(0), {"tag1"})));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0", zx::duration(0), {"tag1"})));
   EXPECT_TRUE(
-      store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0", zx::duration(0), {"tag1", "tag2"})));
+      store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0", zx::duration(0), {"tag1"})));
+  EXPECT_TRUE(
+      store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0", zx::duration(0), {"tag1"})));
+  EXPECT_TRUE(store.Add(
+      BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0", zx::duration(0), {"tag1", "tag2"})));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][tag1] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
@@ -472,9 +474,9 @@ TEST(LogMessageStoreTest, VerifyDroppedRepeatedMessage_OnBufferFull) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! DROPPED 2 MESSAGES !!!
@@ -490,15 +492,15 @@ TEST(LogMessageStoreTest, VerifyNoRepeatMessage_AfterFirstConsume) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! DROPPED 1 MESSAGES !!!
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 1
 )");
   EXPECT_FALSE(end_of_block);
@@ -512,9 +514,9 @@ TEST(LogMessageStoreTest, VerifyRepeatMessage_AfterFirstConsume) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
@@ -522,7 +524,7 @@ TEST(LogMessageStoreTest, VerifyRepeatMessage_AfterFirstConsume) {
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
   EXPECT_EQ(store.Consume(&end_of_block), R"(!!! MESSAGE REPEATED 1 MORE TIME !!!
 )");
   EXPECT_FALSE(end_of_block);
@@ -536,9 +538,9 @@ TEST(LogMessageStoreTest, VerifyRepeatedAndDropped) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! MESSAGE REPEATED 1 MORE TIME !!!
@@ -546,7 +548,7 @@ TEST(LogMessageStoreTest, VerifyRepeatedAndDropped) {
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 1
 )");
   EXPECT_FALSE(end_of_block);
@@ -560,19 +562,19 @@ TEST(LogMessageStoreTest, VerifyNoRepeatMessage_TimeOrdering) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1 overflow msg")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1 overflow msg")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1 overflow msg")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1 overflow msg")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 !!! DROPPED 5 MESSAGES !!!
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 )");
@@ -587,12 +589,12 @@ TEST(LogMessageStoreTest, VerifyAppendToEnd) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1 overflow msg")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 1 overflow msg")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1 overflow msg")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1 overflow msg")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
   store.AppendToEnd("DONE\n");
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
@@ -602,7 +604,7 @@ DONE
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 )");
@@ -617,8 +619,8 @@ TEST(LogMessageStoreTest, VerifyNoRepeatWarningAfter_AppendToEnd) {
                         MakeIdentityEncoder());
   store.TurnOnRateLimiting();
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
   store.AppendToEnd("DONE\n");
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
@@ -627,7 +629,7 @@ DONE
 )");
   EXPECT_FALSE(end_of_block);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
 
   EXPECT_EQ(store.Consume(&end_of_block), R"([15604.000][07559][07687][] INFO: line 0
 )");

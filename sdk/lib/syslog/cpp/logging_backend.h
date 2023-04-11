@@ -12,12 +12,12 @@
 
 namespace syslog_backend {
 
-WEAK void SetLogSettings(const syslog::LogSettings& settings);
+WEAK void SetLogSettings(const fuchsia_logging::LogSettings& settings);
 
-WEAK void SetLogSettings(const syslog::LogSettings& settings,
+WEAK void SetLogSettings(const fuchsia_logging::LogSettings& settings,
                          const std::initializer_list<std::string>& tags);
 
-WEAK syslog::LogSeverity GetMinLogLevel();
+WEAK fuchsia_logging::LogSeverity GetMinLogLevel();
 
 }  // namespace syslog_backend
 

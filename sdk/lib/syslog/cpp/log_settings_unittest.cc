@@ -12,7 +12,7 @@
 #include "src/lib/files/file.h"
 #include "src/lib/files/scoped_temp_dir.h"
 
-namespace syslog {
+namespace fuchsia_logging {
 namespace {
 
 class LogSettingsFixture : public ::testing::Test {
@@ -67,4 +67,4 @@ TEST_F(LogSettingsFixture, SetInvalidLogFile) {
 #endif
 
 }  // namespace
-}  // namespace syslog
+}  // namespace fuchsia_logging

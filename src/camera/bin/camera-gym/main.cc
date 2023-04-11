@@ -321,7 +321,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  syslog::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL}, {"camera-gym"});
+  fuchsia_logging::SetLogSettings({.min_log_level = CAMERA_MIN_LOG_LEVEL}, {"camera-gym"});
 
   async::Loop buffer_collage_loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Loop cycler_loop(&kAsyncLoopConfigNoAttachToCurrentThread);

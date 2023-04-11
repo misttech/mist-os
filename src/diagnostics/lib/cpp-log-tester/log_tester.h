@@ -16,7 +16,7 @@ namespace log_tester {
 /// Redirects all logs to a fake LogSink
 /// and returns the handle to the logsink
 /// to be passed to RetrieveLogs later.
-zx::channel SetupFakeLog(syslog::LogSettings settings = syslog::LogSettings());
+zx::channel SetupFakeLog(fuchsia_logging::LogSettings settings = fuchsia_logging::LogSettings());
 
 /// Retrieves logs from a given LogSink connection,
 /// and converts them to plaintext.

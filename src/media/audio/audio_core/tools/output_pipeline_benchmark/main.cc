@@ -197,7 +197,7 @@ void RegisterDeadlineProfile(sys::ComponentContext& context,
 int main(int argc, char** argv) {
   // Rewrite the program name to be just the executable file, not the full path.
   const std::string prog_name = files::GetBaseName(argv[0]);
-  syslog::SetTags({prog_name});
+  fuchsia_logging::SetTags({prog_name});
 
   auto opts = ParseCommandLine(argc, argv);
   printf("Audio output pipeline profiling tool\n");

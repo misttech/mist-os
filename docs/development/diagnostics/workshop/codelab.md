@@ -138,7 +138,7 @@ the `workshop` tag:
 ```
 #include <lib/syslog/cpp/log_settings.h>
 ...
-syslog::SetTags({"workshop", "profile_store_server"});
+fuchsia_logging::SetTags({"workshop", "profile_store_server"});
 ```
 
 Now, it's time to write some logs. We'll be using the `FX_SLOG` macro which allows to write

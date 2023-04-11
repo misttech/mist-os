@@ -196,7 +196,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  syslog::SetTags({"io_conformance_harness_minfs"});
+  fuchsia_logging::SetTags({"io_conformance_harness_minfs"});
 
   minfs::MinfsHarness harness;
   fidl::BindingSet<fuchsia::io::test::Io1Harness> bindings;

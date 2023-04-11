@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  syslog::SetTags({"audio_fidelity_tests"});
+  fuchsia_logging::SetTags({"audio_fidelity_tests"});
 
   // --subset  Measure only a small subset of frequencies.
   // --recap   Display summary fidelity results.

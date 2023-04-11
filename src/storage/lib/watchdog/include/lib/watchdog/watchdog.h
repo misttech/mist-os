@@ -7,8 +7,8 @@
 
 #ifdef __Fuchsia__
 #include <lib/syslog/cpp/macros.h>
-using LogSeverity = syslog::LogSeverity;
-constexpr LogSeverity LOG_INFO = syslog::LOG_INFO;
+using LogSeverity = fuchsia_logging::LogSeverity;
+constexpr LogSeverity LOG_INFO = fuchsia_logging::LOG_INFO;
 #else
 using LogSeverity = int;
 constexpr LogSeverity LOG_INFO = 4;

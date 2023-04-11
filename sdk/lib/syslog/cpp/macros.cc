@@ -15,7 +15,7 @@
 #include <zircon/status.h>
 #endif
 
-namespace syslog {
+namespace fuchsia_logging {
 namespace {
 
 const char* StripDots(const char* path) {
@@ -86,17 +86,18 @@ uint8_t GetVlogVerbosity() {
 
 bool ShouldCreateLogMessage(LogSeverity severity) { return severity >= GetMinLogLevel(); }
 
-}  // namespace syslog
+}  // namespace fuchsia_logging
 
-syslog::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
+fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
   // Clamp verbosity scale to the interstitial space between INFO and DEBUG
-  uint8_t max_verbosity = (syslog::LOG_INFO - syslog::LOG_DEBUG) / syslog::LogVerbosityStepSize;
+  uint8_t max_verbosity = (fuchsia_logging::LOG_INFO - fuchsia_logging::LOG_DEBUG) /
+                          fuchsia_logging::LogVerbosityStepSize;
   if (verbosity > max_verbosity) {
     verbosity = max_verbosity;
   }
-  int severity = syslog::LOG_INFO - (verbosity * syslog::LogVerbosityStepSize);
-  if (severity < syslog::LOG_DEBUG + 1) {
-    return syslog::LOG_DEBUG + 1;
+  int severity = fuchsia_logging::LOG_INFO - (verbosity * fuchsia_logging::LogVerbosityStepSize);
+  if (severity < fuchsia_logging::LOG_DEBUG + 1) {
+    return fuchsia_logging::LOG_DEBUG + 1;
   }
-  return static_cast<syslog::LogSeverity>(severity);
+  return static_cast<fuchsia_logging::LogSeverity>(severity);
 }

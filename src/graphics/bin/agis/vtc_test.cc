@@ -179,7 +179,7 @@ void VtcTest::Communicate(uint32_t wait_secs) {
 
 int main(int argc, char **argv) {
   VtcTest test;
-  syslog::SetTags({"vtc-test"});
+  fuchsia_logging::SetTags({"vtc-test"});
 
   test.SetUp();
 

@@ -13,33 +13,33 @@
 #include <zircon/status.h>
 #include <zircon/syscalls/debug.h>
 
-#define print_error(msg)                                 \
-  do {                                                   \
-    if (syslog::GetMinLogLevel() <= syslog::LOG_ERROR) { \
-      FX_SLOG(ERROR, msg);                               \
-    }                                                    \
+#define print_error(msg)                                                   \
+  do {                                                                     \
+    if (fuchsia_logging::GetMinLogLevel() <= fuchsia_logging::LOG_ERROR) { \
+      FX_SLOG(ERROR, msg);                                                 \
+    }                                                                      \
   } while (0)
 
 #define log_zx_error(status, msg)                                                                \
   do {                                                                                           \
-    if (syslog::GetMinLogLevel() <= syslog::LOG_ERROR) {                                         \
+    if (fuchsia_logging::GetMinLogLevel() <= fuchsia_logging::LOG_ERROR) {                       \
       FX_SLOG(ERROR, msg, KV("status", status), KV("status_str", zx_status_get_string(status))); \
     }                                                                                            \
   } while (0)
 
 #define log_zx_error_msg(status, msg, pid, tid)                                                    \
   do {                                                                                             \
-    if (syslog::GetMinLogLevel() <= syslog::LOG_ERROR) {                                           \
+    if (fuchsia_logging::GetMinLogLevel() <= fuchsia_logging::LOG_ERROR) {                         \
       FX_SLOG(ERROR, msg, KV("status", status), KV("status_string", zx_status_get_string(status)), \
               KV("pid", pid), KV("tid", tid));                                                     \
     }                                                                                              \
   } while (0)
 
-#define log_zx_error_msg_pid_tid(msg, pid, tid)            \
-  do {                                                     \
-    if (syslog::GetMinLogLevel() <= syslog::LOG_ERROR) {   \
-      FX_SLOG(ERROR, msg, KV("pid", pid), KV("tid", tid)); \
-    }                                                      \
+#define log_zx_error_msg_pid_tid(msg, pid, tid)                            \
+  do {                                                                     \
+    if (fuchsia_logging::GetMinLogLevel() <= fuchsia_logging::LOG_ERROR) { \
+      FX_SLOG(ERROR, msg, KV("pid", pid), KV("tid", tid));                 \
+    }                                                                      \
   } while (0)
 
 static zx_koid_t get_koid(zx_handle_t thread_handle) {

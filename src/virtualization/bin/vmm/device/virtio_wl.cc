@@ -1200,7 +1200,7 @@ bool VirtioWl::AcquireWritableDescriptor(VirtioQueue* queue, VirtioChain* chain,
 }
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"virtio_wl"});
+  fuchsia_logging::SetTags({"virtio_wl"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());

@@ -156,7 +156,7 @@ std::string GetUsage() {
 }
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"basemgr"});
+  fuchsia_logging::SetTags({"basemgr"});
 
   // Process command line arguments.
   const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);

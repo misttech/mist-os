@@ -166,7 +166,7 @@ class CalculatorClient {
 };
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"calculator_client"});
+  fuchsia_logging::SetTags({"calculator_client"});
 
   // Note the path starts with /pkg/ even though the build rule
   // `resource("input")` uses `data/input.txt`. At runtime, components are

@@ -92,14 +92,16 @@ double SecondsSinceStart() {
 
 }  // namespace
 
-bool IsDebugLoggingActive() { return syslog::ShouldCreateLogMessage(syslog::LOG_DEBUG); }
+bool IsDebugLoggingActive() {
+  return fuchsia_logging::ShouldCreateLogMessage(fuchsia_logging::LOG_DEBUG);
+}
 
 void SetDebugLogging(bool activate) {
-  syslog::LogSettings settings;
+  fuchsia_logging::LogSettings settings;
   if (activate) {
-    settings.min_log_level = syslog::LOG_DEBUG;
+    settings.min_log_level = fuchsia_logging::LOG_DEBUG;
   }
-  syslog::SetLogSettings(settings);
+  fuchsia_logging::SetLogSettings(settings);
 }
 
 void SetLogCategories(std::initializer_list<LogCategory> categories) {

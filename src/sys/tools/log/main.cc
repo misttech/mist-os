@@ -8,7 +8,7 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-  syslog::SetLogSettings(syslog::LogSettings{
+  fuchsia_logging::SetLogSettings(fuchsia_logging::LogSettings{
       .disable_interest_listener = true,
   });
   if (argc != 3) {

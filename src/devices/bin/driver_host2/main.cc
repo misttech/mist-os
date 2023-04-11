@@ -29,7 +29,7 @@ namespace fi = fuchsia::inspect;
 constexpr char kDiagnosticsDir[] = "diagnostics";
 
 int main(int argc, char** argv) {
-  syslog::SetTags({"driver_host2", "driver"});
+  fuchsia_logging::SetTags({"driver_host2", "driver"});
   driver_logger::GetLogger().AddTag("driver_host2").AddTag("driver");
   // TODO(fxbug.dev/33183): Lock down job.
   zx_status_t status = StdoutToDebuglog::Init();

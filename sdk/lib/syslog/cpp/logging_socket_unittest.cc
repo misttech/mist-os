@@ -13,7 +13,7 @@
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "zircon/system/ulib/syslog/include/lib/syslog/logger.h"
 
-namespace syslog {
+namespace fuchsia_logging {
 namespace {
 
 struct LogPacket {
@@ -66,7 +66,7 @@ class LoggingSocketTest : public LoggingBaseSocketTest {
     ASSERT_EQ(ZX_OK, zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &socket_));
 
     fx_logger_config_t config = {
-        .min_severity = syslog::LOG_INFO,
+        .min_severity = fuchsia_logging::LOG_INFO,
         .log_sink_socket = local.release(),
         .tags = nullptr,
         .num_tags = 0,
@@ -79,7 +79,7 @@ class LoggingSocketTest : public LoggingBaseSocketTest {
 TEST_F(LoggingBaseSocketTest, LoggerCreatedNotConnected) {
   fx_logger_t* logger = NULL;
   fx_logger_config_t config = {
-      .min_severity = syslog::LOG_INFO,
+      .min_severity = fuchsia_logging::LOG_INFO,
       .tags = nullptr,
       .num_tags = 0,
   };
@@ -95,7 +95,7 @@ TEST_F(LoggingBaseSocketTest, LoggerCreatedNotConnected) {
 TEST_F(LoggingBaseSocketTest, LoggerCreatedConnected) {
   fx_logger_t* logger = NULL;
   fx_logger_config_t config = {
-      .min_severity = syslog::LOG_INFO,
+      .min_severity = fuchsia_logging::LOG_INFO,
       .tags = nullptr,
       .num_tags = 0,
   };
@@ -111,7 +111,7 @@ TEST_F(LoggingBaseSocketTest, LoggerCreatedConnected) {
 TEST_F(LoggingBaseSocketTest, LoggerReconfiguredConnected) {
   fx_logger_t* logger = NULL;
   fx_logger_config_t config = {
-      .min_severity = syslog::LOG_INFO,
+      .min_severity = fuchsia_logging::LOG_INFO,
       .tags = nullptr,
       .num_tags = 0,
   };
@@ -125,7 +125,7 @@ TEST_F(LoggingBaseSocketTest, LoggerReconfiguredConnected) {
   ASSERT_EQ(ZX_OK, zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &socket_));
 
   config = {
-      .min_severity = syslog::LOG_INFO,
+      .min_severity = fuchsia_logging::LOG_INFO,
       .log_sink_socket = local.release(),
       .tags = nullptr,
       .num_tags = 0,
@@ -142,7 +142,7 @@ TEST_F(LoggingBaseSocketTest, LoggerReconfiguredConnected) {
 TEST_F(LoggingBaseSocketTest, LoggerSetConnected) {
   fx_logger_t* logger = NULL;
   fx_logger_config_t config = {
-      .min_severity = syslog::LOG_INFO,
+      .min_severity = fuchsia_logging::LOG_INFO,
       .tags = nullptr,
       .num_tags = 0,
   };
@@ -165,16 +165,16 @@ TEST_F(LoggingBaseSocketTest, LoggerSetConnected) {
 
 TEST_F(LoggingSocketTest, LogSimple) {
   const char* msg = "test message";
-  syslog::LOGS(INFO) << msg;
-  ReadPacketAndCompare(syslog::LOG_INFO, msg);
+  fuchsia_logging::LOGS(INFO) << msg;
+  ReadPacketAndCompare(fuchsia_logging::LOG_INFO, msg);
   CheckSocketEmpty();
 }
 
 TEST_F(LoggingSocketTest, LogWithTag) {
   const char* kMsg = "just some string";
   const char* kTag = "tag";
-  syslog::LOGST(INFO, kTag) << "just some string";
-  ReadPacketAndCompare(syslog::LOG_INFO, kMsg, {kTag});
+  fuchsia_logging::LOGST(INFO, kTag) << "just some string";
+  ReadPacketAndCompare(fuchsia_logging::LOG_INFO, kMsg, {kTag});
   CheckSocketEmpty();
 }
 
@@ -200,8 +200,8 @@ TEST_F(LoggingSocketTest, VLog) {
   FX_VLOGS(2) << kMsg3;
   CheckSocketEmpty();
 
-  syslog::LOGS(WARNING) << kMsg4;
-  ReadPacketAndCompare(syslog::LOG_WARNING, kMsg4);
+  fuchsia_logging::LOGS(WARNING) << kMsg4;
+  ReadPacketAndCompare(fuchsia_logging::LOG_WARNING, kMsg4);
   CheckSocketEmpty();
 }
 
@@ -222,18 +222,19 @@ TEST_F(LoggingSocketTest, VLogWithTag) {
 
 TEST_F(LoggingSocketTest, PLog) {
   FX_PLOGS(ERROR, ZX_OK) << "should be ok";
-  ReadPacketAndCompare(syslog::LOG_ERROR, "should be ok: 0 (ZX_OK)");
+  ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, "should be ok: 0 (ZX_OK)");
   CheckSocketEmpty();
 
   FX_PLOGS(INFO, ZX_ERR_ACCESS_DENIED) << "something that failed";
-  ReadPacketAndCompare(syslog::LOG_INFO, "something that failed: -30 (ZX_ERR_ACCESS_DENIED)");
+  ReadPacketAndCompare(fuchsia_logging::LOG_INFO,
+                       "something that failed: -30 (ZX_ERR_ACCESS_DENIED)");
   CheckSocketEmpty();
 }
 
 TEST_F(LoggingSocketTest, PLogWithTag) {
   FX_PLOGST(WARNING, "test", ZX_ERR_IO_NOT_PRESENT) << "something bad happened";
-  ReadPacketAndCompare(syslog::LOG_WARNING, "something bad happened: -44 (ZX_ERR_IO_NOT_PRESENT)",
-                       {"test"});
+  ReadPacketAndCompare(fuchsia_logging::LOG_WARNING,
+                       "something bad happened: -44 (ZX_ERR_IO_NOT_PRESENT)", {"test"});
   CheckSocketEmpty();
 }
 
@@ -244,10 +245,10 @@ TEST_F(LoggingSocketTest, LogFirstN) {
   static_assert(kCycles > kLimit);
 
   for (int i = 0; i < kCycles; ++i) {
-    syslog::LOGS_FIRST_N(ERROR, kLimit) << kLogMessage;
+    fuchsia_logging::LOGS_FIRST_N(ERROR, kLimit) << kLogMessage;
   }
   for (int i = 0; i < kLimit; ++i) {
-    ReadPacketAndCompare(syslog::LOG_ERROR, kLogMessage);
+    ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, kLogMessage);
   }
   CheckSocketEmpty();
 }
@@ -260,16 +261,16 @@ TEST_F(LoggingSocketTest, LogFirstNWithTag) {
   static_assert(kCycles > kLimit);
 
   for (int i = 0; i < kCycles; ++i) {
-    syslog::LOGST_FIRST_N(ERROR, kLimit, kTag) << kLogMessage;
+    fuchsia_logging::LOGST_FIRST_N(ERROR, kLimit, kTag) << kLogMessage;
   }
   for (int i = 0; i < kLimit; ++i) {
-    ReadPacketAndCompare(syslog::LOG_ERROR, kLogMessage, {kTag});
+    ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, kLogMessage, {kTag});
   }
   CheckSocketEmpty();
 }
 
 TEST_F(LoggingSocketTest, DontWriteSeverity) {
-  syslog::LOGS(ERROR) << "Hi";
+  fuchsia_logging::LOGS(ERROR) << "Hi";
   LogPacket packet = ReadPacket();
   ASSERT_THAT(packet.message, testing::Not(testing::HasSubstr("ERROR")));
   CheckSocketEmpty();
@@ -283,12 +284,12 @@ TEST_F(LoggingSocketTest, SetSettingsAndTags) {
 
   SetLogSettings(LogSettings(), {kGlobalTag});
 
-  syslog::LOGS(ERROR) << kLogMessage1;
-  ReadPacketAndCompare(syslog::LOG_ERROR, kLogMessage1, {kGlobalTag});
+  fuchsia_logging::LOGS(ERROR) << kLogMessage1;
+  ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, kLogMessage1, {kGlobalTag});
   CheckSocketEmpty();
 
-  syslog::LOGST(WARNING, kTag) << kLogMessage2;
-  ReadPacketAndCompare(syslog::LOG_WARNING, kLogMessage2, {kGlobalTag, kTag});
+  fuchsia_logging::LOGST(WARNING, kTag) << kLogMessage2;
+  ReadPacketAndCompare(fuchsia_logging::LOG_WARNING, kLogMessage2, {kGlobalTag, kTag});
   CheckSocketEmpty();
 }
 
@@ -299,30 +300,30 @@ TEST_F(LoggingSocketTest, SetSettingsAndTagsFromCommandLine) {
   fxl::CommandLine command_line = fxl::CommandLineFromInitializerList({"argv0", "--quiet"});
   fxl::SetLogSettingsFromCommandLine(command_line, {kTag});
 
-  syslog::LOGS(ERROR) << kLogMessage;
-  ReadPacketAndCompare(syslog::LOG_ERROR, kLogMessage, {kTag});
+  fuchsia_logging::LOGS(ERROR) << kLogMessage;
+  ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, kLogMessage, {kTag});
   CheckSocketEmpty();
 }
 
 TEST_F(LoggingSocketTest, TooManyTags) {
   constexpr const char* kLogMessage = "Hello";
-  syslog::SetTags({"1", "2", "3", "4", "5"});
-  syslog::LOGS(ERROR) << kLogMessage;
-  ReadPacketAndCompare(syslog::LOG_ERROR, kLogMessage, {"1", "2", "3", "4"});
+  fuchsia_logging::SetTags({"1", "2", "3", "4", "5"});
+  fuchsia_logging::LOGS(ERROR) << kLogMessage;
+  ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, kLogMessage, {"1", "2", "3", "4"});
   CheckSocketEmpty();
 }
 
 TEST_F(LoggingSocketTest, Structured) {
   FX_SLOG(INFO, "msg", KV("one", 1), KV("three", 3));
-  ReadPacketAndCompare(syslog::LOG_INFO, "msg one=1 three=3");
+  ReadPacketAndCompare(fuchsia_logging::LOG_INFO, "msg one=1 three=3");
   CheckSocketEmpty();
 }
 
 TEST_F(LoggingSocketTest, LogId) {
-  syslog::LOGS(ERROR("test")) << "Hello";
-  ReadPacketAndCompare(syslog::LOG_ERROR, "Hello log_id=\"test\"");
+  fuchsia_logging::LOGS(ERROR("test")) << "Hello";
+  ReadPacketAndCompare(fuchsia_logging::LOG_ERROR, "Hello log_id=\"test\"");
   CheckSocketEmpty();
 }
 
 }  // namespace
-}  // namespace syslog
+}  // namespace fuchsia_logging

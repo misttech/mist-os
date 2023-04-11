@@ -926,7 +926,7 @@ TEST_F(FlatlandTest, SetDebugNameAddsPrefixToLogs) {
 
    private:
     // |scenic_impl::ErrorReporter|
-    void ReportError(syslog::LogSeverity severity, std::string error_string) override {
+    void ReportError(fuchsia_logging::LogSeverity severity, std::string error_string) override {
       *reported_error = error_string;
     }
   };

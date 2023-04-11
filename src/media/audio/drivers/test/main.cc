@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
 
   testing::InitGoogleTest(&argc, argv);
 
-  syslog::SetTags({"audio_driver_tests"});
+  fuchsia_logging::SetTags({"audio_driver_tests"});
 
   // --admin: Validate commands that require the privileged channel, such as SetFormat.
   //   Otherwise, omit AdminTest cases if a device/driver is exposed in the device tree.

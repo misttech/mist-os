@@ -13,7 +13,7 @@
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  syslog::SetTags({"network-context"});
+  fuchsia_logging::SetTags({"network-context"});
   FX_LOGS(INFO) << "starting...";
 
   std::unique_ptr context = sys::ComponentContext::CreateAndServeOutgoingDirectory();

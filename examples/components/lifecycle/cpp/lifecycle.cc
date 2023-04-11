@@ -45,7 +45,7 @@ class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle {
 // [END lifecycle_handler]
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"lifecycle", "example"});
+  fuchsia_logging::SetTags({"lifecycle", "example"});
 
   // Create the main async event loop.
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

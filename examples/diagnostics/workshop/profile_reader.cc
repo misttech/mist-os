@@ -19,7 +19,7 @@
 #include <src/lib/fxl/command_line.h>
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"workshop", "reader"});
+  fuchsia_logging::SetTags({"workshop", "reader"});
 
   if (argc < 3) {
     FX_LOGS(FATAL) << "required args: "

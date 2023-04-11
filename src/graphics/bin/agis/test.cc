@@ -534,6 +534,6 @@ TEST(AgisDisconnect, Main) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  syslog::SetTags({"agis-test"});
+  fuchsia_logging::SetTags({"agis-test"});
   return RUN_ALL_TESTS();
 }

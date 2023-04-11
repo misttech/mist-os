@@ -360,7 +360,7 @@ TEST_F(ComponentControllerTest, ControllerScope) {
 }
 
 TEST_F(ComponentControllerTest, DetachController) {
-  syslog::SetLogSettings({.min_log_level = -2});
+  fuchsia_logging::SetLogSettings({.min_log_level = -2});
   bool wait = false;
   {
     fuchsia::sys::ComponentControllerPtr component_ptr;

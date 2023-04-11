@@ -11,7 +11,7 @@
 #include "src/connectivity/network/mdns/service/services/mdns_service_impl.h"
 
 int main(int argc, const char** argv) {
-  syslog::SetTags({"mdns"});
+  fuchsia_logging::SetTags({"mdns"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
