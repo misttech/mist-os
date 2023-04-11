@@ -235,7 +235,6 @@ impl FileOps for Arc<InputFile> {
         user_addr: UserAddress,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            // TODO(https://fxbug.dev/124599): Factor out `write_object()` and `Ok()`.
             uapi::EVIOCGVERSION => {
                 current_task.mm.write_object(UserRef::new(user_addr), &self.driver_version)?;
                 Ok(SUCCESS)
