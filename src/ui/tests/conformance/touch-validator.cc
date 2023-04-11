@@ -136,22 +136,34 @@ class TouchConformanceTest : public gtest::RealLoopFixture {
   uint32_t display_height_ = 0;
 };
 
-TEST_F(TouchConformanceTest, SimpleTap) {
+class SingleViewTouchConformanceTest : public TouchConformanceTest {
+ public:
+  ~SingleViewTouchConformanceTest() override = default;
+
+  void SetUp() override {
+    TouchConformanceTest::SetUp();
+
+    // Get root view token.
+    //
+    // Note that the test context will automatically present the view created
+    // using this token to the scene.
+    FX_LOGS(INFO) << "Creating root view token";
+    fuchsia::ui::views::ViewCreationToken view_creation_token;
+    test_context_->GetRootViewToken(&view_creation_token);
+
+    // Create puppet using root view token.
+    FX_LOGS(INFO) << "Creating puppet under test";
+    puppet_ = std::make_unique<TouchPuppet>(test_context_.get(), std::move(view_creation_token),
+                                            /* is_puppet_under_test = */ true);
+  }
+
+ protected:
+  std::unique_ptr<TouchPuppet> puppet_;
+};
+
+TEST_F(SingleViewTouchConformanceTest, SimpleTap) {
   const auto kTapX = 3 * display_width_as_int() / 4;
   const auto kTapY = display_height_as_int() / 4;
-
-  // Get root view token.
-  //
-  // Note that the test context will automatically present the view created
-  // using this token to the scene.
-  FX_LOGS(INFO) << "Creating root view token";
-  fuchsia::ui::views::ViewCreationToken view_creation_token;
-  test_context_->GetRootViewToken(&view_creation_token);
-
-  // Create puppet using root view token.
-  FX_LOGS(INFO) << "Creating puppet under test";
-  TouchPuppet puppet(test_context_.get(), std::move(view_creation_token),
-                     /* is_puppet_under_test = */ true);
 
   // Inject tap in the middle of the top-right quadrant.
   fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
@@ -161,51 +173,64 @@ TEST_F(TouchConformanceTest, SimpleTap) {
   fake_touch_screen_->SimulateTap(std::move(tap_request));
 
   FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
-  RunLoopUntil([&puppet, kTapX, kTapY]() {
+  RunLoopUntil([this, kTapX, kTapY]() {
     // The puppet's view matches the display dimensions exactly, and the device
     // pixel ratio is 1. Therefore, the puppet's logical coordinate space will
     // match the physical coordinate space, so we expect the puppet to report
     // the event at (kTapX, kTapY).
-    return puppet.touch_listener.LastEventReceivedMatches(static_cast<float>(kTapX),
-                                                          static_cast<float>(kTapY));
+    return this->puppet_->touch_listener.LastEventReceivedMatches(static_cast<float>(kTapX),
+                                                                  static_cast<float>(kTapY));
   });
 }
 
-TEST_F(TouchConformanceTest, EmbeddedViewTap) {
-  const uint64_t kChildViewportId = 1u;
+class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
+ public:
+  ~EmbeddedViewTouchConformanceTest() override = default;
+
+  void SetUp() override {
+    TouchConformanceTest::SetUp();
+    // Get root view token.
+    //
+    // Note that the test context will automatically present the view created
+    // using this token to the scene.
+    FX_LOGS(INFO) << "Creating root view token";
+    fuchsia::ui::views::ViewCreationToken parent_view_creation_token;
+    test_context_->GetRootViewToken(&parent_view_creation_token);
+
+    // Create parent puppet using root view token.
+    FX_LOGS(INFO) << "Creating parent puppet";
+    this->parent_puppet_ =
+        std::make_unique<TouchPuppet>(test_context_.get(), std::move(parent_view_creation_token),
+                                      /* is_puppet_under_test = */ false);
+
+    // Create child viewport.
+    FX_LOGS(INFO) << "Creating child viewport";
+    fuchsia::ui::test::conformance::PuppetEmbedRemoteViewRequest embed_remote_view_request;
+    const uint64_t kChildViewportId = 1u;
+    embed_remote_view_request.set_id(kChildViewportId);
+    embed_remote_view_request.mutable_properties()->mutable_bounds()->set_size(
+        {.width = display_width_ / 2, .height = display_height_ / 2});
+    embed_remote_view_request.mutable_properties()->mutable_bounds()->set_origin(
+        {.x = display_width_as_int() / 2, .y = display_height_as_int() / 2});
+    fuchsia::ui::test::conformance::PuppetEmbedRemoteViewResponse embed_remote_view_response;
+    this->parent_puppet_->puppet_ptr->EmbedRemoteView(std::move(embed_remote_view_request),
+                                                      &embed_remote_view_response);
+
+    // Create child view.
+    FX_LOGS(INFO) << "Creating child puppet";
+    this->child_puppet_ = std::make_unique<TouchPuppet>(
+        test_context_.get(), std::move(*embed_remote_view_response.mutable_view_creation_token()),
+        /* is_puppet_under_test = */ true);
+  }
+
+ protected:
+  std::unique_ptr<TouchPuppet> parent_puppet_;
+  std::unique_ptr<TouchPuppet> child_puppet_;
+};
+
+TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   const auto kTapX = 3 * display_width_as_int() / 4;
   const auto kTapY = 3 * display_height_as_int() / 4;
-
-  // Get root view token.
-  //
-  // Note that the test context will automatically present the view created
-  // using this token to the scene.
-  FX_LOGS(INFO) << "Creating root view token";
-  fuchsia::ui::views::ViewCreationToken parent_view_creation_token;
-  test_context_->GetRootViewToken(&parent_view_creation_token);
-
-  // Create parent puppet using root view token.
-  FX_LOGS(INFO) << "Creating parent puppet";
-  TouchPuppet parent(test_context_.get(), std::move(parent_view_creation_token),
-                     /* is_puppet_under_test = */ false);
-
-  // Create child viewport.
-  FX_LOGS(INFO) << "Creating child viewport";
-  fuchsia::ui::test::conformance::PuppetEmbedRemoteViewRequest embed_remote_view_request;
-  embed_remote_view_request.set_id(kChildViewportId);
-  embed_remote_view_request.mutable_properties()->mutable_bounds()->set_size(
-      {.width = display_width_ / 2, .height = display_height_ / 2});
-  embed_remote_view_request.mutable_properties()->mutable_bounds()->set_origin(
-      {.x = display_width_as_int() / 2, .y = display_height_as_int() / 2});
-  fuchsia::ui::test::conformance::PuppetEmbedRemoteViewResponse embed_remote_view_response;
-  parent.puppet_ptr->EmbedRemoteView(std::move(embed_remote_view_request),
-                                     &embed_remote_view_response);
-
-  // Create child view.
-  FX_LOGS(INFO) << "Creating child puppet";
-  TouchPuppet child(test_context_.get(),
-                    std::move(*embed_remote_view_response.mutable_view_creation_token()),
-                    /* is_puppet_under_test = */ true);
 
   // Inject tap in the middle of the bottom-right quadrant.
   fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
@@ -215,16 +240,16 @@ TEST_F(TouchConformanceTest, EmbeddedViewTap) {
   fake_touch_screen_->SimulateTap(std::move(tap_request));
 
   FX_LOGS(INFO) << "Waiting for child touch event listener to receive response";
-  RunLoopUntil([this, &child]() {
+  RunLoopUntil([this]() {
     // The child view's origin is in the center of the screen, so the center of
     // the bottom-right quadrant is at (display_width_ / 4, display_height_ / 4)
     // in the child's local coordinate space.
-    return child.touch_listener.LastEventReceivedMatches(static_cast<float>(display_width_) / 4.f,
-                                                         static_cast<float>(display_height_) / 4.f);
+    return this->child_puppet_->touch_listener.LastEventReceivedMatches(
+        static_cast<float>(display_width_) / 4.f, static_cast<float>(display_height_) / 4.f);
   });
 
   // The parent should not have received any pointer events.
-  EXPECT_TRUE(parent.touch_listener.events_received().empty());
+  EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());
 }
 
 }  //  namespace ui_conformance_testing
