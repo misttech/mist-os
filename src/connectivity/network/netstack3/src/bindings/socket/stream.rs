@@ -93,56 +93,12 @@ pub(crate) enum ConnectionStatus {
     Rejected { reported: bool },
 }
 
-pub(crate) trait SocketWorkerDispatcher:
-    tcp::socket::NonSyncContext<
-    ProvidedBuffers = LocalZirconSocketAndNotifier,
-    ReturnedBuffers = PeerZirconSocketAndWatcher,
->
-{
+impl BindingsNonSyncCtxImpl {
     /// Registers a newly created listener with its local zircon socket.
     ///
     /// # Panics
+    ///
     /// Panics if `id` is already registered.
-    fn register_listener<I: Ip>(&mut self, id: ListenerId<I>, socket: zx::Socket);
-
-    /// Unregisters an existing listener when it is about to be closed.
-    ///
-    /// Returns the zircon socket that used to be registered.
-    ///
-    /// # Panics
-    /// Panics if `id` is non-existent.
-    fn unregister_listener<I: Ip>(&mut self, id: ListenerId<I>) -> zx::Socket;
-
-    /// Returns a mutable reference to state for an existing listener.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` does not correspond to a listener.
-    fn get_listener_mut<I: Ip>(&mut self, id: ListenerId<I>) -> &mut ListenerState;
-
-    /// Registers a newly created connection with its state.
-    ///
-    /// # Panics
-    /// Panics if `id` is already registered.
-    fn register_connection<I: Ip>(&mut self, id: ConnectionId<I>, status: ConnectionStatus);
-
-    /// Unregisters an existing connection when it is about to be closed.
-    ///
-    /// Returns the state that used to be registered.
-    ///
-    /// # Panics
-    /// Panics if `id` is non-existent.
-    fn unregister_connection<I: Ip>(&mut self, id: ConnectionId<I>) -> ConnectionStatus;
-
-    /// Returns a mutable reference to state for an existing connection.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `id` does not correspond to a connection.
-    fn get_connection_mut<I: Ip>(&mut self, id: ConnectionId<I>) -> &mut ConnectionStatus;
-}
-
-impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
     fn register_listener<I: Ip>(&mut self, id: ListenerId<I>, socket: zx::Socket) {
         let state = ListenerState(socket);
         match I::VERSION {
@@ -151,6 +107,13 @@ impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
         }
     }
 
+    /// Unregisters an existing listener when it is about to be closed.
+    ///
+    /// Returns the zircon socket that used to be registered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is non-existent.
     fn unregister_listener<I: Ip>(&mut self, id: ListenerId<I>) -> zx::Socket {
         let ListenerState(socket) = match I::VERSION {
             IpVersion::V4 => {
@@ -163,6 +126,11 @@ impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
         socket
     }
 
+    /// Returns a mutable reference to state for an existing listener.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` does not correspond to a listener.
     fn get_listener_mut<I: Ip>(&mut self, id: ListenerId<I>) -> &mut ListenerState {
         match I::VERSION {
             IpVersion::V4 => {
@@ -174,6 +142,11 @@ impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
         }
     }
 
+    /// Registers a newly created connection with its state.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is already registered.
     fn register_connection<I: Ip>(&mut self, id: ConnectionId<I>, status: ConnectionStatus) {
         match I::VERSION {
             IpVersion::V4 => {
@@ -185,6 +158,13 @@ impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
         }
     }
 
+    /// Unregisters an existing connection when it is about to be closed.
+    ///
+    /// Returns the state that used to be registered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is non-existent.
     fn unregister_connection<I: Ip>(&mut self, id: ConnectionId<I>) -> ConnectionStatus {
         let status = match I::VERSION {
             IpVersion::V4 => {
@@ -197,6 +177,11 @@ impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
         status
     }
 
+    /// Returns a mutable reference to state for an existing connection.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` does not correspond to a connection.
     fn get_connection_mut<I: Ip>(&mut self, id: ConnectionId<I>) -> &mut ConnectionStatus {
         match I::VERSION {
             IpVersion::V4 => {
