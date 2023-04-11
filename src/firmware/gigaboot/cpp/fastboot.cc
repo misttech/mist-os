@@ -14,6 +14,7 @@
 #include <xefi.h>
 
 #include <algorithm>
+#include <numeric>
 #include <string>
 
 #include <efi/string/string.h>
@@ -60,15 +61,18 @@ zx::result<void *> Fastboot::GetDownloadBuffer(size_t total_download_size) {
   return zx::ok(download_buffer_.data());
 }
 
+constexpr std::string_view kSlotArgs[] = {"a", "b"};
+
 cpp20::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
   static VariableEntry var_entries[] = {
+      {"all", VarFuncAndArgs{&Fastboot::GetVarAll}},
       // Function based variables
-      {"max-download-size", {&Fastboot::GetVarMaxDownloadSize}},
-      {"current-slot", {&Fastboot::GetVarCurrentSlot}},
-      {"slot-last-set-active", {&Fastboot::GetVarSlotLastSetActive}},
-      {"slot-retry-count", {&Fastboot::GetVarSlotRetryCount}},
-      {"slot-successful", {&Fastboot::GetVarSlotSuccessful}},
-      {"slot-unbootable", {&Fastboot::GetVarSlotUnbootable}},
+      {"max-download-size", VarFuncAndArgs{&Fastboot::GetVarMaxDownloadSize}},
+      {"current-slot", VarFuncAndArgs{&Fastboot::GetVarCurrentSlot}},
+      {"slot-last-set-active", VarFuncAndArgs{&Fastboot::GetVarSlotLastSetActive}},
+      {"slot-retry-count", VarFuncAndArgs{&Fastboot::GetVarSlotRetryCount, kSlotArgs}},
+      {"slot-successful", VarFuncAndArgs{&Fastboot::GetVarSlotSuccessful, kSlotArgs}},
+      {"slot-unbootable", VarFuncAndArgs{&Fastboot::GetVarSlotUnbootable, kSlotArgs}},
       // Constant based variables
       {"slot-count", {"2"}},
       {"slot-suffixes", {"a,b"}},
@@ -175,27 +179,128 @@ zx::result<> Fastboot::GetVar(std::string_view cmd, fastboot::Transport *transpo
   auto var_table = GetVariableTable();
   for (const VariableEntry &ele : var_table) {
     if (args.args[1] == ele.name) {
-      return std::visit(
-          overload{
-              [this, &args, transport](VarFunc arg) { return (this->*(arg))(args, transport); },
-              [transport](std::string_view arg) {
-                return SendResponse(ResponseType::kOkay, arg, transport);
-              },
-          },
-          ele.var);
+      return std::visit(overload{
+                            [this, &args, transport](const VarFuncAndArgs &entry) {
+                              return (this->*(entry.func))(args, transport, DefaultResponder);
+                            },
+                            [transport](std::string_view arg) {
+                              return SendResponse(ResponseType::kOkay, arg, transport);
+                            },
+                        },
+                        ele.var);
     }
   }
 
   return SendResponse(ResponseType::kFail, "Unknown variable", transport);
 }
 
-zx::result<> Fastboot::GetVarMaxDownloadSize(const CommandArgs &, fastboot::Transport *transport) {
-  char size_str[16] = {0};
-  snprintf(size_str, sizeof(size_str), "0x%08zx", download_buffer_.size());
-  return SendResponse(ResponseType::kOkay, size_str, transport);
+// Inspired by python's str.join()
+// Take a span of string_views
+// (really could be any iterable/range of string-like objects),
+// a delimiter character, and an output buffer, and put into the output buffer
+// the concatenation of all the input strings, in order, with a single delimiter
+// between each string.
+//
+// Note: empty strings are not treated specially. If any input strings are empty,
+// the output will contain consecutive delimiters.
+constexpr size_t StringJoin(cpp20::span<const std::string_view> names, char delimiter,
+                            cpp20::span<char> buffer) {
+  constexpr auto len_reducer = [](size_t sum, std::string_view val) { return sum + val.size(); };
+  size_t total_length = std::reduce(names.begin(), names.end(), 0, len_reducer) + names.size() - 1;
+  ZX_ASSERT(total_length <= buffer.size());
+
+  size_t pos = 0;
+  for (auto n : names) {
+    pos += n.copy(&buffer[pos], n.size());
+    // Don't add a trailing separator for the last string
+    if (pos < total_length) {
+      buffer[pos++] = delimiter;
+    }
+  }
+
+  return total_length;
 }
 
-zx::result<> Fastboot::GetVarCurrentSlot(const CommandArgs &, fastboot::Transport *transport) {
+class GetVarAllResponder {
+ public:
+  explicit GetVarAllResponder(fbl::Vector<std::string_view> &args) : args_(args) {}
+
+  zx::result<> operator()(Fastboot::ResponseType resp, std::string_view msg,
+                          fastboot::Transport *transport) {
+    if (resp == Fastboot::ResponseType::kFail) {
+      return Fastboot::SendResponse(resp, msg, transport, zx::error(ZX_ERR_INTERNAL));
+    }
+
+    args_.push_back(msg);
+    char buffer[fastboot::kMaxCommandPacketSize - sizeof("INFO")];
+    cpp20::span<char> buffer_span(buffer, sizeof(buffer));
+    size_t payload_len = StringJoin(args_, ':', buffer_span);
+    args_.pop_back();
+    buffer_span = {buffer, payload_len};
+
+    return Fastboot::SendResponse(Fastboot::ResponseType::kInfo,
+                                  std::string_view(buffer_span.data(), buffer_span.size()),
+                                  transport);
+  }
+
+ private:
+  fbl::Vector<std::string_view> &args_;
+};
+
+zx::result<> Fastboot::GetVarAll(const CommandArgs &, fastboot::Transport *transport,
+                                 const Responder &resp) {
+  for (const auto &var_entry : GetVariableTable()) {
+    if (var_entry.name == "all") {
+      continue;
+    }
+
+    fbl::Vector<std::string_view> strs = {var_entry.name};
+    GetVarAllResponder responder(strs);
+
+    if (std::holds_alternative<std::string_view>(var_entry.var)) {
+      zx::result result =
+          responder(ResponseType::kInfo, std::get<std::string_view>(var_entry.var), transport);
+      if (result.is_error()) {
+        return result;
+      }
+    } else if (std::holds_alternative<VarFuncAndArgs>(var_entry.var)) {
+      const VarFuncAndArgs &vfa = std::get<VarFuncAndArgs>(var_entry.var);
+      CommandArgs args = {.args = {"getvar", var_entry.name}, .num_args = 2};
+
+      if (vfa.arg_list.empty()) {
+        zx::result result = (this->*(vfa.func))(args, transport, responder);
+        if (result.is_error()) {
+          return result;
+        }
+      } else {
+        args.num_args = 3;
+        for (auto const arg : vfa.arg_list) {
+          args.args[2] = arg;
+          strs.push_back(arg);
+          zx::result result = (this->*(vfa.func))(args, transport, responder);
+          strs.pop_back();
+          if (result.is_error()) {
+            return result;
+          }
+        }
+      }
+    } else {
+      ZX_ASSERT_MSG(false, "non-exhaustive visitation!");
+    }
+  }
+
+  return resp(ResponseType::kOkay, "", transport);
+}
+
+zx::result<> Fastboot::GetVarMaxDownloadSize(const CommandArgs &, fastboot::Transport *transport,
+                                             const Responder &resp) {
+  char size_str[16] = {0};
+  snprintf(size_str, sizeof(size_str), "0x%08zx", download_buffer_.size());
+  return resp(ResponseType::kOkay, size_str, transport);
+}
+
+zx::result<> Fastboot::GetVarCurrentSlot(const CommandArgs &, fastboot::Transport *transport,
+                                         const Responder &resp) {
   AbrOps abr_ops = GetAbrOps();
 
   char const *slot_str;
@@ -215,87 +320,87 @@ zx::result<> Fastboot::GetVarCurrentSlot(const CommandArgs &, fastboot::Transpor
       break;
   }
 
-  return SendResponse(ResponseType::kOkay, slot_str, transport);
+  return resp(ResponseType::kOkay, slot_str, transport);
 }
 
-zx::result<> Fastboot::GetVarSlotLastSetActive(const CommandArgs &,
-                                               fastboot::Transport *transport) {
+zx::result<> Fastboot::GetVarSlotLastSetActive(const CommandArgs &, fastboot::Transport *transport,
+                                               const Responder &resp) {
   AbrOps abr_ops = GetAbrOps();
   AbrSlotIndex slot;
   AbrResult res = AbrGetSlotLastMarkedActive(&abr_ops, &slot);
   if (res != kAbrResultOk) {
-    return SendResponse(ResponseType::kFail, "Failed to get slot last set active", transport);
+    return resp(ResponseType::kFail, "Failed to get slot last set active", transport);
   }
   // The slot is guaranteed not to be r if the result is okay.
   const char *slot_str = slot == kAbrSlotIndexA ? "a" : "b";
 
-  return SendResponse(ResponseType::kOkay, slot_str, transport);
+  return resp(ResponseType::kOkay, slot_str, transport);
 }
 
-zx::result<> Fastboot::GetVarSlotRetryCount(const CommandArgs &args,
-                                            fastboot::Transport *transport) {
+zx::result<> Fastboot::GetVarSlotRetryCount(const CommandArgs &args, fastboot::Transport *transport,
+                                            const Responder &resp) {
   if (args.num_args < 3) {
-    return SendResponse(ResponseType::kFail, "Not enough arguments", transport);
+    return resp(ResponseType::kFail, "Not enough arguments", transport);
   }
 
   std::optional<AbrSlotIndex> idx = ParseAbrSlotStr(args.args[2], false);
   if (!idx) {
-    return SendResponse(ResponseType::kFail, "slot name is invalid", transport);
+    return resp(ResponseType::kFail, "slot name is invalid", transport);
   }
 
   AbrOps abr_ops = GetAbrOps();
   AbrSlotInfo info;
   AbrResult res = AbrGetSlotInfo(&abr_ops, *idx, &info);
   if (res != kAbrResultOk) {
-    return SendResponse(ResponseType::kFail, "Failed to get slot retry count", transport);
+    return resp(ResponseType::kFail, "Failed to get slot retry count", transport);
   }
 
   char retry_str[16] = {0};
   snprintf(retry_str, sizeof(retry_str), "%u", info.num_tries_remaining);
 
-  return SendResponse(ResponseType::kOkay, retry_str, transport);
+  return resp(ResponseType::kOkay, retry_str, transport);
 }
 
-zx::result<> Fastboot::GetVarSlotSuccessful(const CommandArgs &args,
-                                            fastboot::Transport *transport) {
+zx::result<> Fastboot::GetVarSlotSuccessful(const CommandArgs &args, fastboot::Transport *transport,
+                                            const Responder &resp) {
   if (args.num_args < 3) {
-    return SendResponse(ResponseType::kFail, "Not enough arguments", transport);
+    return resp(ResponseType::kFail, "Not enough arguments", transport);
   }
 
   std::optional<AbrSlotIndex> idx = ParseAbrSlotStr(args.args[2], true);
   if (!idx) {
-    return SendResponse(ResponseType::kFail, "slot name is invalid", transport);
+    return resp(ResponseType::kFail, "slot name is invalid", transport);
   }
 
   AbrOps abr_ops = GetAbrOps();
   AbrSlotInfo info;
   AbrResult res = AbrGetSlotInfo(&abr_ops, *idx, &info);
   if (res != kAbrResultOk) {
-    return SendResponse(ResponseType::kFail, "Failed to get slot successful", transport);
+    return resp(ResponseType::kFail, "Failed to get slot successful", transport);
   }
 
-  return SendResponse(ResponseType::kOkay, info.is_marked_successful ? "yes" : "no", transport);
+  return resp(ResponseType::kOkay, info.is_marked_successful ? "yes" : "no", transport);
 }
 
-zx::result<> Fastboot::GetVarSlotUnbootable(const CommandArgs &args,
-                                            fastboot::Transport *transport) {
+zx::result<> Fastboot::GetVarSlotUnbootable(const CommandArgs &args, fastboot::Transport *transport,
+                                            const Responder &resp) {
   if (args.num_args < 3) {
-    return SendResponse(ResponseType::kFail, "Not enough arguments", transport);
+    return resp(ResponseType::kFail, "Not enough arguments", transport);
   }
 
   std::optional<AbrSlotIndex> idx = ParseAbrSlotStr(args.args[2], true);
   if (!idx) {
-    return SendResponse(ResponseType::kFail, "slot name is invalid", transport);
+    return resp(ResponseType::kFail, "slot name is invalid", transport);
   }
 
   AbrOps abr_ops = GetAbrOps();
   AbrSlotInfo info;
   AbrResult res = AbrGetSlotInfo(&abr_ops, *idx, &info);
   if (res != kAbrResultOk) {
-    return SendResponse(ResponseType::kFail, "Failed to get slot unbootable", transport);
+    return resp(ResponseType::kFail, "Failed to get slot unbootable", transport);
   }
 
-  return SendResponse(ResponseType::kOkay, info.is_bootable ? "no" : "yes", transport);
+  return resp(ResponseType::kOkay, info.is_bootable ? "no" : "yes", transport);
 }
 
 zx::result<> Fastboot::Flash(std::string_view cmd, fastboot::Transport *transport) {

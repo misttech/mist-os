@@ -13,6 +13,7 @@
 #include <lib/zircon_boot/zbi_utils.h>
 
 #include <algorithm>
+#include <cctype>
 #include <vector>
 
 #include <fbl/vector.h>
@@ -140,9 +141,8 @@ TEST(FastbootTest, FastbootContinueTest) {
 }
 
 struct BasicVarTestCase {
-  char const* name;
-  char const* var;
-  char const* expected_val;
+  const std::string_view var;
+  const std::string_view expected_val;
 };
 
 using BasicVarTest = ::testing::TestWithParam<BasicVarTestCase>;
@@ -154,24 +154,32 @@ TEST_P(BasicVarTest, TestBasicVar) {
   Fastboot fastboot(download_buffer, zb_ops.GetZirconBootOps());
   fastboot::TestTransport transport;
 
-  std::string command = std::string{"getvar:"} + test_case.var;
+  std::string command("getvar:");
+  command += test_case.var;
   transport.AddInPacket(command);
   zx::result ret = fastboot.ProcessPacket(&transport);
   ASSERT_TRUE(ret.is_ok());
 
-  ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(
-      transport.GetOutPackets(), fastboot::Packets{std::string{"OKAY"} + test_case.expected_val}));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckPacketsEqual(transport.GetOutPackets(),
+                        fastboot::Packets{std::string("OKAY").append(test_case.expected_val)}));
 }
 
 INSTANTIATE_TEST_SUITE_P(FastbootGetVarsTests, BasicVarTest,
                          testing::ValuesIn<BasicVarTest::ParamType>({
-                             {"slot_count", "slot-count", "2"},
-                             {"slot_suffixes", "slot-suffixes", "a,b"},
-                             {"max_download_size", "max-download-size", "0x00002000"},
-                             {"hw_revision", "hw-revision", BOARD_NAME},
+                             {"slot-count", "2"},
+                             {"slot-suffixes", "a,b"},
+                             {"max-download-size", "0x00002000"},
+                             {"hw-revision", BOARD_NAME},
+                             {"version", "0.4"},
                          }),
                          [](testing::TestParamInfo<BasicVarTest::ParamType> const& info) {
-                           return info.param.name;
+                           const std::string_view& v = info.param.var;
+                           std::string name;
+                           std::transform(
+                               v.cbegin(), v.cend(), std::back_inserter(name),
+                               [](unsigned char c) { return std::isalnum(c) ? c : '_'; });
+                           return name;
                          });
 
 TEST(FastbootTcpSessionTest, ExitOnFastbootContinue) {
@@ -541,6 +549,51 @@ TEST_F(FastbootSlotTest, GetVarSlotBootableR) {
   zx::result ret = fastboot.ProcessPacket(&transport);
   ASSERT_TRUE(ret.is_ok());
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), {"OKAYno"}));
+}
+
+TEST_F(FastbootSlotTest, GetVarAll) {
+  ZirconBootOps zb_ops = mock_zb_ops().GetZirconBootOps();
+  Fastboot fastboot(download_buffer, zb_ops);
+  fastboot::TestTransport transport;
+
+  InitializeAbr(kAbrSlotIndexA);
+  transport.AddInPacket(std::string_view("getvar:all"));
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+
+  // Check for a few variables, making sure that we check
+  // * Compile time constant variables
+  // * Runtime dynamic variables with no extra parameters
+  // * Runtime dynamic variables with multiple possible parameters
+  const fastboot::Packets& actual = transport.GetOutPackets();
+  EXPECT_NE(std::find(actual.begin(), actual.end(), "INFOversion:0.4"), actual.end());
+  EXPECT_NE(std::find(actual.begin(), actual.end(), "INFOcurrent-slot:a"), actual.end());
+  EXPECT_NE(std::find(actual.begin(), actual.end(), "INFOslot-successful:a:no"), actual.end());
+  EXPECT_NE(std::find(actual.begin(), actual.end(), "INFOslot-successful:b:no"), actual.end());
+}
+
+TEST_F(FastbootSlotTest, GetVarAllErrors) {
+  ZirconBootOps zb_ops = mock_zb_ops().GetZirconBootOps();
+  Fastboot fastboot(download_buffer, zb_ops);
+  fastboot::TestTransport transport;
+
+  mock_zb_ops().RemoveAllPartitions();
+  transport.AddInPacket(std::string_view("getvar:all"));
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_error());
+
+  // We should still get some output, but not any variables that read partitions.
+  const fastboot::Packets& actual = transport.GetOutPackets();
+  EXPECT_EQ(std::find(actual.begin(), actual.end(), "INFOcurrent-slot:a"), actual.end());
+  EXPECT_EQ(std::find(actual.begin(), actual.end(), "INFOcurrent-slot:b"), actual.end());
+
+  // Failures should give some message
+  EXPECT_NE(std::find(actual.begin(), actual.end(), "FAILFailed to get slot last set active(-1)"),
+            actual.end());
+
+  // We should get variables emitted before the error without a problem
+  EXPECT_NE(std::find(actual.begin(), actual.end(), "INFOmax-download-size:0x00002000"),
+            actual.end());
 }
 
 struct FastbootSetActiveErrorTestCase {

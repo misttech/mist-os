@@ -43,14 +43,34 @@ class Fastboot : public fastboot::FastbootBase {
   zx::result<void *> GetDownloadBuffer(size_t total_download_size) override;
   AbrOps GetAbrOps() { return GetAbrOpsFromZirconBootOps(&zb_ops_); }
 
+  // For getvar:all, we need to customize SendResponse to
+  // 1) send INFO instead of OKAY messages
+  // 2) prepend the name of the variable for each variable and optionally its argument
+  //
+  // The way this is implemented is by capturing the variable name,
+  // which means we need a type that abstracts over function pointers and callable objects.
+  using Responder =
+      std::function<zx::result<>(ResponseType, std::string_view, fastboot::Transport *)>;
+
+  // Minor hack to call SendResponse with the default value of zx::ok()
+  static constexpr auto DefaultResponder = [](ResponseType r, std::string_view s,
+                                              fastboot::Transport *t) {
+    return SendResponse(r, s, t);
+  };
+
   // A function to call to determine the value of a variable.
   // Variables with constant, i.e. compile-time values should instead
   // define their value via the string variant.
-  using VarFunc = zx::result<> (Fastboot::*)(const CommandArgs &, fastboot::Transport *);
+  using VarFunc = zx::result<> (Fastboot::*)(const CommandArgs &, fastboot::Transport *,
+                                             const Responder &);
+  struct VarFuncAndArgs {
+    VarFunc func;
+    cpp20::span<const std::string_view> arg_list = {};
+  };
 
   struct VariableEntry {
     std::string_view name;
-    std::variant<VarFunc, std::string_view> var;
+    std::variant<VarFuncAndArgs, std::string_view> var;
   };
 
   cpp20::span<VariableEntry> GetVariableTable();
@@ -62,12 +82,14 @@ class Fastboot : public fastboot::FastbootBase {
 
   cpp20::span<CommandCallbackEntry> GetCommandCallbackTable();
 
-  zx::result<> GetVarMaxDownloadSize(const CommandArgs &, fastboot::Transport *);
-  zx::result<> GetVarCurrentSlot(const CommandArgs &, fastboot::Transport *);
-  zx::result<> GetVarSlotLastSetActive(const CommandArgs &, fastboot::Transport *);
-  zx::result<> GetVarSlotRetryCount(const CommandArgs &, fastboot::Transport *);
-  zx::result<> GetVarSlotSuccessful(const CommandArgs &, fastboot::Transport *);
-  zx::result<> GetVarSlotUnbootable(const CommandArgs &, fastboot::Transport *);
+  zx::result<> GetVarAll(const CommandArgs &, fastboot::Transport *, const Responder &);
+  zx::result<> GetVarMaxDownloadSize(const CommandArgs &, fastboot::Transport *, const Responder &);
+  zx::result<> GetVarCurrentSlot(const CommandArgs &, fastboot::Transport *, const Responder &);
+  zx::result<> GetVarSlotLastSetActive(const CommandArgs &, fastboot::Transport *,
+                                       const Responder &);
+  zx::result<> GetVarSlotRetryCount(const CommandArgs &, fastboot::Transport *, const Responder &);
+  zx::result<> GetVarSlotSuccessful(const CommandArgs &, fastboot::Transport *, const Responder &);
+  zx::result<> GetVarSlotUnbootable(const CommandArgs &, fastboot::Transport *, const Responder &);
 
   zx::result<> GetVar(std::string_view cmd, fastboot::Transport *transport);
   zx::result<> Flash(std::string_view cmd, fastboot::Transport *transport);
