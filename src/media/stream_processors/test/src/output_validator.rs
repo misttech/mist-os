@@ -13,6 +13,7 @@ use mundane::hash::{Digest, Hasher, Sha256};
 use num_traits::PrimInt;
 use std::io::Write;
 use std::{convert::TryInto, fmt, rc::Rc};
+use tracing::info;
 
 #[derive(ValidFidlTable, Debug, PartialEq)]
 #[fidl_table_src(StreamOutputFormat)]

@@ -31,7 +31,7 @@ use stream_processor_test::*;
 //           b5. On the resulting track use Effect > Amplify and observe the new peak amplitude
 // 5. If all looks good, commit the hash.
 
-#[test]
+#[fuchsia::test]
 fn sbc_test_suite() -> Result<()> {
     with_large_stack(|| {
         let sub_bands = SbcSubBands::SubBands4;
@@ -61,7 +61,7 @@ fn sbc_test_suite() -> Result<()> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn aac_test_suite() -> Result<()> {
     with_large_stack(|| {
         let aac_raw_tests = AudioEncoderTestCase {
@@ -120,7 +120,7 @@ fn aac_test_suite() -> Result<()> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn aac_adts_test_suite() -> Result<()> {
     with_large_stack(|| {
         let aac_adts_tests = AudioEncoderTestCase {
@@ -151,7 +151,7 @@ fn aac_adts_test_suite() -> Result<()> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn aac_latm_test_suite() -> Result<()> {
     with_large_stack(|| {
         let aac_latm_with_mux_config_test = AudioEncoderTestCase {
@@ -208,7 +208,7 @@ fn aac_latm_test_suite() -> Result<()> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn cvsd_simple_test_suite() -> Result<()> {
     with_large_stack(|| {
         let cvsd_tests = AudioEncoderTestCase {

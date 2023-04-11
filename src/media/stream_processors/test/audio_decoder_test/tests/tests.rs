@@ -33,7 +33,7 @@ const SBC_TEST_FILE: &str = "/pkg/data/s16le44100mono.sbc";
 //           b5. On the resulting track use Effect > Amplify and observe the new peak amplitude
 // 5. If all looks good, commit the hash.
 
-#[test]
+#[fuchsia::test]
 fn sbc_decode() -> Result<()> {
     let output_format = FormatDetails {
         format_details_version_ordinal: Some(1),
@@ -76,7 +76,7 @@ fn sbc_decode() -> Result<()> {
     fasync::TestExecutor::new().run_singlethreaded(sbc_tests.run())
 }
 
-#[test]
+#[fuchsia::test]
 fn sbc_decode_large_input_chunk() -> Result<()> {
     let output_format2 = FormatDetails {
         format_details_version_ordinal: Some(1),
@@ -119,7 +119,7 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
     fasync::TestExecutor::new().run_singlethreaded(sbc_tests.run())
 }
 
-#[test]
+#[fuchsia::test]
 fn cvsd_simple_decode() -> Result<()> {
     let output_format = FormatDetails {
         format_details_version_ordinal: Some(1),

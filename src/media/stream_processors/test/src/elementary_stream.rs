@@ -157,7 +157,7 @@ mod test {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn chunks_are_capped() {
         let stream = TimestampedStream {
             source: FakeStream { data: (0..).take(100).collect() },

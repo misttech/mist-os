@@ -9,6 +9,7 @@ use crate::{
 use fidl_fuchsia_media::*;
 use futures::TryStreamExt;
 use std::rc::Rc;
+use tracing::debug;
 
 /// Runs elementary streams through a stream processor.
 pub struct StreamRunner {
@@ -42,12 +43,7 @@ impl StreamRunner {
         let format_details_version_ordinal = get_ordinal(&mut self.format_details_ordinals);
         let stream_lifetime_ordinal = get_ordinal(&mut self.stream_lifetime_ordinals);
 
-        vlog!(
-            2,
-            "Starting a stream with lifetime ordinal {} and format details ordinal {}",
-            stream_lifetime_ordinal,
-            format_details_version_ordinal
-        );
+        debug!(%stream_lifetime_ordinal, %format_details_version_ordinal, "Starting a stream");
 
         let mut events = self.stream_processor.take_event_stream();
 

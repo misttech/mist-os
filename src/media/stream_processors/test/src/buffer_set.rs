@@ -21,6 +21,7 @@ use std::{
     ops::RangeFrom,
 };
 use thiserror::Error;
+use tracing::debug;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -90,7 +91,7 @@ impl BufferSetFactory {
             Self::settings(buffer_lifetime_ordinal, constraints, buffer_collection_constraints)
                 .await?;
 
-        vlog!(2, "Got settings; waiting for buffers. {:?}", settings);
+        debug!("Got settings; waiting for buffers. {:?}", settings);
 
         match buffer_set_type {
             BufferSetType::Input => codec
@@ -103,27 +104,25 @@ impl BufferSetFactory {
 
         let (status, collection_info) =
             collection_client.wait_for_buffers_allocated().await.context("Waiting for buffers")?;
-        vlog!(2, "Sysmem responded: {:?}", status);
+        debug!("Sysmem responded: {:?}", status);
         let collection_info = zx::Status::ok(status).map(|_| collection_info)?;
 
         if let BufferSetType::Output = buffer_set_type {
-            vlog!(2, "Completing settings for output.");
+            debug!("Completing settings for output.");
             codec.complete_output_buffer_partial_settings(buffer_lifetime_ordinal)?;
         }
 
         //collection_client.close()?;
 
-        vlog!(
-            2,
+        debug!(
             "Got {} buffers of size {:?}",
-            collection_info.buffer_count,
-            collection_info.settings.buffer_settings.size_bytes
+            collection_info.buffer_count, collection_info.settings.buffer_settings.size_bytes
         );
-        vlog!(3, "Buffer collection is: {:#?}", collection_info.settings);
+        debug!("Buffer collection is: {:#?}", collection_info.settings);
         for (i, buffer) in collection_info.buffers.iter().enumerate() {
             // We enumerate beyond collection_info.buffer_count just for debugging
             // purposes at this log level.
-            vlog!(3, "Buffer {} is : {:#?}", i, buffer);
+            debug!("Buffer {} is : {:#?}", i, buffer);
         }
 
         Ok(BufferSet::try_from(BufferSetSpec {
@@ -174,7 +173,7 @@ impl BufferSetFactory {
         );
         collection_constraints.min_buffer_count_for_camping = MIN_BUFFER_COUNT_FOR_CAMPING;
 
-        vlog!(3, "Our buffer collection constraints are: {:#?}", collection_constraints);
+        debug!("Our buffer collection constraints are: {:#?}", collection_constraints);
 
         // By design we must say true even if all our fields are left at
         // default, or sysmem will not give us buffer handles.

@@ -10,6 +10,7 @@ use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem::BufferCollectionConstraints;
 use fuchsia_stream_processors::*;
 use std::{convert::TryFrom, rc::Rc};
+use tracing::debug;
 
 pub type OrdinalSequence = <OrdinalPattern as IntoIterator>::IntoIter;
 
@@ -61,7 +62,7 @@ pub enum StreamControlFlow {
 impl<'a: 'b, 'b> Stream<'a> {
     pub async fn start(&'b mut self) -> Result<()> {
         if self.options.queue_format_details && self.input_packet_stream.is_some() {
-            vlog!(2, "Sending input format details for follow-up stream.");
+            debug!("Sending input format details for follow-up stream.");
             self.stream_processor.queue_input_format_details(
                 self.stream_lifetime_ordinal,
                 self.stream.format_details(self.format_details_version_ordinal),
@@ -79,8 +80,8 @@ impl<'a: 'b, 'b> Stream<'a> {
     ) -> Result<StreamControlFlow> {
         match event {
             StreamProcessorEvent::OnInputConstraints { input_constraints } => {
-                vlog!(2, "Received input constraints.");
-                vlog!(3, "Input constraints are: {:#?}", input_constraints);
+                debug!("Received input constraints.");
+                debug!("Input constraints are: {:#?}", input_constraints);
 
                 let buffer_set = BufferSetFactory::buffer_set(
                     get_ordinal(self.input_buffer_ordinals),
@@ -91,7 +92,7 @@ impl<'a: 'b, 'b> Stream<'a> {
                 )
                 .await?;
 
-                vlog!(2, "Sending input format details in response to input constraints.");
+                debug!("Sending input format details in response to input constraints.");
                 self.stream_processor.queue_input_format_details(
                     self.stream_lifetime_ordinal,
                     self.stream.format_details(self.format_details_version_ordinal),
@@ -106,8 +107,8 @@ impl<'a: 'b, 'b> Stream<'a> {
                 self.send_available_input()?;
             }
             StreamProcessorEvent::OnOutputConstraints { output_config } => {
-                vlog!(2, "Received output constraints.");
-                vlog!(3, "Output constraints are: {:#?}", output_config);
+                debug!("Received output constraints.");
+                debug!("Output constraints are: {:#?}", output_config);
 
                 let constraints = ValidStreamOutputConstraints::try_from(output_config)?;
                 if constraints.buffer_constraints_action_required {
@@ -124,8 +125,8 @@ impl<'a: 'b, 'b> Stream<'a> {
                 }
             }
             StreamProcessorEvent::OnFreeInputPacket { free_input_packet } => {
-                vlog!(2, "Received freed input packet.");
-                vlog!(2, "Freed input packet is: {:#?}", free_input_packet);
+                debug!("Received freed input packet.");
+                debug!("Freed input packet is: {:#?}", free_input_packet);
 
                 let free_input_packet = ValidPacketHeader::try_from(free_input_packet)?;
                 let input_packet_stream = self.input_packet_stream.as_mut().expect(concat!(
@@ -137,8 +138,8 @@ impl<'a: 'b, 'b> Stream<'a> {
                 self.send_available_input()?;
             }
             StreamProcessorEvent::OnOutputFormat { output_format } => {
-                vlog!(2, "Received output format.");
-                vlog!(3, "Output format is: {:#?}", output_format);
+                debug!("Received output format.");
+                debug!("Output format is: {:#?}", output_format);
 
                 let output_format = ValidStreamOutputFormat::try_from(output_format)?;
                 assert_eq!(output_format.stream_lifetime_ordinal, self.stream_lifetime_ordinal);
@@ -151,8 +152,8 @@ impl<'a: 'b, 'b> Stream<'a> {
             } => {
                 assert!(!error_detected_before);
                 assert!(!error_detected_during);
-                vlog!(2, "Received output packet.");
-                vlog!(3, "Output packet is: {:#?}", output_packet);
+                debug!("Received output packet.");
+                debug!("Output packet is: {:#?}", output_packet);
 
                 let output_packet = ValidPacket::try_from(output_packet)?;
                 self.output.push(Output::Packet(OutputPacket {
@@ -188,8 +189,8 @@ impl<'a: 'b, 'b> Stream<'a> {
                 error_detected_before,
             } => {
                 assert!(!error_detected_before);
-                vlog!(2, "Received output end of stream.");
-                vlog!(3, "End of stream is for stream {}", stream_lifetime_ordinal);
+                debug!("Received output end of stream.");
+                debug!("End of stream is for stream {}", stream_lifetime_ordinal);
 
                 // TODO(turnage): Enable the flush method of ending stream in options.
                 self.output.push(Output::Eos { stream_lifetime_ordinal });
@@ -207,7 +208,7 @@ impl<'a: 'b, 'b> Stream<'a> {
                 return Ok(StreamControlFlow::Stop);
             }
             e => {
-                vlog!(2, "Got other event: {:#?}", e);
+                debug!("Got other event: {:#?}", e);
             }
         }
 
@@ -225,11 +226,11 @@ impl<'a: 'b, 'b> Stream<'a> {
         loop {
             match input_packet_stream.next_packet()? {
                 PacketPoll::Ready(input_packet) => {
-                    vlog!(2, "Sending input packet. {:?}", input_packet.valid_length_bytes);
+                    debug!("Sending input packet. {:?}", input_packet.valid_length_bytes);
                     self.stream_processor.queue_input_packet(input_packet)?;
                 }
                 PacketPoll::Eos => {
-                    vlog!(2, "Sending end of stream.");
+                    debug!("Sending end of stream.");
                     break Ok(self
                         .stream_processor
                         .queue_input_end_of_stream(self.stream_lifetime_ordinal)?);

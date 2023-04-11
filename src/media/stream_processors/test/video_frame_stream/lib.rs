@@ -239,7 +239,7 @@ mod test {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn stream_timestamps() {
         let test_spec = TestSpec {
             pixel_format: sysmem::PixelFormatType::Nv12,
@@ -275,7 +275,7 @@ mod test {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn pattern_check() {
         let test_spec = TestSpec {
             pixel_format: sysmem::PixelFormatType::Nv12,

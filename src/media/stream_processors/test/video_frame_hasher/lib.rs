@@ -369,7 +369,7 @@ mod test {
         .into_iter()
     }
 
-    #[test]
+    #[fuchsia::test]
     fn packets_of_different_formats_hash_same_with_matching_data() -> Result<(), Error> {
         let mut rng = StdRng::seed_from_u64(45);
 
@@ -470,7 +470,7 @@ mod test {
         Ok(())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn sanity_test_that_different_packets_hash_differently() -> Result<(), Error> {
         let mut rng = StdRng::seed_from_u64(45);
 

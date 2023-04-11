@@ -366,7 +366,7 @@ impl<'a> Iterator for H264ChunkIter<'a> {
 mod test {
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn test_nal_iter() {
         let sps_pps_idr = [
             0x00, 0x00, 0x00, 0x01, 0x67, 0x4d, 0x00, 0x28, 0xf4, 0x03, 0xc0, 0x11, 0x3f, 0x2a,
@@ -383,7 +383,7 @@ mod test {
         assert_eq!(result[2].kind, H264NalKind::IDR);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_chunk_iter() {
         let sps_pps_idr = [
             0x00, 0x00, 0x00, 0x01, 0x67, 0x4d, 0x00, 0x28, 0xf4, 0x03, 0xc0, 0x11, 0x3f, 0x2a,

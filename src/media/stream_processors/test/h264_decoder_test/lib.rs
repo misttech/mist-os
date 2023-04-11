@@ -20,7 +20,6 @@ use video_frame_hasher::*;
 pub const BEAR_TEST_FILE: &str = "/pkg/data/bear.h264";
 
 lazy_static! {
-    static ref LOGGER: () = ::fuchsia_syslog::init().expect("Initializing syslog");
     static ref BEAR_DIGEST: ExpectedDigest = ExpectedDigest::new_with_per_frame_digest(
         "bear.h264 decoded digest",
         "1dc4d1510fc4d26173480f5e689e38dca7c1fa2df1894085f1bcee9c0d19acf7",
@@ -62,11 +61,9 @@ lazy_static! {
 // TODO(turnage): Add test spec for buffers released between streams.
 // TODO(turnage): Add hash validator for NV12 and YV12.
 
-#[test]
+#[fuchsia::test]
 fn test_bear() -> std::result::Result<(), ::anyhow::Error> {
     with_large_stack(|| {
-        *LOGGER;
-
         let stream = Rc::new(TimestampedStream {
             source: H264Stream::from_file(BEAR_TEST_FILE)?,
             timestamps: 0..,
@@ -99,11 +96,9 @@ fn test_bear() -> std::result::Result<(), ::anyhow::Error> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn test_serial_bear_on_same_codec() -> std::result::Result<(), ::anyhow::Error> {
     with_large_stack(|| {
-        *LOGGER;
-
         let stream = Rc::new(TimestampedStream {
             source: H264Stream::from_file(BEAR_TEST_FILE)?,
             timestamps: 0..,
@@ -153,11 +148,9 @@ fn test_serial_bear_on_same_codec() -> std::result::Result<(), ::anyhow::Error> 
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn bear_with_sei_itu_t35() -> Result<(), anyhow::Error> {
     with_large_stack(|| {
-        *LOGGER;
-
         let mut nal_stream = H264SeiItuT35 {
             country_code: H264SeiItuT35::COUNTRY_CODE_UNITED_STATES,
             country_code_extension: 0,
@@ -196,11 +189,9 @@ fn bear_with_sei_itu_t35() -> Result<(), anyhow::Error> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn bear_with_large_sei_itu_t35() -> Result<(), anyhow::Error> {
     with_large_stack(|| {
-        *LOGGER;
-
         let mut nal_stream = H264SeiItuT35 {
             country_code: H264SeiItuT35::COUNTRY_CODE_UNITED_STATES,
             country_code_extension: 0,
@@ -242,11 +233,9 @@ fn bear_with_large_sei_itu_t35() -> Result<(), anyhow::Error> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn bear_with_gaps() -> Result<(), anyhow::Error> {
     with_large_stack(|| {
-        *LOGGER;
-
         let mut nal_stream = Vec::new();
         let mut bear = Vec::new();
         File::open(BEAR_TEST_FILE)?.read_to_end(&mut bear)?;
@@ -281,11 +270,9 @@ fn bear_with_gaps() -> Result<(), anyhow::Error> {
     })
 }
 
-#[test]
+#[fuchsia::test]
 fn test_bear_avcc() -> std::result::Result<(), ::anyhow::Error> {
     with_large_stack(|| {
-        *LOGGER;
-
         let stream = Rc::new(TimestampedStream {
             source: H264AVCCStream::from_annexb_stream(H264Stream::from_file(BEAR_TEST_FILE)?)?,
             timestamps: 0..,

@@ -14,7 +14,7 @@ use stream_processor_test::*;
 
 const CVSD_TEST_FILE: &str = "/pkg/data/test_s16le64000mono.cvsd";
 
-#[test]
+#[fuchsia::test]
 fn cvsd_test_suite() -> Result<()> {
     with_large_stack(|| {
         let output_format = FormatDetails {
