@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
+#include <lib/device-protocol/display-panel.h>
+
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
@@ -259,6 +261,10 @@ void Vout::DisplayDisconnected() {
 
 zx::result<> Vout::PowerOff() {
   if (type_ == kDsi) {
+    // TODO(fxbug.dev/125229): Remove this when the DSI bug on VIM3 is fixed.
+    if (dsi_.dsi_host->panel_type() == PANEL_MTF050FHDI_03) {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
     dsi_.clock->Disable();
     dsi_.dsi_host->Disable(dsi_.disp_setting);
     return zx::ok();
@@ -268,6 +274,10 @@ zx::result<> Vout::PowerOff() {
 
 zx::result<> Vout::PowerOn() {
   if (type_ == kDsi) {
+    // TODO(fxbug.dev/125229): Remove this when the DSI bug on VIM3 is fixed.
+    if (dsi_.dsi_host->panel_type() == PANEL_MTF050FHDI_03) {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
     dsi_.clock->Enable(dsi_.disp_setting);
     dsi_.dsi_host->Enable(dsi_.disp_setting, dsi_.clock->GetBitrate());
     return zx::ok();
