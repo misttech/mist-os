@@ -87,7 +87,7 @@ def main():
 
         # If the file is not stripped, add it to the output no matter whether
         # it has debug_info.
-        os.makedirs(os.path.dirname(debug_path))
+        os.makedirs(os.path.dirname(debug_path), exist_ok=True)
         shutil.copy2(elf_file, debug_path)
         did_copy = True
 
