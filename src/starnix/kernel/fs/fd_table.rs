@@ -243,6 +243,13 @@ impl FdTable {
             .ok_or_else(|| errno!(EBADF))
     }
 
+    pub fn retain<F>(&self, f: F)
+    where
+        F: Fn(FdNumber, &mut FdFlags) -> bool,
+    {
+        self.table.lock().map.write().retain(|fd, entry| f(*fd, &mut entry.flags));
+    }
+
     fn get_lowest_available_fd(
         &self,
         map: &HashMap<FdNumber, FdTableEntry>,

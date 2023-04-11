@@ -73,6 +73,7 @@ pub fn dispatch_syscall(
         clone[5],
         clone3[2],
         close[1],
+        close_range[3],
         connect[3],
         #[cfg(target_arch = "x86_64")] creat[2],
         #[cfg(target_arch = "x86_64")] dup2[2],

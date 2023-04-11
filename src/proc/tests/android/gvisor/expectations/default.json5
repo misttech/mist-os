@@ -52,21 +52,6 @@
                 "Sleepers/WallClockNanosleepTest.InterruptedNanosleep/*",
                 "Sleepers/WallClockNanosleepTest.SleepUntil/0",
 
-                // close_range_test
-                "CloseRangeTest.RangeWithHoles",
-                "CloseRangeTest.CloexecFlagTest",
-                "CloseRangeTest.RangeInMiddleOfOpenFiles",
-                "CloseRangeTest.InvalidFlags",
-                "CloseRangeTest.SingleFile",
-                "CloseRangeTest.UnshareFlagAndCloseRangeAtStart",
-                "CloseRangeTest.CloexecAndUnshareFlagTest",
-                "CloseRangeTest.RangeFirstGreaterThanLast",
-                "CloseRangeTest.UnshareFlagAndCloseRangeAtEnd",
-                "CloseRangeTest.CallCloseRangeTwice",
-                "CloseRangeTest.UnshareFlagTest",
-                "CloseRangeTest.ContiguousRange",
-                "CloseRangeTest.ConcurrentCalls",
-
                 // dev_test
                 "DevTest.OpenDevFuse",
 

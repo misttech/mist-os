@@ -18,6 +18,7 @@
 #include <linux/auxvec.h>
 #include <linux/bpf.h>
 #include <linux/capability.h>
+#include <linux/close_range.h>
 #include <linux/errno.h>
 #include <linux/eventpoll.h>
 #include <linux/fb.h>

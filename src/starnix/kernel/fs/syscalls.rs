@@ -60,6 +60,32 @@ pub fn sys_close(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> 
     Ok(())
 }
 
+pub fn sys_close_range(
+    current_task: &CurrentTask,
+    first: FdNumber,
+    last: FdNumber,
+    flags: u32,
+) -> Result<(), Errno> {
+    if first > last || flags & !(CLOSE_RANGE_UNSHARE | CLOSE_RANGE_CLOEXEC) != 0 {
+        return error!(EINVAL);
+    }
+    if flags & CLOSE_RANGE_UNSHARE != 0 {
+        current_task.files.unshare();
+    }
+    let in_range = |fd: FdNumber| fd.raw() >= first.raw() && fd.raw() <= last.raw();
+    if flags & CLOSE_RANGE_CLOEXEC != 0 {
+        current_task.files.retain(|fd, flags| {
+            if in_range(fd) {
+                *flags |= FdFlags::CLOEXEC;
+            }
+            true
+        });
+    } else {
+        current_task.files.retain(|fd, _| !in_range(fd));
+    }
+    Ok(())
+}
+
 pub fn sys_lseek(
     current_task: &CurrentTask,
     fd: FdNumber,
