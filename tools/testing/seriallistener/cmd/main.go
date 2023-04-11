@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"time"
@@ -85,7 +86,8 @@ func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 
 	// Print out a log periodically to give an estimate of the timestamp at which
 	// logs are getting read from the socket.
-	ticker := time.NewTicker(30 * time.Second)
+	tickerSecs := math.Min(30, timeout.Seconds()/2)
+	ticker := time.NewTicker(time.Duration(tickerSecs) * time.Second)
 	defer ticker.Stop()
 	go func() {
 		for range ticker.C {
