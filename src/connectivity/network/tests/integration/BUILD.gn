@@ -23,6 +23,9 @@ tests_with_err_logs = [
     label = "dhcp"
   },
   {
+    label = "dhcp-client"
+  },
+  {
     label = "dns"
   },
   {
@@ -100,6 +103,9 @@ package_deps = [
 
   # DHCPv4 Server is used to test DHCP address acquisition.
   "//src/connectivity/network/dhcpv4/server:component",
+
+  # DHCP(v4) client is under test.
+  "//src/connectivity/network/dhcpv4/client/bindings:component",
 
   # DHCPv6 client is under test.
   "//src/connectivity/network/dhcpv6/client:component",

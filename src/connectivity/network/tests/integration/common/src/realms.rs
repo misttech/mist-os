@@ -178,6 +178,7 @@ pub enum KnownServiceProvider {
     Manager { agent: ManagementAgent, use_dhcp_server: bool, config: ManagerConfig },
     SecureStash,
     DhcpServer { persistent: bool },
+    DhcpClient,
     Dhcpv6Client,
     DnsResolver,
     Reachability { eager: bool },
@@ -213,6 +214,10 @@ pub mod constants {
     pub mod dhcp_server {
         pub const COMPONENT_NAME: &str = "dhcpd";
         pub const COMPONENT_URL: &str = "#meta/dhcpv4_server.cm";
+    }
+    pub mod dhcp_client {
+        pub const COMPONENT_NAME: &str = "dhcp-client";
+        pub const COMPONENT_URL: &str = "#meta/dhcp-client.cm";
     }
     pub mod dhcpv6_client {
         pub const COMPONENT_NAME: &str = "dhcpv6-client";
@@ -431,6 +436,26 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 } else {
                     None
                 },
+                ..fnetemul::ChildDef::EMPTY
+            },
+            KnownServiceProvider::DhcpClient => fnetemul::ChildDef {
+                name: Some(constants::dhcp_client::COMPONENT_NAME.to_string()),
+                source: Some(fnetemul::ChildSource::Component(
+                    constants::dhcp_client::COMPONENT_URL.to_string(),
+                )),
+                exposes: Some(vec![fnet_dhcp::ClientProviderMarker::PROTOCOL_NAME.to_string()]),
+                uses: Some(fnetemul::ChildUses::Capabilities(vec![
+                    fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                    fnetemul::Capability::ChildDep(protocol_dep::<fposix_socket::ProviderMarker>(
+                        constants::netstack::COMPONENT_NAME,
+                    )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<
+                        fposix_socket_packet::ProviderMarker,
+                    >(
+                        constants::netstack::COMPONENT_NAME
+                    )),
+                ])),
+                program_args: None,
                 ..fnetemul::ChildDef::EMPTY
             },
             KnownServiceProvider::Dhcpv6Client => fnetemul::ChildDef {

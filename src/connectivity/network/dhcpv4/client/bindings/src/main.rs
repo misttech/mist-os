@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 
 //! DHCP client binary for Fuchsia. Serves fuchsia.net.dhcp/ClientProvider.
+//!
+//! Integration tests (which comprise the test coverage for the FIDL API surface
+//! of this component) live at
+//! //src/connectivity/network/tests/integration/dhcp-client.
 
 mod client;
 mod packetsocket;
