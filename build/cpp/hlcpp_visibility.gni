@@ -327,7 +327,6 @@ hlcpp_visibility = [
   "//src/sys/test_runners/legacy_test:*",
   "//src/sys/tools/activity-ctl:*",
   "//src/sys/tools/log:*",
-  "//src/sys/tools/run:*",
   "//src/testing/loadbench:*",
   "//src/testing/sl4f_ffx/fidl:*",
   "//src/testing/system-validation/web/apps:*",
