@@ -76,6 +76,8 @@ fn main() {
         manifest_path: Vec<&'static str>,
         /// Expected file (`BUILD.gn`); relative to the base test directory.
         golden_expected_filename: Vec<&'static str>,
+        /// Fuchsia SDK metadata output path; relative to the base test directory.
+        sdk_metadata_path: Option<Vec<&'static str>>,
         /// Extra arguments to pass to gnaw.
         extra_args: Vec<&'static str>,
     }
@@ -84,85 +86,115 @@ fn main() {
         TestCase {
             manifest_path: vec!["simple", "Cargo.toml"],
             golden_expected_filename: vec!["simple", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["simple_deps", "Cargo.toml"],
             golden_expected_filename: vec!["simple_deps", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["simple_deps", "Cargo.toml"],
             golden_expected_filename: vec!["simple_deps", "BUILD_WITH_NO_ROOT.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--skip-root"],
         },
         TestCase {
             manifest_path: vec!["platform_deps", "Cargo.toml"],
             golden_expected_filename: vec!["platform_deps", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--skip-root"],
         },
         TestCase {
             manifest_path: vec!["platform_features", "Cargo.toml"],
             golden_expected_filename: vec!["platform_features", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--skip-root"],
         },
         TestCase {
             manifest_path: vec!["binary", "Cargo.toml"],
             golden_expected_filename: vec!["binary", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["binary_with_tests", "Cargo.toml"],
             golden_expected_filename: vec!["binary_with_tests", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["multiple_crate_types", "Cargo.toml"],
             golden_expected_filename: vec!["multiple_crate_types", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["feature_review", "Cargo.toml"],
             golden_expected_filename: vec!["feature_review", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-default.gn"],
+            sdk_metadata_path: None,
             extra_args: vec![],
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-all-features.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--all-features"],
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-no-default-features.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--no-default-features"],
         },
         TestCase {
             manifest_path: vec!["cargo_features", "Cargo.toml"],
             golden_expected_filename: vec!["cargo_features", "BUILD-featurefoo.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--features", "featurefoo"],
         },
         TestCase {
             manifest_path: vec!["visibility", "Cargo.toml"],
             golden_expected_filename: vec!["visibility", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--skip-root"],
         },
         TestCase {
             manifest_path: vec!["target_renaming", "Cargo.toml"],
             golden_expected_filename: vec!["target_renaming", "BUILD.gn"],
+            sdk_metadata_path: None,
             extra_args: vec!["--skip-root"],
+        },
+        TestCase {
+            manifest_path: vec!["sdk_metadata", "Cargo.toml"],
+            golden_expected_filename: vec!["sdk_metadata", "BUILD.gn"],
+            sdk_metadata_path: Some(vec![
+                "sdk_metadata",
+                "sdk_metadata",
+                "sdk_metadata.sdk.meta.json",
+            ]),
+            extra_args: vec![],
         },
     ];
 
-    let run_gnaw = |manifest_path: &[&str], extra_args: &[&str]| {
+    let run_gnaw = |manifest_path: &[&str],
+                    extra_args: &[&str],
+                    sdk_metadata_path: Option<&[&str]>| {
         let test_dir = tempfile::TempDir::new().unwrap();
         let mut manifest_path: PathBuf =
             test_dir.path().join(manifest_path.iter().collect::<PathBuf>());
         let output = test_dir.path().join("BUILD.gn");
+        let output_sdk_metadata = sdk_metadata_path.map(|sdk_metadata_path| {
+            test_dir.path().join(sdk_metadata_path.iter().collect::<PathBuf>())
+        });
 
         // we need the emitted file to be under the same path as the gn targets it references
         let test_base_dir = PathBuf::from(&paths.test_base_dir);
@@ -196,19 +228,34 @@ fn main() {
             // is necessary here.
             absolute_cargo_binary_path.to_str().unwrap(),
         ];
+        if let Some(output_sdk_metadata) = &output_sdk_metadata {
+            args.extend(&[
+                "--output-fuchsia-sdk-metadata",
+                output_sdk_metadata.parent().unwrap().to_str().unwrap(),
+            ]);
+        }
         args.extend(extra_args);
         gnaw_lib::run(&args)
             .with_context(|| format!("error running gnaw with args: {:?}\n\t", &args))?;
         let output = std::fs::read_to_string(&output)
             .with_context(|| format!("while reading tempfile: {}", output.display()))
             .expect("tempfile read success");
-        Result::<_, anyhow::Error>::Ok(output)
+        let output_sdk_metadata = output_sdk_metadata
+            .as_ref()
+            .map(std::fs::read_to_string)
+            .transpose()
+            .with_context(|| {
+                format!("while reading sdk metadata: {}", output_sdk_metadata.unwrap().display())
+            })
+            .expect("sdk metadata read success");
+        Result::<_, anyhow::Error>::Ok((output, output_sdk_metadata))
     };
 
     for test in tests {
-        let output = run_gnaw(&test.manifest_path, &test.extra_args)
-            .with_context(|| format!("\n\ttest was: {:?}", &test))
-            .expect("gnaw_lib::run should succeed");
+        let (output, output_sdk_metadata) =
+            run_gnaw(&test.manifest_path, &test.extra_args, test.sdk_metadata_path.as_deref())
+                .with_context(|| format!("\n\ttest was: {:?}", &test))
+                .expect("gnaw_lib::run should succeed");
 
         let test_base_dir = PathBuf::from(&paths.test_base_dir);
         let expected_path: PathBuf =
@@ -225,6 +272,23 @@ fn main() {
             &test,
             &output
         );
+
+        if let Some(output_sdk_metadata) = output_sdk_metadata {
+            let expected_sdk_metadata_path = test_base_dir
+                .join(test.sdk_metadata_path.as_ref().unwrap().iter().collect::<PathBuf>());
+            let expected_sdk_metadata = std::fs::read_to_string(&expected_sdk_metadata_path)
+                .with_context(|| {
+                    format!("while reading sdk metadata: {}", expected_sdk_metadata_path.display())
+                })
+                .expect("sdk metadata read success");
+            assert_eq!(
+                DisplayAsDebug(&expected_sdk_metadata),
+                DisplayAsDebug(&output_sdk_metadata),
+                "left: expected; right: actual: {:?}\n\nGenerated content:\n----------\n{}\n----------\n",
+                &test,
+                &output_sdk_metadata,
+            );
+        }
     }
 
     #[derive(Debug)]
@@ -257,7 +321,7 @@ fn main() {
         },
     ];
     for test in tests {
-        let result = run_gnaw(&test.manifest_path, &test.extra_args);
+        let result = run_gnaw(&test.manifest_path, &test.extra_args, None);
         let error = match result {
             Ok(_) => panic!("gnaw unexpectedly succeeded for {:?}", test),
             Err(e) => e,

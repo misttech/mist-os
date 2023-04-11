@@ -14,7 +14,7 @@ use {
     std::borrow::Cow,
     std::collections::BTreeMap,
     std::fmt::Display,
-    std::io,
+    std::io::{self, Write},
     std::path::Path,
     std::string::ToString,
 };
@@ -39,6 +39,11 @@ pub fn write_header<W: io::Write>(output: &mut W, _cargo_file: &Path) -> Result<
     .map_err(Into::into)
 }
 
+pub fn write_fuchsia_sdk_metadata_header<W: io::Write>(output: &mut W) -> Result<(), Error> {
+    writeln!(output, include_str!("../templates/gn_sdk_metadata_header.template"),)
+        .map_err(Into::into)
+}
+
 /// Write an import stament for the output GN file
 pub fn write_import<W: io::Write>(output: &mut W, file_name: &str) -> Result<(), Error> {
     writeln!(output, include_str!("../templates/gn_import.template"), file_name = file_name)
@@ -50,7 +55,7 @@ pub fn write_import<W: io::Write>(output: &mut W, file_name: &str) -> Result<(),
 /// Args:
 ///   - `rule_renaming`: if set, the renaming rules will be used to generate
 ///     appropriate group and rule names. See [RuleRenaming] for details.
-pub fn write_top_level_rule<'a, W: io::Write>(
+pub fn write_top_level_rule<W: io::Write>(
     output: &mut W,
     platform: Option<String>,
     pkg: &Package,
@@ -100,6 +105,56 @@ pub fn write_top_level_rule<'a, W: io::Write>(
     if platform.is_some() {
         writeln!(output, "}}\n")?;
     }
+    Ok(())
+}
+
+/// Writes Fuchsia SDK metadata for a top-level rule.
+pub fn write_fuchsia_sdk_metadata<W: io::Write>(
+    output: &mut W,
+    pkg: &Package,
+    abs_dir: &Path,
+    rel_dir: &Path,
+) -> Result<(), Error> {
+    // TODO: add features, and registry
+    std::fs::create_dir_all(abs_dir)
+        .with_context(|| format!("while making directories for {}", abs_dir.display()))?;
+
+    let file_name = format!("{}.sdk.meta.json", pkg.name);
+    let abs_path = abs_dir.join(&file_name);
+    let rel_path = rel_dir.join(&file_name);
+    let mut metadata_output = std::fs::File::create(&abs_path)
+        .with_context(|| format!("while writing {}", abs_path.display()))?;
+    writeln!(
+        metadata_output,
+        r#"{{
+    "contents": {{
+        "type": "{sdk_atom_type}",
+        "name": "{group_name}",
+        "version": "{version}"
+    }}
+}}"#,
+        sdk_atom_type = if pkg.is_proc_macro() { "rust_3p_proc_macro" } else { "rust_3p_library" },
+        group_name = pkg.name,
+        version = pkg.version,
+    )?;
+
+    writeln!(
+        output,
+        r#" if (_generating_sdk) {{
+            sdk_atom("{group_name}_sdk") {{
+                id = "sdk://${{_sdk_prefix}}third_party/rust_crates/{group_name}"
+                category = "internal"
+                meta = {{
+                    source = "{source}"
+                    dest = "${{_sdk_prefix}}third_party/rust_crates/{group_name}/meta.json"
+                    schema = "3p_rust_library"
+                }}
+            }}
+        }}"#,
+        source = rel_path.display(),
+        group_name = pkg.name,
+    )?;
+
     Ok(())
 }
 

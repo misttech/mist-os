@@ -74,6 +74,10 @@ pub struct Opt {
     /// run cargo with `--features <FEATURES>`
     #[argh(option)]
     features: Vec<String>,
+
+    /// directory to emit Fuchsia SDK metadata atoms into
+    #[argh(option)]
+    output_fuchsia_sdk_metadata: Option<PathBuf>,
 }
 
 type PackageName = String;
@@ -284,6 +288,15 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
         .unwrap()
         .strip_prefix(&opt.project_root)
         .expect("--project-root must be a parent of --output");
+    let fuchsia_sdk_metadata_paths =
+        opt.output_fuchsia_sdk_metadata.as_ref().map(|output_fuchsia_sdk_metadata| {
+            let path_from_root_to_generated = output_fuchsia_sdk_metadata
+                .parent()
+                .unwrap()
+                .strip_prefix(&opt.project_root)
+                .expect("--project-root must be a parent of --output");
+            (output_fuchsia_sdk_metadata, path_from_root_to_generated)
+        });
     let mut emitted_metadata: Vec<CrateOutputMetadata> = Vec::new();
     let mut top_level_metadata: HashSet<String> = HashSet::new();
     let mut imported_files: HashSet<String> = HashSet::new();
@@ -322,6 +335,11 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
         toml::from_str(&contents).context("parsing manifest toml")?;
 
     gn::write_header(&mut output, &manifest_path).context("writing header")?;
+
+    if opt.output_fuchsia_sdk_metadata.is_some() {
+        gn::write_fuchsia_sdk_metadata_header(&mut output)
+            .context("writing Fuchsia SDK metadata header")?;
+    }
 
     // Construct a build graph of all the targets for GN
     let mut build_graph = GnBuildGraph::new(&metadata);
@@ -379,6 +397,22 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                                 format!("while writing top level rule for package: {}", &dep.pkg)
                             })
                             .context("writing top level rule")?;
+
+                            if let Some((abs_path, rel_path)) = &fuchsia_sdk_metadata_paths {
+                                gn::write_fuchsia_sdk_metadata(
+                                    &mut output,
+                                    package,
+                                    abs_path,
+                                    rel_path,
+                                )
+                                .with_context(|| {
+                                    format!(
+                                        "while writing top level rule for package: {}",
+                                        &dep.pkg
+                                    )
+                                })
+                                .context("writing Fuchsia SDK metadata for top level rule")?;
+                            }
                         }
                     }
                 }
@@ -408,6 +442,11 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                     cfg.map(|c| c.tests).unwrap_or(false),
                 )
                 .with_context(|| "writing top level rule")?;
+
+                if let Some((abs_path, rel_path)) = &fuchsia_sdk_metadata_paths {
+                    gn::write_fuchsia_sdk_metadata(&mut output, package, abs_path, rel_path)
+                        .with_context(|| "writing Fuchsia SDK metadata for top level rule")?;
+                }
             }
         }
         None => anyhow::bail!("Failed to resolve a build graph for the package tree"),
