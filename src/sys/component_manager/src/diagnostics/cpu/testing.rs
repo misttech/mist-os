@@ -14,6 +14,7 @@ use {
     fuchsia_zircon::sys as zx_sys,
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{channel::oneshot, lock::Mutex},
+    injectable_time::{IncrementingFakeTime, TimeSource},
     std::{collections::VecDeque, sync::Arc},
 };
 
@@ -90,16 +91,27 @@ impl TaskInfo<FakeTask> {
 /// Mock for the `RuntimeInfo` object that is provided through the Started hook.
 pub struct FakeRuntime {
     container: Mutex<Option<FakeDiagnosticsContainer>>,
+    start_time: IncrementingFakeTime,
 }
 
 impl FakeRuntime {
     pub fn new(container: FakeDiagnosticsContainer) -> Self {
-        Self { container: Mutex::new(Some(container)) }
+        Self::new_with_start_times(
+            container,
+            IncrementingFakeTime::new(0, std::time::Duration::from_nanos(0)),
+        )
+    }
+
+    pub fn new_with_start_times(
+        container: FakeDiagnosticsContainer,
+        start_time: IncrementingFakeTime,
+    ) -> Self {
+        Self { container: Mutex::new(Some(container)), start_time }
     }
 }
 
 #[async_trait]
-impl DiagnosticsReceiverProvider<FakeDiagnosticsContainer, FakeTask> for FakeRuntime {
+impl ComponentStartedInfo<FakeDiagnosticsContainer, FakeTask> for FakeRuntime {
     async fn get_receiver(&self) -> Option<oneshot::Receiver<FakeDiagnosticsContainer>> {
         match self.container.lock().await.take() {
             None => None,
@@ -109,6 +121,10 @@ impl DiagnosticsReceiverProvider<FakeDiagnosticsContainer, FakeTask> for FakeRun
                 Some(rcv)
             }
         }
+    }
+
+    fn start_time(&self) -> zx::Time {
+        zx::Time::from_nanos(self.start_time.now())
     }
 }
 

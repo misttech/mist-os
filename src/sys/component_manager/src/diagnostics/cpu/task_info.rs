@@ -176,6 +176,20 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
         }
     }
 
+    /// Take a zero-valued measurement at timestamp `t`.
+    ///
+    /// Specifically meant for the very first measurement taken.
+    pub fn record_measurement_with_start_time(&mut self, t: zx::Time) {
+        self.record_measurement(Measurement::empty(t));
+    }
+
+    fn record_measurement(&mut self, m: Measurement) {
+        let current_cpu = *m.cpu_time();
+        self.add_to_histogram(current_cpu - self.previous_cpu, *m.timestamp());
+        self.previous_cpu = current_cpu;
+        self.measurements.insert(m);
+    }
+
     fn measure_subtree<'a>(&'a mut self) -> BoxFuture<'a, Option<&'a Measurement>> {
         async move {
             let (task_terminated_can_measure, runtime_info_res) = {
@@ -215,11 +229,8 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
                     }
                 }
                 self.children = alive_children;
+                self.record_measurement(measurement);
 
-                let current_cpu = *measurement.cpu_time();
-                self.add_to_histogram(current_cpu - self.previous_cpu, *measurement.timestamp());
-                self.previous_cpu = current_cpu;
-                self.measurements.insert(measurement);
                 if task_terminated_can_measure {
                     self.exited_cpu = self.measurements.most_recent_measurement().cloned();
                     return None;

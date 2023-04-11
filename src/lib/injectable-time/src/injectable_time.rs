@@ -52,8 +52,9 @@ pub struct IncrementingFakeTime {
 
 impl TimeSource for IncrementingFakeTime {
     fn now(&self) -> i64 {
+        let now = self.time.now();
         self.time.add_ticks(self.increment_by.as_nanos() as i64);
-        self.time.now()
+        now
     }
 }
 
@@ -188,8 +189,8 @@ mod test {
         let duration = std::time::Duration::from_nanos(1000);
         let timer = IncrementingFakeTime::new(0, duration);
 
-        assert_eq!(duration.as_nanos() as i64, timer.now());
+        assert_eq!(0, timer.now());
+        assert_eq!((1 * duration).as_nanos() as i64, timer.now());
         assert_eq!((2 * duration).as_nanos() as i64, timer.now());
-        assert_eq!((3 * duration).as_nanos() as i64, timer.now());
     }
 }

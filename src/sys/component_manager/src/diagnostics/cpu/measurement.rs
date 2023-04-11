@@ -35,7 +35,6 @@ pub struct Measurement {
 }
 
 impl Measurement {
-    #[cfg(test)]
     pub fn empty(timestamp: zx::Time) -> Self {
         Self {
             timestamp,

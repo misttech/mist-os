@@ -9,7 +9,7 @@ use {
             constants::*,
             measurement::{Measurement, MeasurementsQueue},
             runtime_stats_source::{
-                DiagnosticsReceiverProvider, RuntimeStatsContainer, RuntimeStatsSource,
+                ComponentStartedInfo, RuntimeStatsContainer, RuntimeStatsSource,
             },
             task_info::{create_cpu_histogram, TaskInfo},
         },
@@ -362,7 +362,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
 
     async fn on_component_started<P, C>(self: &Arc<Self>, moniker: &AbsoluteMoniker, runtime: &P)
     where
-        P: DiagnosticsReceiverProvider<C, T>,
+        P: ComponentStartedInfo<C, T>,
         C: RuntimeStatsContainer<T> + Send + Sync + 'static,
     {
         if let Some(receiver) = runtime.get_receiver().await {
@@ -370,6 +370,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
                 Arc::downgrade(&self),
                 moniker.clone().into(),
                 receiver,
+                runtime.start_time(),
             ));
             let _ = self.diagnostics_waiter_task_sender.unbounded_send(task);
         }
@@ -379,6 +380,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         weak_self: Weak<Self>,
         moniker: ExtendedMoniker,
         receiver: oneshot::Receiver<C>,
+        start_time: zx::Time,
     ) where
         C: RuntimeStatsContainer<T> + Send + Sync + 'static,
     {
@@ -402,8 +404,12 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
             .map(|task| task.koid());
         let koid = task_info.koid();
 
-        // At this point we haven't set the parent yet. We take an initial measurement of the
-        // individual task.
+        // At this point we haven't set the parent yet.
+        // We take two types of initial measurement for the task:
+        //  1) a zero-valued measurement that anchors the data at the provided start_time
+        //     with a cpu_time and queue_time of 0.
+        //  2) a "real" measurement that captures the first changed CPU data
+        task_info.record_measurement_with_start_time(start_time);
         task_info.measure_if_no_parent().await;
 
         let mut task_guard = this.tasks.lock().await;
@@ -528,7 +534,7 @@ mod tests {
         diagnostics_hierarchy::DiagnosticsHierarchy,
         fuchsia_inspect::testing::{assert_data_tree, AnyProperty},
         fuchsia_zircon::{AsHandleRef, DurationNum},
-        injectable_time::FakeTime,
+        injectable_time::{FakeTime, IncrementingFakeTime},
         moniker::AbsoluteMoniker,
     };
 
@@ -1322,8 +1328,17 @@ mod tests {
     #[fuchsia::test]
     async fn on_started_handles_parent_task() {
         let inspector = inspect::Inspector::default();
-        let stats =
-            Arc::new(ComponentTreeStats::new(inspector.root().create_child("cpu_stats")).await);
+        let clock = Arc::new(FakeTime::new());
+        // set ticks to 20 to avoid interfering with the start times reported
+        // by FakeRuntime
+        clock.add_ticks(20);
+        let stats = Arc::new(
+            ComponentTreeStats::new_with_timesource(
+                inspector.root().create_child("cpu_stats"),
+                clock.clone(),
+            )
+            .await,
+        );
         let parent_task = FakeTask::new(
             1,
             vec![
@@ -1354,8 +1369,11 @@ mod tests {
                 },
             ],
         );
-        let fake_runtime =
-            FakeRuntime::new(FakeDiagnosticsContainer::new(parent_task.clone(), None));
+
+        let fake_runtime = FakeRuntime::new_with_start_times(
+            FakeDiagnosticsContainer::new(parent_task.clone(), None),
+            IncrementingFakeTime::new(3, std::time::Duration::from_nanos(5)),
+        );
         stats
             .on_component_started(
                 &AbsoluteMoniker::try_from(vec!["parent"]).unwrap(),
@@ -1363,8 +1381,10 @@ mod tests {
             )
             .await;
 
-        let fake_runtime =
-            FakeRuntime::new(FakeDiagnosticsContainer::new(component_task, Some(parent_task)));
+        let fake_runtime = FakeRuntime::new_with_start_times(
+            FakeDiagnosticsContainer::new(component_task, Some(parent_task)),
+            IncrementingFakeTime::new(8, std::time::Duration::from_nanos(5)),
+        );
         stats
             .on_component_started(&AbsoluteMoniker::try_from(vec!["child"]).unwrap(), &fake_runtime)
             .await;
@@ -1387,10 +1407,15 @@ mod tests {
                                 "@samples": {
                                     // Taken when this task started.
                                     "0": {
+                                        timestamp: 3i64,
+                                        cpu_time: 0i64,
+                                        queue_time: 0i64,
+                                    },
+                                    "1": {
                                         timestamp: AnyProperty,
                                         cpu_time: 20i64,
                                         queue_time: 40i64,
-                                    },
+                                    }
                                 }
                             },
                         },
@@ -1398,6 +1423,11 @@ mod tests {
                             "2": {
                                 "@samples": {
                                     "0": {
+                                        timestamp: 8i64,
+                                        cpu_time: 0i64,
+                                        queue_time: 0i64,
+                                    },
+                                    "1": {
                                         timestamp: AnyProperty,
                                         cpu_time: 2i64,
                                         queue_time: 4i64,

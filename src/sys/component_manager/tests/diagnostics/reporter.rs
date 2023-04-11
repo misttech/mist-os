@@ -81,6 +81,11 @@ async fn main() {
                             "@samples": {
                                 "0": {
                                     timestamp: AnyProperty,
+                                    cpu_time: 0u64,
+                                    queue_time: 0u64,
+                                },
+                                "1": {
+                                    timestamp: AnyProperty,
                                     cpu_time: AnyProperty,
                                     queue_time: AnyProperty,
                                 }
@@ -91,6 +96,11 @@ async fn main() {
                         reporter_job_koid.to_string() => {
                             "@samples": {
                                 "0": {
+                                    timestamp: AnyProperty,
+                                    cpu_time: 0u64,
+                                    queue_time: 0u64,
+                                },
+                                "1": {
                                     timestamp: AnyProperty,
                                     cpu_time: AnyProperty,
                                     queue_time: AnyProperty,

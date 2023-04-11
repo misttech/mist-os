@@ -36,7 +36,7 @@ pub trait RuntimeStatsContainer<T: RuntimeStatsSource> {
 /// Trait for the providers of asynchronous receivers where the diagnostics data is sent.
 /// Used for simplying testing.
 #[async_trait]
-pub trait DiagnosticsReceiverProvider<T, S>
+pub trait ComponentStartedInfo<T, S>
 where
     T: RuntimeStatsContainer<S>,
     S: RuntimeStatsSource,
@@ -44,6 +44,9 @@ where
     /// Fetches a oneshot receiver that will eventually resolve to the diagnostics of a component
     /// if the runner provides them.
     async fn get_receiver(&self) -> Option<oneshot::Receiver<T>>;
+
+    /// Returns the reported start time.
+    fn start_time(&self) -> zx::Time;
 }
 
 #[async_trait]
@@ -95,9 +98,13 @@ impl RuntimeStatsContainer<DiagnosticsTask> for ComponentDiagnostics {
 }
 
 #[async_trait]
-impl DiagnosticsReceiverProvider<ComponentDiagnostics, DiagnosticsTask> for RuntimeInfo {
+impl ComponentStartedInfo<ComponentDiagnostics, DiagnosticsTask> for RuntimeInfo {
     async fn get_receiver(&self) -> Option<oneshot::Receiver<ComponentDiagnostics>> {
         let mut receiver_guard = self.diagnostics_receiver.lock().await;
         receiver_guard.take()
+    }
+
+    fn start_time(&self) -> zx::Time {
+        self.start_time
     }
 }
