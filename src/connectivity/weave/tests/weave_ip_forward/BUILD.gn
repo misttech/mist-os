@@ -17,15 +17,16 @@ rustc_binary("bin") {
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/testing/netemul/sync-manager/rust:lib",
+    "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
-    "//src/lib/syslog/rust:syslog",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:prettytable-rs",
     "//third_party/rust_crates:structopt",
+    "//third_party/rust_crates:tracing",
   ]
 }
 

@@ -9,7 +9,6 @@ use {
     fidl_fuchsia_net_stack::StackMarker,
     fuchsia_async as fasync,
     fuchsia_component::client,
-    fuchsia_syslog::fx_log_info,
     net_declare::fidl_subnet,
     net_types::ip::Ipv6,
     prettytable::{cell, format, row, Table},
@@ -17,6 +16,7 @@ use {
     std::io::{Read as _, Write as _},
     std::net::{SocketAddr, TcpListener, TcpStream},
     structopt::StructOpt,
+    tracing::info,
 };
 
 const BUS_NAME: &str = "test-bus";
@@ -87,9 +87,9 @@ async fn run_fuchsia_node() -> Result<(), Error> {
     let wpan_if_id = get_interface_id("wpan-f-ep", &intf)?;
     let weave_if_id = get_interface_id("weave-f-ep", &intf)?;
 
-    fx_log_info!("wlan intf: {:?}", wlan_if_id);
-    fx_log_info!("wpan intf: {:?}", wpan_if_id);
-    fx_log_info!("weave intf: {:?}", weave_if_id);
+    info!(wlan_intf = ?wlan_if_id);
+    info!(wpan_intf = ?wpan_if_id);
+    info!(weave_intf = ?weave_if_id);
 
     // routing rules for weave tun
     let () = add_route_table_entry(
@@ -116,7 +116,7 @@ async fn run_fuchsia_node() -> Result<(), Error> {
         .await
         .context("adding routing table entry for wlan")?;
 
-    fx_log_info!("successfully added entries to route table");
+    info!("successfully added entries to route table");
 
     let ipv6_routing_table = {
         let state_v6 = client::connect_to_protocol::<fnet_routes::StateV6Marker>()
@@ -150,22 +150,22 @@ async fn run_fuchsia_node() -> Result<(), Error> {
         t.add_row(row![destination, next_hop, outbound_interface, metric]);
     }
 
-    fx_log_info!("{}", t.printstd());
+    info!("{}", t.printstd());
 
     let bus = netemul_sync::Bus::subscribe(BUS_NAME, FUCHSIA_NODE_NAME)?;
-    fx_log_info!("waiting for server to finish...");
+    info!("waiting for server to finish...");
     let () = bus
         .wait_for_events(vec![
             netemul_sync::Event::from_code(WEAVE_SERVER_NODE_DONE),
             netemul_sync::Event::from_code(WPAN_SERVER_NODE_DONE),
         ])
         .await?;
-    fx_log_info!("fuchsia node exited");
+    info!("fuchsia node exited");
     Ok(())
 }
 
 async fn handle_request(mut stream: TcpStream, remote: SocketAddr) -> Result<(), Error> {
-    fx_log_info!("accepted connection from {}", remote);
+    info!("accepted connection from {}", remote);
 
     let mut buffer = [0; 512];
     let rd = stream.read(&mut buffer).context("read failed")?;
@@ -174,7 +174,7 @@ async fn handle_request(mut stream: TcpStream, remote: SocketAddr) -> Result<(),
     if req != HELLO_MSG_REQ {
         return Err(format_err!("Got unexpected request from client: {}", req));
     }
-    fx_log_info!("Got request {}", req);
+    info!("Got request {}", req);
     let bytes_written = stream.write(HELLO_MSG_RSP.as_bytes()).context("write failed")?;
     if bytes_written != HELLO_MSG_RSP.len() {
         return Err(format_err!("response not fully written to TCP stream: {}", bytes_written));
@@ -192,7 +192,7 @@ async fn run_server_node(
     for listen_addr in listen_addrs {
         listener_vec.push(TcpListener::bind(listen_addr).context("Can't bind to address")?);
     }
-    fx_log_info!("server {} for connections...", node_name);
+    info!("server {} for connections...", node_name);
     let bus = netemul_sync::Bus::subscribe(BUS_NAME, node_name)?;
 
     for listener_idx in 0..listener_vec.len() {
@@ -208,7 +208,7 @@ async fn run_server_node(
 
     let () = bus.publish(netemul_sync::Event::from_code(node_code))?;
 
-    fx_log_info!("server {} exited successfully", node_name);
+    info!("server {} exited successfully", node_name);
 
     Ok(())
 }
@@ -229,7 +229,7 @@ async fn get_test_fut_client(connect_addr: String) -> Result<(), Error> {
     let mut buffer = [0; 512];
     let rd = stream.read(&mut buffer)?;
     let rsp = String::from_utf8(buffer[0..rd].to_vec()).context("not a valid utf8")?;
-    fx_log_info!("got response {} from {}", rsp, connect_addr);
+    info!("got response {} from {}", rsp, connect_addr);
     if rsp != HELLO_MSG_RSP {
         return Err(format_err!("Got unexpected echo from server: {}", rsp));
     }
@@ -242,26 +242,26 @@ async fn run_client_node(
     server_node_names: Vec<&'static str>,
 ) -> Result<(), Error> {
     let bus = netemul_sync::Bus::subscribe(BUS_NAME, node_name)?;
-    fx_log_info!("client {} is up and for fuchsia node to start", node_name);
+    info!("client {} is up and for fuchsia node to start", node_name);
     let () = bus.wait_for_client(FUCHSIA_NODE_NAME).await?;
     for server_node_name in server_node_names {
-        fx_log_info!("waiting for server node {} to start...", server_node_name);
+        info!("waiting for server node {} to start...", server_node_name);
         let () = bus.wait_for_client(server_node_name).await?;
     }
 
     let futs = connect_addrs.into_iter().map(|connect_addr| async move {
-        fx_log_info!("connecting to {}...", connect_addr);
+        info!("connecting to {}...", connect_addr);
         let result = get_test_fut_client(connect_addr.clone()).await;
         match result {
-            Ok(()) => fx_log_info!("connected to {}", connect_addr),
-            Err(ref e) => fx_log_info!("failed to connect to {}: {}", connect_addr, e),
+            Ok(()) => info!("connected to {}", connect_addr),
+            Err(ref e) => info!("failed to connect to {}: {}", connect_addr, e),
         };
         result
     });
 
     let _: Vec<()> = futures::future::try_join_all(futs).await?;
 
-    fx_log_info!("client {} exited", node_name);
+    info!("client {} exited", node_name);
     Ok(())
 }
 
@@ -287,7 +287,7 @@ async fn main() -> Result<(), Error> {
         Opt::WlanNode { .. } => "wlan_node",
         Opt::WpanNode { .. } => "wpan_node",
     };
-    fuchsia_syslog::init_with_tags(&[node_name_str])?;
+    diagnostics_log::init!(&[node_name_str]);
 
     match opt {
         Opt::WeaveNode { listen_addr_0, listen_addr_1 } => {

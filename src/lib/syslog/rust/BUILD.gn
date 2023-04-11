@@ -49,7 +49,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/connectivity/location/regulatory_region:*",
   "//src/connectivity/ppp/lib/ppp_packet:*",
   "//src/connectivity/ppp/lib/ppp_protocol:*",
-  "//src/connectivity/weave/tests/weave_ip_forward:*",
   "//src/connectivity/wlan/lib/mlme/fullmac:*",
   "//src/connectivity/wlan/lib/mlme/rust:*",
   "//src/connectivity/wlan/lib/stash:*",
