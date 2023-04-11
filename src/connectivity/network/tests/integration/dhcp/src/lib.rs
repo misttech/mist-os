@@ -415,7 +415,6 @@ fn test_dhcp<'a, N: Netstack>(
                         format!("netstack_realm_{}_{}", test_name, id),
                         &[
                             KnownServiceProvider::DhcpServer { persistent: false },
-                            KnownServiceProvider::DnsResolver,
                             KnownServiceProvider::FakeClock,
                             KnownServiceProvider::SecureStash,
                         ],
@@ -708,7 +707,6 @@ async fn acquire_dhcp_server_after_restart<N: Netstack>(name: &str, mode: Persis
                         KnownServiceProvider::DhcpServer { persistent: true }
                     }
                 },
-                KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
                 KnownServiceProvider::SecureStash,
             ],
@@ -887,7 +885,6 @@ async fn test_dhcp_server_persistence_mode<N: Netstack>(name: &str, mode: Persis
                         KnownServiceProvider::DhcpServer { persistent: true }
                     }
                 },
-                KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
                 KnownServiceProvider::SecureStash,
             ],

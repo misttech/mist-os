@@ -399,30 +399,33 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     constants::dhcp_server::COMPONENT_URL.to_string(),
                 )),
                 exposes: Some(vec![fnet_dhcp::Server_Marker::PROTOCOL_NAME.to_string()]),
-                uses: Some(fnetemul::ChildUses::Capabilities(vec![
-                    fnetemul::Capability::LogSink(fnetemul::Empty {}),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_name::LookupMarker>(
-                        constants::dns_resolver::COMPONENT_NAME,
-                    )),
-                    fnetemul::Capability::ChildDep(
-                        protocol_dep::<fnet_neighbor::ControllerMarker>(
-                            constants::netstack::COMPONENT_NAME,
+                uses: Some(fnetemul::ChildUses::Capabilities(
+                    [
+                        fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                        fnetemul::Capability::ChildDep(protocol_dep::<
+                            fnet_neighbor::ControllerMarker,
+                        >(
+                            constants::netstack::COMPONENT_NAME
+                        )),
+                        fnetemul::Capability::ChildDep(
+                            protocol_dep::<fposix_socket::ProviderMarker>(
+                                constants::netstack::COMPONENT_NAME,
+                            ),
                         ),
-                    ),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fposix_socket::ProviderMarker>(
-                        constants::netstack::COMPONENT_NAME,
-                    )),
-                    fnetemul::Capability::ChildDep(protocol_dep::<
-                        fposix_socket_packet::ProviderMarker,
+                        fnetemul::Capability::ChildDep(protocol_dep::<
+                            fposix_socket_packet::ProviderMarker,
+                        >(
+                            constants::netstack::COMPONENT_NAME
+                        )),
+                    ]
+                    .into_iter()
+                    .chain(persistent.then_some(fnetemul::Capability::ChildDep(protocol_dep::<
+                        fstash::SecureStoreMarker,
                     >(
-                        constants::netstack::COMPONENT_NAME
-                    )),
-                    // TODO(https://fxbug.dev/82890): only include SecureStash as a dependency of
-                    // DhcpServer if it is started in persistent mode.
-                    fnetemul::Capability::ChildDep(protocol_dep::<fstash::SecureStoreMarker>(
                         constants::secure_stash::COMPONENT_NAME,
-                    )),
-                ])),
+                    ))))
+                    .collect(),
+                )),
                 program_args: if *persistent {
                     Some(vec![String::from("--persistent")])
                 } else {
