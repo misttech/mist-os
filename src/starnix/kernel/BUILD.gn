@@ -356,7 +356,7 @@ fuchsia_unittest_package("starnix-tests") {
   deps = [
     ":starnix-test-files",
     ":starnix_kernel_bin_test",
-    "//src/proc/examples/hello_starnix:bin",
+    "//src/starnix/examples/hello_starnix:bin",
   ]
   test_specs = {
     log_settings = {

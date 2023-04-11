@@ -2,11 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("starnix") {
+group("examples") {
+  deps = [ "hello_starnix:hello-starnix" ]
   if (target_cpu == "x64") {
-    deps = [
-      "//src/proc/bin",
-      "//src/starnix/examples",
+    deps += [
+      "android",
+      "chromiumos",
     ]
   }
+}
+
+group("tests") {
+  testonly = true
 }
