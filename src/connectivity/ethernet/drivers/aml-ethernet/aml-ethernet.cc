@@ -52,14 +52,15 @@ zx_status_t AmlEthernet::InitPdev() {
   // Reset is optional.
   gpios_[PHY_RESET] = ddk::GpioProtocolClient(parent(), "gpio-reset");
 
-  gpios_[PHY_INTR] = ddk::GpioProtocolClient(parent(), "gpio-int");
-  if (!gpios_[PHY_INTR].is_valid()) {
-    zxlogf(ERROR, "Could not get GPIO protocol");
+  zx_status_t status =
+      ddk::GpioProtocolClient::CreateFromDevice(parent(), "gpio-int", &gpios_[PHY_INTR]);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not get GPIO protocol: %s", zx_status_get_string(status));
     return ZX_ERR_NO_RESOURCES;
   }
 
   // Map amlogic peripheral control registers.
-  zx_status_t status = pdev_.MapMmio(MMIO_PERIPH, &periph_mmio_);
+  status = pdev_.MapMmio(MMIO_PERIPH, &periph_mmio_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-dwmac: could not map periph mmio: %d", status);
     return status;
