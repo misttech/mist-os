@@ -6,14 +6,14 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::ops::{Deref as _, DerefMut as _};
+use std::ops::{Deref, DerefMut};
 
 use async_utils::futures::{FutureExt as _, ReplaceValue};
 use derivative::Derivative;
 use fuchsia_async as fasync;
 use futures::{
     channel::mpsc,
-    future::{AbortHandle, Abortable, Aborted},
+    future::{AbortHandle, Abortable, Aborted, Future},
     stream::{FuturesUnordered, StreamExt as _},
 };
 use log::{trace, warn};
@@ -41,10 +41,17 @@ struct TimerInfo {
 
 /// A context for specified for a timer type `T` that provides asynchronous
 /// locking to a [`TimerHandler`].
-pub(crate) trait TimerContext<T: Hash + Eq>:
-    'static + for<'a> crate::bindings::context::Lockable<'a, <Self as TimerContext<T>>::Handler> + Clone
-{
+pub(crate) trait TimerContext<T: Hash + Eq>: 'static + Clone {
     type Handler: TimerHandler<T>;
+
+    type Guard<'a>: Deref<Target = Self::Handler> + DerefMut + Send
+    where
+        Self: 'a;
+    type Fut<'a>: Future<Output = Self::Guard<'a>> + Send
+    where
+        Self: 'a;
+
+    fn lock(&self) -> Self::Fut<'_>;
 }
 
 /// An entity responsible for receiving expired timers.
@@ -342,7 +349,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bindings::{context::Lockable, integration_tests::set_logger_for_test};
+    use crate::bindings::integration_tests::set_logger_for_test;
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, DurationNum};
     use futures::{channel::mpsc, lock::Mutex, task::Poll, Future, StreamExt};
@@ -381,17 +388,15 @@ mod tests {
         }
     }
 
-    impl<'a> Lockable<'a, TimerData> for TestContext {
-        type Guard = futures::lock::MutexGuard<'a, TimerData>;
-        type Fut = futures::lock::MutexLockFuture<'a, TimerData>;
-        fn lock(&'a self) -> Self::Fut {
+    impl TimerContext<usize> for TestContext {
+        type Handler = TimerData;
+
+        type Guard<'a> = futures::lock::MutexGuard<'a, TimerData> where Self: 'a;
+        type Fut<'a> = futures::lock::MutexLockFuture<'a, TimerData> where Self: 'a;
+        fn lock(&self) -> Self::Fut<'_> {
             let Self(arc) = self;
             arc.lock()
         }
-    }
-
-    impl TimerContext<usize> for TestContext {
-        type Handler = TimerData;
     }
 
     fn nanos_from_now(nanos: i64) -> StackTime {

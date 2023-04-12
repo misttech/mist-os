@@ -12,7 +12,6 @@ mod macros;
 #[cfg(test)]
 mod integration_tests;
 
-mod context;
 mod debug_fidl_worker;
 mod devices;
 mod filter_worker;
@@ -161,14 +160,6 @@ impl AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl
     }
 }
 
-impl<'a> context::Lockable<'a, Ctx<BindingsNonSyncCtxImpl>> for Netstack {
-    type Guard = futures::lock::MutexGuard<'a, Ctx<BindingsNonSyncCtxImpl>>;
-    type Fut = futures::lock::MutexLockFuture<'a, Ctx<BindingsNonSyncCtxImpl>>;
-    fn lock(&'a self) -> Self::Fut {
-        self.ctx.lock()
-    }
-}
-
 impl AsRef<IcmpEchoSockets> for BindingsNonSyncCtxImpl {
     fn as_ref(&self) -> &IcmpEchoSockets {
         &self.icmp_echo_sockets
@@ -196,6 +187,12 @@ impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx<BindingsNonSy
 
 impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
     type Handler = Ctx<BindingsNonSyncCtxImpl>;
+
+    type Guard<'a> = futures::lock::MutexGuard<'a, Ctx<BindingsNonSyncCtxImpl>>;
+    type Fut<'a> = futures::lock::MutexLockFuture<'a, Ctx<BindingsNonSyncCtxImpl>>;
+    fn lock(&'_ self) -> Self::Fut<'_> {
+        self.ctx.lock()
+    }
 }
 
 impl<D> ConversionContext for D
