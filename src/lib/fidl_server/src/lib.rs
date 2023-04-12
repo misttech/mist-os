@@ -50,6 +50,12 @@
 //! fs.dir("svc").add_fidl_service(|stream: LogRequestStream| {
 //!     serve_detached(stream, LogHandler);
 //! });
+//!
+//! For asynchronous request handling you can alternatively use the following:
+//!
+//! * `AsyncRequestHandler`
+//! * `serve_async`
+//! * `serve_async_detached`.
 //! ```
 
 #![deny(missing_docs)]

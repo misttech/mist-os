@@ -4,6 +4,7 @@
 
 use {
     anyhow::{anyhow, Error, Result},
+    async_trait::async_trait,
     fidl::endpoints::{create_endpoints, create_proxy_and_stream},
     fidl_fuchsia_examples::{EchoMarker, EchoRequest},
     fidl_server::*,
@@ -16,6 +17,13 @@ struct EchoHandler;
 
 impl RequestHandler<EchoMarker> for EchoHandler {
     fn handle_request(&self, request: EchoRequest) -> Result<(), Error> {
+        handle_echo_request(request)
+    }
+}
+
+#[async_trait]
+impl AsyncRequestHandler<EchoMarker> for EchoHandler {
+    async fn handle_request(&self, request: EchoRequest) -> Result<(), Error> {
         handle_echo_request(request)
     }
 }
@@ -56,6 +64,18 @@ async fn should_accept_handler_object() -> Result<(), Error> {
     let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
 
     serve_detached(stream, EchoHandler);
+
+    assert_eq!(client.echo_string("message 1").await?, "message 1");
+    assert_eq!(client.echo_string("message 2").await?, "message 2");
+    assert_eq!(client.echo_string("message 3").await?, "message 3");
+    Ok(())
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn should_accept_async_handler_object() -> Result<(), Error> {
+    let (client, stream) = create_proxy_and_stream::<EchoMarker>()?;
+
+    serve_async_detached(stream, EchoHandler);
 
     assert_eq!(client.echo_string("message 1").await?, "message 1");
     assert_eq!(client.echo_string("message 2").await?, "message 2");

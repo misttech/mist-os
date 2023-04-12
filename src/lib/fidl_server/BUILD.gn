@@ -15,6 +15,7 @@ rustc_library("fidl_server") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
@@ -30,6 +31,7 @@ rustc_test("fidl_server_tests") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
