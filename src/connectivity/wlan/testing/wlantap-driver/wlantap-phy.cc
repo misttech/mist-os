@@ -350,7 +350,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
       zxlogf(ERROR, "%s: StartScan() failed", status.status_string());
       return;
     }
-    zxlogf(DEBUG, "%s: WlantapMacStartScan done", name_.c_str());
+    zxlogf(INFO, "%s: WlantapMacStartScan done", name_.c_str());
   }
 
   virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfiguration& key_config) override {
