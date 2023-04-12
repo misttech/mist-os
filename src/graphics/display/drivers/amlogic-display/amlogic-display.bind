@@ -5,6 +5,7 @@
 composite display;
 
 using fuchsia.hardware.dsi;
+using fuchsia.hardware.hdmi;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.sysmem;
@@ -26,6 +27,7 @@ node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY;
   accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
     fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
     fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
   }
@@ -36,6 +38,11 @@ node "gpio-lcd-reset" {
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_RESET;
 }
 
+optional node "gpio-hdmi-hotplug-detect" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
+}
+
 node "sysmem" {
   fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
 }
@@ -44,3 +51,6 @@ node "canvas" {
   fuchsia.BIND_PROTOCOL == fuchsia.amlogic.platform.BIND_PROTOCOL.CANVAS;
 }
 
+optional node "hdmi" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.hdmi.BIND_FIDL_PROTOCOL.SERVICE;
+}

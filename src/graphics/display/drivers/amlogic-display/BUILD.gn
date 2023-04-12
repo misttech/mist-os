@@ -7,34 +7,11 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-config("display-vim3-config") {
-  defines = [ "ENABLE_VIM3_DISPLAY" ]
-}
-
 driver_bind_rules("amlogic_display_bind") {
   rules = "amlogic-display.bind"
   header_output = "amlogic-display-bind.h"
   bind_output = "amlogic-display.bindbc"
   tests = "bind_tests.json"
-
-  # TODO(fxb/115757): Remove this once we no longer need to generate
-  # fragments for composite bind rules.
-  disable_fragment_gen = true
-
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.hardware.dsi",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
-driver_bind_rules("amlogic_display_vim3_bind") {
-  rules = "amlogic-display-vim3.bind"
-  header_output = "amlogic-display-vim3-bind.h"
-  bind_output = "amlogic-display-vim3.bindbc"
-  tests = "bind_tests_vim3.json"
 
   # TODO(fxb/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
@@ -108,21 +85,6 @@ source_set("amlogic_display_driver_src") {
   ]
   public_deps = [
     ":amlogic_display_bind",
-    ":amlogic_display_vim3_bind_header",
-    ":common_srcs",
-  ]
-  sources = [ "amlogic-display.cc" ]
-}
-
-source_set("amlogic_display_driver_vim3_src") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-    ":display-vim3-config",
-  ]
-  public_deps = [
-    ":amlogic_display_bind_header",
-    ":amlogic_display_vim3_bind",
     ":common_srcs",
   ]
   sources = [ "amlogic-display.cc" ]
@@ -142,22 +104,6 @@ fuchsia_driver_component("amlogic-display") {
   deps = [ ":amlogic-display-driver" ]
   info = "amlogic-display-info.json"
   manifest = "meta/amlogic-display.cml"
-}
-
-fuchsia_driver("amlogic-display-driver-vim3") {
-  output_name = "amlogic-display-vim3"
-  deps = [
-    ":amlogic_display_driver_vim3_src",
-    ":common_srcs",
-    "//sdk/lib/syslog/cpp:backend",
-  ]
-}
-
-fuchsia_driver_component("amlogic-display-vim3") {
-  component_name = "amlogic-display-vim3"
-  deps = [ ":amlogic-display-driver-vim3" ]
-  info = "amlogic-display-info.json"
-  manifest = "meta/amlogic-display-vim3.cml"
 }
 
 test("amlogic-display-test") {
@@ -194,7 +140,6 @@ group("tests") {
     ":amlogic-clock-test-package",
     ":amlogic-display-test-package",
     ":amlogic_display_bind_test",
-    ":amlogic_display_vim3_bind_test",
   ]
 }
 

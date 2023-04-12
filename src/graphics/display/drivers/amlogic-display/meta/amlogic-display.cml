@@ -27,10 +27,10 @@
         colocate: "true",
         compat: "driver/amlogic-display.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
     },
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
+        { service: "fuchsia.hardware.hdmi.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }
