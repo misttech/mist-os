@@ -5,7 +5,7 @@
 use crate::{
     fidl::{FidlServer, StateMachineController},
     inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode},
-    installer::{FuchsiaInstallError, InstallerFailureReason},
+    installer::{is_update_urgent, FuchsiaInstallError, InstallerFailureReason},
 };
 use anyhow::anyhow;
 use fidl_fuchsia_feedback::{CrashReporterMarker, CrashReporterProxy};
@@ -217,13 +217,15 @@ where
     }
 
     fn on_omaha_response(&mut self, response: Response) {
-        self.target_version = response
-            .apps
-            .into_iter()
-            .next()
-            .and_then(|app| app.update_check)
-            .and_then(|update_check| update_check.manifest)
-            .map(|manifest| manifest.version);
+        if let Some(update_check) =
+            response.apps.into_iter().next().and_then(|app| app.update_check)
+        {
+            FidlServer::set_urgent_update(
+                Rc::clone(&self.fidl_server),
+                is_update_urgent(&update_check),
+            );
+            self.target_version = update_check.manifest.map(|manifest| manifest.version);
+        }
     }
 }
 

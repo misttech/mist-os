@@ -44,12 +44,14 @@ pub struct State {
     pub manager_state: state_machine::State,
     pub version_available: Option<String>,
     pub install_progress: Option<f32>,
+    pub urgent: Option<bool>,
 }
 
 impl From<State> for Option<update::State> {
     fn from(state: State) -> Self {
         let update = Some(UpdateInfo {
             version_available: state.version_available,
+            urgent: state.urgent,
             download_size: None,
             ..UpdateInfo::EMPTY
         });
@@ -244,6 +246,7 @@ where
             manager_state: state_machine::State::Idle,
             version_available: None,
             install_progress: None,
+            urgent: None,
         };
         state_node.set(&state);
         let (single_monitor_queue_fut, single_monitor_queue) = EventQueue::new();
@@ -590,7 +593,9 @@ where
 
         match state {
             state_machine::State::Idle => {
-                server.borrow_mut().state.install_progress = None;
+                let state = &mut server.borrow_mut().state;
+                state.install_progress = None;
+                state.urgent = None;
             }
             state_machine::State::WaitingForReboot => {
                 server.borrow_mut().state.install_progress = Some(1.);
@@ -670,6 +675,10 @@ where
     ) {
         server.borrow_mut().state.install_progress = Some(progress.progress);
         Self::send_state_to_queue(server).await;
+    }
+
+    pub fn set_urgent_update(server: Rc<RefCell<Self>>, is_urgent: bool) {
+        server.borrow_mut().state.urgent = Some(is_urgent);
     }
 
     /// Alert the `FidlServer` that a previous update attempt on this boot failed with an
@@ -1628,6 +1637,7 @@ mod tests {
             manager_state: state_machine::State::WaitingForReboot,
             version_available: None,
             install_progress: None,
+            urgent: None,
         };
 
         assert_fidl_server_calls_reboot(fidl).await;
@@ -1642,9 +1652,27 @@ mod tests {
             manager_state: state_machine::State::Idle,
             version_available: None,
             install_progress: None,
+            urgent: None,
         };
         fidl.borrow_mut().previous_out_of_space_failure = true;
 
         assert_fidl_server_calls_reboot(fidl).await;
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_set_urgent_update() {
+        let fidl = FidlServerBuilder::new().build().await;
+        fidl.borrow_mut().state = State {
+            manager_state: state_machine::State::Idle,
+            version_available: None,
+            install_progress: None,
+            urgent: None,
+        };
+
+        FidlServer::set_urgent_update(Rc::clone(&fidl), true);
+        assert_eq!(fidl.borrow().state.urgent, Some(true));
+
+        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::Idle).await;
+        assert_eq!(fidl.borrow().state.urgent, None);
     }
 }

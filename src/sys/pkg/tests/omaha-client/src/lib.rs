@@ -796,7 +796,12 @@ async fn expect_states(stream: &mut MonitorRequestStream, expected_states: &[Sta
 fn update_info() -> Option<UpdateInfo> {
     // TODO(fxbug.dev/47469): version_available should be `Some("0.1.2.3".to_string())` once omaha-client
     // returns version_available.
-    Some(UpdateInfo { version_available: None, download_size: None, ..UpdateInfo::EMPTY })
+    Some(UpdateInfo {
+        version_available: None,
+        download_size: None,
+        urgent: Some(false),
+        ..UpdateInfo::EMPTY
+    })
 }
 
 fn progress(fraction_completed: Option<f32>) -> Option<InstallationProgress> {
@@ -807,6 +812,7 @@ async fn omaha_client_update(
     mut env: TestEnv,
     platform_metrics: TreeAssertion,
     should_wait_for_reboot: bool,
+    update_info: Option<UpdateInfo>,
 ) {
     env.proxies
         .resolver
@@ -836,7 +842,7 @@ async fn omaha_client_update(
         &[
             State::CheckingForUpdates(CheckingForUpdatesData::EMPTY),
             State::InstallingUpdate(InstallingData {
-                update: update_info(),
+                update: update_info.clone(),
                 installation_progress: progress(None),
                 ..InstallingData::EMPTY
             }),
@@ -849,7 +855,7 @@ async fn omaha_client_update(
         let MonitorRequest::OnState { state, responder } = request;
         match state {
             State::InstallingUpdate(InstallingData { update, installation_progress, .. }) => {
-                assert_eq!(update, update_info());
+                assert_eq!(update, update_info.clone());
                 assert!(!waiting_for_reboot);
                 if let Some(last_progress) = last_progress {
                     let last = last_progress.fraction_completed.unwrap();
@@ -863,7 +869,7 @@ async fn omaha_client_update(
                 last_progress = installation_progress;
             }
             State::WaitingForReboot(InstallingData { update, installation_progress, .. }) => {
-                assert_eq!(update, update_info());
+                assert_eq!(update, update_info.clone());
                 assert_eq!(installation_progress, progress(Some(1.)));
                 assert!(!waiting_for_reboot);
                 waiting_for_reboot = true;
@@ -909,6 +915,7 @@ async fn test_omaha_client_update() {
             }
         ),
         true,
+        update_info(),
     )
     .await;
 }
@@ -1014,6 +1021,7 @@ async fn test_omaha_client_update_multi_app() {
             }
         ),
         true,
+        update_info(),
     )
     .await;
 }
@@ -1123,6 +1131,7 @@ async fn test_omaha_client_update_eager_package() {
             }
         ),
         false,
+        update_info(),
     )
     .await;
 }
@@ -1188,6 +1197,7 @@ async fn test_omaha_client_update_cup_force_historical_key() {
             }
         ),
         true,
+        update_info(),
     )
     .await;
 }
@@ -1618,6 +1628,7 @@ async fn test_omaha_client_installation_deferred() {
             }
         ),
         true,
+        update_info(),
     )
     .await;
 }
@@ -2070,4 +2081,36 @@ async fn test_omaha_client_persists_cohort() {
 
     env.server.lock().set_all_cohort_assertions(Some("1:1:".to_string()));
     do_nop_update_check(&env).await;
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_omaha_client_urgent_update() {
+    let env =
+        TestEnvBuilder::new().default_with_response(OmahaResponse::UrgentUpdate).build().await;
+    omaha_client_update(
+        env,
+        tree_assertion!(
+            "children": {
+                "0": contains {
+                    "event": "CheckingForUpdates",
+                },
+                "1": contains {
+                    "event": "InstallingUpdate",
+                    "target-version": "0.1.2.3",
+                },
+                "2": contains {
+                    "event": "WaitingForReboot",
+                    "target-version": "0.1.2.3",
+                }
+            }
+        ),
+        true,
+        Some(UpdateInfo {
+            version_available: None,
+            download_size: None,
+            urgent: Some(true),
+            ..UpdateInfo::EMPTY
+        }),
+    )
+    .await;
 }

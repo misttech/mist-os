@@ -27,7 +27,7 @@ use omaha_client::{
     installer::{AppInstallResult, Installer, ProgressObserver},
     protocol::{
         request::InstallSource,
-        response::{OmahaStatus, Response},
+        response::{OmahaStatus, Response, UpdateCheck},
     },
     request_builder::RequestParams,
 };
@@ -431,7 +431,7 @@ fn try_create_install_plan_impl(
 
         update_package_urls.push(if app.id == system_app_id {
             // If urgent_update is present, assume true.
-            urgent_update = update_check.extra_attributes.contains_key("_urgent_update");
+            urgent_update = is_update_urgent(update_check);
             UpdatePackageUrl::System(pkg_url)
         } else {
             UpdatePackageUrl::Package(pkg_url)
@@ -448,6 +448,10 @@ fn try_create_install_plan_impl(
         request_metadata: request_metadata.cloned(),
         ecdsa_signature,
     })
+}
+
+pub fn is_update_urgent(update_check: &UpdateCheck) -> bool {
+    update_check.extra_attributes.contains_key("_urgent_update")
 }
 
 #[cfg(test)]

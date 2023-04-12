@@ -289,6 +289,7 @@ mod tests {
             manager_state: state_machine::State::CheckingForUpdates(InstallSource::OnDemand),
             version_available: Some("1.2.3.4".to_string()),
             install_progress: None,
+            urgent: Some(false),
         };
         node.set(&state);
 

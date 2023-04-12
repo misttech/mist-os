@@ -44,6 +44,7 @@ use {
 pub enum OmahaResponse {
     NoUpdate,
     Update,
+    UrgentUpdate,
     InvalidResponse,
     InvalidURL,
 }
@@ -368,6 +369,40 @@ pub async fn handle_omaha_request(
                                 ]
                             }
                         }
+                    }),
+                    OmahaResponse::UrgentUpdate => json!({
+                        "status": "ok",
+                        "urls": {
+                            "url": [
+                                {
+                                    "codebase": expected.codebase,
+                                }
+                            ]
+                        },
+                        "manifest": {
+                            "version": "0.1.2.3",
+                            "actions": {
+                                "action": [
+                                    {
+                                        "run": &package_name,
+                                        "event": "install"
+                                    },
+                                    {
+                                        "event": "postinstall"
+                                    }
+                                ]
+                            },
+                            "packages": {
+                                "package": [
+                                    {
+                                        "name": &package_name,
+                                        "fp": "2.0.1.2.3",
+                                        "required": true
+                                    }
+                                ]
+                            }
+                        },
+                        "_urgent_update": true
                     }),
                     OmahaResponse::NoUpdate => json!({
                         "status": "noupdate",
