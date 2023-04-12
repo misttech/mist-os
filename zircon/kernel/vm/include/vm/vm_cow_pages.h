@@ -388,6 +388,10 @@ class VmCowPages final : public VmHierarchyBase,
                                 list_node* alloc_list, LazyPageRequest* page_request,
                                 LookupInfo* out) TA_REQ(lock());
 
+  class LookupCursor;
+  // See VmObjectPaged::GetLookupCursorLocked
+  zx::result<LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len) TA_REQ(lock());
+
   // Controls the type of content that can be overwritten by the Add[New]Page[s]Locked functions.
   enum class CanOverwriteContent : uint8_t {
     // Do not overwrite any kind of content, i.e. only add a page at the slot if there is true
@@ -1339,6 +1343,267 @@ class VmCowPagesContainer : public fbl::RefCountedUpgradeable<VmCowPagesContaine
 
   ktl::aligned_storage_t<sizeof(VmCowPages), alignof(VmCowPages)> cow_space_;
   bool is_cow_present_ = false;
+};
+
+// Implements a cursor that allows for retrieving successive pages over a range in a VMO. The
+// range that is iterated is determined at construction from GetLookupCursorLocked and cannot be
+// modified, although it can be effectively shrunk by ceasing queries early.
+//
+// The cursor is designed under the assumption that the caller is tracking, implicitly or
+// explicitly, how many queries have been done, and the methods do not return errors if more slots
+// are queried than was originally requested in the range. They will, however, assert and panic.
+//
+// There are three controls provided by this object.
+//
+//   Zero forks: By default new zero pages will be considered zero forks and added to the zero page
+//   scanner list, this can be disabled with |DisableZeroFork|.
+//
+//   Access time: By default pages that are returned will be considered accessed. This can be
+//   changed with |DisableMarkAccessed|.
+//
+//   Allocation lists: By default pages will be acquired from the pmm as needed. An allocation list
+//   can be given use |GiveAllocList|.
+//
+// The VMO lock *must* be held contiguously from the call to GetLookupCursorLocked over the entire
+// usage of this object.
+class VmCowPages::LookupCursor {
+ public:
+  ~LookupCursor() { DEBUG_ASSERT(!alloc_list_); }
+
+  // Convenience struct holding the return result of the Require* methods.
+  struct RequireResult {
+    vm_page_t* page = nullptr;
+    bool writable = false;
+  };
+
+  // The Require* methods will attempt to lookup the next offset in the VMO and return you a page
+  // with the properties requested. If a page can be returned in the zx::ok result then the internal
+  // cursor is incremented and future operations will act on the next offset. If an error occurs
+  // then the internal cursor is not incremented.
+  // These methods all take a PageRequest, which will be populated in the case of returning
+  // ZX_ERR_SHOULD_WAIT. For optimal page request generation the |max_request_pages| controls how
+  // many pages you are intending to lookup, and |max_request_pages| must not exceed the remaining
+  // window of the cursor.
+  // The returned page, unless it was just allocated, will have its access time updated based on
+  // |EnableMarkAccessed|, with newly allocated pages always being default considered to have just
+  // been accessed.
+
+  // Returned page must be an allocated and owned page in this VMO. As such this will never return a
+  // reference to the zero page. |will_write| indicates if this page needs to be writable or not,
+  // which for an owned and allocated page just involves a potential dirty request / transition.
+  zx::result<RequireResult> RequireOwnedPage(bool will_write, uint max_request_pages,
+                                             LazyPageRequest* page_request) TA_REQ(lock());
+
+  // Returned page will only be read from. This can return zero pages or pages from a parent VMO.
+  zx::result<RequireResult> RequireReadPage(uint max_request_pages, LazyPageRequest* page_request)
+      TA_REQ(lock());
+
+  // Returned page will be readable or writable based on the |will_write| flag.
+  zx::result<RequireResult> RequirePage(bool will_write, uint max_request_pages,
+                                        LazyPageRequest* page_request) TA_REQ(lock()) {
+    // Being writable implies owning the page, so forward to the correct operation.
+    if (will_write) {
+      return RequireOwnedPage(true, max_request_pages, page_request);
+    }
+    return RequireReadPage(max_request_pages, page_request);
+  }
+
+  // The IfExistPages methods is intended to be cheaper than the Require* methods and to allow for
+  // performing actions if pages already exist, without performing allocations. As a result this
+  // may fail to return pages in scenarios that Require* methods would, and in general are allowed
+  // to always fail for any reason.
+  // These methods cannot generate page requests and will not perform allocations or otherwise
+  // mutate the VMO contents and will not update the access time of the pages.
+
+  // Walks up to |max_pages| from the current offset, filling in |paddrs| as long as there are
+  // actual pages and, if |will_write| is true, that they can be written to. The return value is
+  // the number of contiguous pages found and filled into |paddrs|, and the cursor is incremented
+  // by that many pages.
+  uint IfExistPages(bool will_write, uint max_pages, paddr_t* paddrs) TA_REQ(lock());
+
+  // Checks the current slot for a page and returns it. This does not return zero pages and, due to
+  // the lack of taking a page request, will not perform copy-on-write allocations or dirty
+  // transitions. In these cases it will return nullptr even though there is content.
+  // The internal cursor is always incremented regardless of the return value.
+  vm_page_t* MaybePage(bool will_write) TA_REQ(lock());
+
+  // Provides a list of pages that can be used to service any allocations. This is useful if you
+  // know you will be looking up multiple absent pages and want to avoid repeatedly hitting the pmm
+  // for single pages.
+  // If a list is provided then ClearAllocList must be called prior to the cursor being destroyed.
+  void GiveAllocList(list_node_t* alloc_list) {
+    DEBUG_ASSERT(alloc_list);
+    alloc_list_ = alloc_list;
+  }
+
+  // Clears any remaining allocation list. This does not free any remaining pages, and it is the
+  // callers responsibility to check the list and free any pages.
+  void ClearAllocList() {
+    DEBUG_ASSERT(alloc_list_);
+    alloc_list_ = nullptr;
+  }
+
+  // Disables placing newly allocated zero pages in the zero fork list.
+  void DisableZeroFork() { zero_fork_ = false; }
+
+  // Indicates that any existing pages that are returned should not be considered accessed and have
+  // their accessed times updated.
+  void DisableMarkAccessed() { mark_accessed_ = false; }
+
+  // Exposed for lock assertions.
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
+    return target_->lock_ref();
+  }
+
+ private:
+  LookupCursor(VmCowPages* target, uint64_t offset, uint64_t len)
+      : target_(target),
+        offset_(offset),
+        end_offset_(offset + len),
+        target_preserving_page_content_(target->is_source_preserving_page_content()),
+        zero_fork_(!target_preserving_page_content_ && target->can_decommit_zero_pages_locked()) {}
+
+  // Increments the cursor to the next offset. Doing so may invalidate the cursor and requiring
+  // recalculating.
+  void IncrementCursor() TA_REQ(lock());
+
+  // Increments the current offset by the given delta, but invalidates the cursor itself requiring
+  // it to be recalculated next time EstablishCursor is called.
+  void IncrementOffsetAndInvalidateCursor(uint64_t delta);
+
+  // Returns whether the cursor is currently valid or needs to be re-calculated.
+  bool IsCursorValid() const {
+    // The owner being set is used to indicate whether the cursor is valid or not. Any operations
+    // that would invalidate the cursor will always clear owner_.
+    return owner_;
+  }
+
+  // Calculates the current cursor, finding the correct owner, owner offset etc. There is always an
+  // owner and this process can never fail.
+  void EstablishCursor() TA_REQ(lock());
+
+  // Helpers for querying the state of the cursor.
+  bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
+  bool CursorIsMarker() const { return owner_cursor_ && owner_cursor_->IsMarker(); }
+  bool CursorIsEmpty() const { return !owner_cursor_ || owner_cursor_->IsEmpty(); }
+  bool CursorIsReference() const { return owner_cursor_ && owner_cursor_->IsReference(); }
+  // Checks if the cursor is exactly at a sentinel, and not generally inside an interval.
+  bool CursorIsIntervalZero() const { return owner_cursor_ && owner_cursor_->IsIntervalZero(); }
+
+  // Checks if the cursor, as determined by the current offset and not the literal cursor_, is in a
+  // zero interval.
+  bool CursorIsInIntervalZero() const TA_REQ(lock()) {
+    return CursorIsIntervalZero() || owner()->page_list_.IsOffsetInZeroInterval(owner_offset_);
+  }
+
+  // The cursor can be considered to have content of zero if either it points at a zero marker, or
+  // the cursor itself is empty and content is initially zero. Content is initially zero if either
+  // there isn't a page source, or the offset is in a zero interval.
+  // If a page source is not preserving content then we could consider it to be zero, except we
+  // would not necessarily be able to fork that zero page to create an owned/writable page. In
+  // practice this case only exists for contiguous VMOs, and the way they are used makes optimizing
+  // to return the zero page in the case of reads not beneficial.
+  bool CursorIsContentZero() const TA_REQ(lock());
+
+  // A usable page is either just any page, if not writing, or if writing, a page that is owned by
+  // the target and doesn't need any dirty transitions. i.e., a page that is ready to use right now.
+  bool CursorIsUsablePage(bool writing) {
+    return CursorIsPage() && (!writing || (owner_ == target_ && !TargetDirtyTracked()));
+  }
+
+  // Determines whether the zero content at the current cursor should be supplied as dirty or not.
+  // This is only allowed to be called if CursorIsContentZero is true.
+  bool TargetZeroContentSupplyDirty(bool writing) const TA_REQ(lock());
+
+  // Returns whether the target is tracking the dirtying of content with dirty pages and dirty
+  // transitions.
+  bool TargetDirtyTracked() const {
+    // Presently no distinction between preserving page content and being dirty tracked.
+    return target_preserving_page_content_;
+  }
+
+  // Turns the supplied page into a result. Does not increment the cursor. |in_target| specifies
+  // whether the page is known to be in target_ or in some parent object.
+  RequireResult PageAsResultNoIncrement(vm_page_t* page, bool in_target);
+
+  // Turns the current cursor, which must be a page, into a result and handles any access time
+  // updating. Increments the cursor.
+  RequireResult CursorAsResult() TA_REQ(lock());
+
+  // Allocates a new page for the target that is a copy of the provided |source| page. On success
+  // page is inserted into target at the current offset_ and the cursor is incremented.
+  zx::result<RequireResult> TargetAllocateCopyPageAsResult(vm_page_t* source,
+                                                           DirtyState dirty_state,
+                                                           LazyPageRequest* page_request)
+      TA_REQ(lock());
+
+  // Attempts to turn the current cursor, which must be a reference, into a page.
+  zx_status_t CursorReferenceToPage(LazyPageRequest* page_request) TA_REQ(lock());
+
+  // Helpers for generating read or dirty requests for the given maximal range.
+  zx_status_t ReadRequest(uint max_request_pages, LazyPageRequest* page_request) TA_REQ(lock());
+  zx_status_t DirtyRequest(uint max_request_pages, LazyPageRequest* page_request) TA_REQ(lock());
+
+  // If we held lock(), then since owner_ is from the same hierarchy as the target then we must also
+  // hold its lock.
+  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_; }
+
+  // Target always exists. This is provided in the constructor and will always be non-null.
+  VmCowPages* const target_;
+
+  // The current offset_ in target_. This will always be <= end_offset_ and is only allowed to
+  // increase. The validity of this range is checked prior to construction by GetLookupCursor
+  uint64_t offset_ = 0;
+
+  // The offset_ in target_ at which the cursor ceases being valid. The end_offset_ itself will
+  // never be used as a valid offset_. VMOs are designed such that the end of a VMO+1 will not
+  // overflow.
+  const uint64_t end_offset_;
+
+  // owner_ represent the current owner of cursor_/pl_cursor_. owner_ can be non-null while cursor_
+  // is null to indicate a lack of content, although in this case the owner_ can also be assumed to
+  // be the root.
+  // owner_ being null is used to indicate that the cursor is invalid and the owner for any content
+  // in the current slot needs to be looked up.
+  VmCowPages* owner_ = nullptr;
+
+  // The offset_ normalized to the current owner_. This is equal to offset_ when owner_ == target_.
+  uint64_t owner_offset_ = 0;
+
+  // Tracks the offset in target_ at which the current pl_cursor_ becomes invalid. This range
+  // essentially means that no VMO between target_ and owner_ had any content, and so the cursor in
+  // owner is free to walk contiguous pages up to this point.
+  // This does not mean that there is no content in the parent_ of owner_, and so even if
+  // visible_end_ is not reached, if an empty slot is found the parent_ must then be checked.
+  // See IncrementCursor for more details.
+  uint64_t visible_end_ = 0;
+
+  // This is a cache of owner_pl_cursor_.current()
+  VmPageOrMarkerRef owner_cursor_;
+
+  // Cursor in the page list of the current owner_ and is invalid if owner_ is nullptr. This is used
+  // to efficiently pull contiguous pages in an owner_ and the current() value of it is cached in
+  // cursor_.
+  VMPLCursor owner_pl_cursor_;
+
+  // Value of target_->is_source_preserving_page_content() cached on creation as there is spare
+  // padding space to store it here, and needed to retrieve this value to initialize zero_fork_
+  // anyway.
+  const bool target_preserving_page_content_;
+
+  // Tracks whether zero forks should be tracked and placed in the corresponding page queue. This is
+  // initialized to true if it's legal to place pages in the zero fork queue, which requires that
+  // target_ not be pager backed.
+  bool zero_fork_ = false;
+
+  // Whether existing pages should be have their access time updated when they are returned.
+  bool mark_accessed_ = false;
+
+  // Optional allocation list that will be used for any page allocations.
+  list_node_t* alloc_list_ = nullptr;
+
+  friend VmCowPages;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_COW_PAGES_H_

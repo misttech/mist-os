@@ -209,6 +209,19 @@ class VmObjectPaged final : public VmObject {
                                                  max_waitable_pages, alloc_list, page_request, out);
   }
 
+  // Gets a reference to a LookupCursor for the specified range in the VMO. The returned cursor and
+  // all the items returned by the cursor are only valid as long as the lock is contiguous held.
+  //
+  // The requested range must be fully inside the VMO, and if a cursor is returned the caller can
+  // assume that all offsets up to |max_len| can be queried. Pages returned by the cursor itself
+  // might be from this VMO or a parent, depending on actual cursor methods used.
+  //
+  // See |VmCowPages::LookupCursor|.
+  zx::result<VmCowPages::LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len)
+      TA_REQ(lock()) {
+    return cow_pages_locked()->GetLookupCursorLocked(offset, max_len);
+  }
+
   zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset, uint64_t size,
                           bool copy_name, fbl::RefPtr<VmObject>* child_vmo) override;
 

@@ -2312,6 +2312,548 @@ void VmCowPages::UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) {
   pq->MarkAccessed(page);
 }
 
+inline void VmCowPages::LookupCursor::EstablishCursor() {
+  // Check if the cursor needs recalculating.
+  if (IsCursorValid()) {
+    return;
+  }
+
+  // Ensure still in the valid range.
+  DEBUG_ASSERT(offset_ < end_offset_);
+  owner_pl_cursor_ = target_->page_list_.LookupMutableCursor(offset_);
+  owner_cursor_ = owner_pl_cursor_.current();
+  // If there's no parent, take the cursor as is, otherwise only accept a cursor that has some
+  // non-empty content.
+  if (!target_->parent_ || !CursorIsEmpty()) {
+    owner_ = target_;
+    owner_offset_ = offset_;
+    visible_end_ = end_offset_;
+  } else {
+    // Start our visible length as the range available in the target, allowing
+    // FindInitialPageContentLocked to trim it to the actual visible range. Skip this process if our
+    // starting range is a page in size as it's redundant since we know our visible length is always
+    // at least a page.
+    uint64_t visible_length = end_offset_ - offset_;
+    owner_pl_cursor_ = target_->FindInitialPageContentLocked(
+        offset_, &owner_, &owner_offset_, visible_length > PAGE_SIZE ? &visible_length : nullptr);
+    owner_cursor_ = owner_pl_cursor_.current();
+    visible_end_ = offset_ + visible_length;
+    DEBUG_ASSERT((owner_ != target_) || (owner_offset_ == offset_));
+  }
+}
+
+inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsResultNoIncrement(
+    vm_page_t* page, bool in_target) {
+  // The page is writable if it's present in the target (non owned pages are never writable) and it
+  // does not need a dirty transition. A page doesn't need a dirty transition if the target isn't
+  // preserving page contents, or if the page is just already dirty.
+  RequireResult result{page,
+                       (in_target && (!target_preserving_page_content_ || is_page_dirty(page)))};
+  return result;
+}
+
+inline void VmCowPages::LookupCursor::IncrementCursor() {
+  offset_ += PAGE_SIZE;
+  if (offset_ == visible_end_) {
+    // Have reached either the end of the valid iteration range, or the end of the visible portion
+    // of the owner. In the latter case we set owner_ to null as we need to walk up the hierarchy
+    // again to find the next owner that applies to this slot.
+    // In the case where we have reached the end of the range, i.e. offset_ is also equal to
+    // end_offset_, there is nothing we need to do, but to ensure that an error is generated if the
+    // user incorrectly attempts to get another page we also set the owner to the nullptr.
+    owner_ = nullptr;
+  } else {
+    // Increment the owner offset and step the page list cursor to the next slot.
+    owner_offset_ += PAGE_SIZE;
+    owner_pl_cursor_.step();
+    owner_cursor_ = owner_pl_cursor_.current();
+
+    // When iterating, it's possible that we need to find a new owner even before we hit the
+    // visible_end_. This happens since even if we have no content at our cursor, we might have a
+    // parent with content, and the visible_end_ is tracking the range visible in us from the
+    // target and does not imply we have all the content.
+    // Consider a simple hierarchy where the root has a page in slot 1, [.P.], then its child has a
+    // page in slot 0 [P...] and then its child, the target, has no pages [...]
+    // A cursor on this range will initially find the owner as this middle object, and a visible
+    // length of 3 pages. However, when we step the cursor we clearly need to then walk up to our
+    // parent to get the page.
+    // In this case we would ideally walk up to the parent, if there is one, and check for content,
+    // or if no parent keep returning empty slots. Unfortunately once the cursor returns a nullptr
+    // we cannot know where the next content might be.
+    // To make things simpler we just invalidate owner_ if we hit this case and re-walk from the
+    // bottom again.
+    if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
+      owner_ = nullptr;
+    }
+  }
+}
+
+inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::CursorAsResult() {
+  if (mark_accessed_) {
+    owner()->UpdateOnAccessLocked(owner_cursor_->Page(), 0);
+  }
+  // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
+  // actual writability of the page.
+  RequireResult result = PageAsResultNoIncrement(owner_cursor_->Page(), owner_ == target_);
+  IncrementCursor();
+  return result;
+}
+
+void VmCowPages::LookupCursor::IncrementOffsetAndInvalidateCursor(uint64_t delta) {
+  offset_ += delta;
+  owner_ = nullptr;
+}
+
+bool VmCowPages::LookupCursor::CursorIsContentZero() const {
+  // Markers are always zero.
+  if (CursorIsMarker()) {
+    return true;
+  }
+
+  if (owner_->page_source_) {
+    // With a page source emptiness implies needing to request content, however we can have zero
+    // intervals which do start as zero content.
+    return CursorIsInIntervalZero();
+  }
+  // Without a page source emptiness is filled with zeros and intervals are only permitted if there
+  // is a page source.
+  return CursorIsEmpty();
+}
+
+bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const {
+  if (!TargetDirtyTracked()) {
+    return false;
+  }
+  if (writing) {
+    return true;
+  }
+  // Markers start clean
+  if (CursorIsMarker()) {
+    return false;
+  }
+  // The only way this offset can have been zero content and reach here, is if we are in an
+  // interval. If this slot were empty then, since we are dirty tracked and hence must have a
+  // page source, we would not consider this zero.
+  DEBUG_ASSERT(CursorIsInIntervalZero());
+  // Zero intervals are considered implicitly dirty and allocating them, even for reading, causes
+  // them to be supplied as new dirty pages.
+  return true;
+}
+
+zx::result<VmCowPages::LookupCursor::RequireResult>
+VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, DirtyState dirty_state,
+                                                         LazyPageRequest* page_request) {
+  // The general pmm_alloc_flags_ are not allowed to contain the BORROW option, and this is relied
+  // upon below to assume the page allocated cannot be loaned.
+  DEBUG_ASSERT(!(target_->pmm_alloc_flags_ & PMM_ALLOC_FLAG_CAN_BORROW));
+
+  vm_page_t* out_page = nullptr;
+  zx_status_t status = AllocateCopyPage(target_->pmm_alloc_flags_, source->paddr(), alloc_list_,
+                                        page_request, &out_page);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  // The forked page was just allocated, and so cannot be a loaned page.
+  DEBUG_ASSERT(!out_page->is_loaned());
+
+  // We could be allocating a page to replace a zero page marker in a pager-backed VMO. If so then
+  // set its dirty state to what was requested, AddPageLocked below will then insert the page into
+  // the appropriate page queue.
+  if (target_preserving_page_content_) {
+    // The only page we can be forking here is the zero page.
+    DEBUG_ASSERT(source == vm_get_zero_page());
+    // The object directly owns the page.
+    DEBUG_ASSERT(owner_ == target_);
+
+    target_->UpdateDirtyStateLocked(out_page, offset_, dirty_state,
+                                    /*is_pending_add=*/true);
+  }
+  VmPageOrMarker insert = VmPageOrMarker::Page(out_page);
+  status = target_->AddPageLocked(&insert, offset_, CanOverwriteContent::Zero, nullptr);
+  if (status != ZX_OK) {
+    // AddPageLocked failing for any other reason is a programming error.
+    DEBUG_ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "status=%d\n", status);
+    // We are freeing a page we just got from the PMM (or from the alloc_list), so we do not own
+    // it yet.
+    target_->FreePageLocked(insert.ReleasePage(), /*freeing_owned_page=*/false);
+    return zx::error(status);
+  }
+  target_->IncrementHierarchyGenerationCountLocked();
+
+  // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
+  // correct queue.
+  if (zero_fork_ && source == vm_get_zero_page()) {
+    pmm_page_queues()->MoveToAnonymousZeroFork(out_page);
+  }
+
+  // This is the only path where we can allocate a new page without being a clone (clones are
+  // always cached). So we check here if we are not fully cached and if so perform a
+  // clean/invalidate to flush our zeroes. After doing this we will not touch the page via the
+  // physmap and so we can pretend there isn't an aliased mapping.
+  // There are three potential states that may exist
+  //  * VMO is cached, paged_ref_ might be null, we might have children -> no cache op needed
+  //  * VMO is uncached, paged_ref_ is not null, we have no children -> cache op needed
+  //  * VMO is uncached, paged_ref_ is null, we have no children -> cache op not needed /
+  //                                                                state cannot happen
+  // In the uncached case we know we have no children, since it is by definition not valid to
+  // have copy-on-write children of uncached pages. The third case cannot happen, but even if it
+  // could with no children and no paged_ref_ the pages cannot actually be referenced so any
+  // cache operation is pointless.
+  // The paged_ref_ could be null if the VmObjectPaged has been destroyed.
+  if (target_->paged_ref_) {
+    AssertHeld(target_->paged_ref_->lock_ref());
+    if (target_->paged_ref_->GetMappingCachePolicyLocked() != ARCH_MMU_FLAG_CACHED) {
+      arch_clean_invalidate_cache_range((vaddr_t)paddr_to_physmap(out_page->paddr()), PAGE_SIZE);
+    }
+  }
+
+  // Need to increment the cursor, but we have also potentially modified the page lists in the
+  // process of inserting the page.
+  if (owner_ == target_) {
+    // In the case of owner_ == target_ we may have create a node and need to establish a cursor.
+    // However, if we already had a node, i.e. the cursor was valid, then it would have had the page
+    // inserted into it.
+    if (!owner_pl_cursor_.current()) {
+      IncrementOffsetAndInvalidateCursor(PAGE_SIZE);
+    } else {
+      // Cursor should have been updated to the new page
+      DEBUG_ASSERT(CursorIsPage());
+      DEBUG_ASSERT(owner_cursor_->Page() == out_page);
+      IncrementCursor();
+    }
+  } else {
+    // If owner_ != target_ then owner_ page list will not have been modified, so safe to just
+    // increment.
+    IncrementCursor();
+  }
+
+  // Return the page. We know it's in the target, since we just put it there, but let PageAsResult
+  // determine if that means it is actually writable or not.
+  return zx::ok(PageAsResultNoIncrement(out_page, true));
+}
+
+zx_status_t VmCowPages::LookupCursor::CursorReferenceToPage(LazyPageRequest* page_request) {
+  DEBUG_ASSERT(CursorIsReference());
+
+  return owner()->ReplaceReferenceWithPageLocked(owner_cursor_, owner_offset_, page_request);
+}
+
+zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
+                                                  LazyPageRequest* page_request) {
+  // The owner must have a page_source_ to be doing a read request.
+  DEBUG_ASSERT(owner_->page_source_);
+  // The cursor should be explicitly empty as read requests are only for complete content absence.
+  DEBUG_ASSERT(CursorIsEmpty());
+  DEBUG_ASSERT(!CursorIsInIntervalZero());
+  // The total range requested should not be beyond the cursors valid range.
+  DEBUG_ASSERT(offset_ + PAGE_SIZE * max_request_pages <= end_offset_);
+  DEBUG_ASSERT(max_request_pages > 0);
+
+  VmoDebugInfo vmo_debug_info{};
+  // The page owner has a page source so it cannot be a hidden node, but the VmObjectPaged
+  // could have been destroyed. We could be looking up a page via a lookup in a child after
+  // the parent VmObjectPaged has gone away, so paged_ref_ could be null. Let the page source
+  // handle any failures requesting the pages.
+  if (owner()->paged_ref_) {
+    AssertHeld(owner()->paged_ref_->lock_ref());
+    vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(owner()->paged_ref_),
+                      .vmo_id = owner()->paged_ref_->user_id_locked()};
+  }
+
+  // Try and batch more pages up to |max_request_pages|.
+  uint64_t request_size = static_cast<uint64_t>(max_request_pages) * PAGE_SIZE;
+  if (owner_ != target_) {
+    DEBUG_ASSERT(visible_end_ > offset_);
+    // Limit the request by the number of pages that are actually visible from the target_ to
+    // owner_
+    request_size = ktl::min(request_size, visible_end_ - offset_);
+  }
+  // Limit |request_size| to the first page visible in the page owner to avoid requesting pages
+  // that are already present. If there is one page present in an otherwise long run of absent pages
+  // then it might be preferable to have one big page request, but for now only request absent
+  // pages.If already requesting a single page then can avoid the page list operation.
+  if (request_size > PAGE_SIZE) {
+    owner()->page_list_.ForEveryPageInRange(
+        [&](const VmPageOrMarker* p, uint64_t offset) {
+          // Content should have been empty initially, so should not find anything at the start
+          // offset.
+          DEBUG_ASSERT(offset > owner_offset_);
+          // If this is an interval sentinel, it can only be a start or slot, since we know we
+          // started in a true gap outside of an interval.
+          DEBUG_ASSERT(!p->IsInterval() || p->IsIntervalSlot() || p->IsIntervalStart());
+          const uint64_t new_size = offset - owner_offset_;
+          // Due to the limited range of the operation, the only way this callback ever fires is if
+          // the range is actually getting trimmed.
+          DEBUG_ASSERT(new_size < request_size);
+          request_size = new_size;
+          return ZX_ERR_STOP;
+        },
+        owner_offset_, owner_offset_ + request_size);
+  }
+  DEBUG_ASSERT(request_size >= PAGE_SIZE);
+
+  zx_status_t status = owner_->page_source_->GetPages(owner_offset_, request_size,
+                                                      page_request->get(), vmo_debug_info);
+  // Pager page sources will never synchronously return a page.
+  DEBUG_ASSERT(status != ZX_OK);
+  return status;
+}
+
+zx_status_t VmCowPages::LookupCursor::DirtyRequest(uint max_request_pages,
+                                                   LazyPageRequest* page_request) {
+  // Dirty requests, unlike read requests, happen directly against the target, and not the owner.
+  // This is because to make something dirty you must own it, i.e. target_ is already equal to
+  // owner_.
+  DEBUG_ASSERT(target_ == owner_);
+  DEBUG_ASSERT(target_->page_source_);
+  DEBUG_ASSERT(max_request_pages > 0);
+  DEBUG_ASSERT(offset_ + PAGE_SIZE * max_request_pages <= end_offset_);
+
+  // As we know target_==owner_ there is no need to trim the requested range to any kind of visible
+  // range, so just attempt to dirty the entire range.
+  uint64_t dirty_len = 0;
+  zx_status_t status = target_->PrepareForWriteLocked(offset_, PAGE_SIZE * max_request_pages,
+                                                      page_request, &dirty_len);
+  if (status == ZX_OK) {
+    // If success is claimed then it must be the case that at least one page was dirtied, allowing
+    // us to make progress.
+    DEBUG_ASSERT(dirty_len != 0 && dirty_len <= max_request_pages * PAGE_SIZE);
+  } else {
+    DEBUG_ASSERT(dirty_len == 0);
+  }
+  return status;
+}
+
+vm_page_t* VmCowPages::LookupCursor::MaybePage(bool will_write) {
+  EstablishCursor();
+
+  // If the page is immediately usable, i.e. no dirty transitions etc needed, then we can provide
+  // it. Otherwise just increment the cursor and return the nullptr.
+  vm_page_t* page = CursorIsUsablePage(will_write) ? owner_cursor_->Page() : nullptr;
+
+  if (page && mark_accessed_) {
+    owner()->UpdateOnAccessLocked(page, 0);
+  }
+
+  IncrementCursor();
+
+  return page;
+}
+
+uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, paddr_t* paddrs) {
+  // Ensure that the requested range is valid.
+  DEBUG_ASSERT(offset_ + PAGE_SIZE * max_pages <= end_offset_);
+  DEBUG_ASSERT(paddrs);
+
+  EstablishCursor();
+
+  // We only return actual pages that are ready to use right now without any dirty transitions or
+  // copy-on-write or needing to mark them accessed.
+  if (!CursorIsUsablePage(will_write) || mark_accessed_) {
+    return 0;
+  }
+
+  // Trim max pages to the visible length of the current owner. This only has an effect when
+  // target_ != owner_ as otherwise the visible_end_ is the same as end_offset_ and we already
+  // validated that we are within that range.
+  if (owner_ != target_) {
+    max_pages = ktl::min(max_pages, static_cast<uint>((visible_end_ - offset_) / PAGE_SIZE));
+  }
+  DEBUG_ASSERT(max_pages > 0);
+
+  // Take up to the max_pages as long as they exist contiguously.
+  uint pages = 0;
+  owner_pl_cursor_.ForEveryContiguous([&](VmPageOrMarkerRef page) {
+    if (page->IsPage()) {
+      paddrs[pages] = page->Page()->paddr();
+      pages++;
+      return pages == max_pages ? ZX_ERR_STOP : ZX_ERR_NEXT;
+    }
+    return ZX_ERR_STOP;
+  });
+  // Update the cursor to reflect the number of pages we found and are returning.
+  // We could check if cursor is still valid, but it's more efficient to just invalidate it and let
+  // any potential next page request recalculate it.
+  IncrementOffsetAndInvalidateCursor(pages * PAGE_SIZE);
+  return pages;
+}
+
+zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireOwnedPage(
+    bool will_write, uint max_request_pages, LazyPageRequest* page_request) {
+  DEBUG_ASSERT(page_request);
+
+  // Make sure the cursor is valid.
+  EstablishCursor();
+
+  // Convert any references to pages.
+  if (CursorIsReference()) {
+    // Decompress in place.
+    zx_status_t status = CursorReferenceToPage(page_request);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+  }
+
+  // If page exists in the target, i.e. the owner is the target, then we handle this case separately
+  // as it's the only scenario where we might be dirtying an existing committed page.
+  if (owner_ == target_ && CursorIsPage()) {
+    // If we're writing to a root VMO backed by a user pager, i.e. a VMO whose page source preserves
+    // page contents, we might need to mark pages Dirty so that they can be written back later. This
+    // is the only path that can result in a write to such a page; if the page was not present, we
+    // would have already blocked on a read request the first time, and ended up here when
+    // unblocked, at which point the page would be present.
+    if (will_write && target_preserving_page_content_) {
+      // If this page was loaned, it should be replaced with a non-loaned page, so that we can make
+      // progress with marking pages dirty. PrepareForWriteLocked terminates its page walk when it
+      // encounters a loaned page; loaned pages are reclaimed by evicting them and we cannot evict
+      // dirty pages.
+      if (owner_cursor_->Page()->is_loaned()) {
+        vm_page_t* res_page = nullptr;
+        DEBUG_ASSERT(is_page_clean(owner_cursor_->Page()));
+        zx_status_t status = target_->ReplacePageLocked(
+            owner_cursor_->Page(), offset_, /*with_loaned=*/false, &res_page, page_request);
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+        // Cursor should remain valid and have been replaced with the page.
+        DEBUG_ASSERT(CursorIsPage());
+        DEBUG_ASSERT(owner_cursor_->Page() == res_page);
+        DEBUG_ASSERT(!owner_cursor_->Page()->is_loaned());
+      }
+      // If the page is not already dirty, then generate a dirty request. The dirty request code can
+      // handle the page already being dirty, this is just a short circuit optimization.
+      if (!is_page_dirty(owner_cursor_->Page())) {
+        zx_status_t status = DirtyRequest(max_request_pages, page_request);
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+      }
+    }
+    // Return the page.
+    return zx::ok(CursorAsResult());
+  }
+
+  // Should there be page, but it not be owned by the target, then we are performing copy on write
+  // into the target. As the target cannot have a page source do not need to worry about writes or
+  // dirtying.
+  if (CursorIsPage()) {
+    DEBUG_ASSERT(owner_ != target_);
+    vm_page_t* res_page = nullptr;
+    // Although we are not returning the page, the act of forking counts as an access, and this is
+    // an access regardless of whether the final returned page should be considered accessed, so
+    // ignore the mark_accessed_ check here.
+    owner()->UpdateOnAccessLocked(owner_cursor_->Page(), 0);
+    if (!owner()->is_hidden_locked()) {
+      // Directly copying the page from the owner into the target.
+      return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked,
+                                            page_request);
+    }
+    zx_status_t result =
+        target_->CloneCowPageLocked(offset_, alloc_list_, owner_, owner_cursor_->Page(),
+                                    owner_offset_, page_request, &res_page);
+    if (result != ZX_OK) {
+      return zx::error(result);
+    }
+    target_->IncrementHierarchyGenerationCountLocked();
+    // Cloning the cow page may have impacted our cursor due to a split page being moved so
+    // invalidate the cursor to perform a fresh lookup on the next page requested.
+    IncrementOffsetAndInvalidateCursor(PAGE_SIZE);
+    // This page as just allocated so no need to worry about update access times, can just return.
+    return zx::ok(RequireResult{res_page, true});
+  }
+
+  // Zero content is the most complicated cases where, even if reading, dirty requests might need to
+  // be performed and the resulting committed pages may / may not be dirty.
+  if (CursorIsContentZero()) {
+    // If the page source is preserving content (is a PagerProxy), and is configured to trap dirty
+    // transitions, we first need to generate a DIRTY request *before* the zero page can be forked
+    // and marked dirty. If dirty transitions are not trapped, we will fall through to allocate the
+    // page and then mark it dirty below.
+    //
+    // Note that the check for ShouldTrapDirtyTransitions() is an optimization here.
+    // PrepareForWriteLocked() would do the right thing depending on ShouldTrapDirtyTransitions(),
+    // however we choose to avoid the extra work only to have it be a no-op if dirty transitions
+    // should not be trapped.
+    const bool target_page_dirty = TargetZeroContentSupplyDirty(will_write);
+    if (target_page_dirty && target_->page_source_->ShouldTrapDirtyTransitions()) {
+      zx_status_t status = DirtyRequest(max_request_pages, page_request);
+      // Since we know we have a page source that traps, and page sources will never succeed
+      // synchronously, our dirty request must have 'failed'.
+      DEBUG_ASSERT(status != ZX_OK);
+      return zx::error(status);
+    }
+    // Allocate the page and mark it dirty or clean as previously determined.
+    return TargetAllocateCopyPageAsResult(vm_get_zero_page(),
+                                          target_page_dirty ? DirtyState::Dirty : DirtyState::Clean,
+                                          page_request);
+  }
+  DEBUG_ASSERT(CursorIsEmpty());
+
+  // Generate a read request to populate the content in the owner. Even if this is a write, we still
+  // populate content first, then perform any dirty transitions / requests.
+  return zx::error(ReadRequest(max_request_pages, page_request));
+}
+
+zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireReadPage(
+    uint max_request_pages, LazyPageRequest* page_request) {
+  DEBUG_ASSERT(page_request);
+
+  // Make sure the cursor is valid.
+  EstablishCursor();
+
+  // If there's a page or reference, return it.
+  if (CursorIsPage() || CursorIsReference()) {
+    if (CursorIsReference()) {
+      zx_status_t status = CursorReferenceToPage(page_request);
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+      DEBUG_ASSERT(CursorIsPage());
+    }
+    return zx::ok(CursorAsResult());
+  }
+
+  // Check for zero page options.
+  if (CursorIsContentZero()) {
+    IncrementCursor();
+    return zx::ok(RequireResult{vm_get_zero_page(), false});
+  }
+
+  // No available content, need to fetch it from the page source. ReadRequest performs all the
+  // requisite asserts to ensure we are not doing this mistakenly.
+  return zx::error(ReadRequest(max_request_pages, page_request));
+}
+
+zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(uint64_t offset,
+                                                                       uint64_t max_len) {
+  canary_.Assert();
+  DEBUG_ASSERT(!is_hidden_locked());
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset) && max_len > 0 && IS_PAGE_ALIGNED(max_len));
+  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+
+  if (unlikely(offset >= size_ || !InRange(offset, max_len, size_))) {
+    return zx::error{ZX_ERR_OUT_OF_RANGE};
+  }
+
+  if (discardable_tracker_) {
+    discardable_tracker_->assert_cow_pages_locked();
+    // This vmo was discarded and has not been locked yet after the discard. Do not return any
+    // pages.
+    if (discardable_tracker_->WasDiscardedLocked()) {
+      return zx::error{ZX_ERR_NOT_FOUND};
+    }
+  }
+
+  if (is_slice_locked()) {
+    uint64_t parent_offset = 0;
+    VmCowPages* parent = PagedParentOfSliceLocked(&parent_offset);
+    AssertHeld(parent->lock_ref());
+    return parent->GetLookupCursorLocked(offset + parent_offset, max_len);
+  }
+
+  return zx::ok(LookupCursor(this, offset, max_len));
+}
+
 // Looks up the page at the requested offset, faulting it in if requested and necessary.  If
 // this VMO has a parent and the requested page isn't found, the parent will be searched.
 //
