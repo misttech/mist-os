@@ -284,11 +284,7 @@ class CompositeTestCase : public MultipleDeviceTestCase {
     return config;
   }
 
-  void SetUp() override {
-    MultipleDeviceTestCase::SetUp();
-    ASSERT_NOT_NULL(coordinator().LoadFragmentDriver());
-    ASSERT_NOT_NULL(coordinator().driver_loader().LoadDriverUrl(kFakeDriverUrl));
-  }
+  void SetUp() override { MultipleDeviceTestCase::SetUp(); }
 
   void TearDown() override {
     driver_index_loop_.Quit();
@@ -333,7 +329,7 @@ void CompositeTestCase::CheckCompositeFragments(const char* composite_name,
   for (size_t i = 0; i < device_indexes_count; ++i) {
     auto device_state = device(device_indexes[i]);
     // Check that the fragments got bound
-    fbl::String driver = coordinator().LoadFragmentDriver()->url;
+    fbl::String driver = fdf::kFragmentDriverUrl;
     ASSERT_NO_FATAL_FAILURE(device_state->CheckBindDriverReceivedAndReply(driver.data()));
     coordinator_loop()->RunUntilIdle();
 
@@ -714,7 +710,7 @@ TEST_F(CompositeTestCase, SharedFragmentUnbinds) {
   {
     auto device_state = device(device_indexes[0]);
     // Wait for the fragments to get bound
-    fbl::String driver = coordinator().LoadFragmentDriver()->url;
+    fbl::String driver = fdf::kFragmentDriverUrl;
     ASSERT_NO_FATAL_FAILURE(device_state->CheckBindDriverReceivedAndReply(driver.data()));
     coordinator_loop()->RunUntilIdle();
 
@@ -725,7 +721,7 @@ TEST_F(CompositeTestCase, SharedFragmentUnbinds) {
   {
     auto device_state = device(device_indexes[0]);
     // Wait for the fragments to get bound
-    fbl::String driver = coordinator().LoadFragmentDriver()->url;
+    fbl::String driver = fdf::kFragmentDriverUrl;
     ASSERT_NO_FATAL_FAILURE(device_state->CheckBindDriverReceivedAndReply(driver.data()));
     coordinator_loop()->RunUntilIdle();
 
@@ -808,7 +804,7 @@ TEST_F(CompositeTestCase, FragmentUnbinds) {
   {
     auto device_state = device(device_indexes[0]);
     // Wait for the fragments to get bound
-    fbl::String driver = coordinator().LoadFragmentDriver()->url;
+    fbl::String driver = fdf::kFragmentDriverUrl;
     ASSERT_NO_FATAL_FAILURE(device_state->CheckBindDriverReceivedAndReply(driver.data()));
     coordinator_loop()->RunUntilIdle();
 
@@ -1287,7 +1283,7 @@ TEST_F(CompositeMetadataTestCase, GetMetadataAfterCompositeReassemble) {
   {
     auto device_state = device(device_indexes[0]);
     // Wait for the fragments to get bound
-    fbl::String driver = coordinator().LoadFragmentDriver()->url;
+    fbl::String driver = fdf::kFragmentDriverUrl;
     ASSERT_NO_FATAL_FAILURE(device_state->CheckBindDriverReceivedAndReply(driver.data()));
     coordinator_loop()->RunUntilIdle();
 
@@ -1401,7 +1397,7 @@ TEST_F(CompositeTestCase, DeviceIteratorCompositeSibling) {
 
 TEST_F(CompositeTestCase, DeviceIteratorOrphanFragment) {
   size_t index;
-  fbl::String driver = coordinator().LoadFragmentDriver()->url;
+  fbl::String driver = fdf::kFragmentDriverUrl;
   ASSERT_NO_FATAL_FAILURE(AddDevice(platform_bus()->device, "fragment-device", 0, driver, &index));
 
   device(index)->device->DetachFromParent();

@@ -335,12 +335,6 @@ void Coordinator::LoadV1Drivers(std::string_view root_device_driver) {
 }
 
 void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
-  // If the root device is not a path, then we try to load it like a URL.
-  if (root_device_driver[0] != '/') {
-    auto string = std::string(root_device_driver.data());
-    driver_loader_.LoadDriverUrl(string);
-  }
-
   root_device_ =
       fbl::MakeRefCounted<Device>(this, "sys", root_device_driver, nullptr, 0, zx::vmo(),
                                   fidl::ClientEnd<fuchsia_device_manager::DeviceController>(),

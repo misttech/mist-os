@@ -159,13 +159,6 @@ class Coordinator : public CompositeManagerBridge,
   // Function to attempt binding a driver to the device.
   zx_status_t AttemptBind(const MatchedDriverInfo matched_driver, const fbl::RefPtr<Device>& dev);
 
-  const Driver* LoadFragmentDriver() {
-    return driver_loader_.LoadDriverUrl(std::string{fdf::kFragmentDriverUrl});
-  }
-  const Driver* LoadFragmentProxyDriver() {
-    return driver_loader_.LoadDriverUrl(std::string{fdf::kFragmentProxyDriverUrl});
-  }
-
   zx_status_t NewDriverHost(const char* name, fbl::RefPtr<DriverHost>* out);
 
   // These methods are used by the DriverHost class to register in the coordinator's bookkeeping

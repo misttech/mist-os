@@ -298,11 +298,6 @@ zx_status_t Device::CreateProxy(
     const char* end = strstr(begin, ".cm");
     std::string_view prefix(begin, end == nullptr ? driver_path.size() : end - begin);
     driver_path = fbl::String::Concat({prefix, ".proxy.cm"});
-    // If the proxy is a URL we have to load it first.
-    if (driver_path[0] != '/') {
-      std::string string(driver_path.data());
-      coordinator->driver_loader().LoadDriverUrl(string);
-    }
   }
 
   auto dev = fbl::MakeRefCounted<Device>(this->coordinator, fbl::String::Concat({name_, "-proxy"}),
