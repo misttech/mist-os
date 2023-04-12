@@ -127,6 +127,8 @@ pub struct FullmacMlme {
 
 impl FullmacMlme {
     pub fn start(device: FullmacDeviceInterface) -> Result<FullmacMlmeHandle, anyhow::Error> {
+        // Logger requires the executor to be initialized first.
+        let mut executor = fasync::LocalExecutor::new();
         logger::init();
 
         let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
@@ -150,7 +152,6 @@ impl FullmacMlme {
             executor.run_singlethreaded(future);
         });
 
-        let mut executor = fasync::LocalExecutor::new();
         let startup_result = executor.run_singlethreaded(startup_receiver);
         match startup_result.map_err(|_e| FullmacMlmeError::UnableToGetStartupResult) {
             Ok(Ok(())) => Ok(FullmacMlmeHandle {

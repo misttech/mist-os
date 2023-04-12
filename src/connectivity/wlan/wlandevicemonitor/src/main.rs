@@ -17,7 +17,6 @@ use {
         server::{ServiceFs, ServiceObjLocal},
     },
     fuchsia_inspect::{Inspector, InspectorConfig},
-    fuchsia_syslog as syslog,
     futures::{
         channel::mpsc,
         future::{try_join4, BoxFuture},
@@ -69,10 +68,8 @@ fn serve_phys(
     Box::pin(fut)
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["wlan"])]
 async fn main() -> Result<(), Error> {
-    // Initialize logging with a tag that can be used to select these logs for forwarding to console
-    syslog::init_with_tags(&["wlan"]).expect("Syslog init should not fail");
     log::set_max_level(MAX_LOG_LEVEL);
 
     info!("Starting");

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_syslog as syslog, std::sync::Once};
+use std::sync::Once;
 
 static LOGGER_ONCE: Once = Once::new();
 
@@ -12,6 +12,6 @@ pub fn init() {
     // a shared `Once::call_once()`.
     LOGGER_ONCE.call_once(|| {
         // Initialize logging with a tag that can be used to filter for forwarding to console
-        syslog::init_with_tags(&["wlan"]).expect("Syslog init should not fail");
+        diagnostics_log::init!(&["wlan"]);
     });
 }

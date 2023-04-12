@@ -16,11 +16,9 @@ pub mod test_helper;
 use anyhow::{Context, Error};
 use argh::FromArgs;
 use fidl_fuchsia_wlan_device_service::DeviceServiceRequestStream;
-use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{Inspector, InspectorConfig};
 use fuchsia_inspect_contrib::auto_persist;
-use fuchsia_syslog as syslog;
 use fuchsia_trace as ftrace;
 use fuchsia_trace_provider as ftrace_provider;
 use futures::future::try_join;
@@ -62,10 +60,8 @@ impl From<wlanstack_config::Config> for ServiceCfg {
     }
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["wlan"])]
 async fn main() -> Result<(), Error> {
-    // Initialize logging with a tag that can be used to select these logs for forwarding to console
-    syslog::init_with_tags(&["wlan"]).expect("Syslog init should not fail");
     ftrace_provider::trace_provider_create_with_fdio();
     ftrace::instant!(
         wtrace::CATEGORY_WLAN!(),

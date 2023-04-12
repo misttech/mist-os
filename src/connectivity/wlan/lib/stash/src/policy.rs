@@ -8,7 +8,6 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_stash as fidl_stash,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_syslog::fx_log_err,
     std::collections::HashMap,
     wlan_stash_constants::{NODE_SEPARATOR, POLICY_DATA_KEY, POLICY_STASH_PREFIX},
 };
@@ -135,7 +134,7 @@ impl PolicyStash {
                                 config_list.push(network_config);
                             }
                             Err(e) => {
-                                fx_log_err!("Error loading from stash: {:?}", e);
+                                tracing::error!("Error loading from stash: {:?}", e);
                             }
                         }
                     }
@@ -146,7 +145,7 @@ impl PolicyStash {
                     network_configs.insert(net_id, config_list);
                 }
                 Err(e) => {
-                    fx_log_err!("Error reading network identifier from stash: {:?}", e);
+                    tracing::error!("Error reading network identifier from stash: {:?}", e);
                     continue;
                 }
             }

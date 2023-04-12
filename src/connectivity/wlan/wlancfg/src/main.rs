@@ -17,7 +17,7 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::component,
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_syslog as syslog, fuchsia_trace as ftrace, fuchsia_trace_provider as ftrace_provider,
+    fuchsia_trace as ftrace, fuchsia_trace_provider as ftrace_provider,
     fuchsia_zircon::prelude::*,
     futures::{
         self,
@@ -441,10 +441,8 @@ async fn run_all_futures() -> Result<(), Error> {
 
 // The return value from main() gets swallowed, including if it returns a Result<Err>. Therefore,
 // use this simple wrapper to ensure that any errors from run_all_futures() are printed to the log.
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["wlan"])]
 async fn main() {
-    // Initialize logging with a tag that can be used to select these logs for forwarding to console
-    syslog::init_with_tags(&["wlan"]).expect("Syslog init should not fail");
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     ftrace_provider::trace_provider_create_with_fdio();
     ftrace::instant!(

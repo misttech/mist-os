@@ -8,7 +8,6 @@ use {
     fidl_fuchsia_wlan_device_service::{
         DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
     },
-    fuchsia_syslog::fx_log_info,
     fuchsia_zircon as zx,
 };
 
@@ -35,7 +34,7 @@ pub async fn get_first_iface(
     if wlan_iface_ids.len() == 0 {
         return Err(format_err!("No wlan interface found"));
     }
-    fx_log_info!("Found {} wlan iface entries", wlan_iface_ids.len());
+    tracing::info!("Found {} wlan iface entries", wlan_iface_ids.len());
     for iface_id in wlan_iface_ids {
         let iface_info = query_iface(monitor_proxy, iface_id).await?;
 
@@ -59,7 +58,7 @@ pub async fn destroy_iface(monitor_proxy: &DeviceMonitorProxy, iface_id: u16) ->
 
     let response = monitor_proxy.destroy_iface(&mut req).await.context("Error destroying iface")?;
     zx::Status::ok(response).context("Destroy iface returned non-OK status")?;
-    Ok(fx_log_info!("Destroyed iface {:?}", iface_id))
+    Ok(tracing::info!("Destroyed iface {:?}", iface_id))
 }
 
 async fn query_iface(
