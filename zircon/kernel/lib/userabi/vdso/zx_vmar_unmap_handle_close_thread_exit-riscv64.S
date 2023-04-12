@@ -21,6 +21,7 @@ syscall_entry_begin zx_vmar_unmap_handle_close_thread_exit
   .cfi_adjust_cfa_offset 16
   sd s1, (sp)
   .cfi_offset s1, -16
+  mv s1, a3
 
   zircon_syscall ZX_SYS_vmar_unmap, zx_vmar_unmap, zx_vmar_unmap_handle_close_thread_exit
   bnez a0, .Lvmar_unmap_fail
