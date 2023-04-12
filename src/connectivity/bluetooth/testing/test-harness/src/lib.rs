@@ -121,7 +121,7 @@ where
     F: FnOnce(H) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    fuchsia_syslog::init().expect("could not initialize logger");
+    diagnostics_log::init!();
     let state = Default::default();
     let (harness, env, runner) = H::init(&state).await.expect("couldn't initialize harness");
     // Drop `state` so that SharedState entries may be dropped if not needed during test execution.
