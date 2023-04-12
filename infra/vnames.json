@@ -1,0 +1,9 @@
+[
+  {
+    "pattern": "out/(.*)",
+    "vname": {
+      "root": "out",
+      "path": "@1@"
+    }
+  }
+]
