@@ -3,6 +3,8 @@
     "manufacturer": "AMLogic",
     "families": [],
     "models": [
+        "T931",
+        "S905D3",
         "S905D2",
         "A311D"
     ],

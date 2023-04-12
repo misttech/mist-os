@@ -59,6 +59,8 @@ struct CanvasEntry {
 class AmlCanvas : public DeviceType,
                   public ddk::AmlogicCanvasProtocol<AmlCanvas, ddk::base_protocol> {
  public:
+  // `mmio` is the region documented as DMC in Section 8.1 "Memory Map" of the
+  // AMLogic A311D datasheet.
   AmlCanvas(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti)
       : DeviceType(parent), dmc_regs_(std::move(mmio)), bti_(std::move(bti)) {}
 

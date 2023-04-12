@@ -7,14 +7,15 @@
 
 #include <hwreg/bitfields.h>
 
-// The register definitions here are stitched together from the AMLogic A311D
-// datasheet revision 08 section 13.1.2 "Memory Interface" > "DDR" >
-// "Register Description" and the S912 datasheet revision 0.1 section 30.2 "DDR"
-// > "Register Description".
+// The register definitions here are stitched together from the A311D datasheet
+// revision 08 section 13.1.2 "Memory Interface" > "DDR" > "Register
+// Description", and from experimentally confirmed clues in the S912 datasheet
+// revision 0.1 section 30.2 "DDR" > "Register Description".
 //
 // The A311D defines two sets of registers, and lists the same base
-// 0xff63'8000 for both sets. Fortunately, the S912 datasheet has enough
-// information to recover from this typographical error.
+// 0xff63'8000 for both sets. Fortunately, the S912 datasheet offered us clues
+// for recovering from this typographical error. We confirmed experimentally
+// that our guess below is correct.
 //
 // The S912 datasheet lists separate base addresses for the two sets - the DMC_
 // registers are based at 0xc883'8000, while the AM_DDR_ registers (for the DDR
@@ -23,13 +24,13 @@
 // whereas the AM_DDR_ registers are in the second half of the "DDR TOP" MMIO
 // region.
 //
-// Section 8.1 "Memory Map" lists 0xff63'8000 as the
+// Section 8.1 "Memory Map" in the A311D datasheet lists 0xff63'8000 as the
 // base of the DMC register set.
-// registers here are in the second set, with the base .
 //
 // Section 13.1.2 has some (fortunately obvious) typographical errors in some of
 // the register names. The "DMC_" prefix is incorrectly replaced with "DC_". The
-// correct names are listed in the S912 datasheet
+// S912 datasheet uses the "DMC_" prefix for the same registers, confirming the
+// suspicion that "DC_" is a typographical error.
 
 // The DMC is briefly described in A311D datasheet section 13.1.1 "Memory
 // Interface" > "DDR" > "Overview" and S912 datasheet section 30.1 "DDR" >

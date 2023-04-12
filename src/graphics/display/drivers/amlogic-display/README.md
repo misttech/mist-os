@@ -1,5 +1,21 @@
 # Display driver for AMLogic display engines
 
+## Target hardware
+
+Changes to the driver should be reviewed against the documentation for the
+following hardware.
+
+* AMLogic A311D (G12B) - on Khadas VIM3
+* AMLogic S905D3 (SM1) - on Nelson
+* AMLogic T931 (G12B) - on Sherlock
+* AMLogic S905D2 (G12B) - on Astro
+
+Datasheets for other models may be used to correct gaps and errors in the
+datasheets for the target models. All information obtained in this manner must
+be confirmed experimentally, especially when the datasheet we use applies to a
+different design generation. For example, the AMLogic S912 datasheet fills a few
+gaps, but the S912 chip uses the GXM design.
+
 ## Hardware model
 
 AMLogic's documentation makes heavy use of acronyms. This section goes over the
@@ -152,6 +168,9 @@ The code contains references to the following documents.
 * [AMLogic A311D2 datasheet][a311d2-datasheet] - revision 0.6, released
   2021-11-30; distributed by Khadas for the VIM4, referenced as "A311D2
   datasheet"
+* [AMLogic S905D3 datasheet][s905d3-datasheet] - revision 0.2, released
+  2019-05-14; distributed by Khadas for the VIM3L, referenced as "S905D3
+  datasheet"
 * [AMLogic S912 datasheet][s912-datasheet] - revision 0.1, released 3/14/2017;
   distributed by Khadas for the VIM2, referenced as "S912 datasheet"
 * [Synopsis DesignWare Cores HDMI Transmitter Controller Databook][dw-hdmi-databook]
@@ -161,6 +180,7 @@ The code contains references to the following documents.
 
 [a311d-datasheet]: https://dl.khadas.com/products/vim3/datasheet/a311d_datasheet_08_wesion.pdf
 [a311d2-datasheet]: https://dl.khadas.com/products/vim4/datasheet/amlogic_a311d2_datasheet_v06.pdf
+[s905d3-datasheet]: https://dl.khadas.com/products/vim3l/datasheet/s905d3_datasheet_0.2_wesion.pdf
 [s912-datasheet]: https://dl.khadas.com/products/vim2/datasheet/s912_datasheet_v0.220170314publicversion-wesion.pdf
 [dw-hmdi-databook]: https://www.synopsys.com/dw/doc.php/iip/DWC_hdmi_tx/2.12a/doc/DWC_hdmi_tx_databook.pdf
 [dw-dsi-databook]: https://www.synopsys.com/dw/doc.php/iip/DWC_mipi_dsi_host/1.51a/doc/DWC_mipi_dsi_host_databook.pdf
