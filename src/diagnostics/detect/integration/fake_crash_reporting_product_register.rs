@@ -5,12 +5,11 @@
 use {
     super::DoneSignaler,
     anyhow::{bail, Error},
-    fidl_fuchsia_feedback as fcrash, fuchsia_async as fasync,
-    futures::StreamExt,
-    std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    async_trait::async_trait,
+    fidl_fuchsia_feedback as fcrash,
+    fidl_server::*,
+    std::sync::atomic::{AtomicUsize, Ordering},
+    std::sync::Arc,
     tracing::*,
 };
 
@@ -18,6 +17,7 @@ const REPORT_PROGRAM_NAME: &str = "triage_detect";
 const REGISTER_PRODUCT_NAME: &str = "FuchsiaDetect";
 
 /// FakeCrashReportingProductRegister can be injected to capture Detect's program-name registration.
+#[derive(Clone)]
 pub struct FakeCrashReportingProductRegister {
     done_signaler: DoneSignaler,
     // The program under test should call upsert_with_ack() exactly once, with predictable inputs.
@@ -25,7 +25,7 @@ pub struct FakeCrashReportingProductRegister {
     // 0: No call to upsert_with_ack().
     // 1: A single correct call to upsert_with_ack().
     // >1: Error: Multiple calls, and/or incorrect call.
-    ok_tracker: AtomicUsize,
+    ok_tracker: Arc<AtomicUsize>,
 }
 
 fn evaluate_registration(
@@ -47,11 +47,8 @@ fn evaluate_registration(
 }
 
 impl FakeCrashReportingProductRegister {
-    pub fn new(done_signaler: DoneSignaler) -> Arc<FakeCrashReportingProductRegister> {
-        Arc::new(FakeCrashReportingProductRegister {
-            done_signaler,
-            ok_tracker: AtomicUsize::new(0),
-        })
+    pub fn new(done_signaler: DoneSignaler) -> Self {
+        Self { done_signaler, ok_tracker: Arc::new(AtomicUsize::new(0)) }
     }
 
     fn record_correct_registration(&self) {
@@ -72,59 +69,41 @@ impl FakeCrashReportingProductRegister {
         let state = self.ok_tracker.load(Ordering::Relaxed);
         state == 1
     }
+}
 
-    async fn serve(
-        self: Arc<Self>,
-        mut request_stream: fcrash::CrashReportingProductRegisterRequestStream,
+#[async_trait]
+impl AsyncRequestHandler<fcrash::CrashReportingProductRegisterMarker>
+    for FakeCrashReportingProductRegister
+{
+    async fn handle_request(
+        &self,
+        request: fcrash::CrashReportingProductRegisterRequest,
     ) -> Result<(), Error> {
-        loop {
-            match request_stream.next().await {
-                Some(Ok(fcrash::CrashReportingProductRegisterRequest::Upsert { .. })) => {
-                    error!("We shouldn't be calling upsert")
-                }
-                Some(Ok(fcrash::CrashReportingProductRegisterRequest::UpsertWithAck {
-                    component_url,
-                    product,
-                    responder,
-                    ..
-                })) => {
-                    match evaluate_registration(component_url, &product) {
-                        Ok(()) => {
-                            self.record_correct_registration();
-                        }
-                        Err(problem) => {
-                            error!("Problem in report: {}", problem);
-                            self.record_bad_registration();
-                            self.done_signaler.signal_done().await;
-                        }
+        match request {
+            fcrash::CrashReportingProductRegisterRequest::Upsert { .. } => {
+                bail!("We shouldn't be calling upsert")
+            }
+            fcrash::CrashReportingProductRegisterRequest::UpsertWithAck {
+                component_url,
+                product,
+                responder,
+                ..
+            } => {
+                match evaluate_registration(component_url, &product) {
+                    Ok(()) => {
+                        self.record_correct_registration();
                     }
-                    match responder.send() {
-                        Ok(()) => (),
-                        Err(problem) => error!("Failed to send response: {}", problem),
+                    Err(problem) => {
+                        error!("Problem in report: {}", problem);
+                        self.record_bad_registration();
+                        self.done_signaler.signal_done().await;
                     }
                 }
-                Some(Err(e)) => {
-                    info!("Registration error: {}", e);
-                    self.record_bad_registration();
-                    self.done_signaler.signal_done().await;
-                    bail!("{}", e);
+                if let Err(problem) = responder.send() {
+                    bail!("Failed to send response: {}", problem)
                 }
-                None => break,
+                Ok(())
             }
         }
-        Ok(())
-    }
-
-    pub fn serve_async(
-        self: Arc<Self>,
-        stream: fcrash::CrashReportingProductRegisterRequestStream,
-    ) {
-        fasync::Task::spawn(async move {
-            let result = self.serve(stream).await;
-            if let Err(e) = result {
-                error!("Error while serving CrashReportingProductRegister: {:?}", e);
-            }
-        })
-        .detach();
     }
 }

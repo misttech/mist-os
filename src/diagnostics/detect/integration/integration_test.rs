@@ -31,6 +31,7 @@ use {
     fake_crash_reporting_product_register::FakeCrashReportingProductRegister,
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_feedback as fcrash,
     fidl_fuchsia_io as fio,
+    fidl_server::*,
     fuchsia_component::server::*,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -187,8 +188,8 @@ impl fake_archive_accessor::EventSignaler for ArchiveEventSignaler {
 
 fn create_mock_component(
     test_data: TestData,
-    crash_reporter: Arc<FakeCrashReporter>,
-    crash_reporting_product_register: Arc<FakeCrashReportingProductRegister>,
+    crash_reporter: FakeCrashReporter,
+    crash_reporting_product_register: FakeCrashReportingProductRegister,
     archive_accessor: Arc<FakeArchiveAccessor>,
 ) -> impl Fn(LocalComponentHandles) -> BoxFuture<'static, Result<(), anyhow::Error>>
        + Sync
@@ -217,10 +218,10 @@ fn create_mock_component(
             // Serve crash reporter, crash reporting product register, and archive accessor
             fs.dir("svc")
                 .add_fidl_service(|stream: fcrash::CrashReporterRequestStream| {
-                    crash_reporter.clone().serve_async(stream);
+                    serve_async_detached(stream, crash_reporter.clone());
                 })
                 .add_fidl_service(|stream: fcrash::CrashReportingProductRegisterRequestStream| {
-                    crash_reporting_product_register.clone().serve_async(stream);
+                    serve_async_detached(stream, crash_reporting_product_register.clone());
                 })
                 .add_fidl_service_at(
                     "fuchsia.diagnostics.FeedbackArchiveAccessor",
@@ -330,13 +331,17 @@ async fn run_a_test(test_data: TestData) -> Result<(), Error> {
     // having arrived and been recorded. To avoid any possibility of flakes, if the
     // test takes less than 10 seconds, only insist that no error was detected; don't insist that
     // a correct registration has arrived.
-    if crash_reporting_product_register.detected_error()
-        || (minimum_test_time_seconds >= 10
-            && !crash_reporting_product_register.detected_good_registration())
-    {
-        error!("Test {} failed: Incorrect registration.", test_data.name);
-        bail!("Test {} failed: Incorrect registration.", test_data.name);
+    if crash_reporting_product_register.detected_error() {
+        error!("Test {} failed: Detected bad registration.", test_data.name);
+        bail!("Test {} failed: Detected bad registration.", test_data.name);
     }
+    if minimum_test_time_seconds >= 10
+        && !crash_reporting_product_register.detected_good_registration()
+    {
+        error!("Test {} failed: Did not detect good registration.", test_data.name);
+        bail!("Test {} failed: Did not detect good registration.", test_data.name);
+    }
+
     let too_fast = end_time - start_time < std::time::Duration::new(minimum_test_time_seconds, 0);
     match evaluate_test_events(&test_data, &events) {
         Ok(()) => {}
