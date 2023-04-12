@@ -13,8 +13,8 @@
 #include <optional>
 
 #include <gtest/gtest.h>
+#include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 
 namespace i915 {

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
-
 #include <lib/mmio/mmio.h>
 
 #include <cstdint>
 
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
+#include <mock-mmio-range/mock-mmio-range.h>
 
 namespace i915 {
 

@@ -14,8 +14,8 @@
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
 
 namespace i915 {
