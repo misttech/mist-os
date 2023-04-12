@@ -135,6 +135,11 @@ async fn main_inner() -> Result<(), Error> {
                 let cache_packages =
                     system_image.cache_packages().await.context("reading cache_packages")?;
                 index::load_cache_packages(&mut package_index, &cache_packages, &blobfs).await;
+                let cache_packages = Arc::new(cache_packages);
+                inspector.root().record_lazy_values(
+                    "cache-packages",
+                    cache_packages.record_lazy_inspect("cache-packages"),
+                );
                 Ok(cache_packages)
             },
             system_image.non_static_allow_list(),
@@ -196,7 +201,6 @@ async fn main_inner() -> Result<(), Error> {
         let package_index = Arc::clone(&package_index);
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
-        let cache_packages = Arc::new(cache_packages);
         let non_static_allow_list = Arc::clone(&non_static_allow_list);
         let scope = scope.clone();
         let cobalt_sender = cobalt_sender.clone();
@@ -211,7 +215,7 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&package_index),
                         blobfs.clone(),
                         Arc::clone(&base_packages),
-                        Arc::clone(&cache_packages),
+                        cache_packages.clone(),
                         executability_restrictions,
                         Arc::clone(&non_static_allow_list),
                         scope.clone(),

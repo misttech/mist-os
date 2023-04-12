@@ -5,8 +5,11 @@
 use {
     crate::CachePackagesInitError,
     fuchsia_hash::Hash,
+    fuchsia_inspect::{self as finspect, ArrayProperty as _},
     fuchsia_url::{AbsolutePackageUrl, PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
+    futures::{future::BoxFuture, FutureExt as _},
     serde::{Deserialize, Serialize},
+    std::sync::Arc,
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -73,6 +76,36 @@ impl CachePackages {
         url: &UnpinnedAbsolutePackageUrl,
     ) -> Option<&PinnedAbsolutePackageUrl> {
         self.contents().find(|pinned_url| pinned_url.as_unpinned() == url)
+    }
+
+    /// Returns a callback to be given to `finspect::Node::record_lazy_values`.
+    /// Creates an array named `array_name`.
+    pub fn record_lazy_inspect(
+        self: &Arc<Self>,
+        array_name: &'static str,
+    ) -> impl Fn() -> BoxFuture<'static, Result<finspect::Inspector, anyhow::Error>>
+           + Send
+           + Sync
+           + 'static {
+        let this = Arc::downgrade(self);
+        move || {
+            let this = this.clone();
+            async move {
+                let inspector = finspect::Inspector::default();
+                if let Some(this) = this.upgrade() {
+                    let root = inspector.root();
+                    let array = root.create_string_array(array_name, this.contents.len());
+                    let () = this
+                        .contents
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, url)| array.set(i, url.to_string()));
+                    root.record(array);
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        }
     }
 }
 
@@ -214,5 +247,30 @@ mod tests {
         packages.serialize(&mut bytes).unwrap();
 
         assert_eq!(CachePackages::from_json(&bytes).unwrap(), packages);
+    }
+
+    #[fuchsia::test]
+    async fn test_inspect() {
+        let hash = fuchsia_hash::Hash::from([0; 32]);
+        let packages = Arc::new(CachePackages::from_entries(vec![
+            PinnedAbsolutePackageUrl::parse(&format!("fuchsia-pkg://foo.bar/qwe/0?hash={hash}"))
+                .unwrap(),
+            PinnedAbsolutePackageUrl::parse(&format!("fuchsia-pkg://foo.bar/other/0?hash={hash}"))
+                .unwrap(),
+        ]));
+        let inspector = finspect::Inspector::default();
+
+        inspector
+            .root()
+            .record_lazy_values("unused", packages.record_lazy_inspect("cache-packages"));
+
+        finspect::assert_data_tree!(inspector, root: {
+            "cache-packages": vec![
+                "fuchsia-pkg://foo.bar/qwe/0?hash=\
+                0000000000000000000000000000000000000000000000000000000000000000",
+                "fuchsia-pkg://foo.bar/other/0?hash=\
+                0000000000000000000000000000000000000000000000000000000000000000",
+            ],
+        });
     }
 }

@@ -95,6 +95,35 @@ async fn base_packages() {
 }
 
 #[fuchsia::test]
+async fn cache_packages() {
+    let cache_package = PackageBuilder::new("a-cache-package").build().await.unwrap();
+    let system_image_package =
+        SystemImageBuilder::new().cache_packages(&[&cache_package]).build().await;
+    let env = TestEnv::builder()
+        .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&cache_package])
+        .await
+        .build()
+        .await;
+    env.block_until_started().await;
+
+    let hierarchy = env.inspect_hierarchy().await;
+
+    assert_data_tree!(
+        hierarchy,
+        root: contains {
+            "cache-packages": vec![
+                format!(
+                    "fuchsia-pkg://fuchsia.com/a-cache-package/0?hash={}",
+                    cache_package.meta_far_merkle_root()
+                )
+            ]
+        }
+
+    );
+    env.stop().await;
+}
+
+#[fuchsia::test]
 async fn executability_restrictions_enabled() {
     let env = TestEnv::builder().build().await;
     env.block_until_started().await;

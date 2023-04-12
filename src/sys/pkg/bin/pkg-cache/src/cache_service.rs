@@ -50,7 +50,7 @@ pub(crate) async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     blobfs: blobfs::Client,
     base_packages: Arc<BasePackages>,
-    cache_packages: Arc<Option<system_image::CachePackages>>,
+    cache_packages: Option<Arc<system_image::CachePackages>>,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     non_static_allow_list: Arc<system_image::NonStaticAllowList>,
     scope: package_directory::ExecutionScope,
@@ -134,7 +134,7 @@ pub(crate) async fn serve(
                 }
                 PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
-                    serve_cache_package_index(Arc::clone(&cache_packages), stream).await;
+                    serve_cache_package_index(cache_packages.clone(), stream).await;
                 }
                 PackageCacheRequest::Sync { responder } => {
                     responder.send(&mut blobfs.sync().await.map_err(|e| {
@@ -1097,10 +1097,10 @@ async fn serve_base_package_index(
 /// Serves the `PackageIndexIteratorRequestStream` with as many cache package index entries per
 /// request as will fit in a fidl message.
 async fn serve_cache_package_index(
-    cache_packages: Arc<Option<system_image::CachePackages>>,
+    cache_packages: Option<Arc<system_image::CachePackages>>,
     stream: PackageIndexIteratorRequestStream,
 ) {
-    let package_entries = match &*cache_packages {
+    let package_entries = match cache_packages {
         Some(cache_packages) => cache_packages
             .contents()
             .map(|package_url| PackageIndexEntry {
@@ -2974,7 +2974,7 @@ mod serve_cache_package_index_tests {
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
-        let task = Task::local(serve_cache_package_index(Arc::new(Some(cache_packages)), stream));
+        let task = Task::local(serve_cache_package_index(Some(Arc::new(cache_packages)), stream));
 
         let entries = proxy.next().await.unwrap();
         assert_eq!(
