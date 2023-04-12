@@ -20,6 +20,20 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    The Bazel product bundle target to build.
 #    Type: label (from BUILD.bazel)
 #
+#  bazel_product_image_target (optional)
+#    The Bazel product image target for this product bundle.
+#
+#    When set, two extra sub_targets are provided to access outputs from Bazel
+#    product image build steps:
+#
+#      * ${target_name}_product_assembly: for images.json
+#      * ${target_name}_create_system: for image_assembly.json
+#
+#    NOTE: This template does not check this is the actual product image target
+#    used in `bazel_product_bundle_target`.
+#
+#    Type: label (from BUIDL.bazel)
+#
 #  bazel_inputs_from_gn (required)
 #    The Bazel input targets (defined by bazel_input_xxx GN templates) used to
 #    plumb outputs from GN/Ninja to Bazel. This list should include all GN
@@ -51,8 +65,72 @@ template("bazel_product_bundle") {
   assert(defined(invoker.bazel_inputs_from_gn),
          "bazel_inputs_from_gn is required")
 
-  _bazel_action_target = "${target_name}_bazel_action"
-  bazel_action(_bazel_action_target) {
+  _aib_bazel_inputs = []
+  if (defined(invoker.allow_eng_platform_bundle_use) &&
+      invoker.allow_eng_platform_bundle_use) {
+    _aibs_to_use = eng_platform_aib_labels
+    not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
+  } else {
+    if (defined(invoker.allow_userdebug_platform_bundle_use) &&
+        invoker.allow_userdebug_platform_bundle_use) {
+      _aibs_to_use = userdebug_platform_aib_labels
+    } else {
+      _aibs_to_use = user_platform_aib_labels
+    }
+  }
+  foreach(_aib, _aibs_to_use) {
+    _aib_bazel_inputs += [ "${_aib}_bazel_inputs" ]
+  }
+
+  # NOTE: Only depend on product image targets if your outputs are not included
+  # in product bundles.
+  if (defined(invoker.bazel_product_image_target)) {
+    _product_assembly_target = "${target_name}_product_assembly"
+    bazel_action(_product_assembly_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "deps",
+                             ])
+
+      command = "build"
+      bazel_targets =
+          [ invoker.bazel_product_image_target + "_product_assembly" ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/image_assembly.json"
+          ninja = "${_product_assembly_target}/image_assembly.json"
+        },
+      ]
+    }
+
+    _create_system_target = "${target_name}_create_system"
+    bazel_action(_create_system_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "deps",
+                             ])
+
+      command = "build"
+      bazel_targets = [ invoker.bazel_product_image_target ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      allow_directory_in_outputs = true
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+          ninja = _create_system_target
+        },
+      ]
+      directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
+    }
+  }
+
+  _product_bundle_bazel_action_target = "${target_name}_bazel_action"
+  bazel_action(_product_bundle_bazel_action_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -65,24 +143,7 @@ template("bazel_product_bundle") {
     command = "build"
     bazel_targets = [ invoker.bazel_product_bundle_target ]
 
-    bazel_inputs = invoker.bazel_inputs_from_gn
-
-    # Make sure AIBs are built before Bazel assembly.
-    if (defined(invoker.allow_eng_platform_bundle_use) &&
-        invoker.allow_eng_platform_bundle_use) {
-      _aibs_to_use = eng_platform_aib_labels
-      not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
-    } else {
-      if (defined(invoker.allow_userdebug_platform_bundle_use) &&
-          invoker.allow_userdebug_platform_bundle_use) {
-        _aibs_to_use = userdebug_platform_aib_labels
-      } else {
-        _aibs_to_use = user_platform_aib_labels
-      }
-    }
-    foreach(_aib, _aibs_to_use) {
-      bazel_inputs += [ "${_aib}_bazel_inputs" ]
-    }
+    bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
 
     # Directory outputs are OK because `product_bundle.json` correctly
     # represents the freshness of all outputs.
@@ -195,7 +256,7 @@ template("bazel_product_bundle") {
     product_bundle = target_gen_dir + "/product_bundle"
     manifests_dir = "${target_out_dir}/manifests"
 
-    deps = [ ":${_bazel_action_target}" ]
+    deps = [ ":${_product_bundle_bazel_action_target}" ]
   }
 
   _transfer_manifest_target = "${target_name}_transfer_manifest"
@@ -206,7 +267,7 @@ template("bazel_product_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    product_bundle_target = ":${_bazel_action_target}"
+    product_bundle_target = ":${_product_bundle_bazel_action_target}"
     product_bundle_dir = target_gen_dir + "/product_bundle"
     output_dir = target_gen_dir
   }
@@ -219,8 +280,8 @@ template("bazel_product_bundle") {
                              "visibility",
                            ])
     deps = [
-      ":${_bazel_action_target}",
       ":${_package_manifests_list_target}",
+      ":${_product_bundle_bazel_action_target}",
       ":${_transfer_manifest_target}",
     ]
   }
