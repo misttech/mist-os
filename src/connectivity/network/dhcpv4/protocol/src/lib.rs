@@ -749,6 +749,29 @@ pub enum DhcpOption {
     ParameterRequestList(
         AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<OptionCode>>>,
     ),
+    /// According to [RFC 2132 section 9.9], "The message consists of n octets
+    /// of NVT ASCII text, which the client may display on an available output
+    /// device". According to [RFC 3629 section 1], UTF-8 preserves US-ASCII
+    /// octets.
+    ///
+    /// While it's somewhat ambiguous from [RFC 854] whether "NVT ASCII"
+    /// includes the non-standard-7-bit-ASCII control codes or not, [RFC 698]
+    /// states that "it is expected normal NVT ASCII would be used for 7-bit
+    /// ASCII", suggesting that NVT ASCII does designate only the
+    /// US-ASCII-compatible subset of characters that can be output by NVT
+    /// terminals.
+    ///
+    /// Thus, it is safe to represent incoming Message options as a UTF-8 String
+    /// and discard Message options that cannot be represented in UTF-8.
+    ///
+    /// However, _outgoing_ Message options (e.g. ones written by a DHCP server
+    /// implemented using this library) must be careful to use only ASCII text
+    /// rather than full UTF-8.
+    ///
+    /// [RFC 2132 section 9.9]: https://datatracker.ietf.org/doc/html/rfc2132#section-9.9
+    /// [RFC 3629 section 1]: https://datatracker.ietf.org/doc/html/rfc3629#section-1
+    /// [RFC 854]: https://datatracker.ietf.org/doc/html/rfc854
+    /// [RFC 698]: https://datatracker.ietf.org/doc/html/rfc698
     Message(String),
     MaxDhcpMessageSize(u16),
     RenewalTimeValue(u32),
