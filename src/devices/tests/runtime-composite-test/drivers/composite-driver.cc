@@ -17,27 +17,7 @@ namespace composite_driver {
 zx_status_t CompositeDriver::Bind(void* ctx, zx_device_t* device) {
   auto dev = std::make_unique<CompositeDriver>(device);
 
-  // Verify the metadata.
-  char metadata[32] = "";
-  size_t len = 0;
-  auto status = dev->DdkGetMetadata(DEVICE_METADATA_PRIVATE, &metadata, std::size(metadata), &len);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to read metadata %d", status);
-    return status;
-  }
-
-  constexpr char kMetadataStr[] = "composite-metadata";
-  if (strlen(kMetadataStr) + 1 != len) {
-    zxlogf(ERROR, "Incorrect metadata size: %zu", strlen(kMetadataStr));
-    return ZX_ERR_INTERNAL;
-  }
-
-  if (strcmp(kMetadataStr, metadata) != 0) {
-    zxlogf(ERROR, "Incorrect metadata value: %s", metadata);
-    return ZX_ERR_INTERNAL;
-  }
-
-  status = dev->DdkAdd("composite");
+  zx_status_t status = dev->DdkAdd("composite");
   if (status != ZX_OK) {
     return status;
   }

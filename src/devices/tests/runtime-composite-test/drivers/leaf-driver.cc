@@ -48,18 +48,9 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_test::BIND_PROTOCOL_VALUE_2),
   };
 
-  const device_metadata_t metadata[] = {
-      {
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = const_cast<char*>(composite_driver::kMetadataStr),
-          .length = strlen(composite_driver::kMetadataStr) + 1,
-      },
-  };
-
   status = dev->DdkAddCompositeNodeSpec("test_composite_1",
                                         ddk::CompositeNodeSpec(node_1_bind_rules, node_1_properties)
-                                            .AddParentSpec(node_2_bind_rules, node_2_properties)
-                                            .set_metadata(metadata));
+                                            .AddParentSpec(node_2_bind_rules, node_2_properties));
   if (status != ZX_OK) {
     return status;
   }
