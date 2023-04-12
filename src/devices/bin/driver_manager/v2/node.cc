@@ -908,9 +908,11 @@ zx::result<> Node::StartDriver(
   node_ref_.emplace(dispatcher_, std::move(endpoints->server), this,
                     [](Node* node, fidl::UnbindInfo info) {
                       node->node_ref_.reset();
-                      LOGF(WARNING, "Removing node %s because of fdf::Node binding closed: %s",
-                           node->name().c_str(), info.FormatDescription().c_str());
-                      node->Remove(RemovalSet::kAll, nullptr);
+                      if (!info.is_user_initiated()) {
+                        LOGF(WARNING, "Removing node %s because of fdf::Node binding closed: %s",
+                             node->name().c_str(), info.FormatDescription().c_str());
+                        node->Remove(RemovalSet::kAll, nullptr);
+                      }
                     });
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
@@ -991,9 +993,11 @@ Node::DriverComponent::DriverComponent(
     : component_controller_ref(
           node.dispatcher_, std::move(controller), &node,
           [](Node* node, fidl::UnbindInfo info) {
-            LOGF(WARNING, "Removing node %s because of ComponentController binding closed: %s",
-                 node->name().c_str(), info.FormatDescription().c_str());
-            node->Remove(RemovalSet::kAll, nullptr);
+            if (!info.is_user_initiated()) {
+              LOGF(WARNING, "Removing node %s because of ComponentController binding closed: %s",
+                   node->name().c_str(), info.FormatDescription().c_str());
+              node->Remove(RemovalSet::kAll, nullptr);
+            }
           }),
       driver(std::move(driver), node.dispatcher_, &node),
       driver_url(std::move(url)) {}
