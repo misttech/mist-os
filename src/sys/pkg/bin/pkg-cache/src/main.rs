@@ -130,11 +130,7 @@ async fn main_inner() -> Result<(), Error> {
         inspector.root().record_string("system_image", system_image.hash().to_string());
 
         let (base_packages_res, cache_packages_res, non_static_allow_list) = join!(
-            BasePackages::new(
-                &blobfs,
-                &system_image,
-                inspector.root().create_child("base-packages"),
-            ),
+            BasePackages::new(&blobfs, &system_image),
             async {
                 let cache_packages =
                     system_image.cache_packages().await.context("reading cache_packages")?;
@@ -168,7 +164,7 @@ async fn main_inner() -> Result<(), Error> {
             None,
             system_image::ExecutabilityRestrictions::Enforce,
             system_image::NonStaticAllowList::empty(),
-            BasePackages::empty(inspector.root().create_child("base-packages")),
+            BasePackages::empty(),
             None,
         )
     };
@@ -181,6 +177,7 @@ async fn main_inner() -> Result<(), Error> {
         .record_child("non_static_allow_list", |n| non_static_allow_list.record_inspect(n));
 
     let base_packages = Arc::new(base_packages);
+    inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
     let non_static_allow_list = Arc::new(non_static_allow_list);
     let package_index = Arc::new(async_lock::RwLock::new(package_index));
     let scope = vfs::execution_scope::ExecutionScope::new();

@@ -14,7 +14,7 @@ use {
     fuchsia_inspect::{
         assert_data_tree, hierarchy::DiagnosticsHierarchy, testing::AnyProperty, tree_assertion,
     },
-    fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
+    fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
     fuchsia_zircon as zx,
     fuchsia_zircon::Status,
     futures::prelude::*,
@@ -76,28 +76,9 @@ async fn non_static_allow_list() {
     env.stop().await;
 }
 
-async fn assert_base_blob_count(
-    static_packages: &[&Package],
-    cache_packages: Option<&[&Package]>,
-    count: u64,
-) {
-    let mut system_image_package = SystemImageBuilder::new().static_packages(static_packages);
-    if let Some(cache_packages) = cache_packages {
-        system_image_package = system_image_package.cache_packages(cache_packages);
-    }
-    let system_image_package = system_image_package.build().await;
-    let env = TestEnv::builder()
-        .blobfs_from_system_image_and_extra_packages(
-            &system_image_package,
-            &static_packages
-                .iter()
-                .cloned()
-                .chain(cache_packages.unwrap_or(&[]).iter().cloned())
-                .collect::<Vec<_>>(),
-        )
-        .await
-        .build()
-        .await;
+#[fuchsia::test]
+async fn base_packages() {
+    let env = TestEnv::builder().build().await;
     env.block_until_started().await;
 
     let hierarchy = env.inspect_hierarchy().await;
@@ -106,59 +87,11 @@ async fn assert_base_blob_count(
         hierarchy,
         root: contains {
             "base-packages": {
-                "blob-count": count
+                "system_image/0": AnyProperty
             }
         }
     );
     env.stop().await;
-}
-
-#[fuchsia::test]
-async fn base_blob_count_with_empty_system_image() {
-    // system_image: meta.far and data/static_packages (the empty blob)
-    assert_base_blob_count(&[], None, 2).await;
-}
-
-#[fuchsia::test]
-async fn base_blob_count_with_one_base_package() {
-    let pkg = PackageBuilder::new("a-base-package")
-        .add_resource_at("some-empty-blob", &[][..])
-        .build()
-        .await
-        .unwrap();
-    // system_image: meta.far and data/static_packages (no longer the empty blob)
-    // a-base-package: meta.far and some-empty-blob
-    assert_base_blob_count(&[&pkg], None, 4).await;
-}
-
-#[fuchsia::test]
-async fn base_blob_count_with_two_base_packages_and_one_shared_blob() {
-    let pkg0 = PackageBuilder::new("a-base-package")
-        .add_resource_at("some-blob", &b"shared-contents"[..])
-        .build()
-        .await
-        .unwrap();
-    let pkg1 = PackageBuilder::new("other-base-package")
-        .add_resource_at("this-blob-is-shared-with-pkg0", &b"shared-contents"[..])
-        .build()
-        .await
-        .unwrap();
-    // system_image: meta.far and data/static_packages (no longer the empty blob)
-    // a-base-package: meta.far and some-blob
-    // other-base-package: meta.far (this-blob-is-shared-with-pkg0 is shared)
-    assert_base_blob_count(&[&pkg0, &pkg1], None, 5).await;
-}
-
-#[fuchsia::test]
-async fn base_blob_count_ignores_cache_packages() {
-    let pkg = PackageBuilder::new("a-cache-package")
-        .add_resource_at("some-cached-blob", &b"unique contents"[..])
-        .build()
-        .await
-        .unwrap();
-    // system_image: meta.far, data/static_packages (empty), data/cache_packages (non-empty)
-    // a-cache-package: ignored
-    assert_base_blob_count(&[], Some(&[&pkg]), 3).await;
 }
 
 #[fuchsia::test]

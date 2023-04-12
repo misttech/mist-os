@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context as _},
+    anyhow::Context as _,
     fuchsia_inspect as finspect,
     fuchsia_merkle::Hash,
     fuchsia_pkg::PackagePath,
-    futures::{StreamExt as _, TryStreamExt as _},
-    std::collections::{HashMap, HashSet},
+    futures::{future::BoxFuture, FutureExt as _, StreamExt as _, TryStreamExt as _},
+    std::{
+        collections::{HashMap, HashSet},
+        sync::Arc,
+    },
 };
 
 /// The system_image package, the packages in the static packages manifest, and the transitive
@@ -17,19 +20,17 @@ use {
 pub struct BasePackages {
     /// The meta.fars of the base packages (including subpackages).
     base_packages: HashSet<Hash>,
-    /// The meta.fars and content blobs of the base packages.
+    /// The meta.fars and content blobs of the base packages (including subpackages).
     /// Equivalently, the contents of `base_packages` plus the content blobs.
     base_blobs: HashSet<Hash>,
     /// The paths and hashes of the root base packages (i.e. not including subpackages).
     root_paths_and_hashes: Vec<(PackagePath, Hash)>,
-    _node: finspect::Node,
 }
 
 impl BasePackages {
     pub async fn new(
         blobfs: &blobfs::Client,
         system_image: &system_image::SystemImage,
-        node: finspect::Node,
     ) -> Result<Self, anyhow::Error> {
         let root_paths_and_hashes = system_image
             .static_packages()
@@ -42,13 +43,11 @@ impl BasePackages {
             )))
             .collect::<Vec<_>>();
 
-        match Self::load_base_blobs(blobfs, root_paths_and_hashes.iter().map(|(_, h)| *h)).await {
-            Ok((base_packages, base_blobs)) => {
-                node.record_uint("blob-count", base_blobs.len() as u64);
-                Ok(Self { base_packages, base_blobs, root_paths_and_hashes, _node: node })
-            }
-            Err(e) => Err(anyhow!(e).context("Error determining base blobs")),
-        }
+        let (base_packages, base_blobs) =
+            Self::load_base_blobs(blobfs, root_paths_and_hashes.iter().map(|(_, h)| *h))
+                .await
+                .context("Error determining base blobs")?;
+        Ok(Self { base_packages, base_blobs, root_paths_and_hashes })
     }
 
     /// Returns the base packages and base blobs (including the transitive closure of subpackages).
@@ -92,16 +91,15 @@ impl BasePackages {
 
     /// Create an empty `BasePackages`, i.e. a `BasePackages` that does not have any packages (and
     /// therefore does not have any blobs). Useful for when there is no system_image package.
-    pub fn empty(node: finspect::Node) -> Self {
-        node.record_uint("blob-count", 0);
+    pub fn empty() -> Self {
         Self {
             base_packages: HashSet::new(),
             base_blobs: HashSet::new(),
             root_paths_and_hashes: Vec::new(),
-            _node: node,
         }
     }
 
+    /// The meta.fars and content blobs of the base packages (including subpackages).
     pub fn list_blobs(&self) -> &HashSet<Hash> {
         &self.base_blobs
     }
@@ -116,6 +114,30 @@ impl BasePackages {
         self.root_paths_and_hashes.iter()
     }
 
+    /// Returns a callback to be given to `finspect::Node::record_lazy_child`.
+    pub fn record_lazy_inspect(
+        self: &Arc<Self>,
+    ) -> impl Fn() -> BoxFuture<'static, Result<finspect::Inspector, anyhow::Error>>
+           + Send
+           + Sync
+           + 'static {
+        let this = Arc::downgrade(self);
+        move || {
+            let this = this.clone();
+            async move {
+                let inspector = finspect::Inspector::default();
+                if let Some(this) = this.upgrade() {
+                    let root = inspector.root();
+                    let () = this.root_paths_and_hashes.iter().for_each(|(path, hash)| {
+                        root.record_string(path.to_string(), hash.to_string())
+                    });
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        }
+    }
+
     /// Test-only constructor to allow testing with this type without constructing a blobfs.
     /// base_packages isn't populated, so is_base_package will always return false.
     #[cfg(test)]
@@ -127,7 +149,6 @@ impl BasePackages {
             base_packages: HashSet::new(),
             base_blobs,
             root_paths_and_hashes: root_paths_and_hashes.into_iter().collect(),
-            _node: finspect::Inspector::default().root().clone_weak(),
         }
     }
 }
@@ -174,7 +195,6 @@ mod tests {
                     .await
                     .unwrap(),
                 ),
-                inspector.root().create_child("base-packages"),
             )
             .await
             .unwrap();
@@ -212,16 +232,18 @@ mod tests {
             .chain(base_subpackage.list_blobs().unwrap())
             .collect();
         assert_eq!(base_packages.list_blobs(), &expected_blobs);
-
-        assert_data_tree!(env.inspector, root: {
-            "base-packages": {
-                "blob-count": 6u64,
-            }
-        });
+        // Six expected blobs:
+        //   system_image meta.far
+        //   system_image content blob "data/static_packages"
+        //   base-subpackage meta.far
+        //   base-subpackage content blob "base-subpackage-blob"
+        //   a-base-package meta.far
+        //   a-base-package content blob "a-base-blob"
+        assert_eq!(base_packages.list_blobs().len(), 6);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn inspect_correct_blob_count_shared_blob() {
+    async fn correct_blob_count_shared_blob() {
         let a_base_package0 = PackageBuilder::new("a-base-package0")
             .add_resource_at("a-base-blob0", &b"duplicate-blob-contents"[..])
             .build()
@@ -232,7 +254,7 @@ mod tests {
             .build()
             .await
             .unwrap();
-        let (env, _base_packages) = TestEnv::new(&[&a_base_package0, &a_base_package1]).await;
+        let (_env, base_packages) = TestEnv::new(&[&a_base_package0, &a_base_package1]).await;
 
         // Expect 5 blobs:
         //   * system_image meta.far
@@ -242,9 +264,30 @@ mod tests {
         //   * a-base-package1 meta.far -> differs with a-base-package0 meta.far because
         //       meta/package and meta/contents differ
         //   * a-base-package1 a-base-blob1 -> duplicate of a-base-package0 a-base-blob0
+        assert_eq!(base_packages.list_blobs().len(), 5);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn inspect_base_packages() {
+        let base_subpackage = PackageBuilder::new("base-subpackage").build().await.unwrap();
+        let a_base_package = PackageBuilder::new("a-base-package")
+            .add_subpackage("my-subpackage", &base_subpackage)
+            .build()
+            .await
+            .unwrap();
+        let (env, base_packages) =
+            TestEnv::new_with_subpackages(&[&a_base_package], &[&base_subpackage]).await;
+        let base_packages = Arc::new(base_packages);
+
+        env.inspector
+            .root()
+            .record_lazy_child("base-packages", base_packages.record_lazy_inspect());
+
+        // Note base-subpackage is not present.
         assert_data_tree!(env.inspector, root: {
             "base-packages": {
-                "blob-count": 5u64,
+                "a-base-package/0": a_base_package.meta_far_merkle_root().to_string(),
+                "system_image/0": env.system_image.meta_far_merkle_root().to_string(),
             }
         });
     }
@@ -333,23 +376,10 @@ mod tests {
                 .await
                 .unwrap(),
             ),
-            inspector.root().create_child("base-packages"),
         )
         .await;
 
         assert!(base_packages_res.is_err());
         assert_data_tree!(inspector, root: {});
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn empty_inspect() {
-        let inspector = finspect::Inspector::default();
-        let _base_packages = BasePackages::empty(inspector.root().create_child("base-packages"));
-
-        assert_data_tree!(inspector, root: {
-            "base-packages": {
-                "blob-count": 0u64,
-            }
-        });
     }
 }
