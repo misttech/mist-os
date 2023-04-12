@@ -30,7 +30,12 @@ static constexpr zx_driver_ops_t brcmfmac_driver_ops = {
         [](void* ctx, zx_device_t* device) {
           zx_status_t status = ZX_ERR_NOT_SUPPORTED;
 #if CONFIG_BRCMFMAC_SDIO
-          status = ::wlan::brcmfmac::SdioDevice::Create(device);
+          if ((status = ::wlan::brcmfmac::SdioDevice::Create(device)) == ZX_OK) {
+            return ZX_OK;
+          }
+          if (status != ZX_ERR_NOT_SUPPORTED) {
+            return status;
+          }
 #endif  // CONFIG_BRCMFMAC_SDIO
           return status;
         },

@@ -74,11 +74,9 @@ static const std::vector<fpbus::Irq> gpio_irqs{
 
 // GPIOs to expose from generic GPIO driver.
 static const gpio_pin_t gpio_pins[] = {
-    DECL_GPIO_PIN(VIM3_J4_PIN_39),      DECL_GPIO_PIN(VIM3_ETH_MAC_INTR),
-    DECL_GPIO_PIN(A311D_GPIOBOOT(12)),  DECL_GPIO_PIN(A311D_GPIOX(6)),
-    DECL_GPIO_PIN(VIM3_HPD_IN),         DECL_GPIO_PIN(VIM3_FUSB302_INT),
-    DECL_GPIO_PIN(VIM3_WIFI_WAKE_HOST), DECL_GPIO_PIN(VIM3_WIFI_32K),
-    DECL_GPIO_PIN(VIM3_BT_EN),
+    DECL_GPIO_PIN(VIM3_J4_PIN_39),     DECL_GPIO_PIN(VIM3_ETH_MAC_INTR),
+    DECL_GPIO_PIN(A311D_GPIOBOOT(12)), DECL_GPIO_PIN(A311D_GPIOX(6)),
+    DECL_GPIO_PIN(VIM3_HPD_IN),        DECL_GPIO_PIN(VIM3_FUSB302_INT),
 };
 
 static const std::vector<fpbus::Metadata> gpio_metadata{
