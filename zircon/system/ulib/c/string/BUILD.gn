@@ -171,6 +171,8 @@ llvm_libc_source_set("compat") {
     "bcmp",
     "bcopy",
     "bzero",
+    "index",
+    "rindex",
   ]
 
   deps = [ ":swab" ]
