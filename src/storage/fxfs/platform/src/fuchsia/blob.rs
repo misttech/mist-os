@@ -299,7 +299,11 @@ impl DirectoryEntry for BlobDirectory {
             match self.lookup(flags, path).await {
                 Err(e) => {
                     debug!(?e, "lookup failed");
-                    send_on_open_with_error(flags, server_end, map_to_status(e));
+                    send_on_open_with_error(
+                        flags.contains(fio::OpenFlags::DESCRIBE),
+                        server_end,
+                        map_to_status(e),
+                    );
                 }
                 Ok(node) => {
                     if node.is::<BlobDirectory>() {
@@ -436,7 +440,11 @@ impl FxBlob {
             let stream = match zx::Stream::create(options, this.buffer.vmo(), 0) {
                 Ok(stream) => stream,
                 Err(status) => {
-                    send_on_open_with_error(flags, server_end, status);
+                    send_on_open_with_error(
+                        flags.contains(fio::OpenFlags::DESCRIBE),
+                        server_end,
+                        status,
+                    );
                     return;
                 }
             };
@@ -466,7 +474,11 @@ impl DirectoryEntry for FxBlob {
         server_end: ServerEnd<NodeMarker>,
     ) {
         if !path.is_empty() {
-            send_on_open_with_error(flags, server_end, Status::NOT_FILE);
+            send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                Status::NOT_FILE,
+            );
             return;
         }
         scope.clone().spawn_with_shutdown(move |shutdown| {
@@ -942,7 +954,11 @@ impl DirectoryEntry for FxUnsealedBlob {
         server_end: ServerEnd<NodeMarker>,
     ) {
         if !path.is_empty() {
-            send_on_open_with_error(flags, server_end, Status::NOT_FILE);
+            send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                Status::NOT_FILE,
+            );
             return;
         }
         scope.clone().spawn_with_shutdown(move |shutdown| {

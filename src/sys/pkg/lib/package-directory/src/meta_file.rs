@@ -68,8 +68,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaFil
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
         if !path.is_empty() {
-            let () = send_on_open_with_error(flags, server_end, zx::Status::NOT_DIR);
+            let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_DIR);
             return;
         }
 
@@ -81,7 +82,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaFil
                 | fio::OpenFlags::TRUNCATE
                 | fio::OpenFlags::APPEND,
         ) {
-            let () = send_on_open_with_error(flags, server_end, zx::Status::NOT_SUPPORTED);
+            let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
             return;
         }
 

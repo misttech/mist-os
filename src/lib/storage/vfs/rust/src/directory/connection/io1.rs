@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::{inherit_rights_for_clone, send_on_open_with_error, IntoAny, GET_FLAGS_VISIBLE},
+    common::{inherit_rights_for_clone, send_on_open_with_error, IntoAny as _},
     directory::{
-        common::check_child_connection_flags,
+        common::{check_child_connection_flags, DirectoryOptions, OptionsWithDescribe},
         connection::util::OpenDirectory,
         entry::DirectoryEntry,
         entry_container::{Directory, DirectoryWatcher},
+        mutable::entry_constructor::NewEntryType,
         read_dirents,
         traversal_position::TraversalPosition,
     },
@@ -51,7 +52,7 @@ pub trait DerivedConnection: Send + Sync {
     fn new(
         scope: ExecutionScope,
         directory: OpenDirectory<Self::Directory>,
-        flags: fio::OpenFlags,
+        flags: DirectoryOptions,
     ) -> Self;
 
     /// Initializes a directory connection, checking the flags and sending `OnOpen` event if
@@ -62,14 +63,15 @@ pub trait DerivedConnection: Send + Sync {
     fn create_connection(
         scope: ExecutionScope,
         directory: Arc<Self::Directory>,
-        flags: fio::OpenFlags,
+        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
         server_end: ServerEnd<fio::NodeMarker>,
     );
 
     fn entry_not_found(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
-        flags: fio::OpenFlags,
+        entry_type: NewEntryType,
+        create: bool,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, zx::Status>;
@@ -90,7 +92,7 @@ where
     pub(in crate::directory) directory: OpenDirectory<Connection::Directory>,
 
     /// Flags set on this connection when it was opened or cloned.
-    pub(in crate::directory) flags: fio::OpenFlags,
+    pub(in crate::directory) flags: DirectoryOptions,
 
     /// Seek position for this connection to the directory.  We just store the element that was
     /// returned last by ReadDirents for this connection.  Next call will look for the next element
@@ -147,13 +149,13 @@ where
     pub(in crate::directory) fn new(
         scope: ExecutionScope,
         directory: OpenDirectory<Connection::Directory>,
-        flags: fio::OpenFlags,
+        flags: DirectoryOptions,
     ) -> Self {
         BaseConnection { scope, directory, flags, seek: Default::default() }
     }
 
     pub(in crate::directory) fn node_info(&self) -> fio::NodeInfoDeprecated {
-        if self.flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
+        if self.flags.node {
             fio::NodeInfoDeprecated::Service(fio::Service)
         } else {
             fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)
@@ -191,7 +193,7 @@ where
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
                 // TODO(https://fxbug.dev/77623): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
                 let mut rights = fio::Operations::GET_ATTRIBUTES;
-                if !self.flags.contains(fio::OpenFlags::NODE_REFERENCE) {
+                if !self.flags.node {
                     rights |= fio::Operations::ENUMERATE | fio::Operations::TRAVERSE;
                 }
                 responder.send(fio::ConnectionInfo {
@@ -230,7 +232,7 @@ where
             }
             fio::DirectoryRequest::GetFlags { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetFlags");
-                responder.send(zx::Status::OK.into_raw(), self.flags & GET_FLAGS_VISIBLE)?;
+                responder.send(zx::Status::OK.into_raw(), self.flags.into_io1())?;
             }
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::SetFlags");
@@ -312,7 +314,7 @@ where
             }
             fio::DirectoryRequest::Query { responder } => {
                 let () = responder.send(
-                    if self.flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
+                    if self.flags.node {
                         fio::NODE_PROTOCOL_NAME
                     } else {
                         fio::DIRECTORY_PROTOCOL_NAME
@@ -347,10 +349,11 @@ where
     }
 
     fn handle_clone(&self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
-        let flags = match inherit_rights_for_clone(self.flags, flags) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
+        let flags = match inherit_rights_for_clone(self.flags.into_io1(), flags) {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };
@@ -364,15 +367,16 @@ where
         path: String,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        if self.flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            send_on_open_with_error(flags, server_end, zx::Status::BAD_HANDLE);
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
+        if self.flags.node {
+            send_on_open_with_error(describe, server_end, zx::Status::BAD_HANDLE);
             return;
         }
 
         let path = match Path::validate_and_split(path) {
             Ok(path) => path,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };
@@ -381,20 +385,20 @@ where
             flags |= fio::OpenFlags::DIRECTORY;
         }
 
-        let flags = match check_child_connection_flags(self.flags, flags) {
+        let flags = match check_child_connection_flags(self.flags.into_io1(), flags) {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };
         if path.is_dot() {
             if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-                send_on_open_with_error(flags, server_end, zx::Status::INVALID_ARGS);
+                send_on_open_with_error(describe, server_end, zx::Status::INVALID_ARGS);
                 return;
             }
             if flags.intersects(fio::OpenFlags::CREATE_IF_ABSENT) {
-                send_on_open_with_error(flags, server_end, zx::Status::ALREADY_EXISTS);
+                send_on_open_with_error(describe, server_end, zx::Status::ALREADY_EXISTS);
                 return;
             }
         }
@@ -406,7 +410,7 @@ where
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (zx::Status, Vec<u8>) {
         async {
-            if self.flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
+            if self.flags.node {
                 return Err(zx::Status::BAD_HANDLE);
             }
 
@@ -442,7 +446,12 @@ where
             return Err(zx::Status::INVALID_ARGS);
         }
 
-        if !self.flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
+        let DirectoryOptions { node, rights } = self.flags;
+        if node {
+            // TODO(https://fxbug.dev/77623): should this be an error?
+            // return Err(zx::Status::NOT_SUPPORTED);
+        }
+        if !rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 

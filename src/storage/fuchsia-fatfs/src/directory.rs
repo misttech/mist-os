@@ -756,7 +756,9 @@ impl DirectoryEntry for FatDirectory {
         let mut closer = Closer::new(&self.filesystem);
 
         match self.lookup(flags, path, &mut closer) {
-            Err(e) => send_on_open_with_error(flags, server_end, e),
+            Err(e) => {
+                send_on_open_with_error(flags.contains(fio::OpenFlags::DESCRIBE), server_end, e)
+            }
             Ok(FatNode::Dir(entry)) => {
                 entry
                     .open_ref(&self.filesystem.lock().unwrap())

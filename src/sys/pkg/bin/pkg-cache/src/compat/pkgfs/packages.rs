@@ -100,6 +100,7 @@ impl DirectoryEntry for PkgfsPackages {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags.difference(fio::OpenFlags::POSIX_WRITABLE);
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
         // This directory and all child nodes are read-only
         if flags.intersects(
@@ -109,7 +110,7 @@ impl DirectoryEntry for PkgfsPackages {
                 | fio::OpenFlags::TRUNCATE
                 | fio::OpenFlags::APPEND,
         ) {
-            return send_on_open_with_error(flags, server_end, zx::Status::NOT_SUPPORTED);
+            return send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
         }
 
         scope.clone().spawn(async move {
@@ -120,11 +121,11 @@ impl DirectoryEntry for PkgfsPackages {
                         Arc::new(PkgfsPackagesVariants::new(variants, self.blobfs.clone()))
                             .open(scope, flags, path, server_end)
                     }
-                    None => send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND),
+                    None => send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND),
                 },
                 Some(Err(_)) => {
                     // Names that are not valid package names can't exist in this directory.
-                    send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND)
+                    send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND)
                 }
             }
         })

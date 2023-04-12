@@ -82,17 +82,14 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  using fuchsia_io::Operations;
-  using fuchsia_io::wire::ConnectionInfo;
-
-  Operations rights = Operations::kGetAttributes;
+  fio::Operations rights = fio::Operations::kGetAttributes;
   if (!options().flags.node_reference) {
-    rights |= options().rights.read ? Operations::kReadBytes : Operations();
-    rights |= options().rights.write ? Operations::kWriteBytes : Operations();
-    rights |= options().rights.execute ? Operations::kExecute : Operations();
+    rights |= options().rights.read ? fio::wire::kRStarDir : fio::Operations();
+    rights |= options().rights.write ? fio::wire::kWStarDir : fio::Operations();
+    rights |= options().rights.execute ? fio::wire::kXStarDir : fio::Operations();
   }
   fidl::Arena arena;
-  completer.Reply(ConnectionInfo::Builder(arena).rights(rights).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights).Build());
 }
 
 void FileConnection::Sync(SyncCompleter::Sync& completer) {
@@ -126,9 +123,9 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
 void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
   zx::result result = Connection::NodeQueryFilesystem();
   completer.Reply(result.status_value(),
-                  result.is_ok() ? fidl::ObjectView<fuchsia_io::wire::FilesystemInfo>::FromExternal(
-                                       &result.value())
-                                 : nullptr);
+                  result.is_ok()
+                      ? fidl::ObjectView<fio::wire::FilesystemInfo>::FromExternal(&result.value())
+                      : nullptr);
 }
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
@@ -153,8 +150,7 @@ void FileConnection::Resize(ResizeRequestView request, ResizeCompleter::Sync& co
   }
 }
 
-zx_status_t FileConnection::GetBackingMemoryInternal(fuchsia_io::wire::VmoFlags flags,
-                                                     zx::vmo* out_vmo) {
+zx_status_t FileConnection::GetBackingMemoryInternal(fio::wire::VmoFlags flags, zx::vmo* out_vmo) {
   if (options().flags.node_reference) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -185,9 +181,8 @@ void FileConnection::GetBackingMemory(GetBackingMemoryRequestView request,
   }
 }
 
-void FileConnection::AdvisoryLock(
-    fidl::WireServer<fuchsia_io::File>::AdvisoryLockRequestView request,
-    AdvisoryLockCompleter::Sync& completer) {
+void FileConnection::AdvisoryLock(fidl::WireServer<fio::File>::AdvisoryLockRequestView request,
+                                  AdvisoryLockCompleter::Sync& completer) {
   // advisory_lock replies to the completer
   auto async_completer = completer.ToAsync();
   fit::callback<void(zx_status_t)> callback = file_lock::lock_completer_t(

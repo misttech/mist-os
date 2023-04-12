@@ -38,6 +38,8 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags & !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
+
         if path.is_empty() {
             if flags.intersects(
                 fio::OpenFlags::RIGHT_WRITABLE
@@ -47,7 +49,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
                     | fio::OpenFlags::TRUNCATE
                     | fio::OpenFlags::APPEND,
             ) {
-                let () = send_on_open_with_error(flags, server_end, zx::Status::NOT_SUPPORTED);
+                let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
                 return;
             }
 
@@ -90,7 +92,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
             }
         }
 
-        let () = send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND);
+        let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
     fn entry_info(&self) -> EntryInfo {

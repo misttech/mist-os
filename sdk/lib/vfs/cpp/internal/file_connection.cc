@@ -66,13 +66,13 @@ void FileConnection::GetConnectionInfo(GetConnectionInfoCallback callback) {
   fuchsia::io::Operations rights = fuchsia::io::Operations::GET_ATTRIBUTES;
   if (!Flags::IsNodeReference(flags())) {
     if (Flags::IsReadable(flags())) {
-      rights |= fuchsia::io::Operations::READ_BYTES;
+      rights |= fuchsia::io::R_STAR_DIR;
     }
     if (Flags::IsWritable(flags())) {
-      rights |= fuchsia::io::Operations::WRITE_BYTES;
+      rights |= fuchsia::io::W_STAR_DIR;
     }
     if (Flags::IsExecutable(flags())) {
-      rights |= fuchsia::io::Operations::EXECUTE;
+      rights |= fuchsia::io::X_STAR_DIR;
     }
   }
   callback(std::move(fuchsia::io::ConnectionInfo().set_rights(rights)));

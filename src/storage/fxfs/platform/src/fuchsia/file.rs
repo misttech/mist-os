@@ -92,7 +92,11 @@ impl FxFile {
             let stream = match zx::Stream::create(options, this.vmo(), 0) {
                 Ok(stream) => stream,
                 Err(status) => {
-                    send_on_open_with_error(flags, server_end, status);
+                    send_on_open_with_error(
+                        flags.contains(fio::OpenFlags::DESCRIBE),
+                        server_end,
+                        status,
+                    );
                     return;
                 }
             };
@@ -230,7 +234,11 @@ impl DirectoryEntry for FxFile {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         if !path.is_empty() {
-            send_on_open_with_error(flags, server_end, Status::NOT_FILE);
+            send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                Status::NOT_FILE,
+            );
             return;
         }
         scope.clone().spawn_with_shutdown(move |shutdown| {

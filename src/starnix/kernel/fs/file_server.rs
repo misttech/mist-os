@@ -502,7 +502,11 @@ impl directory::entry::DirectoryEntry for StarnixNodeConnection {
         mut server_end: ServerEnd<fio::NodeMarker>,
     ) {
         if let Err(errno) = self.directory_entry_open(scope, flags, path, &mut server_end) {
-            vfs::common::send_on_open_with_error(flags, server_end, errno.into());
+            vfs::common::send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                errno.into(),
+            );
         }
     }
 

@@ -59,6 +59,7 @@ impl DirectoryEntry for PkgfsPackagesVariants {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags.difference(fio::OpenFlags::POSIX_WRITABLE);
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
         // This directory and all child nodes are read-only
         if flags.intersects(
@@ -68,7 +69,7 @@ impl DirectoryEntry for PkgfsPackagesVariants {
                 | fio::OpenFlags::TRUNCATE
                 | fio::OpenFlags::APPEND,
         ) {
-            return send_on_open_with_error(flags, server_end, zx::Status::NOT_SUPPORTED);
+            return send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
         }
 
         match path.next().map(|variant| self.variant(variant)) {
@@ -84,7 +85,7 @@ impl DirectoryEntry for PkgfsPackagesVariants {
                     }
                 })
             }
-            Some(None) => send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND),
+            Some(None) => send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND),
         }
     }
 

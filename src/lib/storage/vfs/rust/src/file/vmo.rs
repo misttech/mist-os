@@ -231,13 +231,14 @@ impl DirectoryEntry for VmoFile {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         if !path.is_empty() {
-            send_on_open_with_error(flags, server_end, Status::NOT_DIR);
+            send_on_open_with_error(describe, server_end, Status::NOT_DIR);
             return;
         }
 
         if flags.intersects(fio::OpenFlags::APPEND) {
-            send_on_open_with_error(flags, server_end, Status::NOT_SUPPORTED);
+            send_on_open_with_error(describe, server_end, Status::NOT_SUPPORTED);
             return;
         }
 

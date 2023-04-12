@@ -4,14 +4,47 @@
 
 //! Common utilities used by several directory implementations.
 
-use crate::{common::stricter_or_same_rights, directory::entry::EntryInfo};
+use crate::{
+    common::{io2_conversions, stricter_or_same_rights},
+    directory::entry::EntryInfo,
+};
 
 use {
-    byteorder::{LittleEndian, WriteBytesExt},
+    byteorder::{LittleEndian, WriteBytesExt as _},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     static_assertions::assert_eq_size,
-    std::{io::Write, mem::size_of},
+    std::{io::Write as _, mem::size_of},
 };
+
+pub struct OptionsWithDescribe<T: TryFrom<fio::OpenFlags>> {
+    pub describe: bool,
+    pub options: Result<T, <T as TryFrom<fio::OpenFlags>>::Error>,
+}
+
+impl<T: TryFrom<fio::OpenFlags>> From<fio::OpenFlags> for OptionsWithDescribe<T> {
+    fn from(flags: fio::OpenFlags) -> Self {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
+        let options = (flags & !fio::OpenFlags::DESCRIBE).try_into();
+        Self { describe, options }
+    }
+}
+
+/// A directory can be open either as a directory or a node.
+pub struct DirectoryOptions {
+    pub node: bool,
+    pub rights: fio::Operations,
+}
+
+impl DirectoryOptions {
+    pub(crate) fn into_io1(&self) -> fio::OpenFlags {
+        let Self { node, rights } = self;
+        let mut flags = io2_conversions::io2_to_io1(*rights);
+        if *node {
+            flags |= fio::OpenFlags::NODE_REFERENCE;
+        }
+        flags
+    }
+}
 
 /// Checks flags provided for a new connection.  Returns adjusted flags (cleaning up some
 /// ambiguities) or a fidl Status error, in case new new connection flags are not permitting the
@@ -20,51 +53,54 @@ use {
 /// OPEN_FLAG_NODE_REFERENCE is preserved.
 ///
 /// Changing this function can be dangerous!  Flags operations may have security implications.
-pub fn new_connection_validate_flags(
-    mut flags: fio::OpenFlags,
-) -> Result<fio::OpenFlags, zx::Status> {
-    if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        flags &= fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
+impl TryFrom<fio::OpenFlags> for DirectoryOptions {
+    type Error = zx::Status;
+
+    fn try_from(mut flags: fio::OpenFlags) -> Result<Self, Self::Error> {
+        let node = flags.intersects(fio::OpenFlags::NODE_REFERENCE);
+        if node {
+            flags &= fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
+        }
+
+        if flags.intersects(fio::OpenFlags::DIRECTORY) {
+            flags &= !fio::OpenFlags::DIRECTORY;
+        }
+
+        if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
+            return Err(zx::Status::NOT_FILE);
+        }
+
+        // Parent connection must check the POSIX flags in `check_child_connection_flags`, so if any
+        // are still present, we expand their respective rights and remove any remaining flags.
+        if flags.intersects(fio::OpenFlags::POSIX_EXECUTABLE) {
+            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+        }
+        if flags.intersects(fio::OpenFlags::POSIX_WRITABLE) {
+            flags |= fio::OpenFlags::RIGHT_WRITABLE;
+        }
+        flags &= !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
+
+        let allowed_flags = fio::OpenFlags::NODE_REFERENCE
+            | fio::OpenFlags::DESCRIBE
+            | fio::OpenFlags::CREATE
+            | fio::OpenFlags::CREATE_IF_ABSENT
+            | fio::OpenFlags::DIRECTORY
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_EXECUTABLE;
+
+        let prohibited_flags = fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE;
+
+        if flags.intersects(prohibited_flags) {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+
+        if flags.intersects(!allowed_flags) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+
+        Ok(Self { node, rights: io2_conversions::io1_to_io2(flags) })
     }
-
-    if flags.intersects(fio::OpenFlags::DIRECTORY) {
-        flags &= !fio::OpenFlags::DIRECTORY;
-    }
-
-    if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-        return Err(zx::Status::NOT_FILE);
-    }
-
-    // Parent connection must check the POSIX flags in `check_child_connection_flags`, so if any
-    // are still present, we expand their respective rights and remove any remaining flags.
-    if flags.intersects(fio::OpenFlags::POSIX_EXECUTABLE) {
-        flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
-    }
-    if flags.intersects(fio::OpenFlags::POSIX_WRITABLE) {
-        flags |= fio::OpenFlags::RIGHT_WRITABLE;
-    }
-    flags &= !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
-
-    let allowed_flags = fio::OpenFlags::NODE_REFERENCE
-        | fio::OpenFlags::DESCRIBE
-        | fio::OpenFlags::CREATE
-        | fio::OpenFlags::CREATE_IF_ABSENT
-        | fio::OpenFlags::DIRECTORY
-        | fio::OpenFlags::RIGHT_READABLE
-        | fio::OpenFlags::RIGHT_WRITABLE
-        | fio::OpenFlags::RIGHT_EXECUTABLE;
-
-    let prohibited_flags = fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE;
-
-    if flags.intersects(prohibited_flags) {
-        return Err(zx::Status::INVALID_ARGS);
-    }
-
-    if flags.intersects(!allowed_flags) {
-        return Err(zx::Status::NOT_SUPPORTED);
-    }
-
-    Ok(flags)
 }
 
 /// Directories need to make sure that connections to child entries do not receive more rights than
@@ -156,10 +192,22 @@ pub fn encode_dirent(buf: &mut Vec<u8>, max_bytes: u64, entry: &EntryInfo, name:
 
 #[cfg(test)]
 mod tests {
-    use super::{check_child_connection_flags, new_connection_validate_flags};
+    use super::{check_child_connection_flags, DirectoryOptions, OptionsWithDescribe};
     use crate::test_utils::build_flag_combinations;
 
     use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
+
+    // TODO(https://fxbug.dev/77623): Remove and directly test
+    // `<DirectoryOptions as TryFrom<fio::OpenFlags>>`.
+    fn new_connection_validate_flags(flags: fio::OpenFlags) -> Result<fio::OpenFlags, zx::Status> {
+        let OptionsWithDescribe { describe, options } = flags.into();
+        let options: DirectoryOptions = options?;
+        let mut flags = options.into_io1();
+        if describe {
+            flags |= fio::OpenFlags::DESCRIBE;
+        }
+        Ok(flags)
+    }
 
     #[track_caller]
     fn ncvf_ok(flags: fio::OpenFlags, expected_new_flags: fio::OpenFlags) {
@@ -231,20 +279,6 @@ mod tests {
                 expected_rights |= fio::OpenFlags::RIGHT_EXECUTABLE
             }
             ncvf_ok(open_flags, expected_rights);
-        }
-    }
-
-    #[test]
-    fn new_connection_validate_flags_create() {
-        for open_flags in build_flag_combinations(
-            fio::OpenFlags::CREATE.bits(),
-            (fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE_IF_ABSENT)
-                .bits(),
-        ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
-            ncvf_ok(open_flags, open_flags);
         }
     }
 

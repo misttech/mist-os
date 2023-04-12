@@ -8,13 +8,14 @@
 use crate::{
     common::send_on_open_with_error,
     directory::{
-        common::new_connection_validate_flags,
+        common::{DirectoryOptions, OptionsWithDescribe},
         connection::{
-            io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown},
+            io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
             util::OpenDirectory,
         },
         entry::DirectoryEntry,
         entry_container,
+        mutable::entry_constructor::NewEntryType,
     },
     execution_scope::ExecutionScope,
     path::Path,
@@ -24,7 +25,7 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::Status,
-    futures::{channel::oneshot, TryStreamExt},
+    futures::{channel::oneshot, TryStreamExt as _},
     std::sync::Arc,
 };
 
@@ -54,7 +55,7 @@ impl DerivedConnection for ImmutableConnection {
     fn new(
         scope: ExecutionScope,
         directory: OpenDirectory<Self::Directory>,
-        flags: fio::OpenFlags,
+        flags: DirectoryOptions,
     ) -> Self {
         ImmutableConnection { base: BaseConnection::<Self>::new(scope, directory, flags) }
     }
@@ -62,7 +63,7 @@ impl DerivedConnection for ImmutableConnection {
     fn create_connection(
         scope: ExecutionScope,
         directory: Arc<Self::Directory>,
-        flags: fio::OpenFlags,
+        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         // Ensure we close the directory if we fail to create the connection.
@@ -70,10 +71,11 @@ impl DerivedConnection for ImmutableConnection {
 
         // TODO(fxbug.dev/82054): These flags should be validated before create_connection is called
         // since at this point the directory resource has already been opened/created.
-        let flags = match new_connection_validate_flags(flags) {
+        let OptionsWithDescribe { describe, options } = flags.into();
+        let flags = match options {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };
@@ -92,7 +94,7 @@ impl DerivedConnection for ImmutableConnection {
 
         let connection = Self::new(scope.clone(), directory, flags);
 
-        if flags.intersects(fio::OpenFlags::DESCRIBE) {
+        if describe {
             match control_handle
                 .send_on_open_(Status::OK.into_raw(), Some(&mut connection.base.node_info()))
             {
@@ -112,14 +114,14 @@ impl DerivedConnection for ImmutableConnection {
     fn entry_not_found(
         _scope: ExecutionScope,
         _parent: Arc<dyn DirectoryEntry>,
-        flags: fio::OpenFlags,
+        _entry_type: NewEntryType,
+        create: bool,
         _name: &str,
         _path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        if !flags.intersects(fio::OpenFlags::CREATE) {
-            Err(Status::NOT_FOUND)
-        } else {
-            Err(Status::NOT_SUPPORTED)
+        match create {
+            false => Err(Status::NOT_FOUND),
+            true => Err(Status::NOT_SUPPORTED),
         }
     }
 }

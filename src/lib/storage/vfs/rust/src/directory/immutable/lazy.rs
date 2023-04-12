@@ -192,12 +192,13 @@ impl<T: LazyDirectory> DirectoryEntry for Lazy<T> {
             }
         };
 
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         let task = Box::pin({
             let scope = scope.clone();
             async move {
                 match self.inner.get_entry(&name).await {
                     Ok(entry) => entry.open(scope, flags, path, server_end),
-                    Err(status) => send_on_open_with_error(flags, server_end, status),
+                    Err(status) => send_on_open_with_error(describe, server_end, status),
                 }
             }
         });

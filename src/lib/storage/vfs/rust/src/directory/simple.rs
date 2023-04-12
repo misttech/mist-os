@@ -15,7 +15,7 @@ use crate::{
         entry_container::{Directory, DirectoryWatcher},
         helper::DirectlyMutable,
         immutable::connection::io1::ImmutableConnection,
-        mutable::connection::io1::MutableConnection,
+        mutable::{connection::io1::MutableConnection, entry_constructor::NewEntryType},
         traversal_position::TraversalPosition,
         watchers::{
             event_producers::{SingleNameEventProducer, StaticVecEventProducer},
@@ -104,8 +104,15 @@ where
                 Ok(entry.clone())
             }
             None => {
-                let entry =
-                    Connection::entry_not_found(scope.clone(), self.clone(), flags, name, path)?;
+                let (type_, create) = NewEntryType::from_flags(flags, path.is_dir())?;
+                let entry = Connection::entry_not_found(
+                    scope.clone(),
+                    self.clone(),
+                    type_,
+                    create,
+                    name,
+                    path,
+                )?;
 
                 let _ = this.entries.insert(name.to_string(), entry.clone());
                 Ok(entry)
@@ -203,9 +210,10 @@ where
         } else {
             self.get_or_insert_entry(scope.clone(), flags, name, path_ref)
         };
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         let found = match res {
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 false
             }
             Ok(entry) => {

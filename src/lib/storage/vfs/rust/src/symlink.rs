@@ -81,16 +81,17 @@ impl Connection {
         server_end: ServerEnd<fio::NodeMarker>,
         mut shutdown: oneshot::Receiver<()>,
     ) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         if let Err(status) = validate_flags(flags) {
-            send_on_open_with_error(flags, server_end, status);
+            send_on_open_with_error(describe, server_end, status);
             return;
         }
 
-        let target = if flags.intersects(fio::OpenFlags::DESCRIBE) {
+        let target = if describe {
             match symlink.read_target() {
                 Ok(target) => Some(target),
                 Err(status) => {
-                    send_on_open_with_error(flags, server_end, status);
+                    send_on_open_with_error(describe, server_end, status);
                     return;
                 }
             }
@@ -211,10 +212,11 @@ impl Connection {
     }
 
     fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         let flags = match inherit_rights_for_clone(fio::OpenFlags::RIGHT_READABLE, flags) {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };
@@ -245,8 +247,9 @@ impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         if !path.is_empty() {
-            send_on_open_with_error(flags, server_end, zx::Status::NOT_DIR);
+            send_on_open_with_error(describe, server_end, zx::Status::NOT_DIR);
             return;
         }
         Connection::spawn(scope, self, flags, server_end);

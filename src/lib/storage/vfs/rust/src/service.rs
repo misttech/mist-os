@@ -153,7 +153,8 @@ impl DirectoryEntry for Service {
         if !path.is_empty() {
             // See comment at the beginning of [`Service::open_as_service`].
             if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-                send_on_open_with_error(flags, server_end, Status::NOT_DIR);
+                let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
+                send_on_open_with_error(describe, server_end, Status::NOT_DIR);
             }
             return;
         }

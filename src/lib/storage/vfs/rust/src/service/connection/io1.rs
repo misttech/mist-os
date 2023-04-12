@@ -63,10 +63,11 @@ impl Connection {
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let flags = match new_connection_validate_flags(flags) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
+        let _: fio::OpenFlags = match new_connection_validate_flags(flags) {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };
@@ -80,7 +81,7 @@ impl Connection {
             }
         };
 
-        if flags.intersects(fio::OpenFlags::DESCRIBE) {
+        if describe {
             let mut info = fio::NodeInfoDeprecated::Service(fio::Service);
             match control_handle.send_on_open_(Status::OK.into_raw(), Some(&mut info)) {
                 Ok(()) => (),
@@ -185,10 +186,11 @@ impl Connection {
 
     fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
         let parent_flags = fio::OpenFlags::NODE_REFERENCE;
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         let flags = match inherit_rights_for_clone(parent_flags, flags) {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };

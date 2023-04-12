@@ -508,7 +508,11 @@ impl DirectoryEntry for FxDirectory {
         let scope = self.volume().scope().clone();
         scope.clone().spawn_with_shutdown(move |shutdown| async move {
             match self.lookup(flags, path).await {
-                Err(e) => send_on_open_with_error(flags, server_end, map_to_status(e)),
+                Err(e) => send_on_open_with_error(
+                    flags.contains(fio::OpenFlags::DESCRIBE),
+                    server_end,
+                    map_to_status(e),
+                ),
                 Ok(node) => {
                     if node.is::<FxDirectory>() {
                         MutableConnection::create_connection_async(

@@ -142,7 +142,11 @@ pub async fn serve_path(
     let root_dir = match RootDir::new(non_meta_storage, meta_far).await {
         Ok(d) => d,
         Err(e) => {
-            let () = send_on_open_with_error(flags, server_end, e.to_zx_status());
+            let () = send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                e.to_zx_status(),
+            );
             return Err(e);
         }
     };

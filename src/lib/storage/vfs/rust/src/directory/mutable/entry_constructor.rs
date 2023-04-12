@@ -66,7 +66,7 @@ impl NewEntryType {
     pub fn from_flags(
         flags: fio::OpenFlags,
         force_directory: bool,
-    ) -> Result<NewEntryType, Status> {
+    ) -> Result<(Self, bool), Status> {
         // Same for `flags`, allow only one of OPEN_FLAG_DIRECTORY or OPEN_FLAG_NOT_DIRECTORY.
         if flags.intersects(fio::OpenFlags::DIRECTORY)
             && flags.intersects(fio::OpenFlags::NOT_DIRECTORY)
@@ -75,22 +75,22 @@ impl NewEntryType {
         }
 
         let type_ = if flags.intersects(fio::OpenFlags::DIRECTORY) {
-            NewEntryType::Directory
+            Self::Directory
         } else if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-            NewEntryType::File
+            Self::File
         } else {
             // Neither is set, so default to file, unless `force_directory` would make use fail.
             if force_directory {
-                NewEntryType::Directory
+                Self::Directory
             } else {
-                NewEntryType::File
+                Self::File
             }
         };
 
-        if force_directory && type_ == NewEntryType::File {
+        if force_directory && type_ == Self::File {
             Err(Status::INVALID_ARGS)
         } else {
-            Ok(type_)
+            Ok((type_, flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT)))
         }
     }
 }
@@ -102,16 +102,16 @@ mod tests {
 
     use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
 
-    #[test_case(fio::OpenFlags::empty(), false, Ok(NewEntryType::File))]
-    #[test_case(fio::OpenFlags::NOT_DIRECTORY, false, Ok(NewEntryType::File))]
-    #[test_case(fio::OpenFlags::DIRECTORY, false, Ok(NewEntryType::Directory))]
-    #[test_case(fio::OpenFlags::empty(), true, Ok(NewEntryType::Directory))]
+    #[test_case(fio::OpenFlags::empty(), false, Ok((NewEntryType::File, false)))]
+    #[test_case(fio::OpenFlags::NOT_DIRECTORY, false, Ok((NewEntryType::File, false)))]
+    #[test_case(fio::OpenFlags::DIRECTORY, false, Ok((NewEntryType::Directory, false)))]
+    #[test_case(fio::OpenFlags::empty(), true, Ok((NewEntryType::Directory, false)))]
     #[test_case(fio::OpenFlags::NOT_DIRECTORY, true, Err(Status::INVALID_ARGS))]
-    #[test_case(fio::OpenFlags::DIRECTORY, true, Ok(NewEntryType::Directory))]
+    #[test_case(fio::OpenFlags::DIRECTORY, true, Ok((NewEntryType::Directory, false)))]
     fn from_flags(
         flags: fio::OpenFlags,
         force_directory: bool,
-        expected: Result<NewEntryType, Status>,
+        expected: Result<(NewEntryType, bool), Status>,
     ) {
         assert_eq!(NewEntryType::from_flags(flags, force_directory), expected);
     }

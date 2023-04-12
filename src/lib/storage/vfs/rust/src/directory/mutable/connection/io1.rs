@@ -7,9 +7,9 @@
 use crate::{
     common::send_on_open_with_error,
     directory::{
-        common::new_connection_validate_flags,
+        common::{DirectoryOptions, OptionsWithDescribe},
         connection::{
-            io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown},
+            io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
             util::OpenDirectory,
         },
         entry::DirectoryEntry,
@@ -25,7 +25,7 @@ use {
     anyhow::{bail, Error},
     fidl::{endpoints::ServerEnd, Handle},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{channel::oneshot, pin_mut, TryStreamExt},
+    futures::{channel::oneshot, pin_mut, TryStreamExt as _},
     pin_project::pin_project,
     std::{pin::Pin, sync::Arc},
 };
@@ -42,7 +42,7 @@ impl DerivedConnection for MutableConnection {
     fn new(
         scope: ExecutionScope,
         directory: OpenDirectory<Self::Directory>,
-        flags: fio::OpenFlags,
+        flags: DirectoryOptions,
     ) -> Self {
         MutableConnection { base: BaseConnection::<Self>::new(scope, directory, flags) }
     }
@@ -50,7 +50,7 @@ impl DerivedConnection for MutableConnection {
     fn create_connection(
         scope: ExecutionScope,
         directory: Arc<Self::Directory>,
-        flags: fio::OpenFlags,
+        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         if let Ok((connection, requests)) =
@@ -69,22 +69,19 @@ impl DerivedConnection for MutableConnection {
     fn entry_not_found(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
-        flags: fio::OpenFlags,
+        entry_type: NewEntryType,
+        create: bool,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, zx::Status> {
-        if !flags.intersects(fio::OpenFlags::CREATE) {
-            return Err(zx::Status::NOT_FOUND);
+        match create {
+            false => Err(zx::Status::NOT_FOUND),
+            true => {
+                let entry_constructor =
+                    scope.entry_constructor().ok_or(zx::Status::NOT_SUPPORTED)?;
+                entry_constructor.create_entry(parent, entry_type, name, path)
+            }
         }
-
-        let type_ = NewEntryType::from_flags(flags, path.is_dir())?;
-
-        let entry_constructor = match scope.entry_constructor() {
-            None => return Err(zx::Status::NOT_SUPPORTED),
-            Some(constructor) => constructor,
-        };
-
-        entry_constructor.create_entry(parent, type_, name, path)
     }
 }
 
@@ -166,7 +163,12 @@ impl MutableConnection {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
-        if !self.base.flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
+        let DirectoryOptions { node, rights } = self.base.flags;
+        if node {
+            // TODO(https://fxbug.dev/77623): should this be an error?
+            // return Err(zx::Status::NOT_SUPPORTED);
+        }
+        if !rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -180,7 +182,12 @@ impl MutableConnection {
         name: String,
         options: fio::UnlinkOptions,
     ) -> Result<(), zx::Status> {
-        if !self.base.flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
+        let DirectoryOptions { node, rights } = self.base.flags;
+        if node {
+            // TODO(https://fxbug.dev/77623): should this be an error?
+            // return Err(zx::Status::NOT_SUPPORTED);
+        }
+        if !rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -202,7 +209,12 @@ impl MutableConnection {
     }
 
     fn handle_get_token(this: Pin<&Tokenizable<Self>>) -> Result<Handle, zx::Status> {
-        if !this.base.flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
+        let DirectoryOptions { node, rights } = this.base.flags;
+        if node {
+            // TODO(https://fxbug.dev/77623): should this be an error?
+            // return Err(zx::Status::NOT_SUPPORTED);
+        }
+        if !rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
         Ok(TokenRegistry::get_token(this)?)
@@ -214,7 +226,12 @@ impl MutableConnection {
         dst_parent_token: Handle,
         dst: String,
     ) -> Result<(), zx::Status> {
-        if !self.base.flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
+        let DirectoryOptions { node, rights } = self.base.flags;
+        if node {
+            // TODO(https://fxbug.dev/77623): should this be an error?
+            // return Err(zx::Status::NOT_SUPPORTED);
+        }
+        if !rights.contains(fio::W_STAR_DIR) {
             return Err(zx::Status::BAD_HANDLE);
         }
 
@@ -237,7 +254,7 @@ impl MutableConnection {
     fn prepare_connection(
         scope: ExecutionScope,
         directory: Arc<dyn MutableDirectory>,
-        flags: fio::OpenFlags,
+        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(Self, fio::DirectoryRequestStream), Error> {
         // Ensure we close the directory if we fail to prepare the connection.
@@ -245,10 +262,11 @@ impl MutableConnection {
 
         // TODO(fxbug.dev/82054): These flags should be validated before prepare_connection is
         // called since at this point the directory resource has already been opened/created.
-        let flags = match new_connection_validate_flags(flags) {
+        let OptionsWithDescribe { describe, options } = flags.into();
+        let flags = match options {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 bail!(status);
             }
         };
@@ -259,7 +277,7 @@ impl MutableConnection {
 
         let connection = Self::new(scope, directory, flags);
 
-        if flags.intersects(fio::OpenFlags::DESCRIBE) {
+        if describe {
             control_handle
                 .send_on_open_(zx::Status::OK.into_raw(), Some(&mut connection.base.node_info()))?;
         }
@@ -288,7 +306,7 @@ impl MutableConnection {
 
 impl TokenInterface for MutableConnection {
     fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-        (self.base.directory.clone(), self.base.flags)
+        (self.base.directory.clone(), self.base.flags.into_io1())
     }
 
     fn token_registry(&self) -> &TokenRegistry {

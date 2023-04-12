@@ -100,7 +100,7 @@ pub fn node_attributes() -> fio::NodeAttributes {
 /// If `status` is `Status::OK`.  In this case `OnOpen` may need to contain a description of the
 /// object, and server_end should not be dropped.
 pub fn send_on_open_with_error(
-    flags: fio::OpenFlags,
+    describe: bool,
     server_end: ServerEnd<fio::NodeMarker>,
     status: Status,
 ) {
@@ -108,7 +108,7 @@ pub fn send_on_open_with_error(
         panic!("send_on_open_with_error() should not be used to respond with Status::OK");
     }
 
-    if !flags.intersects(fio::OpenFlags::DESCRIBE) {
+    if !describe {
         // There is no reasonable way to report this error.  Assuming the `server_end` has just
         // disconnected or failed in some other way why we are trying to send OnOpen.
         let _ = server_end.close_with_epitaph(status);
@@ -153,21 +153,40 @@ pub fn rights_to_posix_mode_bits(readable: bool, writable: bool, executable: boo
 }
 
 // TODO(https://fxbug.dev/124432): Consolidate with other implementations that do the same thing.
-/// Map a set of io1 rights flags for files to their respective io2 Operations.
-///
-/// Changing this function can be dangerous! Allowed operations may have security implications.
-pub fn io1_rights_to_io2_operations(flags: &fio::OpenFlags) -> fio::Operations {
-    let mut operations = fio::Operations::empty();
-    if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-        operations |= fio::Operations::READ_BYTES;
+pub(crate) mod io2_conversions {
+    use super::fio;
+
+    // This code is adapted from /src/sys/lib/routing/src/rights.rs.
+    //
+    // Unlike that implementation, this is stricter: a particular io1 right is present iff all its
+    // constituent io2 rights are present.
+    pub fn io2_to_io1(rights: fio::Operations) -> fio::OpenFlags {
+        let mut flags = fio::OpenFlags::empty();
+        if rights.contains(fio::R_STAR_DIR) {
+            flags |= fio::OpenFlags::RIGHT_READABLE;
+        }
+        if rights.contains(fio::W_STAR_DIR) {
+            flags |= fio::OpenFlags::RIGHT_WRITABLE;
+        }
+        if rights.contains(fio::X_STAR_DIR) {
+            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+        }
+        flags
     }
-    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-        operations |= fio::Operations::WRITE_BYTES;
+
+    pub fn io1_to_io2(flags: fio::OpenFlags) -> fio::Operations {
+        let mut operations = fio::Operations::empty();
+        if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+            operations |= fio::R_STAR_DIR;
+        }
+        if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            operations |= fio::W_STAR_DIR;
+        }
+        if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+            operations |= fio::X_STAR_DIR;
+        }
+        operations
     }
-    if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-        operations |= fio::Operations::EXECUTE;
-    }
-    operations
 }
 
 #[cfg(test)]

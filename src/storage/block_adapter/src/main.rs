@@ -51,7 +51,11 @@ impl DirectoryEntry for BlockFile {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         if !path.is_empty() {
-            send_on_open_with_error(flags, server_end, zx::Status::NOT_FILE);
+            send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                zx::Status::NOT_FILE,
+            );
             return;
         }
         create_connection(scope, self, flags, server_end, true, true, false);

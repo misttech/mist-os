@@ -156,7 +156,11 @@ impl DirectoryEntry for FilteredServiceDirectory {
             }
             return;
         } else {
-            send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND);
+            send_on_open_with_error(
+                flags.contains(fio::OpenFlags::DESCRIBE),
+                server_end,
+                zx::Status::NOT_FOUND,
+            );
         }
     }
 

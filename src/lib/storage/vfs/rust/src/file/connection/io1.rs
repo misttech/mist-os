@@ -5,8 +5,7 @@
 use {
     crate::{
         common::{
-            inherit_rights_for_clone, io1_rights_to_io2_operations, send_on_open_with_error,
-            GET_FLAGS_VISIBLE,
+            inherit_rights_for_clone, io2_conversions, send_on_open_with_error, GET_FLAGS_VISIBLE,
         },
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
@@ -164,10 +163,11 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
     // RAII helper that ensures that the file is closed if we fail to create the connection.
     let file = OpenFile::new(file, scope.clone());
 
+    let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
     let flags = match new_connection_validate_flags(flags, readable, writable, executable) {
         Ok(updated) => updated,
         Err(status) => {
-            send_on_open_with_error(flags, server_end, status);
+            send_on_open_with_error(describe, server_end, status);
             return;
         }
     };
@@ -175,14 +175,14 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
     match file.open(flags).await {
         Ok(()) => (),
         Err(status) => {
-            send_on_open_with_error(flags, server_end, status);
+            send_on_open_with_error(describe, server_end, status);
             return;
         }
     };
 
     if flags.intersects(fio::OpenFlags::TRUNCATE) {
         if let Err(status) = file.truncate(0).await {
-            send_on_open_with_error(flags, server_end, status);
+            send_on_open_with_error(describe, server_end, status);
             return;
         }
     }
@@ -201,7 +201,7 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
 
     let connection = FileConnection { scope: scope.clone(), file, requests, flags };
 
-    if flags.intersects(fio::OpenFlags::DESCRIBE) {
+    if describe {
         let result = match connection.node_info() {
             Ok(mut info) => {
                 control_handle.send_on_open_(zx::Status::OK.into_raw(), Some(&mut info))
@@ -755,7 +755,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
                 let mut rights = fio::Operations::GET_ATTRIBUTES;
                 if !self.flags.contains(fio::OpenFlags::NODE_REFERENCE) {
-                    rights |= io1_rights_to_io2_operations(&self.flags);
+                    rights |= io2_conversions::io1_to_io2(self.flags);
                 }
                 responder.send(fio::ConnectionInfo {
                     rights: Some(rights),
@@ -872,10 +872,11 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
+        let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
         let flags = match inherit_rights_for_clone(parent_flags, flags) {
             Ok(updated) => updated,
             Err(status) => {
-                send_on_open_with_error(flags, server_end, status);
+                send_on_open_with_error(describe, server_end, status);
                 return;
             }
         };

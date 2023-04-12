@@ -115,6 +115,7 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let flags = flags.difference(fio::OpenFlags::POSIX_WRITABLE);
+        let describe = flags.contains(fio::OpenFlags::DESCRIBE);
 
         // This directory and all child nodes are read-only
         if flags.intersects(
@@ -124,7 +125,7 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                 | fio::OpenFlags::TRUNCATE
                 | fio::OpenFlags::APPEND,
         ) {
-            return send_on_open_with_error(flags, server_end, zx::Status::NOT_SUPPORTED);
+            return send_on_open_with_error(describe, server_end, zx::Status::NOT_SUPPORTED);
         }
 
         scope.clone().spawn(async move {
@@ -140,7 +141,8 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                     )
                     .await;
                     if let crate::cache_service::PackageStatus::Other = package_status {
-                        let () = send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND);
+                        let () =
+                            send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
                         return;
                     }
 
@@ -154,7 +156,7 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                     let flags = match (executability_status, executablity_requested) {
                         (Forbidden, true) => {
                             let () = send_on_open_with_error(
-                                flags,
+                                describe,
                                 server_end,
                                 zx::Status::ACCESS_DENIED,
                             );
@@ -178,7 +180,7 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                 }
                 Some(Err(_)) => {
                     // Names that are not valid hashes can't exist in this directory.
-                    send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND)
+                    send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND)
                 }
             }
         })
