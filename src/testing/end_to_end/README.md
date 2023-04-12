@@ -85,13 +85,16 @@ TestBeds:
       FuchsiaDevice:
         - name: $FUCHSIA_NODENAME
           ssh_private_key: $PKEY
+          ip_address: $SSH_IP_ADDRESS
 ```
 
-Where `$FUCHSIA_NODENAME` and `$PKEY` need to be manually substituted to fit
-your local development environment.
+Where `$FUCHSIA_NODENAME`, `$PKEY` and `$SSH_IP_ADDRESS` need to be manually
+substituted to fit your local development environment.
 
-`$FUCHSIA_NODENAME` is the device-under-test that's accessible from the host.
-A quick way to determine what this is in your local environment is to use `ffx`:
+#### `name` attribute of FuchsiaDevice
+`name: $FUCHSIA_NODENAME` is the device-under-test that's accessible from the
+host. A quick way to determine what this is in your local environment is to use
+`ffx`:
 
 ```sh
 $ ffx target list
@@ -105,12 +108,13 @@ NOTE: This may be an emulator or a physical device. If there are multiple
 accessible devices, choose only the one that you'd like to target in the host
 test.
 
-The `$PKEY` value should match the path of the SSH private key that can be used
-to connect to the DUT. This is the key that pairs with the `authorized_keys`
-used in paving workflows or exists in the emulator image. For most users, this
-is ` ~/.ssh/fuchsia_ed25519` as it's the key used by Fuchsia's `fx` workflows.
-If the DUT is provisioned by other means, you'd have to provide the path to the
-corresponding SSH private key.
+#### `ssh_private_key` attribute of FuchsiaDevice
+The `ssh_private_key: $PKEY` value should match the path of the SSH private key
+that can be used to connect to the DUT. This is the key that pairs with the
+`authorized_keys` used in paving workflows or exists in the emulator image. For
+most users, this is ` ~/.ssh/fuchsia_ed25519` as it's the key used by Fuchsia's
+`fx` workflows. If the DUT is provisioned by other means, you'd have to provide
+the path to the corresponding SSH private key.
 
 A quick way to confirm that Fuchsia's default SSH key works is the following:
 
@@ -124,6 +128,30 @@ path:
 
 ```sh
 $ head -1 $FUCHSIA_DIR/.fx-ssh-path
+```
+
+#### `ip_address` attribute of FuchsiaDevice
+`ip_address: $SSH_IP_ADDRESS` is the SSH IP address assigned to the device.
+This is the same IP address `fx shell` command also uses to communicate with the
+device from host.
+
+You can get this by value running `fx shell -vvv`
+```sh
+$ fx shell -vvv
+OpenSSH_9.2p1, OpenSSL 3.0.7 1 Nov 2022
+debug1: Reading configuration data ~/fuchsia/out/default/ssh-keys/ssh_config
+debug1: ~/fuchsia/out/default/ssh-keys/ssh_config line 7: Applying options for *
+debug2: resolve_canonicalize: hostname fe80::71bb:d31c:2ddc:ef15%qemu is address
+...
+$
+```
+The `$SSH_IP_ADDRESS` in the above example would be
+`fe80::71bb:d31c:2ddc:ef15%qemu`.
+
+A quick way to confirm that this $SSH_IP_ADDRESS value is correct is by
+successfully running the below command:
+```sh
+$ ssh -oPasswordAuthentication=no -oStrictHostKeyChecking=no -oConnectTimeout=3 -i $PKEY fuchsia@$SSH_IP_ADDRESS ls
 ```
 
 ### Lacewing test module

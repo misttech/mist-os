@@ -3,7 +3,9 @@
 [TOC]
 
 ## Setup
-1. Ensure device type that you want to run the test on (will be listed in "device_type" field in test case's BUILD.gn file) is connected to host and detectable by FFX
+1. Ensure device type that you want to run the test on (will be listed in
+"device_type" field in test case's BUILD.gn file) is connected to host and
+detectable by FFX
 ```shell
 
 $ ffx target list
@@ -11,7 +13,11 @@ NAME                SERIAL       TYPE                        STATE      ADDRS/IP
 fuchsia-emulator*   <unknown>    workstation_eng.qemu-x64    Product    [fe80::e2c:464d:6de4:4c55%qemu]    Y
 ```
 
-2. Ensure the testbeds used by the test case (will be listed in "local_config_source" field in test case's BUILD.gn file) has correct device name listed
+2. Ensure the testbeds used by the test case (will be listed in
+"local_config_source" field in test case's BUILD.gn file) has correct device
+information listed (`name`, `ssh_private_key` and `ip_address` fields. For more
+information about these fields, refer to
+[Lacewing Mobly Config YAML file](../README.md#Mobly-Config-YAML-File))
 
 ### Fuchsia Emulator
 If a test case requires fuchsia emulator then follow the below steps to start it
