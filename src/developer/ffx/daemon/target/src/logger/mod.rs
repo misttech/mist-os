@@ -44,7 +44,7 @@ fn get_timestamp() -> Result<Timestamp> {
     ))
 }
 
-fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
+pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
     streamer: Arc<T>,
     symbolizer_config: Option<&'a SymbolizerConfig<'a>>,
 ) -> Result<(ServerEnd<ArchiveIteratorMarker>, impl Future<Output = Result<()>> + 'a)> {
@@ -303,7 +303,7 @@ pub struct SymbolizerConfig<'a> {
 }
 
 impl<'a> SymbolizerConfig<'a> {
-    async fn new() -> Result<SymbolizerConfig<'a>> {
+    pub async fn new() -> Result<SymbolizerConfig<'a>> {
         if get(SYMBOLIZE_ENABLED_CONFIG).await? {
             Ok(Self {
                 symbolizer: Some(Arc::new(LogSymbolizer::new())),

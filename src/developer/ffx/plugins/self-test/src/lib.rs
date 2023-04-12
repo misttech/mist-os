@@ -13,6 +13,7 @@ mod config;
 mod daemon;
 mod debug;
 mod experiment;
+mod log;
 mod target;
 mod test;
 
@@ -51,6 +52,7 @@ pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
     ];
 
     let mut target_tests = tests![
+        log::include_log::test_log_run_normal,
         component::include_target::test_list,
         debug::include_target::test_debug_run_crasher,
         debug::include_target::test_debug_limbo,

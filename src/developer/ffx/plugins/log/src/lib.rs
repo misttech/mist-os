@@ -2,28 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod error;
+
 use anyhow::{anyhow, Context, Error, Result};
 use async_trait::async_trait;
 use blocking::Unblock;
 use chrono::{Local, TimeZone, Utc};
 use diagnostics_data::{LogsData, Severity, Timestamp};
+use error::LogError;
 use errors::{ffx_bail, ffx_error};
 use ffx_config::{get, keys::TARGET_DEFAULT_KEY};
+use ffx_core::macro_deps::fidl::endpoints::create_proxy;
 use ffx_log_args::{DumpCommand, LogCommand, LogSubCommand, TimeFormat, WatchCommand};
 use ffx_log_data::{EventType, LogData, LogEntry};
 use ffx_log_frontend::{exec_log_cmd, LogCommandParameters, LogFormatter};
-use fho::{
-    daemon_protocol, deferred, selector, AvailabilityFlag, Deferred, FfxMain, FfxTool,
-    MachineWriter, ToolIO,
+use fho::{daemon_protocol, deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fidl_fuchsia_developer_ffx::{
+    DiagnosticsProxy, StreamMode, TargetCollectionProxy, TargetQuery, TimeBound,
 };
-use fidl_fuchsia_developer_ffx::{DiagnosticsProxy, StreamMode, TimeBound};
 use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, RemoteControlProxy};
 use fidl_fuchsia_diagnostics::LogSettingsProxy;
 use futures::{AsyncWrite, AsyncWriteExt};
 use moniker::{AbsoluteMoniker, AbsoluteMonikerBase};
-use std::{fs, iter::Iterator, time::SystemTime};
+use std::{fs, iter::Iterator, sync::Arc, time::SystemTime};
 use termion::{color, style};
 
+use ffx_log_frontend::{RemoteDiagnosticsBridgeProxyWrapper, StreamDiagnostics};
 mod spam_filter;
 
 type ArchiveIteratorResult = Result<LogEntry, ArchiveIteratorError>;
@@ -542,8 +546,9 @@ This likely means that your logs will not be symbolized."
 type Writer = MachineWriter<Vec<LogEntry>>;
 
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("proactive_log.enabled"))]
 pub struct LogTool {
+    #[with(daemon_protocol())]
+    target_collection: TargetCollectionProxy,
     #[with(daemon_protocol())]
     diagnostics_proxy: DiagnosticsProxy,
     rcs_proxy: fho::Result<RemoteControlProxy>,
@@ -565,10 +570,59 @@ impl FfxMain for LogTool {
             writer,
             self.rcs_proxy.ok(),
             self.log_settings.await.ok(),
+            self.target_collection,
             self.cmd,
         )
         .await
         .map_err(Into::into)
+    }
+}
+
+async fn log_internal(
+    diagnostics_proxy: DiagnosticsProxy,
+    writer: Writer,
+    mut rcs_proxy: Option<RemoteControlProxy>,
+    log_settings: Option<LogSettingsProxy>,
+    bridge_proxy: TargetCollectionProxy,
+    cmd: LogCommand,
+) -> Result<(), LogError> {
+    // TODO(https://fxbug.dev/125266): Fix coverage bots.
+    let proactive_enabled: bool = get::<bool, &str>("proactive_log.enabled").await?;
+    if !proactive_enabled {
+        if rcs_proxy.is_none() {
+            let (client, server) = create_proxy()?;
+            bridge_proxy.open_target(TargetQuery::EMPTY, server).await??;
+            let (rcs_client, rcs_server) = create_proxy()?;
+            client.open_remote_control(rcs_server).await??;
+            rcs_proxy = Some(rcs_client);
+        }
+        let host =
+            rcs_proxy.as_ref().ok_or(LogError::NoRcsProxyAvailable)?.identify_host().await??;
+        log_impl(
+            Arc::new(RemoteDiagnosticsBridgeProxyWrapper::new(
+                bridge_proxy,
+                host.nodename.ok_or(LogError::NoHostname)?,
+            )),
+            rcs_proxy,
+            &log_settings,
+            cmd,
+            &mut std::io::stdout(),
+            LogOpts { is_machine: writer.is_machine() },
+        )
+        .await?;
+        Ok(())
+    } else {
+        // TODO(fxbug.dev/121413): this will be removed as we remove proactive logging.
+        log_impl(
+            diagnostics_proxy,
+            rcs_proxy,
+            &log_settings,
+            cmd,
+            &mut std::io::stdout(),
+            LogOpts { is_machine: writer.is_machine() },
+        )
+        .await?;
+        Ok(())
     }
 }
 
@@ -577,21 +631,15 @@ async fn log(
     writer: Writer,
     rcs_proxy: Option<RemoteControlProxy>,
     log_settings: Option<LogSettingsProxy>,
+    bridge_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<()> {
-    log_impl(
-        diagnostics_proxy,
-        rcs_proxy,
-        &log_settings,
-        cmd,
-        &mut std::io::stdout(),
-        LogOpts { is_machine: writer.is_machine() },
-    )
-    .await
+    log_internal(diagnostics_proxy, writer, rcs_proxy, log_settings, bridge_proxy, cmd).await?;
+    Ok(())
 }
 
 pub async fn log_impl<W: std::io::Write>(
-    diagnostics_proxy: DiagnosticsProxy,
+    diagnostics_proxy: impl StreamDiagnostics,
     rcs_proxy: Option<RemoteControlProxy>,
     log_settings: &Option<LogSettingsProxy>,
     cmd: LogCommand,
@@ -645,7 +693,7 @@ pub async fn log_impl<W: std::io::Write>(
 }
 
 async fn log_cmd<W: std::io::Write>(
-    diagnostics_proxy: DiagnosticsProxy,
+    diagnostics_proxy: impl StreamDiagnostics,
     rcs_opt: Option<RemoteControlProxy>,
     // NOTE: The fact that this is a reference is load-bearing.
     // It needs to be kept alive to prevent the connection from being dropped

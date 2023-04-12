@@ -19,7 +19,7 @@ pub struct SelftestCommand {
 
     #[argh(
         option,
-        default = "12",
+        default = "60",
         description = "maximum run time of a single test case in seconds"
     )]
     pub case_timeout: u64,
