@@ -216,9 +216,6 @@ pub trait RngContext {
     /// that property for their correctness and security.
     type Rng: RngCore + CryptoRng;
 
-    /// Gets the random number generator (RNG).
-    fn rng(&self) -> &Self::Rng;
-
     /// Gets the random number generator (RNG) mutably.
     fn rng_mut(&mut self) -> &mut Self::Rng;
 }
@@ -1046,10 +1043,6 @@ pub(crate) mod testutil {
 
     impl<TimerId, Event: Debug, State> RngContext for FakeNonSyncCtx<TimerId, Event, State> {
         type Rng = FakeCryptoRng<XorShiftRng>;
-
-        fn rng(&self) -> &Self::Rng {
-            &self.rng
-        }
 
         fn rng_mut(&mut self) -> &mut Self::Rng {
             &mut self.rng

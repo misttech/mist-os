@@ -1963,7 +1963,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(non_sync_ctx.rng().clone().next_u64()),
+            OpaqueIidNonce::Random(non_sync_ctx.rng_mut().clone().next_u64()),
             &slaac_config.temporary_address_configuration.unwrap().secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3291,7 +3291,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(non_sync_ctx.rng().clone().next_u64()),
+            OpaqueIidNonce::Random(non_sync_ctx.rng_mut().clone().next_u64()),
             &secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];

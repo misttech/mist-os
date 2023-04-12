@@ -273,10 +273,6 @@ impl CounterContext for BindingsNonSyncCtxImpl {}
 impl RngContext for BindingsNonSyncCtxImpl {
     type Rng = OsRng;
 
-    fn rng(&self) -> &OsRng {
-        &self.rng
-    }
-
     fn rng_mut(&mut self) -> &mut OsRng {
         &mut self.rng
     }
