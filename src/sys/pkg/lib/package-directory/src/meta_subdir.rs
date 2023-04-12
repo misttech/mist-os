@@ -11,7 +11,7 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            connection::io1::DerivedConnection, entry::EntryInfo,
+            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
             immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
@@ -56,8 +56,10 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
                 return;
             }
 
-            let () = ImmutableConnection::create_connection(scope, self, flags, server_end);
-            return;
+            return with_directory_options(flags, server_end, |describe, options, server_end| {
+                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
+            })
+            .unwrap_or(());
         }
 
         // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except

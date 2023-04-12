@@ -14,7 +14,7 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            connection::io1::DerivedConnection, entry::EntryInfo,
+            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
             immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
@@ -82,8 +82,10 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
                 return;
             }
 
-            let () = ImmutableConnection::create_connection(scope, self, flags, server_end);
-            return;
+            return with_directory_options(flags, server_end, |describe, options, server_end| {
+                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
+            })
+            .unwrap_or(());
         }
 
         if path.as_ref() == "missing" {

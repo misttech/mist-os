@@ -865,6 +865,7 @@ mod tests {
         test_case::test_case,
         vfs::{
             directory::{
+                common::with_directory_options,
                 connection::io1::DerivedConnection,
                 dirents_sink,
                 entry::{DirectoryEntry, EntryInfo},
@@ -1389,12 +1390,16 @@ mod tests {
             _path: Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            <ImmutableConnection as DerivedConnection>::create_connection(
-                self.scope.clone(),
-                self.clone(),
-                flags,
-                server_end,
-            );
+            with_directory_options(flags, server_end, |describe, options, server_end| {
+                ImmutableConnection::create_connection(
+                    self.scope.clone(),
+                    self.clone(),
+                    describe,
+                    options,
+                    server_end,
+                )
+            })
+            .unwrap_or(())
         }
 
         fn entry_info(&self) -> EntryInfo {

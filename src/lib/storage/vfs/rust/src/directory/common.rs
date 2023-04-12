@@ -5,7 +5,7 @@
 //! Common utilities used by several directory implementations.
 
 use crate::{
-    common::{io2_conversions, stricter_or_same_rights},
+    common::{io2_conversions, send_on_open_with_error, stricter_or_same_rights},
     directory::entry::EntryInfo,
 };
 
@@ -16,9 +16,9 @@ use {
     std::{io::Write as _, mem::size_of},
 };
 
-pub struct OptionsWithDescribe<T: TryFrom<fio::OpenFlags>> {
-    pub describe: bool,
-    pub options: Result<T, <T as TryFrom<fio::OpenFlags>>::Error>,
+struct OptionsWithDescribe<T: TryFrom<fio::OpenFlags>> {
+    describe: bool,
+    options: Result<T, <T as TryFrom<fio::OpenFlags>>::Error>,
 }
 
 impl<T: TryFrom<fio::OpenFlags>> From<fio::OpenFlags> for OptionsWithDescribe<T> {
@@ -31,8 +31,8 @@ impl<T: TryFrom<fio::OpenFlags>> From<fio::OpenFlags> for OptionsWithDescribe<T>
 
 /// A directory can be open either as a directory or a node.
 pub struct DirectoryOptions {
-    pub node: bool,
-    pub rights: fio::Operations,
+    pub(crate) node: bool,
+    pub(crate) rights: fio::Operations,
 }
 
 impl DirectoryOptions {
@@ -103,11 +103,26 @@ impl TryFrom<fio::OpenFlags> for DirectoryOptions {
     }
 }
 
+pub fn with_directory_options<T>(
+    flags: fio::OpenFlags,
+    server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
+    op: impl FnOnce(bool, DirectoryOptions, fidl::endpoints::ServerEnd<fio::NodeMarker>) -> T,
+) -> Option<T> {
+    let OptionsWithDescribe { describe, options } = flags.into();
+    match options {
+        Ok(options) => Some(op(describe, options, server_end)),
+        Err(status) => {
+            let () = send_on_open_with_error(describe, server_end, status);
+            None
+        }
+    }
+}
+
 /// Directories need to make sure that connections to child entries do not receive more rights than
 /// the connection to the directory itself.  Plus there is special handling of the OPEN_FLAG_POSIX_*
 /// flags. This function should be called before calling [`new_connection_validate_flags`] if both
 /// are needed.
-pub fn check_child_connection_flags(
+pub(crate) fn check_child_connection_flags(
     parent_flags: fio::OpenFlags,
     mut flags: fio::OpenFlags,
 ) -> Result<fio::OpenFlags, zx::Status> {
@@ -155,7 +170,12 @@ pub fn check_child_connection_flags(
 /// an entry description as specified by `entry` and `name` to the `buf`, and would return `true`.
 /// In case this would cause the buffer size to exceed `max_bytes`, the buffer is then left
 /// untouched and a `false` value is returned.
-pub fn encode_dirent(buf: &mut Vec<u8>, max_bytes: u64, entry: &EntryInfo, name: &str) -> bool {
+pub(crate) fn encode_dirent(
+    buf: &mut Vec<u8>,
+    max_bytes: u64,
+    entry: &EntryInfo,
+    name: &str,
+) -> bool {
     let header_size = size_of::<u64>() + size_of::<u8>() + size_of::<u8>();
 
     assert_eq_size!(u64, usize);

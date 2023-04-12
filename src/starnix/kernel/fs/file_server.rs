@@ -197,15 +197,17 @@ impl StarnixNodeConnection {
     ) -> Result<(), Errno> {
         if self.is_dir() {
             if path.is_dot() {
-                // Reopen the current directory.
-                let file = self.reopen(flags)?;
                 let server_end = std::mem::replace(server_end, zx::Handle::invalid().into());
-                scope.clone().spawn_with_shutdown(move |shutdown| {
-                    directory::mutable::connection::io1::MutableConnection::create_connection_async(
-                        scope, file, flags, server_end, shutdown,
-                    )
-                });
-                return Ok(());
+                return directory::common::with_directory_options(flags, server_end, |describe, options, server_end| {
+                    // Reopen the current directory.
+                    let file = self.reopen(flags)?;
+                    scope.clone().spawn_with_shutdown(move |shutdown| {
+                        directory::mutable::connection::io1::MutableConnection::create_connection_async(
+                            scope, file, describe, options, server_end, shutdown,
+                        )
+                    });
+                    Ok(())
+                }).unwrap_or(Ok(()));
             }
 
             // Open a path under the current directory.

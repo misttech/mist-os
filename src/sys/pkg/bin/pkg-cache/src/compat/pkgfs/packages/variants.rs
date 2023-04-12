@@ -18,6 +18,7 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
+            common::with_directory_options,
             connection::io1::DerivedConnection,
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
@@ -73,7 +74,15 @@ impl DirectoryEntry for PkgfsPackagesVariants {
         }
 
         match path.next().map(|variant| self.variant(variant)) {
-            None => ImmutableConnection::create_connection(scope, self, flags, server_end),
+            None => {
+                let () =
+                    with_directory_options(flags, server_end, |describe, options, server_end| {
+                        ImmutableConnection::create_connection(
+                            scope, self, describe, options, server_end,
+                        )
+                    })
+                    .unwrap_or(());
+            }
             Some(Some(hash)) => {
                 let blobfs = self.blobfs.clone();
                 scope.clone().spawn(async move {

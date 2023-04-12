@@ -29,10 +29,12 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
+            common::with_directory_options,
             connection::io1::DerivedConnection,
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{Directory, DirectoryWatcher, MutableDirectory},
+            mutable::connection::io1::MutableConnection,
             traversal_position::TraversalPosition,
             watchers::{
                 event_producers::{SingleNameEventProducer, StaticVecEventProducer},
@@ -760,15 +762,19 @@ impl DirectoryEntry for FatDirectory {
                 send_on_open_with_error(flags.contains(fio::OpenFlags::DESCRIBE), server_end, e)
             }
             Ok(FatNode::Dir(entry)) => {
-                entry
-                    .open_ref(&self.filesystem.lock().unwrap())
-                    .expect("entry should already be open");
-                vfs::directory::mutable::connection::io1::MutableConnection::create_connection(
-                    scope,
-                    entry.clone(),
-                    flags,
-                    server_end,
-                );
+                with_directory_options(flags, server_end, |describe, options, server_end| {
+                    let () = entry
+                        .open_ref(&self.filesystem.lock().unwrap())
+                        .expect("entry should already be open");
+                    MutableConnection::create_connection(
+                        scope,
+                        entry.clone(),
+                        describe,
+                        options,
+                        server_end,
+                    )
+                })
+                .unwrap_or(())
             }
             Ok(FatNode::File(entry)) => {
                 entry.clone().open(scope, flags, Path::dot(), server_end);

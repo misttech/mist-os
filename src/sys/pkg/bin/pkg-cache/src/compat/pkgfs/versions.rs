@@ -16,7 +16,7 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
-            connection::io1::DerivedConnection, entry::EntryInfo,
+            common::with_directory_options, connection::io1::DerivedConnection, entry::EntryInfo,
             immutable::connection::io1::ImmutableConnection, traversal_position::TraversalPosition,
         },
         execution_scope::ExecutionScope,
@@ -132,7 +132,18 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
             // The `path.next()` above pops of the next path element, but `path`
             // still holds any remaining path elements.
             match path.next().map(Hash::from_str) {
-                None => ImmutableConnection::create_connection(scope, self, flags, server_end),
+                None => {
+                    let () = with_directory_options(
+                        flags,
+                        server_end,
+                        |describe, options, server_end| {
+                            ImmutableConnection::create_connection(
+                                scope, self, describe, options, server_end,
+                            )
+                        },
+                    )
+                    .unwrap_or(());
+                }
                 Some(Ok(package_hash)) => {
                     let package_status = crate::cache_service::get_package_status(
                         self.base_packages.as_ref(),

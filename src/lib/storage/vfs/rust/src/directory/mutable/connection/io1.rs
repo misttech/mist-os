@@ -5,9 +5,8 @@
 //! Connection to a directory that can be modified by the client though a FIDL connection.
 
 use crate::{
-    common::send_on_open_with_error,
     directory::{
-        common::{DirectoryOptions, OptionsWithDescribe},
+        common::DirectoryOptions,
         connection::{
             io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
             util::OpenDirectory,
@@ -22,7 +21,7 @@ use crate::{
 };
 
 use {
-    anyhow::{bail, Error},
+    anyhow::Error,
     fidl::{endpoints::ServerEnd, Handle},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, pin_mut, TryStreamExt as _},
@@ -42,19 +41,20 @@ impl DerivedConnection for MutableConnection {
     fn new(
         scope: ExecutionScope,
         directory: OpenDirectory<Self::Directory>,
-        flags: DirectoryOptions,
+        options: DirectoryOptions,
     ) -> Self {
-        MutableConnection { base: BaseConnection::<Self>::new(scope, directory, flags) }
+        MutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
     }
 
     fn create_connection(
         scope: ExecutionScope,
         directory: Arc<Self::Directory>,
-        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
+        describe: bool,
+        options: DirectoryOptions,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         if let Ok((connection, requests)) =
-            Self::prepare_connection(scope.clone(), directory, flags, server_end)
+            Self::prepare_connection(scope.clone(), directory, describe, options, server_end)
         {
             // If we fail to send the task to the executor, it is probably shut down or is in the
             // process of shutting down (this is the only error state currently).  So there is
@@ -90,12 +90,13 @@ impl MutableConnection {
     pub async fn create_connection_async(
         scope: ExecutionScope,
         directory: Arc<dyn MutableDirectory>,
-        flags: fio::OpenFlags,
+        describe: bool,
+        options: DirectoryOptions,
         server_end: ServerEnd<fio::NodeMarker>,
         shutdown: oneshot::Receiver<()>,
     ) {
         if let Ok((connection, requests)) =
-            Self::prepare_connection(scope, directory, flags, server_end)
+            Self::prepare_connection(scope, directory, describe, options, server_end)
         {
             Self::handle_requests(connection, requests, shutdown).await;
         }
@@ -163,7 +164,7 @@ impl MutableConnection {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), zx::Status> {
-        let DirectoryOptions { node, rights } = self.base.flags;
+        let DirectoryOptions { node, rights } = self.base.options;
         if node {
             // TODO(https://fxbug.dev/77623): should this be an error?
             // return Err(zx::Status::NOT_SUPPORTED);
@@ -182,7 +183,7 @@ impl MutableConnection {
         name: String,
         options: fio::UnlinkOptions,
     ) -> Result<(), zx::Status> {
-        let DirectoryOptions { node, rights } = self.base.flags;
+        let DirectoryOptions { node, rights } = self.base.options;
         if node {
             // TODO(https://fxbug.dev/77623): should this be an error?
             // return Err(zx::Status::NOT_SUPPORTED);
@@ -209,7 +210,7 @@ impl MutableConnection {
     }
 
     fn handle_get_token(this: Pin<&Tokenizable<Self>>) -> Result<Handle, zx::Status> {
-        let DirectoryOptions { node, rights } = this.base.flags;
+        let DirectoryOptions { node, rights } = this.base.options;
         if node {
             // TODO(https://fxbug.dev/77623): should this be an error?
             // return Err(zx::Status::NOT_SUPPORTED);
@@ -226,7 +227,7 @@ impl MutableConnection {
         dst_parent_token: Handle,
         dst: String,
     ) -> Result<(), zx::Status> {
-        let DirectoryOptions { node, rights } = self.base.flags;
+        let DirectoryOptions { node, rights } = self.base.options;
         if node {
             // TODO(https://fxbug.dev/77623): should this be an error?
             // return Err(zx::Status::NOT_SUPPORTED);
@@ -254,28 +255,18 @@ impl MutableConnection {
     fn prepare_connection(
         scope: ExecutionScope,
         directory: Arc<dyn MutableDirectory>,
-        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
+        describe: bool,
+        options: DirectoryOptions,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(Self, fio::DirectoryRequestStream), Error> {
         // Ensure we close the directory if we fail to prepare the connection.
         let directory = OpenDirectory::new(directory);
 
-        // TODO(fxbug.dev/82054): These flags should be validated before prepare_connection is
-        // called since at this point the directory resource has already been opened/created.
-        let OptionsWithDescribe { describe, options } = flags.into();
-        let flags = match options {
-            Ok(updated) => updated,
-            Err(status) => {
-                send_on_open_with_error(describe, server_end, status);
-                bail!(status);
-            }
-        };
-
         let (requests, control_handle) =
             ServerEnd::<fio::DirectoryMarker>::new(server_end.into_channel())
                 .into_stream_and_control_handle()?;
 
-        let connection = Self::new(scope, directory, flags);
+        let connection = Self::new(scope, directory, options);
 
         if describe {
             control_handle
@@ -306,7 +297,7 @@ impl MutableConnection {
 
 impl TokenInterface for MutableConnection {
     fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-        (self.base.directory.clone(), self.base.flags.into_io1())
+        (self.base.directory.clone(), self.base.options.into_io1())
     }
 
     fn token_registry(&self) -> &TokenRegistry {
@@ -320,6 +311,7 @@ mod tests {
         super::*,
         crate::{
             directory::{
+                common::with_directory_options,
                 dirents_sink,
                 entry::{DirectoryEntry, EntryInfo},
                 entry_container::{Directory, DirectoryWatcher},
@@ -494,12 +486,17 @@ mod tests {
             *cur_id += 1;
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            MutableConnection::create_connection(
-                self.scope.clone(),
-                dir.clone(),
-                flags,
-                server_end.into_channel().into(),
-            );
+            let server_end = server_end.into_channel().into();
+            let () = with_directory_options(flags, server_end, |describe, options, server_end| {
+                MutableConnection::create_connection(
+                    self.scope.clone(),
+                    dir.clone(),
+                    describe,
+                    options,
+                    server_end,
+                )
+            })
+            .unwrap_or(());
             (dir, proxy)
         }
     }

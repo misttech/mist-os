@@ -35,6 +35,7 @@ use {
     vfs::{
         common::send_on_open_with_error,
         directory::{
+            common::with_directory_options,
             connection::io1::DerivedConnection,
             dirents_sink,
             entry::{DirectoryEntry, EntryInfo},
@@ -121,8 +122,10 @@ impl DirectoryEntry for FilteredServiceDirectory {
     ) {
         if path.is_empty() {
             // If path is empty just connect to itself as a directory.
-            ImmutableConnection::create_connection(scope, self, flags, server_end);
-            return;
+            return with_directory_options(flags, server_end, |describe, options, server_end| {
+                ImmutableConnection::create_connection(scope, self, describe, options, server_end)
+            })
+            .unwrap_or(());
         }
         let input_path_string = path.clone().into_string();
         let service_instance_name =

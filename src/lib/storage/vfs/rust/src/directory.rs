@@ -7,8 +7,7 @@
 #[macro_use]
 pub mod test_utils;
 
-#[macro_use]
-mod common;
+pub mod common;
 
 pub mod immutable;
 pub mod mutable;

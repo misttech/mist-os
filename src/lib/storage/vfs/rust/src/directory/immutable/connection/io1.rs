@@ -6,9 +6,8 @@
 //! the client has on the FIDL connection.
 
 use crate::{
-    common::send_on_open_with_error,
     directory::{
-        common::{DirectoryOptions, OptionsWithDescribe},
+        common::DirectoryOptions,
         connection::{
             io1::{BaseConnection, ConnectionState, DerivedConnection, WithShutdown as _},
             util::OpenDirectory,
@@ -55,30 +54,20 @@ impl DerivedConnection for ImmutableConnection {
     fn new(
         scope: ExecutionScope,
         directory: OpenDirectory<Self::Directory>,
-        flags: DirectoryOptions,
+        options: DirectoryOptions,
     ) -> Self {
-        ImmutableConnection { base: BaseConnection::<Self>::new(scope, directory, flags) }
+        ImmutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
     }
 
     fn create_connection(
         scope: ExecutionScope,
         directory: Arc<Self::Directory>,
-        flags: impl Into<OptionsWithDescribe<DirectoryOptions>>,
+        describe: bool,
+        options: DirectoryOptions,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         // Ensure we close the directory if we fail to create the connection.
         let directory = OpenDirectory::new(directory);
-
-        // TODO(fxbug.dev/82054): These flags should be validated before create_connection is called
-        // since at this point the directory resource has already been opened/created.
-        let OptionsWithDescribe { describe, options } = flags.into();
-        let flags = match options {
-            Ok(updated) => updated,
-            Err(status) => {
-                send_on_open_with_error(describe, server_end, status);
-                return;
-            }
-        };
 
         let (requests, control_handle) =
             match ServerEnd::<fio::DirectoryMarker>::new(server_end.into_channel())
@@ -92,7 +81,7 @@ impl DerivedConnection for ImmutableConnection {
                 }
             };
 
-        let connection = Self::new(scope.clone(), directory, flags);
+        let connection = Self::new(scope.clone(), directory, options);
 
         if describe {
             match control_handle

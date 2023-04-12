@@ -35,6 +35,7 @@ use {
     vfs::{
         common::{rights_to_posix_mode_bits, send_on_open_with_error},
         directory::{
+            common::with_directory_options,
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
             entry_container::{DirectoryWatcher, MutableDirectory},
@@ -515,16 +516,25 @@ impl DirectoryEntry for FxDirectory {
                 ),
                 Ok(node) => {
                     if node.is::<FxDirectory>() {
-                        MutableConnection::create_connection_async(
-                            scope,
-                            node.downcast::<FxDirectory>()
-                                .unwrap_or_else(|_| unreachable!())
-                                .take(),
+                        let () = match with_directory_options(
                             flags,
                             server_end,
-                            shutdown,
-                        )
-                        .await;
+                            |describe, options, server_end| {
+                                MutableConnection::create_connection_async(
+                                    scope,
+                                    node.downcast::<FxDirectory>()
+                                        .unwrap_or_else(|_| unreachable!())
+                                        .take(),
+                                    describe,
+                                    options,
+                                    server_end,
+                                    shutdown,
+                                )
+                            },
+                        ) {
+                            None => {}
+                            Some(fut) => fut.await,
+                        };
                     } else if node.is::<FxFile>() {
                         let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
                         if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
