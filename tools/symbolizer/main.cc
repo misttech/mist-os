@@ -7,8 +7,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "src/developer/debug/zxdb/client/cloud_storage_symbol_server.h"
-#include "src/developer/debug/zxdb/client/symbol_server.h"
+#include "src/developer/debug/zxdb/client/symbol_server_impl.h"
 #include "src/developer/debug/zxdb/common/curl.h"
 #include "src/developer/debug/zxdb/common/version.h"
 #include "src/lib/fxl/strings/trim.h"
@@ -28,7 +27,7 @@ int AuthMode() {
   debug::MessageLoopPoll loop;
   loop.Init(nullptr);
 
-  auto server = zxdb::CloudStorageSymbolServer::Impl(nullptr, "", true);
+  auto server = std::make_unique<zxdb::SymbolServerImpl>(nullptr, "", true);
   if (server->state() == zxdb::SymbolServer::State::kBusy) {
     server->set_state_change_callback(
         [&](zxdb::SymbolServer*, zxdb::SymbolServer::State state) { loop.QuitNow(); });

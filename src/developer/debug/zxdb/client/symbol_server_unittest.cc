@@ -10,8 +10,8 @@
 
 #include <gtest/gtest.h>
 
-#include "src/developer/debug/zxdb/client/cloud_storage_symbol_server.h"
 #include "src/developer/debug/zxdb/client/mock_process.h"
+#include "src/developer/debug/zxdb/client/mock_symbol_server.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/target_impl.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
@@ -22,14 +22,14 @@ namespace zxdb {
 
 class SymbolServerTest : public TestWithLoop {
  public:
-  SymbolServerTest() : session_() {
+  SymbolServerTest() {
     static auto fake_home =
         std::filesystem::path(GetSelfPath()).parent_path() / "test_data" / "zxdb" / "fake_home";
     setenv("HOME", fake_home.string().c_str(), true);
     unsetenv("XDG_CACHE_HOME");
     unsetenv("GCE_METADATA_HOST");
 
-    auto server = std::make_unique<MockCloudStorageSymbolServer>(&session_, "gs://fake-bucket");
+    auto server = std::make_unique<MockSymbolServer>(&session_, "gs://fake-bucket");
     server_ = server.get();
     session_.system().InjectSymbolServerForTesting(std::move(server));
   }
@@ -37,7 +37,7 @@ class SymbolServerTest : public TestWithLoop {
   virtual ~SymbolServerTest() = default;
 
   Session* session() { return &session_; }
-  MockCloudStorageSymbolServer* server() { return server_; }
+  MockSymbolServer* server() { return server_; }
 
   void QuietlyFinishInit() {
     server()->on_do_authenticate = [](const std::map<std::string, std::string>& data,
@@ -54,7 +54,7 @@ class SymbolServerTest : public TestWithLoop {
 
  private:
   Session session_;
-  MockCloudStorageSymbolServer* server_;
+  MockSymbolServer* server_;
 };
 
 TEST_F(SymbolServerTest, LoadAuth) {
