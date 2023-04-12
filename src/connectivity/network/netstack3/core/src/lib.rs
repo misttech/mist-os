@@ -257,6 +257,7 @@ impl<
 }
 
 /// The synchronized context.
+#[derive(Default)]
 pub struct SyncCtx<NonSyncCtx: NonSyncContext> {
     /// Contains the state of the stack.
     pub state: StackState<NonSyncCtx>,
@@ -269,6 +270,7 @@ pub struct SyncCtx<NonSyncCtx: NonSyncContext> {
 /// `Ctx` provides access to the state of the netstack and to an event
 /// dispatcher which can be used to emit events and schedule timers. A mutable
 /// reference to a `Ctx` is passed to every function in the netstack.
+#[derive(Default)]
 pub struct Ctx<NonSyncCtx: NonSyncContext> {
     /// The non-synchronized context.
     // We put `non_sync_ctx` before `sync_ctx` in non-test builds to make sure
@@ -288,18 +290,6 @@ pub struct Ctx<NonSyncCtx: NonSyncContext> {
     // device IDs in our unit tests. See `non_sync_ctx` above for more details.
     #[cfg(test)]
     pub non_sync_ctx: NonSyncCtx,
-}
-
-impl<NonSyncCtx: NonSyncContext + Default> Default for Ctx<NonSyncCtx>
-where
-    StackState<NonSyncCtx>: Default,
-{
-    fn default() -> Ctx<NonSyncCtx> {
-        Ctx {
-            sync_ctx: SyncCtx { state: StackState::default(), non_sync_ctx_marker: PhantomData },
-            non_sync_ctx: Default::default(),
-        }
-    }
 }
 
 impl<NonSyncCtx: NonSyncContext + Default> Ctx<NonSyncCtx> {
