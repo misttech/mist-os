@@ -61,7 +61,7 @@
             from: "#ui",
             to: "#setui_service",
 
-            // TODO resolve the dependency cycle
+            // TODO(fxbug.dev/125372): resolve the dependency cycle.
             dependency: "weak",
             source_availability: "unknown",
         },
