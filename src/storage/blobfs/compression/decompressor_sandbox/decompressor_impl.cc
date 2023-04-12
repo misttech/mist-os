@@ -196,7 +196,7 @@ void SetDeadlineProfile(thrd_t& thread) {
 
 void DecompressorImpl::Create(zx::fifo server_end, zx::vmo compressed_vmo, zx::vmo decompressed_vmo,
                               CreateCallback callback) {
-  FX_LOGS(INFO) << "Creating decompressor.";
+  FX_LOGS(DEBUG) << "Creating decompressor.";
   size_t vmo_size;
   zx_status_t status = decompressed_vmo.get_size(&vmo_size);
   if (status != ZX_OK) {
