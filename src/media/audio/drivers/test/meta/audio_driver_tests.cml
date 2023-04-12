@@ -3,19 +3,23 @@
 // found in the LICENSE file.
 {
     include: [
-        "sys/component/realm_builder.shard.cml",
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
 
         // This test defines its own main
-        "sys/testing/elf_test_runner.shard.cml",
-        "sys/testing/system-test.shard.cml",
-        "syslog/client.shard.cml",
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+        "//sdk/lib/sys/testing/system-test.shard.cml",
+        "//sdk/lib/syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/audio_driver_tests",
     },
     use: [
         {
-            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.virtualaudio.Control",
+                "fuchsia.virtualaudio.Device",
+            ],
         },
         {
             directory: "dev-audio-input",
@@ -26,6 +30,13 @@
             directory: "dev-audio-output",
             rights: [ "r*" ],
             path: "/dev/class/audio-output",
+        },
+
+        // This is used to enable (and then test) virtual_audio driver instances.
+        {
+            directory: "sys",
+            rights: [ "r*" ],
+            path: "/dev/sys",
         },
     ],
 }

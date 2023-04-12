@@ -99,6 +99,8 @@ void VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t msg,
 }
 
 namespace {
+// Although one can configure `virtual_audio` instances in non-compliant ways for testing purposes,
+// the default settings should always produce a fully functional device that passes all tests.
 VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
   VirtualAudioDeviceImpl::Config config;
   config.is_input = is_input;
