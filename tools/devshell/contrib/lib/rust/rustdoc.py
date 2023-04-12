@@ -19,10 +19,11 @@ def manifest_path_from_path_or_gn_target(arg):
         return os.path.abspath(arg)
     else:
         gn_target = rust.GnTarget(arg)
+        gn_target.label_name += ".actual"
         return gn_target.manifest_path()
 
 def main():
-    parser = argparse.ArgumentParser("Compiles all third-party Rust crates")
+    parser = argparse.ArgumentParser("fx rustdoc")
     parser.add_argument("manifest_path",
                         metavar="gn_target",
                         type=manifest_path_from_path_or_gn_target,
