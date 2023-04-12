@@ -149,13 +149,23 @@ where
     T: Transport<Ipv6>,
     T: Transport<Self>,
 {
-    fn get_collection<D: AsRef<SocketCollectionPair<T>>>(
+    fn with_collection<
+        D: AsRef<SocketCollectionPair<T>>,
+        O,
+        F: FnOnce(&SocketCollection<Self, T>) -> O,
+    >(
         dispatcher: &D,
-    ) -> &SocketCollection<Self, T>;
+        cb: F,
+    ) -> O;
 
-    fn get_collection_mut<D: AsMut<SocketCollectionPair<T>>>(
+    fn with_collection_mut<
+        D: AsMut<SocketCollectionPair<T>>,
+        O,
+        F: FnOnce(&mut SocketCollection<Self, T>) -> O,
+    >(
         dispatcher: &mut D,
-    ) -> &mut SocketCollection<Self, T>;
+        cb: F,
+    ) -> O;
 }
 
 impl<T> SocketCollectionIpExt<T> for Ipv4
@@ -164,16 +174,26 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
 {
-    fn get_collection<D: AsRef<SocketCollectionPair<T>>>(
+    fn with_collection<
+        D: AsRef<SocketCollectionPair<T>>,
+        O,
+        F: FnOnce(&SocketCollection<Ipv4, T>) -> O,
+    >(
         dispatcher: &D,
-    ) -> &SocketCollection<Ipv4, T> {
-        &dispatcher.as_ref().v4
+        cb: F,
+    ) -> O {
+        cb(&dispatcher.as_ref().v4)
     }
 
-    fn get_collection_mut<D: AsMut<SocketCollectionPair<T>>>(
+    fn with_collection_mut<
+        D: AsMut<SocketCollectionPair<T>>,
+        O,
+        F: FnOnce(&mut SocketCollection<Ipv4, T>) -> O,
+    >(
         dispatcher: &mut D,
-    ) -> &mut SocketCollection<Ipv4, T> {
-        &mut dispatcher.as_mut().v4
+        cb: F,
+    ) -> O {
+        cb(&mut dispatcher.as_mut().v4)
     }
 }
 
@@ -183,16 +203,26 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
 {
-    fn get_collection<D: AsRef<SocketCollectionPair<T>>>(
+    fn with_collection<
+        D: AsRef<SocketCollectionPair<T>>,
+        O,
+        F: FnOnce(&SocketCollection<Ipv6, T>) -> O,
+    >(
         dispatcher: &D,
-    ) -> &SocketCollection<Ipv6, T> {
-        &dispatcher.as_ref().v6
+        cb: F,
+    ) -> O {
+        cb(&dispatcher.as_ref().v6)
     }
 
-    fn get_collection_mut<D: AsMut<SocketCollectionPair<T>>>(
+    fn with_collection_mut<
+        D: AsMut<SocketCollectionPair<T>>,
+        O,
+        F: FnOnce(&mut SocketCollection<Ipv6, T>) -> O,
+    >(
         dispatcher: &mut D,
-    ) -> &mut SocketCollection<Ipv6, T> {
-        &mut dispatcher.as_mut().v6
+        cb: F,
+    ) -> O {
+        cb(&mut dispatcher.as_mut().v6)
     }
 }
 
@@ -1277,7 +1307,7 @@ where
     /// Creates a new `BindingData`.
     fn new(
         sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         properties: SocketWorkerProperties,
     ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
@@ -1290,7 +1320,6 @@ where
             error!("socket failed to signal peer: {:?}", e);
         }
         let unbound_id = T::create_unbound(sync_ctx);
-        let SocketCollection { conns: _, listeners: _ } = I::get_collection_mut(non_sync_ctx);
 
         Self {
             peer_event,
@@ -1440,7 +1469,7 @@ where
             SocketState::BoundListen { listener_id } => {
                 // Remove from bindings:
                 assert_matches!(
-                    I::get_collection_mut(non_sync_ctx).listeners.remove(&listener_id),
+                    I::with_collection_mut(non_sync_ctx, |c| c.listeners.remove(&listener_id)),
                     Some(_)
                 );
                 // Remove from core:
@@ -1450,7 +1479,7 @@ where
             SocketState::BoundConnect { conn_id, .. } => {
                 // Remove from bindings:
                 assert_matches!(
-                    I::get_collection_mut(non_sync_ctx).conns.remove(&conn_id),
+                    I::with_collection_mut(non_sync_ctx, |c| c.conns.remove(&conn_id)),
                     Some(_)
                 );
                 // Remove from core:
@@ -1976,7 +2005,7 @@ where
                 // TODO(https://fxbug.dev/103049): Make T::connect_listener not
                 // remove the existing listener on failure.
                 let messages = assert_matches!(
-                    I::get_collection_mut(non_sync_ctx).listeners.remove(&listener_id),
+                    I::with_collection_mut(non_sync_ctx, |c| c.listeners.remove(&listener_id)),
                     Some(t) => t
                 );
 
@@ -1991,9 +2020,9 @@ where
                     Err((e, listener_id)) => {
                         // Replace the consumed listener with the new one.
                         assert_matches!(
-                            I::get_collection_mut(non_sync_ctx)
+                            I::with_collection_mut(non_sync_ctx, |c| c
                                 .listeners
-                                .insert(&listener_id, messages),
+                                .insert(&listener_id, messages)),
                             None
                         );
                         self.data.info.state = SocketState::BoundListen { listener_id };
@@ -2008,14 +2037,16 @@ where
                 // Whether reconnect_conn succeeds or fails, it will consume
                 // the existing socket.
                 let messages = assert_matches!(
-                    I::get_collection_mut(non_sync_ctx).conns.remove(&conn_id),
+                    I::with_collection_mut(non_sync_ctx, |c| c.conns.remove(&conn_id)),
                     Some(t) => t);
 
                 match T::reconnect_conn(sync_ctx, non_sync_ctx, conn_id, remote_addr, remote_port) {
                     Ok(conn_id) => (conn_id, messages),
                     Err((e, conn_id)) => {
                         assert_matches!(
-                            I::get_collection_mut(non_sync_ctx).conns.insert(&conn_id, messages),
+                            I::with_collection_mut(non_sync_ctx, |c| c
+                                .conns
+                                .insert(&conn_id, messages)),
                             None
                         );
                         self.data.info.state =
@@ -2028,7 +2059,10 @@ where
 
         self.data.info.state =
             SocketState::BoundConnect { conn_id, shutdown_read: false, shutdown_write: false };
-        assert_matches!(I::get_collection_mut(non_sync_ctx).conns.insert(&conn_id, messages), None);
+        assert_matches!(
+            I::with_collection_mut(non_sync_ctx, |c| c.conns.insert(&conn_id, messages)),
+            None
+        );
         Ok(())
     }
 
@@ -2077,9 +2111,9 @@ where
             T::listen_on_unbound(sync_ctx, non_sync_ctx, unbound_id, local_addr, local_port)
                 .map_err(IntoErrno::into_errno)?;
         assert_matches!(
-            I::get_collection_mut(non_sync_ctx)
+            I::with_collection_mut(non_sync_ctx, |c| c
                 .listeners
-                .insert(&listener_id, available_data.clone()),
+                .insert(&listener_id, available_data.clone())),
             None
         );
         Ok(listener_id)
@@ -2099,7 +2133,7 @@ where
             | SocketState::BoundListen { listener_id: _ } => return Err(fposix::Errno::Einval),
             SocketState::BoundConnect { conn_id, .. } => {
                 let messages = assert_matches!(
-                    I::get_collection_mut(non_sync_ctx).conns.remove(&conn_id),
+                    I::with_collection_mut(non_sync_ctx, |c| c.conns.remove(&conn_id)),
                     Some(t) => t);
                 let listener_id = T::disconnect_connected(sync_ctx, non_sync_ctx, conn_id);
                 (listener_id, messages)
@@ -2108,7 +2142,7 @@ where
 
         self.data.info.state = SocketState::BoundListen { listener_id };
         assert_matches!(
-            I::get_collection_mut(non_sync_ctx).listeners.insert(&listener_id, messages),
+            I::with_collection_mut(non_sync_ctx, |c| c.listeners.insert(&listener_id, messages)),
             None
         );
         Ok(())
@@ -3231,10 +3265,13 @@ mod tests {
         for i in 0..2 {
             t.get(i)
                 .with_ctx(|ctx| {
-                    let SocketCollection { conns, listeners } =
-                        <A::AddrType as IpAddress>::Version::get_collection(&ctx.non_sync_ctx);
-                    assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                    assert_matches!(listeners.iter().collect::<Vec<_>>()[..], [_]);
+                    <A::AddrType as IpAddress>::Version::with_collection(
+                        &ctx.non_sync_ctx,
+                        |SocketCollection { conns, listeners }| {
+                            assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
+                            assert_matches!(listeners.iter().collect::<Vec<_>>()[..], [_]);
+                        },
+                    )
                 })
                 .await;
         }
@@ -3256,10 +3293,13 @@ mod tests {
         for i in 0..2 {
             t.get(i)
                 .with_ctx(|ctx| {
-                    let SocketCollection { conns, listeners } =
-                        <A::AddrType as IpAddress>::Version::get_collection(&ctx.non_sync_ctx);
-                    assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                    assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                    <A::AddrType as IpAddress>::Version::with_collection(
+                        &ctx.non_sync_ctx,
+                        |SocketCollection { conns, listeners }| {
+                            assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
+                            assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                        },
+                    )
                 })
                 .await;
         }
@@ -3299,10 +3339,13 @@ mod tests {
         // empty
         test_stack
             .with_ctx(|ctx| {
-                let SocketCollection { conns, listeners } =
-                    <A::AddrType as IpAddress>::Version::get_collection(&ctx.non_sync_ctx);
-                assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                <A::AddrType as IpAddress>::Version::with_collection(
+                    &ctx.non_sync_ctx,
+                    |SocketCollection { conns, listeners }| {
+                        assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
+                        assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                    },
+                )
             })
             .await;
         let () = cloned
@@ -3314,10 +3357,13 @@ mod tests {
         // Now it should become empty
         test_stack
             .with_ctx(|ctx| {
-                let SocketCollection { conns, listeners } =
-                    <A::AddrType as IpAddress>::Version::get_collection(&ctx.non_sync_ctx);
-                assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                <A::AddrType as IpAddress>::Version::with_collection(
+                    &ctx.non_sync_ctx,
+                    |SocketCollection { conns, listeners }| {
+                        assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
+                        assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                    },
+                )
             })
             .await;
     }
@@ -3349,10 +3395,13 @@ mod tests {
         // No socket should be there now.
         test_stack
             .with_ctx(|ctx| {
-                let SocketCollection { conns, listeners } =
-                    <A::AddrType as IpAddress>::Version::get_collection(&ctx.non_sync_ctx);
-                assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                <A::AddrType as IpAddress>::Version::with_collection(
+                    &ctx.non_sync_ctx,
+                    |SocketCollection { conns, listeners }| {
+                        assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
+                        assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                    },
+                )
             })
             .await;
     }
@@ -3380,10 +3429,13 @@ mod tests {
         // make sure we don't leak anything.
         test_stack
             .with_ctx(|ctx| {
-                let SocketCollection { conns, listeners } =
-                    <A::AddrType as IpAddress>::Version::get_collection(&ctx.non_sync_ctx);
-                assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
-                assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                <A::AddrType as IpAddress>::Version::with_collection(
+                    &ctx.non_sync_ctx,
+                    |SocketCollection { conns, listeners }| {
+                        assert_matches!(conns.iter().collect::<Vec<_>>()[..], []);
+                        assert_matches!(listeners.iter().collect::<Vec<_>>()[..], []);
+                    },
+                )
             })
             .await;
     }
@@ -3544,14 +3596,14 @@ mod tests {
         loop {
             let all_delivered = stack
                 .with_ctx(|Ctx { sync_ctx: _, non_sync_ctx }| {
-                    let SocketCollection { conns: _, listeners } =
-                                <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<
-                                    Udp,
-                                >>::get_collection(non_sync_ctx);
-                    // Check the lone socket to see if the packets were
-                    // received.
-                    let messages = listeners.iter().next().unwrap();
-                    has_all_delivered(&messages.lock())
+                    <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<
+                        Udp,
+                    >>::with_collection(non_sync_ctx, |SocketCollection { conns: _, listeners }| {
+                        // Check the lone socket to see if the packets were
+                        // received.
+                        let messages = listeners.iter().next().unwrap();
+                        has_all_delivered(&messages.lock())
+                    })
                 })
                 .await;
             if all_delivered {

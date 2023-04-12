@@ -356,7 +356,7 @@ where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho> + icmp::IcmpIpExt,
 {
     fn receive_icmp_error(&mut self, conn: icmp::IcmpConnId<I>, seq_num: u16, err: I::ErrorCode) {
-        I::get_collection_mut(self).receive_icmp_error(conn, seq_num, err)
+        I::with_collection_mut(self, |c| c.receive_icmp_error(conn, seq_num, err))
     }
 }
 
@@ -374,7 +374,9 @@ where
         seq_num: u16,
         data: B,
     ) {
-        I::get_collection_mut(self).receive_icmp_echo_reply(conn, src_ip, dst_ip, id, seq_num, data)
+        I::with_collection_mut(self, |c| {
+            c.receive_icmp_echo_reply(conn, src_ip, dst_ip, id, seq_num, data)
+        })
     }
 }
 
@@ -383,7 +385,7 @@ where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {
     fn receive_icmp_error(&mut self, id: udp::BoundId<I>, err: I::ErrorCode) {
-        I::get_collection_mut(self).receive_icmp_error(id, err)
+        I::with_collection_mut(self, |c| c.receive_icmp_error(id, err))
     }
 }
 
@@ -398,7 +400,7 @@ where
         src_port: NonZeroU16,
         body: &B,
     ) {
-        I::get_collection_mut(self).receive_udp_from_conn(conn, src_ip, src_port, body)
+        I::with_collection_mut(self, |c| c.receive_udp_from_conn(conn, src_ip, src_port, body))
     }
 
     fn receive_udp_from_listen(
@@ -409,8 +411,9 @@ where
         src_port: Option<NonZeroU16>,
         body: &B,
     ) {
-        I::get_collection_mut(self)
-            .receive_udp_from_listen(listener, src_ip, dst_ip, src_port, body)
+        I::with_collection_mut(self, |c| {
+            c.receive_udp_from_listen(listener, src_ip, dst_ip, src_port, body)
+        })
     }
 }
 
