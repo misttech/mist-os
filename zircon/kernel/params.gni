@@ -152,3 +152,6 @@ declare_args() {
   # disabled.
   enable_lock_dep_tests = enable_lock_dep
 }
+
+assert(!enable_lock_dep_tests || enable_lock_dep,
+       "enable_lock_dep_tests=true requires enable_lock_dep=true")
