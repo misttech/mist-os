@@ -3145,7 +3145,7 @@ removed: fxb/117339
 
 **Current value (from the default):** `false`
 
-From //src/developer/ffx/config.gni:17
+From //src/developer/ffx/config.gni:19
 
 ### fidl_trace_level
 
