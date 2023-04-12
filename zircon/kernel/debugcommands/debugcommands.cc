@@ -53,6 +53,8 @@ static int cmd_crash_assert(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_thread_lock(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_pop(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -83,6 +85,10 @@ STATIC_COMMAND("crash_stack_guard", "attempt to crash by overwriting the stack g
                &cmd_crash_stack_guard)
 STATIC_COMMAND("crash_illegal_instruction", "attempt to crash by running an illegal instruction",
                &cmd_crash_illegal_instruction)
+STATIC_COMMAND("crash_break_instruction", "attempt to crash by running a break isntruction",
+               &cmd_crash_break_instruction)
+STATIC_COMMAND("crash_syscall_instruction", "attempt to crash by running a syscall isntruction",
+               &cmd_crash_syscall_instruction)
 STATIC_COMMAND("sleep", "sleep number of seconds", &cmd_sleep)
 STATIC_COMMAND("sleepm", "sleep number of milliseconds", &cmd_sleep)
 STATIC_COMMAND(
@@ -585,6 +591,37 @@ static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_
   asm("ud2");
 #elif defined(__aarch64__)
   asm("udf #0");
+#else
+  printf("not implemented for this architecture\n");
+#endif
+
+  return 0;
+}
+
+static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t flags) {
+  printf("attempting to crash with a break instruction\n");
+#if defined(__riscv)
+  asm("ebreak");
+#elif defined(__x86_64__)
+  asm("int3");
+#elif defined(__aarch64__)
+  asm("brk #0");
+#else
+  printf("not implemented for this architecture\n");
+#endif
+
+  return 0;
+}
+
+static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_t flags) {
+  printf("attempting to crash with a syscall instruction\n");
+#if defined(__riscv)
+  // Actually not a good idea, this will probably call into firmware with undefined args.
+  printf("not implemented for RISC-V, ecall instruction would probably be trapped by firmware\n");
+#elif defined(__x86_64__)
+  asm("syscall");
+#elif defined(__aarch64__)
+  asm("svc #0");
 #else
   printf("not implemented for this architecture\n");
 #endif
