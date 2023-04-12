@@ -88,14 +88,14 @@ template("bad_signature_update") {
     }
 
     # Create and resource v1 TUF repo with poisoned signature.
-    compiled_action("${test_name}_poisoned_v1_pm_publish_archive") {
+    compiled_action("${test_name}_poisoned_v1_publish_archive") {
       testonly = true
       tool = "//src/security/tests/pkg_test/poison_tuf_signature"
-      deps = [ ":${test_name}_v1_pm_publish_archive" ]
+      deps = [ ":${test_name}_v1_publish_archive" ]
 
-      pm_publish_archive_outputs =
-          get_target_outputs(":${test_name}_v1_pm_publish_archive")
-      input = pm_publish_archive_outputs[0]
+      publish_archive_outputs =
+          get_target_outputs(":${test_name}_v1_publish_archive")
+      input = publish_archive_outputs[0]
 
       output = "${target_out_dir}/poisoned_v1_tuf_repo.zip"
 
@@ -112,10 +112,10 @@ template("bad_signature_update") {
     }
     zip_resource("${test_name}_poisoned_v1_tuf_repo_resources") {
       testonly = true
-      deps = [ ":${test_name}_poisoned_v1_pm_publish_archive" ]
-      poisoned_pm_publish_archive_outputs =
-          get_target_outputs(":${test_name}_poisoned_v1_pm_publish_archive")
-      file = poisoned_pm_publish_archive_outputs[0]
+      deps = [ ":${test_name}_poisoned_v1_publish_archive" ]
+      poisoned_publish_archive_outputs =
+          get_target_outputs(":${test_name}_poisoned_v1_publish_archive")
+      file = poisoned_publish_archive_outputs[0]
 
       # TODO: This is computed internally by
       # `assemble_security_pkg_test_system()` based on
