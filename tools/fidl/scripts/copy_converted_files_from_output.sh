@@ -1,7 +1,7 @@
+#!/bin/bash
 # Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-#!/bin/bash
 
 # This script works on repos with a simple mapping from src -> out paths.  For
 # the more complex cases in fuchsia.git, use fidl_converter.py instead.
