@@ -305,12 +305,12 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   auto selector = "realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher:root";
   inspect::contrib::ArchiveReader reader(std::move(accessor), {selector});
 
-  fpromise::result<std::vector<inspect::contrib::DiagnosticsData>, std::string> actual_result;
+  fpromise::result<std::vector<inspect::contrib::InspectData>, std::string> actual_result;
   fpromise::single_threaded_executor executor;
 
   executor.schedule_task(
       reader.SnapshotInspectUntilPresent({"inspect-publisher"})
-          .then([&](fpromise::result<std::vector<inspect::contrib::DiagnosticsData>, std::string>&
+          .then([&](fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>&
                         result) mutable { actual_result = std::move(result); }));
 
   executor.run();

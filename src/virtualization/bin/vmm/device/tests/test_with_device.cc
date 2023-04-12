@@ -75,16 +75,16 @@ zx_status_t TestWithDevice::MakeStartInfo(
   return phys_mem_.Init(std::move(vmo));
 }
 
-inspect::contrib::DiagnosticsData TestWithDevice::GetInspect(const std::string& selector,
-                                                             const std::string& name) {
+inspect::contrib::InspectData TestWithDevice::GetInspect(const std::string& selector,
+                                                         const std::string& name) {
   fuchsia::diagnostics::ArchiveAccessorPtr accessor;
   auto svc = sys::ServiceDirectory::CreateFromNamespace();
   svc->Connect(accessor.NewRequest());
   inspect::contrib::ArchiveReader reader(std::move(accessor), {selector});
-  fpromise::result<std::vector<inspect::contrib::DiagnosticsData>, std::string> result;
+  fpromise::result<std::vector<inspect::contrib::InspectData>, std::string> result;
   async::Executor executor(dispatcher());
   executor.schedule_task(reader.SnapshotInspectUntilPresent({name}).then(
-      [&](fpromise::result<std::vector<inspect::contrib::DiagnosticsData>, std::string>& rest) {
+      [&](fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>& rest) {
         result = std::move(rest);
       }));
   RunLoopWithTimeoutOrUntil([&] { return result.is_ok() || result.is_error(); }, zx::sec(10),

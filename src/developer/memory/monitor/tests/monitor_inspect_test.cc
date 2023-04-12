@@ -21,7 +21,7 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
-using inspect::contrib::DiagnosticsData;
+using inspect::contrib::InspectData;
 
 constexpr char kTestCollectionName[] = "test_apps";
 constexpr char kTestChildUrl[] = "#meta/memory_monitor_test_app.cm";
@@ -93,15 +93,15 @@ class InspectTest : public gtest::RealLoopFixture {
     child_name_ += "1";
   }
 
-  fpromise::result<DiagnosticsData> GetInspect() {
+  fpromise::result<InspectData> GetInspect() {
     fuchsia::diagnostics::ArchiveAccessorPtr archive;
     context_->svc()->Connect(archive.NewRequest());
     inspect::contrib::ArchiveReader reader(std::move(archive), {ChildSelector()});
-    fpromise::result<std::vector<DiagnosticsData>, std::string> result;
+    fpromise::result<std::vector<InspectData>, std::string> result;
     async::Executor executor(dispatcher());
     executor.schedule_task(
         reader.SnapshotInspectUntilPresent({ChildMoniker()})
-            .then([&](fpromise::result<std::vector<DiagnosticsData>, std::string>& rest) {
+            .then([&](fpromise::result<std::vector<InspectData>, std::string>& rest) {
               result = std::move(rest);
             }));
     RunLoopUntil([&] { return result.is_ok() || result.is_error(); });
@@ -125,13 +125,13 @@ class InspectTest : public gtest::RealLoopFixture {
   fuchsia::component::RealmPtr realm_proxy_;
 };
 
-void expect_string_not_empty(const DiagnosticsData& data, const std::vector<std::string>& path) {
+void expect_string_not_empty(const InspectData& data, const std::vector<std::string>& path) {
   auto& value = data.GetByPath(path);
   EXPECT_EQ(value.GetType(), rapidjson::kStringType) << path.back() << " is not a string";
   EXPECT_NE(value.GetStringLength(), 0u) << path.back() << " is empty";
 }
 
-void expect_object_not_empty(const DiagnosticsData& data, const std::vector<std::string>& path) {
+void expect_object_not_empty(const InspectData& data, const std::vector<std::string>& path) {
   auto& value = data.GetByPath(path);
   EXPECT_EQ(value.GetType(), rapidjson::kObjectType) << path.back() << " is not an object";
   EXPECT_FALSE(value.ObjectEmpty()) << path.back() << " is empty";

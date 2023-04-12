@@ -115,7 +115,7 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
   std::unique_ptr<sys::ComponentContext> component_context_;
 };
 
-using ResultType = fpromise::result<std::vector<inspect::contrib::DiagnosticsData>, std::string>;
+using ResultType = fpromise::result<std::vector<inspect::contrib::InspectData>, std::string>;
 
 constexpr char cm1[] = "test_app";
 constexpr char cm2[] = "test_app_2";

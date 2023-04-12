@@ -19,8 +19,7 @@ class TestWithDevice : public gtest::RealLoopFixture {
   zx_status_t MakeStartInfo(size_t phys_mem_size,
                             fuchsia::virtualization::hardware::StartInfo* start_info);
 
-  inspect::contrib::DiagnosticsData GetInspect(const std::string& selector,
-                                               const std::string& name);
+  inspect::contrib::InspectData GetInspect(const std::string& selector, const std::string& name);
 
   zx::event event_;
   PhysMem phys_mem_;
