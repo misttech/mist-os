@@ -4,7 +4,7 @@
 
 use std::{
     num::NonZeroU16,
-    ops::{ControlFlow, DerefMut},
+    ops::{ControlFlow, Deref as _, DerefMut},
     sync::Arc,
 };
 
@@ -66,7 +66,8 @@ impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
         frame: Frame<&[u8]>,
         raw: &[u8],
     ) {
-        let Sockets { sockets } = &self.packet_sockets;
+        let packet_sockets = self.packet_sockets.read();
+        let Sockets { sockets } = packet_sockets.deref();
         let SocketState { queue, kind } =
             sockets.get(socket.get_key_index()).expect("invalid socket ID");
 
@@ -91,7 +92,7 @@ impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
             interface_type: iface_type(device),
             interface_id: self.get_binding_id(device.clone()).get(),
         };
-        queue.lock().receive(IntoMessage(data, message))
+        queue.lock().receive(IntoMessage(data, message));
     }
 }
 
@@ -190,7 +191,8 @@ impl BindingData {
         let message_queue = Arc::new(Mutex::new(MessageQueue::new(local_event)));
         let id = netstack3_core::device::socket::create(sync_ctx);
 
-        let Sockets { sockets } = &mut non_sync_ctx.packet_sockets;
+        let mut packet_sockets = non_sync_ctx.packet_sockets.write();
+        let Sockets { sockets } = packet_sockets.deref_mut();
         assert_matches!(
             sockets.insert(id.get_key_index(), SocketState { queue: message_queue.clone(), kind }),
             None
@@ -232,7 +234,8 @@ impl worker::SocketWorkerHandler for BindingData {
     ) {
         let Self { peer_event: _, state, message_queue: _ } = self;
         let State { id, kind: _ } = state;
-        let Sockets { sockets } = &mut non_sync_ctx.packet_sockets;
+        let mut packet_sockets = non_sync_ctx.packet_sockets.write();
+        let Sockets { sockets } = packet_sockets.deref_mut();
         assert_matches!(sockets.remove(id.get_key_index()), Some(_));
         netstack3_core::device::socket::remove(sync_ctx, id)
     }

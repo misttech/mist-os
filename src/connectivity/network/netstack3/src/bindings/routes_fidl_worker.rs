@@ -93,7 +93,8 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     let watcher = {
         let ctx = &mut ns.ctx.lock().await;
         let Ctx { sync_ctx: _, ref mut non_sync_ctx } = ctx.deref_mut();
-        non_sync_ctx.route_update_dispatcher.connect_new_client::<I>()
+        let x = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
+        x
     };
 
     let canceled_fut = watcher.canceled.wait();
@@ -126,7 +127,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     {
         let ctx = &mut ns.ctx.lock().await;
         let Ctx { sync_ctx: _, ref mut non_sync_ctx } = ctx.deref_mut();
-        non_sync_ctx.route_update_dispatcher.disconnect_client::<I>(watcher.into_inner());
+        non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher.into_inner());
     }
 
     result

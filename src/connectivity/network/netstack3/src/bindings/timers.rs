@@ -6,6 +6,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::ops::{Deref as _, DerefMut as _};
 
 use async_utils::futures::{FutureExt as _, ReplaceValue};
 use derivative::Derivative;
@@ -16,6 +17,8 @@ use futures::{
     stream::{FuturesUnordered, StreamExt as _},
 };
 use log::{trace, warn};
+
+use netstack3_core::sync::RwLock as CoreRwLock;
 
 use super::StackTime;
 
@@ -61,7 +64,7 @@ pub(crate) trait TimerHandler<T: Hash + Eq>: Sized + 'static {
     /// as the `TimerHandler` so it can ensure the contract that timers that are
     /// cancelled or rescheduled are *never* passed to
     /// [`TimerHandler::handle_expired_timer`].
-    fn get_timer_dispatcher(&mut self) -> &mut TimerDispatcher<T>;
+    fn get_timer_dispatcher(&mut self) -> &TimerDispatcher<T>;
 }
 
 type TimerFut = ReplaceValue<fasync::Timer, InternalId>;
@@ -69,11 +72,10 @@ type TimerFut = ReplaceValue<fasync::Timer, InternalId>;
 /// Shorthand for the type of futures used by [`TimerDispatcher`] internally.
 type InternalFut = Abortable<TimerFut>;
 
-/// Helper struct to keep track of timers for the event loop.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct TimerDispatcher<T: Hash + Eq> {
-    // Invariant: TimerDispatcher uses a HashMap keyed on an external identifier
+struct TimerDispatcherInner<T: Hash + Eq> {
+    // Invariant: This dispatcher uses a HashMap keyed on an external identifier
     // T and assigns an internal "versioning" ID every time a timer is
     // scheduled. The "versioning" ID is just monotonically incremented and it
     // is used to disambiguate different scheduling events of the same timer T.
@@ -95,6 +97,13 @@ pub(crate) struct TimerDispatcher<T: Hash + Eq> {
     futures_sender: Option<mpsc::UnboundedSender<InternalFut>>,
 }
 
+/// Helper struct to keep track of timers for the event loop.
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+pub(crate) struct TimerDispatcher<T: Hash + Eq> {
+    inner: CoreRwLock<TimerDispatcherInner<T>>,
+}
+
 impl<T> TimerDispatcher<T>
 where
     T: Hash + Debug + Eq + Clone + Send + Sync + Unpin + 'static,
@@ -105,10 +114,16 @@ where
     /// # Panics
     ///
     /// Panics if this `TimerDispatcher` was already spawned.
-    pub(crate) fn spawn<C: TimerContext<T> + Send + Sync>(&mut self, ctx: C) {
-        assert!(self.futures_sender.is_none(), "TimerDispatcher already spawned");
+    pub(crate) fn spawn<C: TimerContext<T> + Send + Sync>(&self, ctx: C) {
         let (sender, mut recv) = mpsc::unbounded();
-        self.futures_sender = Some(sender);
+        {
+            let Self { inner } = self;
+            let mut inner = inner.write();
+            let TimerDispatcherInner { timer_ids: _, timers: _, next_id: _, futures_sender } =
+                inner.deref_mut();
+            assert!(futures_sender.replace(sender).is_none(), "TimerDispatcher already spawned");
+        };
+
         fasync::Task::spawn(async move {
             let mut futures = FuturesUnordered::<InternalFut>::new();
 
@@ -182,17 +197,25 @@ where
     ///
     /// If a timer with the same `timer_id` was already scheduled, the old timer
     /// is unscheduled and its expiry time is returned.
-    pub(crate) fn schedule_timer(&mut self, timer_id: T, time: StackTime) -> Option<StackTime> {
-        let next_id = self.next_id;
+    pub(crate) fn schedule_timer(&self, timer_id: T, time: StackTime) -> Option<StackTime> {
+        let Self { inner } = self;
+        let mut inner = inner.write();
+        let TimerDispatcherInner { timer_ids, timers, next_id, futures_sender } = inner.deref_mut();
 
-        // Overflowing next_id should be safe enough to hold TimerDispatcher's
-        // invariant about around "versioning" timer identifiers. We'll
-        // overlflow after 2^64 timers are scheduled (which can take a while)
-        // and, even then, for it to break the invariant we'd need to still have
-        // a timer scheduled from long ago and be unlucky enough that ordering
-        // ends up giving it the same ID. That seems unlikely, so we just wrap
-        // around and overflow next_id.
-        self.next_id = next_id.increment();
+        let next_id = {
+            let id = *next_id;
+
+            // Overflowing next_id should be safe enough to hold TimerDispatcher's
+            // invariant about around "versioning" timer identifiers. We'll
+            // overlflow after 2^64 timers are scheduled (which can take a while)
+            // and, even then, for it to break the invariant we'd need to still have
+            // a timer scheduled from long ago and be unlucky enough that ordering
+            // ends up giving it the same ID. That seems unlikely, so we just wrap
+            // around and overflow next_id.
+            *next_id = next_id.increment();
+
+            id
+        };
 
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let timeout = {
@@ -200,16 +223,16 @@ where
             Abortable::new(fasync::Timer::new(time).replace_value(next_id), abort_registration)
         };
 
-        if let Some(sender) = self.futures_sender.as_mut() {
+        if let Some(sender) = futures_sender.as_ref() {
             sender.unbounded_send(timeout).expect("TimerDispatcher's task receiver is gone");
         } else {
             // Timers are always stopped in tests.
             warn!("TimerDispatcher not spawned, timer {:?} will not fire", timer_id);
         }
 
-        assert_eq!(self.timer_ids.insert(next_id, timer_id.clone()), None);
+        assert_eq!(timer_ids.insert(next_id, timer_id.clone()), None);
 
-        match self.timers.entry(timer_id) {
+        match timers.entry(timer_id) {
             Entry::Vacant(e) => {
                 // If we don't have any currently scheduled timers with this
                 // timer_id, we're just going to insert a new value into the
@@ -238,7 +261,7 @@ where
                 let old = Some(info.instant);
                 info.instant = time;
 
-                assert_eq!(self.timer_ids.remove(&prev_id).as_ref(), Some(e.key()));
+                assert_eq!(timer_ids.remove(&prev_id).as_ref(), Some(e.key()));
 
                 old
             }
@@ -249,11 +272,15 @@ where
     ///
     /// If a timer with the provided `timer_id` was scheduled, returns the
     /// expiry time for it after having cancelled it.
-    pub(crate) fn cancel_timer(&mut self, timer_id: &T) -> Option<StackTime> {
-        if let Some(t) = self.timers.remove(timer_id) {
+    pub(crate) fn cancel_timer(&self, timer_id: &T) -> Option<StackTime> {
+        let Self { inner } = self;
+        let mut inner = inner.write();
+        let TimerDispatcherInner { timer_ids, timers, next_id: _, futures_sender: _ } =
+            inner.deref_mut();
+        if let Some(t) = timers.remove(timer_id) {
             // call the abort handle, in case the future hasn't fired yet:
             t.abort_handle.abort();
-            assert_eq!(self.timer_ids.remove(&t.id).as_ref(), Some(timer_id));
+            assert_eq!(timer_ids.remove(&t.id).as_ref(), Some(timer_id));
             Some(t.instant)
         } else {
             None
@@ -264,8 +291,12 @@ where
     ///
     /// `f` will be called sequentially for all the currently scheduled timers.
     /// If `f(id)` returns `true`, the timer with `id` will be cancelled.
-    pub(crate) fn cancel_timers_with<F: FnMut(&T) -> bool>(&mut self, mut f: F) {
-        self.timers.retain(|id, info| {
+    pub(crate) fn cancel_timers_with<F: FnMut(&T) -> bool>(&self, mut f: F) {
+        let Self { inner } = self;
+        let mut inner = inner.write();
+        let TimerDispatcherInner { timer_ids: _, timers, next_id: _, futures_sender: _ } =
+            inner.deref_mut();
+        timers.retain(|id, info| {
             let discard = f(&id);
             if discard {
                 info.abort_handle.abort();
@@ -279,7 +310,11 @@ where
     /// If a timer with the provided `timer_id` exists, returns the expiry
     /// time for it; `None` otherwise.
     pub(crate) fn scheduled_time(&self, timer_id: &T) -> Option<StackTime> {
-        self.timers.get(timer_id).map(|t| t.instant)
+        let Self { inner } = self;
+        let inner = inner.read();
+        let TimerDispatcherInner { timer_ids: _, timers, next_id: _, futures_sender: _ } =
+            inner.deref();
+        timers.get(timer_id).map(|t| t.instant)
     }
 
     /// Retrieves the internal timer value of a timer ID.
@@ -292,9 +327,13 @@ where
     ///
     /// [`cancel_timer`]: TimerDispatcher::cancel_timer
     /// [`schedule_timer`]: TimerDispatcher::schedule_timer
-    fn commit_timer(&mut self, id: InternalId) -> Result<T, InternalId> {
-        let external_id = self.timer_ids.remove(&id).ok_or(id)?;
-        let info = self.timers.remove(&external_id).ok_or(id)?;
+    fn commit_timer(&self, id: InternalId) -> Result<T, InternalId> {
+        let Self { inner } = self;
+        let mut inner = inner.write();
+        let TimerDispatcherInner { timer_ids, timers, next_id: _, futures_sender: _ } =
+            inner.deref_mut();
+        let external_id = timer_ids.remove(&id).ok_or(id)?;
+        let info = timers.remove(&external_id).ok_or(id)?;
         assert_eq!(info.id, id);
         Ok(external_id)
     }
@@ -320,9 +359,8 @@ mod tests {
         fn handle_expired_timer(&mut self, timer: usize) {
             self.fired.unbounded_send(timer).expect("Can't fire timer")
         }
-
-        fn get_timer_dispatcher(&mut self) -> &mut TimerDispatcher<usize> {
-            &mut self.dispatcher
+        fn get_timer_dispatcher(&mut self) -> &TimerDispatcher<usize> {
+            &self.dispatcher
         }
     }
 
@@ -395,7 +433,7 @@ mod tests {
 
         let (t, mut fired) = TestContext::new();
         run_in_executor(&mut executor, async {
-            let mut d = t.lock().await;
+            let d = t.lock().await;
             assert_eq!(d.dispatcher.schedule_timer(1, nanos_from_now(1)), None);
             assert_eq!(d.dispatcher.schedule_timer(2, nanos_from_now(2)), None);
         });
@@ -574,7 +612,7 @@ mod tests {
             // cancel timers 1, 3, and 4.
             d.cancel_timers_with(|id| *id != 2);
             // check that only one timer remains
-            assert_eq!(d.timers.len(), 1);
+            assert_eq!(d.inner.read().timers.len(), 1);
         });
         // advance time so that all timers would've been fired.
         executor.set_fake_time(nanos_from_now(4).0);

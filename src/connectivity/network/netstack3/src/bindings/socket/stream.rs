@@ -99,11 +99,15 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` is already registered.
-    fn register_listener<I: Ip>(&mut self, id: ListenerId<I>, socket: zx::Socket) {
+    fn register_listener<I: Ip>(&self, id: ListenerId<I>, socket: zx::Socket) {
         let state = ListenerState(socket);
         match I::VERSION {
-            IpVersion::V4 => assert_matches!(self.tcp_v4_listeners.insert(id.into(), state), None),
-            IpVersion::V6 => assert_matches!(self.tcp_v6_listeners.insert(id.into(), state), None),
+            IpVersion::V4 => {
+                assert_matches!(self.tcp_v4_listeners.lock().insert(id.into(), state), None)
+            }
+            IpVersion::V6 => {
+                assert_matches!(self.tcp_v6_listeners.lock().insert(id.into(), state), None)
+            }
         }
     }
 
@@ -114,13 +118,13 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` is non-existent.
-    fn unregister_listener<I: Ip>(&mut self, id: ListenerId<I>) -> zx::Socket {
+    fn unregister_listener<I: Ip>(&self, id: ListenerId<I>) -> zx::Socket {
         let ListenerState(socket) = match I::VERSION {
             IpVersion::V4 => {
-                self.tcp_v4_listeners.remove(id.into()).expect("invalid v4 ListenerId")
+                self.tcp_v4_listeners.lock().remove(id.into()).expect("invalid v4 ListenerId")
             }
             IpVersion::V6 => {
-                self.tcp_v6_listeners.remove(id.into()).expect("invalid v6 ListenerId")
+                self.tcp_v6_listeners.lock().remove(id.into()).expect("invalid v6 ListenerId")
             }
         };
         socket
@@ -133,18 +137,18 @@ impl BindingsNonSyncCtxImpl {
     ///
     /// Panics if `id` does not correspond to a listener.
     fn with_listener_mut<I: Ip, O, F: FnOnce(&mut ListenerState) -> O>(
-        &mut self,
+        &self,
         id: ListenerId<I>,
         cb: F,
     ) -> O {
-        cb(match I::VERSION {
+        match I::VERSION {
             IpVersion::V4 => {
-                self.tcp_v4_listeners.get_mut(id.into()).expect("invalid v4 ListenerId")
+                cb(self.tcp_v4_listeners.lock().get_mut(id.into()).expect("invalid v4 ListenerId"))
             }
             IpVersion::V6 => {
-                self.tcp_v6_listeners.get_mut(id.into()).expect("invalid v6 ListenerId")
+                cb(self.tcp_v6_listeners.lock().get_mut(id.into()).expect("invalid v6 ListenerId"))
             }
-        })
+        }
     }
 
     /// Registers a newly created connection with its state.
@@ -152,13 +156,13 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` is already registered.
-    fn register_connection<I: Ip>(&mut self, id: ConnectionId<I>, status: ConnectionStatus) {
+    fn register_connection<I: Ip>(&self, id: ConnectionId<I>, status: ConnectionStatus) {
         match I::VERSION {
             IpVersion::V4 => {
-                assert_matches!(self.tcp_v4_connections.insert(id.into(), status), None)
+                assert_matches!(self.tcp_v4_connections.lock().insert(id.into(), status), None)
             }
             IpVersion::V6 => {
-                assert_matches!(self.tcp_v6_connections.insert(id.into(), status), None)
+                assert_matches!(self.tcp_v6_connections.lock().insert(id.into(), status), None)
             }
         }
     }
@@ -170,13 +174,13 @@ impl BindingsNonSyncCtxImpl {
     /// # Panics
     ///
     /// Panics if `id` is non-existent.
-    fn unregister_connection<I: Ip>(&mut self, id: ConnectionId<I>) -> ConnectionStatus {
+    fn unregister_connection<I: Ip>(&self, id: ConnectionId<I>) -> ConnectionStatus {
         let status = match I::VERSION {
             IpVersion::V4 => {
-                self.tcp_v4_connections.remove(id.into()).expect("invalid v4 ConnectionId")
+                self.tcp_v4_connections.lock().remove(id.into()).expect("invalid v4 ConnectionId")
             }
             IpVersion::V6 => {
-                self.tcp_v6_connections.remove(id.into()).expect("invalid v6 ConnectionId")
+                self.tcp_v6_connections.lock().remove(id.into()).expect("invalid v6 ConnectionId")
             }
         };
         status
@@ -189,18 +193,22 @@ impl BindingsNonSyncCtxImpl {
     ///
     /// Panics if `id` does not correspond to a connection.
     fn with_connection_mut<I: Ip, O, F: FnOnce(&mut ConnectionStatus) -> O>(
-        &mut self,
+        &self,
         id: ConnectionId<I>,
         cb: F,
     ) -> O {
-        cb(match I::VERSION {
-            IpVersion::V4 => {
-                self.tcp_v4_connections.get_mut(id.into()).expect("invalid v4 ConnectionId")
-            }
-            IpVersion::V6 => {
-                self.tcp_v6_connections.get_mut(id.into()).expect("invalid v6 ConnectionId")
-            }
-        })
+        match I::VERSION {
+            IpVersion::V4 => cb(self
+                .tcp_v4_connections
+                .lock()
+                .get_mut(id.into())
+                .expect("invalid v4 ConnectionId")),
+            IpVersion::V6 => cb(self
+                .tcp_v6_connections
+                .lock()
+                .get_mut(id.into())
+                .expect("invalid v6 ConnectionId")),
+        }
     }
 }
 

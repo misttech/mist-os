@@ -21,6 +21,7 @@ use netstack3_core::{
     device::{
         handle_queued_rx_packets, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
     },
+    sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     Ctx,
 };
 
@@ -42,13 +43,13 @@ pub type BindingId = NonZeroU64;
 /// types used by `EventLoop` for brevity in the main use case. The type
 /// parameters are there to allow testing without dependencies on `core`.
 pub struct Devices<C> {
-    id_map: HashMap<BindingId, C>,
-    last_id: BindingId,
+    id_map: CoreRwLock<HashMap<BindingId, C>>,
+    last_id: CoreMutex<BindingId>,
 }
 
 impl<C> Default for Devices<C> {
     fn default() -> Self {
-        Self { id_map: HashMap::new(), last_id: BindingId::MIN }
+        Self { id_map: Default::default(), last_id: CoreMutex::new(BindingId::MIN) }
     }
 }
 
@@ -58,8 +59,9 @@ where
 {
     /// Allocates a new [`BindingId`].
     #[must_use]
-    pub fn alloc_new_id(&mut self) -> BindingId {
+    pub fn alloc_new_id(&self) -> BindingId {
         let Self { id_map: _, last_id } = self;
+        let mut last_id = last_id.lock();
         let id = *last_id;
         *last_id = last_id.checked_add(1).expect("exhausted binding device IDs");
         id
@@ -71,23 +73,23 @@ where
     /// currently tracked by [`Devices`]). A new [`BindingId`] will be allocated
     /// and a [`DeviceInfo`] struct will be created with the provided `info` and
     /// IDs.
-    pub fn add_device(&mut self, id: BindingId, core_id: C) {
+    pub fn add_device(&self, id: BindingId, core_id: C) {
         let Self { id_map, last_id: _ } = self;
-        assert_matches::assert_matches!(id_map.insert(id, core_id.clone()), None);
+        assert_matches::assert_matches!(id_map.write().insert(id, core_id.clone()), None);
     }
 
     /// Removes a device from the internal list.
     ///
     /// Removes a device from the internal [`Devices`] list and returns the
     /// associated [`DeviceInfo`] if `id` is found or `None` otherwise.
-    pub fn remove_device(&mut self, id: BindingId) -> Option<C> {
+    pub fn remove_device(&self, id: BindingId) -> Option<C> {
         let Self { id_map, last_id: _ } = self;
-        id_map.remove(&id)
+        id_map.write().remove(&id)
     }
 
     /// Retrieve associated `core_id` for [`BindingId`].
     pub fn get_core_id(&self, id: BindingId) -> Option<C> {
-        self.id_map.get(&id).cloned()
+        self.id_map.read().get(&id).cloned()
     }
 }
 
@@ -95,6 +97,7 @@ impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
     /// Retrieves the device with the given name.
     pub fn get_device_by_name(&self, name: &str) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
         self.id_map
+            .read()
             .iter()
             .find_map(|(_binding_id, c)| {
                 (c.external_state().static_common_info().name == name).then_some(c)

@@ -453,7 +453,7 @@ impl TestSetupBuilder {
                 // Disable DAD for simplicity of testing.
                 stack
                     .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-                        let devices: &mut Devices<_> = non_sync_ctx.as_mut();
+                        let devices: &Devices<_> = non_sync_ctx.as_ref();
                         let device = devices.get_core_id(if_id).unwrap();
                         update_ipv6_configuration(sync_ctx, non_sync_ctx, &device, |config| {
                             config.dad_transmits = None

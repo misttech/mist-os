@@ -47,7 +47,7 @@ use futures::{
 use log::{debug, error};
 use packet::{Buf, BufferMut};
 use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, CryptoRng, RngCore};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
@@ -82,6 +82,7 @@ use netstack3_core::{
         types::RawMetric,
         IpExt,
     },
+    sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp,
     Ctx, NonSyncContext, SyncCtx, TimerId,
 };
@@ -135,17 +136,17 @@ type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 /// Provides an implementation of [`NonSyncContext`].
 #[derive(Default)]
 pub(crate) struct BindingsNonSyncCtxImpl {
-    rng: OsRng,
+    rng: RngImpl,
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
-    packet_sockets: crate::bindings::socket::packet::Sockets,
+    packet_sockets: CoreRwLock<crate::bindings::socket::packet::Sockets>,
     icmp_echo_sockets: IcmpEchoSockets,
     udp_sockets: UdpSockets,
-    tcp_v4_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,
-    tcp_v6_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,
-    tcp_v4_connections: IdMap<crate::bindings::socket::stream::ConnectionStatus>,
-    tcp_v6_connections: IdMap<crate::bindings::socket::stream::ConnectionStatus>,
-    route_update_dispatcher: routes_fidl_worker::RouteUpdateDispatcher,
+    tcp_v4_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
+    tcp_v6_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
+    tcp_v4_connections: CoreMutex<IdMap<crate::bindings::socket::stream::ConnectionStatus>>,
+    tcp_v6_connections: CoreMutex<IdMap<crate::bindings::socket::stream::ConnectionStatus>>,
+    route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
 }
 
 impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
@@ -154,21 +155,9 @@ impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for Binding
     }
 }
 
-impl AsMut<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
-    fn as_mut(&mut self) -> &mut TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
-        &mut self.timers
-    }
-}
-
 impl AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
     fn as_ref(&self) -> &Devices<DeviceId<BindingsNonSyncCtxImpl>> {
         &self.devices
-    }
-}
-
-impl AsMut<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
-    fn as_mut(&mut self) -> &mut Devices<DeviceId<BindingsNonSyncCtxImpl>> {
-        &mut self.devices
     }
 }
 
@@ -186,21 +175,9 @@ impl AsRef<IcmpEchoSockets> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl AsMut<IcmpEchoSockets> for BindingsNonSyncCtxImpl {
-    fn as_mut(&mut self) -> &mut IcmpEchoSockets {
-        &mut self.icmp_echo_sockets
-    }
-}
-
 impl AsRef<UdpSockets> for BindingsNonSyncCtxImpl {
     fn as_ref(&self) -> &UdpSockets {
         &self.udp_sockets
-    }
-}
-
-impl AsMut<UdpSockets> for BindingsNonSyncCtxImpl {
-    fn as_mut(&mut self) -> &mut UdpSockets {
-        &mut self.udp_sockets
     }
 }
 
@@ -212,8 +189,8 @@ impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx<BindingsNonSy
 
     fn get_timer_dispatcher(
         &mut self,
-    ) -> &mut timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
-        self.non_sync_ctx.as_mut()
+    ) -> &timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
+        self.non_sync_ctx.as_ref()
     }
 }
 
@@ -270,11 +247,38 @@ impl InstantContext for BindingsNonSyncCtxImpl {
 
 impl CounterContext for BindingsNonSyncCtxImpl {}
 
-impl RngContext for BindingsNonSyncCtxImpl {
-    type Rng<'a> = &'a mut OsRng where Self: 'a;
+#[derive(Default)]
+pub struct RngImpl(CoreMutex<OsRng>);
 
-    fn rng(&mut self) -> &mut OsRng {
-        &mut self.rng
+impl RngCore for &'_ RngImpl {
+    fn next_u32(&mut self) -> u32 {
+        let RngImpl(this) = self;
+        this.lock().next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let RngImpl(this) = self;
+        this.lock().next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        let RngImpl(this) = self;
+        this.lock().fill_bytes(dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        let RngImpl(this) = self;
+        this.lock().try_fill_bytes(dest)
+    }
+}
+
+impl CryptoRng for &'_ RngImpl where OsRng: CryptoRng {}
+
+impl RngContext for BindingsNonSyncCtxImpl {
+    type Rng<'a> = &'a RngImpl where Self: 'a;
+
+    fn rng(&mut self) -> &RngImpl {
+        &self.rng
     }
 }
 
@@ -492,6 +496,7 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
             entry.try_into_fidl_with_ctx(self).expect("failed to convert route to FIDL");
         let route_update = either::for_both!(route_update_fn, f => f(installed_route));
         self.route_update_dispatcher
+            .lock()
             .notify(route_update)
             .expect("failed to notify route update dispatcher");
     }
@@ -759,7 +764,7 @@ impl Netstack {
 
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
-        let devices: &mut Devices<_> = non_sync_ctx.as_mut();
+        let devices: &Devices<_> = non_sync_ctx.as_ref();
         let (control_sender, control_receiver) =
             interfaces_admin::OwnedControlHandle::new_channel();
         let loopback_rx_notifier = Default::default();

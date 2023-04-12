@@ -38,7 +38,7 @@ use netstack3_core::{
         ConnectListenerError, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
         SetMulticastMembershipError, SockCreationError,
     },
-    sync::Mutex,
+    sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp,
     BufferNonSyncContext, Ctx, NonSyncContext, SyncCtx,
 };
@@ -113,8 +113,8 @@ impl<I, T: Transport<I>> From<BoundSocketId<I, T>> for SocketId<I, T> {
 /// available and some bindings code here holds the `MessageQueue` and
 /// attempts to lock Core state via a `netstack3_core` call.
 pub(crate) struct SocketCollection<I: Ip, T: Transport<I>> {
-    conns: IdMapCollection<T::ConnId, Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>>,
-    listeners: IdMapCollection<T::ListenerId, Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>>,
+    conns: IdMapCollection<T::ConnId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
+    listeners: IdMapCollection<T::ListenerId, Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
 }
 
 impl<I: Ip, T: Transport<I>> Default for SocketCollection<I, T> {
@@ -128,8 +128,8 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
 {
-    v4: SocketCollection<Ipv4, T>,
-    v6: SocketCollection<Ipv6, T>,
+    v4: CoreRwLock<SocketCollection<Ipv4, T>>,
+    v6: CoreRwLock<SocketCollection<Ipv6, T>>,
 }
 
 impl<T> Default for SocketCollectionPair<T>
@@ -159,7 +159,7 @@ where
     ) -> O;
 
     fn with_collection_mut<
-        D: AsMut<SocketCollectionPair<T>>,
+        D: AsRef<SocketCollectionPair<T>>,
         O,
         F: FnOnce(&mut SocketCollection<Self, T>) -> O,
     >(
@@ -182,18 +182,18 @@ where
         dispatcher: &D,
         cb: F,
     ) -> O {
-        cb(&dispatcher.as_ref().v4)
+        cb(&dispatcher.as_ref().v4.read())
     }
 
     fn with_collection_mut<
-        D: AsMut<SocketCollectionPair<T>>,
+        D: AsRef<SocketCollectionPair<T>>,
         O,
         F: FnOnce(&mut SocketCollection<Ipv4, T>) -> O,
     >(
         dispatcher: &mut D,
         cb: F,
     ) -> O {
-        cb(&mut dispatcher.as_mut().v4)
+        cb(&mut dispatcher.as_ref().v4.write())
     }
 }
 
@@ -211,18 +211,18 @@ where
         dispatcher: &D,
         cb: F,
     ) -> O {
-        cb(&dispatcher.as_ref().v6)
+        cb(&dispatcher.as_ref().v6.read())
     }
 
     fn with_collection_mut<
-        D: AsMut<SocketCollectionPair<T>>,
+        D: AsRef<SocketCollectionPair<T>>,
         O,
         F: FnOnce(&mut SocketCollection<Ipv6, T>) -> O,
     >(
         dispatcher: &mut D,
         cb: F,
     ) -> O {
-        cb(&mut dispatcher.as_mut().v6)
+        cb(&mut dispatcher.as_ref().v6.write())
     }
 }
 
@@ -1293,7 +1293,7 @@ struct BindingData<I: Ip, T: Transport<I>> {
     ///
     /// The message queue is held here and also in the [`SocketCollection`]
     /// to which the socket belongs.
-    messages: Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>,
+    messages: Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>,
 }
 
 impl<I, T> BindingData<I, T>
@@ -1327,7 +1327,7 @@ where
                 _properties: properties,
                 state: SocketState::Unbound { unbound_id },
             },
-            messages: Arc::new(Mutex::new(MessageQueue::new(local_event))),
+            messages: Arc::new(CoreMutex::new(MessageQueue::new(local_event))),
         }
     }
 }
@@ -1494,8 +1494,7 @@ where
     }
 }
 
-pub(crate) trait RequestHandlerDispatcher<I, T>:
-    AsRef<SocketCollectionPair<T>> + AsMut<SocketCollectionPair<T>>
+pub(crate) trait RequestHandlerDispatcher<I, T>: AsRef<SocketCollectionPair<T>>
 where
     I: IpExt,
     T: Transport<Ipv4>,
@@ -1510,7 +1509,7 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: Transport<I>,
-    D: AsRef<SocketCollectionPair<T>> + AsMut<SocketCollectionPair<T>>,
+    D: AsRef<SocketCollectionPair<T>>,
 {
 }
 /// A borrow into a [`SocketWorker`]'s state.
@@ -2103,7 +2102,7 @@ where
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         unbound_id: <T as Transport<I>>::UnboundId,
-        available_data: &Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>,
+        available_data: &Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>,
         local_addr: Option<ZonedAddr<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>>,
         local_port: Option<<T as TransportState<I>>::LocalIdentifier>,
     ) -> Result<<T as Transport<I>>::ListenerId, fposix::Errno> {
