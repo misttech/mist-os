@@ -624,16 +624,16 @@ impl BinderProcess {
                 return Ok(());
             }
             Handle::Object { index } => {
+                // Requesting a death notification implies keeping a reference to the handle until the
+                // client is not interested in the notification anymore.
+                self.handle_refcount_operation(
+                    current_task,
+                    binder_driver_command_protocol_BC_INCREFS,
+                    handle,
+                )?;
                 self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?
             }
         };
-        // Requesting a death notification implies keeping a reference to the handle until the
-        // client is not interested in the notification anymore.
-        self.handle_refcount_operation(
-            current_task,
-            binder_driver_command_protocol_BC_INCREFS,
-            handle,
-        )?;
         if let Some(owner) = proxy.owner.upgrade() {
             owner.lock().death_subscribers.push((Arc::downgrade(self), cookie));
         } else {
@@ -3227,19 +3227,21 @@ impl BinderDriver {
                             let source_proc = source_proc.lock();
                             let proxy =
                                 source_proc.handles.get(index).ok_or(TransactionError::Failure)?;
+                            // Insert the handle in the handle table of the receiving process
+                            // and add a strong reference to it to ensure it survives for the
+                            // lifetime of the transaction, even if it is owned by the
+                            // receiving process. Otherwise the receiving process might end up
+                            // deleting the reference before handling the transaction.
+                            let new_handle =
+                                source_proc.insert_for_transaction(target_proc, proxy.clone())?;
+                            // Tie this handle's strong reference to be held as long as this
+                            // buffer.
+                            transaction_state.push_handle(new_handle);
                             if std::ptr::eq(Arc::as_ptr(target_proc), proxy.owner.as_ptr()) {
                                 // The binder object belongs to the receiving process, so convert it
                                 // from a handle to a local object.
                                 SerializedBinderObject::Object { local: proxy.local, flags }
                             } else {
-                                // The binder object does not belong to the receiving process, so
-                                // dup the handle in the receiving process' handle table.
-                                let new_handle =
-                                    source_proc.insert_for_transaction(target_proc, proxy)?;
-                                // Tie this handle's strong reference to be held as long as this
-                                // buffer.
-                                transaction_state.push_handle(new_handle);
-
                                 SerializedBinderObject::Handle { handle: new_handle, flags, cookie }
                             }
                         }
