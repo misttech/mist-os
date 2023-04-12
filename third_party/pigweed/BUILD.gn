@@ -51,6 +51,7 @@ source_set("pw_log") {
   visibility = [ "//src/connectivity/bluetooth/core/bt-host/*" ]
 }
 
+# TODO(fxbug.dev/125377): Add "backends/pw_async_fuchsia:tests" to deps.
 group("tests") {
   testonly = true
   deps = [

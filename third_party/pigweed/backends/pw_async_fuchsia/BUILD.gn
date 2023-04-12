@@ -1,0 +1,86 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/components.gni")
+import("//build_overrides/pigweed.gni")
+import("$dir_pw_build/target_types.gni")
+
+config("public_include_path") {
+  include_dirs = [ "public" ]
+}
+
+config("backend_config") {
+  include_dirs = [ "public_overrides" ]
+  visibility = [ ":*" ]
+}
+
+# Backend for //pw_async:task
+pw_source_set("task") {
+  public_configs = [
+    ":public_include_path",
+    ":backend_config",
+  ]
+  public_deps = [
+    "$dir_pw_async:task.facade",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+  ]
+  sources = [ "task.cc" ]
+}
+
+# Backend for //pw_async:fake_dispatcher
+pw_source_set("fake_dispatcher") {
+  public_configs = [
+    ":public_include_path",
+    ":backend_config",
+  ]
+  sources = [ "fake_dispatcher.cc" ]
+  public_deps = [
+    ":task",
+    "$dir_pw_async:fake_dispatcher.facade",
+  ]
+}
+
+pw_source_set("dispatcher") {
+  public_configs = [ ":public_include_path" ]
+  public = [ "public/pw_async_fuchsia/dispatcher.h" ]
+  sources = [ "dispatcher.cc" ]
+  public_deps = [
+    ":task",
+    "$dir_pw_async:dispatcher",
+  ]
+}
+
+pw_source_set("util") {
+  public_configs = [ ":public_include_path" ]
+  public = [ "public/pw_async_fuchsia/util.h" ]
+}
+
+pw_source_set("fake_dispatcher_fixture") {
+  testonly = true
+  public = [ "$dir_pw_async/public/pw_async/fake_dispatcher_fixture.h" ]
+  public_deps = [
+    ":fake_dispatcher",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+executable("pigweed_backend_pw_async_fuchsia_tests_executable") {
+  testonly = true
+  sources = [
+    "dispatcher_test.cc",
+    "fake_dispatcher_fixture_test.cc",
+  ]
+  deps = [
+    ":dispatcher",
+    ":fake_dispatcher_fixture",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+# TODO(fxbug.dev/125377): Add this target to pigweed:tests group once API is stable.
+# In order to run these tests, manually include this target in your build.
+fuchsia_unittest_package("tests") {
+  package_name = "pigweed-backend-pw-async-fuchsia-tests"
+  deps = [ ":pigweed_backend_pw_async_fuchsia_tests_executable" ]
+}
