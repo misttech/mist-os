@@ -1326,7 +1326,7 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
                 }
             };
 
-            let per_attempt_random_seed = ctx.rng_mut().next_u64();
+            let per_attempt_random_seed = ctx.rng().next_u64();
 
             // Per RFC 8981 Section 3.4.4:
             //    When creating a temporary address, DESYNC_FACTOR MUST be computed
@@ -1377,7 +1377,7 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
             let valid_until = now.checked_add(valid_for.get()).unwrap();
 
             let desync_factor = if let Some(d) = desync_factor(
-                ctx.rng_mut(),
+                &mut ctx.rng(),
                 temporary_address_config.temp_preferred_lifetime,
                 regen_advance,
             ) {
@@ -2432,7 +2432,7 @@ mod tests {
                 ip_device_id_ctx: Default::default(),
             }));
 
-        let mut dup_rng = non_sync_ctx.rng_mut().clone();
+        let mut dup_rng = non_sync_ctx.rng().clone();
 
         struct AddrProps {
             desync_factor: Duration,

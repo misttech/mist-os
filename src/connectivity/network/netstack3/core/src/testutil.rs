@@ -199,11 +199,11 @@ impl TimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
 }
 
 impl RngContext for FakeNonSyncCtx {
-    type Rng = FakeCryptoRng<XorShiftRng>;
+    type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng> where Self: 'a;
 
-    fn rng_mut(&mut self) -> &mut Self::Rng {
+    fn rng(&mut self) -> Self::Rng<'_> {
         let Self(this) = self;
-        this.rng_mut()
+        this.rng()
     }
 }
 
@@ -303,9 +303,9 @@ impl<R: SeedableRng> SeedableRng for FakeCryptoRng<R> {
 }
 
 impl<R: RngCore> crate::context::RngContext for FakeCryptoRng<R> {
-    type Rng = Self;
+    type Rng<'a> = &'a mut Self where Self: 'a;
 
-    fn rng_mut(&mut self) -> &mut Self::Rng {
+    fn rng(&mut self) -> Self::Rng<'_> {
         self
     }
 }

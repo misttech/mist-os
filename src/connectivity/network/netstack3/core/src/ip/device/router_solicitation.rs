@@ -142,8 +142,7 @@ impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
                 // random amount of time between 0 and `MAX_RTR_SOLICITATION_DELAY` to
                 // alleviate congestion when many hosts start up on a link at the same
                 // time.
-                let delay =
-                    ctx.rng_mut().gen_range(Duration::new(0, 0)..MAX_RTR_SOLICITATION_DELAY);
+                let delay = ctx.rng().gen_range(Duration::new(0, 0)..MAX_RTR_SOLICITATION_DELAY);
                 assert_eq!(
                     ctx.schedule_timer(delay, RsTimerId { device_id: device_id.clone() },),
                     None

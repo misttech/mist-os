@@ -214,10 +214,12 @@ pub trait RngContext {
     ///
     /// The provided RNG must be cryptographically secure, and users may rely on
     /// that property for their correctness and security.
-    type Rng: RngCore + CryptoRng;
+    type Rng<'a>: RngCore + CryptoRng
+    where
+        Self: 'a;
 
-    /// Gets the random number generator (RNG) mutably.
-    fn rng_mut(&mut self) -> &mut Self::Rng;
+    /// Gets the random number generator (RNG).
+    fn rng(&mut self) -> Self::Rng<'_>;
 }
 
 /// A context for receiving frames.
@@ -1042,9 +1044,9 @@ pub(crate) mod testutil {
     }
 
     impl<TimerId, Event: Debug, State> RngContext for FakeNonSyncCtx<TimerId, Event, State> {
-        type Rng = FakeCryptoRng<XorShiftRng>;
+        type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng> where Self: 'a;
 
-        fn rng_mut(&mut self) -> &mut Self::Rng {
+        fn rng(&mut self) -> Self::Rng<'_> {
             &mut self.rng
         }
     }

@@ -1035,7 +1035,7 @@ where
     let addr_and_actions =
         sync_ctx.with_gmp_state_mut(device, |GmpState { enabled: _, groups }| {
             let now = ctx.now();
-            let rng = ctx.rng_mut();
+            let mut rng = ctx.rng();
 
             Ok(match target {
                 QueryTarget::Unspecified => either::Either::Left(
@@ -1044,7 +1044,7 @@ where
                         .map(|(addr, state)| {
                             (
                                 addr.clone(),
-                                state.as_mut().query_received(rng, max_response_time, now),
+                                state.as_mut().query_received(&mut rng, max_response_time, now),
                             )
                         })
                         .collect::<Vec<_>>(),
@@ -1055,7 +1055,7 @@ where
                         .get_mut(&group_addr)
                         .ok_or(SC::not_a_member_err(*group_addr))?
                         .as_mut()
-                        .query_received(rng, max_response_time, now),
+                        .query_received(&mut rng, max_response_time, now),
                 )]),
             })
         })?;
@@ -1103,14 +1103,14 @@ where
         }
 
         let now = ctx.now();
-        let rng = ctx.rng_mut();
+        let mut rng = ctx.rng();
 
         groups
             .iter_mut()
             .filter_map(|(group_addr, state)| {
                 let group_addr = *group_addr;
                 I::should_perform_gmp(group_addr)
-                    .then(|| (group_addr, state.as_mut().join_if_non_member(rng, now)))
+                    .then(|| (group_addr, state.as_mut().join_if_non_member(&mut rng, now)))
             })
             .collect::<Vec<_>>()
     });
@@ -1182,12 +1182,12 @@ where
     sync_ctx
         .with_gmp_state_mut(device, |GmpState { enabled, groups }| {
             let now = ctx.now();
-            let rng = ctx.rng_mut();
+            let mut rng = ctx.rng();
 
             groups.join_group_gmp(
                 !enabled || !I::should_perform_gmp(group_addr),
                 group_addr,
-                rng,
+                &mut rng,
                 now,
             )
         })
@@ -1278,7 +1278,7 @@ mod testutil {
                 ctx: &mut C,
             ) -> GmpStateMachine<C::Instant, P> {
                 let now = ctx.now();
-                let (machine, _actions) = GmpStateMachine::join_group(ctx.rng_mut(), now, false);
+                let (machine, _actions) = GmpStateMachine::join_group(&mut ctx.rng(), now, false);
                 machine
             }
 

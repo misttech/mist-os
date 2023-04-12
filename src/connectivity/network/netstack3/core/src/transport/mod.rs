@@ -92,11 +92,13 @@ impl TransportStateBuilder {
     }
 
     pub(crate) fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> TransportLayerState<C> {
+        let now = ctx.now();
+        let mut rng = ctx.rng();
         TransportLayerState {
             udpv4: self.udp.clone().build(),
             udpv6: self.udp.build(),
-            tcpv4: TcpState::new(ctx.now(), ctx.rng_mut()),
-            tcpv6: TcpState::new(ctx.now(), ctx.rng_mut()),
+            tcpv4: TcpState::new(now, &mut rng),
+            tcpv6: TcpState::new(now, &mut rng),
         }
     }
 }

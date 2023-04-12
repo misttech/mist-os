@@ -271,9 +271,9 @@ impl InstantContext for BindingsNonSyncCtxImpl {
 impl CounterContext for BindingsNonSyncCtxImpl {}
 
 impl RngContext for BindingsNonSyncCtxImpl {
-    type Rng = OsRng;
+    type Rng<'a> = &'a mut OsRng where Self: 'a;
 
-    fn rng_mut(&mut self) -> &mut OsRng {
+    fn rng(&mut self) -> &mut OsRng {
         &mut self.rng
     }
 }

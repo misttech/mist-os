@@ -333,7 +333,7 @@ impl DeviceHandler {
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        non_sync_ctx.rng_mut().fill(&mut secret_key);
+        non_sync_ctx.rng().fill(&mut secret_key);
         netstack3_core::device::update_ipv6_configuration(
             sync_ctx,
             non_sync_ctx,

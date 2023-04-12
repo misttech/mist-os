@@ -1815,7 +1815,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             NonZeroDuration::new(max_valid_lifetime).unwrap(),
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             idgen_retries,
@@ -1963,7 +1963,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(non_sync_ctx.rng_mut().clone().next_u64()),
+            OpaqueIidNonce::Random(non_sync_ctx.rng().clone().next_u64()),
             &slaac_config.temporary_address_configuration.unwrap().secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -2032,7 +2032,7 @@ mod tests {
                 initialize_with_temporary_addresses_enabled();
             let mut sync_ctx = &sync_ctx;
 
-            *non_sync_ctx.rng_mut() = rand::SeedableRng::from_seed(RNG_SEED);
+            *non_sync_ctx.rng() = rand::SeedableRng::from_seed(RNG_SEED);
 
             // Receive an RA and determine what temporary address was assigned, then return it.
             receive_prefix_update(
@@ -2077,7 +2077,7 @@ mod tests {
 
         // Seed the RNG right before the RA is received, just like in our
         // earlier run above.
-        *non_sync_ctx.rng_mut() = rand::SeedableRng::from_seed(RNG_SEED);
+        *non_sync_ctx.rng() = rand::SeedableRng::from_seed(RNG_SEED);
 
         // Receive a new RA with new prefix (autonomous). The system will assign
         // a temporary and static SLAAC address. The first temporary address
@@ -2642,7 +2642,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             idgen_retries,
@@ -2797,7 +2797,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             idgen_retries,
@@ -2931,7 +2931,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             0,
@@ -3127,7 +3127,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             1,
@@ -3206,7 +3206,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             1,
@@ -3291,7 +3291,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(non_sync_ctx.rng_mut().clone().next_u64()),
+            OpaqueIidNonce::Random(non_sync_ctx.rng().clone().next_u64()),
             &secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3402,7 +3402,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            non_sync_ctx.rng_mut(),
+            non_sync_ctx.rng(),
             max_valid_lifetime,
             max_preferred_lifetime,
             idgen_retries,

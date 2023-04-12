@@ -501,7 +501,7 @@ fn try_alloc_listen_port<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>(
     ctx: &mut C,
     is_available: impl Fn(NonZeroU16) -> Result<(), InUseError>,
 ) -> Option<NonZeroU16> {
-    let mut port = UdpBoundSocketMap::<I, D>::rand_ephemeral(ctx.rng_mut());
+    let mut port = UdpBoundSocketMap::<I, D>::rand_ephemeral(&mut ctx.rng());
     for _ in UdpBoundSocketMap::<I, D>::EPHEMERAL_RANGE {
         // We can unwrap here because we know that the EPHEMERAL_RANGE doesn't
         // include 0.
@@ -1688,9 +1688,9 @@ impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
     ) -> Option<NonZeroU16> {
         let DatagramFlowId { local_ip, remote_ip, remote_id } = flow;
         let id = ProtocolFlowId::new(local_ip, remote_ip, remote_id);
-        let rng = ctx.rng_mut();
+        let mut rng = ctx.rng();
         // Lazily init port_alloc if it hasn't been inited yet.
-        let port_alloc = self.get_or_insert_with(|| PortAlloc::new(rng));
+        let port_alloc = self.get_or_insert_with(|| PortAlloc::new(&mut rng));
         port_alloc.try_alloc(&id, bound).and_then(NonZeroU16::new)
     }
 }
