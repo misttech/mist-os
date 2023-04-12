@@ -90,10 +90,13 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
     return ZX_ERR_BAD_STATE;
   }
 
-  // copy out of the buffer here to local object so the state can be
-  // pre-validated and used without a possibility of user space manipulating it.
+  // Copy the state out of the state buffer and into an automatic variable.  User mode may have a
+  // mapping of the state buffer so it's critical that we make a copy and then validate the copy
+  // before using the copy to avoid a ToCToU vulnerability.  Use an atomic_signal_fence as a
+  // compiler barrier to ensure the copy actually happens.
   zx_restricted_state_t state;
   state = *state_buffer;
+  ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
 
   if constexpr (LOCAL_TRACE) {
     RestrictedState::ArchDump(state);
