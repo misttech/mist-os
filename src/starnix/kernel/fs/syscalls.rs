@@ -1004,19 +1004,38 @@ pub fn sys_getcwd(
     size: usize,
 ) -> Result<usize, Errno> {
     let mut cwd = current_task.fs().cwd().path();
+    let root = current_task.fs().root().path();
 
-    let mut bytes = vec![];
-    if !cwd.starts_with(&current_task.fs().root().path()) {
-        bytes.append(&mut b"(unreachable)".to_vec());
-    }
-
-    bytes.append(&mut cwd);
-    bytes.push(b'\0');
-    if bytes.len() > size {
+    let mut user_cwd = if root == b"/" {
+        // cwd = "/foo/bar"
+        // root = "/"
+        // user_cwd = "/foo/bar"
+        cwd
+    } else if cwd == root {
+        // cwd = "/foo/bar"
+        // root = "/foo/bar"
+        // user_cwd = "/"
+        b"/".to_vec()
+    } else if cwd.starts_with(&root) {
+        // cwd = "/foo/bar/baz"
+        // root = "/foo/bar"
+        // user_cwd = "/baz"
+        cwd.drain(0..root.len());
+        cwd
+    } else {
+        // cwd = "/foo/bar"
+        // root = "/qux"
+        // user_cwd = "(unreachable)/foo/bar"
+        let mut bytes = b"(unreachable)".to_vec();
+        bytes.append(&mut cwd);
+        bytes
+    };
+    user_cwd.push(b'\0');
+    if user_cwd.len() > size {
         return error!(ERANGE);
     }
-    current_task.mm.write_memory(buf, &bytes)?;
-    Ok(bytes.len())
+    current_task.mm.write_memory(buf, &user_cwd)?;
+    Ok(user_cwd.len())
 }
 
 pub fn sys_umask(current_task: &CurrentTask, umask: FileMode) -> Result<FileMode, Errno> {
