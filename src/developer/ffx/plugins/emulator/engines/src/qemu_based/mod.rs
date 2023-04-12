@@ -230,75 +230,90 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .context("cannot embed boot data")?;
         }
 
-        let disk_image = match &emu_config.guest.disk_image {
-            Some(DiskImage::Fvm(src_fvm)) => {
-                let fvm_path = instance_root
-                    .join(src_fvm.file_name().ok_or_else(|| anyhow!("cannot read fvm file name"))?);
-                if fvm_path.exists() && reuse {
-                    tracing::debug!("Using existing file for {:?}", fvm_path.file_name().unwrap());
-                } else {
-                    fs::copy(src_fvm, &fvm_path).context("cannot stage fvm file")?;
+        if let Some(disk_image) = &emu_config.guest.disk_image {
+            let src_path = disk_image.as_ref();
+            let dest_path = instance_root.join(
+                src_path.file_name().ok_or_else(|| anyhow!("cannot read disk image file name"))?,
+            );
 
-                    // Resize the fvm image if needed.
-                    let image_size = format!(
-                        "{}{}",
-                        emu_config.device.storage.quantity,
-                        emu_config.device.storage.units.abbreviate()
-                    );
-                    let fvm_tool = get_host_tool(config::FVM_HOST_TOOL)
-                        .await
-                        .context("cannot locate fvm tool")?;
-                    let resize_result = Command::new(fvm_tool)
-                        .arg(&fvm_path)
-                        .arg("extend")
-                        .arg("--length")
-                        .arg(&image_size)
-                        .arg("--length-is-lowerbound")
-                        .output()?;
+            if dest_path.exists() && reuse {
+                tracing::debug!("Using existing file for {:?}", dest_path.file_name().unwrap());
+            } else {
+                let original_size: u64 = src_path.metadata()?.len();
 
-                    if !resize_result.status.success() {
-                        bail!("Error resizing fvm: {}", str::from_utf8(&resize_result.stderr)?);
-                    }
-                }
-                Some(DiskImage::Fvm(fvm_path))
-            }
-            Some(DiskImage::Fxfs(src_path)) => {
-                let image_path = instance_root.join(
-                    src_path.file_name().ok_or_else(|| anyhow!("malformed Fxfs image path"))?,
+                tracing::debug!("Disk image original size: {}", original_size);
+                tracing::debug!(
+                    "Disk image target size from product bundle {:?}",
+                    emu_config.device.storage
                 );
-                if image_path.exists() && reuse {
-                    tracing::debug!(
-                        "Using existing file for {:?}",
-                        image_path.file_name().unwrap()
-                    );
-                } else {
-                    let target_size = emu_config.device.storage.as_bytes().ok_or(anyhow!(
-                        "Storage size {:?} overflows u64",
-                        emu_config.device.storage
-                    ))?;
-                    let size = fs::metadata(src_path)?.len();
-                    let tmp = NamedTempFile::new_in(&instance_root)?;
-                    fs::copy(src_path, tmp.path()).context("cannot stage Fxfs image")?;
-                    if size < target_size {
-                        // Resize the image if needed.
-                        tmp.as_file()
-                            .set_len(target_size)
-                            .context(format!("Failed to temp file to {} bytes", target_size))?;
-                    }
-                    tmp.persist(&image_path).context(format!(
-                        "Failed to persist temp Fxfs image to {:?}",
-                        image_path
-                    ))?;
+
+                let mut target_size =
+                    emu_config.device.storage.as_bytes().expect("get device storage size");
+
+                // The disk image needs to be expanded in size in order to make room
+                // for the creation of the data volume. If the original
+                // size is larger than the target size, update the target size
+                // to 1.1 times the size of the original file.
+                if target_size < original_size {
+                    let new_target_size: u64 = original_size + (original_size / 10);
+                    tracing::warn!("Disk image original size is larger than target size.");
+                    tracing::warn!("Forcing target size to {new_target_size}");
+                    target_size = new_target_size;
                 }
-                Some(DiskImage::Fxfs(image_path))
+
+                // The method of resizing is different, depending on the type of the disk image.
+                match disk_image {
+                    DiskImage::Fvm(_) => {
+                        fs::copy(src_path, &dest_path).context("cannot stage disk image file")?;
+                        Self::fvm_extend(&dest_path, target_size).await?;
+                    }
+                    DiskImage::Fxfs(_) => {
+                        let tmp = NamedTempFile::new_in(&instance_root)?;
+                        fs::copy(src_path, tmp.path()).context("cannot stage Fxfs image")?;
+                        if original_size < target_size {
+                            // Resize the image if needed.
+                            tmp.as_file()
+                                .set_len(target_size)
+                                .context(format!("Failed to temp file to {} bytes", target_size))?;
+                        }
+                        tmp.persist(&dest_path).context(format!(
+                            "Failed to persist temp Fxfs image to {:?}",
+                            dest_path
+                        ))?;
+                    }
+                };
             }
-            None => None,
-        };
+
+            // Update the guest config to reference the staged disk image.
+            updated_guest.disk_image = match disk_image {
+                DiskImage::Fvm(_) => Some(DiskImage::Fvm(dest_path)),
+                DiskImage::Fxfs(_) => Some(DiskImage::Fxfs(dest_path)),
+            };
+        } else {
+            updated_guest.disk_image = None;
+        }
 
         updated_guest.kernel_image = kernel_path;
         updated_guest.zbi_image = zbi_path;
-        updated_guest.disk_image = disk_image;
         Ok(updated_guest)
+    }
+
+    async fn fvm_extend(dest_path: &Path, target_size: u64) -> Result<()> {
+        let fvm_tool =
+            get_host_tool(config::FVM_HOST_TOOL).await.context("cannot locate fvm tool")?;
+        let mut resize_command = Command::new(fvm_tool);
+
+        resize_command.arg(&dest_path).arg("extend").arg("--length").arg(target_size.to_string());
+        tracing::debug!("FVM Running command to resize: {:?}", &resize_command);
+
+        let resize_result = resize_command.output()?;
+
+        tracing::debug!("FVM command result: {resize_result:?}");
+
+        if !resize_result.status.success() {
+            bail!("Error resizing fvm: {}", str::from_utf8(&resize_result.stderr)?);
+        }
+        Ok(())
     }
 
     /// embed_boot_data adds authorized_keys for ssh access to the zbi boot image file.
@@ -708,7 +723,9 @@ mod tests {
         }
     }
     const ORIGINAL: &str = "THIS_STRING";
+    const ORIGINAL_PADDED: &str = "THIS_STRING\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
     const UPDATED: &str = "THAT_VALUE*";
+    const UPDATED_PADDED: &str = "THAT_VALUE*\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
     #[derive(Copy, Clone)]
     enum DiskImageFormat {
@@ -796,6 +813,8 @@ mod tests {
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
+        emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
+
         let root = setup(&mut emu_config.guest, &temp, disk_image_format).await?;
 
         let ctx = mock_modules::get_host_tool_context();
@@ -870,7 +889,13 @@ mod tests {
             .context("cannot read contents of reused disk image file")?;
 
         assert_eq!(kernel_contents, UPDATED);
-        assert_eq!(fvm_contents, UPDATED);
+
+        // Fxfs will have ORIGINAL padded with nulls for be 32 bytes.
+        //(set in emu_config at the top of this method).
+        match disk_image_format {
+            DiskImageFormat::Fvm => assert_eq!(fvm_contents, UPDATED),
+            DiskImageFormat::Fxfs => assert_eq!(fvm_contents, UPDATED_PADDED),
+        };
 
         Ok(())
     }
@@ -892,6 +917,7 @@ mod tests {
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
+        emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
         let root = setup(&mut emu_config.guest, &temp, disk_image_format).await?;
 
@@ -966,7 +992,13 @@ mod tests {
         fvm.read_to_string(&mut fvm_contents).context("cannot read contents of reused fvm file")?;
 
         assert_eq!(kernel_contents, ORIGINAL);
-        assert_eq!(fvm_contents, ORIGINAL);
+
+        // Fxfs will have ORIGINAL padded with nulls for be 32 bytes.
+        //(set in emu_config at the top of this method).
+        match disk_image_format {
+            DiskImageFormat::Fvm => assert_eq!(fvm_contents, ORIGINAL),
+            DiskImageFormat::Fxfs => assert_eq!(fvm_contents, ORIGINAL_PADDED),
+        };
 
         Ok(())
     }
