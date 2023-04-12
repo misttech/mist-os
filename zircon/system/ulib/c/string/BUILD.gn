@@ -27,6 +27,7 @@ llvm_libc_source_set("mem") {
 
   functions = [
     "memccpy",
+    "memmem",
     "mempcpy",
     "memrchr",
   ]
