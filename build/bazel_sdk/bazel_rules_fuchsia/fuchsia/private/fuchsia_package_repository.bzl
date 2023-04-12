@@ -32,21 +32,11 @@ def _fuchsia_package_repository_impl(ctx):
     # Publish the packages
     repo_dir = ctx.actions.declare_directory("%s.repo" % repo_name)
     ctx.actions.run(
-        executable = sdk.pm,
-        arguments = [
-            "publish",
-            "-C",
-            "-lp",
-            "-f",
-            list_of_packages.path,
-            "-repo",
-            repo_dir.path,
-        ],
+        executable = sdk.ffx,
+        arguments = ["repository", "publish", "--clean", repo_dir.path],
         inputs = depset(package_deps + [list_of_packages]),
-        outputs = [
-            repo_dir,
-        ],
-        mnemonic = "FuchsiaPmPublish",
+        outputs = [repo_dir],
+        mnemonic = "FuchsiaFfxRepositoryPublish",
         progress_message = "Publishing package repository %{label}",
     )
 
