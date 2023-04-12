@@ -1,7 +1,7 @@
 Name: boringssl
 URL: https://boringssl.googlesource.com/boringssl
 Version: git
-License: BSDish
+License: OpenSSL
 License File: src/LICENSE
 Security Critical: yes
 
