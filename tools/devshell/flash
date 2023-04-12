@@ -101,8 +101,24 @@ if is-remote-workflow-device; then
   exit 1
 fi
 
-flash_manifest="${FUCHSIA_BUILD_DIR}/$(fx-command-run list-build-artifacts --expect-one --name flash-manifest images)"
-product_bundle=
+get_flash_source_args=()
+if [[ "${build}" == "true" ]]; then
+  get_flash_source_args+=(--build)
+fi
+flash_source="$(fx-command-run get-flash-source "${get_flash_source_args[@]}")"
+case "${flash_source}" in
+  flash-manifest:*)
+      flash_manifest="${FUCHSIA_BUILD_DIR}"/"${flash_source#flash-manifest:}"
+      product_bundle=
+      ;;
+  product-bundle:*)
+      flash_manifest=
+      product_bundle="${FUCHSIA_BUILD_DIR}"/"${flash_source#product-bundle:}"
+      ;;
+  *)
+      fx-error "Unsupported flash source format: ${flash_source}"
+      exit 1
+esac
 
 cd "${FUCHSIA_BUILD_DIR}"
 fx-flash "${serial}" "${device}" "${flash_manifest}" "${product_bundle}" "${skip_verify}" "${no_bootloader_reboot}"
