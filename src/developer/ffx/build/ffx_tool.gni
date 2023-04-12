@@ -126,7 +126,6 @@ template("ffx_tool") {
       "${host_tools_dir}/${output_metadata}",
       "${host_tools_dir}/${output_name}",
     ]
-    outputs = [ "${ffx_test_host_tools_out_dir}/{{source_file_part}}" ]
   }
 
   if (defined(invoker.sdk_target_name)) {

@@ -133,7 +133,6 @@ if (is_host) {
   host_test_data("test_data") {
     deps = [ ":host" ]
     sources = [ "${host_tools_dir}/ffx" ]
-    outputs = [ "${ffx_test_host_tools_out_dir}/{{source_file_part}}" ]
   }
 
   group("suite_test_data") {
