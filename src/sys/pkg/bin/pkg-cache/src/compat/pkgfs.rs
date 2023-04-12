@@ -110,8 +110,6 @@ pub fn make_dir(
     let dir = vfs::pseudo_directory! {
         "packages" => Arc::new(packages::PkgfsPackages::new(
             Arc::clone(&base_packages),
-            Arc::clone(&package_index),
-            Arc::clone(&non_static_allow_list),
             blobfs.clone(),
         )),
         "versions" => Arc::new(versions::PkgfsVersions::new(

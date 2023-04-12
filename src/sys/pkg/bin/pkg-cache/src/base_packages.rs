@@ -110,7 +110,7 @@ impl BasePackages {
     }
 
     /// Iterator over the root (i.e not including subpackages) base package paths and hashes.
-    pub fn root_paths_and_hashes(&self) -> impl Iterator<Item = &(PackagePath, Hash)> {
+    pub fn root_paths_and_hashes(&self) -> impl ExactSizeIterator<Item = &(PackagePath, Hash)> {
         self.root_paths_and_hashes.iter()
     }
 
