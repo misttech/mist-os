@@ -40,11 +40,14 @@ TEST_F(DeviceAddTest, CreateDevice) {
   std::unique_ptr<RootMockDevice> root_device;
   std::unique_ptr<MockDevice> child_device;
 
+  constexpr char kName[] = "sys/test/test/mock/first_child";
+
   auto promise = CreateDevice(
                      {
                          (zx_device_prop_t){BIND_PCI_VID, 0, 1234},
                      },
                      ZX_OK, &root_device, &child_device)
+                     .and_then(DoWaitForPath(kName))
                      .and_then([&]() -> Promise<void> {
                        // Destroy the test device.  This should cause an unbind of the child
                        // device.

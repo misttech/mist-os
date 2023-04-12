@@ -34,8 +34,7 @@ class Sysdev : public SysdevType {
 
   // Device protocol implementation.
   void DdkRelease() {
-    // sysdev should never have its release called.
-    ZX_ASSERT_MSG(false, "Sysdev::DdkRelease() invoked!\n");
+    delete this;
   }
 
   zx_status_t MakeComposite();
@@ -53,8 +52,7 @@ class TestParent : public TestParentType {
 
   // Device protocol implementation.
   void DdkRelease() {
-    // test-parent should never have its release called.
-    ZX_ASSERT_MSG(false, "TestParent::DdkRelease() invoked!\n");
+    delete this;
   }
 };
 

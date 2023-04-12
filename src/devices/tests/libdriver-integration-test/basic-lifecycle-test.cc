@@ -38,13 +38,16 @@ TEST_F(BasicLifecycleTest, BindThenUnbindAndRemove) {
   std::unique_ptr<RootMockDevice> root_mock_device;
   std::unique_ptr<MockDevice> mock_child_device;
 
-  auto promise =
-      CreateFirstChild(&root_mock_device, &mock_child_device).and_then([&]() -> Promise<void> {
-        // Destroy the test device.  This should cause an unbind of the child
-        // device.
-        root_mock_device.reset();
-        return ExpectUnbindThenRelease(mock_child_device);
-      });
+  constexpr char kName[] = "sys/test/test/mock/first_child";
+
+  auto promise = CreateFirstChild(&root_mock_device, &mock_child_device)
+                     .and_then(DoWaitForPath(kName))
+                     .and_then([&]() -> Promise<void> {
+                       // Destroy the test device.  This should cause an unbind of the child
+                       // device.
+                       root_mock_device.reset();
+                       return ExpectUnbindThenRelease(mock_child_device);
+                     });
 
   RunPromise(std::move(promise));
 }

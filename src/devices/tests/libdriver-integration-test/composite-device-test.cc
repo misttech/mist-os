@@ -135,17 +135,16 @@ TEST_F(CompositeDeviceTest, UnbindFragment) {
             // Setup our expectations for unbinding. The child device will be unbound,
             // then the composite will be unbound and released, then the child device will be
             // released.
-            auto unbind_promise =
-                ExpectUnbind(child_device1,
-                             [](HookInvocation record, Completer<void> completer) {
-                               ActionList actions;
-                               Promise<void> unbind_reply_done;
-                               actions.AppendUnbindReply(&unbind_reply_done);
-                               completer.complete_ok();
-                               return actions;
-                             })
-                    .and_then(ExpectUnbindThenRelease(composite_child_device))
-                    .and_then(ExpectRelease(child_device1));
+            auto unbind_child_promise =
+                ExpectUnbind(child_device1, [](HookInvocation record, Completer<void> completer) {
+                  ActionList actions;
+                  Promise<void> unbind_reply_done;
+                  actions.AppendUnbindReply(&unbind_reply_done);
+                  completer.complete_ok();
+                  return actions;
+                }).and_then(ExpectRelease(child_device1));
+            auto unbind_promise = JoinPromises(std::move(unbind_child_promise),
+                                               ExpectUnbindThenRelease(composite_child_device));
 
             // Send the unbind request to child1
             fpromise::bridge<void, Error> bridge;
