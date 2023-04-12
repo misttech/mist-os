@@ -10,7 +10,6 @@
 #include <lib/driver/component/cpp/tests/test_base.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fidl/cpp/binding.h>
-#include <lib/syslog/wire_format.h>
 
 #include <gtest/gtest.h>
 #include <rapidjson/document.h>
@@ -83,7 +82,7 @@ DecodedLogMessage decode_log_message_to_struct(uint8_t* data, size_t len) {
   return ret;
 }
 
-void CheckLogReadable(zx::socket& log_socket, fx_log_severity_t severity) {
+void CheckLogReadable(zx::socket& log_socket, flogger::LogLevelFilter severity) {
   // Check state of logger after writing info log.
   zx_signals_t pending = ZX_SIGNAL_NONE;
   EXPECT_EQ(ZX_OK, log_socket.wait_one(ZX_SOCKET_READABLE, zx::time::infinite_past(), &pending));
@@ -95,7 +94,7 @@ void CheckLogReadable(zx::socket& log_socket, fx_log_severity_t severity) {
   ASSERT_EQ(ZX_OK, log_socket.read(0, &packet, sizeof(packet), &actual));
   EXPECT_LT(actual, sizeof(packet));
   auto msg = decode_log_message_to_struct(packet, actual);
-  EXPECT_EQ(severity, msg.message.severity);
+  EXPECT_EQ(static_cast<int32_t>(severity), msg.message.severity);
   EXPECT_EQ(msg.message.tags[0], kName);
   EXPECT_EQ(std::string(msg.document[0]["payload"]["root"]["message"]["value"].GetString()),
             kMessage);
@@ -148,11 +147,11 @@ TEST(LoggerTest, CreateAndLog) {
 
   // Check state of logger after writing logs.
   FDF_LOGL(INFO, *logger.value(), kMessage);
-  CheckLogReadable(log_socket, FX_LOG_INFO);
+  CheckLogReadable(log_socket, flogger::LogLevelFilter::INFO);
   FDF_LOGL(WARNING, *logger.value(), kMessage);
-  CheckLogReadable(log_socket, FX_LOG_WARNING);
+  CheckLogReadable(log_socket, flogger::LogLevelFilter::WARN);
   FDF_LOGL(ERROR, *logger.value(), kMessage);
-  CheckLogReadable(log_socket, FX_LOG_ERROR);
+  CheckLogReadable(log_socket, flogger::LogLevelFilter::ERROR);
 }
 
 TEST(LoggerTest, Create_NoLogSink) {
@@ -225,9 +224,9 @@ TEST(LoggerTest, SetSeverity) {
   // Check state of logger after writing logs that were above or equal to min
   // severity.
   FDF_LOGL(INFO, *logger.value(), kMessage);
-  CheckLogReadable(log_socket, FX_LOG_INFO);
+  CheckLogReadable(log_socket, flogger::LogLevelFilter::INFO);
   FDF_LOGL(WARNING, *logger.value(), kMessage);
-  CheckLogReadable(log_socket, FX_LOG_WARNING);
+  CheckLogReadable(log_socket, flogger::LogLevelFilter::WARN);
 
   // Check severity after setting it.
   logger.value()->SetSeverity(FUCHSIA_LOG_WARNING);
@@ -237,5 +236,5 @@ TEST(LoggerTest, SetSeverity) {
   FDF_LOGL(INFO, *logger.value(), kMessage);
   CheckLogUnreadable(log_socket);
   FDF_LOGL(WARNING, *logger.value(), kMessage);
-  CheckLogReadable(log_socket, FX_LOG_WARNING);
+  CheckLogReadable(log_socket, flogger::LogLevelFilter::WARN);
 }
