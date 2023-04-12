@@ -122,6 +122,7 @@
 //sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_sdk
 //sdk/fidl/fuchsia.ui.brightness:fuchsia.ui.brightness_sdk
 //sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_sdk
+//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_sdk
 //sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_sdk
 //sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_sdk
 //sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_sdk

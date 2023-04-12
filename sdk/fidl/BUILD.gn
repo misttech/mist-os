@@ -129,6 +129,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app",
   "//sdk/fidl/fuchsia.ui.brightness:fuchsia.ui.brightness",
   "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition",
+  "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton",
   "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx",
   "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input",
   "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3",

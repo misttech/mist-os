@@ -5,9 +5,12 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.display.singleton") {
-  sdk_category = "internal"
+  sdk_category = "partner"
 
-  sources = [ "info.fidl" ]
+  sources = [
+    "info.fidl",
+    "overview.fidl",
+  ]
 
   public_deps = [ "//sdk/fidl/fuchsia.math" ]
 
