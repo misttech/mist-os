@@ -21,6 +21,9 @@
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 
+extern std::mutex kDriverGlobalsLock;
+extern zx::resource kRootResource __TA_GUARDED(kDriverGlobalsLock);
+
 namespace compat {
 
 // Driver is the compatibility driver that loads DFv1 drivers.
@@ -35,9 +38,6 @@ class Driver : public fdf::DriverBase {
 
   // Returns the context that DFv1 driver provided.
   void* Context() const;
-  // Logs a message for the DFv1 driver.
-  void Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
-           const char* msg, va_list args);
 
   zx::result<zx::vmo> LoadFirmware(Device* device, const char* filename, size_t* size);
 
@@ -64,6 +64,8 @@ class Driver : public fdf::DriverBase {
   uint32_t GetNextDeviceId() { return next_device_id_++; }
 
   fs::PseudoDir& diagnostics_dir() { return *diagnostics_dir_; }
+
+  const std::string& driver_path() const { return driver_path_; }
 
  private:
   bool IsComposite();
@@ -114,11 +116,11 @@ class Driver : public fdf::DriverBase {
   }
 
   async::Executor executor_;
+
+  std::shared_ptr<fdf::Logger> inner_logger_;
+
   std::string driver_path_;
-
   std::string node_name_;
-
-  std::unique_ptr<fdf::Logger> inner_logger_;
   Device device_;
 
   fuchsia_device_manager::wire::SystemPowerState system_state_ =
@@ -150,34 +152,39 @@ class DriverFactory {
       fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 };
 
-class DriverList {
+// |GlobalLoggerList| is global for the entire driver host process. It maintains a
+// |LoggerInstances| for each driver_path that is active.
+class GlobalLoggerList {
+  friend ::zx_driver;
+  // |LoggerInstances| is shared for all drivers with the same driver_path. The |loggers_| set
+  // contains all the active instances.
+  class LoggerInstances {
+   public:
+    // Logs a message for the DFv1 driver.
+    void Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
+             const char* msg, va_list args);
+    zx_driver_t* ZxDriver();
+    void AddLogger(std::shared_ptr<fdf::Logger>& logger);
+    void RemoveLogger(std::shared_ptr<fdf::Logger>& logger);
+    size_t count() { return loggers_.size(); }
+
+   private:
+    std::unordered_set<std::shared_ptr<fdf::Logger>> loggers_;
+  };
+
  public:
-  zx_driver_t* ZxDriver();
-
-  // Add a driver to the list. `driver` is unowned, and needs
-  // to be removed before the driver goes out of scope.
-  void AddDriver(Driver* driver);
-  void RemoveDriver(Driver* driver);
-
-  // Logs a message for the DFv1 driver.
-  void Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
-           const char* msg, va_list args);
+  zx_driver_t* AddLogger(const std::string& driver_path, std::shared_ptr<fdf::Logger>& logger);
+  void RemoveLogger(const std::string& driver_path, std::shared_ptr<fdf::Logger>& logger);
+  std::optional<size_t> loggers_count_for_testing(const std::string& driver_path);
 
  private:
-  std::unordered_set<Driver*> drivers_;
+  std::unordered_map<std::string, LoggerInstances> instances_;
 };
-
-// This is the list of all of the compat drivers loaded in the same
-// driver host.
-extern DriverList global_driver_list;
 
 }  // namespace compat
 
-struct zx_driver : public compat::DriverList {
+struct zx_driver : public compat::GlobalLoggerList::LoggerInstances {
   // NOTE: Intentionally empty, do not add to this.
 };
-
-extern std::mutex kDriverGlobalsLock;
-extern zx::resource kRootResource __TA_GUARDED(kDriverGlobalsLock);
 
 #endif  // SRC_DEVICES_MISC_DRIVERS_COMPAT_DRIVER_H_

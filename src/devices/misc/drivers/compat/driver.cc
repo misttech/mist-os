@@ -55,6 +55,11 @@ constexpr auto kLibDriverPath = "/pkg/driver/compat.so";
 
 namespace compat {
 
+// This lock protects the global logger list.
+std::mutex kGlobalLoggerListLock;
+// This contains all the loggers in this driver host.
+GlobalLoggerList global_logger_list __TA_GUARDED(kGlobalLoggerListLock);
+
 zx_status_t AddMetadata(Device* device,
                         fidl::VectorView<fuchsia_driver_compat::wire::Metadata> data) {
   for (auto& metadata : data) {
@@ -101,27 +106,53 @@ promise<void, zx_status_t> GetAndAddMetadata(
   return bridge.consumer.promise_or(error(ZX_ERR_INTERNAL));
 }
 
-DriverList global_driver_list;
-
-zx_driver_t* DriverList::ZxDriver() { return static_cast<zx_driver_t*>(this); }
-
-void DriverList::AddDriver(Driver* driver) {
-  std::scoped_lock lock(kDriverGlobalsLock);
-  drivers_.insert(driver);
+void GlobalLoggerList::LoggerInstances::Log(FuchsiaLogSeverity severity, const char* tag,
+                                            const char* file, int line, const char* msg,
+                                            va_list args) {
+  std::lock_guard guard(kGlobalLoggerListLock);
+  auto it = loggers_.begin();
+  ZX_ASSERT_MSG(it != loggers_.end(),
+                "Invalid state. There should be at least 1 logger in this LoggerInstances.");
+  (*it)->logvf(severity, tag, file, line, msg, args);
 }
 
-void DriverList::RemoveDriver(Driver* driver) {
-  std::scoped_lock lock(kDriverGlobalsLock);
-  drivers_.erase(driver);
+zx_driver_t* GlobalLoggerList::LoggerInstances::ZxDriver() {
+  return static_cast<zx_driver_t*>(this);
 }
 
-void DriverList::Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
-                     const char* msg, va_list args) {
-  std::scoped_lock lock(kDriverGlobalsLock);
-  if (drivers_.empty()) {
-    return;
+void GlobalLoggerList::LoggerInstances::AddLogger(std::shared_ptr<fdf::Logger>& logger) {
+  loggers_.insert(logger);
+}
+
+void GlobalLoggerList::LoggerInstances::RemoveLogger(std::shared_ptr<fdf::Logger>& logger) {
+  loggers_.erase(logger);
+}
+
+zx_driver_t* GlobalLoggerList::AddLogger(const std::string& driver_path,
+                                         std::shared_ptr<fdf::Logger>& logger) {
+  auto& instances = instances_.try_emplace(driver_path).first->second;
+  instances.AddLogger(logger);
+  return instances.ZxDriver();
+}
+
+void GlobalLoggerList::RemoveLogger(const std::string& driver_path,
+                                    std::shared_ptr<fdf::Logger>& logger) {
+  auto it = instances_.find(driver_path);
+  if (it != instances_.end()) {
+    it->second.RemoveLogger(logger);
+    if (it->second.count() == 0) {
+      instances_.erase(it);
+    }
   }
-  (*drivers_.begin())->Log(severity, tag, file, line, msg, args);
+}
+
+std::optional<size_t> GlobalLoggerList::loggers_count_for_testing(const std::string& driver_path) {
+  auto it = instances_.find(driver_path);
+  if (it != instances_.end()) {
+    return (*it).second.count();
+  }
+
+  return std::nullopt;
 }
 
 Driver::Driver(fdf::DriverStartArgs start_args,
@@ -135,8 +166,6 @@ Driver::Driver(fdf::DriverStartArgs start_args,
   device_.Bind({std::move(node()), dispatcher()});
   // Call this so the parent device is in the post-init state.
   device_.InitReply(ZX_OK);
-
-  global_driver_list.AddDriver(this);
   ZX_ASSERT(url().has_value());
 }
 
@@ -145,7 +174,10 @@ Driver::~Driver() {
     record_->ops->release(context_);
   }
   dlclose(library_);
-  global_driver_list.RemoveDriver(this);
+  {
+    std::lock_guard guard(kGlobalLoggerListLock);
+    global_logger_list.RemoveLogger(driver_path(), inner_logger_);
+  }
 }
 
 zx::result<> Driver::Start() {
@@ -402,15 +434,22 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
             url_str.data());
     return error(ZX_ERR_INVALID_ARGS);
   }
-  record_->driver = global_driver_list.ZxDriver();
 
-  // Create logger.
-  auto inner_logger = fdf::Logger::Create(*context().incoming(), dispatcher(), note->payload.name);
-  if (inner_logger.is_error()) {
-    return error(inner_logger.status_value());
+  // Create our logger.
+  zx::result logger_result =
+      fdf::Logger::Create(*context().incoming(), dispatcher(), note->payload.name);
+  if (logger_result.is_error()) {
+    return error(logger_result.status_value());
   }
-  inner_logger_ = std::move(inner_logger.value());
-  device_.set_logger(inner_logger_.get());
+
+  // Move the logger over into a shared_ptr instead of unique_ptr so we can pass it to the global
+  // logging manager and compat::Device.
+  inner_logger_ = std::shared_ptr<fdf::Logger>(logger_result.value().release());
+  device_.set_logger(inner_logger_);
+  {
+    std::lock_guard guard(kGlobalLoggerListLock);
+    record_->driver = global_logger_list.AddLogger(driver_path(), inner_logger_);
+  }
 
   return ok();
 }
@@ -554,13 +593,6 @@ promise<void, zx_status_t> Driver::GetDeviceInfo() {
 }
 
 void* Driver::Context() const { return context_; }
-
-void Driver::Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
-                 const char* msg, va_list args) {
-  if (inner_logger_.get() != nullptr) {
-    inner_logger_->logvf(severity, tag, file, line, msg, args);
-  }
-}
 
 zx::result<zx::vmo> Driver::LoadFirmware(Device* device, const char* filename, size_t* size) {
   std::string full_filename = "/pkg/lib/firmware/";

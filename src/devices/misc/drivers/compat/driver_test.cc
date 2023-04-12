@@ -479,6 +479,31 @@ class DriverTest : public testing::Test {
   async::Loop fidl_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 };
 
+class GlobalLoggerListTest : public testing::Test {
+ protected:
+  std::shared_ptr<fdf::Logger> NewLogger(const std::string& name) {
+    auto svc = fidl::CreateEndpoints<fio::Directory>();
+    ZX_ASSERT(ZX_OK == svc.status_value());
+
+    fidl::Arena arena;
+    fidl::VectorView<frunner::wire::ComponentNamespaceEntry> entries(arena, 1);
+    entries[0] = frunner::wire::ComponentNamespaceEntry::Builder(arena)
+                     .path("/svc")
+                     .directory(std::move(svc->client))
+                     .Build();
+    auto ns = fdf::Namespace::Create(entries);
+    ZX_ASSERT(ZX_OK == ns.status_value());
+
+    auto logger = fdf::Logger::Create(*ns, dispatcher(), name, FUCHSIA_LOG_INFO, false);
+    ZX_ASSERT(ZX_OK == logger.status_value());
+    return std::shared_ptr<fdf::Logger>((*logger).release());
+  }
+  async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
+
+ private:
+  fdf::TestSynchronizedDispatcher driver_dispatcher_{fdf::kDispatcherDefault};
+};
+
 TEST_F(DriverTest, Start) {
   zx_protocol_device_t ops{
       .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
@@ -743,4 +768,26 @@ TEST_F(DriverTest, GetFragmentProtocol) {
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));
   EXPECT_TRUE(v1_test->did_release);
+}
+
+TEST_F(GlobalLoggerListTest, GlobalLoggerList) {
+  compat::GlobalLoggerList global_list;
+  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
+  auto logger_1 = NewLogger("logger_1");
+  auto* zx_driver_1 = global_list.AddLogger("path_1", logger_1);
+  ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
+  auto logger_2 = NewLogger("logger_2");
+  auto* zx_driver_2 = global_list.AddLogger("path_1", logger_2);
+  ASSERT_EQ(2, global_list.loggers_count_for_testing("path_1"));
+  ASSERT_EQ(zx_driver_1, zx_driver_2);
+  auto logger_3 = NewLogger("logger_3");
+  auto* zx_driver_3 = global_list.AddLogger("path_2", logger_3);
+  ASSERT_EQ(1, global_list.loggers_count_for_testing("path_2"));
+  ASSERT_NE(zx_driver_3, zx_driver_2);
+  global_list.RemoveLogger("path_2", logger_3);
+  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_2"));
+  global_list.RemoveLogger("path_1", logger_1);
+  ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
+  global_list.RemoveLogger("path_1", logger_2);
+  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
 }

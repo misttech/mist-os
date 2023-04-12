@@ -41,11 +41,11 @@ class DeviceTest : public gtest::TestLoopFixture {
 
     auto logger = fdf::Logger::Create(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
     ASSERT_EQ(ZX_OK, logger.status_value());
-    logger_ = std::move(*logger);
+    logger_ = std::shared_ptr<fdf::Logger>((*logger).release());
   }
 
  protected:
-  fdf::Logger* logger() { return logger_.get(); }
+  std::shared_ptr<fdf::Logger> logger() { return logger_; }
 
  private:
   zx::result<fdf::Namespace> CreateNamespace(fidl::ClientEnd<fio::Directory> client_end) {
@@ -58,7 +58,7 @@ class DeviceTest : public gtest::TestLoopFixture {
     return fdf::Namespace::Create(entries);
   }
 
-  std::unique_ptr<fdf::Logger> logger_;
+  std::shared_ptr<fdf::Logger> logger_;
 };
 
 TEST_F(DeviceTest, ConstructDevice) {
