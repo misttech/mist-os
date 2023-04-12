@@ -22,6 +22,7 @@ if (is_host) {
       "platform_configuration:host_tests",
       "shell_commands:host_tests",
       "structured_config:host_tests",
+      "subpackage_blobs_package:host_tests",
       "test_util:host_tests",
       "tool:host_tests",
       "update_package:host_tests",
