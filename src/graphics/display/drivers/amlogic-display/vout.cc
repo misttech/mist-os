@@ -25,20 +25,17 @@ zx_pixel_format_t kHdmiSupportedPixelFormats[] = {ZX_PIXEL_FORMAT_ARGB_8888,
 // List of supported features
 struct supported_features_t {
   bool afbc;
-  bool capture;
   bool hpd;
 };
 
 // TODO(fxb/69025): read feature support from metadata instead of hardcoding.
 constexpr supported_features_t kDsiSupportedFeatures = supported_features_t{
     .afbc = true,
-    .capture = true,
     .hpd = false,
 };
 
 constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
     .afbc = false,
-    .capture = false,
     .hpd = true,
 };
 
@@ -76,7 +73,6 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   type_ = VoutType::kDsi;
 
   supports_afbc_ = kDsiSupportedFeatures.afbc;
-  supports_capture_ = kDsiSupportedFeatures.capture;
   supports_hpd_ = kDsiSupportedFeatures.hpd;
 
   dsi_.width = width;
@@ -118,7 +114,6 @@ zx_status_t Vout::InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_
   type_ = VoutType::kDsi;
 
   supports_afbc_ = kDsiSupportedFeatures.afbc;
-  supports_capture_ = kDsiSupportedFeatures.capture;
   supports_hpd_ = kDsiSupportedFeatures.hpd;
 
   dsi_.width = width;
@@ -136,7 +131,6 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware
   type_ = VoutType::kHdmi;
 
   supports_afbc_ = kHdmiSupportedFeatures.afbc;
-  supports_capture_ = kHdmiSupportedFeatures.capture;
   supports_hpd_ = kHdmiSupportedFeatures.hpd;
 
   fbl::AllocChecker ac;

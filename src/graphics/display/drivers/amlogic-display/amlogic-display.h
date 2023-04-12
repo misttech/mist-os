@@ -152,6 +152,8 @@ class AmlogicDisplay
   // powered on.
   zx_status_t RestartDisplay() TA_REQ(display_lock_);
 
+  bool SupportsCapture() const;
+
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
 
@@ -170,6 +172,9 @@ class AmlogicDisplay
 
   // Board Info
   pdev_board_info_t board_info_;
+
+  // Device info
+  pdev_device_info_t device_info_;
 
   // Interrupts
   zx::interrupt vsync_irq_;

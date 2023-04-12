@@ -84,6 +84,12 @@ zx_status_t AmlogicDisplay::RestartDisplay() {
   return vout_->RestartDisplay();
 }
 
+bool AmlogicDisplay::SupportsCapture() const {
+  // TODO(fxbug.dev/124947): Capture on VIM3 is disabled due to unexpected
+  // graphics test failures.
+  return device_info_.pid != PDEV_PID_AMLOGIC_A311D;
+}
+
 zx_status_t AmlogicDisplay::DisplayInit() {
   ZX_ASSERT(!fully_initialized());
   zx_status_t status;
@@ -646,7 +652,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t displa
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
-  if (!vout_->supports_capture()) {
+  if (!SupportsCapture()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   fbl::AutoLock lock(&capture_lock_);
@@ -1015,6 +1021,12 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
+  // Get device info
+  if (zx_status_t status = pdev_.GetDeviceInfo(&device_info_); status != ZX_OK) {
+    DISP_ERROR("Could not obtain device_info_\n");
+    return status;
+  }
+
   if (zx_status_t status = ddk::SysmemProtocolClient::CreateFromDevice(parent_, "sysmem", &sysmem_);
       status != ZX_OK) {
     DISP_ERROR("Could not get Display SYSMEM protocol %d\n", status);
@@ -1046,7 +1058,7 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  if (vout_->supports_capture()) {
+  if (SupportsCapture()) {
     // Map VD1_WR Interrupt (used for capture)
     if (zx_status_t status = pdev_.GetInterrupt(IRQ_VD1_WR, 0, &vd1_wr_irq_); status != ZX_OK) {
       DISP_ERROR("Could not map vd1 wr interrupt %d\n", status);

@@ -36,7 +36,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   VoutType type() { return type_; }
   bool supports_afbc() const { return supports_afbc_; }
-  bool supports_capture() const { return supports_capture_; }
   bool supports_hpd() const { return supports_hpd_; }
   uint32_t display_width() {
     switch (type_) {
@@ -128,7 +127,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   // Features
   bool supports_afbc_ = false;
-  bool supports_capture_ = false;
   bool supports_hpd_ = false;
 
   struct dsi_t {
