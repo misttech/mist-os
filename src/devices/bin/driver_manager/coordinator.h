@@ -59,7 +59,6 @@ namespace fdi = fuchsia_driver_index;
 class BindDriverManager;
 class DeviceManager;
 class DriverHostLoaderService;
-class FirmwareLoader;
 class FsProvider;
 class SuspendResumeManager;
 class SystemStateManager;
@@ -192,7 +191,7 @@ class Coordinator : public CompositeManagerBridge,
     return *composite_node_spec_manager_;
   }
   BindDriverManager& bind_driver_manager() const { return *bind_driver_manager_; }
-  FirmwareLoader& firmware_loader() const { return *firmware_loader_; }
+  const FirmwareLoader& firmware_loader() const { return firmware_loader_; }
 
   component::OutgoingDirectory& outgoing() { return *outgoing_; }
   std::optional<Devnode>& root_devnode() { return root_devnode_; }
@@ -250,7 +249,7 @@ class Coordinator : public CompositeManagerBridge,
   internal::PackageResolver package_resolver_;
   DriverLoader driver_loader_;
 
-  std::unique_ptr<FirmwareLoader> firmware_loader_;
+  FirmwareLoader firmware_loader_;
 
   std::unique_ptr<SuspendResumeManager> suspend_resume_manager_;
 

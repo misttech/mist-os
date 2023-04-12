@@ -293,7 +293,8 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
       package_resolver_(config_.boot_args),
       driver_loader_(config_.boot_args, std::move(config_.driver_index), &base_resolver_,
                      dispatcher, config_.delay_fallback_until_base_drivers_indexed,
-                     &package_resolver_) {
+                     &package_resolver_),
+      firmware_loader_(firmware_dispatcher, config_.path_prefix) {
   bind_driver_manager_ = std::make_unique<BindDriverManager>(this);
 
   device_manager_ = std::make_unique<DeviceManager>(this, config_.crash_policy);
@@ -301,8 +302,6 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
   composite_node_spec_manager_ = std::make_unique<CompositeNodeSpecManager>(this);
 
   suspend_resume_manager_ = std::make_unique<SuspendResumeManager>(this, config_.suspend_timeout);
-  firmware_loader_ =
-      std::make_unique<FirmwareLoader>(this, firmware_dispatcher, config_.path_prefix);
 }
 
 Coordinator::~Coordinator() {

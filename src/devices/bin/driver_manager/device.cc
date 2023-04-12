@@ -950,16 +950,30 @@ void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
 void Device::LoadFirmware(LoadFirmwareRequestView request, LoadFirmwareCompleter::Sync& completer) {
   auto dev = fbl::RefPtr(this);
 
-  char driver_path[fuchsia_device_manager::wire::kDevicePathMax + 1];
-  memcpy(driver_path, request->driver_path.data(), request->driver_path.size());
-  driver_path[request->driver_path.size()] = 0;
+  std::string driver_path = std::string(request->driver_path.get());
+  std::string firmware_path = std::string(request->fw_path.get());
 
-  char fw_path[fuchsia_device_manager::wire::kDevicePathMax + 1];
-  memcpy(fw_path, request->fw_path.data(), request->fw_path.size());
-  fw_path[request->fw_path.size()] = 0;
+  const Driver* driver = nullptr;
+  // Unfortunately we have to walk upwards to look for the driver because clients might be
+  // calling load_firmware on a child device that they've created instead of the main device.
+  auto walk_dev = fbl::RefPtr(this);
+  while (walk_dev) {
+    if (walk_dev->bound_driver_ && walk_dev->bound_driver_->url == driver_path) {
+      driver = walk_dev->bound_driver_;
+      break;
+    }
+    walk_dev = walk_dev->parent();
+  }
+  if (!driver) {
+    zx::result topo_path = GetTopologicalPath();
+    LOGF(ERROR, "Wasn't able to find driver %s for device %s", driver_path.c_str(),
+         topo_path.is_ok() ? topo_path.value().c_str() : "<bad_topo>");
+    completer.ReplyError(ZX_ERR_INTERNAL);
+    return;
+  }
 
   dev->coordinator->firmware_loader().LoadFirmware(
-      dev, driver_path, fw_path,
+      driver, firmware_path.c_str(),
       [completer = completer.ToAsync()](zx::result<LoadFirmwareResult> result) mutable {
         if (result.is_error()) {
           completer.ReplyError(result.status_value());

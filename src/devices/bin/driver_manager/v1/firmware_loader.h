@@ -5,11 +5,10 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_FIRMWARE_LOADER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_FIRMWARE_LOADER_H_
 
-#include "lib/async/dispatcher.h"
-#include "src/devices/bin/driver_manager/device.h"
-#include "src/devices/bin/driver_manager/driver_host.h"
+#include <string>
 
-class Coordinator;
+#include "lib/async/dispatcher.h"
+#include "src/devices/bin/driver_manager/driver.h"
 
 struct LoadFirmwareResult {
   zx::vmo vmo;
@@ -18,14 +17,12 @@ struct LoadFirmwareResult {
 
 class FirmwareLoader {
  public:
-  FirmwareLoader(Coordinator* coordinator, async_dispatcher_t* firmware_dispatcher,
-                 std::string path_prefix);
+  FirmwareLoader(async_dispatcher_t* firmware_dispatcher, std::string path_prefix);
 
-  void LoadFirmware(const fbl::RefPtr<Device>& dev, const char* driver_url, const char* path,
-                    fit::callback<void(zx::result<LoadFirmwareResult>)> cb);
+  void LoadFirmware(const Driver* driver, const char* path,
+                    fit::callback<void(zx::result<LoadFirmwareResult>)> cb) const;
 
  private:
-  Coordinator* coordinator_;
   async_dispatcher_t* const firmware_dispatcher_;
   std::string path_prefix_;
 };

@@ -5,8 +5,8 @@
 #include "src/devices/bin/driver_manager/v1/firmware_loader.h"
 
 #include <fcntl.h>
-
-#include "src/devices/bin/driver_manager/coordinator.h"
+#include <lib/async/cpp/task.h>
+#include <lib/fdio/io.h>
 
 namespace {
 
@@ -26,15 +26,11 @@ zx_status_t LoadFirmwareAtPath(int fd, const char* path, zx::vmo* vmo, size_t* s
 
 }  // namespace
 
-FirmwareLoader::FirmwareLoader(Coordinator* coordinator, async_dispatcher_t* firmware_dispatcher,
-                               std::string path_prefix)
-    : coordinator_(coordinator),
-      firmware_dispatcher_(firmware_dispatcher),
-      path_prefix_(path_prefix) {}
+FirmwareLoader::FirmwareLoader(async_dispatcher_t* firmware_dispatcher, std::string path_prefix)
+    : firmware_dispatcher_(firmware_dispatcher), path_prefix_(std::move(path_prefix)) {}
 
-void FirmwareLoader::LoadFirmware(const fbl::RefPtr<Device>& dev, const char* driver_url,
-                                  const char* path,
-                                  fit::callback<void(zx::result<LoadFirmwareResult>)> cb) {
+void FirmwareLoader::LoadFirmware(const Driver* driver, const char* path,
+                                  fit::callback<void(zx::result<LoadFirmwareResult>)> cb) const {
   const std::string fwdirs[] = {
       path_prefix_ + kBootFirmwarePath,
       kSystemFirmwarePath,
@@ -47,17 +43,16 @@ void FirmwareLoader::LoadFirmware(const fbl::RefPtr<Device>& dev, const char* dr
   }
 
   // This is done ahead of time as it is not thread-safe.
-  const Driver* driver = coordinator_->driver_loader().LoadDriverUrl(driver_url);
   fbl::unique_fd package_dir;
   if (driver != nullptr && driver->package_dir.is_valid()) {
     package_dir = driver->package_dir.duplicate();
   }
 
-  bool is_system = strncmp(driver_url, kSystemPrefix, std::size(kSystemPrefix) - 1) == 0;
+  bool is_system = strncmp(driver->url.c_str(), kSystemPrefix, std::size(kSystemPrefix) - 1) == 0;
 
   // This must occur in a separate thread as fdio operations may block when accessing /system or
   // /pkg, possibly deadlocking the system. See http://fxbug.dev/87127 for more context.
-  async::PostTask(firmware_dispatcher_, [dev = std::move(dev), path = std::string(path),
+  async::PostTask(firmware_dispatcher_, [path = std::string(path),
                                          package_dir = std::move(package_dir), is_system, fwdirs,
                                          cb = std::move(cb)]() mutable {
     // We are only going to check /system/ if the driver was loaded out of /system.
