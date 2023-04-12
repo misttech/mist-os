@@ -35,7 +35,10 @@ template("check_included_drivers") {
   metadata_check_output = "${target_gen_dir}/${target_name}_metadata_output"
   generated_file(metadata_check_target) {
     forward_variables_from(invoker, [ "testonly" ])
-    visibility = [ ":*" ]
+    visibility = [
+      ":*",
+      "//build/bazel/assembly:compare_drivers_lists",
+    ]
     outputs = [ metadata_check_output ]
     deps = invoker.deps
 

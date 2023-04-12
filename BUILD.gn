@@ -1392,8 +1392,11 @@ group("default") {
 
   # SDK-only builds must not attempt to build images.
   if (has_board) {
-    deps += [ "//build/images:default-images" ]
-    deps += [ "//:drivers-check" ]
+    deps += [
+      "//:drivers-check",
+      "//build/bazel/assembly:compare_drivers_lists",
+      "//build/images:default-images",
+    ]
   }
 
   if (use_bazel_images_only) {
