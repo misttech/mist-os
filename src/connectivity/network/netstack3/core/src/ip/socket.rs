@@ -599,7 +599,7 @@ impl<
 }
 
 /// IPv6 source address selection as defined in [RFC 6724 Section 5].
-pub(super) mod ipv6_source_address_selection {
+pub(crate) mod ipv6_source_address_selection {
     use net_types::ip::IpAddress as _;
 
     use super::*;
@@ -1339,8 +1339,8 @@ mod tests {
         device::{testutil::FakeDeviceId, DeviceId},
         ip::{
             device::{
-                IpDeviceContext as DeviceIpDeviceContext, IpDeviceEvent, IpDeviceIpExt,
-                IpDeviceNonSyncContext,
+                IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext, IpDeviceEvent,
+                IpDeviceIpExt, IpDeviceNonSyncContext,
             },
             types::{AddableEntryEither, AddableMetric, RawMetric},
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
@@ -1410,10 +1410,14 @@ mod tests {
         ctx: &mut FakeNonSyncCtx,
     ) where
         for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
-            DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+            DeviceIpDeviceConfigurationContext<
+                I,
+                FakeNonSyncCtx,
+                DeviceId = DeviceId<FakeNonSyncCtx>,
+            >,
         FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
     {
-        let devices = DeviceIpDeviceContext::<I, _>::with_devices_and_state(
+        let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
             &mut Locked::new(sync_ctx),
             |devices, _ctx| devices.collect::<Vec<_>>(),
         );
@@ -1515,9 +1519,14 @@ mod tests {
         }; "new remote to local")]
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
-            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
+            IpSocketHandler<I, FakeNonSyncCtx>
+                + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>
+                + DeviceIpDeviceConfigurationContext<
+                    I,
+                    FakeNonSyncCtx,
+                    DeviceId = DeviceId<FakeNonSyncCtx>,
+                >,
         FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeNonSyncCtx>>>
             + EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>,
     {

@@ -5,7 +5,7 @@
 //! An IP device.
 
 pub mod dad;
-mod integration;
+pub(crate) mod integration;
 pub(crate) mod nud;
 pub mod route_discovery;
 pub(crate) mod router_solicitation;
@@ -79,6 +79,8 @@ pub(crate) fn handle_ipv4_timer<
     ctx: &mut C,
     Ipv4DeviceTimerId(id): Ipv4DeviceTimerId<SC::DeviceId>,
 ) {
+    // TODO(https://fxbug.dev/125261): Handle timer using the sync-ctx provided
+    // by `with_ip_device_configuration`.
     TimerHandler::handle_timer(sync_ctx, ctx, id)
 }
 
@@ -175,6 +177,8 @@ pub(crate) fn handle_ipv6_timer<
     ctx: &mut C,
     id: Ipv6DeviceTimerId<SC::DeviceId>,
 ) {
+    // TODO(https://fxbug.dev/125261): Handle timer using the sync-ctx provided
+    // by `with_ipv6_device_configuration`.
     match id {
         Ipv6DeviceTimerId::Mld(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
         Ipv6DeviceTimerId::Dad(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
@@ -354,12 +358,12 @@ impl<
 }
 
 /// Accessor for IP device state.
-pub(crate) trait IpDeviceAddressesAccessor<I: IpDeviceIpExt, Instant>:
+pub(crate) trait IpDeviceStateContext<I: IpDeviceIpExt, C: InstantContext>:
     DeviceIdContext<AnyDevice>
 {
     /// Calls the function with an immutable reference to the device's IP
     /// addresses.
-    fn with_ip_device_addresses<O, F: FnOnce(&IpDeviceAddresses<Instant, I>) -> O>(
+    fn with_ip_device_addresses<O, F: FnOnce(&IpDeviceAddresses<C::Instant, I>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -367,40 +371,102 @@ pub(crate) trait IpDeviceAddressesAccessor<I: IpDeviceIpExt, Instant>:
 
     /// Calls the function with a mutable reference to the device's IP
     /// addresses.
-    fn with_ip_device_addresses_mut<O, F: FnOnce(&mut IpDeviceAddresses<Instant, I>) -> O>(
+    fn with_ip_device_addresses_mut<O, F: FnOnce(&mut IpDeviceAddresses<C::Instant, I>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+
+    /// Calls the function with an immutable reference to the device's default
+    /// hop limit for this IP version.
+    fn with_default_hop_limit<O, F: FnOnce(&NonZeroU8) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to the device's default
+    /// hop limit for this IP version.
+    fn with_default_hop_limit_mut<O, F: FnOnce(&mut NonZeroU8) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
+    /// Joins the link-layer multicast group associated with the given IP
+    /// multicast group.
+    fn join_link_multicast_group(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        multicast_addr: MulticastAddr<I::Addr>,
+    );
+
+    /// Leaves the link-layer multicast group associated with the given IP
+    /// multicast group.
+    fn leave_link_multicast_group(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        multicast_addr: MulticastAddr<I::Addr>,
+    );
+}
+
+/// The context provided to the callback passed to
+/// [`IpDeviceConfigurationContext::with_ip_device_configuration_mut`].
+pub(crate) trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, C: InstantContext>:
+    DeviceIdContext<AnyDevice>
+{
+    type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, C, DeviceId = Self::DeviceId>
+        + GmpHandler<I, C>
+        + NudIpHandler<I, C>
+        + 's
+    where
+        Self: 's;
+
+    /// Returns an immutable reference to a device's IP configuration and an
+    /// `IpDeviceStateCtx`.
+    fn ip_device_configuration_and_ctx(
+        &mut self,
+    ) -> (&I::Configuration, Self::IpDeviceStateCtx<'_>);
+
+    /// Returns a mutable reference to a device's IP configuration.
+    fn configuration_mut(&mut self) -> &mut I::Configuration;
 }
 
 /// The execution context for IP devices.
-pub(crate) trait IpDeviceContext<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, Self::DeviceId>>:
-    IpDeviceAddressesAccessor<I, <C as InstantContext>::Instant> + DeviceIdContext<AnyDevice>
-where
-    I::State<C::Instant>: AsRef<IpDeviceState<C::Instant, I>>,
+pub(crate) trait IpDeviceConfigurationContext<
+    I: IpDeviceIpExt,
+    C: IpDeviceNonSyncContext<I, Self::DeviceId>,
+>: IpDeviceStateContext<I, C> + DeviceIdContext<AnyDevice>
 {
     type DevicesIter<'s>: Iterator<Item = Self::DeviceId> + 's;
-    type DeviceAddressesAccessor<'s>: IpDeviceAddressesAccessor<I, C::Instant, DeviceId = Self::DeviceId>
+    type WithIpDeviceConfigurationInnerCtx<'s>: IpDeviceStateContext<I, C, DeviceId = Self::DeviceId>
+        + GmpHandler<I, C>
+        + NudIpHandler<I, C>
         + 's;
-    type DeviceAddressAndGroupsAccessor<'s>: IpDeviceAddressesAccessor<I, C::Instant, DeviceId = Self::DeviceId>
+    type WithIpDeviceConfigurationMutInner<'s>: WithIpDeviceConfigurationMutInner<I, C, DeviceId = Self::DeviceId>
+        + 's;
+    type DeviceAddressAndGroupsAccessor<'s>: IpDeviceStateContext<I, C, DeviceId = Self::DeviceId>
         + GmpQueryHandler<I, C>
         + 's;
 
     /// Calls the function with an immutable reference to the IP device
-    /// configuration and a `DeviceAddressesAccessor`.
+    /// configuration and a `WithIpDeviceConfigurationInnerCtx`.
     fn with_ip_device_configuration<
         O,
-        F: FnOnce(&I::Configuration, Self::DeviceAddressesAccessor<'_>) -> O,
+        F: FnOnce(&I::Configuration, Self::WithIpDeviceConfigurationInnerCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
 
-    /// Calls the function with a mutable reference to the IP device
-    /// configuration.
-    fn with_ip_device_configuration_mut<O, F: FnOnce(&mut I::Configuration) -> O>(
+    /// Calls the function with a `WithIpDeviceConfigurationMutInner`.
+    fn with_ip_device_configuration_mut<
+        O,
+        F: FnOnce(Self::WithIpDeviceConfigurationMutInner<'_>) -> O,
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -421,39 +487,65 @@ where
     /// The MTU is the maximum size of an IP packet.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 
-    /// Joins the link-layer multicast group associated with the given IP
-    /// multicast group.
-    fn join_link_multicast_group(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<I::Addr>,
-    );
-
-    /// Leaves the link-layer multicast group associated with the given IP
-    /// multicast group.
-    fn leave_link_multicast_group(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<I::Addr>,
-    );
-
     /// Returns the ID of the loopback interface, if one exists on the system
     /// and is initialized.
     fn loopback_id(&mut self) -> Option<Self::DeviceId>;
+}
 
-    /// Calls the function with an immutable reference to the device's default
-    /// hop limit for this IP version.
-    fn with_default_hop_limit<O, F: FnOnce(&NonZeroU8) -> O>(
+/// The context provided to the callback passed to
+/// [`Ipv6DeviceConfigurationContext::with_ipv6_device_configuration_mut`].
+pub(crate) trait WithIpv6DeviceConfigurationMutInner<
+    C: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>,
+>: WithIpDeviceConfigurationMutInner<Ipv6, C>
+{
+    type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<C, DeviceId = Self::DeviceId>
+        + GmpHandler<Ipv6, C>
+        + NudIpHandler<Ipv6, C>
+        + RsHandler<C>
+        + DadHandler<C>
+        + SlaacHandler<C>
+        + RouteDiscoveryHandler<C>
+        + 's
+    where
+        Self: 's;
+
+    /// Returns an immutable reference to a device's IPv6 configuration and an
+    /// `Ipv6DeviceStateCtx`.
+    fn ipv6_device_configuration_and_ctx(
+        &mut self,
+    ) -> (&Ipv6DeviceConfiguration, Self::Ipv6DeviceStateCtx<'_>);
+}
+
+pub(crate) trait Ipv6DeviceConfigurationContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>:
+    IpDeviceConfigurationContext<Ipv6, C>
+{
+    type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<C, DeviceId = Self::DeviceId>
+        + GmpHandler<Ipv6, C>
+        + NudIpHandler<Ipv6, C>
+        + DadHandler<C>
+        + RsHandler<C>
+        + SlaacHandler<C>
+        + RouteDiscoveryHandler<C>
+        + 's;
+    type WithIpv6DeviceConfigurationMutInner<'s>: WithIpv6DeviceConfigurationMutInner<C, DeviceId = Self::DeviceId>
+        + 's;
+
+    /// Calls the function with an immutable reference to the IPv6 device
+    /// configuration and an `Ipv6DeviceStateCtx`.
+    fn with_ipv6_device_configuration<
+        O,
+        F: FnOnce(&Ipv6DeviceConfiguration, Self::Ipv6DeviceStateCtx<'_>) -> O,
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
 
-    /// Calls the function with a mutable reference to the device's default
-    /// hop limit for this IP version.
-    fn with_default_hop_limit_mut<O, F: FnOnce(&mut NonZeroU8) -> O>(
+    /// Calls the function with a `WithIpv6DeviceConfigurationMutInner`.
+    fn with_ipv6_device_configuration_mut<
+        O,
+        F: FnOnce(Self::WithIpv6DeviceConfigurationMutInner<'_>) -> O,
+    >(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -462,7 +554,7 @@ where
 
 /// The execution context for an IPv6 device.
 pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>:
-    IpDeviceContext<Ipv6, C>
+    IpDeviceStateContext<Ipv6, C>
 {
     /// A link-layer address.
     type LinkLayerAddr: AsRef<[u8]>;
@@ -505,8 +597,11 @@ pub(crate) trait IpDeviceHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8);
 }
 
-impl<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, SC::DeviceId>, SC: IpDeviceContext<I, C>>
-    IpDeviceHandler<I, C> for SC
+impl<
+        I: IpDeviceIpExt,
+        C: IpDeviceNonSyncContext<I, SC::DeviceId>,
+        SC: IpDeviceConfigurationContext<I, C>,
+    > IpDeviceHandler<I, C> for SC
 {
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_forwarding_enabled(self, device_id)
@@ -560,7 +655,11 @@ pub(crate) trait Ipv6DeviceHandler<C>: IpDeviceHandler<Ipv6, C> {
 
 impl<
         C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-        SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + DadHandler<C> + SlaacHandler<C>,
+        SC: Ipv6DeviceContext<C>
+            + Ipv6DeviceConfigurationContext<C>
+            + GmpHandler<Ipv6, C>
+            + DadHandler<C>
+            + SlaacHandler<C>,
     > Ipv6DeviceHandler<C> for SC
 {
     type LinkLayerAddr = SC::LinkLayerAddr;
@@ -622,7 +721,7 @@ pub(crate) trait BufferIpDeviceContext<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, Self::DeviceId>,
     B: BufferMut,
->: IpDeviceContext<I, C>
+>: DeviceIdContext<AnyDevice>
 {
     /// Sends an IP packet through the device.
     fn send_ip_frame<S: Serializer<Buffer = B>>(
@@ -634,13 +733,14 @@ pub(crate) trait BufferIpDeviceContext<
     ) -> Result<(), S>;
 }
 
-fn enable_ipv6_device<
+fn enable_ipv6_device_with_config<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + RsHandler<C> + DadHandler<C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
+    config: &Ipv6DeviceConfiguration,
 ) {
     // All nodes should join the all-nodes multicast group.
     join_ip_multicast(sync_ctx, ctx, device_id, Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS);
@@ -686,12 +786,13 @@ fn enable_ipv6_device<
             .expect("valid link-local address")
         };
 
-        match add_ipv6_addr_subnet(
+        match add_ipv6_addr_subnet_with_config(
             sync_ctx,
             ctx,
             device_id,
             link_local_addr_sub,
             AddrConfig::SLAAC_LINK_LOCAL,
+            config,
         ) {
             Ok(()) => {}
             Err(ExistsError) => {
@@ -707,12 +808,12 @@ fn enable_ipv6_device<
     //    address.
     //
     // If we are operating as a router, we do not solicit routers.
-    if !is_ip_forwarding_enabled(sync_ctx, device_id) {
+    if !config.ip_config.forwarding_enabled {
         RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
     }
 }
 
-fn disable_ipv6_device<
+fn disable_ipv6_device_with_config<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: Ipv6DeviceContext<C>
         + GmpHandler<Ipv6, C>
@@ -725,6 +826,7 @@ fn disable_ipv6_device<
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
+    device_config: &Ipv6DeviceConfiguration,
 ) {
     NudIpHandler::flush_neighbor_table(sync_ctx, ctx, device_id);
 
@@ -748,12 +850,13 @@ fn disable_ipv6_device<
         .into_iter()
         .for_each(|(addr, config)| {
             if config == AddrConfig::SLAAC_LINK_LOCAL {
-                del_ipv6_addr_with_reason(
+                del_ipv6_addr_with_reason_with_config(
                     sync_ctx,
                     ctx,
                     device_id,
                     &addr.into_specified(),
                     DelIpv6AddrReason::ManualAction,
+                    device_config,
                 )
                 .expect("delete listed address")
             } else {
@@ -770,13 +873,18 @@ fn disable_ipv6_device<
     leave_ip_multicast(sync_ctx, ctx, device_id, Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS);
 }
 
-fn enable_ipv4_device<
+fn enable_ipv4_device_with_config<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C> + GmpHandler<Ipv4, C>,
+    SC: IpDeviceStateContext<Ipv4, C> + GmpHandler<Ipv4, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
+    // Not used but required to make sure that the caller is currently holding a
+    // a reference to the IP device's IP configuration as a way to prove that
+    // caller has synchronized this operation with other accesses to the IP
+    // device configuration.
+    _config: &Ipv4DeviceConfiguration,
 ) {
     // All systems should join the all-systems multicast group.
     join_ip_multicast(sync_ctx, ctx, device_id, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS);
@@ -792,13 +900,18 @@ fn enable_ipv4_device<
     });
 }
 
-fn disable_ipv4_device<
+fn disable_ipv4_device_with_config<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C> + GmpHandler<Ipv4, C> + NudIpHandler<Ipv4, C>,
+    SC: IpDeviceStateContext<Ipv4, C> + GmpHandler<Ipv4, C> + NudIpHandler<Ipv4, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
+    // Not used but required to make sure that the caller is currently holding a
+    // a reference to the IP device's IP configuration as a way to prove that
+    // caller has synchronized this operation with other accesses to the IP
+    // device configuration.
+    _config: &Ipv4DeviceConfiguration,
 ) {
     NudIpHandler::flush_neighbor_table(sync_ctx, ctx, device_id);
     GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
@@ -816,8 +929,8 @@ fn disable_ipv4_device<
 
 pub(crate) fn with_assigned_addr_subnets<
     I: Ip + IpDeviceIpExt,
-    C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C>,
+    C: InstantContext,
+    SC: IpDeviceStateContext<I, C>,
     O,
     F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<I::Addr>> + '_>) -> O,
 >(
@@ -834,8 +947,8 @@ pub(crate) fn with_assigned_addr_subnets<
 ///
 /// Returns an [`Iterator`] of `AddrSubnet`.
 pub(crate) fn with_assigned_ipv4_addr_subnets<
-    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C>,
+    C: InstantContext,
+    SC: IpDeviceStateContext<Ipv4, C>,
     O,
     F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
 >(
@@ -847,10 +960,7 @@ pub(crate) fn with_assigned_ipv4_addr_subnets<
 }
 
 /// Gets a single IPv4 address and subnet for a device.
-pub(super) fn get_ipv4_addr_subnet<
-    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C>,
->(
+pub(crate) fn get_ipv4_addr_subnet<C: InstantContext, SC: IpDeviceStateContext<Ipv4, C>>(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> Option<AddrSubnet<Ipv4Addr>> {
@@ -858,10 +968,7 @@ pub(super) fn get_ipv4_addr_subnet<
 }
 
 /// Gets the hop limit for new IPv6 packets that will be sent out from `device`.
-pub(crate) fn get_ipv6_hop_limit<
-    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv6, C>,
->(
+pub(crate) fn get_ipv6_hop_limit<C: InstantContext, SC: IpDeviceStateContext<Ipv6, C>>(
     sync_ctx: &mut SC,
     device: &SC::DeviceId,
 ) -> NonZeroU8 {
@@ -872,7 +979,7 @@ pub(crate) fn get_ipv6_hop_limit<
 pub(crate) fn is_ip_forwarding_enabled<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C>,
+    SC: IpDeviceConfigurationContext<I, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
@@ -895,7 +1002,7 @@ pub(crate) fn is_ip_forwarding_enabled<
 pub(crate) fn join_ip_multicast<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C> + GmpHandler<I, C>,
+    SC: IpDeviceStateContext<I, C> + GmpHandler<I, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -927,7 +1034,7 @@ pub(crate) fn join_ip_multicast<
 pub(crate) fn leave_ip_multicast<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C> + GmpHandler<I, C>,
+    SC: IpDeviceStateContext<I, C> + GmpHandler<I, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -948,7 +1055,7 @@ pub(crate) fn leave_ip_multicast<
 
 /// Adds an IPv4 address and associated subnet to this device.
 pub(crate) fn add_ipv4_addr_subnet<
-    SC: BufferIpDeviceContext<Ipv4, C, EmptyBuf>,
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
 >(
     sync_ctx: &mut SC,
@@ -982,7 +1089,7 @@ pub(crate) fn add_ipv4_addr_subnet<
 /// for more details.
 pub(crate) fn add_ipv6_addr_subnet<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + DadHandler<C>,
+    SC: Ipv6DeviceConfigurationContext<C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -990,57 +1097,75 @@ pub(crate) fn add_ipv6_addr_subnet<
     addr_sub: AddrSubnet<Ipv6Addr>,
     addr_config: AddrConfig<C::Instant>,
 ) -> Result<(), ExistsError> {
+    sync_ctx.with_ipv6_device_configuration(device_id, |config, mut sync_ctx| {
+        add_ipv6_addr_subnet_with_config(
+            &mut sync_ctx,
+            ctx,
+            device_id,
+            addr_sub,
+            addr_config,
+            config,
+        )
+    })
+}
+
+fn add_ipv6_addr_subnet_with_config<
+    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
+    SC: IpDeviceStateContext<Ipv6, C> + GmpHandler<Ipv6, C> + DadHandler<C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+    addr_sub: AddrSubnet<Ipv6Addr>,
+    addr_config: AddrConfig<C::Instant>,
+    device_config: &Ipv6DeviceConfiguration,
+) -> Result<(), ExistsError> {
     let addr_sub = addr_sub.to_unicast();
-    sync_ctx
-        .with_ip_device_configuration(device_id, |config, mut sync_ctx| {
-            sync_ctx.with_ip_device_addresses_mut(device_id, |addrs| {
-                addrs
-                    .add(Ipv6AddressEntry::new(addr_sub, Ipv6DadState::Uninitialized, addr_config))
-                    .map(|()| config.ip_config.ip_enabled)
-            })
-        })
-        .map(|ip_enabled| {
-            // As per RFC 4861 section 5.6.2,
-            //
-            //   Before sending a Neighbor Solicitation, an interface MUST join
-            //   the all-nodes multicast address and the solicited-node
-            //   multicast address of the tentative address.
-            //
-            // Note that we join the all-nodes multicast address on interface
-            // enable.
-            join_ip_multicast(
-                sync_ctx,
-                ctx,
-                device_id,
-                addr_sub.addr().to_solicited_node_address(),
-            );
 
-            let state = match ip_enabled {
-                true => IpAddressState::Tentative,
-                false => IpAddressState::Unavailable,
-            };
-            ctx.on_event(IpDeviceEvent::AddressAdded {
-                device: device_id.clone(),
-                addr: addr_sub.to_witness(),
-                state,
-            });
+    sync_ctx.with_ip_device_addresses_mut(device_id, |addrs| {
+        addrs.add(Ipv6AddressEntry::new(addr_sub, Ipv6DadState::Uninitialized, addr_config))
+    })?;
 
-            // NB: We don't start DAD if the device is disabled. DAD will be
-            // performed when the device is enabled for all addressed.
-            if ip_enabled {
-                DadHandler::start_duplicate_address_detection(
-                    sync_ctx,
-                    ctx,
-                    device_id,
-                    addr_sub.addr(),
-                );
-            }
-        })
+    // As per RFC 4861 section 5.6.2,
+    //
+    //   Before sending a Neighbor Solicitation, an interface MUST join
+    //   the all-nodes multicast address and the solicited-node
+    //   multicast address of the tentative address.
+    //
+    // Note that we join the all-nodes multicast address on interface
+    // enable.
+    join_ip_multicast(sync_ctx, ctx, device_id, addr_sub.addr().to_solicited_node_address());
+
+    let Ipv6DeviceConfiguration {
+        dad_transmits: _,
+        max_router_solicitations: _,
+        slaac_config: _,
+        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _, forwarding_enabled: _ },
+    } = device_config;
+
+    let state = match ip_enabled {
+        true => IpAddressState::Tentative,
+        false => IpAddressState::Unavailable,
+    };
+
+    ctx.on_event(IpDeviceEvent::AddressAdded {
+        device: device_id.clone(),
+        addr: addr_sub.to_witness(),
+        state,
+    });
+
+    if *ip_enabled {
+        // NB: We don't start DAD if the device is disabled. DAD will be
+        // performed when the device is enabled for all addressed.
+        DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, addr_sub.addr())
+    }
+
+    Ok(())
 }
 
 /// Removes an IPv4 address and associated subnet from this device.
 pub(crate) fn del_ipv4_addr<
-    SC: BufferIpDeviceContext<Ipv4, C, EmptyBuf>,
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
 >(
     sync_ctx: &mut SC,
@@ -1059,7 +1184,7 @@ pub(crate) fn del_ipv4_addr<
     })
 }
 
-fn del_ipv6_addr<
+fn del_ipv6_addr_with_config<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + DadHandler<C>,
 >(
@@ -1068,10 +1193,17 @@ fn del_ipv6_addr<
     device_id: &SC::DeviceId,
     addr: &SpecifiedAddr<Ipv6Addr>,
     reason: RemovedReason,
+    // Not used but required to make sure that the caller is currently holding a
+    // a reference to the IP device's IP configuration as a way to prove that
+    // caller has synchronized this operation with other accesses to the IP
+    // device configuration.
+    _config: &Ipv6DeviceConfiguration,
 ) -> Result<Ipv6AddressEntry<C::Instant>, NotFoundError> {
     let entry = sync_ctx.with_ip_device_addresses_mut(device_id, |addrs| addrs.remove(&addr))?;
     let addr = entry.addr_sub.addr();
+
     DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
+
     leave_ip_multicast(sync_ctx, ctx, device_id, addr.to_solicited_node_address());
 
     ctx.on_event(IpDeviceEvent::AddressRemoved {
@@ -1086,7 +1218,11 @@ fn del_ipv6_addr<
 /// Removes an IPv6 address and associated subnet from this device.
 pub(crate) fn del_ipv6_addr_with_reason<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + DadHandler<C> + SlaacHandler<C>,
+    SC: Ipv6DeviceContext<C>
+        + Ipv6DeviceConfigurationContext<C>
+        + GmpHandler<Ipv6, C>
+        + DadHandler<C>
+        + SlaacHandler<C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1094,7 +1230,24 @@ pub(crate) fn del_ipv6_addr_with_reason<
     addr: &SpecifiedAddr<Ipv6Addr>,
     reason: DelIpv6AddrReason,
 ) -> Result<(), NotFoundError> {
-    del_ipv6_addr(sync_ctx, ctx, device_id, addr, reason.into()).map(
+    sync_ctx.with_ipv6_device_configuration(device_id, |config, mut sync_ctx| {
+        del_ipv6_addr_with_reason_with_config(&mut sync_ctx, ctx, device_id, addr, reason, config)
+    })
+}
+
+/// Removes an IPv6 address and associated subnet from this device.
+fn del_ipv6_addr_with_reason_with_config<
+    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
+    SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + DadHandler<C> + SlaacHandler<C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+    addr: &SpecifiedAddr<Ipv6Addr>,
+    reason: DelIpv6AddrReason,
+    config: &Ipv6DeviceConfiguration,
+) -> Result<(), NotFoundError> {
+    del_ipv6_addr_with_config(sync_ctx, ctx, device_id, addr, reason.into(), config).map(
         |Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| match config {
             AddrConfig::Slaac(s) => {
                 SlaacHandler::on_address_removed(sync_ctx, ctx, device_id, addr_sub, s, reason)
@@ -1118,14 +1271,12 @@ pub(crate) fn send_ip_frame<
     local_addr: SpecifiedAddr<I::Addr>,
     body: S,
 ) -> Result<(), S> {
-    is_ip_device_enabled(sync_ctx, device_id)
-        .then(|| sync_ctx.send_ip_frame(ctx, device_id, local_addr, body))
-        .unwrap_or(Ok(()))
+    sync_ctx.send_ip_frame(ctx, device_id, local_addr, body)
 }
 
 pub(crate) fn get_ipv4_configuration<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C>,
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
@@ -1135,7 +1286,7 @@ pub(crate) fn get_ipv4_configuration<
 
 pub(crate) fn get_ipv6_configuration<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv6, C>,
+    SC: IpDeviceConfigurationContext<Ipv6, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
@@ -1148,7 +1299,7 @@ pub(crate) fn get_ipv6_configuration<
 /// The device's configuration will be left unchanged when `Err(_)` is returned.
 pub(crate) fn update_ipv4_configuration<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C> + GmpHandler<Ipv4, C> + NudIpHandler<Ipv4, C>,
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
     O,
     F: FnOnce(&mut Ipv4DeviceConfiguration) -> O,
 >(
@@ -1157,8 +1308,9 @@ pub(crate) fn update_ipv4_configuration<
     device_id: &SC::DeviceId,
     update_cb: F,
 ) -> Result<O, NotSupportedError> {
-    let (ret, prev_config, new_config) =
-        sync_ctx.with_ip_device_configuration_mut(device_id, |config| {
+    sync_ctx.with_ip_device_configuration_mut(device_id, |mut inner| {
+        let (ret, prev_config) = {
+            let config = inner.configuration_mut();
             let prev_config = *config;
 
             let ret = update_cb(config);
@@ -1175,54 +1327,57 @@ pub(crate) fn update_ipv4_configuration<
                 }
             }
 
-            Ok((ret, prev_config, *config))
-        })?;
+            (ret, prev_config)
+        };
 
-    let Ipv4DeviceConfiguration {
-        ip_config:
-            IpDeviceConfiguration {
-                ip_enabled: prev_ip_enabled,
-                gmp_enabled: prev_gmp_enabled,
-                forwarding_enabled: _,
-            },
-    } = prev_config;
-    let Ipv4DeviceConfiguration {
-        ip_config:
-            IpDeviceConfiguration {
+        let Ipv4DeviceConfiguration {
+            ip_config:
+                IpDeviceConfiguration {
+                    ip_enabled: prev_ip_enabled,
+                    gmp_enabled: prev_gmp_enabled,
+                    forwarding_enabled: _,
+                },
+        } = prev_config;
+        let (config, mut sync_ctx) = inner.ip_device_configuration_and_ctx();
+        let Ipv4DeviceConfiguration {
+            ip_config:
+                IpDeviceConfiguration {
+                    ip_enabled: next_ip_enabled,
+                    gmp_enabled: next_gmp_enabled,
+                    forwarding_enabled: _,
+                },
+        } = *config;
+        let sync_ctx = &mut sync_ctx;
+
+        if prev_ip_enabled != next_ip_enabled {
+            if next_ip_enabled {
+                enable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
+            } else {
+                disable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
+            }
+
+            ctx.on_event(IpDeviceEvent::EnabledChanged {
+                device: device_id.clone(),
                 ip_enabled: next_ip_enabled,
-                gmp_enabled: next_gmp_enabled,
-                forwarding_enabled: _,
-            },
-    } = new_config;
-
-    if prev_ip_enabled != next_ip_enabled {
-        if next_ip_enabled {
-            enable_ipv4_device(sync_ctx, ctx, device_id);
-        } else {
-            disable_ipv4_device(sync_ctx, ctx, device_id);
+            });
         }
 
-        ctx.on_event(IpDeviceEvent::EnabledChanged {
-            device: device_id.clone(),
-            ip_enabled: next_ip_enabled,
-        });
-    }
-
-    if prev_gmp_enabled != next_gmp_enabled {
-        if next_gmp_enabled {
-            GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-        } else {
-            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+        if prev_gmp_enabled != next_gmp_enabled {
+            if next_gmp_enabled {
+                GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
+            } else {
+                GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+            }
         }
-    }
 
-    Ok(ret)
+        Ok(ret)
+    })
 }
 
 pub(super) fn is_ip_device_enabled<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: IpDeviceContext<I, C>,
+    SC: IpDeviceConfigurationContext<I, C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
@@ -1237,13 +1392,7 @@ pub(super) fn is_ip_device_enabled<
 /// The device's configuration will be left unchanged when `Err(_)` is returned.
 pub(crate) fn update_ipv6_configuration<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: Ipv6DeviceContext<C>
-        + GmpHandler<Ipv6, C>
-        + RsHandler<C>
-        + DadHandler<C>
-        + RouteDiscoveryHandler<C>
-        + SlaacHandler<C>
-        + NudIpHandler<Ipv6, C>,
+    SC: Ipv6DeviceConfigurationContext<C>,
     O,
     F: FnOnce(&mut Ipv6DeviceConfiguration) -> O,
 >(
@@ -1252,10 +1401,10 @@ pub(crate) fn update_ipv6_configuration<
     device_id: &SC::DeviceId,
     update_cb: F,
 ) -> Result<O, NotSupportedError> {
-    let (ret, prev_config, new_config) =
-        sync_ctx.with_ip_device_configuration_mut(device_id, |config| {
+    sync_ctx.with_ipv6_device_configuration_mut(device_id, |mut inner| {
+        let (ret, prev_config) = {
+            let config = inner.configuration_mut();
             let prev_config = *config;
-
             let ret = update_cb(config);
 
             if device_id.is_loopback() {
@@ -1273,118 +1422,131 @@ pub(crate) fn update_ipv6_configuration<
                 }
             }
 
-            Ok((ret, prev_config, *config))
-        })?;
+            (ret, prev_config)
+        };
 
-    let Ipv6DeviceConfiguration {
-        dad_transmits: _,
-        max_router_solicitations: _,
-        slaac_config: _,
-        ip_config:
-            IpDeviceConfiguration {
-                ip_enabled: prev_ip_enabled,
-                gmp_enabled: prev_gmp_enabled,
-                forwarding_enabled: prev_forwarding_enabled,
-            },
-    } = prev_config;
-    let Ipv6DeviceConfiguration {
-        dad_transmits: _,
-        max_router_solicitations: _,
-        slaac_config: _,
-        ip_config:
-            IpDeviceConfiguration {
+        let Ipv6DeviceConfiguration {
+            dad_transmits: _,
+            max_router_solicitations: _,
+            slaac_config: _,
+            ip_config:
+                IpDeviceConfiguration {
+                    ip_enabled: prev_ip_enabled,
+                    gmp_enabled: prev_gmp_enabled,
+                    forwarding_enabled: prev_forwarding_enabled,
+                },
+        } = prev_config;
+        let (config, mut sync_ctx) = inner.ipv6_device_configuration_and_ctx();
+        let Ipv6DeviceConfiguration {
+            dad_transmits: _,
+            max_router_solicitations: _,
+            slaac_config: _,
+            ip_config:
+                IpDeviceConfiguration {
+                    ip_enabled: next_ip_enabled,
+                    gmp_enabled: next_gmp_enabled,
+                    forwarding_enabled: next_forwarding_enabled,
+                },
+        } = *config;
+        let sync_ctx = &mut sync_ctx;
+
+        if prev_ip_enabled != next_ip_enabled {
+            if next_ip_enabled {
+                enable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
+            } else {
+                disable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
+            }
+
+            ctx.on_event(IpDeviceEvent::EnabledChanged {
+                device: device_id.clone(),
                 ip_enabled: next_ip_enabled,
-                gmp_enabled: next_gmp_enabled,
-                forwarding_enabled: next_forwarding_enabled,
-            },
-    } = new_config;
-
-    if prev_ip_enabled != next_ip_enabled {
-        if next_ip_enabled {
-            enable_ipv6_device(sync_ctx, ctx, device_id);
-        } else {
-            disable_ipv6_device(sync_ctx, ctx, device_id);
+            });
         }
 
-        ctx.on_event(IpDeviceEvent::EnabledChanged {
-            device: device_id.clone(),
-            ip_enabled: next_ip_enabled,
-        });
-    }
-
-    if prev_gmp_enabled != next_gmp_enabled {
-        if next_gmp_enabled {
-            GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-        } else {
-            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+        if prev_gmp_enabled != next_gmp_enabled {
+            if next_gmp_enabled {
+                GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
+            } else {
+                GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+            }
         }
-    }
 
-    if prev_forwarding_enabled != next_forwarding_enabled {
-        if next_forwarding_enabled {
-            RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
-            join_ip_multicast(
-                sync_ctx,
-                ctx,
-                device_id,
-                Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
-            );
-        } else {
-            leave_ip_multicast(
-                sync_ctx,
-                ctx,
-                device_id,
-                Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
-            );
-            RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
+        if prev_forwarding_enabled != next_forwarding_enabled {
+            if next_forwarding_enabled {
+                RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
+                join_ip_multicast(
+                    sync_ctx,
+                    ctx,
+                    device_id,
+                    Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+                );
+            } else {
+                leave_ip_multicast(
+                    sync_ctx,
+                    ctx,
+                    device_id,
+                    Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+                );
+                RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
+            }
         }
-    }
 
-    Ok(ret)
+        Ok(ret)
+    })
 }
 
 /// Removes IPv4 state for the device without emitting events.
 pub(crate) fn clear_ipv4_device_state<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C> + GmpHandler<Ipv4, C> + NudIpHandler<Ipv4, C>,
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ } =
-        sync_ctx.with_ip_device_configuration(device_id, |config, _ctx| config.ip_config);
-    if ip_enabled {
-        disable_ipv4_device(sync_ctx, ctx, device_id);
-    }
-    if gmp_enabled {
-        GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
-    }
+    sync_ctx.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
+        let Ipv4DeviceConfiguration {
+            ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+        } = config;
+
+        let sync_ctx = &mut sync_ctx;
+
+        if *ip_enabled {
+            disable_ipv4_device_with_config(sync_ctx, ctx, device_id, config);
+        }
+        if *gmp_enabled {
+            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+        }
+    })
 }
 
 /// Removes IPv6 state for the device without emitting events.
 pub(crate) fn clear_ipv6_device_state<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: Ipv6DeviceContext<C>
-        + GmpHandler<Ipv6, C>
-        + RsHandler<C>
-        + DadHandler<C>
-        + RouteDiscoveryHandler<C>
-        + SlaacHandler<C>
-        + NudIpHandler<Ipv6, C>,
+    SC: Ipv6DeviceConfigurationContext<C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ } =
-        sync_ctx.with_ip_device_configuration(device_id, |config, _ctx| config.ip_config);
-    if ip_enabled {
-        disable_ipv6_device(sync_ctx, ctx, device_id);
-    }
-    if gmp_enabled {
-        GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
-    }
+    sync_ctx.with_ipv6_device_configuration(device_id, |config, mut sync_ctx| {
+        let Ipv6DeviceConfiguration {
+            dad_transmits: _,
+            max_router_solicitations: _,
+            slaac_config: _,
+            ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+        } = config;
+
+        let sync_ctx = &mut sync_ctx;
+
+        if *ip_enabled {
+            disable_ipv6_device_with_config(sync_ctx, ctx, device_id, config);
+        }
+
+        if *gmp_enabled {
+            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+        }
+    })
 }
 
 #[cfg(test)]
@@ -1400,7 +1562,7 @@ pub(crate) mod testutil {
         sync_ctx: &SyncCtx<C>,
         device_id: &DeviceId<C>,
     ) -> Vec<Ipv6AddressEntry<C::Instant>> {
-        IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+        IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
             &mut Locked::new(sync_ctx),
             device_id,
             |addrs| {
@@ -1435,7 +1597,7 @@ pub(crate) mod testutil {
     /// See [`Tentative`] and [`AddrSubnet`] for more information.
     pub(crate) fn with_assigned_ipv6_addr_subnets<
         C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-        SC: IpDeviceContext<Ipv6, C>,
+        SC: IpDeviceConfigurationContext<Ipv6, C>,
         O,
         F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv6Addr>> + '_>) -> O,
     >(
@@ -1591,7 +1753,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(
-            IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
                 &mut Locked::new(*sync_ctx),
                 device_id,
                 |addrs| {
@@ -1720,7 +1882,7 @@ mod tests {
             ]
         );
 
-        IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+        IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
             &mut Locked::new(sync_ctx),
             &device_id,
             |addrs| {
@@ -1744,7 +1906,7 @@ mod tests {
         )
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
-            IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
                 &mut Locked::new(sync_ctx),
                 &device_id,
                 |addrs| {
@@ -1804,7 +1966,7 @@ mod tests {
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
         assert_eq!(
-            IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
                 &mut Locked::new(sync_ctx),
                 &device_id,
                 |addrs| {
@@ -1929,7 +2091,7 @@ mod tests {
         );
 
         assert_eq!(
-            IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
                 &mut Locked::new(sync_ctx),
                 &device_id,
                 |addrs| {

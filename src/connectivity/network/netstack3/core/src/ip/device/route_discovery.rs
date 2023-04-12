@@ -72,8 +72,8 @@ pub(crate) struct Ipv6DiscoveredRouteTimerId<DeviceId> {
     route: Ipv6DiscoveredRoute,
 }
 
-/// The state context provided to IPv6 route discovery.
-pub(super) trait Ipv6RouteDiscoveryStateContext<C>: DeviceIdContext<AnyDevice> {
+/// The execution context for IPv6 route discovery.
+pub(super) trait Ipv6RouteDiscoveryContext<C>: DeviceIdContext<AnyDevice> {
     /// Gets the route discovery state, mutably.
     fn with_discovered_routes_mut<F: FnOnce(&mut Ipv6RouteDiscoveryState)>(
         &mut self,
@@ -92,17 +92,6 @@ impl<
         C: TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>
             + EventContext<Ipv6RouteDiscoveryEvent<DeviceId>>,
     > Ipv6RouteDiscoveryNonSyncContext<DeviceId> for C
-{
-}
-
-/// The execution context for IPv6 route discovery.
-trait Ipv6RouteDiscoveryContext<C: Ipv6RouteDiscoveryNonSyncContext<Self::DeviceId>>:
-    Ipv6RouteDiscoveryStateContext<C>
-{
-}
-
-impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoveryStateContext<C>>
-    Ipv6RouteDiscoveryContext<C> for SC
 {
 }
 
@@ -270,7 +259,7 @@ mod tests {
         (),
     >;
 
-    impl Ipv6RouteDiscoveryStateContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl Ipv6RouteDiscoveryContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
         fn with_discovered_routes_mut<F: FnOnce(&mut Ipv6RouteDiscoveryState)>(
             &mut self,
             &FakeDeviceId: &Self::DeviceId,

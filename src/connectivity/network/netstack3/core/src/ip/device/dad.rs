@@ -35,8 +35,8 @@ pub(super) struct DadStateRef<'a> {
     pub(super) max_dad_transmits: &'a Option<NonZeroU8>,
 }
 
-/// The IP device context provided to DAD.
-pub(super) trait Ipv6DeviceDadContext<C>: DeviceIdContext<AnyDevice> {
+/// The execution context for DAD.
+pub(super) trait DadContext<C>: DeviceIdContext<AnyDevice> {
     /// Calls the function with the DAD state associated with the address.
     fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
         &mut self,
@@ -44,10 +44,7 @@ pub(super) trait Ipv6DeviceDadContext<C>: DeviceIdContext<AnyDevice> {
         addr: UnicastAddr<Ipv6Addr>,
         cb: F,
     ) -> O;
-}
 
-/// The IP layer context provided to DAD.
-pub(super) trait Ipv6LayerDadContext<C>: DeviceIdContext<AnyDevice> {
     /// Sends an NDP Neighbor Solicitation message for DAD to the local-link.
     ///
     /// The message will be sent with the unspecified (all-zeroes) source
@@ -80,17 +77,6 @@ pub(super) trait DadNonSyncContext<DeviceId>:
 }
 impl<DeviceId, C: TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<DeviceId>>>
     DadNonSyncContext<DeviceId> for C
-{
-}
-
-/// The execution context for DAD.
-pub(super) trait DadContext<C: DadNonSyncContext<Self::DeviceId>>:
-    Ipv6DeviceDadContext<C> + Ipv6LayerDadContext<C>
-{
-}
-
-impl<C: DadNonSyncContext<SC::DeviceId>, SC: Ipv6DeviceDadContext<C> + Ipv6LayerDadContext<C>>
-    DadContext<C> for SC
 {
 }
 
@@ -296,7 +282,7 @@ mod tests {
 
     type FakeCtxImpl = FakeSyncCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
 
-    impl Ipv6DeviceDadContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl DadContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
         fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -316,9 +302,7 @@ mod tests {
                 max_dad_transmits,
             })
         }
-    }
 
-    impl Ipv6LayerDadContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
         fn send_dad_packet(
             &mut self,
             ctx: &mut FakeNonSyncCtxImpl,

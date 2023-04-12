@@ -179,7 +179,9 @@ impl_lock_after!(TcpSockets<Ipv6> => UdpSockets<Ipv4>);
 impl_lock_after!(UdpSockets<Ipv4> => UdpSockets<Ipv6>);
 impl_lock_after!(UdpSockets<Ipv6> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
-impl_lock_after!(IpStateRoutingTable<Ipv6> => IpState<Ipv4>);
+impl_lock_after!(IpStateRoutingTable<Ipv6> => IpDeviceConfiguration<Ipv4>);
+impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
+impl_lock_after!(IpDeviceConfiguration<Ipv6> => IpState<Ipv4>);
 impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
 
 impl_lock_after!(IpState<Ipv4> => IpStatePmtuCache<Ipv4>);
@@ -201,18 +203,16 @@ impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 
 // TODO(https://fxbug.dev/120973): Double-check that locking IPv4 ethernet state
 // before IPv6 is correct and won't interfere with dual-stack sockets.
-impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceConfiguration<Ipv4>);
-impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceGmp<Ipv4>);
+impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceGmp<Ipv4>);
 impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);
 impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceDefaultHopLimit<Ipv4>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
-impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceConfiguration<Ipv6>);
-impl_lock_after!(IpDeviceConfiguration<Ipv6> => IpDeviceGmp<Ipv6>);
+impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceGmp<Ipv6>);
 impl_lock_after!(IpDeviceGmp<Ipv6> => IpDeviceAddresses<Ipv6>);
 impl_lock_after!(IpDeviceAddresses<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv6> => Ipv6DeviceRouterSolicitations);
 impl_lock_after!(Ipv6DeviceRouterSolicitations => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceRetransTimeout);
+impl_lock_after!(Ipv6DeviceRetransTimeout => EthernetDeviceDynamicState);
 
-impl_lock_after!(DeviceLayerState => EthernetDeviceDynamicState);
 impl_lock_after!(DeviceLayerState => DeviceSockets);

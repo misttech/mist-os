@@ -15,7 +15,7 @@ use crate::{
     context::NonTestCtxMarker,
     ip::{
         self,
-        device::{IpDeviceContext, IpDeviceIpExt, IpDeviceNonSyncContext},
+        device::{self, IpDeviceIpExt, IpDeviceNonSyncContext},
         gmp::GmpHandler,
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::FragmentStateContext,
@@ -123,7 +123,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IpState<I>>,
     > MulticastMembershipHandler<I, C> for Locked<&SyncCtx<C>, L>
 where
-    Self: IpDeviceContext<I, C> + GmpHandler<I, C>,
+    Self: device::IpDeviceConfigurationContext<I, C> + GmpHandler<I, C>,
 {
     fn join_multicast_group(
         &mut self,

@@ -300,7 +300,7 @@ pub(crate) trait GmpQueryHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
 /// An implementation of a Group Management Protocol (GMP) such as the Internet
 /// Group Management Protocol, Version 2 (IGMPv2) for IPv4 or the Multicast
 /// Listener Discovery (MLD) protocol for IPv6.
-pub(crate) trait GmpHandler<I: Ip, C>: GmpQueryHandler<I, C> {
+pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Handles GMP potentially being enabled.
     ///
     /// Attempts to transition memberships in the non-member state to a member
@@ -909,25 +909,20 @@ pub(crate) struct GmpState<'a, A: IpAddress, GroupState> {
     pub(crate) groups: &'a mut MulticastGroupSet<A, GroupState>,
 }
 
-/// Provides access to GMP state.
-trait GmpStateContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
+/// Provides IP-specific associated types for GMP.
+trait GmpTypeLayout<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     type ProtocolSpecific: ProtocolSpecific;
     type GroupState: From<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>
         + Into<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>
         + AsMut<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>;
+}
 
+/// Provides immutable access to GMP state.
+trait GmpStateContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayout<I, C> {
     /// Calls the function with immutable access to the [`MulticastGroupSet`].
     fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<I::Addr, Self::GroupState>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O;
-
-    /// Calls the function with a boolean indicating whether GMP is disabled and
-    /// an mutable reference to GMP state.
-    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, I::Addr, Self::GroupState>) -> O>(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -937,8 +932,16 @@ trait GmpStateContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
 /// Provides common functionality for GMP context implementations.
 ///
 /// This trait implements portions of a group management protocol.
-trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpStateContext<I, C> {
+trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpTypeLayout<I, C> {
     type Err;
+
+    /// Calls the function with a boolean indicating whether GMP is disabled and
+    /// an mutable reference to GMP state.
+    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, I::Addr, Self::GroupState>) -> O>(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O;
 
     /// Sends a GMP message.
     fn send_message(

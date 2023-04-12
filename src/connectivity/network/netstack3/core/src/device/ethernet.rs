@@ -229,7 +229,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         lookup_addr: SpecifiedAddr<Ipv6Addr>,
     ) {
         let dst_ip = lookup_addr.to_solicited_node_address().into_specified();
-        let src_ip = crate::ip::IpDeviceContext::<Ipv6, _>::get_local_addr_for_remote(
+        let src_ip = crate::ip::IpDeviceStateContext::<Ipv6, _>::get_local_addr_for_remote(
             self,
             &device_id.clone().into(),
             dst_ip,
@@ -1365,14 +1365,14 @@ mod tests {
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
-                crate::ip::device::IpDeviceAddressesAccessor::<Ipv4, _>::with_ip_device_addresses(
+                crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_ip_device_addresses(
                     &mut Locked::new(sync_ctx),
                     device,
                     |addrs| addrs.iter().any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
-                crate::ip::device::IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+                crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
                     &mut Locked::new(sync_ctx),
                     device,
                     |addrs| addrs.iter().any(|a| a.addr() == addr),
@@ -1458,76 +1458,6 @@ mod tests {
             IpVersion::V6 => "receive_ipv6_packet",
         };
         assert_eq!(get_counter_val(&non_sync_ctx, counter), expected_received);
-    }
-
-    #[ip_test]
-    #[test_case(true; "enabled")]
-    #[test_case(false; "disabled")]
-    fn test_send_ip_frame<I: Ip + TestIpExt>(enable: bool) {
-        // Should only send a frame if the device is enabled.
-
-        let config = I::FAKE_CONFIG;
-        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
-        let device = crate::device::add_ethernet_device(
-            &mut sync_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-
-        let expected_sent = if enable {
-            crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
-            1
-        } else {
-            0
-        };
-
-        match I::VERSION {
-            IpVersion::V4 => {
-                let addr = SpecifiedAddr::new(dns_request_v4::IPV4_PACKET.metadata.dst_ip).unwrap();
-                crate::device::insert_static_arp_table_entry(
-                    &mut sync_ctx,
-                    &mut non_sync_ctx,
-                    &device,
-                    addr.get(),
-                    config.remote_mac,
-                )
-                .expect("insert static ARP entry");
-
-                crate::ip::device::send_ip_frame::<Ipv4, _, _, _, _>(
-                    &mut Locked::new(sync_ctx),
-                    &mut non_sync_ctx,
-                    &device,
-                    addr,
-                    Buf::new(dns_request_v4::IPV4_PACKET.bytes.to_vec(), ..),
-                )
-                .expect("error sending IPv4 frame")
-            }
-
-            IpVersion::V6 => {
-                let addr = UnicastAddr::new(dns_request_v6::IPV6_PACKET.metadata.dst_ip).unwrap();
-                crate::device::insert_ndp_table_entry(
-                    &mut sync_ctx,
-                    &mut non_sync_ctx,
-                    &device,
-                    addr,
-                    config.remote_mac.get(),
-                )
-                .expect("insert static NDP entry");
-                crate::ip::device::send_ip_frame::<Ipv6, _, _, _, _>(
-                    &mut Locked::new(sync_ctx),
-                    &mut non_sync_ctx,
-                    &device,
-                    addr.into_specified(),
-                    Buf::new(dns_request_v6::IPV6_PACKET.bytes.to_vec(), ..),
-                )
-                .expect("error sending IPv6 frame")
-            }
-        }
-
-        assert_eq!(get_counter_val(&non_sync_ctx, "ethernet::send_ip_frame"), expected_sent);
     }
 
     #[test]

@@ -156,13 +156,11 @@ pub(super) struct SlaacAddrsMutAndConfig<'a, C: InstantContext, A: SlaacAddresse
     pub(super) _marker: PhantomData<C>,
 }
 
-/// The state context provided to SLAAC.
-pub(super) trait SlaacStateContext<C: SlaacNonSyncContext<Self::DeviceId>>:
+/// The execution context for SLAAC.
+pub(super) trait SlaacContext<C: SlaacNonSyncContext<Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
-    type SlaacAddrs<'a>: SlaacAddresses<C>
-    where
-        Self: 'a;
+    type SlaacAddrs<'a>: SlaacAddresses<C> + 'a;
 
     fn with_slaac_addrs_mut_and_configs<
         O,
@@ -231,11 +229,6 @@ impl<DeviceId, C: RngContext + TimerContext<SlaacTimerId<DeviceId>> + CounterCon
     SlaacNonSyncContext<DeviceId> for C
 {
 }
-
-/// The execution context for SLAAC.
-trait SlaacContext<C: SlaacNonSyncContext<Self::DeviceId>>: SlaacStateContext<C> {}
-
-impl<'a, C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacStateContext<C>> SlaacContext<C> for SC {}
 
 /// An implementation of SLAAC.
 pub(crate) trait SlaacHandler<C: InstantContext>: DeviceIdContext<AnyDevice> {
@@ -1698,7 +1691,7 @@ mod tests {
         }
     }
 
-    impl SlaacStateContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl SlaacContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
         type SlaacAddrs<'a> = &'a mut FakeSlaacAddrs where FakeCtxImpl: 'a;
 
         fn with_slaac_addrs_mut_and_configs<

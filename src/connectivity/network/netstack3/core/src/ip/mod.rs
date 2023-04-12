@@ -342,7 +342,7 @@ impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMark
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits {
-                unicast: IpDeviceContext::<Ipv4, _>::get_hop_limit(self, device),
+                unicast: IpDeviceStateContext::<Ipv4, _>::get_hop_limit(self, device),
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
@@ -369,7 +369,7 @@ impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMark
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits {
-                unicast: IpDeviceContext::<Ipv6, _>::get_hop_limit(self, device),
+                unicast: IpDeviceStateContext::<Ipv6, _>::get_hop_limit(self, device),
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
@@ -536,17 +536,23 @@ pub(crate) trait Ipv4StateContext<C> {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O;
 }
 
-/// The IP device context provided to the IP layer.
-pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
-    /// Is the device enabled?
-    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
-
+/// Provices access to an IP device's state for the IP layer.
+pub(crate) trait IpDeviceStateContext<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
         remote: SpecifiedAddr<I::Addr>,
     ) -> Option<SpecifiedAddr<I::Addr>>;
+
+    /// Returns the hop limit.
+    fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
+}
+
+/// The IP device context provided to the IP layer.
+pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceStateContext<I, C> {
+    /// Is the device enabled?
+    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     type DeviceAndAddressStatusIter<'a, 's>: Iterator<Item = (Self::DeviceId, I::AddressStatus)>
     where
@@ -576,9 +582,6 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice>
 
     /// Returns true iff the device has forwarding enabled.
     fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
-
-    /// Returns the hop limit.
-    fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
 
     /// Returns the MTU of the device.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
@@ -685,7 +688,10 @@ fn get_local_addr<
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
         C: IpDeviceNonSyncContext<I, SC::DeviceId> + IpLayerNonSyncContext<I, SC::DeviceId>,
-        SC: IpLayerContext<I, C> + device::IpDeviceContext<I, C> + NonTestCtxMarker,
+        SC: IpLayerContext<I, C>
+            + device::IpDeviceConfigurationContext<I, C>
+            + IpDeviceStateContext<I, C>
+            + NonTestCtxMarker,
     > IpSocketContext<I, C> for SC
 {
     fn lookup_route(
@@ -885,7 +891,7 @@ pub(crate) trait BufferTransportContext<I: IpLayerIpExt, C, B: BufferMut>:
 
 /// The IP device context provided to the IP layer requiring a buffer type.
 pub(crate) trait BufferIpDeviceContext<I: IpLayerIpExt, C, B: BufferMut>:
-    IpDeviceContext<I, C>
+    IpDeviceStateContext<I, C>
 {
     /// Sends an IP frame to the next hop.
     fn send_ip_frame<S: Serializer<Buffer = B>>(
@@ -2547,7 +2553,7 @@ impl<
 pub(crate) fn send_ipv4_packet_from_device<
     B: BufferMut,
     C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C>,
+    SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C> + IpDeviceStateContext<Ipv4, C>,
     S: Serializer<Buffer = B>,
 >(
     sync_ctx: &mut SC,
@@ -2595,7 +2601,7 @@ pub(crate) fn send_ipv4_packet_from_device<
 pub(crate) fn send_ipv6_packet_from_device<
     B: BufferMut,
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv6, C, B>,
+    SC: BufferIpDeviceContext<Ipv6, C, B> + IpDeviceStateContext<Ipv6, C>,
     S: Serializer<Buffer = B>,
 >(
     sync_ctx: &mut SC,

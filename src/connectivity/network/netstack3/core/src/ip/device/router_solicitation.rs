@@ -47,8 +47,8 @@ pub(crate) struct RsTimerId<DeviceId> {
     pub(crate) device_id: DeviceId,
 }
 
-/// The IP device context provided to RS.
-pub(super) trait Ipv6DeviceRsContext<C>: DeviceIdContext<AnyDevice> {
+/// The execution context for router solicitation.
+pub(super) trait RsContext<C>: DeviceIdContext<AnyDevice> {
     /// A link-layer address.
     type LinkLayerAddr: AsRef<[u8]>;
 
@@ -77,10 +77,7 @@ pub(super) trait Ipv6DeviceRsContext<C>: DeviceIdContext<AnyDevice> {
         &mut self,
         device_id: &Self::DeviceId,
     ) -> Option<Self::LinkLayerAddr>;
-}
 
-/// The IP layer context provided to RS.
-pub(super) trait Ipv6LayerRsContext<C>: DeviceIdContext<AnyDevice> {
     /// Sends an NDP Router Solicitation to the local-link.
     ///
     /// The callback is called with a source address suitable for an outgoing
@@ -103,17 +100,6 @@ pub(super) trait RsNonSyncContext<DeviceId>:
 {
 }
 impl<DeviceId, C: RngContext + TimerContext<RsTimerId<DeviceId>>> RsNonSyncContext<DeviceId> for C {}
-
-/// The execution context for router solicitation.
-pub(super) trait RsContext<C: RsNonSyncContext<Self::DeviceId>>:
-    Ipv6DeviceRsContext<C> + Ipv6LayerRsContext<C>
-{
-}
-
-impl<C: RsNonSyncContext<SC::DeviceId>, SC: Ipv6DeviceRsContext<C> + Ipv6LayerRsContext<C>>
-    RsContext<C> for SC
-{
-}
 
 /// An implementation of Router Solicitation.
 pub(crate) trait RsHandler<C>:
@@ -262,7 +248,7 @@ mod tests {
     type FakeCtxImpl = FakeSyncCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
     type FakeNonSyncCtxImpl = FakeNonSyncCtx<RsTimerId<FakeDeviceId>, (), ()>;
 
-    impl Ipv6DeviceRsContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
+    impl RsContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
         type LinkLayerAddr = Vec<u8>;
 
         fn with_rs_remaining_mut_and_max<
@@ -293,9 +279,7 @@ mod tests {
             } = self.get_ref();
             link_layer_bytes.clone()
         }
-    }
 
-    impl Ipv6LayerRsContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
         fn send_rs_packet<
             S: Serializer<Buffer = EmptyBuf>,
             F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,

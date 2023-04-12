@@ -316,6 +316,8 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             if local_device.map_or(false, |local_device| local_device != device) {
                 return None;
             }
+            // TODO(https://fxbug.dev/125338): Also make sure that the IP device
+            // is enabled.
             if !sync_ctx.is_device_installed(device) {
                 return None;
             }

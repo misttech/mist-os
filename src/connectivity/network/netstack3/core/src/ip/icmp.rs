@@ -1146,7 +1146,7 @@ pub(crate) fn send_ndp_packet<
 
 fn send_neighbor_advertisement<
     C,
-    SC: Ipv6DeviceHandler<C> + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
+    SC: Ipv6DeviceHandler<C> + IpDeviceHandler<Ipv6, C> + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1199,6 +1199,7 @@ fn receive_ndp_packet<
     C: IcmpNonSyncCtx<Ipv6>,
     SC: InnerIcmpv6Context<C>
         + Ipv6DeviceHandler<C>
+        + IpDeviceHandler<Ipv6, C>
         + RouteDiscoveryHandler<C>
         + SlaacHandler<C>
         + NudIpHandler<Ipv6, C>
@@ -1590,6 +1591,7 @@ impl<
         SC: InnerIcmpv6Context<C>
             + InnerBufferIcmpContext<Ipv6, C, B>
             + Ipv6DeviceHandler<C>
+            + IpDeviceHandler<Ipv6, C>
             + PmtuHandler<Ipv6, C>
             + MldPacketHandler<C, <SC as DeviceIdContext<AnyDevice>>::DeviceId>
             + RouteDiscoveryHandler<C>
