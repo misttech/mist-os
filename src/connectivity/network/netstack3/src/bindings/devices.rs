@@ -85,11 +85,6 @@ where
         id_map.remove(&id)
     }
 
-    /// Gets an iterator over all tracked devices.
-    pub fn iter_devices(&self) -> impl Iterator<Item = &C> {
-        self.id_map.iter().map(|(_binding_id, c)| c)
-    }
-
     /// Retrieve associated `core_id` for [`BindingId`].
     pub fn get_core_id(&self, id: BindingId) -> Option<C> {
         self.id_map.get(&id).cloned()
@@ -98,8 +93,13 @@ where
 
 impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
     /// Retrieves the device with the given name.
-    pub fn get_device_by_name(&self, name: &str) -> Option<&DeviceId<BindingsNonSyncCtxImpl>> {
-        self.iter_devices().find(|c| c.external_state().static_common_info().name == name)
+    pub fn get_device_by_name(&self, name: &str) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+        self.id_map
+            .iter()
+            .find_map(|(_binding_id, c)| {
+                (c.external_state().static_common_info().name == name).then_some(c)
+            })
+            .cloned()
     }
 }
 
