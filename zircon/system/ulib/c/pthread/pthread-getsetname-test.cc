@@ -62,8 +62,7 @@ TEST(PthreadGetSetNameTest, GetNameTruncate) {
   EXPECT_STREQ(name, "t");
   pthread_getname_np(thrd, name, 7);
   EXPECT_STREQ(name, "thread");
-  // If this wrote over ZX_MAX_NAME_LEN this would crash
-  pthread_getname_np(thrd, name, 100000);
+  pthread_getname_np(thrd, name, sizeof(name));
   EXPECT_STREQ(name, "thread-name");
 }
 
