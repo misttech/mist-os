@@ -97,8 +97,8 @@ class Device final
   using DriverHostListTag = internal::DeviceDriverHostListTag;
   using AllDevicesListTag = internal::DeviceAllDevicesListTag;
 
-  Device(Coordinator* coord, fbl::String name, fbl::String url, fbl::RefPtr<Device> parent,
-         uint32_t protocol_id, zx::vmo inspect,
+  Device(Coordinator* coord, fbl::String name, fbl::String parent_driver_url,
+         fbl::RefPtr<Device> parent, uint32_t protocol_id, zx::vmo inspect,
          fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
          fidl::ClientEnd<fio::Directory> outgoing_dir);
   ~Device() override;
@@ -109,7 +109,7 @@ class Device final
   // coordinator's devices_ list, or trigger publishing
   static zx_status_t Create(
       Coordinator* coordinator, const fbl::RefPtr<Device>& parent, fbl::String name,
-      fbl::String driver_path, uint32_t protocol_id, fbl::Array<zx_device_prop_t> props,
+      fbl::String parent_driver_url, uint32_t protocol_id, fbl::Array<zx_device_prop_t> props,
       fbl::Array<StrProperty> str_props,
       fidl::ServerEnd<fuchsia_device_manager::Coordinator> coordinator_request,
       fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
@@ -232,9 +232,11 @@ class Device final
   bool is_composite() const { return composite_.has_value(); }
   void disassociate_from_composite() { composite_.reset(); }
 
-  bool is_fragment_device() const { return std::string_view{url_} == fdf::kFragmentDriverUrl; }
+  bool is_fragment_device() const {
+    return std::string_view{parent_driver_url_} == fdf::kFragmentDriverUrl;
+  }
   bool is_fragment_proxy_device() const {
-    return std::string_view{url_} == fdf::kFragmentProxyDriverUrl;
+    return std::string_view{parent_driver_url_} == fdf::kFragmentProxyDriverUrl;
   }
 
   void set_host(fbl::RefPtr<DriverHost> host);
@@ -309,7 +311,7 @@ class Device final
   }
 
   const fbl::String& name() const { return name_; }
-  const std::string& url() const { return url_; }
+  const std::string& parent_driver_url() const { return parent_driver_url_; }
 
   Coordinator* coordinator;
   uint32_t flags = 0;
@@ -417,7 +419,8 @@ class Device final
   std::optional<fidl::ServerBindingRef<fuchsia_device_manager::Coordinator>> coordinator_binding_;
 
   const fbl::String name_;
-  const std::string url_;
+  // The url of the driver that created this device.
+  const std::string parent_driver_url_;
 
   // The device's parent in the device tree. If this is a composite device, its
   // parent will be null.

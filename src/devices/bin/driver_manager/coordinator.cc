@@ -167,7 +167,7 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
                               fidl::ServerEnd<fuchsia_device_manager::DeviceController> controller,
                               zx::channel rpc_proxy) {
   // If we don't have a driver name, then create a stub instead.
-  if (dev->url().size() == 0) {
+  if (dev->parent_driver_url().empty()) {
     return CreateStubDevice(dev, std::move(controller), dh);
   }
 
@@ -177,17 +177,16 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
   }
 
   fidl::Arena arena;
-  zx::result vmo_result = UrlToVmo(dev->coordinator->driver_loader(), dev->url());
+  zx::result vmo_result = UrlToVmo(dev->coordinator->driver_loader(), dev->parent_driver_url());
   if (vmo_result.is_error()) {
-    LOGF(ERROR, "Failed to get VMO for url '%s' %s", dev->url().c_str(),
+    LOGF(ERROR, "Failed to get VMO for url '%s' %s", dev->parent_driver_url().c_str(),
          vmo_result.status_string());
     return vmo_result.error_value();
   }
   zx::vmo vmo = std::move(vmo_result.value());
 
-  auto driver_path = fidl::StringView::FromExternal(dev->url().data(), dev->url().size());
-
-  fdm::wire::ProxyDevice proxy{driver_path, std::move(vmo), std::move(rpc_proxy)};
+  fdm::wire::ProxyDevice proxy{fidl::StringView::FromExternal(dev->parent_driver_url()),
+                               std::move(vmo), std::move(rpc_proxy)};
   auto type = fdm::wire::DeviceType::WithProxy(arena, std::move(proxy));
 
   dh->controller()
@@ -929,7 +928,7 @@ void Coordinator::RestartDriverHosts(RestartDriverHostsRequestView request,
   uint32_t count = 0;
   for (auto& dev : device_manager_->devices()) {
     // Call remove on the device's driver host if it contains the driver.
-    if (dev.url().compare(driver_path) == 0) {
+    if (dev.parent_driver_url().compare(driver_path) == 0) {
       LOGF(INFO, "Device %s found in restart driver hosts.", dev.name().data());
       LOGF(INFO, "Shutting down host: %ld.", dev.host()->koid());
 

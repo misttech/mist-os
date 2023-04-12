@@ -56,13 +56,13 @@ std::string StateToString(Device::State state) {
 
 }  // namespace
 
-Device::Device(Coordinator* coord, fbl::String name, fbl::String url, fbl::RefPtr<Device> parent,
-               uint32_t protocol_id, zx::vmo inspect,
+Device::Device(Coordinator* coord, fbl::String name, fbl::String parent_driver_url,
+               fbl::RefPtr<Device> parent, uint32_t protocol_id, zx::vmo inspect,
                fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
                fidl::ClientEnd<fio::Directory> outgoing_dir)
     : coordinator(coord),
       name_(std::move(name)),
-      url_(std::move(url)),
+      parent_driver_url_(std::move(parent_driver_url)),
       parent_(std::move(parent)),
       protocol_id_(protocol_id),
       publish_task_([this] {
@@ -130,7 +130,7 @@ void Device::Serve(fidl::ServerEnd<fuchsia_device_manager::Coordinator> request)
 
 zx_status_t Device::Create(
     Coordinator* coordinator, const fbl::RefPtr<Device>& parent, fbl::String name,
-    fbl::String driver_path, uint32_t protocol_id, fbl::Array<zx_device_prop_t> props,
+    fbl::String parent_driver_url, uint32_t protocol_id, fbl::Array<zx_device_prop_t> props,
     fbl::Array<StrProperty> str_props,
     fidl::ServerEnd<fuchsia_device_manager::Coordinator> coordinator_request,
     fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
@@ -143,7 +143,7 @@ zx_status_t Device::Create(
     real_parent = real_parent->parent();
   }
 
-  auto dev = fbl::MakeRefCounted<Device>(coordinator, std::move(name), std::move(driver_path),
+  auto dev = fbl::MakeRefCounted<Device>(coordinator, std::move(name), std::move(parent_driver_url),
                                          real_parent, protocol_id, std::move(inspect),
                                          std::move(device_controller), std::move(outgoing_dir));
   if (!dev) {
@@ -208,7 +208,7 @@ zx_status_t Device::Create(
   } else {
     // We should've already verified that this is null by this point.
     ZX_ASSERT_MSG(real_parent->proxy_ == nullptr, "Trying to add a second proxy to device %s",
-                  real_parent->url().c_str());
+                  real_parent->parent_driver_url().c_str());
     real_parent->proxy_ = dev;
   }
 
@@ -290,7 +290,7 @@ zx_status_t Device::CreateProxy(
     fidl::ClientEnd<fuchsia_device_manager::DeviceController> controller) {
   ZX_ASSERT(proxy_ == nullptr);
 
-  fbl::String driver_path = url_;
+  fbl::String driver_path = parent_driver_url_;
   // non-immortal devices, use foo.proxy.cm for
   // their proxy devices instead of foo.so
   if (!(this->flags & DEV_CTX_IMMORTAL)) {
@@ -350,7 +350,7 @@ void Device::set_state(Device::State state) {
 }
 
 void Device::InitializeInspectValues() {
-  inspect().set_driver(url().c_str());
+  inspect().set_driver(parent_driver_url().c_str());
   inspect().set_protocol_id(protocol_id_);
   inspect().set_flags(flags);
   inspect().set_properties(props());
@@ -1032,7 +1032,8 @@ void Device::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
 }
 
 bool Device::DriverLivesInSystemStorage() const {
-  return StringHasPrefix("/system/", url()) || StringHasPrefix("fuchsia-pkg://", url());
+  return StringHasPrefix("/system/", parent_driver_url()) ||
+         StringHasPrefix("fuchsia-pkg://", parent_driver_url());
 }
 
 bool Device::IsAlreadyBound() const {
