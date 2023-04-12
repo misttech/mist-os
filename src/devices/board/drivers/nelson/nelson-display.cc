@@ -20,8 +20,8 @@
 #include <bind/fuchsia/hardware/dsi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
-#include <soc/aml-s905d2/s905d2-gpio.h>
-#include <soc/aml-s905d2/s905d2-hw.h>
+#include <soc/aml-s905d3/s905d3-gpio.h>
+#include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson-gpios.h"
 #include "nelson.h"
@@ -33,47 +33,47 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
         // VBUS/VPU
-        .base = S905D2_VPU_BASE,
-        .length = S905D2_VPU_LENGTH,
+        .base = S905D3_VPU_BASE,
+        .length = S905D3_VPU_LENGTH,
     }},
     {{
         // TOP DSI Host Controller (Amlogic Specific)
-        .base = S905D2_MIPI_TOP_DSI_BASE,
-        .length = S905D2_MIPI_TOP_DSI_LENGTH,
+        .base = S905D3_MIPI_TOP_DSI_BASE,
+        .length = S905D3_MIPI_TOP_DSI_LENGTH,
     }},
     {{
         // DSI PHY
-        .base = S905D2_DSI_PHY_BASE,
-        .length = S905D2_DSI_PHY_LENGTH,
+        .base = S905D3_DSI_PHY_BASE,
+        .length = S905D3_DSI_PHY_LENGTH,
     }},
     {{
         // HHI
-        .base = S905D2_HIU_BASE,
-        .length = S905D2_HIU_LENGTH,
+        .base = S905D3_HIU_BASE,
+        .length = S905D3_HIU_LENGTH,
     }},
     {{
         // AOBUS
-        .base = S905D2_AOBUS_BASE,
-        .length = S905D2_AOBUS_LENGTH,
+        .base = S905D3_AOBUS_BASE,
+        .length = S905D3_AOBUS_LENGTH,
     }},
     {{
         // CBUS
-        .base = S905D2_CBUS_BASE,
-        .length = S905D2_CBUS_LENGTH,
+        .base = S905D3_CBUS_BASE,
+        .length = S905D3_CBUS_LENGTH,
     }},
 };
 
 static const std::vector<fpbus::Irq> display_irqs{
     {{
-        .irq = S905D2_VIU1_VSYNC_IRQ,
+        .irq = S905D3_VIU1_VSYNC_IRQ,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
     {{
-        .irq = S905D2_RDMA_DONE,
+        .irq = S905D3_RDMA_DONE,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
     {{
-        .irq = S905D2_VID1_WR,
+        .irq = S905D3_VID1_WR,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
 };
@@ -146,7 +146,7 @@ zx_status_t Nelson::DisplayInit(uint32_t bootloader_display_id) {
   fpbus::Node display_dev;
   display_dev.name() = "display";
   display_dev.vid() = PDEV_VID_AMLOGIC;
-  display_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
+  display_dev.pid() = PDEV_PID_AMLOGIC_S905D3;
   display_dev.did() = PDEV_DID_AMLOGIC_DISPLAY;
   display_dev.metadata() = display_panel_metadata;
   display_dev.mmio() = display_mmios;

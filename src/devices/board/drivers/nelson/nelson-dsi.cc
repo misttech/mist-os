@@ -11,7 +11,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <soc/aml-s905d2/s905d2-hw.h>
+#include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
 
@@ -23,8 +23,8 @@ namespace {
 static const std::vector<fpbus::Mmio> dsi_mmios{
     {{
         // DSI Host Controller
-        .base = S905D2_MIPI_DSI_BASE,
-        .length = S905D2_MIPI_DSI_LENGTH,
+        .base = S905D3_MIPI_DSI_BASE,
+        .length = S905D3_MIPI_DSI_LENGTH,
     }},
 };
 

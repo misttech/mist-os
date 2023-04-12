@@ -8,8 +8,8 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <soc/aml-s905d2/s905d2-gpio.h>
-#include <soc/aml-s905d2/s905d2-hw.h>
+#include <soc/aml-s905d3/s905d3-gpio.h>
+#include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson.h"
 
@@ -18,8 +18,8 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 static const std::vector<fpbus::Mmio> nelson_canvas_mmios{
     {{
-        .base = S905D2_DMC_BASE,
-        .length = S905D2_DMC_LENGTH,
+        .base = S905D3_DMC_BASE,
+        .length = S905D3_DMC_LENGTH,
     }},
 };
 
