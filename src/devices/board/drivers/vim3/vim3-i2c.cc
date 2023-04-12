@@ -13,6 +13,7 @@
 #include <span>
 #include <vector>
 
+#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
@@ -26,6 +27,7 @@ using i2c_channel_t = fidl_metadata::i2c::Channel;
 // Only the AO and EE_M3 i2c busses are used on VIM3
 
 struct I2cBus {
+  uint32_t bus_id;
   zx_paddr_t mmio;
   uint32_t irq;
   cpp20::span<const i2c_channel_t> channels;
@@ -84,20 +86,22 @@ constexpr i2c_channel_t i2c_ee_m3_channels[]{
     },
 };
 
-constexpr I2cBus buses[]{
+constexpr I2cBus kBuses[]{
     {
+        .bus_id = bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0,
         .mmio = A311D_I2C_AOBUS_BASE,
         .irq = A311D_I2C_AO_IRQ,
         .channels{i2c_ao_channels, std::size(i2c_ao_channels)},
     },
     {
+        .bus_id = bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3,
         .mmio = A311D_EE_I2C_M3_BASE,
         .irq = A311D_I2C_M3_IRQ,
         .channels{i2c_ee_m3_channels, std::size(i2c_ee_m3_channels)},
     },
 };
 
-zx_status_t AddI2cBus(const uint32_t bus_id, const I2cBus& bus,
+zx_status_t AddI2cBus(const I2cBus& bus,
                       const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   const std::vector<fpbus::Mmio> mmios{
       {{
@@ -114,18 +118,18 @@ zx_status_t AddI2cBus(const uint32_t bus_id, const I2cBus& bus,
   };
 
   char name[32];
-  snprintf(name, sizeof(name), "i2c-%u", bus_id);
+  snprintf(name, sizeof(name), "i2c-%u", bus.bus_id);
 
   fpbus::Node i2c_dev;
   i2c_dev.name() = name;
   i2c_dev.vid() = PDEV_VID_AMLOGIC;
   i2c_dev.pid() = PDEV_PID_GENERIC;
   i2c_dev.did() = PDEV_DID_AMLOGIC_I2C;
-  i2c_dev.instance_id() = bus_id;
+  i2c_dev.instance_id() = bus.bus_id;
   i2c_dev.mmio() = mmios;
   i2c_dev.irq() = irqs;
 
-  auto i2c_metadata_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus_id, bus.channels);
+  auto i2c_metadata_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus.bus_id, bus.channels);
   if (i2c_metadata_fidl.is_error()) {
     zxlogf(ERROR, "Failed to FIDL encode I2C channels: %s", i2c_metadata_fidl.status_string());
     return i2c_metadata_fidl.error_value();
@@ -145,12 +149,12 @@ zx_status_t AddI2cBus(const uint32_t bus_id, const I2cBus& bus,
   fdf::Arena arena('I2C_');
   auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "Request to add I2C bus %u failed: %s", bus_id,
+    zxlogf(ERROR, "Request to add I2C bus %u failed: %s", bus.bus_id,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Failed to add I2C bus %u: %s", bus_id,
+    zxlogf(ERROR, "Failed to add I2C bus %u: %s", bus.bus_id,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -168,8 +172,8 @@ zx_status_t Vim3::I2cInit() {
   gpio_impl_.SetAltFunction(A311D_GPIOA(15), A311D_GPIOA_15_I2C_EE_M3_SCL_FN);
   gpio_impl_.SetAltFunction(A311D_GPIOA(14), A311D_GPIOA_14_I2C_EE_M3_SDA_FN);
 
-  for (uint32_t i = 0; i < std::size(buses); i++) {
-    AddI2cBus(i, buses[i], pbus_);
+  for (const I2cBus& bus : kBuses) {
+    AddI2cBus(bus, pbus_);
   }
 
   return ZX_OK;
