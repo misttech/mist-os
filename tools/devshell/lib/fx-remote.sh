@@ -114,6 +114,18 @@ function fetch_remote_build_artifacts {
   fetch_remote_artifacts "${host}" "${remote_checkout}" "${local_dir}" "${artifacts[@]}"
 }
 
+# Fetch the flash source from the remote build directory
+function fetch_remote_flash_source {
+  local host="$1"
+  local remote_checkout="$2"
+  local build="$3"
+  local args=()
+  if [[ "${build}" == "true" ]]; then
+    args+=("--build")
+  fi
+  echo $(ssh "${host}" "cd ${remote_checkout} && .jiri_root/bin/fx get-flash-source ${args[@]}")
+}
+
 # Attempts to fetch a remote tool able to run on the host platform, and
 # default to building one locally if unable to find one.
 function fetch_or_build_tool {

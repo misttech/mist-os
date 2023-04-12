@@ -109,16 +109,28 @@ save_remote_info "$host" "$dir"
 
 # Fetch remote flashing artifacts
 artifact_dir="${FUCHSIA_DIR}/out/fetched"
-flash_manifest=$(find_remote_build_artifact "${host}" "${dir}" flash-manifest images)
-
-if [[ -z "${flash_manifest}" ]]; then
-    fx-error "failed to find flash manifest on $host."
+flash_source=$(fetch_remote_flash_source "${host}" "${dir}" "${build}")
+case "${flash_source}" in
+  flash-manifest:*)
+    flash_manifest="${flash_source#flash-manifest:}"
+    product_bundle=""
+    ;;
+  product-bundle:*)
+    flash_manifest=""
+    product_bundle="${flash_source#product-bundle:}"
+    ;;
+  *)
+    fx-error "failed to find a flash manifest or product bundle on $host."
     exit 1
-fi
+esac
 
 fx-info "Fetching artifacts from remote host: ${host}"
-fetch_remote_build_artifacts "${host}" "${dir}" "${artifact_dir}" flash $build
-fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${flash_manifest}"
+if [[ -n "${flash_manifest}" ]]; then
+  fetch_remote_build_artifacts "${host}" "${dir}" "${artifact_dir}" flash "${build}"
+  fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${flash_manifest}"
+else
+  fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${product_bundle}"
+fi
 
 if "${flash}"; then
   fx-info "Verifying required host tools..."
@@ -129,7 +141,11 @@ if "${flash}"; then
     fetch_or_build_tool ${host} ${dir} "${artifact_dir}" ffx
   fi
   cd "${artifact_dir}"
-  manifest_path="${artifact_dir}/${flash_manifest}"
-  product_bundle=
-  fx-flash "${serial}" "${device}" "${manifest_path}" "${product_bundle}" "${skip_verify}" "${no_bootloader_reboot}"
+  if [[ -n "${flash_manifest}" ]]; then
+    flash_manifest="${artifact_dir}/${flash_manifest}"
+  fi
+  if [[ -n "${product_bundle}" ]]; then
+    product_bundle="${artifact_dir}/${product_bundle}"
+  fi
+  fx-flash "${serial}" "${device}" "${flash_manifest}" "${product_bundle}" "${skip_verify}" "${no_bootloader_reboot}"
 fi
