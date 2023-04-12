@@ -284,8 +284,8 @@ impl i32x8 {
         self
     }
 
-    pub fn abs(mut self) -> self {
-        self.0.iter_mut().for_each(|t| *t.abs());
+    pub fn abs(mut self) -> Self {
+        self.0.iter_mut().for_each(|t| *t = t.abs());
         self
     }
 }
