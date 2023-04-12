@@ -11,7 +11,7 @@ use {
 /// [PackageManifestList] is a construct that points at a path that contains a
 /// package manifest list. This will be used by the packaging tooling to
 /// understand when packages have changed.
-#[derive(Serialize)]
+#[derive(Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct PackageManifestList(Vec<Utf8PathBuf>);
 

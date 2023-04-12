@@ -20,15 +20,8 @@ def main():
     try:
         for path in args.paths:
             with open(path) as f:
-                # Package manifests in a package manifest list are relative to
-                # the directory containing the list.
-                parent = os.path.dirname(path)
-                if parent == '.':
-                    for line in f:
-                        out.write(line)
-                else:
-                    for line in f:
-                        out.write(os.path.join(parent, line))
+                for line in f:
+                    out.write(line)
 
         out.close()
 

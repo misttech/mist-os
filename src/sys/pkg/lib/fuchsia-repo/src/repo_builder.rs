@@ -357,13 +357,7 @@ where
 
         self.deps.insert(path.clone());
 
-        let builder = if let Some(parent) = path.parent() {
-            self.add_packages(package_list_manifest.into_iter().map(|p| parent.join(p))).await?
-        } else {
-            self.add_packages(package_list_manifest.into_iter()).await?
-        };
-
-        Ok(builder)
+        self.add_packages(package_list_manifest.into_iter()).await
     }
 
     /// Stage all the packages pointed to by the iterator of package lists to be published.

@@ -10,10 +10,11 @@ use {
     anyhow::{format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     fidl_fuchsia_developer_ffx::ListFields,
+    fidl_fuchsia_developer_ffx_ext::RepositoryPackage,
     fuchsia_async as fasync,
     fuchsia_hash::Hash,
     fuchsia_lockfile::Lockfile,
-    fuchsia_pkg::{PackageManifest, PackageManifestError},
+    fuchsia_pkg::{PackageManifest, PackageManifestError, PackageManifestList},
     fuchsia_repo::{
         package_manifest_watcher::PackageManifestWatcher,
         repo_builder::RepoBuilder,
@@ -26,12 +27,11 @@ use {
     std::{
         collections::BTreeSet,
         fs::{create_dir_all, File},
-        io::{BufReader, BufWriter, Write},
+        io::{BufReader, BufWriter},
         str::FromStr,
     },
     tracing::{error, info, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
-    utf8_path::path_relative_from_file,
 };
 
 /// Time in seconds after which the attempt to get a lock file is considered failed.
@@ -94,18 +94,7 @@ pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()
         .src_trusted_root_path
         .unwrap_or(cmd.src_repo_path.join("repository").join("1.root.json"));
 
-    let package_manifest_list_path = match cmd.package_manifest_list_path {
-        Some(path) => path,
-        None => cmd.manifest_dir.clone().join("package_manifests.list"),
-    };
-
-    repo_package_manifest_list(
-        cmd.src_repo_path,
-        src_trusted_root_path,
-        cmd.manifest_dir,
-        package_manifest_list_path,
-    )
-    .await
+    repo_package_manifest_list(cmd.src_repo_path, src_trusted_root_path, cmd.manifest_dir).await
 }
 
 async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
@@ -149,8 +138,9 @@ pub async fn repo_package_manifest_list(
     src_repo_path: Utf8PathBuf,
     src_trusted_root_path: Utf8PathBuf,
     manifests_dir: Utf8PathBuf,
-    package_manifest_list_path: Utf8PathBuf,
 ) -> Result<()> {
+    let package_manifest_list_path = manifests_dir.join("package_manifests.list");
+
     // Create repository based on src repository path
     let blobs_dir = src_repo_path.join("blobs");
     create_dir_all(&manifests_dir)?;
@@ -159,37 +149,49 @@ pub async fn repo_package_manifest_list(
         let buf = async_fs::read(&src_trusted_root_path)
             .await
             .with_context(|| format!("reading trusted root {src_trusted_root_path}"))?;
+
         let trusted_root = RawSignedMetadata::new(buf);
+
         let mut client = RepoClient::from_trusted_root(&trusted_root, &src_repo)
             .await
             .context("creating the src repo client")?;
+
         client.update().await.context("updating the src repo metadata")?;
+
         let packages =
             client.list_packages(ListFields::empty()).await.context("listing packages")?;
-        let mut package_manfiest_list = Vec::new();
-        for package in &packages {
-            let hash = &package.hash.clone().expect("package should have hash for meta.far");
-            let source_pathbuf =
-                manifests_dir.clone().join(format!("{}_package_manifest.json", hash));
-            package_manfiest_list
-                .push(path_relative_from_file(&source_pathbuf, &package_manifest_list_path)?);
+
+        let mut package_manifest_list = Vec::new();
+
+        for package in packages {
+            let package = RepositoryPackage::from(package);
+
+            let hash = package.hash.clone().expect("package should have hash for meta.far");
+
+            let package_manifest_path =
+                manifests_dir.join(format!("{}_package_manifest.json", hash));
 
             let package_manifest = PackageManifest::from_blobs_dir(
                 blobs_dir.as_std_path(),
-                Hash::from_str(hash)?,
+                Hash::from_str(&hash)?,
                 manifests_dir.as_std_path(),
             )?;
 
             package_manifest
-                .write_with_relative_paths(source_pathbuf.as_path())
+                .write_with_relative_paths(&package_manifest_path)
                 .map_err(PackageManifestError::RelativeWrite)?;
+
+            package_manifest_list.push(package_manifest_path);
         }
 
+        // Sort the package manifest list so it is in a consistent order.
+        package_manifest_list.sort();
+
+        let package_manifest_list = PackageManifestList::from(package_manifest_list);
+
         let file = File::create(&package_manifest_list_path)?;
-        let mut writer = BufWriter::new(file);
-        for package_manfiest in package_manfiest_list {
-            writeln!(writer, "{}", package_manfiest)?;
-        }
+
+        package_manifest_list.to_writer(BufWriter::new(file))?;
     }
 
     Ok(())
@@ -363,11 +365,9 @@ mod tests {
         fuchsia_pkg::{PackageManifest, PackageManifestList},
         fuchsia_repo::{repository::CopyMode, test_utils},
         futures::FutureExt,
+        pretty_assertions::assert_eq,
         sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
-        std::{
-            fs::{create_dir_all, read_to_string},
-            io::Write,
-        },
+        std::{fs::create_dir_all, io::Write},
         tempfile::TempDir,
         tuf::metadata::Metadata as _,
     };
@@ -402,23 +402,15 @@ mod tests {
 
             let list_names = (1..=2).map(|i| format!("list{i}.json")).collect::<Vec<_>>();
             let list_paths = list_names.iter().map(|name| root.join(name)).collect::<Vec<_>>();
+
             // Bundle up package3, package4, and package5 into package list manifests.
-            let list_parent = list_paths[0].parent().unwrap();
-            let pkg_list1_manifest = PackageManifestList::from_iter(
-                [&manifest_paths[2], &manifest_paths[3]]
-                    .iter()
-                    .map(|path| path.strip_prefix(list_parent).unwrap())
-                    .map(Into::into),
-            );
+            let pkg_list1_manifest = PackageManifestList::from(vec![
+                manifest_paths[2].clone(),
+                manifest_paths[3].clone(),
+            ]);
             pkg_list1_manifest.to_writer(File::create(&list_paths[0]).unwrap()).unwrap();
 
-            let list_parent = list_paths[1].parent().unwrap();
-            let pkg_list2_manifest = PackageManifestList::from_iter(
-                [&manifest_paths[4]]
-                    .iter()
-                    .map(|path| path.strip_prefix(list_parent).unwrap())
-                    .map(Into::into),
-            );
+            let pkg_list2_manifest = PackageManifestList::from(vec![manifest_paths[4].clone()]);
             pkg_list2_manifest.to_writer(File::create(&list_paths[1]).unwrap()).unwrap();
 
             let depfile_path = root.join("deps");
@@ -1019,6 +1011,25 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_write_blob_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        let mut env = TestEnv::new();
+
+        let blob_manifest = tmp.path().join("all_blobs.json");
+        env.cmd.blob_manifest = Some(Utf8PathBuf::from_path_buf(blob_manifest.clone()).unwrap());
+
+        assert_matches!(repo_publish(&env.cmd).await, Ok(()));
+
+        let all_blobs = serde_json::from_reader(File::open(blob_manifest).unwrap()).unwrap();
+
+        let expected_all_blobs: BTreeSet<_> =
+            env.manifests.into_iter().flat_map(|manifest| manifest.into_blobs()).collect();
+
+        assert_eq!(expected_all_blobs, all_blobs);
+    }
+
+    #[fuchsia::test]
     async fn test_create_package_manifest_list() {
         let tempdir = TempDir::new().unwrap();
         let dir = Utf8Path::from_path(tempdir.path()).unwrap();
@@ -1099,29 +1110,23 @@ mod tests {
             src_repo_path,
             src_trusted_root_path: None,
             manifest_dir: dir.join("manifests"),
-            package_manifest_list_path: None,
         };
 
         assert_matches!(cmd_repo_package_manifest_list(merge_cmd).await, Ok(()));
-        let package_manifest_list = dir.join("manifests").join("package_manifests.list");
-        let list_string = read_to_string(package_manifest_list).unwrap();
-        assert!(list_string.contains("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9_package_manifest.json"));
-        assert!(list_string.contains("cd726370b3dd4656f4408f7fa4e2818f3f086da710f6580d4213e3e01d3e7faa_package_manifest.json"));
-    }
 
-    #[fuchsia::test]
-    async fn test_write_blob_manifest() {
-        let tmp = tempfile::tempdir().unwrap();
-        let blob_manifest = tmp.path().join("all_blobs.json");
-        let mut env = TestEnv::new();
-        env.cmd.blob_manifest = Some(Utf8PathBuf::from_path_buf(blob_manifest.clone()).unwrap());
+        let manifest_dir = dir.join("manifests");
+        let package_manifest_list_path = manifest_dir.join("package_manifests.list");
 
-        assert_matches!(repo_publish(&env.cmd).await, Ok(()));
+        let package_manifest_list =
+            PackageManifestList::from_reader(File::open(package_manifest_list_path).unwrap())
+                .unwrap();
 
-        let all_blobs = serde_json::from_reader(File::open(blob_manifest).unwrap()).unwrap();
-
-        let expected_all_blobs: BTreeSet<_> =
-            env.manifests.into_iter().flat_map(|manifest| manifest.into_blobs()).collect();
-        assert_eq!(expected_all_blobs, all_blobs);
+        assert_eq!(
+            package_manifest_list,
+            vec![
+                manifest_dir.join("cd726370b3dd4656f4408f7fa4e2818f3f086da710f6580d4213e3e01d3e7faa_package_manifest.json"),
+                manifest_dir.join("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9_package_manifest.json"),
+            ].into(),
+        );
     }
 }

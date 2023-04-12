@@ -215,10 +215,6 @@ pub struct RepoPMListCommand {
     /// path to the initial trusted root metadata (Default is to use 1.root.json from the source repository)
     #[argh(option)]
     pub src_trusted_root_path: Option<Utf8PathBuf>,
-
-    /// path to the package manifest list (Default is to use <manifest_dir>/package_manifests.list)
-    #[argh(option)]
-    pub package_manifest_list_path: Option<Utf8PathBuf>,
 }
 
 fn parse_copy_mode(value: &str) -> Result<CopyMode, String> {
