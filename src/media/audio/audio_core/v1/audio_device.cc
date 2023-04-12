@@ -104,7 +104,6 @@ void AudioDevice::SetSoftwareGainInfo(const fuchsia::media::AudioGainInfo& info)
 
   const auto muted = (info.flags & fuchsia::media::AudioGainInfoFlags::MUTE) ==
                      fuchsia::media::AudioGainInfoFlags::MUTE;
-
   if (is_output()) {
     // See discussion on fxrev.dev/641221.
     if (muted || info.gain_db != 0) {
@@ -113,21 +112,23 @@ void AudioDevice::SetSoftwareGainInfo(const fuchsia::media::AudioGainInfo& info)
   } else {
     // For inputs, change the gain of all links where it is the source.
     FX_DCHECK(is_input());
-    link_matrix_.ForEachDestLink(*this, [&info, muted](const LinkMatrix::LinkHandle& link) {
-      if (link.object->type() == AudioObject::Type::AudioCapturer) {
-        if constexpr (kLogSetDeviceGainMuteActions) {
-          if (muted) {
-            FX_LOGS(WARNING) << "Source device is muted";
-          } else {
-            // TODO(fxbug.dev/51049) Logging should be removed upon creation of inspect tool or
-            // other real-time method for gain observation
-            FX_LOGS(INFO) << "Source device gain=" << info.gain_db;
+    link_matrix_.ForEachDestLink(
+        *this, [&info, muted, name = this->name()](const LinkMatrix::LinkHandle& link) {
+          if (link.object->type() == AudioObject::Type::AudioCapturer) {
+            if constexpr (kLogSetDeviceGainMuteActions) {
+              if (muted) {
+                FX_LOGS(WARNING) << "Audio input '" << name.c_str() << "': source gain is muted";
+              } else {
+                // TODO(fxbug.dev/51049) Logging should be removed upon creation of inspect tool or
+                // other real-time method for gain observation
+                FX_LOGS(INFO) << "Audio input '" << name.c_str() << "': source gain is "
+                              << info.gain_db << " dB";
+              }
+            }
+            link.mixer->gain.SetSourceMute(muted);
+            link.mixer->gain.SetSourceGain(info.gain_db);
           }
-        }
-        link.mixer->gain.SetSourceMute(muted);
-        link.mixer->gain.SetSourceGain(info.gain_db);
-      }
-    });
+        });
   }
 }
 
