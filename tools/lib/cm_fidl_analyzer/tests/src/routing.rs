@@ -46,7 +46,6 @@ use {
     },
     routing_test_helpers::{
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
-        ServiceInstance,
     },
     std::{
         collections::{HashMap, HashSet},
@@ -609,7 +608,7 @@ mod tests {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: CapabilityPath::try_from("/foo").unwrap(),
-                    instance: ServiceInstance::Named("".into()),
+                    instance: "".into(),
                     member: "".into(),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -660,7 +659,7 @@ mod tests {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: CapabilityPath::try_from("/foo").unwrap(),
-                    instance: ServiceInstance::Named("".into()),
+                    instance: "".into(),
                     member: "".into(),
                     expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
                 },
@@ -714,7 +713,7 @@ mod tests {
                 AbsoluteMoniker::root(),
                 CheckUse::Service {
                     path: CapabilityPath::try_from("/foo").unwrap(),
-                    instance: ServiceInstance::Named("".into()),
+                    instance: "".into(),
                     member: "".into(),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -779,7 +778,7 @@ mod tests {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: CapabilityPath::try_from("/foo").unwrap(),
-                    instance: ServiceInstance::Named("".into()),
+                    instance: "".into(),
                     member: "".into(),
                     expected_res: ExpectedResult::Ok,
                 },

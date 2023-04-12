@@ -2883,13 +2883,33 @@ async fn use_service_from_sibling_collection() {
     )
     .await;
 
+    let namespace = test.bind_and_get_namespace(vec!["b"].try_into().unwrap()).await;
+    let dir = capability_util::take_dir_from_namespace(&namespace, "/svc").await;
+    let service_dir = fuchsia_fs::directory::open_directory(
+        &dir,
+        "my.service.Service",
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .await
+    .expect("failed to open service");
+    let entries: HashSet<String> = fuchsia_fs::directory::readdir(&service_dir)
+        .await
+        .expect("failed to read entries")
+        .into_iter()
+        .map(|d| d.name)
+        .collect();
+    assert_eq!(entries.len(), 2);
+    assert!(entries.contains("foo,default"));
+    assert!(entries.contains("bar,default"));
+    capability_util::add_dir_to_namespace(&namespace, "/svc", dir).await;
+
     join!(
         async move {
             test.check_use(
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: "/svc/my.service.Service".try_into().unwrap(),
-                    instance: ServiceInstance::Aggregated(2),
+                    instance: "foo,default".to_string(),
                     member: "echo".to_string(),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -3056,7 +3076,7 @@ async fn use_filtered_service_from_sibling() {
         vec!["c"].try_into().unwrap(),
         CheckUse::Service {
             path: "/svc/my.service.Service".try_into().unwrap(),
-            instance: ServiceInstance::Named("variantinstance".to_string()),
+            instance: "variantinstance".to_string(),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },
@@ -3066,7 +3086,7 @@ async fn use_filtered_service_from_sibling() {
         vec!["d"].try_into().unwrap(),
         CheckUse::Service {
             path: "/svc/my.service.Service".try_into().unwrap(),
-            instance: ServiceInstance::Named("renamed_default".to_string()),
+            instance: "renamed_default".to_string(),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },
@@ -3076,7 +3096,7 @@ async fn use_filtered_service_from_sibling() {
         vec!["d"].try_into().unwrap(),
         CheckUse::Service {
             path: "/svc/my.service.Service".try_into().unwrap(),
-            instance: ServiceInstance::Named("variantinstance".to_string()),
+            instance: "variantinstance".to_string(),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },

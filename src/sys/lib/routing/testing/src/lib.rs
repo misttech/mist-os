@@ -118,12 +118,6 @@ pub struct ComponentEventRoute {
 }
 
 #[derive(Debug)]
-pub enum ServiceInstance {
-    Named(String),
-    Aggregated(usize),
-}
-
-#[derive(Debug)]
 pub enum CheckUse {
     Protocol {
         path: CapabilityPath,
@@ -131,7 +125,7 @@ pub enum CheckUse {
     },
     Service {
         path: CapabilityPath,
-        instance: ServiceInstance,
+        instance: String,
         member: String,
         expected_res: ExpectedResult,
     },
