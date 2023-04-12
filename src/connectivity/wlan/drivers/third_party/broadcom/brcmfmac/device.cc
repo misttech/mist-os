@@ -40,6 +40,7 @@ constexpr uint8_t kClientInterfaceId = 0;
 constexpr char kApInterfaceName[] = "brcmfmac-wlan-fullmac-ap";
 constexpr uint8_t kApInterfaceId = 1;
 constexpr uint8_t kMaxBufferParts = 1;
+constexpr zx::duration kDeviceRemovalTimeout = zx::sec(5);
 }  // namespace
 
 namespace wlan_llcpp = fuchsia_factory_wlan;
@@ -330,8 +331,9 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
   BRCMF_DBG(WLANPHY, "Destroying interface %d", iface_id);
   switch (iface_id) {
     case kClientInterfaceId: {
-      DestroyIface(&client_interface_, [completer = completer.ToAsync(), arena = std::move(arena),
-                                        iface_id](auto status) mutable {
+      libsync::Completion device_removal;
+      DestroyIface(&client_interface_, [&, completer = completer.ToAsync(),
+                                        arena = std::move(arena), iface_id](auto status) mutable {
         if (status != ZX_OK) {
           BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
                     zx_status_get_string(status));
@@ -340,11 +342,18 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
           BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
           completer.buffer(arena).ReplySuccess();
         }
+        device_removal.Signal();
       });
+      zx_status_t status = device_removal.Wait(kDeviceRemovalTimeout);
+      if (status != ZX_OK) {
+        BRCMF_ERR(
+            "Timeout: Waiting for brcmfmac-wlan-fullmac-client to be released in driver framework.");
+      }
       return;
     }
     case kApInterfaceId: {
-      DestroyIface(&ap_interface_, [completer = completer.ToAsync(), arena = std::move(arena),
+      libsync::Completion device_removal;
+      DestroyIface(&ap_interface_, [&, completer = completer.ToAsync(), arena = std::move(arena),
                                     iface_id](auto status) mutable {
         if (status != ZX_OK) {
           BRCMF_ERR("Device::DestroyIface() Error destroying AP interface : %s",
@@ -354,7 +363,13 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
           BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
           completer.buffer(arena).ReplySuccess();
         }
+        device_removal.Signal();
       });
+      zx_status_t status = device_removal.Wait(kDeviceRemovalTimeout);
+      if (status != ZX_OK) {
+        BRCMF_ERR(
+            "Timeout: Waiting for brcmfmac-wlan-fullmac-ap to be released in driver framework.");
+      }
       return;
     }
     default: {
@@ -550,18 +565,25 @@ void Device::ShutdownDispatcher() {
 }
 
 void Device::DestroyAllIfaces(void) {
-  DestroyIface(&client_interface_, [](auto status) {
+  std::lock_guard<std::mutex> lock(lock_);
+  libsync::Completion client_device_removal;
+  libsync::Completion ap_device_removal;
+  DestroyIface(&client_interface_, [&client_device_removal](auto status) {
     if (status != ZX_OK) {
       BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying client interface : %s",
                 zx_status_get_string(status));
     }
+    client_device_removal.Signal();
   });
-  DestroyIface(&ap_interface_, [](auto status) {
+  DestroyIface(&ap_interface_, [&ap_device_removal](auto status) {
     if (status != ZX_OK) {
       BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying AP interface : %s",
                 zx_status_get_string(status));
     }
+    ap_device_removal.Signal();
   });
+  client_device_removal.Wait();
+  ap_device_removal.Wait();
 }
 
 void Device::DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_status_t)> respond) {
