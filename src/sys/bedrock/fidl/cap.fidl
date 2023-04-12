@@ -57,3 +57,12 @@ protocol Sender {
         capability Capability;
     }) -> () error SenderError;
 };
+
+protocol Receiver {
+    /// Receives a single Capability handle.
+    ///
+    /// This is a hanging get that returns the next available handle.
+    Receive() -> (resource struct {
+        capability Capability;
+    });
+};
