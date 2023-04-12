@@ -56,6 +56,7 @@ use {
 // API.
 pub type ExpectedResult = ::routing_test_helpers::ExpectedResult;
 pub type CheckUse = ::routing_test_helpers::CheckUse;
+pub type ServiceInstance = ::routing_test_helpers::ServiceInstance;
 
 /// Builder for setting up a new `RoutingTest` instance with a non-standard setup.
 ///
@@ -650,16 +651,40 @@ impl RoutingTestModel for RoutingTest {
             CheckUse::Protocol { path, expected_res } => {
                 capability_util::call_echo_svc_from_namespace(&namespace, path, expected_res).await;
             }
-            CheckUse::Service { path, instance, member, expected_res } => {
-                capability_util::call_service_instance_echo_svc_from_namespace(
-                    &namespace,
-                    path,
-                    instance,
-                    member,
-                    expected_res,
-                )
-                .await;
-            }
+            CheckUse::Service { path, instance, member, expected_res } => match instance {
+                ServiceInstance::Named(instance) => {
+                    capability_util::call_service_instance_echo_svc_from_namespace(
+                        &namespace,
+                        path,
+                        instance,
+                        member,
+                        expected_res,
+                    )
+                    .await;
+                }
+                ServiceInstance::Aggregated(count) => {
+                    let entries =
+                        capability_util::read_service_in_namespace(&namespace, path.clone()).await;
+                    assert_eq!(
+                        entries.len(),
+                        count,
+                        "service directory has wrong number of instances, \
+                        expected: {}, actual, {}",
+                        count,
+                        entries.len()
+                    );
+                    for instance in entries {
+                        capability_util::call_service_instance_echo_svc_from_namespace(
+                            &namespace,
+                            path.clone(),
+                            instance.clone(),
+                            member.clone(),
+                            expected_res.clone(),
+                        )
+                        .await;
+                    }
+                }
+            },
             CheckUse::Directory { path, file, expected_res } => {
                 capability_util::read_data_from_namespace(
                     &namespace,
@@ -822,17 +847,46 @@ impl RoutingTestModel for RoutingTest {
                 )
                 .await;
             }
-            CheckUse::Service { path, instance, member, expected_res } => {
-                capability_util::call_service_instance_echo_svc_from_exposed_dir(
-                    path,
-                    instance,
-                    member,
-                    &moniker,
-                    &self.model,
-                    expected_res,
-                )
-                .await;
-            }
+            CheckUse::Service { path, instance, member, expected_res } => match instance {
+                ServiceInstance::Named(instance) => {
+                    capability_util::call_service_instance_echo_svc_from_exposed_dir(
+                        path,
+                        instance,
+                        member,
+                        &moniker,
+                        &self.model,
+                        expected_res,
+                    )
+                    .await;
+                }
+                ServiceInstance::Aggregated(count) => {
+                    let entries = capability_util::read_service_from_exposed_dir(
+                        path.clone(),
+                        &moniker,
+                        &self.model,
+                    )
+                    .await;
+                    assert_eq!(
+                        entries.len(),
+                        count,
+                        "service directory has wrong number of instances, \
+                            expected: {}, actual, {}",
+                        count,
+                        entries.len()
+                    );
+                    for instance in entries {
+                        capability_util::call_service_instance_echo_svc_from_exposed_dir(
+                            path.clone(),
+                            instance.clone(),
+                            member.clone(),
+                            &moniker,
+                            &self.model,
+                            expected_res.clone(),
+                        )
+                        .await;
+                    }
+                }
+            },
             CheckUse::Directory { path, file, expected_res } => {
                 capability_util::read_data_from_exposed_dir(
                     path,
@@ -1151,6 +1205,30 @@ pub mod capability_util {
             .expect("failed to open service")
     }
 
+    pub async fn read_service_in_namespace(
+        namespace: &ManagedNamespace,
+        path: CapabilityPath,
+    ) -> Vec<String> {
+        let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
+        let service_dir = fuchsia_fs::directory::open_directory(
+            &dir_proxy,
+            &path.basename,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .expect("failed to open service dir");
+
+        let entries = fuchsia_fs::directory::readdir(&service_dir)
+            .await
+            .expect("failed to read directory entries")
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+
+        add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
+        entries
+    }
+
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`. Expects the service
     /// to be fidl.examples.routing.echo.Echo.
     pub async fn call_echo_svc_from_namespace(
@@ -1309,6 +1387,25 @@ pub mod capability_util {
             connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&instance_dir, &member)
                 .expect("failed to connect to Echo service");
         call_echo_and_validate_result(echo_proxy, expected_res).await;
+    }
+
+    pub async fn read_service_from_exposed_dir(
+        path: CapabilityPath,
+        abs_moniker: &AbsoluteMoniker,
+        model: &Arc<Model>,
+    ) -> Vec<String> {
+        let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        open_exposed_dir(&path, abs_moniker, model, false, server_end).await;
+        // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
+        // the service instance, passing in the service_dir, instance name, and member path.
+        let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
+        let entries = fuchsia_fs::directory::readdir(&service_dir)
+            .await
+            .expect("failed to read directory entries")
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        entries
     }
 
     /// Looks up `resolved_url` in the namespace, and attempts to use `path`. Expects the service

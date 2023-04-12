@@ -691,7 +691,7 @@ impl CollectionServiceDirectory {
             Ok(source) => {
                 // Add entries for the component `instance`, from its `source`,
                 // the service exposed by the component.
-                if let Err(err) = self.add_entries_from_capability_source(&child_name, source).await
+                if let Err(err) = self.add_entries_from_capability_source(child_name, source).await
                 {
                     parent
                         .with_logger_as_default(|| {
@@ -791,8 +791,9 @@ impl CollectionServiceDirectory {
             error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&"".into()), e);
             ModelError::open_directory_error(target.abs_moniker.clone(), child_name)
         })?;
+        let rng = &mut rand::thread_rng();
         for dirent in dirents {
-            let name = format!("{},{}", &child_name, &dirent.name);
+            let name = Self::generate_instance_id(rng);
             let entry: Arc<ServiceInstanceDirectoryEntry> =
                 Arc::new(ServiceInstanceDirectoryEntry {
                     name: name.clone(),
@@ -826,6 +827,13 @@ impl CollectionServiceDirectory {
             .await;
             Ok(())
         })
+    }
+
+    /// Generates a 128-bit uuid as a hex string.
+    fn generate_instance_id(rng: &mut impl rand::Rng) -> String {
+        let mut num: [u8; 16] = [0; 16];
+        rng.fill_bytes(&mut num);
+        num.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join("")
     }
 
     async fn on_started_async(
@@ -979,7 +987,6 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
 
 #[cfg(test)]
 mod tests {
-
     use {
         super::*,
         crate::{
@@ -1001,6 +1008,8 @@ mod tests {
         fuchsia_async as fasync,
         futures::StreamExt,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+        proptest::prelude::*,
+        rand::SeedableRng,
         std::{
             collections::{HashMap, HashSet},
             convert::TryInto,
@@ -1479,7 +1488,9 @@ mod tests {
             .expect("failed to read directory entries");
         let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
         assert_eq!(instance_names.len(), 1);
-        assert_eq!(instance_names.iter().next().unwrap(), "foo,default");
+        for instance in instance_names {
+            assert!(is_instance_id(&instance), "{}", instance);
+        }
     }
 
     #[fuchsia::test]
@@ -1560,9 +1571,28 @@ mod tests {
             .expect("failed to read directory entries");
 
         let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
-        assert!(instance_names.contains("bar,default"));
-        assert!(instance_names.contains("bar,one"));
-        assert!(instance_names.contains("foo,default"));
+        assert_eq!(instance_names.len(), 3);
+        for instance in instance_names {
+            assert!(is_instance_id(&instance), "{}", instance);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn service_instance_id(seed in 0..u64::MAX) {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+            let instance = CollectionServiceDirectory::generate_instance_id(&mut rng);
+            assert!(is_instance_id(&instance), "{}", instance);
+
+            // Verify it's random
+            let instance2 = CollectionServiceDirectory::generate_instance_id(&mut rng);
+            assert!(is_instance_id(&instance2), "{}", instance2);
+            assert_ne!(instance, instance2);
+        }
+    }
+
+    fn is_instance_id(id: &str) -> bool {
+        id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit())
     }
 
     #[fuchsia::test]
