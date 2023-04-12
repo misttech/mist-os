@@ -2829,7 +2829,7 @@ static zx_status_t brcmf_sdio_download_firmware(struct brcmf_sdio* bus, const vo
               FILE_LOAD_MAX_ATTEMPTS - attempt_times);
   } while (attempt_times < FILE_LOAD_MAX_ATTEMPTS);
 
-  BRCMF_DBG(SDIO, "attempted %u times.", attempt_times);
+  BRCMF_DBG(SDIO, "FW download attempted %u times.", attempt_times);
   if (bcmerror != ZX_OK)
     goto err;
 
@@ -2844,7 +2844,7 @@ static zx_status_t brcmf_sdio_download_firmware(struct brcmf_sdio* bus, const vo
               FILE_LOAD_MAX_ATTEMPTS - attempt_times);
   } while (attempt_times < FILE_LOAD_MAX_ATTEMPTS);
 
-  BRCMF_DBG(SDIO, "attempted %u times.", attempt_times);
+  BRCMF_DBG(SDIO, "NVRAM download attempted %u times.", attempt_times);
   if (bcmerror != ZX_OK)
     goto err;
 
@@ -3123,6 +3123,13 @@ static void brcmf_sdio_dataworker(WorkItem* work) {
   brcmf_sdio_event_handler(bus);
 }
 
+static zx_status_t brcmf_get_wifi_metadata(brcmf_bus* bus_if, void* data, size_t exp_size,
+                                           size_t* actual) {
+  struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
+  return sdiodev->drvr->device->DeviceGetMetadata(DEVICE_METADATA_WIFI_CONFIG, data, exp_size,
+                                                  actual);
+}
+
 zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAFETY_ANALYSIS {
   zx_status_t status = ZX_OK;
   brcmf_bus* bus_if = drvr->bus_if;
@@ -3170,15 +3177,35 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
     return status;
   }
 
+  // Get metadata to see if CLM is expected to be present.
+  wifi_config_t config;
+  size_t actual;
+  bool clm_present = false;
+  bool clm_needed = false;
+
+  zx_status_t ret = brcmf_get_wifi_metadata(bus_if, &config, sizeof(config), &actual);
+  if (ret == ZX_OK && actual == sizeof(config)) {
+    clm_needed = config.clm_needed;
+  } else {
+    BRCMF_ERR("device_get_metadata failed");
+    clm_needed = false;
+  }
+
   std::string clm_binary;
   if ((status =
            wlan::brcmfmac::GetClmBinary(drvr->device, brcmf_bus_type::BRCMF_BUS_TYPE_SDIO,
                                         static_cast<wlan::brcmfmac::CommonCoreId>(bus_if->chip),
                                         bus_if->chiprev, &clm_binary)) != ZX_OK) {
-    BRCMF_ERR("Load CLM binary failed, error: %s", zx_status_get_string(status));
-    if (reload)
-      drvr->fw_reloading.unlock();
-    return status;
+    if (clm_needed) {
+      BRCMF_ERR("Load CLM binary failed, error: %s", zx_status_get_string(status));
+      if (reload)
+        drvr->fw_reloading.unlock();
+      return status;
+    } else {
+      BRCMF_INFO("CLM binary not available...ignore");
+    }
+  } else {
+    clm_present = true;
   }
 
   // Unlock firmware reload lock after reloading the firmware or in other failure branches above if
@@ -3186,14 +3213,16 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
   if (reload)
     drvr->fw_reloading.unlock();
 
-  // The firmware IOVAR accesses to upload the CLM blob are always on ifidx 0, so we stub out an
-  // appropriate brcmf_if instance here.
-  brcmf_if ifp = {};
-  ifp.drvr = drvr;
-  ifp.ifidx = 0;
-  if ((status = brcmf_c_process_clm_blob(&ifp, clm_binary)) != ZX_OK) {
-    BRCMF_ERR("Process clm blob fail.");
-    return status;
+  if (clm_present) {
+    // The firmware IOVAR accesses to upload the CLM blob are always on ifidx 0, so we stub out an
+    // appropriate brcmf_if instance here.
+    brcmf_if ifp = {};
+    ifp.drvr = drvr;
+    ifp.ifidx = 0;
+    if ((status = brcmf_c_process_clm_blob(&ifp, clm_binary)) != ZX_OK) {
+      BRCMF_ERR("Process clm blob fail.");
+      return status;
+    }
   }
 
   return ZX_OK;
@@ -3687,13 +3716,6 @@ static void brcmf_sdio_watchdog(struct brcmf_sdio* bus) {
     }
   }
   bus->sdiodev->drvr->irq_callback_lock.unlock();
-}
-
-static zx_status_t brcmf_get_wifi_metadata(brcmf_bus* bus_if, void* data, size_t exp_size,
-                                           size_t* actual) {
-  struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
-  return sdiodev->drvr->device->DeviceGetMetadata(DEVICE_METADATA_WIFI_CONFIG, data, exp_size,
-                                                  actual);
 }
 
 static zx_status_t brcmf_sdio_get_bootloader_macaddr(brcmf_bus* bus_if, uint8_t* mac_addr) {

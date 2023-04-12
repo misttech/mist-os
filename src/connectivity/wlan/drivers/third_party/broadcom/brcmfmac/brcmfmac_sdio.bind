@@ -10,4 +10,5 @@ fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_DID
 accept fuchsia.BIND_PLATFORM_DEV_PID {
   fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM4356,
   fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM43458,
+  fuchsia.broadcom.platform.BIND_PLATFORM_DEV_PID.BCM4359,
 }
