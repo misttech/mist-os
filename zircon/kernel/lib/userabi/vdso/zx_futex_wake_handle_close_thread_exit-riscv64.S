@@ -14,9 +14,11 @@
 syscall_entry_begin zx_futex_wake_handle_close_thread_exit
 
   // Store the value into the futex, which should signal that the stack is no
-  // longer in use.  atomic_store_explicit(value_ptr, new_value,
-  // memory_order_release)
-  sd a2, (a0)
+  // longer in use.
+
+  // atomic_store_explicit(value_ptr, new_value, memory_order_release)
+  fence rw, w
+  sw a2, (a0)
 
   // Now the stack might be gone and we can never return!
 
@@ -27,7 +29,7 @@ syscall_entry_begin zx_futex_wake_handle_close_thread_exit
   zircon_syscall ZX_SYS_futex_wake, zx_futex_wake, zx_futex_wake_handle_close_thread_exit
   bnez a0, .Lfutex_wake_fail
 
-  bnez s1, .Lthread_exit
+  beqz s1, .Lthread_exit
   mv a0, s1
   zircon_syscall ZX_SYS_handle_close, zx_handle_close, zx_futex_wake_handle_close_thread_exit
   bnez a0, .Lhandle_close_fail
