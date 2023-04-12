@@ -926,8 +926,8 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
   return ZX_OK;
 }
 
-zx_status_t Device::ConnectRuntime(const char* service_name, const char* protocol_name,
-                                   fdf::Channel request) {
+zx_status_t Device::ConnectFragmentRuntime(const char* fragment_name, const char* service_name,
+                                           const char* protocol_name, fdf::Channel request) {
   zx::channel client_token, server_token;
   auto status = zx::channel::create(0, &client_token, &server_token);
   if (status != ZX_OK) {
@@ -938,7 +938,7 @@ zx_status_t Device::ConnectRuntime(const char* service_name, const char* protoco
     return status;
   }
 
-  return ConnectFragmentFidl("default", service_name, protocol_name, std::move(server_token));
+  return ConnectFragmentFidl(fragment_name, service_name, protocol_name, std::move(server_token));
 }
 
 zx_status_t Device::ServeInspectVmo(zx::vmo inspect_vmo) {

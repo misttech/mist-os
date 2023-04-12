@@ -208,6 +208,15 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol2(zx_device_t* device,
 __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
                                                      const char* protocol_name,
                                                      fdf_handle_t request) {
-  return dev->ConnectRuntime(service_name, protocol_name, fdf::Channel(request));
+  return dev->ConnectFragmentRuntime("default", service_name, protocol_name, fdf::Channel(request));
+}
+
+__EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
+                                                              const char* fragment_name,
+                                                              const char* service_name,
+                                                              const char* protocol_name,
+                                                              fdf_handle_t request) {
+  return dev->ConnectFragmentRuntime(fragment_name, service_name, protocol_name,
+                                     fdf::Channel(request));
 }
 }
