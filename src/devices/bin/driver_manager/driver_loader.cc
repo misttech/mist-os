@@ -37,11 +37,6 @@ bool VerifyMatchedCompositeNodeParentInfo(fdi::wire::MatchedCompositeNodeParentI
   return true;
 }
 
-bool ShouldUseUniversalResolver(fdi::wire::DriverPackageType package_type) {
-  return package_type == fdi::wire::DriverPackageType::kUniverse ||
-         package_type == fdi::wire::DriverPackageType::kCached;
-}
-
 }  // namespace
 
 const Driver* DriverLoader::UrlToDriver(const std::string& url) {
@@ -106,22 +101,6 @@ const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
   // Success. Return driver.
   driver_index_drivers_[manifest_url] = std::move(fetched_driver.value());
   return driver_index_drivers_[manifest_url].get();
-}
-
-const Driver* DriverLoader::LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info) {
-  if (!driver_info.has_driver_url()) {
-    LOGF(ERROR, "Driver info is missing the driver URL");
-    return nullptr;
-  }
-  if (!driver_info.has_url()) {
-    LOGF(ERROR, "Driver info is missing the URL");
-    return nullptr;
-  }
-
-  std::string url(driver_info.url().get());
-  bool use_universe_resolver =
-      driver_info.has_package_type() && ShouldUseUniversalResolver(driver_info.package_type());
-  return LoadDriverUrl(url, use_universe_resolver);
 }
 
 void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,

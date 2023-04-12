@@ -68,7 +68,6 @@ class DriverLoader {
       const MatchDeviceConfig& config);
 
   const Driver* LoadDriverUrl(const std::string& manifest_url, bool use_universe_resolver = false);
-  const Driver* LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info);
 
  private:
   const Driver* UrlToDriver(const std::string& url);
