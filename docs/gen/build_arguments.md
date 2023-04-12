@@ -36,6 +36,15 @@ with specific boards, due to driver and hardware challenges.
 
 From //build/images/args.gni:130
 
+### all_cpu_kernel_boot_tests
+
+Cause //zircon/kernel:boot_tests to generate the phys boot tests
+for all supported CPUs, not just $target_cpu.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/BUILD.gn:26
+
 ### all_cpu_phys_boot_tests
 
 Cause //zircon/kernel/phys:boot_tests to generate the phys boot tests
@@ -1610,7 +1619,7 @@ be removed after everyone has had a chance to get hold of their machines.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:32
+From //zircon/kernel/BUILD.gn:38
 
 ### dev_bootfs_labels
 
