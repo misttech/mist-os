@@ -45,3 +45,15 @@ protocol Dict {
         capability Capability;
     }) error DictError;
 };
+
+type SenderError = flexible enum {
+    /// The `Capability` handle was invalid.
+    BAD_HANDLE = 1;
+};
+
+protocol Sender {
+    /// Sends a single Capability handle over this sender.
+    Send(resource struct {
+        capability Capability;
+    }) -> () error SenderError;
+};
