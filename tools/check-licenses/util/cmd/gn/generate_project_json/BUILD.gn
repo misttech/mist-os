@@ -50,4 +50,7 @@ compiled_action("generate_project_json") {
     "--stamp_output",
     "license/gen/project.json.stamp",
   ]
+
+  # "project.json" names the output dir
+  no_output_dir_leaks = false
 }
