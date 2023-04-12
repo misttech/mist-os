@@ -312,6 +312,11 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #       the name of the directory containing the invoking BUILD.gn file.
 #     - Type: list(string)
 #
+#   * dir
+#     - Optional: Subdirectory of $llvm_libc where source is found.
+#     - Type: relative dir
+#     - Default: get_path_info(target_out_dir, "name")
+#
 #   * cpu_functions
 #     - Optional: A subset of $functions that whose implementations come from
 #       the $llvm_libc/src/$dir/$clang_cpu directory instead.
@@ -342,6 +347,11 @@ template("llvm_libc_source_set") {
     test_target = "unittests"
   } else {
     test_target = "$target_name.unittests"
+  }
+
+  if (defined(invoker.dir)) {
+    # This doesn't affect the logic above, but overrides the subdir used below.
+    target_dir = invoker.dir
   }
 
   cpu_functions = []

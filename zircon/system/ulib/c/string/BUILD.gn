@@ -172,4 +172,13 @@ llvm_libc_source_set("compat") {
     "bcopy",
     "bzero",
   ]
+
+  deps = [ ":swab" ]
+}
+
+# This lives in libc/src/unistd upstream because it's declared in <unistd.h>
+# but it's really a compat string function, so we include it here instead.
+llvm_libc_source_set("swab") {
+  dir = "unistd"
+  functions = [ "swab" ]
 }
