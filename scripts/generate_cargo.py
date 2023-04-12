@@ -551,6 +551,14 @@ def main():
                     fout.write(", package = \"%s\"" % (package,))
                 fout.write(" }\n")
             fout.write("\n")
+
+    rust_targets = [
+        { "label": t, "type": project.targets[t]["type"] }
+        for t in project.rust_targets if t in project.reachable_targets
+    ]
+    with open(os.path.join(gn_cargo_dir, "rust_targets.json"), "w") as f:
+        json.dump(rust_targets, f)
+
     return 0
 
 
