@@ -8,8 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bind-fail-test-bind") {
-  disable_autobind = true
+  rules = "bind-fail.bind"
   header_output = "bind-fail-test-bind.h"
+  deps = [ "//src/devices/bind/fuchsia.compat" ]
 }
 
 fuchsia_driver("fuchsia_driver") {
