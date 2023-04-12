@@ -40,7 +40,9 @@ zx_status_t StmMcu::Create(void* ctx, zx_device_t* parent) {
 
   device->Init();
 
-  if (zx_status_t status = device->DdkAdd("vim3-mcu"); status != ZX_OK) {
+  if (zx_status_t status =
+          device->DdkAdd(ddk::DeviceAddArgs("vim3-mcu").set_inspect_vmo(device->inspect_vmo()));
+      status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed");
     return status;
   }
@@ -65,6 +67,26 @@ void StmMcu::Init() {
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to enable WOL: %d", status);
   }
+
+  uint8_t pcie_enabled = 0;
+  status = i2c_.ReadSync(STM_MCU_USB_PCIE_SWITCH_REG, &pcie_enabled, 1);
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "Failed to read PCIe enabled: %s", zx_status_get_string(status));
+    pcie_enabled = -1;
+  }
+
+  if (pcie_enabled != 0) {
+    zxlogf(INFO, "PCIe is enabled. Switching it to USB3.");
+    pcie_enabled = 0;
+    const uint8_t write_buf[] = {STM_MCU_USB_PCIE_SWITCH_REG, pcie_enabled};
+    status = i2c_.WriteSync(write_buf, std::size(write_buf));
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to disable PCIe: %s", zx_status_get_string(status));
+      pcie_enabled = 1;
+    }
+  }
+
+  inspect_.GetRoot().CreateUint("PCIe enabled", pcie_enabled, &inspect_);
 }
 
 zx_status_t StmMcu::SetFanLevel(FanLevel level) {

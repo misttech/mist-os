@@ -7,6 +7,7 @@
 
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <threads.h>
 
 #include <optional>
@@ -50,6 +51,8 @@
 
 #define STM_MCU_REG_EN_WOL_RESET_ENABLE 0x03
 
+#define STM_MCU_USB_PCIE_SWITCH_REG 0x33
+
 // Vim3MCU is an external MCU made by STM used in vim3 for
 // fan control and WoL
 //
@@ -77,12 +80,15 @@ class StmMcu : public DeviceType {
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
+  zx::vmo inspect_vmo() const { return inspect_.DuplicateVmo(); }
+
  private:
   zx_status_t SetFanLevel(FanLevel level);
 
   ddk::I2cChannel i2c_;
   void ShutDown();
   fbl::Mutex i2c_lock_;
+  inspect::Inspector inspect_;
 };
 
 }  // namespace stm
