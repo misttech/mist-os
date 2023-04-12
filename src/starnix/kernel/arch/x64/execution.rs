@@ -13,7 +13,7 @@ macro_rules! generate_cfi_directives {
             // the register values in the `zx_thread_state_general_regs_t` struct.
             std::arch::asm!(
                 ".cfi_remember_state",
-                ".cfi_def_cfa r15, 0",
+                ".cfi_def_cfa r14, 0",
                 ".cfi_offset rdi, 0",
                 ".cfi_offset rsi, 0x08",
                 ".cfi_offset rbp, 0x10",
@@ -36,9 +36,9 @@ macro_rules! generate_cfi_directives {
                 // ".cfi_offset fs.base, 0x90",
                 // ".cfi_offset gs.base, 0x98",
 
-                // r15 could technically get clobbered between here and `execute_syscall`. We should
+                // r14 could technically get clobbered between here and `execute_syscall`. We should
                 // use a method for computing `.cfi_def_cfa` that can't fail (e.g., rsp offset).
-                in("r15") state_addr,
+                in("r14") state_addr,
                 options(nomem, preserves_flags, nostack),
             );
         }
