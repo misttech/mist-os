@@ -5,6 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_GLOBAL_TOPOLOGY_DATA_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_GLOBAL_TOPOLOGY_DATA_H_
 
+#include <lib/trace/event.h>
+
 #include <string>
 #include <unordered_set>
 
@@ -21,6 +23,29 @@ using GlobalIndexVector = std::vector<size_t>;
 using HitRegions = std::unordered_map<TransformHandle, std::vector<flatland::HitRegion>>;
 
 struct GlobalTopologyData {
+  GlobalTopologyData() = default;
+  // Disallow copy ctors.
+  GlobalTopologyData(const GlobalTopologyData&) = delete;
+  GlobalTopologyData& operator=(const GlobalTopologyData&) = delete;
+  // Allow move ctors.
+  GlobalTopologyData(GlobalTopologyData&& other) = default;
+  GlobalTopologyData& operator=(GlobalTopologyData&& other) {
+    topology_vector = std::move(other.topology_vector);
+    child_counts = std::move(other.child_counts);
+    parent_indices = std::move(other.parent_indices);
+    // TODO(fxbug.dev/125315): Investigate why move is slow.
+    {
+      TRACE_DURATION("gfx", "GlobalTopologyData[move]", "length", other.live_handles.size());
+      live_handles = std::move(other.live_handles);
+    }
+    view_refs = std::move(other.view_refs);
+    root_transforms = std::move(other.root_transforms);
+    debug_names = std::move(other.debug_names);
+    clip_regions = std::move(other.clip_regions);
+
+    return *this;
+  }
+
   // The LinkSystem stores topology links as a key-value pair of TransformHandles. This type alias
   // is declared because while this map is created by the LinkSystem, it is only ever consumed
   // by ComputeGlobalTopologyData().

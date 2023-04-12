@@ -137,9 +137,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   CullRectangles(&scene_state.image_rectangles, &scene_state.images, hw_display->width_in_px(),
                  hw_display->height_in_px());
 
-  TRACE_DURATION_BEGIN("gfx", "flatland::Engine::RenderScheduledFrame [move]");
-  last_global_topology_data_ = std::move(scene_state.topology_data);
-  TRACE_DURATION_END("gfx", "flatland::Engine::RenderScheduledFrame [move]");
+  {
+    TRACE_DURATION("gfx", "flatland::Engine::RenderScheduledFrame[move topology_data]");
+    last_global_topology_data_ = std::move(scene_state.topology_data);
+  }
 
   // Don't render any initial frames if there is no image that could actually be rendered. We do
   // this to avoid triggering any changes in the display until we have content ready to render. We

@@ -24,17 +24,17 @@ namespace flatland {
 // the internal IDs, so it is up to the calling code to enforce uniqueness when desirable.
 class TransformHandle {
  public:
-  TransformHandle() = default;
-
   using InstanceId = scheduling::SessionId;
 
+  TransformHandle() = default;
   TransformHandle(InstanceId instance_id, uint64_t transform_id)
       : instance_id_(instance_id), transform_id_(transform_id) {}
 
-  TransformHandle(const TransformHandle& other) {
-    instance_id_ = other.instance_id_;
-    transform_id_ = other.transform_id_;
-  }
+  // Allow copy and move ctors.
+  TransformHandle(const TransformHandle& other) = default;
+  TransformHandle& operator=(const TransformHandle& other) = default;
+  TransformHandle(TransformHandle&& other) = default;
+  TransformHandle& operator=(TransformHandle&& other) = default;
 
   bool operator==(const TransformHandle& rhs) const {
     return instance_id_ == rhs.instance_id_ && transform_id_ == rhs.transform_id_;
@@ -54,7 +54,7 @@ class TransformHandle {
   friend class std::hash<flatland::TransformHandle>;
   friend std::ostream& std::operator<<(std::ostream& out, const flatland::TransformHandle& h);
 
-  uint64_t instance_id_ = 0;
+  InstanceId instance_id_ = 0;
   uint64_t transform_id_ = 0;
 };
 
