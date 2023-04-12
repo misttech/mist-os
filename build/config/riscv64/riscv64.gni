@@ -70,7 +70,7 @@ riscv_profiles = {
       # "ziccrse",
       # "ziccamoa",
       # "za128rs",
-      # "ziccism",
+      # "zicclsm",
     ]
     u64_optional = [
       # Clang doesn't understand this, but it's just CSRs.
@@ -80,7 +80,7 @@ riscv_profiles = {
     # The s64 details aren't relevant to the compiler, since they are all just
     # CSRs, features in CSRs, or characteristics of CPU behavior.
     s64_mandatory = [
-      "zifenci",
+      "zifencei",
       "ss1p11",
       "svbare",
       "sv39",
