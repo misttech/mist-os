@@ -4,47 +4,69 @@
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     blocking::Unblock,
     errors::ffx_bail,
     ffx_audio_device_args::{DeviceCommand, DeviceType, SubCommand},
-    ffx_core::ffx_plugin,
+    fho::{selector, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
         AudioDaemonProxy, AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
     fidl_fuchsia_media::AudioStreamType,
+    fuchsia_zircon_status::Status,
     futures,
     serde::{Deserialize, Serialize},
 };
 
-#[ffx_plugin(
-    "audio",
-    AudioDaemonProxy = "core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"
-)]
-pub async fn device_cmd(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
-    match cmd.subcommand {
-        SubCommand::Info(_) => device_info(audio_proxy, cmd).await,
-        SubCommand::Play(_) => device_play(audio_proxy, cmd).await,
-        SubCommand::Record(_) => device_record(audio_proxy, cmd).await,
-        SubCommand::Gain(_) | SubCommand::Mute(_) | SubCommand::Unmute(_) | SubCommand::Agc(_) => {
-            let mut request_info = DeviceGainStateRequest {
-                audio_proxy,
-                device_id: cmd.id,
-                device_type: cmd.device_type,
-                gain_db: None,
-                agc_enabled: None,
-                muted: None,
-            };
+#[derive(FfxTool)]
+pub struct DeviceTool {
+    #[command]
+    cmd: DeviceCommand,
+    #[with(selector("core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"))]
+    audio_proxy: AudioDaemonProxy,
+}
 
-            match cmd.subcommand {
-                SubCommand::Gain(gain_cmd) => request_info.gain_db = Some(gain_cmd.gain),
-                SubCommand::Mute(..) => request_info.muted = Some(true),
-                SubCommand::Unmute(..) => request_info.muted = Some(false),
-                SubCommand::Agc(agc_command) => request_info.agc_enabled = Some(agc_command.enable),
-                _ => {}
+fho::embedded_plugin!(DeviceTool);
+#[async_trait(?Send)]
+impl FfxMain for DeviceTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        match self.cmd.subcommand {
+            SubCommand::Info(_) => {
+                device_info(self.audio_proxy, self.cmd).await.map_err(Into::into)
             }
-            device_set_gain_state(request_info).await
+            SubCommand::Play(_) => {
+                device_play(self.audio_proxy, self.cmd).await.map_err(Into::into)
+            }
+            SubCommand::Record(_) => {
+                device_record(self.audio_proxy, self.cmd).await.map_err(Into::into)
+            }
+            SubCommand::Gain(_)
+            | SubCommand::Mute(_)
+            | SubCommand::Unmute(_)
+            | SubCommand::Agc(_) => {
+                let mut request_info = DeviceGainStateRequest {
+                    audio_proxy: self.audio_proxy,
+                    device_id: self.cmd.id,
+                    device_type: self.cmd.device_type,
+                    gain_db: None,
+                    agc_enabled: None,
+                    muted: None,
+                };
+
+                match self.cmd.subcommand {
+                    SubCommand::Gain(gain_cmd) => request_info.gain_db = Some(gain_cmd.gain),
+                    SubCommand::Mute(..) => request_info.muted = Some(true),
+                    SubCommand::Unmute(..) => request_info.muted = Some(false),
+                    SubCommand::Agc(agc_command) => {
+                        request_info.agc_enabled = Some(agc_command.enable)
+                    }
+                    _ => {}
+                }
+                device_set_gain_state(request_info).await.map_err(Into::into)
+            }
         }
     }
 }
@@ -118,26 +140,38 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
     let request = AudioDaemonDeviceInfoRequest {
         device: Some(DeviceSelector {
             is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
-            id: Some(cmd.id),
+            id: Some(cmd.id.clone()),
             ..DeviceSelector::EMPTY
         }),
         ..AudioDaemonDeviceInfoRequest::EMPTY
     };
     let info = match audio_proxy.device_info(request).await? {
         Ok(value) => value,
-        Err(err) => ffx_bail!("Device info failed with err: {}", err),
+        Err(err) => ffx_bail!("Device info failed with error: {}", Status::from_raw(err)),
     };
 
-    let device_info = info.device_info.expect("DeviceInfo missing from response.");
+    let device_info =
+        info.device_info.ok_or(anyhow::anyhow!("DeviceInfo missing from response."))?;
 
-    let stream_properties =
-        device_info.stream_properties.clone().expect("Stream properties field missing.");
+    let stream_properties = device_info.stream_properties.clone().ok_or(anyhow::anyhow!(
+        "Stream properties field missing for device with id {0}.",
+        cmd.id
+    ))?;
 
-    let supported_formats =
-        device_info.supported_formats.clone().expect("Supported formats field missing.");
+    let supported_formats = device_info.supported_formats.clone().ok_or(anyhow::anyhow!(
+        "Supported formats field missing for device with id {0}.",
+        cmd.id
+    ))?;
 
-    let gain_state = device_info.gain_state.clone().expect("Gain state field is missing.");
-    let plug_state_info = device_info.plug_state.clone().expect("Plug state info field missing");
+    let gain_state = device_info
+        .gain_state
+        .clone()
+        .ok_or(anyhow::anyhow!("Gain state field missing for device with id {0}.", cmd.id))?;
+
+    let plug_state_info = device_info
+        .plug_state
+        .clone()
+        .ok_or(anyhow::anyhow!("Plug state info field missing for device with id {0}.", cmd.id))?;
 
     let pcm_supported_formats: Vec<PcmSupportedFormats> =
         supported_formats.into_iter().filter_map(|format| format.pcm_supported_formats).collect();
