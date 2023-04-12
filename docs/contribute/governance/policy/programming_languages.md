@@ -12,8 +12,9 @@ runs on the target Fuchsia device outside the Fuchsia Source Platform Tree.
 The policy does not apply to (a) developer tooling that end-developers execute,
 either on target or host devices, or (b) software on the target device
 that is not executed in normal, end-user operation of the device. For example,
-this policy does not apply to zxdb (a debugger) because zxdb is a developer
-tool that end-developers execute; the policy does apply to pkgfs because
+this policy does not apply to the language that zxdb (a debugger) is written in,
+because zxdb is a developer tool that end-developers execute and it does not run
+on a target device. However, this the policy does apply to pkgfs because
 pkgfs (a file system) executes in the normal, end-user operation of the device.
 
 This policy is an _allowlist_. Languages not explicitly allowed below are
