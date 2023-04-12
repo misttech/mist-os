@@ -200,13 +200,17 @@ static void invpcid_all_excluding_global() {
 }
 
 /**
- * @brief  invalidate all TLB entries, excluding global entries
+ * @brief  invalidate all TLB entries for the given PCID, excluding global entries
  */
-static void x86_tlb_nonglobal_invalidate() {
+static void x86_tlb_nonglobal_invalidate(uint16_t pcid) {
   if (g_x86_feature_invpcid) {
     // If using PCID, make sure we invalidate all entries in all PCIDs.
     // If just using INVPCID, take advantage of the fancier instruction.
-    invpcid_all_excluding_global();
+    if (pcid != MMU_X86_UNUSED_PCID) {
+      invpcid_pcid_all(pcid);
+    } else {
+      invpcid_all_excluding_global();
+    }
   } else {
     // Read CR3 and immediately write it back.
     arch::X86Cr3::Read().Write();
@@ -214,7 +218,7 @@ static void x86_tlb_nonglobal_invalidate() {
 }
 
 /**
- * @brief  invalidate all TLB entries, including global entries
+ * @brief  invalidate all TLB entries for all contexts, including global entries
  */
 static void x86_tlb_global_invalidate() {
   if (g_x86_feature_invpcid) {
@@ -391,7 +395,7 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
       return;
     }
 
-    /* Full TLB shootdowns handled here */
+    /* Full context shootdowns handled here */
     if (context->pending->full_shootdown) {
       if (context->pending->contains_global) {
         kcounter_add(tlb_invalidations_full_global_received, 1);
@@ -399,7 +403,7 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
         maybe_invvpid(InvVpid::SINGLE_CONTEXT, context->vpid, 0);
       } else {
         kcounter_add(tlb_invalidations_full_nonglobal_received, 1);
-        x86_tlb_nonglobal_invalidate();
+        x86_tlb_nonglobal_invalidate(context->pcid);
         maybe_invvpid(InvVpid::SINGLE_CONTEXT_RETAIN_GLOBALS, context->vpid, 0);
       }
       return;
