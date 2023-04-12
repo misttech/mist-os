@@ -100,23 +100,43 @@ struct pthread {
   int dlerror_flag;
 
 #ifdef TLS_ABOVE_TP
+  // This is a misnomer in this case, since it's entirely an implementation
+  // detail where the dtv pointer lives and if there is no ABI_TCBHEAD_SIZE
+  // then there's no particularly natural place to put it.  Likewise, there's
+  // no possibility of a presumption that *tp==tp as in TLS-below-TP machines
+  // so there's no need to have that field either. But to simplify things for
+  // the existing code using the `head` field, it's placed here with the same
+  // name (and the unused `head.tp` slot).
+#ifndef ABI_TCBHEAD_SIZE
+  tcbhead_t head;
+#endif  // ABI_TCBHEAD_SIZE
+
   // These must be the very last members.
   tp_abi_t abi;
+#ifdef ABI_TCBHEAD_SIZE
   tcbhead_t head;
-#endif
+#endif  // ABI_TCBHEAD_SIZE
+#endif  // TLS_ABOVE_TP
 };
 
 #ifdef TLS_ABOVE_TP
+#ifdef ABI_TCBHEAD_SIZE
 #define PTHREAD_TP_OFFSET offsetof(struct pthread, head)
+#else
+#define PTHREAD_TP_OFFSET sizeof(struct pthread)
+#endif
 #else
 #define PTHREAD_TP_OFFSET 0
 #endif
 
 #define TP_OFFSETOF(field) ((ptrdiff_t)offsetof(struct pthread, field) - PTHREAD_TP_OFFSET)
 
+#if !defined(TLS_ABOVE_TP) || defined(ABI_TCBHEAD_SIZE)
 static_assert(TP_OFFSETOF(head) == 0, "ABI tcbhead_t misplaced in struct pthread");
+#endif
 
 #ifdef ABI_TCBHEAD_SIZE
+static_assert(ABI_TCBHEAD_SIZE >= sizeof(tcbhead_t), "ABI_TCBHEAD_SIZE doesn't make sense");
 static_assert((sizeof(struct pthread) - offsetof(struct pthread, head)) == ABI_TCBHEAD_SIZE,
               "ABI tcbhead_t misplaced in struct pthread");
 #endif

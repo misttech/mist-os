@@ -129,6 +129,12 @@ struct gnu_note {
 #define ADDEND_LIMIT 32
 static size_t *saved_addends, *apply_addends_to;
 
+#ifdef ABI_TCBHEAD_SIZE
+#define INITIAL_TLS_OFFSET ABI_TCBHEAD_SIZE
+#else
+#define INITIAL_TLS_OFFSET 0
+#endif
+
 static struct dso ldso, vdso;
 static struct dso *head, *tail, *fini_head;
 static struct dso* detached_head;
@@ -139,7 +145,8 @@ static jmp_buf* rtld_fail;
 static pthread_rwlock_t lock;
 static struct r_debug debug;
 static struct tls_module* tls_tail;
-static size_t tls_cnt, tls_offset = 16, tls_align = MIN_TLS_ALIGN;
+static size_t tls_cnt, tls_align = MIN_TLS_ALIGN;
+static size_t tls_offset = INITIAL_TLS_OFFSET;
 static size_t static_tls_cnt;
 static pthread_mutex_t init_fini_lock = {
     ._m_attr = PTHREAD_MUTEX_MAKE_ATTR(PTHREAD_MUTEX_RECURSIVE, PTHREAD_PRIO_NONE)};
@@ -2034,8 +2041,12 @@ LIBC_NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
   // useless instruction serves that purpose.
 #ifdef __aarch64__
       "adrp %0, zxdb.thrd_t\n"
+#elif defined(__riscv)
+      "lla %0, zxdb.thrd_t\n"
 #elif defined(__x86_64__)
       "lea zxdb.thrd_t(%%rip), %0\n"
+#else
+#error "what machine?"
 #endif
       ".pushsection .zxdb_debug_api,\"a\",%%progbits\n"
 #define DEBUG_API(name) #name ":\n"
