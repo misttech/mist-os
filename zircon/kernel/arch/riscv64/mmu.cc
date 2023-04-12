@@ -174,6 +174,12 @@ ktl::string_view Riscv64AspaceTypeName(Riscv64AspaceType type) {
   __UNREACHABLE;
 }
 
+bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
+  return (base == USER_ASPACE_BASE && size == USER_ASPACE_SIZE) ||
+         (base == USER_ASPACE_BASE && size == (USER_ASPACE_SIZE / 2)) ||
+         (base == USER_ASPACE_BASE + (USER_ASPACE_SIZE / 2) && size == (USER_ASPACE_SIZE / 2));
+}
+
 }  // namespace
 
 // A consistency manager that tracks TLB updates, walker syncs and free pages in an effort to
@@ -1094,8 +1100,8 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     asid_ = (uint16_t)MMU_RISCV64_GLOBAL_ASID;
   } else {
     if (type_ == Riscv64AspaceType::kUser) {
-      DEBUG_ASSERT(base_ == USER_ASPACE_BASE);
-      DEBUG_ASSERT(size_ == USER_ASPACE_SIZE);
+      DEBUG_ASSERT_MSG(IsUserBaseSizeValid(base_, size_), "base %#" PRIxPTR " size 0x%zx", base_,
+                       size_);
       auto status = asid.Alloc();
       if (status.is_error()) {
         printf("RISC-V: out of ASIDs!\n");
