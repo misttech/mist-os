@@ -28,7 +28,7 @@ zx_status_t get_user_handles_to_consume(user_inout_ptr<zx_handle_disposition_t> 
 // have been removed, error otherwise. It only stops early if get_user_handles() fails.
 template <typename T>
 zx_status_t RemoveUserHandles(T user_handles, size_t num_handles, ProcessDispatcher* process) {
-  zx_handle_t handles[kMaxMessageHandles];
+  zx_handle_t handles[kMaxMessageHandles] = {ZX_HANDLE_INVALID};
   size_t offset = 0u;
   zx_status_t status = ZX_OK;
 
