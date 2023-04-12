@@ -192,6 +192,18 @@ TEST_P(DeliveryBlobTest, WriteChunked) {
   ASSERT_EQ(ZX_OK, file->Close());
 }
 
+// Verify that CalculateDeliveryBlobDigest works with all types of generated delivery blobs.
+TEST_P(DeliveryBlobTest, CalculateDeliveryBlobDigest) {
+  const std::unique_ptr<BlobInfo> info =
+      GenerateRandomBlob(/*mount_path*/ "", GetParam().blob_size);
+  const fbl::Array<uint8_t> delivery_blob =
+      GenerateDeliveryBlobType1({info->data.get(), info->size_data}, GetParam().compress).value();
+  zx::result<digest::Digest> digest = CalculateDeliveryBlobDigest(delivery_blob);
+  ASSERT_TRUE(digest.is_ok()) << digest.status_string() << "Data length: " << delivery_blob.size();
+  const auto digest_str = digest->ToString();
+  ASSERT_EQ(info->GetMerkleRoot(), digest_str);
+}
+
 std::string GetTestParamName(const ::testing::TestParamInfo<DeliveryBlobTestParams>& p) {
   return DeliveryBlobTestParams::GetTestParamName(p.param);
 }

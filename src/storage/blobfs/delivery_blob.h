@@ -20,6 +20,8 @@
 
 #include <fbl/array.h>
 
+#include "src/lib/digest/digest.h"
+
 namespace blobfs {
 
 constexpr std::string_view kDeliveryBlobPrefix = "v1-";
@@ -76,6 +78,14 @@ std::string GetDeliveryBlobPath(const std::string_view& path);
 // `compressed_file_size` in the blob info JSON file.
 zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
                                                           std::optional<bool> compress);
+
+// Calculate the Merkle root of an RFC 0207 compliant delivery blob. `data` must be a complete
+// delivery blob and cannot include any trailing data.
+//
+// *WARNING*: Aside from checksum verification and basic validity checks provided by the
+// chunked_compression library, this function makes no security guarantees. Decompression is
+// performed in the thread/address space of the caller.
+zx::result<digest::Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data);
 
 }  // namespace blobfs
 

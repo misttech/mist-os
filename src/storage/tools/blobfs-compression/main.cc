@@ -27,7 +27,8 @@ using blobfs::DeliveryBlobType;
 using ::chunked_compression::CompressionParams;
 
 const std::set<std::string_view> kCliOptions = {
-    "source_file", "compressed_file", "type", "disable_size_alignment", "help", "verbose",
+    "source_file", "compressed_file", "type", "disable_size_alignment", "calculate_digest",
+    "help",        "verbose",
 };
 
 zx::result<DeliveryBlobType> DeliveryTypeFromString(const std::string& delivery_type_str) {
@@ -51,18 +52,19 @@ void usage(const char* fname) {
       "compression implementation in blobfs. The merkle tree used here is a non-compact merkle \n"
       "tree as it contributes to a bigger size than a compact merkle tree.\n\n");
   fprintf(stderr, "Options:\n");
-  fprintf(stderr, "--%s=/path/to/file\n    %s\n", "source_file",
-          "(required) the file to be compressed.");
+  fprintf(stderr, "--%s=/path/to/file\n    %s\n", "source_file", "The file to be compressed.");
   fprintf(stderr, "--%s=/path/to/file\n    %s\n", "compressed_file",
-          "(optional) the compressed file output path (override if existing). Unless --type is "
+          "The compressed file output path (override if existing). Unless --type is "
           "specified, will contain compressed data with zero-padding at the end to ensure the "
           "compressed file size matches the size in stdout.");
   fprintf(stderr, "--%s=TYPE\n    %s\n", "type",
-          "(optional) If specified, uses specified type for size calculation, and will output "
-          "blob in delivery format. Output is only compressed if space is saved. Supported types:"
+          "If specified, use specified type when generating the output. Supported types:"
           "\n\t1 - Type A: zstd-chunked, default compression level");
   fprintf(stderr, "--%s\n    %s\n", "disable_size_alignment",
           "Do not align compressed output with block size. Incompatible with --type.");
+  fprintf(stderr, "--%s=/path/to/file\n    %s\n", "calculate_digest",
+          "Calculate the Merkle root/digest of a delivery blob (i.e. one created with --type). "
+          "Other options are ignored if set.");
   fprintf(stderr, "--%s\n    %s\n", "help", "print this usage message.");
   fprintf(stderr, "--%s\n    %s\n", "verbose", "show debugging information.");
 }
@@ -95,26 +97,31 @@ zx_status_t MapFileForWriting(const fbl::unique_fd& fd, const char* file, size_t
   return ZX_OK;
 }
 
-// Mmaps the |fd| for reading.
-// Returns the  size of the file in |out_size|, and the managed FD in |out_fd|.
-// This method can fail only with user-input-irrelevant errors.
-zx_status_t MapFileForReading(const fbl::unique_fd& fd, const uint8_t** out_buf, size_t* out_size) {
+// Mmaps the |fd| for reading, returning the mapping as a span.
+zx::result<cpp20::span<const uint8_t>> MapFileForReading(const fbl::unique_fd& fd) {
   struct stat info;
-  fstat(fd.get(), &info);
-  size_t size = info.st_size;
+  if (fstat(fd.get(), &info) < 0) {
+    fprintf(stderr, "fstat failed: %s\n", strerror(errno));
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  if (!S_ISREG(info.st_mode)) {
+    fprintf(stderr, "Cannot map input: can only map regular files\n");
+    return zx::error(ZX_ERR_NOT_FILE);
+  }
 
-  void* data = nullptr;
+  ZX_ASSERT(info.st_size >= 0);
+  const size_t size = info.st_size;
+  const void* data = nullptr;
+
   if (size > 0) {
     data = mmap(nullptr, size, PROT_READ, MAP_SHARED, fd.get(), 0);
     if (data == MAP_FAILED) {
       fprintf(stderr, "mmap failed: %s\n", strerror(errno));
-      return ZX_ERR_NO_MEMORY;
+      return zx::error(ZX_ERR_NO_MEMORY);
     }
   }
 
-  *out_buf = static_cast<uint8_t*>(data);
-  *out_size = size;
-  return ZX_OK;
+  return zx::ok(cpp20::span{static_cast<const uint8_t*>(data), size});
 }
 
 zx::result<> WriteDataToFile(const fbl::unique_fd& fd, cpp20::span<const uint8_t> data) {
@@ -129,6 +136,27 @@ zx::result<> WriteDataToFile(const fbl::unique_fd& fd, cpp20::span<const uint8_t
     written_bytes += write_result;
   }
   return zx::ok();
+}
+
+zx::result<digest::Digest> HandleCalculateDigest(std::string_view path) {
+  fbl::unique_fd fd(open(path.data(), O_RDONLY));
+  if (!fd) {
+    fprintf(stderr, "Failed to open %s: %s", path.data(), strerror(errno));
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  zx::result data = MapFileForReading(fd);
+  if (data.is_error()) {
+    fprintf(stderr, "Failed to map delivery blob for reading!\n");
+    return data.take_error();
+  }
+  zx::result digest = blobfs::CalculateDeliveryBlobDigest(*data);
+  if (digest.is_error()) {
+    fprintf(stderr,
+            "Failed to calculate delivery blob digest. Ensure the file is a valid delivery blob, "
+            "and that the file is not corrupted.\n");
+    return digest.take_error();
+  }
+  return digest;
 }
 
 }  // namespace
@@ -159,6 +187,19 @@ int main(int argc, char** argv) {
   if (printHelp) {
     usage(argv[0]);
     return 0;
+  }
+
+  // Handle case where --calculate_digest is specified (other options will be ignored).
+  if (cl.HasOption("calculate_digest")) {
+    std::string delivery_blob_path;
+    ZX_ASSERT(cl.GetOptionValue("calculate_digest", &delivery_blob_path));
+    zx::result digest = HandleCalculateDigest(delivery_blob_path);
+    if (digest.is_error()) {
+      return digest.error_value();
+    }
+    fbl::String digest_str = digest->ToString();
+    fprintf(stdout, "%s\n", digest_str.c_str());
+    return ZX_OK;
   }
 
   blobfs_compress::CompressionCliOptionStruct options;
@@ -210,18 +251,15 @@ int main(int argc, char** argv) {
     return error_code;
   }
 
-  const uint8_t* src_data;
-  size_t src_size;
-  error_code = MapFileForReading(options.source_file_fd, &src_data, &src_size);
-  if (error_code) {
-    return error_code;
+  zx::result source = MapFileForReading(options.source_file_fd);
+  if (source.is_error()) {
+    return source.error_value();
   }
 
   // We need to generate a delivery blob.
   if (options.type.has_value()) {
     ZX_ASSERT(!options.compressed_file.empty() && options.compressed_file_fd.is_valid());
-    const zx::result delivery_blob =
-        blobfs_compress::GenerateDeliveryBlob({src_data, src_size}, *options.type);
+    const zx::result delivery_blob = blobfs_compress::GenerateDeliveryBlob(*source, *options.type);
     if (delivery_blob.is_error()) {
       fprintf(stderr, "Error generating delivery blob.\n");
       return delivery_blob.error_value();
@@ -232,11 +270,11 @@ int main(int argc, char** argv) {
   }
 
   uint8_t* dest_data = nullptr;
-  CompressionParams params = blobfs::GetDefaultChunkedCompressionParams(src_size);
+  CompressionParams params = blobfs::GetDefaultChunkedCompressionParams(source->size());
   if (!options.compressed_file.empty()) {
     const size_t dest_buffer_size =
-        params.ComputeOutputSizeLimit(src_size) +
-        digest::CalculateMerkleTreeSize(src_size, digest::kDefaultNodeSize, false);
+        params.ComputeOutputSizeLimit(source->size()) +
+        digest::CalculateMerkleTreeSize(source->size(), digest::kDefaultNodeSize, false);
     error_code = MapFileForWriting(options.compressed_file_fd, options.compressed_file.c_str(),
                                    dest_buffer_size, &dest_data);
     if (error_code) {
@@ -247,7 +285,8 @@ int main(int argc, char** argv) {
   // Compress the blob and output compressed size, optionally writing data into the mapped buffer.
 
   size_t dest_size;
-  if (blobfs_compress::BlobfsCompress(src_data, src_size, dest_data, &dest_size, params, options)) {
+  if (blobfs_compress::BlobfsCompress(source->data(), source->size(), dest_data, &dest_size, params,
+                                      options)) {
     return ZX_ERR_INTERNAL;
   }
 

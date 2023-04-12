@@ -7,7 +7,9 @@
 #include <lib/cksum.h>
 #include <zircon/assert.h>
 
+#include "src/lib/chunked-compression/chunked-decompressor.h"
 #include "src/lib/chunked-compression/multithreaded-chunked-compressor.h"
+#include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/delivery_blob_private.h"
 
@@ -196,6 +198,63 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
     std::memcpy(delivery_blob.data() + kPayloadOffset, data.data(), data.size_bytes());
   }
   return zx::ok(std::move(delivery_blob));
+}
+
+zx::result<digest::Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data) {
+  zx::result header = DeliveryBlobHeader::FromBuffer(data);
+  if (header.is_error()) {
+    return header.take_error();
+  }
+  if (header->type != DeliveryBlobType::kType1) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // Currently, Type 1 blobs have a fixed header size, but this may change if we move the seek table
+  // from the payload section into the metadata.
+  constexpr size_t kExpectedHeaderLength = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
+  if (data.size() < kExpectedHeaderLength) {
+    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
+  }
+  if (header->header_length != kExpectedHeaderLength) {
+    return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
+  }
+
+  zx::result metadata =
+      MetadataType1::FromBuffer(data.subspan(sizeof(DeliveryBlobHeader)), *header);
+  if (metadata.is_error()) {
+    return metadata.take_error();
+  }
+
+  cpp20::span<const uint8_t> payload = data.subspan(header->header_length);
+  if (payload.size() != metadata->payload_length) {
+    return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
+  }
+
+  // Decompress `payload` if required, and update the span to point to the uncompressed result.
+  fbl::Array<uint8_t> decompressed_result;
+  if (metadata->IsCompressed() && !payload.empty()) {
+    size_t unused_bytes_written;
+    if (chunked_compression::Status status =
+            chunked_compression::ChunkedDecompressor::DecompressBytes(
+                payload.data(), payload.size(), &decompressed_result, &unused_bytes_written);
+        status != chunked_compression::kStatusOk) {
+      return zx::error(chunked_compression::ToZxStatus(status));
+    }
+    payload = decompressed_result;
+  }
+
+  // Calculate Merkle root of `payload` which points to the uncompressed blob data (may be empty).
+  std::unique_ptr<uint8_t[]> unused_tree;
+  size_t unused_tree_len;
+  digest::Digest root;
+
+  if (zx_status_t status = digest::MerkleTreeCreator::Create(payload.data(), payload.size(),
+                                                             &unused_tree, &unused_tree_len, &root);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  return zx::ok(root);
 }
 
 }  // namespace blobfs
