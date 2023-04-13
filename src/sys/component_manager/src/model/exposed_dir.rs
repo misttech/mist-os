@@ -32,10 +32,10 @@ impl ExposedDir {
     pub fn new(
         scope: ExecutionScope,
         component: WeakComponentInstance,
-        decl: ComponentDecl,
+        decl: &ComponentDecl,
     ) -> Result<Self, ResolveActionError> {
         let mut dir = pfs::simple();
-        let tree = DirTree::build_from_exposes(route_expose_fn, component.clone(), &decl);
+        let tree = DirTree::build_from_exposes(route_expose_fn, component.clone(), decl);
         tree.install(&mut dir).map_err(|err| ResolveActionError::ExposeDirError {
             moniker: component.abs_moniker.clone(),
             err,

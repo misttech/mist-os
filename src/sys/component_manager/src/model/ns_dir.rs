@@ -33,11 +33,11 @@ impl NamespaceDir {
     pub fn new(
         scope: ExecutionScope,
         component: WeakComponentInstance,
-        decl: ComponentDecl,
+        decl: &ComponentDecl,
         pkg_dir: Option<fio::DirectoryProxy>,
     ) -> Result<Self, ResolveActionError> {
         let mut dir = pfs::simple();
-        let tree = DirTree::build_from_uses(route_use_fn, component.clone(), &decl);
+        let tree = DirTree::build_from_uses(route_use_fn, component.clone(), decl);
         tree.install(&mut dir).map_err(|err| ResolveActionError::NamespaceDirError {
             moniker: component.abs_moniker.clone(),
             err,

@@ -1291,20 +1291,16 @@ impl ResolvedInstanceState {
         context_to_resolve_children: Option<ComponentResolutionContext>,
     ) -> Result<Self, ResolveActionError> {
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
-        let exposed_dir = ExposedDir::new(
-            ExecutionScope::new(),
-            WeakComponentInstance::new(&component),
-            decl.clone(),
-        )?;
+        let exposed_dir =
+            ExposedDir::new(ExecutionScope::new(), WeakComponentInstance::new(&component), &decl)?;
         let ns_dir = NamespaceDir::new(
             ExecutionScope::new(),
             WeakComponentInstance::new(&component),
-            decl.clone(),
+            &decl,
             package.clone().map(|p| p.package_dir),
         )?;
         let mut state = Self {
             execution_scope: ExecutionScope::new(),
-            decl: decl.clone(),
             children: HashMap::new(),
             next_dynamic_instance_id: 1,
             environments: Self::instantiate_environments(component, &decl),
@@ -1316,8 +1312,9 @@ impl ResolvedInstanceState {
             address,
             context_to_resolve_children,
             collection_services: HashMap::new(),
+            decl,
         };
-        state.add_static_children(component, &decl).await?;
+        state.add_static_children(component).await?;
         Ok(state)
     }
 
@@ -1597,9 +1594,11 @@ impl ResolvedInstanceState {
     async fn add_static_children(
         &mut self,
         component: &Arc<ComponentInstance>,
-        decl: &ComponentDecl,
     ) -> Result<(), ResolveActionError> {
-        for child in decl.children.iter() {
+        // We can't hold an immutable reference to `self` while passing a mutable reference later
+        // on. To get around this, clone the children.
+        let children = self.decl.children.clone();
+        for child in &children {
             self.add_child(component, child, None, None, None).await.map_err(|err| {
                 ResolveActionError::AddStaticChildError { child_name: child.name.to_string(), err }
             })?;
