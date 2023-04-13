@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("access_ota_blob_as_executable/access_ota_blob_as_executable.gni")
 import("bad_signature_update/bad_signature_update.gni")
 
@@ -72,11 +73,15 @@ if (is_fuchsia) {
 
 group("tests") {
   testonly = true
-  deps = [ ":core_bad_signature_update-package($target_toolchain)" ]
-
-  if (!is_coverage) {
-    # TODO(https://fxbug.dev/112796): Re-enable this test in coverage when it no
-    # longer fails with coverage enabled.
-    deps += [ ":core_access_ota_blob_as_executable-package($target_toolchain)" ]
+  deps = []
+  if (!fxfs_blob) {
+    # TODO(fxbug.dev/122056): Support Fxblob in this test.
+    deps += [ ":core_bad_signature_update-package($target_toolchain)" ]
+    if (!is_coverage) {
+      # TODO(https://fxbug.dev/112796): Re-enable this test in coverage when it no
+      # longer fails with coverage enabled.
+      deps +=
+          [ ":core_access_ota_blob_as_executable-package($target_toolchain)" ]
+    }
   }
 }
