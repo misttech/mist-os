@@ -33,6 +33,7 @@ use camino::Utf8Path;
 use errors::ffx_bail;
 use fms::Entries;
 use futures::TryStreamExt as _;
+use hyper::{Body, Method, Request};
 use itertools::Itertools as _;
 use sdk;
 use sdk_metadata::ProductBundle;
@@ -53,7 +54,6 @@ mod pbms;
 mod repo;
 mod repo_info;
 pub mod transfer_manifest;
-
 /// Select an Oauth2 authorization flow.
 #[derive(PartialEq, Debug, Clone)]
 pub enum AuthFlowChoice {
@@ -562,7 +562,19 @@ where
 {
     tracing::debug!("string_from_url {:?}", product_url);
     Ok(match product_url.scheme() {
-        "http" | "https" => unimplemented!(),
+        "http" | "https" => {
+            let https_client = fuchsia_hyper::new_https_client();
+            let req = Request::builder()
+                .method(Method::GET)
+                .uri(product_url.as_str())
+                .body(Body::empty())?;
+            let res = https_client.request(req).await?;
+            if !res.status().is_success() {
+                bail!("http(s) request failed, status {}, for {}", res.status(), product_url);
+            }
+            let bytes = hyper::body::to_bytes(res.into_body()).await?;
+            String::from_utf8_lossy(&bytes).to_string()
+        }
         GS_SCHEME => string_from_gcs(product_url.as_str(), auth_flow, progress, ui, client)
             .await
             .context("Downloading from GCS as string.")?,

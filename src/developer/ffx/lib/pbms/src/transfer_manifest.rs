@@ -7,8 +7,8 @@
 //! This builds upon the lower level /src/lib/transfer_manifest lib.
 
 use crate::{
-    gcs::{fetch_from_gcs, string_from_gcs},
-    AuthFlowChoice,
+    pbms::{fetch_from_url, GS_SCHEME},
+    string_from_url, AuthFlowChoice,
 };
 use ::gcs::{
     client::{Client, ProgressResult, ProgressState},
@@ -42,15 +42,9 @@ where
     );
     assert!(local_dir.is_dir());
 
-    let tm = string_from_gcs(
-        &transfer_manifest_url.as_str(),
-        auth_flow,
-        &|f| progress(vec![f]),
-        ui,
-        client,
-    )
-    .await
-    .with_context(|| format!("string from gcs: {:?}", transfer_manifest_url))?;
+    let tm = string_from_url(&transfer_manifest_url, auth_flow, &|f| progress(vec![f]), ui, client)
+        .await
+        .with_context(|| format!("string from gcs: {:?}", transfer_manifest_url))?;
 
     let manifest = serde_json::from_str::<TransferManifest>(&tm)
         .with_context(|| format!("Parsing json {:?}", tm))?;
@@ -88,10 +82,15 @@ where
     F: Fn(Vec<ProgressState<'_>>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
-    let base_url = format!(
-        "gs://{}",
-        split_gs_url(&transfer_manifest_url.as_str()).context("splitting transfer_manifest_url")?.0
-    );
+    let base_url = match transfer_manifest_url.scheme() {
+        GS_SCHEME => format!(
+            "gs://{}",
+            split_gs_url(&transfer_manifest_url.as_str())
+                .context("splitting transfer_manifest_url")?
+                .0
+        ),
+        _ => transfer_manifest_url[..url::Position::BeforePath].to_string(),
+    };
     let transfer_entry_count = transfer_manifest.entries.len() as u64;
     for (i, transfer_entry) in transfer_manifest.entries.iter().enumerate() {
         // Avoid using base_url.join().
@@ -101,7 +100,8 @@ where
         let artifact_entry_count = transfer_entry.entries.len() as u64;
         for (k, artifact_entry) in transfer_entry.entries.iter().enumerate() {
             // Avoid using te_remote_dir.join().
-            let remote_file = format!("{}/{}", te_remote_dir, artifact_entry.name.as_str());
+            let remote_file =
+                url::Url::parse(&format!("{}/{}", te_remote_dir, artifact_entry.name.as_str()))?;
 
             let local_file = te_local_dir.join(&artifact_entry.name);
             let local_parent = local_file.parent().context("getting local parent")?;
@@ -110,8 +110,8 @@ where
                 .with_context(|| format!("creating local_parent {:?}", local_parent))?;
 
             tracing::debug!("Transfer {:?} to {:?}", remote_file, local_parent);
-            fetch_from_gcs(
-                &remote_file.as_str(),
+            fetch_from_url(
+                &remote_file,
                 &local_parent,
                 auth_flow,
                 &|_, f| {
@@ -137,7 +137,7 @@ where
                 client,
             )
             .await
-            .context("fetching from gcs")?;
+            .context("fetching from url")?;
         }
     }
     Ok(())
