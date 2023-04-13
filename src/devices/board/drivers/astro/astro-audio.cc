@@ -342,7 +342,7 @@ zx_status_t Astro::AudioInit() {
         },
     };
 
-    status = DdkAddCompositeNodeSpec("audio-codec-tas27xx",
+    status = DdkAddCompositeNodeSpec("audio_codec_tas27xx",
                                      ddk::CompositeNodeSpec(kI2cRules, kI2cProps)
                                          .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
                                          .set_metadata(codec_metadata));
@@ -409,7 +409,7 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.irq() = frddr_b_irqs;
     tdm_dev.metadata() = tdm_metadata;
     auto tdm_spec = fdf::CompositeNodeSpec{{
-        "astro-i2s-audio-out-tdm",
+        "aml_tdm",
         kTdmI2sSpec,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),

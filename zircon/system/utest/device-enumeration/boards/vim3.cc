@@ -34,8 +34,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-controller",
       "sys/platform/05:06:2b/aml-hdmi",
       "sys/platform/05:06:1d",  // pwm
-      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/aml_pwm_regulator/pwm-0-regulator",
-      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/aml_pwm_regulator/pwm-9-regulator",
+      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-0-regulator",
+      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-9-regulator",
       "sys/platform/05:06:26/aml-power-impl-composite",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-little-core",
@@ -62,7 +62,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "class/thermal/000",
 
       // GPIO
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/ti_tca6408a/ti-tca6408a/gpio-107",
+      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-107",
 
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-24/vim3-mcu",
   };

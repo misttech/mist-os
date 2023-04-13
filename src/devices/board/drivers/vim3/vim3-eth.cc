@@ -203,8 +203,8 @@ zx_status_t Vim3::EthInit() {
   }
 
   // Add a composite device for dwmac driver in the ethernet board driver's driver host.
-  auto spec = fuchsia_driver_framework::CompositeNodeSpec{
-      {.name = "eth-board", .parents = kEthBoardParents}};
+  auto spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "dwmac", .parents = kEthBoardParents}};
   fdf::WireUnownedResult dwmac_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(arena, dwmac_dev), fidl::ToWire(arena, spec));
   if (!dwmac_result.ok()) {
