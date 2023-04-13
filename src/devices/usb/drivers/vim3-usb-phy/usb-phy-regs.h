@@ -13,6 +13,7 @@ namespace vim3_usb_phy {
 
 constexpr uint32_t RESET1_REGISTER_OFFSET = 0x8;
 constexpr uint32_t RESET1_LEVEL_OFFSET = 0x84;
+constexpr uint32_t USB2PHY_PORTCOUNT = 2;
 
 // PHY register offsets
 constexpr uint32_t U2P_REGISTER_OFFSET = 32;
@@ -25,6 +26,8 @@ constexpr uint32_t USB_R2_OFFSET = 0x88;
 constexpr uint32_t USB_R3_OFFSET = 0x8c;
 constexpr uint32_t USB_R4_OFFSET = 0x90;
 constexpr uint32_t USB_R5_OFFSET = 0x94;
+
+constexpr uint32_t USB_PHY_REG21_OFFSET = 0x54;
 
 class U2P_R0_V2 : public hwreg::RegisterBase<U2P_R0_V2, uint32_t> {
  public:
@@ -112,6 +115,20 @@ class USB_R5_V2 : public hwreg::RegisterBase<USB_R5_V2, uint32_t> {
   DEF_FIELD(15, 8, iddig_th);
   DEF_FIELD(23, 16, iddig_cnt);
   static auto Get() { return hwreg::RegisterAddr<USB_R5_V2>(USB_R5_OFFSET); }
+};
+
+class USB_PHY_REG21 : public hwreg::RegisterBase<USB_PHY_REG21, uint32_t> {
+ public:
+  DEF_FIELD(31, 26, reg32_21_31_26_reserved);
+  DEF_FIELD(25, 20, bypass_utmi_reg);
+  DEF_FIELD(19, 16, bypass_utmi_cntr);
+  DEF_FIELD(15, 6, reg32_21_15_6_reserved);
+  DEF_FIELD(5, 4, usb2_otg_aca_trim_1_0);
+  DEF_BIT(3, usb2_tx_strg_pd);
+  DEF_BIT(2, usb2_otg_aca_en);
+  DEF_BIT(1, usb2_cal_ack_en);
+  DEF_BIT(0, usb2_bgr_force);
+  static auto Get() { return hwreg::RegisterAddr<USB_PHY_REG21>(USB_PHY_REG21_OFFSET); }
 };
 
 // Undocumented PLL registers used for PHY tuning.
