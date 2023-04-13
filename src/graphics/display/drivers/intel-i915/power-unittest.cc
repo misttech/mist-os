@@ -23,35 +23,31 @@ class PowerTest : public ::testing::Test {
  public:
   PowerTest() = default;
 
-  void SetUp() override {
-    regs_.resize(kMinimumRegCount);
-    reg_region_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.data(), sizeof(uint32_t),
-                                                                kMinimumRegCount);
-    mmio_buffer_.emplace(reg_region_->GetMmioBuffer());
-  }
+  void SetUp() override { mmio_buffer_.emplace(reg_region_.GetMmioBuffer()); }
 
   void TearDown() override {}
 
  protected:
   constexpr static uint32_t kMinimumRegCount = 0x50000 / sizeof(uint32_t);
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> reg_region_;
-  std::vector<ddk_fake::FakeMmioReg> regs_;
+  ddk_fake::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
 };
 
 // Verify setting Power Well 2 status on Skylake platform.
 TEST_F(PowerTest, Skylake_PowerWell2) {
-  auto kPwrWellCtlIndex = registers::PowerWellControl::Get().addr() / sizeof(uint32_t);
-  auto kFuseStatusIndex = registers::FuseStatus::Get().addr() / sizeof(uint32_t);
+  auto kPwrWellCtlAddr = registers::PowerWellControl::Get().addr();
+  auto kFuseStatusAddr = registers::FuseStatus::Get().addr();
 
   bool pg2_status = false;
 
-  regs_[kPwrWellCtlIndex].SetWriteCallback(
+  reg_region_[kPwrWellCtlAddr].SetWriteCallback(
       [&pg2_status](uint64_t in) { pg2_status = in & (1 << 31); });
 
-  regs_[kPwrWellCtlIndex].SetReadCallback([&pg2_status]() -> uint64_t { return pg2_status << 30; });
+  reg_region_[kPwrWellCtlAddr].SetReadCallback(
+      [&pg2_status]() -> uint64_t { return pg2_status << 30; });
 
-  regs_[kFuseStatusIndex].SetReadCallback([&pg2_status]() -> uint64_t { return pg2_status << 25; });
+  reg_region_[kFuseStatusAddr].SetReadCallback(
+      [&pg2_status]() -> uint64_t { return pg2_status << 25; });
 
   constexpr uint16_t kDeviceIdSkylake = 0x191b;
   auto power = Power::New(&*mmio_buffer_, kDeviceIdSkylake);
@@ -109,27 +105,27 @@ TEST_F(PowerTest, Skylake_AuxIo) {
 }
 
 TEST_F(PowerTest, TigerLake_DdiIo) {
-  const auto kPowerWellControlDdi2Index =
-      registers::PowerWellControlDdi2::Get().addr() / sizeof(uint32_t);
+  const auto kPowerWellControlDdi2Addr = registers::PowerWellControlDdi2::Get().addr();
 
   auto power_well_control_ddi_reg = registers::PowerWellControlDdi2::Get().FromValue(0);
 
   // Fake PowerWellControlDdi2 register, which flips the state bit once the
   // corresponding request bit is flipped.
-  regs_[kPowerWellControlDdi2Index].SetWriteCallback([&power_well_control_ddi_reg](uint64_t in) {
-    constexpr uint32_t kPowerStateBitMask = 0b010101010101010101;
+  reg_region_[kPowerWellControlDdi2Addr].SetWriteCallback(
+      [&power_well_control_ddi_reg](uint64_t in) {
+        constexpr uint32_t kPowerStateBitMask = 0b010101010101010101;
 
-    const uint32_t current_power_state_bits =
-        power_well_control_ddi_reg.reg_value() & kPowerStateBitMask;
-    const uint32_t incoming_power_state_bits = static_cast<uint32_t>(in) & kPowerStateBitMask;
-    EXPECT_EQ(incoming_power_state_bits, current_power_state_bits)
-        << "power state bits must not be modified";
+        const uint32_t current_power_state_bits =
+            power_well_control_ddi_reg.reg_value() & kPowerStateBitMask;
+        const uint32_t incoming_power_state_bits = static_cast<uint32_t>(in) & kPowerStateBitMask;
+        EXPECT_EQ(incoming_power_state_bits, current_power_state_bits)
+            << "power state bits must not be modified";
 
-    power_well_control_ddi_reg.set_reg_value(
-        (power_well_control_ddi_reg.reg_value() & (~kPowerStateBitMask)) |
-        ((in >> 1) & kPowerStateBitMask));
-  });
-  regs_[kPowerWellControlDdi2Index].SetReadCallback(
+        power_well_control_ddi_reg.set_reg_value(
+            (power_well_control_ddi_reg.reg_value() & (~kPowerStateBitMask)) |
+            ((in >> 1) & kPowerStateBitMask));
+      });
+  reg_region_[kPowerWellControlDdi2Addr].SetReadCallback(
       [&power_well_control_ddi_reg]() { return power_well_control_ddi_reg.reg_value(); });
 
   constexpr uint16_t kDeviceIdTigerLake = 0x9a49;
@@ -174,8 +170,8 @@ TEST_F(PowerTest, TigerLake_DdiIo) {
 
 // Verify setting Power Well status on Tiger lake platform.
 TEST_F(PowerTest, TigerLake_PowerWell) {
-  auto kPwrWellCtlIndex = registers::PowerWellControl::Get().addr() / sizeof(uint32_t);
-  auto kFuseStatusIndex = registers::FuseStatus::Get().addr() / sizeof(uint32_t);
+  auto kPwrWellCtlAddr = registers::PowerWellControl::Get().addr();
+  auto kFuseStatusAddr = registers::FuseStatus::Get().addr();
 
   std::unordered_map<PowerWellId, bool> pg_status = {
       {PowerWellId::PG1, true},  {PowerWellId::PG2, false}, {PowerWellId::PG3, false},
@@ -183,7 +179,7 @@ TEST_F(PowerTest, TigerLake_PowerWell) {
   };
   uint64_t power_well_ctl_reg = 0u;
 
-  regs_[kPwrWellCtlIndex].SetWriteCallback([&pg_status, &power_well_ctl_reg](uint64_t in) {
+  reg_region_[kPwrWellCtlAddr].SetWriteCallback([&pg_status, &power_well_ctl_reg](uint64_t in) {
     pg_status[PowerWellId::PG2] = in & (1 << 3);
     pg_status[PowerWellId::PG3] = in & (1 << 5);
     pg_status[PowerWellId::PG4] = in & (1 << 7);
@@ -196,10 +192,10 @@ TEST_F(PowerTest, TigerLake_PowerWell) {
                          (pg_status[PowerWellId::PG5] << 8) | (in & (1 << 9));
   });
 
-  regs_[kPwrWellCtlIndex].SetReadCallback(
+  reg_region_[kPwrWellCtlAddr].SetReadCallback(
       [&power_well_ctl_reg]() -> uint64_t { return power_well_ctl_reg; });
 
-  regs_[kFuseStatusIndex].SetReadCallback([&pg_status]() -> uint64_t {
+  reg_region_[kFuseStatusAddr].SetReadCallback([&pg_status]() -> uint64_t {
     return (pg_status[PowerWellId::PG1] << 26) | (pg_status[PowerWellId::PG2] << 25) |
            (pg_status[PowerWellId::PG3] << 24) | (pg_status[PowerWellId::PG4] << 23) |
            (pg_status[PowerWellId::PG5] << 22);

@@ -12,11 +12,11 @@ namespace ddk_fake_test {
 
 TEST(MockMmioReg, CopyFrom) {
   constexpr size_t kRegArrayLength = 0x100;
-  ddk_fake::FakeMmioReg reg_array_1[kRegArrayLength];
-  ddk_fake::FakeMmioReg reg_array_2[kRegArrayLength];
+  //ddk_fake::FakeMmioReg reg_array_1[kRegArrayLength];
+  //ddk_fake::FakeMmioReg reg_array_2[kRegArrayLength];
 
-  ddk_fake::FakeMmioRegRegion reg_region_1(reg_array_1, sizeof(uint32_t), std::size(reg_array_1));
-  ddk_fake::FakeMmioRegRegion reg_region_2(reg_array_2, sizeof(uint32_t), std::size(reg_array_2));
+  ddk_fake::FakeMmioRegRegion reg_region_1(sizeof(uint32_t), kRegArrayLength);
+  ddk_fake::FakeMmioRegRegion reg_region_2(sizeof(uint32_t), kRegArrayLength);
 
   fdf::MmioBuffer dut_1(reg_region_1.GetMmioBuffer());
   fdf::MmioBuffer dut_2(reg_region_2.GetMmioBuffer());

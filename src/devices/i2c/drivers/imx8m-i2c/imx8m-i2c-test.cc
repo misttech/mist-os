@@ -31,23 +31,18 @@
 
 namespace imx8m_i2c {
 
-constexpr size_t kRegSize = kRegisterSetSize / sizeof(uint16_t);
 static constexpr size_t kMaxTransferSize = (UINT16_MAX - 1);
 
 class FakeMmio {
  public:
-  FakeMmio() {
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(kRegSize);
-    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint16_t), kRegSize);
-  }
+  FakeMmio() : mmio_(sizeof(uint16_t), kRegisterSetSize) {}
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
 
-  ddk_fake::FakeMmioReg& reg(size_t ix) { return regs_[ix >> 1]; }
+  ddk_fake::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
 
  private:
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 struct IncomingNamespace {

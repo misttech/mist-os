@@ -176,19 +176,16 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
 class FakeMmio {
  public:
   FakeMmio() {
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(kRegArrayLength);
-    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t),
-                                                          kRegArrayLength);
+    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(sizeof(uint32_t), kRegArrayLength);
   }
 
   fdf::MmioBuffer MmioBuffer() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
 
-  ddk_fake::FakeMmioReg& FakeRegister(size_t address) { return regs_[address >> 2]; }
+  ddk_fake::FakeMmioReg& FakeRegister(size_t address) { return (*mmio_)[address]; }
 
  private:
   static constexpr size_t kMmioBufferSize = 0x5000;
   static constexpr size_t kRegArrayLength = kMmioBufferSize / sizeof(uint32_t);
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 

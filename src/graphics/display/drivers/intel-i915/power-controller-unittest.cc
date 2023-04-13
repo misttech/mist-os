@@ -400,14 +400,16 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutAfterRetry) {
   voltage_level_timeout_change_.reset();
   voltage_level_timeout_change_ =
       PowerController::OverrideVoltageLevelRequestTotalTimeoutUsForTesting(kRealClockTestTimeout);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(0x140000 / sizeof(uint32_t));
 
   bool report_busy_mailbox = false;
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback([&](uint64_t value) {
+
+  ddk_fake::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
+
+  fake_mmio_region[kMailboxInterfaceOffset].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(0x8000'0007, value) << "Unexpected command";
     report_busy_mailbox = true;
   });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  fake_mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t {
     if (report_busy_mailbox) {
       // Report busy once, so RequestDisplayVoltageLevelRetryTimeout() gets some
       // sleep between retries.
@@ -416,14 +418,12 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutAfterRetry) {
     }
     return 0x0000'0007;
   });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  fake_mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t {
     // Always produce the result "voltage level not applied", so
     // RequestDisplayVoltageLevel() retries.
     return 0x0000'0000;
   });
 
-  ddk_fake::FakeMmioRegRegion fake_mmio_region(fake_mmio_regs.data(), sizeof(uint32_t),
-                                               fake_mmio_regs.size());
   fdf::MmioBuffer fake_mmio_buffer = fake_mmio_region.GetMmioBuffer();
   PowerController power_controller(&fake_mmio_buffer);
 
@@ -602,14 +602,15 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutAf
   typec_blocking_timeout_change_ =
       PowerController::OverrideTypeCColdBlockingChangeTotalTimeoutUsForTesting(
           kRealClockTestTimeout);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(0x140000 / sizeof(uint32_t));
 
   bool report_busy_mailbox = false;
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback([&](uint64_t value) {
+
+  ddk_fake::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
+  fake_mmio_region[kMailboxInterfaceOffset].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(0x8000'0026, value) << "Unexpected command";
     report_busy_mailbox = true;
   });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  fake_mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t {
     if (report_busy_mailbox) {
       // Report busy once, so SetDisplayTypeCColdBlockingTigerLake() gets some
       // sleep between retries.
@@ -618,14 +619,12 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutAf
     }
     return 0x0000'0026;
   });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  fake_mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t {
     // Always produce the result "in TCCOLD", so
     // SetDisplayTypeCColdBlockingTigerLake() retries.
     return 0x0000'0001;
   });
 
-  ddk_fake::FakeMmioRegRegion fake_mmio_region(fake_mmio_regs.data(), sizeof(uint32_t),
-                                               fake_mmio_regs.size());
   fdf::MmioBuffer fake_mmio_buffer = fake_mmio_region.GetMmioBuffer();
   PowerController power_controller(&fake_mmio_buffer);
 
@@ -804,14 +803,15 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutAft
   system_agent_enablement_timeout_change_ =
       PowerController::OverrideSystemAgentEnablementChangeTotalTimeoutUsForTesting(
           kRealClockTestTimeout);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(0x140000 / sizeof(uint32_t));
 
   bool report_busy_mailbox = false;
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback([&](uint64_t value) {
+
+  ddk_fake::FakeMmioRegRegion fake_mmio_region(sizeof(uint32_t), 0x140000 / sizeof(uint32_t));
+  fake_mmio_region[kMailboxInterfaceOffset].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(0x8000'0021, value) << "Unexpected command";
     report_busy_mailbox = true;
   });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  fake_mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t {
     if (report_busy_mailbox) {
       // Report busy once, so SetSystemAgentGeyservilleEnabledRetryTimeout() gets some
       // sleep between retries.
@@ -820,14 +820,12 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutAft
     }
     return 0x0000'0021;
   });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  fake_mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t {
     // Always produce the result "voltage level not applied", so
     // SetSystemAgentGeyservilleEnabled() retries.
     return 0x0000'0000;
   });
 
-  ddk_fake::FakeMmioRegRegion fake_mmio_region(fake_mmio_regs.data(), sizeof(uint32_t),
-                                               fake_mmio_regs.size());
   fdf::MmioBuffer fake_mmio_buffer = fake_mmio_region.GetMmioBuffer();
   PowerController power_controller(&fake_mmio_buffer);
 

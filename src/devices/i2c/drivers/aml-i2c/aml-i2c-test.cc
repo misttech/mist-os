@@ -41,10 +41,11 @@ class FakeAmlI2cController {
   };
 
   explicit FakeAmlI2cController(zx::unowned_interrupt irq)
-      : mmio_(regs_, sizeof(reg_values_[0]), std::size(regs_)), irq_(std::move(irq)) {
+      : mmio_(sizeof(reg_values_[0]), 8),
+        irq_(std::move(irq)) {
     for (size_t i = 0; i < std::size(reg_values_); i++) {
-      regs_[i].SetReadCallback(ReadRegCallback(i));
-      regs_[i].SetWriteCallback(WriteRegCallback(i));
+      mmio_[i * sizeof(reg_values_[0])].SetReadCallback(ReadRegCallback(i));
+      mmio_[i * sizeof(reg_values_[0])].SetWriteCallback(WriteRegCallback(i));
     }
     mmio_[kControlReg].SetWriteCallback([&](uint64_t value) { WriteControlReg(value); });
   }
@@ -148,7 +149,6 @@ class FakeAmlI2cController {
            (static_cast<uint64_t>(reg_values_[(offset / sizeof(uint32_t)) + 1]) << 32);
   }
 
-  ddk_fake::FakeMmioReg regs_[8];
   ddk_fake::FakeMmioRegRegion mmio_;
   uint32_t reg_values_[8]{};
   zx::unowned_interrupt irq_;

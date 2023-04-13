@@ -50,16 +50,20 @@ class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
   FakePDev() : pdev_({&pdev_protocol_ops_, this}) {
     // Initialize register read/write hooks.
     for (size_t i = 0; i < kRegisterBanks; i++) {
+      regions_[i].emplace(sizeof(uint32_t), kRegisterCount);
+
       for (size_t c = 0; c < kRegisterCount; c++) {
-        regs_[i][c].SetReadCallback([this, i, c]() { return reg_values_[i][c]; });
-        regs_[i][c].SetWriteCallback([this, i, c](uint64_t value) {
+        (*regions_[i])[c * sizeof(uint32_t)].SetReadCallback(
+            [this, i, c]() { return reg_values_[i][c]; }
+        );
+
+        (*regions_[i])[c * sizeof(uint32_t)].SetWriteCallback([this, i, c](uint64_t value) {
           reg_values_[i][c] = value;
           if (callback_) {
             (*callback_)(i, c, value);
           }
         });
       }
-      regions_[i].emplace(regs_[i], sizeof(uint32_t), kRegisterCount);
     }
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
   }
@@ -104,7 +108,6 @@ class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
   zx::unowned_interrupt irq_signaller_;
   zx::interrupt irq_;
   uint64_t reg_values_[kRegisterBanks][kRegisterCount] = {};
-  ddk_fake::FakeMmioReg regs_[kRegisterBanks][kRegisterCount];
   std::optional<ddk_fake::FakeMmioRegRegion> regions_[kRegisterBanks];
   pdev_protocol_t pdev_;
 };

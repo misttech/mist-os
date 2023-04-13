@@ -6,10 +6,10 @@
 
 #include <lib/ddk/driver.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/mmio-ptr/fake.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"

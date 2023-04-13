@@ -23,7 +23,7 @@
 class SpiFlashTest : public zxtest::Test {
  public:
   SpiFlashTest()
-      : region_(registers_, 4, std::size(registers_)), fake_parent_(MockDevice::FakeRootParent()) {}
+      : region_(4, spiflash::kSpiFlashSbrs + 1), fake_parent_(MockDevice::FakeRootParent()) {}
   void SetUp() override {
     cmd_handler_thread_ = std::thread(&SpiFlashTest::CmdThread, this);
 
@@ -104,7 +104,7 @@ class SpiFlashTest : public zxtest::Test {
     }
   }
 
-  ddk_fake::FakeMmioReg& GetReg(uint32_t offset) { return registers_[offset / 4]; }
+  ddk_fake::FakeMmioReg& GetReg(uint32_t offset) { return region_[offset]; }
 
   void CmdThread() {
     std::scoped_lock lock(mutex_);
@@ -137,7 +137,6 @@ class SpiFlashTest : public zxtest::Test {
   }
 
  protected:
-  ddk_fake::FakeMmioReg registers_[(spiflash::kSpiFlashSbrs / 4) + 1];
   ddk_fake::FakeMmioRegRegion region_;
   spiflash::FlashControl control_ __TA_GUARDED(mutex_);
   spiflash::FlashAddress address_;

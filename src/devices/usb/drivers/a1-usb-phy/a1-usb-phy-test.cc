@@ -48,25 +48,22 @@ constexpr auto kRegisterCount = 2048;
 
 class FakeMmio {
  public:
-  FakeMmio() {
+  FakeMmio() : region_(sizeof(uint32_t), kRegisterCount) {
     for (size_t c = 0; c < kRegisterCount; c++) {
-      regs_[c].SetReadCallback([this, c]() { return reg_values_[c]; });
-      regs_[c].SetWriteCallback([this, c](uint64_t value) {
+      region_[c * sizeof(uint32_t)].SetReadCallback([this, c]() { return reg_values_[c]; });
+      region_[c * sizeof(uint32_t)].SetWriteCallback([this, c](uint64_t value) {
         reg_values_[c] = value;
         if (callback_) {
           (*callback_)(c, value);
         }
       });
     }
-    region_.emplace(regs_, sizeof(uint32_t), kRegisterCount);
   }
 
-  fdf::MmioBuffer mmio() { return region_->GetMmioBuffer(); }
+  fdf::MmioBuffer mmio() { return region_.GetMmioBuffer(); }
 
  private:
-  ddk_fake::FakeMmioReg regs_[kRegisterCount];
-  std::optional<ddk_fake::FakeMmioRegRegion> region_;
-
+  ddk_fake::FakeMmioRegRegion region_;
   std::optional<fit::function<void(size_t reg, uint64_t value)>> callback_;
   uint64_t reg_values_[kRegisterCount] = {};
 };

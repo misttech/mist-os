@@ -46,22 +46,16 @@ zx_paddr_t PageMask() { return static_cast<uintptr_t>(zx_system_get_page_size())
 
 namespace imx8m_sdmmc {
 
-constexpr size_t kRegSize = kRegisterSetSize / sizeof(uint32_t);
-
 class FakeMmio {
  public:
-  FakeMmio() {
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(kRegSize);
-    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegSize);
-  }
+  FakeMmio() : mmio_(sizeof(uint32_t), kRegisterSetSize) {}
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
 
-  ddk_fake::FakeMmioReg& reg(size_t ix) { return regs_[ix >> 2]; }
+  ddk_fake::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
 
  private:
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 struct IncomingNamespace {

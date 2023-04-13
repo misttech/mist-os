@@ -81,7 +81,6 @@ test("usb-peripheral-unittest-bin") {
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
-    "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",

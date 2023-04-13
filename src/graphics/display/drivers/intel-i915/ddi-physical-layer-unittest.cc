@@ -88,16 +88,13 @@ TEST_F(TypeCDdiTigerLakeTest, EnableFsm_TypeCColdBlock_Failure) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
       [&](uint64_t value) { EXPECT_EQ(0x8000'0026, value) << "Unexpected command"; });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x0000'0026; });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x0000'0001; });
+  mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t { return 0x0000'0026; });
+  mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t { return 0x0000'0001; });
 
   TypeCDdiTigerLake ddi(kTargetDdiId, &power_, &mmio_buffer,
                         /*is_static_port=*/false);
@@ -330,18 +327,16 @@ TEST_F(TypeCDdiTigerLakeTest, DisableFsm_TypeCColdUnblock_Failure) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
       [&](uint64_t value) { EXPECT_EQ(0x8000'0026, value) << "Unexpected command"; });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t {
     // Always busy.
     return 0x8000'0026;
   });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x0000'0001; });
+  mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t { return 0x0000'0001; });
 
   TypeCDdiTigerLake ddi(kTargetDdiId, &power_, &mmio_buffer,
                         /*is_static_port=*/false);
@@ -377,8 +372,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_OnlyValidOnHealthy) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   EXPECT_DEATH(
@@ -428,8 +422,7 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_FailsOnUnhealthy) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_1;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   {
@@ -522,15 +515,13 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_TcColdCannotBlock) {
   bool tccold_block_requested = false;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
       [&](uint64_t value) { EXPECT_EQ(0x8000'0026, value) << "Unexpected command"; });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x0000'0026; });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetWriteCallback([&](uint64_t data) {
+  mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t { return 0x0000'0026; });
+  mmio_region[kMailboxData0Offset].SetWriteCallback([&](uint64_t data) {
     if (data == 0x0000'0000) {
       // The driver makes TCCOLD block request first.
       EXPECT_FALSE(tccold_unblock_requested);
@@ -544,7 +535,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_Failure_TcColdCannotBlock) {
       FAIL() << "Unexpected TCCOLD config";
     }
   });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t {
     // TCCOLD block request never succeeds, the device is always in TCCOLD
     // state.
     return 0x0000'0001;
@@ -722,29 +713,26 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_FailureOnBailout) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_2;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   bool most_recent_tccold_request_is_block = false;
 
   // TCCOLD command can be successfully handled only when it's a "Block" request
   // (i.e. on "Enable()").
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
       [&](uint64_t value) { EXPECT_EQ(0x8000'0026, value) << "Unexpected command"; });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback([&]() -> uint64_t {
+  mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t {
     return most_recent_tccold_request_is_block ? 0x0000'0026 : 0x8000'0026;
   });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxData0Offset].SetWriteCallback(
       [&](uint64_t data) { most_recent_tccold_request_is_block = (data == 0x0000'0000); });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x0000'0000; });
+  mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t { return 0x0000'0000; });
 
   // DynamicFlexIoDisplayPortPhyModeStatus: Type-C PHY is not ready on DDI_TC_2.
-  const size_t phy_mode_status_reg_index =
-      registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(kTargetDdiId).addr() /
-      sizeof(uint32_t);
-  fake_mmio_regs[phy_mode_status_reg_index].SetReadCallback([] { return 0x0000'0000; });
+  const size_t phy_mode_status_reg_addr =
+      registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(kTargetDdiId).addr();
+  mmio_region[phy_mode_status_reg_addr].SetReadCallback([] { return 0x0000'0000; });
 
   TypeCDdiTigerLake ddi(kTargetDdiId, &power_, &mmio_buffer,
                         /*is_static_port=*/false);
@@ -825,32 +813,28 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_Failure_TcColdCannotUnblock) {
   constexpr DdiId kTargetDdiId = DdiId::DDI_TC_2;
 
   const size_t kMmioRegCount = kMmioRangeSize / sizeof(uint32_t);
-  std::vector<ddk_fake::FakeMmioReg> fake_mmio_regs(kMmioRegCount);
-  ddk_fake::FakeMmioRegRegion mmio_region(fake_mmio_regs.data(), sizeof(uint32_t), kMmioRegCount);
+  ddk_fake::FakeMmioRegRegion mmio_region(sizeof(uint32_t), kMmioRegCount);
   fdf::MmioBuffer mmio_buffer = mmio_region.GetMmioBuffer();
 
   // Re-enable safe mode.
-  const size_t safe_state_reg_index =
+  const size_t safe_state_reg_addr =
       registers::DynamicFlexIoDisplayPortControllerSafeStateSettings::GetForDdi(kTargetDdiId)
-          .addr() /
-      sizeof(uint32_t);
+          .addr();
   bool safe_mode_enabled = false;
-  fake_mmio_regs[safe_state_reg_index].SetWriteCallback([&](uint64_t value) {
+  mmio_region[safe_state_reg_addr].SetWriteCallback([&](uint64_t value) {
     EXPECT_EQ(value, 0x0000'0000u);
     safe_mode_enabled = true;
   });
-  fake_mmio_regs[safe_state_reg_index].SetReadCallback(
+  mmio_region[safe_state_reg_addr].SetReadCallback(
       [&] { return safe_mode_enabled ? 0x0000'0000 : 0x0000'0002; });
 
   // TCCOLD command fails on unblock.
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxInterfaceOffset].SetWriteCallback(
       [&](uint64_t value) { EXPECT_EQ(0x8000'0026u, value) << "Unexpected command"; });
-  fake_mmio_regs[kMailboxInterfaceOffset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x8000'0026; });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetWriteCallback(
+  mmio_region[kMailboxInterfaceOffset].SetReadCallback([&]() -> uint64_t { return 0x8000'0026; });
+  mmio_region[kMailboxData0Offset].SetWriteCallback(
       [&](uint64_t value) { EXPECT_EQ(0x0000'0001u, value) << "Unexpected TCCOLD state"; });
-  fake_mmio_regs[kMailboxData0Offset / sizeof(uint32_t)].SetReadCallback(
-      [&]() -> uint64_t { return 0x0000'0001; });
+  mmio_region[kMailboxData0Offset].SetReadCallback([&]() -> uint64_t { return 0x0000'0001; });
 
   TypeCDdiTigerLake ddi(kTargetDdiId, &power_, &mmio_buffer,
                         /*is_static_port=*/false);

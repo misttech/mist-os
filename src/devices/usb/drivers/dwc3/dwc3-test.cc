@@ -27,7 +27,7 @@ class TestFixture : public zxtest::Test {
   TestFixture();
   void SetUp() override;
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(reg_region_.GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return reg_region_.GetMmioBuffer(); }
 
  protected:
   static constexpr size_t kRegSize = sizeof(uint32_t);
@@ -71,14 +71,13 @@ class TestFixture : public zxtest::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
-  std::array<ddk_fake::FakeMmioReg, kRegCount> registers_;
-  ddk_fake::FakeMmioRegRegion reg_region_{registers_.data(), kRegSize, registers_.size()};
+  ddk_fake::FakeMmioRegRegion reg_region_{kRegSize, kRegCount};
 };
 
 TestFixture::TestFixture() {
-  auto& hwparams3 = registers_[GHWPARAMS3::Get().addr() / sizeof(uint32_t)];
-  auto& ver_reg = registers_[USB31_VER_NUMBER::Get().addr() / sizeof(uint32_t)];
-  auto& dctl_reg = registers_[DCTL::Get().addr() / sizeof(uint32_t)];
+  auto& hwparams3 = reg_region_[GHWPARAMS3::Get().addr()];
+  auto& ver_reg = reg_region_[USB31_VER_NUMBER::Get().addr()];
+  auto& dctl_reg = reg_region_[DCTL::Get().addr()];
 
   hwparams3.SetReadCallback([this]() -> uint64_t { return Read_GHWPARAMS3(); });
   ver_reg.SetReadCallback([this]() -> uint64_t { return Read_USB31_VER_NUMBER(); });

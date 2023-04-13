@@ -9,6 +9,8 @@
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 
+#include <fbl/vector.h>
+
 namespace ddk_fake {
 
 // Fakes a single MMIO register. This class is intended to be used with a fdf::MmioBuffer;
@@ -23,6 +25,8 @@ namespace ddk_fake {
 // fake_registers[0].SetWriteCallback(write_fn);
 // SomeDriver dut(mmio_buffer);
 // (put your test here)
+
+namespace {
 
 class FakeMmioReg {
  public:
@@ -50,22 +54,24 @@ class FakeMmioReg {
   fit::function<uint64_t()> read_;
 };
 
+} // namespace
+
 // Represents an array of FakeMmioReg objects.
 class FakeMmioRegRegion {
  public:
   // Constructs a FakeMmioRegRegion backed by the given array. reg_size is the size of each
-  // register in bytes, reg_count is the total size of the region in bytes. Ownership of fake_regs
-  // is not transferred.
-  FakeMmioRegRegion(FakeMmioReg* fake_regs, size_t reg_size, size_t reg_count)
-      : fake_regs_(fake_regs), reg_size_(reg_size), reg_count_(reg_count) {
+  // register in bytes, and reg_count is the total number of registers.
+  FakeMmioRegRegion(size_t reg_size, size_t reg_count)
+      : reg_size_(reg_size), reg_count_(reg_count) {
     ZX_ASSERT(reg_size_ > 0);
+    regs_.resize(reg_count_);
   }
 
   // Accesses the FakeMmioReg at the given offset. Note that this is the _offset_, not the
   // _index_.
   FakeMmioReg& operator[](size_t offset) const {
     ZX_ASSERT(offset / reg_size_ < reg_count_);
-    return fake_regs_[offset / reg_size_];
+    return regs_[offset / reg_size_];
   }
 
   // Returns an mmio_buffer_t that can be used for constructing a fdf::MmioBuffer object.
@@ -129,7 +135,7 @@ class FakeMmioRegRegion {
       .Write64 = Write64,
   };
 
-  FakeMmioReg* fake_regs_;
+  fbl::Vector<FakeMmioReg> regs_;
   const size_t reg_size_;
   const size_t reg_count_;
 };

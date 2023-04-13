@@ -44,21 +44,17 @@ fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
 
 class FakeMmio {
  public:
-  FakeMmio() {
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(kRegCount);
-    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegCount);
-  }
+  FakeMmio() : mmio_(sizeof(uint32_t), kRegCount) {}
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
   ddk_fake::FakeMmioReg& reg(size_t ix) {
-    return regs_[ix >> 2];  // AML registers are in virtual address units.
+    return mmio_[ix];
   }
 
  private:
   static constexpr size_t kRegCount =
       S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 metadata::AmlPdmConfig GetDefaultMetadata() {

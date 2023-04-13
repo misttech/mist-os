@@ -31,10 +31,9 @@ constexpr size_t kDataLen = 32;
 
 class DeviceState {
  public:
-  DeviceState() {
-    region_.emplace(regs_, sizeof(uint32_t), std::size(regs_));
+  DeviceState() : region_(sizeof(uint32_t), 6) {
     // Control register
-    regs_[2].SetWriteCallback([=](uint64_t value) {
+    region_[2 * sizeof(uint32_t)].SetWriteCallback([=](uint64_t value) {
       control_reg_ = value;
       auto ctrl = Control();
       if (ctrl.rst_rx()) {
@@ -44,32 +43,32 @@ class DeviceState {
         reset_tx_ = true;
       }
     });
-    regs_[2].SetReadCallback([=]() { return control_reg_; });
+    region_[2 * sizeof(uint32_t)].SetReadCallback([=]() { return control_reg_; });
     // Status register
-    regs_[3].SetWriteCallback([=](uint64_t value) { status_reg_ = value; });
-    regs_[3].SetReadCallback([=]() {
+    region_[3 * sizeof(uint32_t)].SetWriteCallback([=](uint64_t value) { status_reg_ = value; });
+    region_[3 * sizeof(uint32_t)].SetReadCallback([=]() {
       auto status = Status();
       status.set_rx_empty(!rx_len_);
       return status.reg_value();
     });
     // TFIFO
-    regs_[0].SetWriteCallback(
+    region_[0 * sizeof(uint32_t)].SetWriteCallback(
         [=](uint64_t value) { tx_buf_.push_back(static_cast<uint8_t>(value)); });
     // RFIFO
-    regs_[1].SetReadCallback([=]() {
+    region_[1 * sizeof(uint32_t)].SetReadCallback([=]() {
       uint8_t value = *rx_buf_;
       rx_buf_++;
       rx_len_--;
       return value;
     });
     // Reg5
-    regs_[5].SetWriteCallback([=](uint64_t value) { reg5_ = value; });
-    regs_[5].SetReadCallback([=]() { return reg5_; });
+    region_[5 * sizeof(uint32_t)].SetWriteCallback([=](uint64_t value) { reg5_ = value; });
+    region_[5 * sizeof(uint32_t)].SetReadCallback([=]() { return reg5_; });
   }
 
   void set_irq_signaller(zx::unowned_interrupt signaller) { irq_signaller_ = std::move(signaller); }
 
-  fdf::MmioBuffer GetMmio() { return region_->GetMmioBuffer(); }
+  fdf::MmioBuffer GetMmio() { return region_.GetMmioBuffer(); }
 
   bool PortResetRX() {
     bool reset = reset_rx_;
@@ -154,8 +153,7 @@ class DeviceState {
   uint64_t reg5_ = 0;
   uint64_t control_reg_ = 0;
   uint64_t status_reg_ = 0;
-  ddk_fake::FakeMmioReg regs_[6];
-  std::optional<ddk_fake::FakeMmioRegRegion> region_;
+  ddk_fake::FakeMmioRegRegion region_;
   zx::unowned_interrupt irq_signaller_;
 };
 
@@ -202,8 +200,8 @@ class AmlUartHarness : public zxtest::Test {
   DeviceState& device_state() { return state_; }
 
  private:
+  DeviceState state_; // Must not be destructed before fake_parent_.
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  DeviceState state_;
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};

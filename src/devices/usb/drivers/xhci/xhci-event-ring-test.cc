@@ -56,24 +56,24 @@ class EventRingHarness : public zxtest::Test {
       : trb_context_allocator_(-1, true), hci_(root_.get(), ddk_fake::CreateBufferFactory()) {}
   void SetUp() override {
     // Globals
-    constexpr auto kRuntimeRegisterOffset = 6;
-    constexpr auto kErdp = 2062;
-    region_.emplace(regs_, sizeof(uint32_t), std::size(regs_));
+    constexpr auto kRuntimeRegisterOffset = 6 * sizeof(uint32_t);
+    constexpr auto kErdp = 2062 * sizeof(uint32_t);
+    region_.emplace(sizeof(uint32_t), 4096);
     buffer_.emplace(region_->GetMmioBuffer());
 
     // Core registers
-    regs_[kRuntimeRegisterOffset].SetReadCallback([=]() { return 0x2000; });
-    regs_[kErdp].SetReadCallback([=]() { return erdp_; });
-    regs_[kErdp].SetWriteCallback([=](uint64_t value) {
+    (*region_)[kRuntimeRegisterOffset].SetReadCallback([=]() { return 0x2000; });
+    (*region_)[kErdp].SetReadCallback([=]() { return erdp_; });
+    (*region_)[kErdp].SetWriteCallback([=](uint64_t value) {
       ERDP reg;
       reg.set_reg_value(value);
       erdp_ = reg.Pointer();
     });
 
     // Port/per-slot registers
-    regs_[PORTSC::Get(0, kPortNo).addr() / sizeof(uint32_t)].SetReadCallback(
+    (*region_)[PORTSC::Get(0, kPortNo).addr()].SetReadCallback(
         [=]() { return port_sc_.reg_value(); });
-    regs_[PORTSC::Get(0, kPortNo).addr() / sizeof(uint32_t)].SetWriteCallback([=](uint64_t value) {
+    (*region_)[PORTSC::Get(0, kPortNo).addr()].SetWriteCallback([=](uint64_t value) {
       PORTSC sc;
       sc.set_reg_value(static_cast<uint32_t>(value));
       if (sc.PR()) {
@@ -182,7 +182,7 @@ class EventRingHarness : public zxtest::Test {
     }
     ERDP reg;
     reg.set_Pointer(ddk_fake::PhysToVirt<zx_paddr_t*>(ring_->erst())[0]);
-    regs_[2062].Write(reg.reg_value());
+    (*region_)[2062 * sizeof(uint32_t)].Write(reg.reg_value());
     return ZX_OK;
   }
   void SetShortPacketHandler(fit::function<void(usb_xhci::TRB*, size_t, usb_xhci::TRB**)> handler) {
@@ -238,7 +238,6 @@ class EventRingHarness : public zxtest::Test {
   CommandRing command_ring_;
   uint64_t dcbaa_[128];
   uint64_t erdp_;
-  ddk_fake::FakeMmioReg regs_[4096];
   std::optional<ddk_fake::FakeMmioRegRegion> region_;
 };
 

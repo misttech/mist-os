@@ -176,21 +176,18 @@ TEST(SynDhubTest, StartDmaForChannel0) {
 
 class FakeMmio {
  public:
-  explicit FakeMmio(uint32_t size) : reg_count_(size / sizeof(uint32_t)) {  // in 32 bits chunks.
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(reg_count_);
-    mmio_ =
-        std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), reg_count_);
-  }
+  explicit FakeMmio(uint32_t size)
+      : reg_count_(size / sizeof(uint32_t)),
+        mmio_(sizeof(uint32_t), reg_count_) {}
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
   ddk_fake::FakeMmioReg& reg(size_t ix) {
-    return regs_[ix >> 2];  // Registers are in virtual address units.
+    return mmio_[ix];  // Registers are in virtual address units.
   }
 
  private:
-  const size_t reg_count_;
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+  [[maybe_unused]] const size_t reg_count_;
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 struct SynDhubLocal : public SynDhub {

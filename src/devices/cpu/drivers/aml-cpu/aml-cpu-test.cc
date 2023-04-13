@@ -70,13 +70,11 @@ const uint32_t kTestCoreCount = 1;
 
 class FakeMmio {
  public:
-  FakeMmio() {
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(kRegCount);
-    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegCount);
-    (*mmio_)[kCpuVersionOffset].SetReadCallback([]() { return kCpuVersion; });
+  FakeMmio() : mmio_(sizeof(uint32_t), kRegCount) {
+    mmio_[kCpuVersionOffset].SetReadCallback([]() { return kCpuVersion; });
   }
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
 
  private:
   static constexpr size_t kCpuVersionOffset = 0x220;
@@ -84,8 +82,7 @@ class FakeMmio {
 
   constexpr static uint64_t kCpuVersion = 43;
 
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 class FakePowerDevice : public ddk::PowerProtocol<FakePowerDevice, ddk::base_protocol> {

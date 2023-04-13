@@ -74,30 +74,32 @@ struct FakeTRB : TRB {
 class FakeDevice {
  public:
   FakeDevice() {
-    constexpr auto kHcsParams2 = 2;
-    constexpr auto kHccParams1 = 4;
-    constexpr auto kXecp = 320;
-    constexpr auto kOffset = 0;
-    constexpr auto kHcsParams1 = 1;
-    constexpr auto kOffset1 = 5;
-    constexpr auto kOffset2 = 6;
-    constexpr auto kUsbCmd = 7;
-    constexpr auto kUsbSts = 8;
-    constexpr auto kUsbPageSize = 9;
-    constexpr auto kConfig = 14;
-    constexpr auto kCrCr = 13;
-    constexpr auto kDcbaa = 19;
-    constexpr auto kDoorbellBase = 1024;
-    constexpr auto kImodi = 457;
+    constexpr auto kHcsParams2 = 2 * sizeof(uint32_t);
+    constexpr auto kHccParams1 = 4 * sizeof(uint32_t);
+    constexpr auto kXecp = 320 * sizeof(uint32_t);
+    constexpr auto kOffset = 0 * sizeof(uint32_t);
+    constexpr auto kHcsParams1 = 1 * sizeof(uint32_t);
+    constexpr auto kOffset1 = 5 * sizeof(uint32_t);
+    constexpr auto kOffset2 = 6 * sizeof(uint32_t);
+    constexpr auto kUsbCmd = 7 * sizeof(uint32_t);
+    constexpr auto kUsbSts = 8 * sizeof(uint32_t);
+    constexpr auto kUsbPageSize = 9 * sizeof(uint32_t);
+    constexpr auto kConfig = 14 * sizeof(uint32_t);
+    constexpr auto kCrCr = 13 * sizeof(uint32_t);
+    constexpr auto kDcbaa = 19 * sizeof(uint32_t);
+    constexpr auto kDoorbellBase = 1024 * sizeof(uint32_t);
+    constexpr auto kImodi = 457 * sizeof(uint32_t);
 
-    regs_[kHcsParams2].SetReadCallback([]() {
+    region_.emplace(sizeof(uint32_t), 2048);
+
+    region()[kHcsParams2].SetReadCallback([]() {
       auto params = HCSPARAMS2::Get().FromValue(0);
       params.set_ERST_MAX(4);
       params.set_MAX_SCRATCHPAD_BUFFERS_LOW(1);
       return params.reg_value();
     });
 
-    regs_[kHccParams1].SetReadCallback([]() {
+    region()[kHccParams1].SetReadCallback([]() {
       auto params = HCCPARAMS1::Get().FromValue(0);
       params.set_AC64(true);
       params.set_CSZ(true);
@@ -105,9 +107,11 @@ class FakeDevice {
       return params.reg_value();
     });
 
-    regs_[kXecp].SetReadCallback([=]() {
-      auto xecp = XECP::Get(HCCPARAMS1::Get().FromValue(static_cast<uint32_t>(regs_[4].Read())))
-                      .FromValue(0);
+    region()[kXecp].SetReadCallback([=]() {
+      auto xecp = (XECP::Get(HCCPARAMS1::Get()
+                             .FromValue(static_cast<uint32_t>(region()[4 * sizeof(uint32_t)]
+                             .Read())))
+                      .FromValue(0));
       xecp.set_NEXT(0);
       xecp.set_ID(XECP::UsbLegacySupport);
       if (driver_owned_controller_) {
@@ -118,14 +122,14 @@ class FakeDevice {
       return xecp.reg_value();
     });
 
-    regs_[kXecp].SetWriteCallback([=](uint64_t value) {
+    region()[kXecp].SetWriteCallback([=](uint64_t value) {
       if (value & (1 << 24)) {
         driver_owned_controller_ = true;
       }
     });
-    regs_[kOffset].SetReadCallback([=]() { return 0x1c; });
+    region()[kOffset].SetReadCallback([=]() { return 0x1c; });
 
-    regs_[kHcsParams1].SetReadCallback([=]() {
+    region()[kHcsParams1].SetReadCallback([=]() {
       HCSPARAMS1 parms = HCSPARAMS1::Get().FromValue(0);
       parms.set_MaxIntrs(1);
       parms.set_MaxPorts(4);
@@ -133,12 +137,12 @@ class FakeDevice {
       return parms.reg_value();
     });
 
-    regs_[kOffset1].SetReadCallback([=]() { return 0x1000; });
+    region()[kOffset1].SetReadCallback([=]() { return 0x1000; });
 
-    regs_[kOffset2].SetReadCallback([=]() { return 0x700; });
+    region()[kOffset2].SetReadCallback([=]() { return 0x700; });
 
-    regs_[kUsbCmd].SetReadCallback([=]() {
-      USBCMD cmd = USBCMD::Get(static_cast<uint8_t>(regs_[0].Read())).FromValue(0);
+    region()[kUsbCmd].SetReadCallback([=]() {
+      USBCMD cmd = USBCMD::Get(static_cast<uint8_t>(region()[0].Read())).FromValue(0);
       cmd.set_ENABLE(controller_enabled_);
       cmd.set_EWE(event_wrap_enable_);
       cmd.set_HSEE(host_system_error_enable_);
@@ -147,8 +151,8 @@ class FakeDevice {
       return cmd.reg_value();
     });
 
-    regs_[kUsbCmd].SetWriteCallback([=](uint64_t value) {
-      USBCMD cmd = USBCMD::Get(static_cast<uint8_t>(regs_[0].Read()))
+    region()[kUsbCmd].SetWriteCallback([=](uint64_t value) {
+      USBCMD cmd = USBCMD::Get(static_cast<uint8_t>(region()[0].Read()))
                        .FromValue(static_cast<uint32_t>(value));
       if (cmd.RESET()) {
         controller_was_reset_ = true;
@@ -159,60 +163,60 @@ class FakeDevice {
       irq_enable_ = cmd.INTE();
     });
 
-    regs_[kUsbSts].SetReadCallback([=]() {
+    region()[kUsbSts].SetReadCallback([=]() {
       auto sts = USBSTS::Get(0x1c).FromValue(0);
       sts.set_HCHalted(!controller_enabled_);
       return sts.reg_value();
     });
 
-    regs_[kUsbPageSize].SetReadCallback([=]() {
+    region()[kUsbPageSize].SetReadCallback([=]() {
       USB_PAGESIZE size = USB_PAGESIZE::Get(0x1c).FromValue(0);
       size.set_PageSize(1);
       return size.reg_value();
     });
 
-    regs_[kConfig].SetReadCallback([=]() {
+    region()[kConfig].SetReadCallback([=]() {
       CONFIG config = CONFIG::Get(0x1c).FromValue(0);
       config.set_MaxSlotsEn(slots_enabled_);
       return config.reg_value();
     });
 
-    regs_[kConfig].SetWriteCallback([=](uint64_t value) {
+    region()[kConfig].SetWriteCallback([=](uint64_t value) {
       CONFIG config = CONFIG::Get(0x1c).FromValue(static_cast<uint32_t>(value));
       slots_enabled_ = config.MaxSlotsEn();
     });
 
-    regs_[kCrCr].SetWriteCallback([=](uint64_t value) {
+    region()[kCrCr].SetWriteCallback([=](uint64_t value) {
       CRCR cr = CRCR::Get(0x1c).FromValue(value);
       crcr_ = reinterpret_cast<zx_paddr_t>(cr.PTR());
     });
 
-    regs_[kDcbaa].SetReadCallback([=]() { return dcbaa_; });
-    regs_[kDcbaa].SetWriteCallback([=](uint64_t value) {
+    region()[kDcbaa].SetReadCallback([=]() { return dcbaa_; });
+    region()[kDcbaa].SetWriteCallback([=](uint64_t value) {
       auto val = DCBAAP::Get(0x1c).FromValue(value);
       dcbaa_ = val.PTR();
     });
     doorbell_callback_ = [](uint8_t doorbell, uint8_t target) {};
     for (size_t i = 0; i < 32; i++) {
-      regs_[kDoorbellBase + i].SetWriteCallback([=](uint64_t value) {
+      region()[kDoorbellBase + i * sizeof(uint32_t)].SetWriteCallback([=](uint64_t value) {
         auto buffer = mmio();
         auto bell = DOORBELL::Get(DoorbellOffset::Get().ReadFrom(&buffer), 0)
                         .FromValue(static_cast<uint32_t>(value));
         doorbell_callback_(static_cast<uint8_t>(i), static_cast<uint8_t>(bell.Target()));
       });
     }
-    regs_[kImodi].SetWriteCallback([=](uint64_t value) {
+    region()[kImodi].SetWriteCallback([=](uint64_t value) {
       auto buffer = mmio();
       auto imodi = IMODI::Get(RuntimeRegisterOffset::Get().ReadFrom(&buffer), 0)
                        .FromValue(static_cast<uint32_t>(value));
       imodi_ = static_cast<uint16_t>(imodi.MODI());
     });
 
-    region_.emplace(regs_, sizeof(uint32_t), std::size(regs_));
     // Control register
   }
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(region_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return region_->GetMmioBuffer(); }
+  ddk_fake::FakeMmioRegRegion& region() { return *region_; }
 
   void set_irq_signaller(zx::unowned_interrupt signaller) { irq_signaller_ = std::move(signaller); }
 
@@ -223,7 +227,6 @@ class FakeDevice {
   FakeTRB* crcr() { return FakeTRB::get(crcr_); }
 
  private:
-  ddk_fake::FakeMmioReg regs_[2048];
   std::optional<ddk_fake::FakeMmioRegRegion> region_;
   zx::unowned_interrupt irq_signaller_;
   bool driver_owned_controller_ = false;

@@ -24,25 +24,21 @@
 
 namespace amlogic_ram {
 
-constexpr size_t kRegSize = 0x01000 / sizeof(uint32_t);
+constexpr size_t kRegCount = 0x01000 / sizeof(uint32_t);
 
 class FakeMmio {
  public:
-  FakeMmio() {
-    regs_ = std::make_unique<ddk_fake::FakeMmioReg[]>(kRegSize);
-    mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegSize);
-  }
+  FakeMmio() : mmio_(sizeof(uint32_t), kRegCount) {}
 
-  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_.GetMmioBuffer()); }
 
   ddk_fake::FakeMmioReg& reg(size_t ix) {
     // AML registers are in virtual address units.
-    return regs_[ix >> 2];
+    return mmio_[ix];
   }
 
  private:
-  std::unique_ptr<ddk_fake::FakeMmioReg[]> regs_;
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
+  ddk_fake::FakeMmioRegRegion mmio_;
 };
 
 struct IncomingNamespace {

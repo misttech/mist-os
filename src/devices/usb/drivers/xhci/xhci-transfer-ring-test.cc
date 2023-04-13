@@ -31,14 +31,14 @@ class TransferRingHarness : public zxtest::Test {
   TransferRingHarness()
       : trb_context_allocator_(-1, true), hci_(root_.get(), ddk_fake::CreateBufferFactory()) {}
   void SetUp() override {
-    constexpr auto kOffset = 6;
-    constexpr auto kErdp = 2062;
+    constexpr auto kOffset = 6 * sizeof(uint32_t);
+    constexpr auto kErdp = 2062 * sizeof(uint32_t);
 
-    region_.emplace(regs_, sizeof(uint32_t), std::size(regs_));
+    region_.emplace(sizeof(uint32_t), 4096);
     buffer_.emplace(region_->GetMmioBuffer());
-    regs_[kOffset].SetReadCallback([=]() { return 0x2000; });
-    regs_[kErdp].SetReadCallback([=]() { return erdp_; });
-    regs_[kErdp].SetWriteCallback([=](uint64_t value) {
+    (*region_)[kOffset].SetReadCallback([=]() { return 0x2000; });
+    (*region_)[kErdp].SetReadCallback([=]() { return erdp_; });
+    (*region_)[kErdp].SetWriteCallback([=](uint64_t value) {
       ERDP reg;
       reg.set_reg_value(value);
       erdp_ = reg.Pointer();
@@ -89,7 +89,6 @@ class TransferRingHarness : public zxtest::Test {
   EventRing event_ring_;
   CommandRing command_ring_;
   uint64_t erdp_;
-  ddk_fake::FakeMmioReg regs_[4096];
   std::optional<ddk_fake::FakeMmioRegRegion> region_;
 };
 

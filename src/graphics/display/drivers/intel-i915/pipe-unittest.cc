@@ -23,19 +23,13 @@ class PipeTest : public ::testing::Test {
  public:
   PipeTest() = default;
 
-  void SetUp() override {
-    regs_.resize(kMinimumRegCount);
-    reg_region_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.data(), sizeof(uint32_t),
-                                                                kMinimumRegCount);
-    mmio_buffer_.emplace(reg_region_->GetMmioBuffer());
-  }
+  void SetUp() override { mmio_buffer_.emplace(reg_region_.GetMmioBuffer()); }
 
   void TearDown() override {}
 
  protected:
   constexpr static uint32_t kMinimumRegCount = 0xd0000 / sizeof(uint32_t);
-  std::unique_ptr<ddk_fake::FakeMmioRegRegion> reg_region_;
-  std::vector<ddk_fake::FakeMmioReg> regs_;
+  ddk_fake::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
 };
 

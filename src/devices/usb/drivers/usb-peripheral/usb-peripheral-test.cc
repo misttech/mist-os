@@ -22,7 +22,6 @@
 #include <memory>
 
 #include <ddk/usb-peripheral-config.h>
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 

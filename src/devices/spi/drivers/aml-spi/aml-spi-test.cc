@@ -38,9 +38,8 @@ struct IncomingNamespace {
 class AmlSpiTest : public zxtest::Test {
  public:
   AmlSpiTest()
-      : root_(MockDevice::FakeRootParent()),
-        mmio_region_(mmio_registers_, sizeof(uint32_t),
-                     sizeof(uint32_t) * std::size(mmio_registers_)) {}
+      : mmio_region_(sizeof(uint32_t), 17),
+        root_(MockDevice::FakeRootParent()) {}
 
   virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
@@ -138,6 +137,7 @@ class AmlSpiTest : public zxtest::Test {
       },
   };
 
+  ddk_fake::FakeMmioRegRegion mmio_region_; // Must be destructed after root_.
   std::shared_ptr<MockDevice> root_;
   zx::vmo mmio_;
   fzl::VmoMapper mmio_mapper_;
@@ -146,8 +146,6 @@ class AmlSpiTest : public zxtest::Test {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
   zx::interrupt interrupt_;
-  ddk_fake::FakeMmioReg mmio_registers_[17];
-  ddk_fake::FakeMmioRegRegion mmio_region_;
 };
 
 zx_koid_t GetVmoKoid(const zx::vmo& vmo) {

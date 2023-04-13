@@ -24,7 +24,7 @@ class IntelGspiTest : public zxtest::Test {
  public:
   IntelGspiTest()
       : loop_(&kAsyncLoopConfigNeverAttachToThread),
-        region_(ddk_fake::FakeMmioRegRegion(registers_, 4, std::size(registers_))),
+        region_(4, gspi::INTEL_GSPI_CAPABILITIES + 1),
         parent_(MockDevice::FakeRootParent()) {}
 
   void CreateDevice(bool with_interrupt) {
@@ -121,11 +121,10 @@ class IntelGspiTest : public zxtest::Test {
 
   void TriggerIrq() { irq_.trigger(0, zx::clock::get_monotonic()); }
 
-  ddk_fake::FakeMmioReg& GetReg(uint32_t offset) { return registers_[offset / 4]; }
+  ddk_fake::FakeMmioReg& GetReg(uint32_t offset) { return region_[offset]; }
 
  protected:
   async::Loop loop_;
-  ddk_fake::FakeMmioReg registers_[(gspi::INTEL_GSPI_CAPABILITIES / 4) + 1];
   ddk_fake::FakeMmioRegRegion region_;
   acpi::mock::Device acpi_;
   std::shared_ptr<MockDevice> parent_;
