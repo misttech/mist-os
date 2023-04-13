@@ -33,16 +33,16 @@ use {
 };
 
 lazy_static! {
-    /// Path to the `bedrock_testbed_echo_server_cap` executable, relative to the test's namespace.
-    static ref ECHO_SERVER_CAP_BIN_PATH: PathBuf = PathBuf::from("/pkg/bin/bedrock_testbed_echo_server_cap");
+    /// Path to the `bedrock_testbed_echo_server_cap_oneshot` executable, relative to the test's namespace.
+    static ref ECHO_SERVER_CAP_ONESHOT_BIN_PATH: PathBuf = PathBuf::from("/pkg/bin/bedrock_testbed_echo_server_cap_oneshot");
 }
 
 /// The name of the echo capability in dicts.
 const ECHO_CAP_NAME: &str = "echo";
 
-/// Creates a program that runs the `bedrock_cap_echo_server` executable.
+/// Creates a program that runs the `bedrock_testbed_echo_server_cap_oneshot` executable.
 async fn create_echo_server_cap(processargs: ProcessArgs) -> Result<exec::elf::Elf, Error> {
-    create_packaged_elf(ECHO_SERVER_CAP_BIN_PATH.as_path(), processargs).await
+    create_packaged_elf(ECHO_SERVER_CAP_ONESHOT_BIN_PATH.as_path(), processargs).await
 }
 
 #[fuchsia::test]
