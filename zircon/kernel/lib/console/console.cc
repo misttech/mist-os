@@ -81,10 +81,13 @@ static int cmd_history(int argc, const cmd_args* argv, uint32_t flags);
 #endif
 static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_and(int argc, const cmd_args* argv, uint32_t flags);
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("help", "this list", &cmd_help, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_MASKED("echo", NULL, &cmd_echo, CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_MASKED("and", "execute command if last command succeeded", &cmd_and,
+                      CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_MASKED("test", "test the command processor", &cmd_test, CMD_AVAIL_ALWAYS)
 #if CONSOLE_ENABLE_HISTORY
 STATIC_COMMAND_MASKED("history", "command history", &cmd_history, CMD_AVAIL_ALWAYS)
@@ -849,6 +852,25 @@ static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags)
   dlog_shutdown(dlog_deadline);
   // Does not return.
   platform_halt(HALT_ACTION_SHUTDOWN, ZirconCrashReason::NoCrash);
+}
+
+static int cmd_and(int argc, const cmd_args* argv, uint32_t flags) {
+  if (argc < 2) {
+    printf("Usage: and COMMAND...\n");
+    return -1;
+  }
+
+  if (lastresult != 0) {
+    return lastresult;
+  }
+
+  const cmd* cmd = match_command(argv[1].str, CMD_AVAIL_NORMAL);
+  if (!cmd) {
+    printf("command \"%s\" not found\n", argv[1].str);
+    return -1;
+  }
+
+  return cmd->cmd_callback(argc - 1, argv + 1, flags);
 }
 
 static constexpr TimerSlack kSlack{ZX_MSEC(10), TIMER_SLACK_CENTER};

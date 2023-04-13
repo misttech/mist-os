@@ -6,9 +6,7 @@
 
 import("//build/config/zircon/standard.gni")
 import("//build/dist/resource.gni")
-import("//build/testing/zbi_test.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
-import("//build/zbi/kernel_cmdline.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zbi/zbi_input.gni")
 import("//build/zircon/c_utils.gni")
@@ -18,6 +16,7 @@ import("//zircon/kernel/lib/code-patching/code-patching.gni")
 import("//zircon/kernel/lib/version/version_string.gni")
 import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("kernel_package.gni")
+import("kernel_shell_script.gni")
 import("params.gni")
 
 declare_args() {
@@ -826,15 +825,14 @@ if (!is_efi_toolchain) {
     }
   }
 
-  zbi_test("kernel-unittests-boot-test") {
-    deps = [
-      ":kernel(:kernel_$current_cpu)",
-      ":kernel-unittests-boot-test.cmdline",
+  kernel_shell_script_test("kernel-unittests-boot-test") {
+    script = [
+      "ut all",
+      "and ut -r 10 timer",
+      "and ut -r 10 pi",
+      "boot-test-success",
+      "graceful-shutdown",
     ]
-  }
-
-  kernel_cmdline("kernel-unittests-boot-test.cmdline") {
-    args = [ "kernel.shell.script=ut+all;boot-test-success;graceful-shutdown" ]
   }
 }
 

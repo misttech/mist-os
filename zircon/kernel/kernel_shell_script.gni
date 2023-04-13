@@ -1,0 +1,91 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/testing/zbi_test.gni")
+import("//build/zbi/kernel_cmdline.gni")
+
+# Define a ZBI input to set the kernel.shell.script option.
+#
+# This is a shorthand to define a kernel_cmdline() target whose contents
+# are "kernel.shell.script=..." with the "..." being constructed from
+# the parameter.
+#
+# Parameters
+#
+#   * script
+#     - Required: This is a list of strings, each a kernel shell command line.
+#     These are combined by putting `;` between the lines and replacing each
+#     space with `+` as expected for the `kernel.shell.script` boot option.
+#     - Type: list(string)
+#
+#   * deps, visibility, testonly
+#     - Optional: See kernel_cmdline().
+#
+template("kernel_shell_script") {
+  kernel_cmdline(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "visibility",
+                             "testonly",
+                           ])
+
+    args = [ "kernel.shell.script=" +
+             string_replace(string_join(";", invoker.script), " ", "+") ]
+  }
+}
+
+# Define a zbi_test() that runs a kernel shell script.
+#
+# This is a simple wrapper around zbi_test() and kernel_shell_script().  It
+# defines a $target_name zbi_test() target that uses a $target_name.script
+# kernel_shell_script() target.
+#
+# Parameters
+#
+#   * deps
+#     - Optional: As for zbi_test(). By default it will include the standard
+#     kernel ZBI, but if overriden the kernel ZBI must be listed explicitly.
+#     - Type: list(label)
+#     - Default: [ ":kernel(:kernel_$current_cpu)" ]
+#
+#   * script
+#     - Required: This is a list of strings, each a kernel shell command line.
+#     These are combined by putting `;` between the lines and replacing each
+#     space with `+` as expected for the `kernel.shell.script` boot option.
+#     - Type: list(string)
+#
+#   * deps, visibility
+#     - Optional: See kernel_cmdline().
+#
+template("kernel_shell_script_test") {
+  main_target = target_name
+  script_target = "$target_name.script"
+
+  zbi_test(main_target) {
+    forward_variables_from(invoker, [ "visibility" ])
+
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    } else {
+      deps = [ ":kernel(:kernel_$current_cpu)" ]
+    }
+
+    deps += [ ":$script_target" ]
+  }
+
+  kernel_shell_script(script_target) {
+    testonly = true
+    forward_variables_from(invoker,
+                           [
+                             "script",
+                             "visibility",
+                           ])
+    if (defined(visibility)) {
+      visibility += [ ":*" ]
+    }
+  }
+}
