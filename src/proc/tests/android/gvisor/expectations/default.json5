@@ -756,6 +756,29 @@
                 // sendfile_socket_test
                 "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/*",
 
+                // sendfile_test
+                "SendFileTest.SendZeroBytes",
+                "SendFileTest.InvalidOffset",
+                "SendFileTest.Overflow",
+                "SendFileTest.SendTrivially",
+                "SendFileTest.SendTriviallyWithBothFilesReadWrite",
+                "SendFileTest.SendAndUpdateFileOffset",
+                "SendFileTest.SendAndUpdateFileOffsetFromNonzeroStartingPoint",
+                "SendFileTest.SendAndUpdateGivenOffset",
+                "SendFileTest.DoNotSendfileIfOutfileIsAppendOnly",
+                "SendFileTest.AppendCheckOrdering",
+                "SendFileTest.DoNotSendfileIfOutfileIsNotWritable",
+                "SendFileTest.DoNotSendfileIfInfileIsNotReadable",
+                "SendFileTest.DoNotSendANegativeNumberOfBytes",
+                "SendFileTest.SendTheCorrectNumberOfBytesEvenIfWeTryToSendTooManyBytes",
+                "SendFileTest.SendToNotARegularFile",
+                "SendFileTest.SendPipeWouldBlock",
+                "SendFileTest.SendPipeEOF",
+                "SendFileTest.SendToFullPipeReturnsEAGAIN",
+                "SendFileTest.SendPipeBlocks",
+                "SendFileTest.SendFileToSelf",
+                "SendFileTest.LargeCount",
+
                 // sigaltstack_test - https://fxbug.dev/79359
                 "SigaltstackTest.ResetByExecve",
 
@@ -1274,6 +1297,9 @@
                 // Fails in updated image, but passes with current. Will be removed after rolling
                 // new images.
                 "RlimitTest.SetRlimitHigher",
+
+                // sendfile_test
+                "SendFileTest.SendFileToPipe",
             ],
         },
     ],

@@ -129,6 +129,7 @@ gvisor_tests = [
   "seccomp_test",
   "select_test",
   "semaphore_test",
+  "sendfile_test",
   "sendfile_socket_test",
   "setgid_test",
   "sigaction_test",
