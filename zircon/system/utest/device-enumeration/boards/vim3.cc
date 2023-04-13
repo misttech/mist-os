@@ -64,6 +64,15 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // GPIO
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-107",
 
+      // Touch panel
+      //
+      // i2c device
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-56",
+      // interrupt pin
+      "sys/platform/05:06:1/aml-gpio/gpio-21",
+      // reset pin
+      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/ti_tca6408a/ti-tca6408a/gpio-106",
+
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-24/vim3-mcu",
   };
 

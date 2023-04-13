@@ -84,6 +84,13 @@ constexpr i2c_channel_t i2c_ee_m3_channels[]{
         .pid = 0,
         .did = 0,
     },
+    // FT5336 touch panel interrupt, used by TS050 touchscreen.
+    {
+        .address = bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH,
+        .vid = 0,
+        .pid = 0,
+        .did = 0,
+    },
 };
 
 constexpr I2cBus kBuses[]{
