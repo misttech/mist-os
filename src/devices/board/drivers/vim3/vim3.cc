@@ -146,11 +146,6 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
-  if ((status = TouchInit()) != ZX_OK) {
-    zxlogf(ERROR, "TouchInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
   if ((status = PwmInit()) != ZX_OK) {
     zxlogf(ERROR, "PwmInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);

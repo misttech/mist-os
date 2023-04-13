@@ -30,8 +30,6 @@
 // USB Power Delivery (Fusb302)
 #define VIM3_FUSB302_INT A311D_GPIOAO(8)
 
-#define VIM3_TOUCH_PANEL_INTERRUPT A311D_GPIOA(5)
-
 // USB Power Enable for USB 2.0 and USB 3.0 ports
 #define VIM3_USB_PWR A311D_GPIOA(6)
 
@@ -49,7 +47,6 @@
 // [1] https://dl.khadas.com/products/vim3/schematic/vim3_sch_v14.pdf
 // [1] https://dl.khadas.com/hardware/Accessories/TS050/TS050_V13_Sch.pdf
 #define VIM3_LCD_BACKLIGHT_ENABLE VIM3_EXPANDER_GPIO(1)
-#define VIM3_TOUCH_PANEL_RESET VIM3_EXPANDER_GPIO(6)
 #define VIM3_SD_MODE VIM3_EXPANDER_GPIO(7)
 
 #endif  // SRC_DEVICES_BOARD_DRIVERS_VIM3_VIM3_GPIOS_H_
