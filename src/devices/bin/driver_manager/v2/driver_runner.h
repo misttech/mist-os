@@ -134,6 +134,19 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   // Should only be called when |bind_orphan_ongoing_| is true and |orphaned_nodes_| is not empty.
   void TryBindAllOrphansInternal(std::shared_ptr<BindResultTracker> tracker);
 
+  // Callback function for a Driver Index match request.
+  void OnMatchDriverCallback(
+      std::weak_ptr<Node> weak_node,
+      fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
+      std::shared_ptr<BindResultTracker> result_tracker,
+      BindMatchCompleteCallback match_complete_callback);
+
+  // Binds |node| to |result. Returns a driver URL string if successful. Otherwise,
+  // return std::nullopt.
+  std::optional<std::string> BindNodeToResult(
+      Node& node, fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
+      bool has_tracker);
+
   // Process any pending bind requests that were queued during an ongoing bind process.
   // Should only be called when |bind_orphan_ongoing_| is true.
   void ProcessPendingBindRequests();
