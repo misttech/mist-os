@@ -30,6 +30,6 @@ pub async fn daemon(cmd: StartCommand) -> Result<()> {
             path = parent_dir.display()
         )
     })?;
-    let mut daemon = ffx_daemon::Daemon::new(ascendd_path);
+    let mut daemon = ffx_daemon_server::Daemon::new(ascendd_path);
     daemon.start(hoist).await
 }

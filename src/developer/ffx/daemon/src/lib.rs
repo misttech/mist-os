@@ -20,14 +20,11 @@ use std::{
 
 mod config;
 mod constants;
-mod daemon;
 mod socket;
 
 pub use config::*;
 
 pub use constants::LOG_FILE_PREFIX;
-
-pub use daemon::Daemon;
 
 pub use socket::SocketDetails;
 
