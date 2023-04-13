@@ -1005,6 +1005,11 @@ void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer)
               completer.ReplyError(result.status());
               return;
             }
+            if (result->is_error() && result->error_value() == ZX_ERR_NOT_FOUND) {
+              // We do not forward failures to find a driver to bind to back to the user.
+              // TODO(https://fxbug.dev/125235): Forward ZX_ERR_NOT_FOUND to the user.
+              completer.Reply(zx::ok());
+            }
             completer.Reply(result.value());
           });
 }
