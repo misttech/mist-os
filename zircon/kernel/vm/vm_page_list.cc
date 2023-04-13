@@ -302,6 +302,9 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   // as soon as possible or avoid it entirely.
   auto pln = list_.lower_bound(node_offset);
 
+  // The slot that will eventually hold offset.
+  VmPageOrMarker* slot = nullptr;
+
   // If offset falls in an interval, this will hold an interval sentinel for the interval that
   // offset is found in. It will be used to mint new sentinel values if we were also asked to split
   // the interval.
@@ -311,10 +314,24 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   // found some valid node if the offset falls in an interval. If we could not find a valid node,
   // we know that offset cannot lie in an interval, so skip the check.
   if (pln.IsValid()) {
-    is_in_interval = IfOffsetInIntervalHelper(offset, *pln, &found_interval);
-    // If we found an interval, we should have found a valid interval sentinel too.
-    DEBUG_ASSERT(!is_in_interval || found_interval);
-    DEBUG_ASSERT(!is_in_interval || found_interval->IsInterval());
+    if (pln->offset() == node_offset) {
+      // We found the node containing offset. Get the slot.
+      slot = &pln->Lookup(node_index);
+      // Short circuit the IfOffsetInIntervalHelper call below if the slot itself is an interval
+      // sentinel. This is purely an optimization, and it would be okay to call
+      // IfOffsetInIntervalHelper for this case too.
+      if (slot->IsInterval()) {
+        is_in_interval = true;
+        found_interval = slot;
+      }
+    }
+
+    if (!is_in_interval) {
+      is_in_interval = IfOffsetInIntervalHelper(offset, *pln, &found_interval);
+      // If we found an interval, we should have found a valid interval sentinel too.
+      DEBUG_ASSERT(!is_in_interval || found_interval);
+      DEBUG_ASSERT(!is_in_interval || found_interval->IsInterval());
+    }
 
     // If we are in an interval but cannot split it, we cannot return a slot. The caller should not
     // be able to manipulate the slot freely without correctly handling the interval(s) around it.
@@ -323,13 +340,9 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
     }
   }
 
-  // The slot that will eventually hold offset.
-  VmPageOrMarker* slot = nullptr;
-  if (pln.IsValid() && pln->offset() == node_offset) {
-    // We found the node containing offset. Get the slot.
-    slot = &pln->Lookup(node_index);
-  } else {
-    // Otherwise allocate the node that would contain offset and then get the slot.
+  // We won't have a valid slot if the node we looked up did not contain the required offset.
+  if (!slot) {
+    // Allocate the node that would contain offset and then get the slot.
     fbl::AllocChecker ac;
     ktl::unique_ptr<VmPageListNode> pl =
         ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(node_offset));
