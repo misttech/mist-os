@@ -1598,7 +1598,7 @@ class VmCowPages::LookupCursor {
   bool zero_fork_ = false;
 
   // Whether existing pages should be have their access time updated when they are returned.
-  bool mark_accessed_ = false;
+  bool mark_accessed_ = true;
 
   // Optional allocation list that will be used for any page allocations.
   list_node_t* alloc_list_ = nullptr;
