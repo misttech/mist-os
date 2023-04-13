@@ -12,7 +12,7 @@
 #define MAGMA_DLOG_ENABLE 0
 #endif
 
-#define DLOG(format, ...)                                                                     \
+#define MAGMA_DLOG(format, ...)                                                               \
   do {                                                                                        \
     if (MAGMA_DLOG_ENABLE) {                                                                  \
       magma::PlatformLogger::Log(magma::PlatformLogger::LOG_INFO, __FILE__, __LINE__, format, \

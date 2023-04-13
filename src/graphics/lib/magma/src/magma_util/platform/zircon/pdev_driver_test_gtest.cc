@@ -24,7 +24,7 @@ msd::DeviceHandle* GetTestDeviceHandle() {
 }
 
 zx_status_t magma_indriver_test(zx_device_t* device) {
-  DLOG("running magma unit tests");
+  MAGMA_DLOG("running magma unit tests");
   platform_device_s = magma::PlatformDevice::Create(device);
   test_device_s = device;
   const int kArgc = 1;

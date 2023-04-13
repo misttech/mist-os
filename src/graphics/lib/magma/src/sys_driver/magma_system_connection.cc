@@ -128,7 +128,7 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(
     return MAGMA_STATUS_OK;
   }
 
-  DLOG("Performance counter access enabled");
+  MAGMA_DLOG("Performance counter access enabled");
   can_access_performance_counters_ = true;
   return MAGMA_STATUS_OK;
 }
@@ -231,7 +231,7 @@ void MagmaSystemConnection::NotificationCallback(void* token,
 
     auto pool_it = connection->pool_map_.find(data.pool_id);
     if (pool_it == connection->pool_map_.end()) {
-      DLOG("Driver attempted to lookup deleted pool id %ld\n", data.pool_id);
+      MAGMA_DLOG("Driver attempted to lookup deleted pool id %ld\n", data.pool_id);
       return;
     }
 

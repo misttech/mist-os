@@ -188,8 +188,8 @@ std::unique_ptr<GpuMapping> AddressSpace<GpuMapping>::MapBufferGpu(
   if (!address_space->Alloc(aligned_size, static_cast<uint8_t>(align_pow2), &gpu_addr))
     return MAGMA_DRETP(nullptr, "failed to allocate gpu address");
 
-  DLOG("MapBufferGpu offset 0x%lx aligned_size 0x%lx allocated gpu_addr 0x%lx", offset,
-       aligned_size, gpu_addr);
+  MAGMA_DLOG("MapBufferGpu offset 0x%lx aligned_size 0x%lx allocated gpu_addr 0x%lx", offset,
+             aligned_size, gpu_addr);
 
   uint64_t page_offset = offset / magma::page_size();
   uint64_t page_count = aligned_size / magma::page_size();

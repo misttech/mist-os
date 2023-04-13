@@ -16,6 +16,6 @@ std::unique_ptr<MockMmio> MockMmio::Create(uint64_t size) {
 MockMmio::MockMmio(void* addr, uint64_t size) : magma::PlatformMmio(addr, size) {}
 
 MockMmio::~MockMmio() {
-  DLOG("MockMmio dtor");
+  MAGMA_DLOG("MockMmio dtor");
   free(addr());
 }

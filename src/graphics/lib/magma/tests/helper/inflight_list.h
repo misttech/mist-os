@@ -57,7 +57,7 @@ class InflightList {
       magma_status_t status = magma_connection_read_notification_channel(
           connection, buffer_ids, sizeof(buffer_ids), &bytes_available, &more_data);
       if (status != MAGMA_STATUS_OK) {
-        DLOG("magma_read_notification_channel returned %d", status);
+        MAGMA_DLOG("magma_read_notification_channel returned %d", status);
         return;
       }
       if (bytes_available == 0)

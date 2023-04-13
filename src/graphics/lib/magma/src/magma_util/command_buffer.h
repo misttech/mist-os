@@ -202,9 +202,10 @@ bool CommandBuffer<Context, GpuMapping>::MapResourcesGpu(
         address_space->FindGpuMapping(platform_buffer, res.offset, res.length);
     if (!mapping)
       return MAGMA_DRETF(false, "failed to find gpu mapping for buffer %lu", platform_buffer->id());
-    DLOG("MapResourcesGpu aspace %p buffer 0x%" PRIx64 " offset 0x%" PRIx64 " length 0x%" PRIx64
-         " gpu_addr 0x%" PRIx64,
-         address_space.get(), platform_buffer->id(), res.offset, res.length, mapping->gpu_addr());
+    MAGMA_DLOG("MapResourcesGpu aspace %p buffer 0x%" PRIx64 " offset 0x%" PRIx64
+               " length 0x%" PRIx64 " gpu_addr 0x%" PRIx64,
+               address_space.get(), platform_buffer->id(), res.offset, res.length,
+               mapping->gpu_addr());
     mappings.push_back(mapping);
   }
 

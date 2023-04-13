@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
+#include "magma_util/short_macros.h"
 #include "platform_device.h"
 #include "platform_thread.h"
 

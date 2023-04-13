@@ -25,7 +25,7 @@ msd::DeviceHandle* GetTestDeviceHandle() {
 }
 
 zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_pci_device) {
-  DLOG("running magma unit tests");
+  MAGMA_DLOG("running magma unit tests");
   platform_pci_device_s = platform_pci_device;
   test_device_s = platform_pci_device->GetDeviceHandle();
   const int kArgc = 1;

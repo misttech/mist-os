@@ -76,7 +76,7 @@ void MagmaSystemDevice::Shutdown() {
 
   std::chrono::duration<double, std::milli> elapsed =
       std::chrono::high_resolution_clock::now() - start;
-  DLOG("shutdown took %u ms", (uint32_t)elapsed.count());
+  MAGMA_DLOG("shutdown took %u ms", (uint32_t)elapsed.count());
 
   (void)elapsed;
 }

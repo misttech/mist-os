@@ -29,7 +29,7 @@ class PlatformDevice {
     kPriorityHighest = 31
   };
 
-  virtual ~PlatformDevice() { DLOG("PlatformDevice dtor"); }
+  virtual ~PlatformDevice() { MAGMA_DLOG("PlatformDevice dtor"); }
 
   virtual void* GetDeviceHandle() = 0;
 
@@ -51,18 +51,18 @@ class PlatformDevice {
   // Map an MMIO listed at |index| in the MDI for this device.
   virtual std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index,
                                                    PlatformMmio::CachePolicy cache_policy) {
-    DLOG("CpuMapMmio unimplemented");
+    MAGMA_DLOG("CpuMapMmio unimplemented");
     return nullptr;
   }
 
   virtual std::unique_ptr<PlatformBuffer> GetMmioBuffer(unsigned int index) {
-    DLOG("GetMmioBuffer unimplemented");
+    MAGMA_DLOG("GetMmioBuffer unimplemented");
     return nullptr;
   }
 
   // Register an interrupt listed at |index| in the MDI for this device.
   virtual std::unique_ptr<PlatformInterrupt> RegisterInterrupt(unsigned int index) {
-    DLOG("RegisterInterrupt unimplemented");
+    MAGMA_DLOG("RegisterInterrupt unimplemented");
     return nullptr;
   }
 

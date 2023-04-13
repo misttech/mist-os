@@ -32,7 +32,7 @@ class Ringbuffer : public InstructionWriter {
   void update_head(uint32_t head) {
     MAGMA_DASSERT((head & (sizeof(*vaddr_) - 1)) == 0);
     MAGMA_DASSERT(head < size_);
-    DLOG("updating head 0x%x", head);
+    MAGMA_DLOG("updating head 0x%x", head);
     head_ = head;
   }
 
@@ -61,7 +61,7 @@ class Ringbuffer : public InstructionWriter {
   void update_tail(uint32_t tail) {
     MAGMA_DASSERT((tail & (sizeof(*vaddr_) - 1)) == 0);
     MAGMA_DASSERT(tail < size_);
-    DLOG("updating tail 0x%x", tail);
+    MAGMA_DLOG("updating tail 0x%x", tail);
     tail_ = tail;
   }
 
@@ -99,7 +99,7 @@ void Ringbuffer<GpuMapping>::Write32(uint32_t value) {
   vaddr_[tail_ >> 2] = value;
   tail_ += sizeof(value);
   if (tail_ >= size_) {
-    DLOG("ringbuffer tail wrapped");
+    MAGMA_DLOG("ringbuffer tail wrapped");
     tail_ = 0;
   }
   MAGMA_DASSERT(tail_ != head_);

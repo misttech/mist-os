@@ -158,7 +158,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
     buffer_ = magma::PlatformBuffer::Create(buffer_size, "command-buffer-backing");
     MAGMA_DASSERT(buffer_);
 
-    DLOG("CommandBuffer backing buffer: %p", buffer_.get());
+    MAGMA_DLOG("CommandBuffer backing buffer: %p", buffer_.get());
 
     bool success = buffer_->MapCpu(&buffer_data_);
     MAGMA_DASSERT(success);

@@ -16,28 +16,28 @@ namespace magma {
 
 class PlatformPciDevice {
  public:
-  virtual ~PlatformPciDevice() { DLOG("PlatformPciDevice dtor"); }
+  virtual ~PlatformPciDevice() { MAGMA_DLOG("PlatformPciDevice dtor"); }
 
   virtual void* GetDeviceHandle() = 0;
 
   virtual std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() {
-    DLOG("GetBusTransactionInitiator unimplemented");
+    MAGMA_DLOG("GetBusTransactionInitiator unimplemented");
     return nullptr;
   }
 
   virtual bool ReadPciConfig16(uint64_t addr, uint16_t* value) {
-    DLOG("ReadPciConfig16 unimplemented");
+    MAGMA_DLOG("ReadPciConfig16 unimplemented");
     return false;
   }
 
   virtual std::unique_ptr<PlatformMmio> CpuMapPciMmio(unsigned int pci_bar,
                                                       PlatformMmio::CachePolicy cache_policy) {
-    DLOG("CpuMapPciMmio unimplemented");
+    MAGMA_DLOG("CpuMapPciMmio unimplemented");
     return nullptr;
   }
 
   virtual std::unique_ptr<PlatformInterrupt> RegisterInterrupt() {
-    DLOG("RegisterInterrupt unimplemented");
+    MAGMA_DLOG("RegisterInterrupt unimplemented");
     return nullptr;
   }
 

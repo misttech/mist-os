@@ -156,7 +156,7 @@ void ZirconConnection::NotificationChannelSend(cpp20::span<uint8_t> data) {
   zx_status_t status = server_notification_endpoint_.write(
       0, data.data(), static_cast<uint32_t>(data.size()), nullptr, 0);
   if (status != ZX_OK)
-    DLOG("Failed writing to channel: %s", zx_status_get_string(status));
+    MAGMA_DLOG("Failed writing to channel: %s", zx_status_get_string(status));
 }
 void ZirconConnection::ContextKilled() {
   async::PostTask(async_loop_.dispatcher(),
@@ -178,7 +178,7 @@ void ZirconConnection::HandleWait(msd_connection_handle_wait_start_t starter,
 
     zx_status_t status = async_begin_wait(async_loop()->dispatcher(), wait_ptr.get());
     if (status != ZX_OK) {
-      DLOG("async_begin_wait failed: %s", zx_status_get_string(status));
+      MAGMA_DLOG("async_begin_wait failed: %s", zx_status_get_string(status));
       return;
     }
 
@@ -193,7 +193,7 @@ void ZirconConnection::HandleWaitCancel(void* cancel_token) {
 
     zx_status_t status = async_cancel_wait(async_loop()->dispatcher(), wait_ptr);
     if (status != ZX_OK) {
-      DLOG("async_cancel_wait failed: %s", zx_status_get_string(status));
+      MAGMA_DLOG("async_cancel_wait failed: %s", zx_status_get_string(status));
       return;
     }
 
@@ -240,7 +240,7 @@ void ZirconConnection::ImportObject2(ImportObject2RequestView request,
                                      ImportObject2Completer::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::ImportObject2", "type",
                  static_cast<uint32_t>(request->object_type));
-  DLOG("ZirconConnection: ImportObject2");
+  MAGMA_DLOG("ZirconConnection: ImportObject2");
 
   auto object_type = ValidateObjectType(request->object_type);
   if (!object_type) {
@@ -268,7 +268,7 @@ void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
                                      ReleaseObjectCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::ReleaseObject", "type",
                  static_cast<uint32_t>(request->object_type));
-  DLOG("ZirconConnection: ReleaseObject");
+  MAGMA_DLOG("ZirconConnection: ReleaseObject");
   FlowControl();
 
   auto object_type = ValidateObjectType(request->object_type);
@@ -284,7 +284,7 @@ void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
 void ZirconConnection::CreateContext(CreateContextRequestView request,
                                      CreateContextCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::CreateContext");
-  DLOG("ZirconConnection: CreateContext");
+  MAGMA_DLOG("ZirconConnection: CreateContext");
   FlowControl();
 
   magma::Status status = delegate_->CreateContext(request->context_id);
@@ -295,7 +295,7 @@ void ZirconConnection::CreateContext(CreateContextRequestView request,
 void ZirconConnection::DestroyContext(DestroyContextRequestView request,
                                       DestroyContextCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::DestroyContext");
-  DLOG("ZirconConnection: DestroyContext");
+  MAGMA_DLOG("ZirconConnection: DestroyContext");
   FlowControl();
 
   magma::Status status = delegate_->DestroyContext(request->context_id);
@@ -358,7 +358,7 @@ void ZirconConnection::ExecuteImmediateCommands(
     ExecuteImmediateCommandsRequestView request,
     ExecuteImmediateCommandsCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::ExecuteImmediateCommands");
-  DLOG("ZirconConnection: ExecuteImmediateCommands");
+  MAGMA_DLOG("ZirconConnection: ExecuteImmediateCommands");
   FlowControl();
 
   magma::Status status = delegate_->ExecuteImmediateCommands(
@@ -370,14 +370,14 @@ void ZirconConnection::ExecuteImmediateCommands(
 
 void ZirconConnection::Flush(FlushCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::Flush");
-  DLOG("ZirconConnection: Flush");
+  MAGMA_DLOG("ZirconConnection: Flush");
   completer.Reply();
 }
 
 void ZirconConnection::MapBuffer(MapBufferRequestView request,
                                  MapBufferCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::MapBuffer");
-  DLOG("ZirconConnection: MapBufferFIDL");
+  MAGMA_DLOG("ZirconConnection: MapBufferFIDL");
   FlowControl();
 
   if (!request->has_range() || !request->has_hw_va()) {
@@ -397,7 +397,7 @@ void ZirconConnection::MapBuffer(MapBufferRequestView request,
 void ZirconConnection::UnmapBuffer(UnmapBufferRequestView request,
                                    UnmapBufferCompleter::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::UnmapBuffer");
-  DLOG("ZirconConnection: UnmapBufferFIDL");
+  MAGMA_DLOG("ZirconConnection: UnmapBufferFIDL");
   FlowControl();
 
   if (!request->has_buffer_id() || !request->has_hw_va()) {
@@ -413,7 +413,7 @@ void ZirconConnection::UnmapBuffer(UnmapBufferRequestView request,
 void ZirconConnection::BufferRangeOp2(BufferRangeOp2RequestView request,
                                       BufferRangeOp2Completer::Sync& completer) {
   TRACE_DURATION("magma", "ZirconConnection::BufferRangeOp2");
-  DLOG("ZirconConnection:::BufferRangeOp2");
+  MAGMA_DLOG("ZirconConnection:::BufferRangeOp2");
   FlowControl();
 
   std::optional<int> buffer_op = GetBufferOp(request->op);
@@ -433,7 +433,7 @@ void ZirconConnection::BufferRangeOp2(BufferRangeOp2RequestView request,
 void ZirconConnection::EnablePerformanceCounterAccess(
     EnablePerformanceCounterAccessRequestView request,
     EnablePerformanceCounterAccessCompleter::Sync& completer) {
-  DLOG("ZirconConnection:::EnablePerformanceCounterAccess");
+  MAGMA_DLOG("ZirconConnection:::EnablePerformanceCounterAccess");
   FlowControl();
 
   magma::Status status =
@@ -445,7 +445,7 @@ void ZirconConnection::EnablePerformanceCounterAccess(
 
 void ZirconConnection::IsPerformanceCounterAccessAllowed(
     IsPerformanceCounterAccessAllowedCompleter::Sync& completer) {
-  DLOG("ZirconConnection:::IsPerformanceCounterAccessAllowed");
+  MAGMA_DLOG("ZirconConnection:::IsPerformanceCounterAccessAllowed");
   completer.Reply(delegate_->IsPerformanceCounterAccessAllowed());
 }
 

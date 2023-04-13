@@ -68,7 +68,7 @@ std::unique_ptr<SimpleAllocator> SimpleAllocator::Create(uint64_t base, size_t s
 SimpleAllocator::SimpleAllocator(uint64_t base, size_t size) : AddressSpaceAllocator(base, size) {}
 
 bool SimpleAllocator::Alloc(size_t size, uint8_t align_pow2, uint64_t* addr_out) {
-  DLOG("Alloc size 0x%zx align_pow2 0x%x", size, align_pow2);
+  MAGMA_DLOG("Alloc size 0x%zx align_pow2 0x%x", size, align_pow2);
   MAGMA_DASSERT(addr_out);
 
   size = magma::round_up(size, magma::page_size());
@@ -88,7 +88,7 @@ bool SimpleAllocator::Alloc(size_t size, uint8_t align_pow2, uint64_t* addr_out)
                &continue_search)) {
     *addr_out = addr;
     regions_.emplace_front(addr, size);
-    DLOG("allocated addr 0x%lx", addr);
+    MAGMA_DLOG("allocated addr 0x%lx", addr);
     return true;
   }
 
@@ -99,7 +99,7 @@ bool SimpleAllocator::Alloc(size_t size, uint8_t align_pow2, uint64_t* addr_out)
     if (CheckGap(prev, next, align, size, &addr, &continue_search)) {
       *addr_out = addr;
       regions_.insert(iter, Region(addr, size));
-      DLOG("allocated addr 0x%lx", addr);
+      MAGMA_DLOG("allocated addr 0x%lx", addr);
       return true;
     }
   }
@@ -108,7 +108,7 @@ bool SimpleAllocator::Alloc(size_t size, uint8_t align_pow2, uint64_t* addr_out)
 }
 
 bool SimpleAllocator::Free(uint64_t addr) {
-  DLOG("Free addr 0x%lx", addr);
+  MAGMA_DLOG("Free addr 0x%lx", addr);
 
   auto iter = FindRegion(addr);
   if (iter == regions_.end())

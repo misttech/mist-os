@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_pci_device_helper.h"
+#include "magma_util/short_macros.h"
 #include "platform_pci_device.h"
 
 TEST(PlatformPciDevice, Basic) {
