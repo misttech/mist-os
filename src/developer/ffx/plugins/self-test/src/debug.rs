@@ -59,7 +59,7 @@ pub mod include_target {
             .context("loading global environment context")?
             .get_sdk()
             .await?;
-        let isolate = new_isolate("target-debug-run-crasher").await?;
+        let isolate = new_isolate("debug-run-crasher").await?;
         let mut config = "sdk.root=".to_owned();
         config.push_str(sdk.get_path_prefix().to_str().unwrap());
         if sdk.get_version() == &sdk::SdkVersion::InTree {
@@ -127,7 +127,7 @@ pub mod include_target {
         // //src/developer/ffx:ffx-e2e-with-target.
 
         let target = get_target_nodename().await?;
-        let isolate = new_isolate("target-debug-limbo").await?;
+        let isolate = new_isolate("debug-limbo").await?;
 
         // Ensure limbo is active and clean.
         let output = isolate.ffx(&["--target", &target, "debug", "limbo", "disable"]).await?;

@@ -7,7 +7,7 @@ use anyhow::*;
 use std::time::Duration;
 
 pub(crate) async fn test_get_ssh_address_timeout() -> Result<()> {
-    let isolate = new_isolate("get-ssh-address").await?;
+    let isolate = new_isolate("target-get-ssh-address-timeout").await?;
 
     let out = isolate.ffx(&["--target", "noexist", "target", "get-ssh-address", "-t", "1"]).await?;
 
@@ -20,7 +20,7 @@ pub(crate) async fn test_get_ssh_address_timeout() -> Result<()> {
 }
 
 pub(crate) async fn test_manual_add_get_ssh_address() -> Result<()> {
-    let isolate = new_isolate("target-add-get-ssh-address").await?;
+    let isolate = new_isolate("target-manual-add-get-ssh-address").await?;
 
     let _ = isolate.ffx(&["target", "add", "--nowait", "[::1]:8022"]).await?;
 
@@ -34,7 +34,7 @@ pub(crate) async fn test_manual_add_get_ssh_address() -> Result<()> {
 }
 
 pub(crate) async fn test_manual_add_get_ssh_address_late_add() -> Result<()> {
-    let isolate = new_isolate("target-add-get-ssh-address-late-add").await?;
+    let isolate = new_isolate("target-manual-add-get-ssh-address-late-add").await?;
 
     let task = isolate.ffx(&["--target", "[::1]:8022", "target", "get-ssh-address", "-t", "10"]);
 
