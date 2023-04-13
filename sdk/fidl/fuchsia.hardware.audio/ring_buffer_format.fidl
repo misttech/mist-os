@@ -1,0 +1,112 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.audio;
+
+const MAX_COUNT_CHANNELS_IN_RING_BUFFER uint32 = 64;
+const MAX_COUNT_SUPPORTED_NUMBER_OF_CHANNELS uint32 = 64;
+const MAX_COUNT_CHANNEL_SETS uint32 = 64;
+const MAX_COUNT_SUPPORTED_SAMPLE_FORMATS uint32 = 3;
+const MAX_COUNT_SUPPORTED_RATES uint32 = 64;
+const MAX_COUNT_SUPPORTED_BYTES_PER_SAMPLE uint32 = 8;
+const MAX_COUNT_SUPPORTED_VALID_BITS_PER_SAMPLE uint32 = 8;
+
+type SampleFormat = strict enum : uint8 {
+    /// Signed Linear Pulse Code Modulation samples at the host endianness.
+    PCM_SIGNED = 1;
+
+    /// Unsigned Linear Pulse Code Modulation samples at the host endianness.
+    PCM_UNSIGNED = 2;
+
+    /// Floating point samples IEEE-754 encoded.
+    PCM_FLOAT = 3;
+};
+
+type ChannelAttributes = table {
+    /// Minimum frequency guaranteed to be emitted by (or captured in) this channel, in Hz.
+    /// Optional.
+    /// If both `min_frequency` and `max_frequency` are not included, then this channel is assumed
+    /// to cover the full frequency range of this device.
+    // TODO(fxbug.dev/81743): Define expectations beyond these min/max limits and enable drivers
+    // to express tolerances related to this.
+    1: min_frequency uint32;
+
+    /// Maximum frequency guaranteed to be emitted by (or captured in) this channel, in Hz.
+    /// Optional.
+    /// If both `min_frequency` and `max_frequency` are not included, then this channel is assumed
+    /// to cover the full frequency range of this device.
+    // TODO(fxbug.dev/81743): Define expectations beyond these min/max limits and enable drivers
+    // to express tolerances related to this.
+    2: max_frequency uint32;
+};
+
+type ChannelSet = table {
+    /// Describes attributes for this channel set. Required.
+    /// The size of this vector defines the number of channels supported by this `ChannelSet`.
+    /// Each element of the vector defines attributes of a single channel.
+    1: attributes vector<ChannelAttributes>:MAX_COUNT_CHANNELS_IN_RING_BUFFER;
+};
+
+type SupportedFormats = table {
+    /// Supported formats for non-compressed PCM samples with attributes. Required.
+    1: pcm_supported_formats PcmSupportedFormats;
+};
+
+/// Format supporting non-compressed PCM audio. Frames are made up of number of channels samples
+/// which have `valid_bits_per_sample` bits of left-justified data within `bytes_per_sample`
+/// bytes. All values listed in each vector are supported. When not all combinations supported by
+/// the driver can be described with one `SupportedFormats` (and hence one `PcmSupportedFormats`),
+/// `GetSupportedFormats` returns more than one `SupportedFormats` in the returned vector.
+/// For more detailed information see [Audio Driver Streaming Interface](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_streaming).
+type PcmSupportedFormats = table {
+    /// Vector of possible `ChannelSets` supported. Required.
+    /// A `ChannelSet` defines a number of channels supported plus a number of optional
+    /// attributes for these channels.
+    /// Only one `ChannelSet` is allowed for each unique number of channels.
+    1: channel_sets vector<ChannelSet>:MAX_COUNT_CHANNEL_SETS;
+
+    /// Vector of possible `SampleFormat`s supported. Required.
+    2: sample_formats vector<SampleFormat>:MAX_COUNT_SUPPORTED_SAMPLE_FORMATS;
+
+    /// Vector of possible number of bits allocated to hold a sample,
+    /// equal or bigger than the actual sample size in `valid_bits_per_sample` in ascending order.
+    /// Required.
+    3: bytes_per_sample vector<uint8>:MAX_COUNT_SUPPORTED_BYTES_PER_SAMPLE;
+
+    /// Vector of possible number of bits in a sample in ascending order, must be equal or smaller
+    /// than `bytes_per_sample` for samples to fit. If smaller, bits are left justified, and any
+    /// additional bits will be ignored. Required.
+    4: valid_bits_per_sample vector<uint8>:MAX_COUNT_SUPPORTED_VALID_BITS_PER_SAMPLE;
+
+    /// Vector of possible frame rates supported in ascending order. Required.
+    5: frame_rates vector<uint32>:MAX_COUNT_SUPPORTED_RATES;
+};
+
+type Format = table {
+    /// Format supporting non-compressed PCM samples. Required.
+    1: pcm_format PcmFormat;
+};
+
+/// Format supporting non-compressed PCM audio. Frames are made up of `number_of_channels` samples
+/// which have `valid_bits_per_sample` bits of left-justified data within `bytes_per_sample`.
+/// bytes. For more detailed information see
+/// [Audio Driver Streaming Interface](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_streaming).
+type PcmFormat = struct {
+    /// Number of channels.
+    number_of_channels uint8;
+
+    /// The format of all samples.
+    sample_format SampleFormat;
+
+    /// Bytes allocated to hold a sample, equal or bigger than the valid sample size in
+    /// `valid_bits_per_sample`.
+    bytes_per_sample uint8;
+
+    /// Number of valid bits in a sample, must be equal or smaller than bits in `bytes_per_sample`.
+    /// If smaller, bits are left justified, and any additional bits must be ignored by the
+    /// receiver.
+    valid_bits_per_sample uint8;
+
+    /// The frame rate for all samples.
+    frame_rate uint32;
+};

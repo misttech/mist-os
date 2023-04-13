@@ -8,14 +8,17 @@ fidl("fuchsia.hardware.audio") {
   sdk_category = "partner"
 
   sources = [
+    "clock.fidl",
     "codec.fidl",
     "codec_connector.fidl",
+    "common.fidl",
     "dai.fidl",
     "dai_connector.fidl",
     "dai_format.fidl",
     "health.fidl",
     "overview.fidl",
     "ring_buffer.fidl",
+    "ring_buffer_format.fidl",
     "stream_config.fidl",
     "stream_config_connector.fidl",
   ]

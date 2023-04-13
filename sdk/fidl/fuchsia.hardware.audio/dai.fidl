@@ -7,7 +7,7 @@ using zx;
 using fuchsia.hardware.audio.signalprocessing;
 
 const MAX_DAI_UI_STRING_SIZE uint32 = 256;
-const MAX_COUNT_DAI_FORMATS uint32 = 64;
+const MAX_COUNT_DAI_FORMATS uint32 = MAX_COUNT_FORMATS;
 
 type DaiProperties = table {
     /// Dai type is input or output. Required.
