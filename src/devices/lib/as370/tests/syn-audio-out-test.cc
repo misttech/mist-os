@@ -24,10 +24,8 @@ class SynAudioOutTest : public zxtest::Test {
   static constexpr size_t kI2sRegCount = as370::kAudioI2sSize / sizeof(uint32_t);
 
   void SetUp() override {
-    global_mocks_ = fbl::Array(new ddk_mock::MockMmioReg[kGlobalRegCount], kGlobalRegCount);
-    i2s_mocks_ = fbl::Array(new ddk_mock::MockMmioReg[kI2sRegCount], kI2sRegCount);
-    global_region_.emplace(global_mocks_.data(), sizeof(uint32_t), kGlobalRegCount);
-    i2s_region_.emplace(i2s_mocks_.data(), sizeof(uint32_t), kI2sRegCount);
+    global_region_.emplace(sizeof(uint32_t), kGlobalRegCount);
+    i2s_region_.emplace(sizeof(uint32_t), kI2sRegCount);
     ddk::MmioBuffer global_buffer(global_region_->GetMmioBuffer());
     ddk::MmioBuffer i2s_buffer(i2s_region_->GetMmioBuffer());
 
@@ -56,8 +54,6 @@ class SynAudioOutTest : public zxtest::Test {
  private:
   std::unique_ptr<SynAudioOutDevice> device_;
   ddk::MockSharedDma dma_mock_;
-  fbl::Array<ddk_mock::MockMmioReg> global_mocks_;
-  fbl::Array<ddk_mock::MockMmioReg> i2s_mocks_;
   std::optional<ddk_mock::MockMmioRegRegion> global_region_;
   std::optional<ddk_mock::MockMmioRegRegion> i2s_region_;
 };

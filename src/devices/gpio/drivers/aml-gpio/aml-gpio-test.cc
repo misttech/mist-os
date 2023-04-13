@@ -130,14 +130,10 @@ class A113AmlGpioTest : public zxtest::Test {
 
  protected:
   std::unique_ptr<FakeAmlGpio> gpio_;
-  std::array<ddk_mock::MockMmioReg, kGpioRegSize> gpio_regs_;
-  std::array<ddk_mock::MockMmioReg, kGpioRegSize> gpio_a0_regs_;
-  std::array<ddk_mock::MockMmioReg, kInterruptRegSize> interrupt_regs_;
-  ddk_mock::MockMmioRegRegion mock_mmio_gpio_{gpio_regs_.data(), sizeof(uint32_t), kGpioRegSize};
-  ddk_mock::MockMmioRegRegion mock_mmio_gpio_a0_{gpio_a0_regs_.data(), sizeof(uint32_t),
-                                                 kGpioRegSize};
-  ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{interrupt_regs_.data(), sizeof(uint32_t),
-                                                   kInterruptRegSize, kInterruptRegOffset};
+  ddk_mock::MockMmioRegRegion mock_mmio_gpio_{sizeof(uint32_t), kGpioRegSize};
+  ddk_mock::MockMmioRegRegion mock_mmio_gpio_a0_{sizeof(uint32_t), kGpioRegSize};
+  ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{sizeof(uint32_t), kInterruptRegSize,
+                                                   kInterruptRegOffset};
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
@@ -156,14 +152,10 @@ class S905d2AmlGpioTest : public zxtest::Test {
 
  protected:
   std::unique_ptr<FakeAmlGpio> gpio_;
-  std::array<ddk_mock::MockMmioReg, kGpioRegSize> gpio_regs_;
-  std::array<ddk_mock::MockMmioReg, kGpioRegSize> gpio_a0_regs_;
-  std::array<ddk_mock::MockMmioReg, kInterruptRegSize> interrupt_regs_;
-  ddk_mock::MockMmioRegRegion mock_mmio_gpio_{gpio_regs_.data(), sizeof(uint32_t), kGpioRegSize};
-  ddk_mock::MockMmioRegRegion mock_mmio_gpio_a0_{gpio_a0_regs_.data(), sizeof(uint32_t),
-                                                 kGpioRegSize};
-  ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{interrupt_regs_.data(), sizeof(uint32_t),
-                                                   kInterruptRegSize, kInterruptRegOffset};
+  ddk_mock::MockMmioRegRegion mock_mmio_gpio_{sizeof(uint32_t), kGpioRegSize};
+  ddk_mock::MockMmioRegRegion mock_mmio_gpio_a0_{sizeof(uint32_t), kGpioRegSize};
+  ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{sizeof(uint32_t), kInterruptRegSize,
+                                                   kInterruptRegOffset};
 
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),

@@ -35,7 +35,7 @@ class DwI2cTester {
  public:
   static constexpr uint32_t kBufferDepth = 0x80;
   DwI2cTester()
-      : mock_i2c_regs_(i2c_reg_array_, kRegSize, kRegBytes),
+      : mock_i2c_regs_(kRegSize, kRegCount),
         mmio_buffer_(mock_i2c_regs_.GetMmioBuffer()) {
     SetupRegisters();
 
@@ -64,7 +64,6 @@ class DwI2cTester {
   static constexpr uint32_t kRegBytes = 0x100;
   static constexpr uint32_t kRegCount = kRegBytes / kRegSize;
   std::unique_ptr<DwI2c> dw_i2c_;
-  ddk_mock::MockMmioReg i2c_reg_array_[kRegCount];
   ddk_mock::MockMmioRegRegion mock_i2c_regs_;
   ddk::MmioBuffer mmio_buffer_;
   zx::interrupt irq_;

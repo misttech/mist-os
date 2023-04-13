@@ -108,13 +108,7 @@ class RegistersDeviceTest : public zxtest::Test {
 
     std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios;
     for (uint32_t i = 0; i < mmio_count; i++) {
-      regs_.push_back(
-          fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize / sizeof(T)], kRegSize / sizeof(T)));
-      if (!ac.check()) {
-        zxlogf(ERROR, "%s: regs_[%u] alloc failed", __func__, i);
-        return nullptr;
-      }
-      mock_mmio_.push_back(std::make_unique<ddk_mock::MockMmioRegRegion>(regs_[i].get(), sizeof(T),
+      mock_mmio_.push_back(std::make_unique<ddk_mock::MockMmioRegRegion>(sizeof(T),
                                                                          kRegSize / sizeof(T)));
 
       std::vector<fbl::Mutex> locks(kRegSize / sizeof(T));
@@ -144,10 +138,7 @@ class RegistersDeviceTest : public zxtest::Test {
   fdf_testing::DriverRuntimeEnv managed_runtime_env_;
   fdf::TestSynchronizedDispatcher registers_dispatcher_{fdf::kDispatcherNoDefault};
 
-  // Mmio Regs and Regions
-  std::vector<fbl::Array<ddk_mock::MockMmioReg>> regs_;
   std::vector<std::unique_ptr<ddk_mock::MockMmioRegRegion>> mock_mmio_;
-
   fidl::Arena<2048> allocator_;
 };
 

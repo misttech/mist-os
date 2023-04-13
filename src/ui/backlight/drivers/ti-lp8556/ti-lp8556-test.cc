@@ -39,7 +39,7 @@ constexpr uint32_t kMmioRegCount = (kAOBrightnessStickyReg + kMmioRegSize) / kMm
 class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper {
  public:
   Lp8556DeviceTest()
-      : mock_regs_(ddk_mock::MockMmioRegRegion(mock_reg_array_, kMmioRegSize, kMmioRegCount)),
+      : mock_regs_(ddk_mock::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)),
         fake_parent_(MockDevice::FakeRootParent()),
         loop_(&kAsyncLoopConfigNeverAttachToThread),
         i2c_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
@@ -123,7 +123,6 @@ class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper 
   std::shared_ptr<MockDevice> fake_parent_;
 
  private:
-  ddk_mock::MockMmioReg mock_reg_array_[kMmioRegCount];
   fidl::ClientEnd<fuchsia_hardware_adhoc_lp8556::Device> client_;
   async::Loop loop_;
   async::Loop i2c_loop_;

@@ -102,13 +102,9 @@ class ThermistorDeviceTest : public zxtest::Test {
 
   void SetUp() override {
     constexpr size_t kRegSize = S905D2_SARADC_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-    fbl::Array<ddk_mock::MockMmioReg> regs0 =
-        fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    fbl::Array<ddk_mock::MockMmioReg> regs1 =
-        fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
 
-    ddk_mock::MockMmioRegRegion mock0(regs0.data(), sizeof(uint32_t), kRegSize);
-    ddk_mock::MockMmioRegRegion mock1(regs1.data(), sizeof(uint32_t), kRegSize);
+    ddk_mock::MockMmioRegRegion mock0(sizeof(uint32_t), kRegSize);
+    ddk_mock::MockMmioRegRegion mock1(sizeof(uint32_t), kRegSize);
 
     zx::interrupt irq;
     adc_ = fbl::MakeRefCounted<TestSarAdc>(mock0.GetMmioBuffer(), mock1.GetMmioBuffer(),

@@ -15,7 +15,6 @@
 #include <zircon/errors.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
@@ -224,9 +223,7 @@ TEST(AmlG12Tdm, InitializeI2sOut) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // Configure TDM OUT for I2S.
   mock[0x580].ExpectRead(0xffffffff).ExpectWrite(0x7fffffff);  // TDM OUT CTRL0 disable.
@@ -282,9 +279,7 @@ TEST(AmlG12Tdm, InitializePcmOut) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // Configure TDM OUT A for PCM. EE_AUDIO_TDMOUT_A_CTRL0.
   mock[0x500].ExpectRead(0xffffffff).ExpectWrite(0x7fffffff);  // TDM OUT CTRL0 disable.
@@ -338,9 +333,7 @@ TEST(AmlG12Tdm, InitializeLeftJustifiedOut) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // Configure TDM OUT for LeftJustified.
   mock[0x580].ExpectRead(0xffffffff).ExpectWrite(0x7fffffff);  // TDM OUT CTRL0 disable.
@@ -393,9 +386,7 @@ TEST(AmlG12Tdm, InitializeTdm1Out) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // Configure TDM OUT for Tdm1.
   mock[0x580].ExpectRead(0xffffffff).ExpectWrite(0x7fffffff);  // TDM OUT CTRL0 disable.
@@ -440,9 +431,7 @@ TEST(AmlG12Tdm, I2sOutCodecsStartedAndMuted) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto};
@@ -508,9 +497,7 @@ TEST(AmlG12Tdm, I2sOutCodecsTurnOnDelay) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto};
@@ -565,9 +552,7 @@ TEST(AmlG12Tdm, I2sOutSetGainState) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto};
@@ -736,9 +721,7 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantAgc) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto};
@@ -796,9 +779,7 @@ TEST(AmlG12Tdm, I2sOutOneCodecCantMute) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto};
@@ -851,9 +832,7 @@ TEST(AmlG12Tdm, I2sOutCodecsStop) {
   auto codec3_proto = codec3->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto, &codec3_proto};
@@ -930,9 +909,7 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
   auto codec3_proto = codec3->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion unused_mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion unused_mock(sizeof(uint32_t), kRegSize);
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
   std::vector<codec_protocol_t*> codec_protocols = {&codec1_proto, &codec2_proto, &codec3_proto};
@@ -1046,9 +1023,7 @@ TEST(AmlG12Tdm, I2sOutSetMclks) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // HW Initialize the MCLK pads. EE_AUDIO_MST_PAD_CTRL0.
   mock[0x01C].ExpectRead(0x00000000).ExpectWrite(0x00000002);  // MCLK C for PAD 0.
@@ -1088,9 +1063,7 @@ TEST(AmlG12Tdm, I2sOutChangeRate96K) {
   auto codec2_proto = codec2->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // HW Initialize the MCLK pads. EE_AUDIO_MST_PAD_CTRL0.
   mock[0x01C].ExpectRead(0x00000000).ExpectWrite(0x00000002);  // MCLK C for PAD 0.
@@ -1191,9 +1164,7 @@ TEST(AmlG12Tdm, PcmChangeRates) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
@@ -1321,9 +1292,7 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsPcm1Channel) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
@@ -1411,9 +1380,7 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm2Lanes) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
@@ -1485,9 +1452,7 @@ TEST(AmlG12Tdm, EnableAndMuteChannelsTdm1Lane) {
   auto codec_proto = codec->GetProto();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   ddk::MockGpio enable_gpio;
   enable_gpio.ExpectWrite(ZX_OK, 0);
@@ -1614,9 +1579,7 @@ TEST(AmlG12Tdm, InitializeI2sIn) {
   auto fake_parent = MockDevice::FakeRootParent();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // Configure TDM IN for I2S.
   mock[0x380].ExpectRead(0xffffffff).ExpectWrite(0x7fffffff);  // TDM IN CTRL0 disable.
@@ -1648,9 +1611,7 @@ TEST(AmlG12Tdm, InitializePcmIn) {
   auto fake_parent = MockDevice::FakeRootParent();
 
   constexpr size_t kRegSize = S905D2_EE_AUDIO_LENGTH / sizeof(uint32_t);  // in 32 bits chunks.
-  fbl::Array<ddk_mock::MockMmioReg> regs =
-      fbl::Array(new ddk_mock::MockMmioReg[kRegSize], kRegSize);
-  ddk_mock::MockMmioRegRegion mock(regs.data(), sizeof(uint32_t), kRegSize);
+  ddk_mock::MockMmioRegRegion mock(sizeof(uint32_t), kRegSize);
 
   // Configure TDM IN for PCM.
   mock[0x380].ExpectRead(0xffffffff).ExpectWrite(0x7fffffff);  // TDM IN CTRL0 disable.

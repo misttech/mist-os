@@ -288,37 +288,22 @@ class AmlTSensorTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    pll_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlTSensorTest::SetUp: pll_regs_ alloc failed");
-      return;
-    }
     mock_pll_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, pll_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_pll_mmio_ alloc failed");
       return;
     }
 
-    trim_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlTSensorTest::SetUp: trim_regs_ alloc failed");
-      return;
-    }
     mock_trim_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, trim_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_trim_mmio_ alloc failed");
       return;
     }
 
-    hiu_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlTSensorTest::SetUp: hiu_regs_ alloc failed");
-      return;
-    }
     mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, hiu_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -395,10 +380,6 @@ class AmlTSensorTest : public zxtest::Test {
  protected:
   std::unique_ptr<FakeAmlTSensor> tsensor_;
 
-  // Mmio Regs and Regions
-  fbl::Array<ddk_mock::MockMmioReg> pll_regs_;
-  fbl::Array<ddk_mock::MockMmioReg> trim_regs_;
-  fbl::Array<ddk_mock::MockMmioReg> hiu_regs_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_pll_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_trim_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_hiu_mmio_;
@@ -623,13 +604,8 @@ class AmlCpuFrequencyTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    hiu_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlCpuFrequencyTest::SetUp: hiu_regs_ alloc failed");
-      return;
-    }
     mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, hiu_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlCpuFrequencyTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -697,7 +673,6 @@ class AmlCpuFrequencyTest : public zxtest::Test {
   std::unique_ptr<FakeAmlCpuFrequency> cpufreq_scaling_;
 
   // Mmio Regs and Regions
-  fbl::Array<ddk_mock::MockMmioReg> hiu_regs_;
   fbl::Array<uint32_t> hiu_internal_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_hiu_mmio_;
   mmio_buffer_t mock_hiu_internal_mmio_;
@@ -909,35 +884,20 @@ class AmlThermalTest : public zxtest::Test {
     fbl::AllocChecker ac;
 
     // Temperature Sensor
-    tsensor_pll_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlThermalTest::SetUp: tsensor_pll_regs_ alloc failed");
-      return;
-    }
     tsensor_mock_pll_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, tsensor_pll_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: mock_pll_mmio_ alloc failed");
       return;
     }
-    tsensor_trim_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlThermalTest::SetUp: tsensor_trim_regs_ alloc failed");
-      return;
-    }
     tsensor_mock_trim_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, tsensor_trim_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: mock_trim_mmio_ alloc failed");
       return;
     }
-    tsensor_hiu_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlThermalTest::SetUp: tsensor_hiu_regs_ alloc failed");
-      return;
-    }
     tsensor_mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, tsensor_hiu_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -956,13 +916,8 @@ class AmlThermalTest : public zxtest::Test {
         .ExpectWrite(0x0F008000);
 
     // CPU Frequency and Scaling
-    cpufreq_scaling_hiu_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlThermalTest::SetUp: cpufreq_scaling_hiu_regs_ alloc failed");
-      return;
-    }
     cpufreq_scaling_mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, cpufreq_scaling_hiu_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlThermalTest::SetUp: cpufreq_scaling_mock_hiu_mmio_ alloc failed");
       return;
@@ -1131,9 +1086,6 @@ class AmlThermalTest : public zxtest::Test {
   std::unique_ptr<FakeAmlThermal> thermal_device_;
 
   // Temperature Sensor
-  fbl::Array<ddk_mock::MockMmioReg> tsensor_pll_regs_;
-  fbl::Array<ddk_mock::MockMmioReg> tsensor_trim_regs_;
-  fbl::Array<ddk_mock::MockMmioReg> tsensor_hiu_regs_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> tsensor_mock_pll_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> tsensor_mock_trim_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> tsensor_mock_hiu_mmio_;
@@ -1143,7 +1095,6 @@ class AmlThermalTest : public zxtest::Test {
   ddk::MockPwm little_cluster_pwm_;
 
   // CPU Frequency and Scaling
-  fbl::Array<ddk_mock::MockMmioReg> cpufreq_scaling_hiu_regs_;
   fbl::Array<uint32_t> cpufreq_scaling_hiu_internal_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> cpufreq_scaling_mock_hiu_mmio_;
   mmio_buffer_t cpufreq_scaling_mock_hiu_internal_mmio_;

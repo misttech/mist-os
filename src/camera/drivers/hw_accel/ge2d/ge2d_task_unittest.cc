@@ -429,8 +429,7 @@ TEST_F(TaskTest, InvalidVmoTest) {
 }
 
 TEST_F(TaskTest, InitTaskTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   [[maybe_unused]] uint32_t resize_task_id, watermark_task_id;
   ASSERT_OK(SetupForFrameProcessing(fake_regs, resize_task_id, watermark_task_id));
@@ -461,8 +460,7 @@ TEST_F(TaskTest, InitTaskTest) {
 }
 
 TEST_F(TaskTest, RemoveTaskTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id, watermark_task_id;
   ASSERT_OK(SetupForFrameProcessing(fake_regs, resize_task_id, watermark_task_id));
@@ -481,8 +479,7 @@ TEST_F(TaskTest, RemoveTaskTest) {
 }
 
 TEST_F(TaskTest, ProcessInvalidFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   [[maybe_unused]] uint32_t resize_task_id, watermark_task_id;
   ASSERT_OK(SetupForFrameProcessing(fake_regs, resize_task_id, watermark_task_id));
@@ -495,8 +492,7 @@ TEST_F(TaskTest, ProcessInvalidFrameTest) {
 }
 
 TEST_F(TaskTest, InvalidBufferProcessFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   [[maybe_unused]] uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -510,8 +506,7 @@ TEST_F(TaskTest, InvalidBufferProcessFrameTest) {
 }
 
 TEST_F(TaskTest, ProcessFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -536,8 +531,7 @@ TEST_F(TaskTest, ProcessFrameTest) {
 }
 
 TEST_F(TaskTest, SetOutputResTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -569,8 +563,7 @@ TEST_F(TaskTest, SetOutputResTest) {
 }
 
 TEST_F(TaskTest, SetInputAndOutputResTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -603,8 +596,7 @@ TEST_F(TaskTest, SetInputAndOutputResTest) {
 }
 
 TEST_F(TaskTest, ReleaseValidFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -633,8 +625,7 @@ TEST_F(TaskTest, ReleaseValidFrameTest) {
 }
 
 TEST_F(TaskTest, ReleaseInValidFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -657,8 +648,7 @@ TEST_F(TaskTest, ReleaseInValidFrameTest) {
 }
 
 TEST_F(TaskTest, MultipleProcessFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;
@@ -715,8 +705,7 @@ TEST_F(TaskTest, MultipleProcessFrameTest) {
 }
 
 TEST_F(TaskTest, DropFrameTest) {
-  ddk_mock::MockMmioReg fake_reg_array[kNumberOfMmios];
-  ddk_mock::MockMmioRegRegion fake_regs(fake_reg_array, sizeof(uint32_t), kNumberOfMmios);
+  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   uint32_t resize_task_id;
   uint32_t watermark_task_id;

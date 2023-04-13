@@ -32,7 +32,7 @@ using fuchsia_hardware_thermal::wire::ThermalDeviceInfo;
 class As370ThermalTest : public zxtest::Test {
  public:
   As370ThermalTest()
-      : reg_region_(reg_array_, sizeof(uint32_t), std::size(reg_array_)),
+      : reg_region_(sizeof(uint32_t), 8),
         dut_(nullptr, ddk::MmioBuffer(reg_region_.GetMmioBuffer()), kThermalDeviceInfo,
              ddk::ClockProtocolClient(clock_.GetProto()),
              ddk::PowerProtocolClient(power_.GetProto())) {}
@@ -94,7 +94,6 @@ class As370ThermalTest : public zxtest::Test {
           },
   };
 
-  ddk_mock::MockMmioReg reg_array_[8];
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 

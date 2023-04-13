@@ -167,37 +167,22 @@ class AmlTSensorTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    pll_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlTSensorTest::SetUp: pll_regs_ alloc failed");
-      return;
-    }
     mock_sensor_base_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, pll_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_sensor_base_mmio_ alloc failed");
       return;
     }
 
-    trim_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlTSensorTest::SetUp: trim_regs_ alloc failed");
-      return;
-    }
     mock_trim_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, trim_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_trim_mmio_ alloc failed");
       return;
     }
 
-    hiu_regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "AmlTSensorTest::SetUp: hiu_regs_ alloc failed");
-      return;
-    }
     mock_hiu_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(
-        &ac, hiu_regs_.get(), sizeof(uint32_t), kRegSize);
+        &ac, sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "AmlTSensorTest::SetUp: mock_hiu_mmio_ alloc failed");
       return;
@@ -275,9 +260,6 @@ class AmlTSensorTest : public zxtest::Test {
   std::unique_ptr<FakeAmlTSensor> tsensor_;
 
   // Mmio Regs and Regions
-  fbl::Array<ddk_mock::MockMmioReg> pll_regs_;
-  fbl::Array<ddk_mock::MockMmioReg> trim_regs_;
-  fbl::Array<ddk_mock::MockMmioReg> hiu_regs_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_sensor_base_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_trim_mmio_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_hiu_mmio_;

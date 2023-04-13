@@ -32,12 +32,12 @@ class Imx8mGpioTest : public zxtest::Test {
  public:
   Imx8mGpioTest()
       : zxtest::Test(),
-        mock_pinmux_regs_(pinmux_reg_array_, sizeof(uint32_t), std::size(pinmux_reg_array_)),
-        mock_gpio1_regs_(gpio1_reg_array_, sizeof(uint32_t), std::size(gpio1_reg_array_)),
-        mock_gpio2_regs_(gpio2_reg_array_, sizeof(uint32_t), std::size(gpio2_reg_array_)),
-        mock_gpio3_regs_(gpio3_reg_array_, sizeof(uint32_t), std::size(gpio3_reg_array_)),
-        mock_gpio4_regs_(gpio4_reg_array_, sizeof(uint32_t), std::size(gpio4_reg_array_)),
-        mock_gpio5_regs_(gpio5_reg_array_, sizeof(uint32_t), std::size(gpio5_reg_array_)) {}
+        mock_pinmux_regs_(sizeof(uint32_t), 1352),
+        mock_gpio1_regs_(sizeof(uint32_t), 32),
+        mock_gpio2_regs_(sizeof(uint32_t), 32),
+        mock_gpio3_regs_(sizeof(uint32_t), 32),
+        mock_gpio4_regs_(sizeof(uint32_t), 32),
+        mock_gpio5_regs_(sizeof(uint32_t), 32) {}
 
   void TearDown() override {
     mock_pinmux_regs_.VerifyAll();
@@ -49,13 +49,6 @@ class Imx8mGpioTest : public zxtest::Test {
   }
 
  protected:
-  ddk_mock::MockMmioReg pinmux_reg_array_[1352];
-  ddk_mock::MockMmioReg gpio1_reg_array_[32];
-  ddk_mock::MockMmioReg gpio2_reg_array_[32];
-  ddk_mock::MockMmioReg gpio3_reg_array_[32];
-  ddk_mock::MockMmioReg gpio4_reg_array_[32];
-  ddk_mock::MockMmioReg gpio5_reg_array_[32];
-
   ddk_mock::MockMmioRegRegion mock_pinmux_regs_;
   ddk_mock::MockMmioRegRegion mock_gpio1_regs_;
   ddk_mock::MockMmioRegRegion mock_gpio2_regs_;

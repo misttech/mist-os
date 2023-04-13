@@ -17,28 +17,10 @@ namespace ddk_mock {
 
 // Mocks a single MMIO register. This class is intended to be used with a fdf::MmioBuffer;
 // operations on an instance of that class will be directed to the mock if the mock-mmio-reg library
-// is a dependency of the test. The base address used by the MmioBuffer should be an array of
-// MockMmioReg objects. See the following example test:
+// is a dependency of the test.
 //
-// ddk_mock::MockMmioReg register_array[number_of_registers];
-// ddk_mock::MockMmioRegRegion mock_registers(register_array, register_size, number_of_registers);
-// fdf::MmioBuffer mmio_buffer(mock_registers.GetMmioBuffer());
-//
-// SomeDriver dut(mmio_buffer);
-// mock_registers[0]
-//     .ExpectRead()
-//     .ExpectWrite(0xdeadbeef)
-//     .ExpectRead(0xcafecafe)
-//     .ExpectWrite()
-//     .ExpectRead();
-// mock_registers[5]
-//     .ExpectWrite(0)
-//     .ExpectWrite(1024)
-//     .ReadReturns(0);
-//
-// EXPECT_OK(dut.SomeMethod());
-// mock_registers.VerifyAll();
-
+// This class will soon be moved to private namespace (or otherwise be made private). Please do not
+// directly instantiate instances of this type.
 class MockMmioReg {
  public:
   // Reads from the mocked register. Returns the value set by the next expectation, or the default
@@ -148,31 +130,56 @@ class MockMmioReg {
   fbl::Vector<MmioExpectation> write_expectations_;
 };
 
-// Represents an array of MockMmioReg objects.
+// Mocks a region of MMIO registers. Each register is backed a MockMmioReg instance.
+//
+// Example:
+// ddk_mock::MockMmioRegRegion mock_registers(register_size, number_of_registers);
+// fdf::MmioBuffer mmio_buffer(mock_registers.GetMmioBuffer());
+//
+// SomeDriver dut(mmio_buffer);
+// mock_registers[0]
+//     .ExpectRead()
+//     .ExpectWrite(0xdeadbeef)
+//     .ExpectRead(0xcafecafe)
+//     .ExpectWrite()
+//     .ExpectRead();
+// mock_registers[5]
+//     .ExpectWrite(0)
+//     .ExpectWrite(1024)
+//     .ReadReturns(0);
+//
+// EXPECT_OK(dut.SomeMethod());
+// mock_registers.VerifyAll();
+//
 class MockMmioRegRegion {
  public:
-  // Constructs a MockMmioRegRegion backed by the given array. reg_size is the size of each register
-  // in bytes, and reg_count is the total number of registers. If all accesses will be to registers
-  // past a certain address, reg_offset can be set to this value (in number of registers) to reduce
-  // the required reg_count. Accesses to registers lower than this offset are not permitted.
-  // Ownership of mock_regs is not transferred.
-  MockMmioRegRegion(MockMmioReg* mock_regs, size_t reg_size, size_t reg_count,
-                    size_t reg_offset = 0)
-      : mock_regs_(mock_regs), reg_size_(reg_size), reg_count_(reg_count), reg_offset_(reg_offset) {
+  // Constructs a MockMmioRegRegion. reg_size is the size of each register in bytes, and reg_count
+  // is the total number of registers. If all accesses will be to registers past a certain address,
+  // reg_offset can be set to this value (in number of registers) to reduce the required reg_count.
+  // Accesses to registers lower than this offset are not permitted.
+  MockMmioRegRegion(size_t reg_size, size_t reg_count, size_t reg_offset = 0)
+      : reg_size_(reg_size), reg_count_(reg_count), reg_offset_(reg_offset) {
     ASSERT_GT(reg_size_, 0);
+    regs_.resize(reg_count_);
   }
+
+  // Because the repos across //integration edges cannot be updated atomically, this overload serves
+  // as a compatible layer. Once all downstream repos have been updated to use the new interface,
+  // this will be removed. Do not use in new code.
+  MockMmioRegRegion(MockMmioReg* unused, size_t reg_size, size_t reg_count, size_t reg_offset = 0)
+      : MockMmioRegRegion(reg_size, reg_count, reg_offset) {}
 
   // Accesses the MockMmioReg at the given offset. Note that this is the _offset_, not the
   // _index_.
   MockMmioReg& operator[](size_t offset) const {
     CheckOffset(offset);
-    return mock_regs_[(offset / reg_size_) - reg_offset_];
+    return regs_[(offset / reg_size_) - reg_offset_];
   }
 
   // Calls VerifyAndClear() on all MockMmioReg objects.
   void VerifyAll() {
-    for (size_t i = 0; i < reg_count_; i++) {
-      mock_regs_[i].VerifyAndClear();
+    for (auto& reg : regs_) {
+      reg.VerifyAndClear();
     }
   }
 
@@ -241,7 +248,7 @@ class MockMmioRegRegion {
     ASSERT_LT((offs / reg_size_) - reg_offset_, reg_count_);
   }
 
-  MockMmioReg* const mock_regs_;
+  fbl::Vector<MockMmioReg> regs_;
   const size_t reg_size_;
   const size_t reg_count_;
   const size_t reg_offset_;

@@ -11,11 +11,8 @@
 namespace ddk_mock_test {
 
 TEST(MockMmioReg, CopyFrom) {
-  ddk_mock::MockMmioReg reg_array_1[0x100];
-  ddk_mock::MockMmioReg reg_array_2[0x100];
-
-  ddk_mock::MockMmioRegRegion reg_region_1(reg_array_1, sizeof(uint32_t), std::size(reg_array_1));
-  ddk_mock::MockMmioRegRegion reg_region_2(reg_array_2, sizeof(uint32_t), std::size(reg_array_2));
+  ddk_mock::MockMmioRegRegion reg_region_1(sizeof(uint32_t), 0x100);
+  ddk_mock::MockMmioRegRegion reg_region_2(sizeof(uint32_t), 0x100);
 
   fdf::MmioBuffer dut_1 = reg_region_1.GetMmioBuffer();
   fdf::MmioBuffer dut_2 = reg_region_2.GetMmioBuffer();
@@ -33,9 +30,7 @@ TEST(MockMmioReg, CopyFrom) {
 }
 
 TEST(MockMmioReg, View) {
-  ddk_mock::MockMmioReg reg_array[0x100];
-
-  ddk_mock::MockMmioRegRegion reg_region(reg_array, sizeof(uint32_t), std::size(reg_array));
+  ddk_mock::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100);
 
   fdf::MmioBuffer dut = reg_region.GetMmioBuffer();
   fdf::MmioView dut_view_1 = dut.View(0x40);
@@ -57,9 +52,7 @@ TEST(MockMmioReg, View) {
 }
 
 TEST(MockMmioReg, Offset) {
-  ddk_mock::MockMmioReg reg_array[0x100];
-
-  ddk_mock::MockMmioRegRegion reg_region(reg_array, sizeof(uint32_t), std::size(reg_array),
+  ddk_mock::MockMmioRegRegion reg_region(sizeof(uint32_t), 0x100,
                                          0x1'0000 / sizeof(uint32_t));
 
   fdf::MmioBuffer dut = reg_region.GetMmioBuffer();

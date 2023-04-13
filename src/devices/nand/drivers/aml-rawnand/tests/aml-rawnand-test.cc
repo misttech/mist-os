@@ -156,12 +156,10 @@ class FakeAmlRawNand : public AmlRawNand {
 
     // We need to create these before the AmlRawNand object but also ensure that
     // the buffers don't move around so put them on the heap.
-    auto mock_nand_regs = std::make_unique<ddk_mock::MockMmioReg[]>(kNandRegCount);
     auto mock_nand_reg_region = std::make_unique<ddk_mock::MockMmioRegRegion>(
-        mock_nand_regs.get(), kNandRegSize, kNandRegCount);
-    auto mock_clock_regs = std::make_unique<ddk_mock::MockMmioReg[]>(kClockRegCount);
+        kNandRegSize, kNandRegCount);
     auto mock_clock_reg_region = std::make_unique<ddk_mock::MockMmioRegRegion>(
-        mock_clock_regs.get(), kClockRegSize, kClockRegCount);
+        kClockRegSize, kClockRegCount);
 
     // The AmlRawNand object owns the Onfi, but we retain a raw pointer to it
     // so we can interact with it during tests.
@@ -169,9 +167,9 @@ class FakeAmlRawNand : public AmlRawNand {
     auto stub_onfi_raw = stub_onfi.get();
 
     auto nand = std::unique_ptr<FakeAmlRawNand>(
-        new FakeAmlRawNand(parent, std::move(bti), std::move(interrupt), std::move(mock_nand_regs),
-                           std::move(mock_nand_reg_region), std::move(mock_clock_regs),
-                           std::move(mock_clock_reg_region), std::move(stub_onfi), rand_mode));
+        new FakeAmlRawNand(parent, std::move(bti), std::move(interrupt),
+                           std::move(mock_nand_reg_region), std::move(mock_clock_reg_region),
+                           std::move(stub_onfi), rand_mode));
     nand->stub_onfi_ = stub_onfi_raw;
 
     // Initialize the AmlRawNand with some parameters taken from a real device.
@@ -284,18 +282,14 @@ class FakeAmlRawNand : public AmlRawNand {
 
  private:
   FakeAmlRawNand(zx_device_t* parent, zx::bti bti, zx::interrupt interrupt,
-                 std::unique_ptr<ddk_mock::MockMmioReg[]> mock_nand_regs,
                  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_nand_reg_region,
-                 std::unique_ptr<ddk_mock::MockMmioReg[]> mock_clock_regs,
                  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_clock_reg_region,
                  std::unique_ptr<Onfi> onfi, bool rand_mode)
       : AmlRawNand(parent, fdf::MmioBuffer(mock_nand_reg_region->GetMmioBuffer()),
                    fdf::MmioBuffer(mock_clock_reg_region->GetMmioBuffer()), std::move(bti),
                    std::move(interrupt), std::move(onfi)),
         rand_mode_(rand_mode),
-        mock_nand_regs_(std::move(mock_nand_regs)),
         mock_nand_reg_region_(std::move(mock_nand_reg_region)),
-        mock_clock_regs_(std::move(mock_clock_regs)),
         mock_clock_reg_region_(std::move(mock_clock_reg_region)) {}
 
   // Sets up the necessary fake page and byte reads to successfully initialize
@@ -418,10 +412,7 @@ class FakeAmlRawNand : public AmlRawNand {
 
   bool rand_mode_;
 
-  std::unique_ptr<ddk_mock::MockMmioReg[]> mock_nand_regs_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_nand_reg_region_;
-
-  std::unique_ptr<ddk_mock::MockMmioReg[]> mock_clock_regs_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_clock_reg_region_;
 
   StubOnfi* stub_onfi_;

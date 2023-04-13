@@ -82,12 +82,7 @@ class AmlHdmiTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    regs_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "regs_ alloc failed");
-      return;
-    }
-    mock_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, regs_.get(),
+    mock_mmio_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
                                                                        sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: mock_mmio_ alloc failed", __func__);
@@ -126,7 +121,6 @@ class AmlHdmiTest : public zxtest::Test {
   std::unique_ptr<FakeAmlHdmiDevice> dut_;
   HdmiClient hdmi_client_;
 
-  fbl::Array<ddk_mock::MockMmioReg> regs_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_mmio_;
 
   std::queue<HdmiDwFn> expected_dw_calls_;

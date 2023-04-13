@@ -65,7 +65,6 @@ test("as370-tdm-output-unit-tests") {
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
-    "//src/devices/testing/mock-mmio-reg",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }

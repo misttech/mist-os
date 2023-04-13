@@ -36,7 +36,6 @@ executable("aml-g12-tdm-test-bin") {
     "//src/media/audio/lib/simple-audio-stream",
     "//src/media/audio/lib/simple-codec",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/pretty",

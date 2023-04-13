@@ -44,7 +44,7 @@ ddk_mock::MockMmioReg& GetMockReg(ddk_mock::MockMmioRegRegion& registers) {
 class AmlCanvasTest : public zxtest::Test {
  public:
   AmlCanvasTest()
-      : mock_regs_(ddk_mock::MockMmioRegRegion(mock_reg_array_, kMmioRegSize, kMmioRegCount)) {
+      : mock_regs_(ddk_mock::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)) {
     fdf::MmioBuffer mmio(mock_regs_.GetMmioBuffer());
 
     zx::bti bti;
@@ -153,7 +153,6 @@ class AmlCanvasTest : public zxtest::Test {
 
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   std::vector<uint8_t> canvas_indices_;
-  ddk_mock::MockMmioReg mock_reg_array_[kMmioRegCount];
   ddk_mock::MockMmioRegRegion mock_regs_;
   std::unique_ptr<AmlCanvas> canvas_;
 };

@@ -46,56 +46,35 @@ class AmlPwmDeviceTest : public zxtest::Test {
   void SetUp() override {
     fbl::AllocChecker ac;
 
-    regs0_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: regs0_ alloc failed", __func__);
-      return;
-    }
-    mock_mmio0_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, regs0_.get(),
+    mock_mmio0_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
                                                                         sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: mock_mmio0_ alloc failed", __func__);
       return;
     }
-    regs1_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: regs1_ alloc failed", __func__);
-      return;
-    }
-    mock_mmio1_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, regs1_.get(),
+
+    mock_mmio1_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
                                                                         sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: mock_mmio1_ alloc failed", __func__);
       return;
     }
-    regs2_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: regs2_ alloc failed", __func__);
-      return;
-    }
-    mock_mmio2_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, regs2_.get(),
+
+    mock_mmio2_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
                                                                         sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: mock_mmio2_ alloc failed", __func__);
       return;
     }
-    regs3_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: regs3_ alloc failed", __func__);
-      return;
-    }
-    mock_mmio3_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, regs3_.get(),
+
+    mock_mmio3_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
                                                                         sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: mock_mmio3_ alloc failed", __func__);
       return;
     }
-    regs4_ = fbl::Array(new (&ac) ddk_mock::MockMmioReg[kRegSize], kRegSize);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: regs4_ alloc failed", __func__);
-      return;
-    }
-    mock_mmio4_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac, regs4_.get(),
+
+    mock_mmio4_ = fbl::make_unique_checked<ddk_mock::MockMmioRegRegion>(&ac,
                                                                         sizeof(uint32_t), kRegSize);
     if (!ac.check()) {
       zxlogf(ERROR, "%s: mock_mmio4_ alloc failed", __func__);
@@ -136,11 +115,6 @@ class AmlPwmDeviceTest : public zxtest::Test {
   std::unique_ptr<FakeAmlPwmDevice> pwm_;
 
   // Mmio Regs and Regions
-  fbl::Array<ddk_mock::MockMmioReg> regs0_;
-  fbl::Array<ddk_mock::MockMmioReg> regs1_;
-  fbl::Array<ddk_mock::MockMmioReg> regs2_;
-  fbl::Array<ddk_mock::MockMmioReg> regs3_;
-  fbl::Array<ddk_mock::MockMmioReg> regs4_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_mmio0_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_mmio1_;
   std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_mmio2_;

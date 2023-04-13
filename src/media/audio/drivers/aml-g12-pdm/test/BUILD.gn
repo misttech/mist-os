@@ -26,7 +26,6 @@ executable("aml-g12-pdm-test-bin") {
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
-    "//src/devices/testing/mock-mmio-reg",
     "//src/lib/ddktl",
     "//src/media/audio/drivers/lib/audio-driver-proto",
     "//src/media/audio/drivers/lib/audio-proto-utils",

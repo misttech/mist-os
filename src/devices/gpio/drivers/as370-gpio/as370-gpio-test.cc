@@ -422,12 +422,12 @@ class As370GpioTest : public zxtest::Test {
  public:
   As370GpioTest()
       : zxtest::Test(),
-        mock_pinmux1_regs_(pinmux1_reg_array_, sizeof(uint32_t), std::size(pinmux1_reg_array_)),
-        mock_pinmux2_regs_(pinmux2_reg_array_, sizeof(uint32_t), std::size(pinmux2_reg_array_)),
-        mock_pinmux3_regs_(pinmux3_reg_array_, sizeof(uint32_t), std::size(pinmux3_reg_array_)),
-        mock_gpio1_regs_(gpio1_reg_array_, sizeof(uint32_t), std::size(gpio1_reg_array_)),
-        mock_gpio2_regs_(gpio2_reg_array_, sizeof(uint32_t), std::size(gpio2_reg_array_)),
-        mock_gpio3_regs_(gpio3_reg_array_, sizeof(uint32_t), std::size(gpio2_reg_array_)) {}
+        mock_pinmux1_regs_(sizeof(uint32_t), 32),
+        mock_pinmux2_regs_(sizeof(uint32_t), 32),
+        mock_pinmux3_regs_(sizeof(uint32_t), 32),
+        mock_gpio1_regs_(sizeof(uint32_t), 128),
+        mock_gpio2_regs_(sizeof(uint32_t), 128),
+        mock_gpio3_regs_(sizeof(uint32_t), 128) {}
 
   void TearDown() override {
     mock_pinmux1_regs_.VerifyAll();
@@ -439,13 +439,6 @@ class As370GpioTest : public zxtest::Test {
   }
 
  protected:
-  ddk_mock::MockMmioReg pinmux1_reg_array_[32];
-  ddk_mock::MockMmioReg pinmux2_reg_array_[32];
-  ddk_mock::MockMmioReg pinmux3_reg_array_[32];
-  ddk_mock::MockMmioReg gpio1_reg_array_[128];
-  ddk_mock::MockMmioReg gpio2_reg_array_[128];
-  ddk_mock::MockMmioReg gpio3_reg_array_[128];
-
   ddk_mock::MockMmioRegRegion mock_pinmux1_regs_;
   ddk_mock::MockMmioRegRegion mock_pinmux2_regs_;
   ddk_mock::MockMmioRegRegion mock_pinmux3_regs_;
