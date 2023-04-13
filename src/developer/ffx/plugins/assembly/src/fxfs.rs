@@ -7,6 +7,7 @@ use crate::base_package::BasePackage;
 use anyhow::{Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fxfs::FxfsBuilder;
+use assembly_images_config::Fxfs;
 use assembly_manifest::BlobfsContents;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashMap;
@@ -17,9 +18,11 @@ pub async fn construct_fxfs(
     gendir: impl AsRef<Utf8Path>,
     image_config: &ImageAssemblyConfig,
     base_package: &BasePackage,
+    fxfs_config: &Fxfs,
 ) -> Result<(Utf8PathBuf, BlobfsContents)> {
     let mut contents = BlobfsContents::default();
     let mut fxfs_builder = FxfsBuilder::new();
+    fxfs_builder.reserve_space(fxfs_config.reserved_space_bytes);
 
     // Add the base and cache packages.
     for package_manifest_path in &image_config.base {
@@ -59,6 +62,7 @@ mod tests {
     use super::construct_fxfs;
     use crate::base_package::construct_base_package;
     use assembly_config_schema::ImageAssemblyConfig;
+    use assembly_images_config::Fxfs;
     use assembly_manifest::AssemblyManifest;
     use camino::{Utf8Path, Utf8PathBuf};
     use serde_json::json;
@@ -147,15 +151,30 @@ mod tests {
             path_relative_from_current_dir(dir.join("base/meta.far")).unwrap()
         );
 
-        let (image_path, blobs) =
-            construct_fxfs(dir, dir, &image_config, &base_package).await.unwrap();
+        let mut sizes = vec![];
+        let reserved_space_byteses = [0, 1024];
+        for reserved_space_bytes in reserved_space_byteses {
+            let (image_path, blobs) = construct_fxfs(
+                dir,
+                dir,
+                &image_config,
+                &base_package,
+                &Fxfs { reserved_space_bytes },
+            )
+            .await
+            .unwrap();
 
-        // Ensure something was created.
-        assert!(image_path.exists());
+            // Ensure something was created.
+            assert!(image_path.exists());
+            sizes.push(std::fs::metadata(image_path).unwrap().len());
 
-        // Ensure the blobs match expectations.
-        let blobs = blobs.relativize(dir).unwrap();
-        assert!(!blobs.packages.base.0.is_empty());
-        assert!(blobs.packages.cache.0.is_empty());
+            // Ensure the blobs match expectations.
+            let blobs = blobs.relativize(dir).unwrap();
+            assert!(!blobs.packages.base.0.is_empty());
+            assert!(blobs.packages.cache.0.is_empty());
+        }
+
+        // Ensure the space reservation was respected.
+        assert!(sizes[1] >= sizes[0] + 1024);
     }
 }

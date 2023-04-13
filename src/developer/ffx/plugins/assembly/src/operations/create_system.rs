@@ -95,11 +95,12 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
                 base_package,
             )?;
         }
-    } else if fxfs_config.is_some() {
+    } else if let Some(fxfs_config) = fxfs_config {
         info!("Constructing Fxfs image <EXPERIMENTAL!>");
         if let Some(base_package) = &base_package {
             let (path, contents) =
-                construct_fxfs(&outdir, &gendir, &image_assembly_config, base_package).await?;
+                construct_fxfs(&outdir, &gendir, &image_assembly_config, base_package, fxfs_config)
+                    .await?;
             assembly_manifest.images.push(assembly_manifest::Image::Fxfs { path, contents });
         }
     } else {

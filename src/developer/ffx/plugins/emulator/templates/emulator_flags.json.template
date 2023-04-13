@@ -7,7 +7,7 @@
     parameters and compares them against each other using "param1 == param2",
     returning "true" if they match and nothing otherwise. }}
 {{! Also note the use of the "ua" helper: the device.memory.units variable
-    normally serializes as the full word, e.g. "megabytes", but the Qemu flag
+    normally serializes as the full word, e.g. "mebibytes", but the Qemu flag
     it populates expects a single-character abbreviation, e.g. "M". The "ua"
     helper calls a rust function to perform that substitution. If the parameter
     doesn't deserialize to a DataUnits, the helper just returns the usual

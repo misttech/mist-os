@@ -412,9 +412,17 @@ pub struct NandFvm {
     pub pages_per_block: u64,
 }
 
+fn default_fxfs_reserved_space_bytes() -> u64 {
+    16777216
+}
+
 /// The parameters describing how to create an Fxfs image.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Fxfs;
+pub struct Fxfs {
+    /// The number of additional bytes to reserve as free space in the image.
+    #[serde(default = "default_fxfs_reserved_space_bytes")]
+    pub reserved_space_bytes: u64,
+}
 
 impl ImagesConfig {
     /// Parse the config from a reader.

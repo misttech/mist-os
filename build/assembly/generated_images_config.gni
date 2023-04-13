@@ -110,9 +110,17 @@
 #           truncate_to_length (optional)
 #             [int] After the optional resize, truncate the file to this length.
 #         }
+#     }
 #
 #   fxfs (optional)
 #     [struct] Arguments for generating optional Fxfs images containing a nested Blobfs instance.
+#     {
+#
+#     ### Parameters
+#       reserved_space_bytes
+#         [int] How many extra bytes to allocate in Fxfs.
+#
+#     }
 #
 template("generated_images_config") {
   output_path = "$target_out_dir/$target_name.json"
@@ -332,9 +340,16 @@ template("generated_images_config") {
   }
 
   # Fxfs.
-  if (defined(invoker.fxfs) && invoker.fxfs) {
+  if (defined(invoker.fxfs)) {
+    invoker_fxfs = invoker.fxfs
     fxfs = {
       type = "fxfs"
+
+      if (defined(invoker_fxfs.reserved_space_bytes)) {
+        reserved_space_bytes = invoker_fxfs.reserved_space_bytes
+      } else {
+        not_needed([ "invoker_fxfs" ])
+      }
     }
   }
 

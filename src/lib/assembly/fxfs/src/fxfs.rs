@@ -24,12 +24,18 @@ use {
 ///
 pub struct FxfsBuilder {
     manifest: BlobManifest,
+    reserved_space_bytes: u64,
 }
 
 impl FxfsBuilder {
     /// Construct a new FxfsBuilder.
     pub fn new() -> Self {
-        FxfsBuilder { manifest: BlobManifest::default() }
+        FxfsBuilder { manifest: BlobManifest::default(), reserved_space_bytes: 0 }
+    }
+
+    /// Reserves |reserve_space_bytes| of free space in the Fxfs image.
+    pub fn reserve_space(&mut self, reserved_space_bytes: u64) {
+        self.reserved_space_bytes += reserved_space_bytes
     }
 
     /// Add a package to fxfs by inserting every blob mentioned in the `package_manifest` on the
@@ -51,6 +57,7 @@ impl FxfsBuilder {
     }
 
     /// Build fxfs, and write it to `output`, while placing intermediate files in `gendir`.
+    /// Returns a path where the blobs JSON was written to.
     pub async fn build(
         &self,
         gendir: impl AsRef<Utf8Path>,
@@ -60,7 +67,7 @@ impl FxfsBuilder {
         let output = output.as_ref();
         if output.exists() {
             std::fs::remove_file(&output)
-                .with_context(|| format!("Failed to delete previous fxfs file: {}", output))?;
+                .with_context(|| format!("Failed to delete previous Fxfs file: {}", output))?;
         }
 
         // Write the blob manifest.
@@ -69,14 +76,35 @@ impl FxfsBuilder {
 
         let blobs_json_path = gendir.as_ref().join("blobs.json");
 
-        // Run the fxfs tool.
+        struct Cleanup(Option<String>);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                if let Some(path) = &self.0 {
+                    // Best-effort, ignore warnings.
+                    let _ = std::fs::remove_file(path);
+                }
+            }
+        }
+        let mut cleanup = Cleanup(Some(output.as_str().to_string()));
         fxfs_make_blob_image::make_blob_image(
             output.as_str(),
             blob_manifest_path.as_str(),
             blobs_json_path.as_str(),
         )
-        .await
-        .map(|_| blobs_json_path.clone())
+        .await?;
+        if self.reserved_space_bytes > 0 {
+            let len = std::fs::metadata(output)?.len();
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(output)?
+                .set_len(len + self.reserved_space_bytes)
+                .context(format!(
+                    "Failed to reserve {} bytes in Fxfs image",
+                    self.reserved_space_bytes
+                ))?;
+        }
+        cleanup.0 = None;
+        Ok(blobs_json_path)
     }
 }
 

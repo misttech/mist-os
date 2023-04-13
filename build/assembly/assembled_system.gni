@@ -198,7 +198,7 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   blobfs_minimum_inodes, blobfs_minimum_data_bytes, blobfs_maximum_bytes, blobfs_maximum_contents_size (optional)
 #     [int] Size options for blobfs to pass to the fvm tool.
 #
-# Board: FVM parameters
+# Board: FVM/Fxfs parameters
 #
 #   generate_fvm (optional; default: true)
 #     [bool] Whether to generate a FVM image.
@@ -219,6 +219,9 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [int] The precise size to make the (non-sparse) FVM image. See
 #     documentation of the `--length` parameter of the `fvm` binary host tool
 #     for details.
+#
+#   assembly_fxfs_reserved_space_bytes (optional; default: 16777216)
+#     [int] The number of extra bytes reserved in Fxfs.
 #
 # Board: ZBI arguments
 #
@@ -787,7 +790,11 @@ template("assembled_system") {
       }
     }
     if (generate_fxfs) {
-      fxfs = true
+      fxfs = {
+        if (defined(invoker.assembly_fxfs_reserved_space_bytes)) {
+          reserved_space_bytes = invoker.assembly_fxfs_reserved_space_bytes
+        }
+      }
     }
   }
 
