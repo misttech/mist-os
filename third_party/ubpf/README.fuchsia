@@ -1,7 +1,7 @@
 Name: ubpf
 URL: https://github.com/iovisor/ubpf
 License: Apache 2.0
-License File: LICENSE.txt
+License File: src/LICENSE.txt
 Upstream Git: https://github.com/iovisor/ubpf
 Security Critical: yes
 Description:

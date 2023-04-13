@@ -3,6 +3,7 @@ Source: https://git.linaro.org/toolchain/cortex-strings.git
 Revision: eb80ac77a6cdb3509d885d23d1dd343803381176
 License: BSD 3-clause
 License File: LICENSE
+Description:
 
 NOTE: kernel/arch/arm64/user_copy.S has intimate knowledge of the
 src/aarch64/memcpy.S code and must be adjusted if that code changes.

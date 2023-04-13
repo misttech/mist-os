@@ -2,7 +2,7 @@ Name: modp_b64
 URL: https://github.com/client9/stringencoders
 License: BSD
 License File: LICENSE
-
+Description:
 The modp_b64.c file was modified to remove the inclusion of modp's config.h
 and to fix compilation errors that occur under VC8.  The file was renamed
 modp_b64.cc to force it to be compiled as C++ so that the inclusion of

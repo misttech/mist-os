@@ -2,7 +2,7 @@ Name: ICU
 URL: http://site.icu-project.org/
 License: MIT
 License File: LICENSE
-
+Description:
 TODO(fxbug.dev/86742): Evaluate whether we can remove this library and use
 //third_party/icu instead.
 

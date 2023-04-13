@@ -1,6 +1,6 @@
 Name: flatbuffers
 License: Apache 2.0
-License File: LICENSE.txt
+License File: src/LICENSE
 Upstream Git: https://github.com/google/flatbuffers
 URL: http://google.github.io/flatbuffers/
 Description:
