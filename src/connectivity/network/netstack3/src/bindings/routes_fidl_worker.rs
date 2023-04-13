@@ -4,17 +4,16 @@
 
 //! FIDL Worker for the `fuchsia.net.routes` suite of protocols.
 
-use std::{
-    cell::{BorrowMutError, RefCell},
-    collections::HashSet,
-    ops::DerefMut,
-};
+use std::{collections::HashSet, ops::DerefMut};
 
 use async_utils::event::Event;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _};
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use futures::{channel::mpsc, FutureExt, StreamExt as _, TryStream, TryStreamExt as _};
+use futures::{
+    channel::mpsc, lock::Mutex as AsyncMutex, FutureExt, StreamExt as _, TryStream,
+    TryStreamExt as _,
+};
 use itertools::Itertools as _;
 use log::warn;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
@@ -98,20 +97,20 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     };
 
     let canceled_fut = watcher.canceled.wait();
-    // NB: `watcher` needs to be a RefCell so that it can be borrowed from "all"
-    // futures in the following `try_for_each_concurrent`.
-    let watcher = RefCell::new(watcher);
+    // NB: `watcher` needs to be an `AsyncMutex` so that it can be borrowed from
+    // "all" futures in the following `try_for_each_concurrent`.
+    let watcher = AsyncMutex::new(watcher);
 
     let result = {
         let watch_fut = request_stream
             .map_err(ServeWatcherError::ErrorInStream)
             .try_for_each_concurrent(None, |request| async {
                 let mut watcher = watcher
-                    .try_borrow_mut()
+                    .try_lock()
                     // If the watcher is already borrowed, then we're still
                     // handling a previous call to watch. This is erroneous
                     // usage by the client, and we're expected to hangup.
-                    .map_err(|_: BorrowMutError| ServeWatcherError::PreviousPendingWatch)?;
+                    .ok_or(ServeWatcherError::PreviousPendingWatch)?;
                 let result = respond_to_watch_request(request, watcher.watch().await)
                     .map_err(ServeWatcherError::FailedToRespond);
                 result

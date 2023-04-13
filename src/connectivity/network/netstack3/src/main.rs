@@ -16,8 +16,11 @@ use bindings::NetstackSeed;
 
 #[fuchsia::main(logging_minimum_severity = "debug")]
 fn main() -> Result<(), anyhow::Error> {
-    let mut executor = fuchsia_async::LocalExecutor::new();
+    // TOOD(https://fxbug.dev/125388): Support running with multiple threads.
+    // This is currently blocked on fixing race conditions when concurrent
+    // operations are allowed.
+    let mut executor = fuchsia_async::SendExecutor::new(1 /* num_threads */);
 
     let seed = NetstackSeed::default();
-    executor.run_singlethreaded(seed.serve())
+    executor.run(seed.serve())
 }

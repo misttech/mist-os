@@ -974,7 +974,7 @@ impl NetstackSeed {
             panic!("interfaces worker finished unexpectedly {:?}", result);
         });
 
-        let mut fs = ServiceFs::new_local();
+        let mut fs = ServiceFs::new();
         let _: &mut ServiceFsDir<'_, _> = fs
             .dir("svc")
             .add_service_connector(Service::DebugDiagnostics)
@@ -1002,72 +1002,89 @@ impl NetstackSeed {
             task_stream.map(WorkItem::Task),
         );
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
-        let work_items_fut = work_items.for_each_concurrent(None, |wi| async {
-            match wi {
-                WorkItem::Incoming(Service::Stack(stack)) => {
-                    stack
-                        .serve_with(|rs| {
-                            stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
-                        })
-                        .await
-                }
-                WorkItem::Incoming(Service::Socket(socket)) => {
-                    socket.serve_with(|rs| socket::serve(netstack.ctx.clone(), rs)).await
-                }
-                WorkItem::Incoming(Service::PacketSocket(socket)) => {
-                    socket.serve_with(|rs| socket::packet::serve(netstack.ctx.clone(), rs)).await
-                }
-                WorkItem::Incoming(Service::RawSocket(socket)) => {
-                    socket.serve_with(|rs| socket::raw::serve(rs)).await
-                }
-                WorkItem::Incoming(Service::RoutesState(rs)) => routes_fidl_worker::serve_state(rs),
-                WorkItem::Incoming(Service::RoutesStateV4(rs)) => {
-                    routes_fidl_worker::serve_state_v4(rs, netstack.clone()).await
-                }
-                WorkItem::Incoming(Service::RoutesStateV6(rs)) => {
-                    routes_fidl_worker::serve_state_v6(rs, netstack.clone()).await
-                }
-                WorkItem::Incoming(Service::Interfaces(interfaces)) => {
-                    interfaces
-                        .serve_with(|rs| {
-                            interfaces_watcher::serve(rs, interfaces_watcher_sink.clone())
-                        })
-                        .await
-                }
-                WorkItem::Incoming(Service::InterfacesAdmin(installer)) => {
-                    log::debug!(
-                        "serving {}",
-                        fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
-                    );
-                    interfaces_admin::serve(netstack.clone(), installer)
-                        .map_err(anyhow::Error::from)
-                        .forward(task_sink.clone().sink_map_err(anyhow::Error::from))
-                        .await
-                        .unwrap_or_else(|e| {
-                            log::warn!(
+        // It is unclear why we need to wrap the `for_each_concurrent` call with
+        // `async move { ... }` but it seems like we do. Without this, the
+        // `Future` returned by this function fails to implement `Send` with the
+        // same issue reported in https://github.com/rust-lang/rust/issues/64552.
+        //
+        // TODO(https://github.com/rust-lang/rust/issues/64552): Remove this
+        // workaround.
+        let work_items_fut = async move {
+            work_items
+                .for_each_concurrent(None, |wi| async {
+                    match wi {
+                        WorkItem::Incoming(Service::Stack(stack)) => {
+                            stack
+                                .serve_with(|rs| {
+                                    stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
+                                })
+                                .await
+                        }
+                        WorkItem::Incoming(Service::Socket(socket)) => {
+                            socket.serve_with(|rs| socket::serve(netstack.ctx.clone(), rs)).await
+                        }
+                        WorkItem::Incoming(Service::PacketSocket(socket)) => {
+                            socket
+                                .serve_with(|rs| socket::packet::serve(netstack.ctx.clone(), rs))
+                                .await
+                        }
+                        WorkItem::Incoming(Service::RawSocket(socket)) => {
+                            socket.serve_with(|rs| socket::raw::serve(rs)).await
+                        }
+                        WorkItem::Incoming(Service::RoutesState(rs)) => {
+                            routes_fidl_worker::serve_state(rs)
+                        }
+                        WorkItem::Incoming(Service::RoutesStateV4(rs)) => {
+                            routes_fidl_worker::serve_state_v4(rs, netstack.clone()).await
+                        }
+                        WorkItem::Incoming(Service::RoutesStateV6(rs)) => {
+                            routes_fidl_worker::serve_state_v6(rs, netstack.clone()).await
+                        }
+                        WorkItem::Incoming(Service::Interfaces(interfaces)) => {
+                            interfaces
+                                .serve_with(|rs| {
+                                    interfaces_watcher::serve(rs, interfaces_watcher_sink.clone())
+                                })
+                                .await
+                        }
+                        WorkItem::Incoming(Service::InterfacesAdmin(installer)) => {
+                            log::debug!(
+                                "serving {}",
+                                fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
+                            );
+                            interfaces_admin::serve(netstack.clone(), installer)
+                                .map_err(anyhow::Error::from)
+                                .forward(task_sink.clone().sink_map_err(anyhow::Error::from))
+                                .await
+                                .unwrap_or_else(|e| {
+                                    log::warn!(
                                 "error serving {}: {:?}",
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                                 e
                             )
-                        })
-                }
-                WorkItem::Incoming(Service::DebugInterfaces(debug_interfaces)) => {
-                    debug_interfaces
-                        .serve_with(|rs| debug_fidl_worker::serve_interfaces(netstack.clone(), rs))
-                        .await
-                }
-                WorkItem::Incoming(Service::DebugDiagnostics(debug_diagnostics)) => {
-                    diagnostics_handler.serve_diagnostics(debug_diagnostics).await
-                }
-                WorkItem::Incoming(Service::Filter(filter)) => {
-                    filter.serve_with(|rs| filter_worker::serve(rs)).await
-                }
-                WorkItem::Incoming(Service::Verifier(verifier)) => {
-                    verifier.serve_with(|rs| verifier_worker::serve(rs)).await
-                }
-                WorkItem::Task(task) => task.await,
-            }
-        });
+                                })
+                        }
+                        WorkItem::Incoming(Service::DebugInterfaces(debug_interfaces)) => {
+                            debug_interfaces
+                                .serve_with(|rs| {
+                                    debug_fidl_worker::serve_interfaces(netstack.clone(), rs)
+                                })
+                                .await
+                        }
+                        WorkItem::Incoming(Service::DebugDiagnostics(debug_diagnostics)) => {
+                            diagnostics_handler.serve_diagnostics(debug_diagnostics).await
+                        }
+                        WorkItem::Incoming(Service::Filter(filter)) => {
+                            filter.serve_with(|rs| filter_worker::serve(rs)).await
+                        }
+                        WorkItem::Incoming(Service::Verifier(verifier)) => {
+                            verifier.serve_with(|rs| verifier_worker::serve(rs)).await
+                        }
+                        WorkItem::Task(task) => task.await,
+                    }
+                })
+                .await
+        };
 
         let ((), (), ()) =
             futures::join!(work_items_fut, interfaces_worker_task, loopback_interface_control_task);
