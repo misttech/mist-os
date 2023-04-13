@@ -43,7 +43,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:26
+From //zircon/kernel/BUILD.gn:25
 
 ### all_cpu_phys_boot_tests
 
@@ -1619,7 +1619,7 @@ be removed after everyone has had a chance to get hold of their machines.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:38
+From //zircon/kernel/BUILD.gn:37
 
 ### dev_bootfs_labels
 
