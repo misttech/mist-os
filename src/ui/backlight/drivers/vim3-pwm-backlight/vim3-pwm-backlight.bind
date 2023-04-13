@@ -1,0 +1,18 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+composite backlight;
+
+using fuchsia.pwm;
+using fuchsia.gpio;
+
+primary node "pwm" {
+  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.LCD_BRIGHTNESS;
+}
+
+node "gpio-lcd-backlight-enable" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE;
+}

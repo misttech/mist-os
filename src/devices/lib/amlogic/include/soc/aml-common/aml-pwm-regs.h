@@ -63,6 +63,15 @@ struct mode_config {
   };
 };
 
+constexpr float kMaximumAllowedDutyCycle = 100.0f;
+constexpr float kMinimumAllowedDutyCycle = 0.0f;
+
+// The maximum allowed PWM period (unit: ns) for Amlogic PWM controller.
+//
+// See //src/devices/pwm/drivers/aml-pwm/aml-pwm.cc for how this value is
+// calculated.
+constexpr int64_t kMaximumAllowedPeriodNs = 343'927'680;
+
 }  // namespace aml_pwm
 
 #endif  // SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_PWM_REGS_H_

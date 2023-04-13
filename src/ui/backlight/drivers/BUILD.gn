@@ -4,10 +4,21 @@
 
 import("//build/packages/prebuilt_package.gni")
 
+group("drivers") {
+  testonly = true
+  deps = [
+    "ti-lp8556",
+    "vim3-pwm-backlight",
+  ]
+}
+
 group("tests") {
   testonly = true
 
-  deps = [ "ti-lp8556:tests" ]
+  deps = [
+    "ti-lp8556:tests",
+    "vim3-pwm-backlight:tests",
+  ]
 }
 
 prebuilt_package("chromebook-keyboard-backlight") {

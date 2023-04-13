@@ -1,0 +1,11 @@
+{
+    "short_description": "VIM3 LCD PWM backlight driver",
+    "manufacturer": "Khadas",
+    "families": [],
+    "models": [
+        "VIM3"
+    ],
+    "areas": [
+        "Display"
+    ]
+}

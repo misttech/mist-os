@@ -34,7 +34,8 @@ constexpr int64_t DivideRounded(int64_t num, int64_t denom) { return (num + (den
 constexpr int kMinimumDivider = 1;
 constexpr int kMaximumDivider = 0x7f + 1;
 
-// The maximum allowed PWM period for this PWM controller.
+// Below explains how `kMaximumAllowedPeriodNs` is calculated and we statically
+// verify the value.
 //
 // High / low time of a PWM period is stored in registers as numbers of clock
 // periods and dividers:
@@ -46,12 +47,12 @@ constexpr int kMaximumDivider = 0x7f + 1;
 // So the maximum allowed PWM period is the maximum value of High (low) time.
 //
 //   0xffff * (Nanoseconds per clock period) * (0x7f + 1)  (unit: ns)
-constexpr int64_t kMaximumAllowedPeriodNs = [] {
+static_assert([] {
   constexpr int64_t kNanosecondsPerClock = kNsecPerSec / kReferenceClockFrequencyHz;
   constexpr int kMaxClockPeriodCount = std::numeric_limits<uint16_t>::max();
 
-  return kNanosecondsPerClock * kMaximumDivider * kMaxClockPeriodCount;
-}();
+  return kMaximumAllowedPeriodNs == kNanosecondsPerClock * kMaximumDivider * kMaxClockPeriodCount;
+}());
 
 // Gets the minimum allowed divider value from given `period_ns`.
 //
