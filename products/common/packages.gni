@@ -18,6 +18,7 @@ declare_args() {
     "//src/media/playback/bundles:services",
     "//src/session",
     "//src/ui/bin/terminal",
+    "//src/ui/bin/tiles-session",
     "//examples/fortune:fortune_teller",
 
     # Starnix
