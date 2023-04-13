@@ -4,12 +4,12 @@
 
 //! Parsing and serialization of DHCP messages
 
+use dhcp_protocol::{AtLeast, AtMostBytes};
 use packet::{InnerPacketBuilder, ParseBuffer as _, Serializer};
 use packet_formats::ip::IpPacket as _;
 use std::{
-    collections::BTreeSet,
     net::Ipv4Addr,
-    num::{NonZeroU16, NonZeroU32},
+    num::{NonZeroU16, NonZeroU32, TryFromIntError},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -102,27 +102,46 @@ pub(crate) fn serialize_dhcp_message_to_ip_packet(
     }
 }
 
-/// Reasons that an incoming DHCP message might be discarded during Selecting
-/// state.
-#[derive(thiserror::Error, Debug, PartialEq)]
-pub(crate) enum SelectingIncomingMessageError {
-    #[error("got op = {0}, want op = BOOTREPLY")]
-    NotBootReply(dhcp_protocol::OpCode),
-    #[error("no DHCP message type")]
-    NoDhcpMessageType,
-    #[error("got DHCP message type = {0}, wanted DHCPOFFER")]
-    NotDhcpOffer(dhcp_protocol::MessageType),
-    #[error("saw two DHCP options with same option code: {0}")]
-    DuplicateOption(dhcp_protocol::OptionCode),
-    #[error("missing field: {0}")]
-    BuilderMissingField(&'static str),
-    #[error("server identifier was the unspecified address")]
-    UnspecifiedServerIdentifier,
-    #[error("yiaddr was the unspecified address")]
-    UnspecifiedYiaddr,
+#[derive(derive_builder::Builder, Debug, PartialEq)]
+#[builder(private, build_fn(error = "CommonIncomingMessageError"))]
+struct CommonIncomingMessageFields {
+    op_code: dhcp_protocol::OpCode,
+    message_type: dhcp_protocol::MessageType,
+    #[builder(setter(custom), default)]
+    server_identifier: Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    #[builder(setter(custom), default)]
+    yiaddr: Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    #[builder(setter(strip_option), default)]
+    ip_address_lease_time_secs: Option<NonZeroU32>,
+    // While it's nonsensical to have a 0-valued lease time, it's somewhat more
+    // reasonable to set the renewal time value to 0 (prompting the client to
+    // begin the renewal process immediately).
+    #[builder(setter(strip_option), default)]
+    renewal_time_value_secs: Option<u32>,
+    // Same holds for the rebinding time.
+    #[builder(setter(strip_option), default)]
+    rebinding_time_value_secs: Option<u32>,
+    #[builder(default)]
+    parameters: Vec<dhcp_protocol::DhcpOption>,
+    #[builder(setter(strip_option), default)]
+    message: Option<String>,
+    #[builder(setter(strip_option), default)]
+    client_identifier: Option<AtLeast<2, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>>>,
 }
 
-impl From<derive_builder::UninitializedFieldError> for SelectingIncomingMessageError {
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub(crate) enum CommonIncomingMessageError {
+    #[error("server identifier was the unspecified address")]
+    UnspecifiedServerIdentifier,
+    #[error("missing: {0}")]
+    BuilderMissingField(&'static str),
+    #[error("duplicate option: {0:?}")]
+    DuplicateOption(dhcp_protocol::OptionCode),
+    #[error("option's inclusion violates protocol: {0:?}")]
+    IllegallyIncludedOption(dhcp_protocol::OptionCode),
+}
+
+impl From<derive_builder::UninitializedFieldError> for CommonIncomingMessageError {
     fn from(value: derive_builder::UninitializedFieldError) -> Self {
         // `derive_builder::UninitializedFieldError` cannot be destructured
         // because its fields are private.
@@ -130,12 +149,67 @@ impl From<derive_builder::UninitializedFieldError> for SelectingIncomingMessageE
     }
 }
 
-/// Extracts the fields from a DHCP message incoming during Selecting state that
-/// should be used during Requesting state.
-pub(crate) fn fields_to_retain_from_selecting(
-    message: dhcp_protocol::Message,
-) -> Result<FieldsFromOfferToUseInRequest, SelectingIncomingMessageError> {
-    let dhcp_protocol::Message {
+impl CommonIncomingMessageFieldsBuilder {
+    fn ignore_unused_result(&mut self) {}
+
+    fn add_requested_parameter(&mut self, option: dhcp_protocol::DhcpOption) {
+        let parameters = self.parameters.get_or_insert_with(Default::default);
+        parameters.push(option)
+    }
+
+    fn server_identifier(&mut self, addr: Ipv4Addr) -> Result<(), CommonIncomingMessageError> {
+        self.server_identifier = Some(Some(
+            net_types::SpecifiedAddr::new(net_types::ip::Ipv4Addr::from(addr))
+                .ok_or(CommonIncomingMessageError::UnspecifiedServerIdentifier)?,
+        ));
+        Ok(())
+    }
+
+    fn yiaddr(&mut self, addr: Ipv4Addr) {
+        match net_types::SpecifiedAddr::new(net_types::ip::Ipv4Addr::from(addr)) {
+            None => {
+                // Unlike with the Server Identifier option, it is not an error
+                // to set `yiaddr` to the unspecified address, as there is no
+                // other way to indicate its absence (it has its own field in
+                // the DHCP message rather than appearing in the list of
+                // options).
+            }
+            Some(specified_addr) => {
+                self.yiaddr = Some(Some(specified_addr));
+            }
+        }
+    }
+}
+
+/// Represents a set of OptionCodes as an array of booleans.
+struct OptionCodeSet {
+    inner: [bool; dhcp_protocol::U8_MAX_AS_USIZE],
+}
+
+impl OptionCodeSet {
+    fn new() -> Self {
+        OptionCodeSet { inner: [false; dhcp_protocol::U8_MAX_AS_USIZE] }
+    }
+
+    /// Inserts `option_code` into the set, returning whether it was newly added.
+    fn insert(&mut self, option_code: dhcp_protocol::OptionCode) -> bool {
+        let option_code_index = usize::from(u8::from(option_code));
+        if self.inner[option_code_index] {
+            return false;
+        }
+
+        self.inner[option_code_index] = true;
+        true
+    }
+
+    fn contains(&self, option_code: dhcp_protocol::OptionCode) -> bool {
+        self.inner[usize::from(u8::from(option_code))]
+    }
+}
+
+fn collect_common_fields(
+    requested_parameters: &OptionCodeSet,
+    dhcp_protocol::Message {
         op,
         xid: _,
         secs: _,
@@ -148,176 +222,215 @@ pub(crate) fn fields_to_retain_from_selecting(
         sname: _,
         file: _,
         options,
-    } = message;
+    }: dhcp_protocol::Message,
+) -> Result<CommonIncomingMessageFields, CommonIncomingMessageError> {
+    use dhcp_protocol::DhcpOption;
 
-    match op {
-        dhcp_protocol::OpCode::BOOTREQUEST => {
-            // Per the table RFC 2131 section 4.3.1, the DHCPOFFER 'op' field
-            // must be BOOTREPLY.
-            return Err(SelectingIncomingMessageError::NotBootReply(op));
-        }
-        dhcp_protocol::OpCode::BOOTREPLY => {}
-    };
+    let mut builder = CommonIncomingMessageFieldsBuilder::default();
+    builder.op_code(op).yiaddr(yiaddr);
 
-    let mut found_message_type: Option<dhcp_protocol::MessageType> = None;
-    let mut builder = FieldsFromOfferToUseInRequestBuilder::default();
-    builder.ip_address_to_request(yiaddr)?;
-
-    let mut seen_options = BTreeSet::new();
+    let mut seen_options = OptionCodeSet::new();
 
     for option in options {
-        let option_code = option.code();
-        let newly_inserted = seen_options.insert(option_code);
-        if !newly_inserted {
-            return Err(SelectingIncomingMessageError::DuplicateOption(option_code));
+        let newly_seen = seen_options.insert(option.code());
+        if !newly_seen {
+            return Err(CommonIncomingMessageError::DuplicateOption(option.code()));
         }
-        match option {
-            dhcp_protocol::DhcpOption::ServerIdentifier(addr) => {
-                builder.server_identifier(addr)?;
-            }
-            dhcp_protocol::DhcpOption::IpAddressLeaseTime(time_in_secs) => {
-                match NonZeroU32::try_from(time_in_secs) {
-                    Err(e) => {
-                        let _: std::num::TryFromIntError = e;
-                    }
-                    Ok(time_in_secs) => {
-                        builder.ip_address_lease_time_secs(time_in_secs).ignore_unused_result();
-                    }
+
+        // From RFC 2131 section 4.3.1:
+        // """
+        // Option                    DHCPOFFER    DHCPACK               DHCPNAK
+        // ------                    ---------    -------               -------
+        // Requested IP address      MUST NOT     MUST NOT              MUST NOT
+        // IP address lease time     MUST         MUST (DHCPREQUEST)    MUST NOT
+        //                                        MUST NOT (DHCPINFORM)
+        // Use 'file'/'sname' fields MAY          MAY                   MUST NOT
+        // DHCP message type         DHCPOFFER    DHCPACK               DHCPNAK
+        // Parameter request list    MUST NOT     MUST NOT              MUST NOT
+        // Message                   SHOULD       SHOULD                SHOULD
+        // Client identifier         MUST NOT     MUST NOT              MAY
+        // Vendor class identifier   MAY          MAY                   MAY
+        // Server identifier         MUST         MUST                  MUST
+        // Maximum message size      MUST NOT     MUST NOT              MUST NOT
+        // All others                MAY          MAY                   MUST NOT
+        //
+        //            Table 3:  Fields and options used by DHCP servers
+        // """
+
+        match &option {
+            DhcpOption::IpAddressLeaseTime(value) => match NonZeroU32::try_from(*value) {
+                Err(e) => {
+                    let _: TryFromIntError = e;
+                    tracing::warn!("dropping 0 lease time");
                 }
-            }
-            dhcp_protocol::DhcpOption::DhcpMessageType(message_type) => match message_type {
-                dhcp_protocol::MessageType::DHCPOFFER => {
-                    let _: &mut dhcp_protocol::MessageType =
-                        found_message_type.insert(message_type);
-                }
-                dhcp_protocol::MessageType::DHCPDISCOVER
-                | dhcp_protocol::MessageType::DHCPREQUEST
-                | dhcp_protocol::MessageType::DHCPDECLINE
-                | dhcp_protocol::MessageType::DHCPACK
-                | dhcp_protocol::MessageType::DHCPNAK
-                | dhcp_protocol::MessageType::DHCPRELEASE
-                | dhcp_protocol::MessageType::DHCPINFORM => {
-                    return Err(SelectingIncomingMessageError::NotDhcpOffer(message_type))
+                Ok(value) => {
+                    builder.ip_address_lease_time_secs(value).ignore_unused_result();
                 }
             },
-            dhcp_protocol::DhcpOption::Pad()
-            | dhcp_protocol::DhcpOption::End()
-            | dhcp_protocol::DhcpOption::SubnetMask(_)
-            | dhcp_protocol::DhcpOption::TimeOffset(_)
-            | dhcp_protocol::DhcpOption::Router(_)
-            | dhcp_protocol::DhcpOption::TimeServer(_)
-            | dhcp_protocol::DhcpOption::NameServer(_)
-            | dhcp_protocol::DhcpOption::DomainNameServer(_)
-            | dhcp_protocol::DhcpOption::LogServer(_)
-            | dhcp_protocol::DhcpOption::CookieServer(_)
-            | dhcp_protocol::DhcpOption::LprServer(_)
-            | dhcp_protocol::DhcpOption::ImpressServer(_)
-            | dhcp_protocol::DhcpOption::ResourceLocationServer(_)
-            | dhcp_protocol::DhcpOption::HostName(_)
-            | dhcp_protocol::DhcpOption::BootFileSize(_)
-            | dhcp_protocol::DhcpOption::MeritDumpFile(_)
-            | dhcp_protocol::DhcpOption::DomainName(_)
-            | dhcp_protocol::DhcpOption::SwapServer(_)
-            | dhcp_protocol::DhcpOption::RootPath(_)
-            | dhcp_protocol::DhcpOption::ExtensionsPath(_)
-            | dhcp_protocol::DhcpOption::IpForwarding(_)
-            | dhcp_protocol::DhcpOption::NonLocalSourceRouting(_)
-            | dhcp_protocol::DhcpOption::PolicyFilter(_)
-            | dhcp_protocol::DhcpOption::MaxDatagramReassemblySize(_)
-            | dhcp_protocol::DhcpOption::DefaultIpTtl(_)
-            | dhcp_protocol::DhcpOption::PathMtuAgingTimeout(_)
-            | dhcp_protocol::DhcpOption::PathMtuPlateauTable(_)
-            | dhcp_protocol::DhcpOption::InterfaceMtu(_)
-            | dhcp_protocol::DhcpOption::AllSubnetsLocal(_)
-            | dhcp_protocol::DhcpOption::BroadcastAddress(_)
-            | dhcp_protocol::DhcpOption::PerformMaskDiscovery(_)
-            | dhcp_protocol::DhcpOption::MaskSupplier(_)
-            | dhcp_protocol::DhcpOption::PerformRouterDiscovery(_)
-            | dhcp_protocol::DhcpOption::RouterSolicitationAddress(_)
-            | dhcp_protocol::DhcpOption::StaticRoute(_)
-            | dhcp_protocol::DhcpOption::TrailerEncapsulation(_)
-            | dhcp_protocol::DhcpOption::ArpCacheTimeout(_)
-            | dhcp_protocol::DhcpOption::EthernetEncapsulation(_)
-            | dhcp_protocol::DhcpOption::TcpDefaultTtl(_)
-            | dhcp_protocol::DhcpOption::TcpKeepaliveInterval(_)
-            | dhcp_protocol::DhcpOption::TcpKeepaliveGarbage(_)
-            | dhcp_protocol::DhcpOption::NetworkInformationServiceDomain(_)
-            | dhcp_protocol::DhcpOption::NetworkInformationServers(_)
-            | dhcp_protocol::DhcpOption::NetworkTimeProtocolServers(_)
-            | dhcp_protocol::DhcpOption::VendorSpecificInformation(_)
-            | dhcp_protocol::DhcpOption::NetBiosOverTcpipNameServer(_)
-            | dhcp_protocol::DhcpOption::NetBiosOverTcpipDatagramDistributionServer(_)
-            | dhcp_protocol::DhcpOption::NetBiosOverTcpipNodeType(_)
-            | dhcp_protocol::DhcpOption::NetBiosOverTcpipScope(_)
-            | dhcp_protocol::DhcpOption::XWindowSystemFontServer(_)
-            | dhcp_protocol::DhcpOption::XWindowSystemDisplayManager(_)
-            | dhcp_protocol::DhcpOption::NetworkInformationServicePlusDomain(_)
-            | dhcp_protocol::DhcpOption::NetworkInformationServicePlusServers(_)
-            | dhcp_protocol::DhcpOption::MobileIpHomeAgent(_)
-            | dhcp_protocol::DhcpOption::SmtpServer(_)
-            | dhcp_protocol::DhcpOption::Pop3Server(_)
-            | dhcp_protocol::DhcpOption::NntpServer(_)
-            | dhcp_protocol::DhcpOption::DefaultWwwServer(_)
-            | dhcp_protocol::DhcpOption::DefaultFingerServer(_)
-            | dhcp_protocol::DhcpOption::DefaultIrcServer(_)
-            | dhcp_protocol::DhcpOption::StreetTalkServer(_)
-            | dhcp_protocol::DhcpOption::StreetTalkDirectoryAssistanceServer(_)
-            | dhcp_protocol::DhcpOption::RequestedIpAddress(_)
-            | dhcp_protocol::DhcpOption::OptionOverload(_)
-            | dhcp_protocol::DhcpOption::TftpServerName(_)
-            | dhcp_protocol::DhcpOption::BootfileName(_)
-            | dhcp_protocol::DhcpOption::ParameterRequestList(_)
-            | dhcp_protocol::DhcpOption::Message(_)
-            | dhcp_protocol::DhcpOption::MaxDhcpMessageSize(_)
-            | dhcp_protocol::DhcpOption::RenewalTimeValue(_)
-            | dhcp_protocol::DhcpOption::RebindingTimeValue(_)
-            | dhcp_protocol::DhcpOption::VendorClassIdentifier(_)
-            | dhcp_protocol::DhcpOption::ClientIdentifier(_) => {}
+            DhcpOption::DhcpMessageType(message_type) => {
+                builder.message_type(*message_type).ignore_unused_result()
+            }
+            DhcpOption::ServerIdentifier(value) => {
+                builder.server_identifier(*value)?;
+            }
+            DhcpOption::Message(message) => builder.message(message.clone()).ignore_unused_result(),
+            DhcpOption::RenewalTimeValue(value) => {
+                builder.renewal_time_value_secs(*value).ignore_unused_result()
+            }
+            DhcpOption::RebindingTimeValue(value) => {
+                builder.rebinding_time_value_secs(*value).ignore_unused_result()
+            }
+            DhcpOption::ClientIdentifier(value) => {
+                builder.client_identifier(value.clone()).ignore_unused_result();
+            }
+            DhcpOption::ParameterRequestList(_)
+            | DhcpOption::RequestedIpAddress(_)
+            | DhcpOption::MaxDhcpMessageSize(_) => {
+                return Err(CommonIncomingMessageError::IllegallyIncludedOption(option.code()))
+            }
+            DhcpOption::Pad()
+            | DhcpOption::End()
+            | DhcpOption::SubnetMask(_)
+            | DhcpOption::TimeOffset(_)
+            | DhcpOption::Router(_)
+            | DhcpOption::TimeServer(_)
+            | DhcpOption::NameServer(_)
+            | DhcpOption::DomainNameServer(_)
+            | DhcpOption::LogServer(_)
+            | DhcpOption::CookieServer(_)
+            | DhcpOption::LprServer(_)
+            | DhcpOption::ImpressServer(_)
+            | DhcpOption::ResourceLocationServer(_)
+            | DhcpOption::HostName(_)
+            | DhcpOption::BootFileSize(_)
+            | DhcpOption::MeritDumpFile(_)
+            | DhcpOption::DomainName(_)
+            | DhcpOption::SwapServer(_)
+            | DhcpOption::RootPath(_)
+            | DhcpOption::ExtensionsPath(_)
+            | DhcpOption::IpForwarding(_)
+            | DhcpOption::NonLocalSourceRouting(_)
+            | DhcpOption::PolicyFilter(_)
+            | DhcpOption::MaxDatagramReassemblySize(_)
+            | DhcpOption::DefaultIpTtl(_)
+            | DhcpOption::PathMtuAgingTimeout(_)
+            | DhcpOption::PathMtuPlateauTable(_)
+            | DhcpOption::InterfaceMtu(_)
+            | DhcpOption::AllSubnetsLocal(_)
+            | DhcpOption::BroadcastAddress(_)
+            | DhcpOption::PerformMaskDiscovery(_)
+            | DhcpOption::MaskSupplier(_)
+            | DhcpOption::PerformRouterDiscovery(_)
+            | DhcpOption::RouterSolicitationAddress(_)
+            | DhcpOption::StaticRoute(_)
+            | DhcpOption::TrailerEncapsulation(_)
+            | DhcpOption::ArpCacheTimeout(_)
+            | DhcpOption::EthernetEncapsulation(_)
+            | DhcpOption::TcpDefaultTtl(_)
+            | DhcpOption::TcpKeepaliveInterval(_)
+            | DhcpOption::TcpKeepaliveGarbage(_)
+            | DhcpOption::NetworkInformationServiceDomain(_)
+            | DhcpOption::NetworkInformationServers(_)
+            | DhcpOption::NetworkTimeProtocolServers(_)
+            | DhcpOption::VendorSpecificInformation(_)
+            | DhcpOption::NetBiosOverTcpipNameServer(_)
+            | DhcpOption::NetBiosOverTcpipDatagramDistributionServer(_)
+            | DhcpOption::NetBiosOverTcpipNodeType(_)
+            | DhcpOption::NetBiosOverTcpipScope(_)
+            | DhcpOption::XWindowSystemFontServer(_)
+            | DhcpOption::XWindowSystemDisplayManager(_)
+            | DhcpOption::NetworkInformationServicePlusDomain(_)
+            | DhcpOption::NetworkInformationServicePlusServers(_)
+            | DhcpOption::MobileIpHomeAgent(_)
+            | DhcpOption::SmtpServer(_)
+            | DhcpOption::Pop3Server(_)
+            | DhcpOption::NntpServer(_)
+            | DhcpOption::DefaultWwwServer(_)
+            | DhcpOption::DefaultFingerServer(_)
+            | DhcpOption::DefaultIrcServer(_)
+            | DhcpOption::StreetTalkServer(_)
+            | DhcpOption::StreetTalkDirectoryAssistanceServer(_)
+            | DhcpOption::OptionOverload(_)
+            | DhcpOption::TftpServerName(_)
+            | DhcpOption::BootfileName(_)
+            | DhcpOption::VendorClassIdentifier(_) => (),
+        };
+
+        if requested_parameters.contains(option.code()) {
+            builder.add_requested_parameter(option);
         }
     }
-
-    if found_message_type.is_none() {
-        return Err(SelectingIncomingMessageError::NoDhcpMessageType);
-    }
-
     builder.build()
 }
 
-#[derive(Debug, Clone, PartialEq, derive_builder::Builder)]
-#[builder(build_fn(error = "SelectingIncomingMessageError"))]
-/// Fields from a DHCPOFFER that should be used while building a DHCPREQUEST.
-pub(crate) struct FieldsFromOfferToUseInRequest {
-    #[builder(setter(custom))]
-    pub(crate) server_identifier: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
-    #[builder(setter(strip_option), default)]
-    pub(crate) ip_address_lease_time_secs: Option<NonZeroU32>,
-    #[builder(setter(custom))]
-    pub(crate) ip_address_to_request: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
+/// Reasons that an incoming DHCP message might be discarded during Selecting
+/// state.
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub(crate) enum SelectingIncomingMessageError {
+    #[error("{0}")]
+    CommonError(#[from] CommonIncomingMessageError),
+    #[error("no server identifier")]
+    NoServerIdentifier,
+    #[error("got op = {0}, want op = BOOTREPLY")]
+    NotBootReply(dhcp_protocol::OpCode),
+    #[error("got DHCP message type = {0}, wanted DHCPOFFER")]
+    NotDhcpOffer(dhcp_protocol::MessageType),
+    #[error("yiaddr was the unspecified address")]
+    UnspecifiedYiaddr,
 }
 
-impl FieldsFromOfferToUseInRequestBuilder {
-    fn ignore_unused_result(&mut self) {}
+/// Extracts the fields from a DHCP message incoming during Selecting state that
+/// should be used during Requesting state.
+pub(crate) fn fields_to_retain_from_selecting(
+    message: dhcp_protocol::Message,
+) -> Result<FieldsFromOfferToUseInRequest, SelectingIncomingMessageError> {
+    let CommonIncomingMessageFields {
+        op_code,
+        message_type,
+        server_identifier,
+        yiaddr,
+        ip_address_lease_time_secs,
+        renewal_time_value_secs: _,
+        rebinding_time_value_secs: _,
+        parameters: _,
+        message: _,
+        client_identifier: _,
+    } = collect_common_fields(&OptionCodeSet::new(), message)?;
 
-    fn server_identifier(&mut self, addr: Ipv4Addr) -> Result<(), SelectingIncomingMessageError> {
-        self.server_identifier = Some(
-            net_types::ip::Ipv4Addr::from(addr)
-                .try_into()
-                .map_err(|()| SelectingIncomingMessageError::UnspecifiedServerIdentifier)?,
-        );
-        Ok(())
-    }
+    match op_code {
+        dhcp_protocol::OpCode::BOOTREQUEST => {
+            return Err(SelectingIncomingMessageError::NotBootReply(op_code))
+        }
+        dhcp_protocol::OpCode::BOOTREPLY => (),
+    };
 
-    fn ip_address_to_request(
-        &mut self,
-        addr: Ipv4Addr,
-    ) -> Result<(), SelectingIncomingMessageError> {
-        self.ip_address_to_request = Some(
-            net_types::ip::Ipv4Addr::from(addr)
-                .try_into()
-                .map_err(|()| SelectingIncomingMessageError::UnspecifiedYiaddr)?,
-        );
-        Ok(())
-    }
+    match message_type {
+        dhcp_protocol::MessageType::DHCPOFFER => (),
+        dhcp_protocol::MessageType::DHCPDISCOVER
+        | dhcp_protocol::MessageType::DHCPREQUEST
+        | dhcp_protocol::MessageType::DHCPDECLINE
+        | dhcp_protocol::MessageType::DHCPACK
+        | dhcp_protocol::MessageType::DHCPNAK
+        | dhcp_protocol::MessageType::DHCPRELEASE
+        | dhcp_protocol::MessageType::DHCPINFORM => {
+            return Err(SelectingIncomingMessageError::NotDhcpOffer(message_type))
+        }
+    };
+
+    Ok(FieldsFromOfferToUseInRequest {
+        server_identifier: server_identifier
+            .ok_or(SelectingIncomingMessageError::NoServerIdentifier)?,
+        ip_address_lease_time_secs,
+        ip_address_to_request: yiaddr.ok_or(SelectingIncomingMessageError::UnspecifiedYiaddr)?,
+    })
+}
+
+#[derive(Debug, Clone, PartialEq)]
+/// Fields from a DHCPOFFER that should be used while building a DHCPREQUEST.
+pub(crate) struct FieldsFromOfferToUseInRequest {
+    pub(crate) server_identifier: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    pub(crate) ip_address_lease_time_secs: Option<NonZeroU32>,
+    pub(crate) ip_address_to_request: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
 }
 
 #[cfg(test)]
@@ -546,10 +659,12 @@ mod test {
                     .expect("should be specified"),
             }),
             FieldsFromOfferCase::UnspecifiedServerIdentifier => {
-                Err(SelectingIncomingMessageError::UnspecifiedServerIdentifier)
+                Err(SelectingIncomingMessageError::CommonError(
+                    CommonIncomingMessageError::UnspecifiedServerIdentifier,
+                ))
             }
             FieldsFromOfferCase::NoServerIdentifier => {
-                Err(SelectingIncomingMessageError::BuilderMissingField("server_identifier"))
+                Err(SelectingIncomingMessageError::NoServerIdentifier)
             }
             FieldsFromOfferCase::UnspecifiedYiaddr => {
                 Err(SelectingIncomingMessageError::UnspecifiedYiaddr)
@@ -561,11 +676,15 @@ mod test {
                 SelectingIncomingMessageError::NotDhcpOffer(dhcp_protocol::MessageType::DHCPACK),
             ),
             FieldsFromOfferCase::NoDhcpMessageType => {
-                Err(SelectingIncomingMessageError::NoDhcpMessageType)
+                Err(SelectingIncomingMessageError::CommonError(
+                    CommonIncomingMessageError::BuilderMissingField("message_type"),
+                ))
             }
             FieldsFromOfferCase::DuplicateOption => {
-                Err(SelectingIncomingMessageError::DuplicateOption(
-                    dhcp_protocol::OptionCode::DomainName,
+                Err(SelectingIncomingMessageError::CommonError(
+                    CommonIncomingMessageError::DuplicateOption(
+                        dhcp_protocol::OptionCode::DomainName,
+                    ),
                 ))
             }
         };
