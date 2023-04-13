@@ -39,7 +39,7 @@
 //! ```
 
 use {
-    super::{Property, StringProperty},
+    super::{InspectType, Property, StringProperty},
     injectable_time::TimeSource,
 };
 
@@ -107,6 +107,8 @@ pub struct Node {
     // The detailed status message, filled out in case the health status is not OK.
     message: Option<StringProperty>,
 }
+
+impl InspectType for Node {}
 
 impl Reporter for Node {
     /// Sets the health status to `STARTING_UP`.
@@ -243,6 +245,36 @@ mod tests {
                 status: "STARTING_UP",
                 start_timestamp_nanos: 42i64,
             }
+        });
+    }
+
+    #[fuchsia::test]
+    fn health_is_recordable() {
+        let inspector = Inspector::default();
+        let root = inspector.root();
+
+        let fake_time = FakeTime::new();
+        fake_time.set_ticks(42);
+        {
+            let mut health = Node::new_with_timestamp(root, fake_time);
+            health.set_ok();
+            assert_data_tree!(inspector,
+                root: contains {
+                    "fuchsia.inspect.Health": {
+                        status: "OK",
+                        start_timestamp_nanos: 42i64,
+                    }
+            });
+
+            root.record(health);
+        }
+
+        assert_data_tree!(inspector,
+            root: contains {
+                "fuchsia.inspect.Health": {
+                    status: "OK",
+                    start_timestamp_nanos: 42i64,
+                }
         });
     }
 }
