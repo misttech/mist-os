@@ -217,6 +217,7 @@ pub fn dispatch_syscall(
         sendmmsg[4],
         sendmsg[3],
         sendto[6],
+        sendfile[4],
         set_tid_address[1],
         setgid[1],
         setgroups[2],

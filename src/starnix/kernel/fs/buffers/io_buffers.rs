@@ -332,7 +332,6 @@ impl VecOutputBuffer {
         Self { buffer: vec![0; capacity], bytes_written: 0 }
     }
 
-    #[cfg(test)]
     pub fn data(&self) -> &[u8] {
         &self.buffer[0..self.bytes_written]
     }
@@ -374,6 +373,12 @@ pub struct VecInputBuffer {
 impl VecInputBuffer {
     pub fn new(buffer: &[u8]) -> Self {
         Self { buffer: buffer.to_vec(), bytes_read: 0 }
+    }
+}
+
+impl From<Vec<u8>> for VecInputBuffer {
+    fn from(buffer: Vec<u8>) -> Self {
+        Self { buffer, bytes_read: 0 }
     }
 }
 
