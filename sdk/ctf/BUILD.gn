@@ -76,12 +76,12 @@ generated_file("host_test_manifest") {
 
 # TODO(125231): Add the same check for API levels 12+ after the next bump.
 #
-# Ensures test authors add new test templates in generate_ctf_tests.gni when adding tests.
-# To avoid duplicate package names (which fail the build) it builds
-# //sdk/ctf/release/packages:packages_test.
+# Ensures test authors add new test templates in generate_ctf_tests.gni when adding tests,
+# and that those templates actually build.
 generate_ctf_tests("check_test_templates") {
   api_level = "test"
   manifest = "//sdk/ctf/goldens/package_archives.json"
+  use_prebuilts_from_current_build = true
 }
 
 golden_files("golden_files") {

@@ -113,6 +113,7 @@ group("non_hermetic_deps") {
   # `prebuilt_package` is hermetic.
   visibility += [
     "//examples/fortune:fortune_teller",
+    "//sdk/ctf:*",
     "//sdk/ctf/release:*",
     "//sdk/ctf/release/packages:*",
     "//src/cast:cast_runner_pkg",

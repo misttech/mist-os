@@ -21,28 +21,36 @@ ctf_executable("hwinfo-test-bin") {
   ]
 }
 
-ctf_fuchsia_component("hwinfo-test") {
-  manifest = "meta/hwinfo-test.cml"
-  testonly = true
-
+ctf_fuchsia_component("default") {
+  manifest = "meta/default.cml"
   deps = [ ":hwinfo-test-bin" ]
+  testonly = true
 }
 
-ctf_fuchsia_test_package("fuchsia-hwinfo-tests") {
-  # TODO(kjharland): This test should be split into three since it exercises
-  # fidl/fuchsia.hwinfo/Board, fidl/fuchsia.hwinfo/Product, and
-  # fidl/fuchsia.hwinfo/Device.
-  plasa_element = "fidl/fuchsia.hwinfo/Board"
+ctf_fuchsia_package("fuchsia-hwinfo-tests") {
   package_name = "fuchsia-hwinfo-tests"
+  testonly = true
+  deps = [ ":default" ]
+}
+
+fuchsia_component("test-root") {
+  manifest = "meta/test-root.cml"
+}
+
+fuchsia_test_package("fuchsia-hwinfo-tests-package") {
+  test_components = [ ":test-root" ]
+  subpackages = [ ":fuchsia-hwinfo-tests" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  test_components = [ ":hwinfo-test" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia-hwinfo-tests" ]
+  deps = [
+    ":fuchsia-hwinfo-tests-package",
+    ":fuchsia-hwinfo-tests_archive",
+  ]
 }
