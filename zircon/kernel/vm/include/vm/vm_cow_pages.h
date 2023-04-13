@@ -1464,9 +1464,45 @@ class VmCowPages::LookupCursor {
         target_preserving_page_content_(target->is_source_preserving_page_content()),
         zero_fork_(!target_preserving_page_content_ && target->can_decommit_zero_pages_locked()) {}
 
+  // Note: Some of these methods are marked __ALWAYS_INLINE as doing so has a dramatic performance
+  // improvement, and is worth the increase in code size. Due to gcc limitations to mark them
+  // __ALWAYS_INLINE they need to be declared here in the header.
+
   // Increments the cursor to the next offset. Doing so may invalidate the cursor and requiring
   // recalculating.
-  void IncrementCursor() TA_REQ(lock());
+  __ALWAYS_INLINE void IncrementCursor() TA_REQ(lock()) {
+    offset_ += PAGE_SIZE;
+    if (offset_ == visible_end_) {
+      // Have reached either the end of the valid iteration range, or the end of the visible portion
+      // of the owner. In the latter case we set owner_ to null as we need to walk up the hierarchy
+      // again to find the next owner that applies to this slot.
+      // In the case where we have reached the end of the range, i.e. offset_ is also equal to
+      // end_offset_, there is nothing we need to do, but to ensure that an error is generated if
+      // the user incorrectly attempts to get another page we also set the owner to the nullptr.
+      owner_ = nullptr;
+    } else {
+      // Increment the owner offset and step the page list cursor to the next slot.
+      owner_offset_ += PAGE_SIZE;
+      owner_pl_cursor_.step();
+      owner_cursor_ = owner_pl_cursor_.current();
+
+      // When iterating, it's possible that we need to find a new owner even before we hit the
+      // visible_end_. This happens since even if we have no content at our cursor, we might have a
+      // parent with content, and the visible_end_ is tracking the range visible in us from the
+      // target and does not imply we have all the content.
+      // Consider a simple hierarchy where the root has a page in slot 1, [.P.], then its child has
+      // a page in slot 0 [P...] and then its child, the target, has no pages [...] A cursor on this
+      // range will initially find the owner as this middle object, and a visible length of 3 pages.
+      // However, when we step the cursor we clearly need to then walk up to our parent to get the
+      // page. In this case we would ideally walk up to the parent, if there is one, and check for
+      // content, or if no parent keep returning empty slots. Unfortunately once the cursor returns
+      // a nullptr we cannot know where the next content might be. To make things simpler we just
+      // invalidate owner_ if we hit this case and re-walk from the bottom again.
+      if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
+        owner_ = nullptr;
+      }
+    }
+  }
 
   // Increments the current offset by the given delta, but invalidates the cursor itself requiring
   // it to be recalculated next time EstablishCursor is called.
@@ -1481,7 +1517,35 @@ class VmCowPages::LookupCursor {
 
   // Calculates the current cursor, finding the correct owner, owner offset etc. There is always an
   // owner and this process can never fail.
-  void EstablishCursor() TA_REQ(lock());
+  __ALWAYS_INLINE void EstablishCursor() TA_REQ(lock()) {
+    // Check if the cursor needs recalculating.
+    if (IsCursorValid()) {
+      return;
+    }
+
+    // Ensure still in the valid range.
+    DEBUG_ASSERT(offset_ < end_offset_);
+    owner_pl_cursor_ = target_->page_list_.LookupMutableCursor(offset_);
+    owner_cursor_ = owner_pl_cursor_.current();
+    // If there's no parent, take the cursor as is, otherwise only accept a cursor that has some
+    // non-empty content.
+    if (!target_->parent_ || !CursorIsEmpty()) {
+      owner_ = target_;
+      owner_offset_ = offset_;
+      visible_end_ = end_offset_;
+    } else {
+      // Start our visible length as the range available in the target, allowing
+      // FindInitialPageContentLocked to trim it to the actual visible range. Skip this process if
+      // our starting range is a page in size as it's redundant since we know our visible length is
+      // always at least a page.
+      uint64_t visible_length = end_offset_ - offset_;
+      owner_pl_cursor_ = target_->FindInitialPageContentLocked(
+          offset_, &owner_, &owner_offset_, visible_length > PAGE_SIZE ? &visible_length : nullptr);
+      owner_cursor_ = owner_pl_cursor_.current();
+      visible_end_ = offset_ + visible_length;
+      DEBUG_ASSERT((owner_ != target_) || (owner_offset_ == offset_));
+    }
+  }
 
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
@@ -1529,7 +1593,16 @@ class VmCowPages::LookupCursor {
 
   // Turns the current cursor, which must be a page, into a result and handles any access time
   // updating. Increments the cursor.
-  RequireResult CursorAsResult() TA_REQ(lock());
+  __ALWAYS_INLINE RequireResult CursorAsResult() TA_REQ(lock()) {
+    if (mark_accessed_) {
+      owner()->UpdateOnAccessLocked(owner_cursor_->Page(), 0);
+    }
+    // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
+    // actual writability of the page.
+    RequireResult result = PageAsResultNoIncrement(owner_cursor_->Page(), owner_ == target_);
+    IncrementCursor();
+    return result;
+  }
 
   // Allocates a new page for the target that is a copy of the provided |source| page. On success
   // page is inserted into target at the current offset_ and the cursor is incremented.

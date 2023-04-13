@@ -2308,36 +2308,6 @@ void VmCowPages::UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) {
   pq->MarkAccessed(page);
 }
 
-inline void VmCowPages::LookupCursor::EstablishCursor() {
-  // Check if the cursor needs recalculating.
-  if (IsCursorValid()) {
-    return;
-  }
-
-  // Ensure still in the valid range.
-  DEBUG_ASSERT(offset_ < end_offset_);
-  owner_pl_cursor_ = target_->page_list_.LookupMutableCursor(offset_);
-  owner_cursor_ = owner_pl_cursor_.current();
-  // If there's no parent, take the cursor as is, otherwise only accept a cursor that has some
-  // non-empty content.
-  if (!target_->parent_ || !CursorIsEmpty()) {
-    owner_ = target_;
-    owner_offset_ = offset_;
-    visible_end_ = end_offset_;
-  } else {
-    // Start our visible length as the range available in the target, allowing
-    // FindInitialPageContentLocked to trim it to the actual visible range. Skip this process if our
-    // starting range is a page in size as it's redundant since we know our visible length is always
-    // at least a page.
-    uint64_t visible_length = end_offset_ - offset_;
-    owner_pl_cursor_ = target_->FindInitialPageContentLocked(
-        offset_, &owner_, &owner_offset_, visible_length > PAGE_SIZE ? &visible_length : nullptr);
-    owner_cursor_ = owner_pl_cursor_.current();
-    visible_end_ = offset_ + visible_length;
-    DEBUG_ASSERT((owner_ != target_) || (owner_offset_ == offset_));
-  }
-}
-
 inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsResultNoIncrement(
     vm_page_t* page, bool in_target) {
   // The page is writable if it's present in the target (non owned pages are never writable) and it
@@ -2345,53 +2315,6 @@ inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::PageAsR
   // preserving page contents, or if the page is just already dirty.
   RequireResult result{page,
                        (in_target && (!target_preserving_page_content_ || is_page_dirty(page)))};
-  return result;
-}
-
-inline void VmCowPages::LookupCursor::IncrementCursor() {
-  offset_ += PAGE_SIZE;
-  if (offset_ == visible_end_) {
-    // Have reached either the end of the valid iteration range, or the end of the visible portion
-    // of the owner. In the latter case we set owner_ to null as we need to walk up the hierarchy
-    // again to find the next owner that applies to this slot.
-    // In the case where we have reached the end of the range, i.e. offset_ is also equal to
-    // end_offset_, there is nothing we need to do, but to ensure that an error is generated if the
-    // user incorrectly attempts to get another page we also set the owner to the nullptr.
-    owner_ = nullptr;
-  } else {
-    // Increment the owner offset and step the page list cursor to the next slot.
-    owner_offset_ += PAGE_SIZE;
-    owner_pl_cursor_.step();
-    owner_cursor_ = owner_pl_cursor_.current();
-
-    // When iterating, it's possible that we need to find a new owner even before we hit the
-    // visible_end_. This happens since even if we have no content at our cursor, we might have a
-    // parent with content, and the visible_end_ is tracking the range visible in us from the
-    // target and does not imply we have all the content.
-    // Consider a simple hierarchy where the root has a page in slot 1, [.P.], then its child has a
-    // page in slot 0 [P...] and then its child, the target, has no pages [...]
-    // A cursor on this range will initially find the owner as this middle object, and a visible
-    // length of 3 pages. However, when we step the cursor we clearly need to then walk up to our
-    // parent to get the page.
-    // In this case we would ideally walk up to the parent, if there is one, and check for content,
-    // or if no parent keep returning empty slots. Unfortunately once the cursor returns a nullptr
-    // we cannot know where the next content might be.
-    // To make things simpler we just invalidate owner_ if we hit this case and re-walk from the
-    // bottom again.
-    if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
-      owner_ = nullptr;
-    }
-  }
-}
-
-inline VmCowPages::LookupCursor::RequireResult VmCowPages::LookupCursor::CursorAsResult() {
-  if (mark_accessed_) {
-    owner()->UpdateOnAccessLocked(owner_cursor_->Page(), 0);
-  }
-  // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
-  // actual writability of the page.
-  RequireResult result = PageAsResultNoIncrement(owner_cursor_->Page(), owner_ == target_);
-  IncrementCursor();
   return result;
 }
 
