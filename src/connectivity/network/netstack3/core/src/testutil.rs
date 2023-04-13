@@ -54,9 +54,9 @@ pub(crate) struct Ctx<NonSyncCtx: crate::NonSyncContext> {
     pub sync_ctx: SyncCtx<NonSyncCtx>,
     /// The non-synchronized context.
     // We put `non_sync_ctx` after `sync_ctx` to make sure that `sync_ctx` is
-    // dropped before `non-sync_ctx` so that strongly-referenced held in
-    // `non_sync_ctx` causes test failures, forcing proper cleanup of device IDs
-    // in our unit tests.
+    // dropped before `non-sync_ctx` so that the existence of strongly-referenced
+    // device IDs in `non_sync_ctx` causes test failures, forcing proper cleanup
+    // of device IDs in our unit tests.
     //
     // Note that if strongly-referenced (device) IDs exist when dropping the
     // primary reference, the primary reference's drop impl will panic. See
