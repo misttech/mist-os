@@ -105,7 +105,6 @@ pub(crate) fn serialize_dhcp_message_to_ip_packet(
 #[derive(derive_builder::Builder, Debug, PartialEq)]
 #[builder(private, build_fn(error = "CommonIncomingMessageError"))]
 struct CommonIncomingMessageFields {
-    op_code: dhcp_protocol::OpCode,
     message_type: dhcp_protocol::MessageType,
     #[builder(setter(custom), default)]
     server_identifier: Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
@@ -131,6 +130,8 @@ struct CommonIncomingMessageFields {
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub(crate) enum CommonIncomingMessageError {
+    #[error("got op = {0}, want op = BOOTREPLY")]
+    NotBootReply(dhcp_protocol::OpCode),
     #[error("server identifier was the unspecified address")]
     UnspecifiedServerIdentifier,
     #[error("missing: {0}")]
@@ -182,17 +183,17 @@ impl CommonIncomingMessageFieldsBuilder {
 }
 
 /// Represents a set of OptionCodes as an array of booleans.
-struct OptionCodeSet {
+pub(crate) struct OptionCodeSet {
     inner: [bool; dhcp_protocol::U8_MAX_AS_USIZE],
 }
 
 impl OptionCodeSet {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         OptionCodeSet { inner: [false; dhcp_protocol::U8_MAX_AS_USIZE] }
     }
 
     /// Inserts `option_code` into the set, returning whether it was newly added.
-    fn insert(&mut self, option_code: dhcp_protocol::OptionCode) -> bool {
+    pub(crate) fn insert(&mut self, option_code: dhcp_protocol::OptionCode) -> bool {
         let option_code_index = usize::from(u8::from(option_code));
         if self.inner[option_code_index] {
             return false;
@@ -202,8 +203,55 @@ impl OptionCodeSet {
         true
     }
 
-    fn contains(&self, option_code: dhcp_protocol::OptionCode) -> bool {
+    pub(crate) fn contains(&self, option_code: dhcp_protocol::OptionCode) -> bool {
         self.inner[usize::from(u8::from(option_code))]
+    }
+}
+
+impl FromIterator<dhcp_protocol::OptionCode> for OptionCodeSet {
+    fn from_iter<T: IntoIterator<Item = dhcp_protocol::OptionCode>>(iter: T) -> Self {
+        let mut set = Self::new();
+        for code in iter {
+            let _: bool = set.insert(code);
+        }
+        set
+    }
+}
+
+pub(crate) struct OptionCodeSetIterator {
+    index: usize,
+    set: [bool; dhcp_protocol::U8_MAX_AS_USIZE],
+}
+
+impl Iterator for OptionCodeSetIterator {
+    type Item = dhcp_protocol::OptionCode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { index, set } = self;
+        match (*index..set.len()).find_map(|index| {
+            if !set[index] {
+                return None;
+            }
+            dhcp_protocol::OptionCode::try_from(
+                u8::try_from(index).expect("index known to be at most u8::MAX"),
+            )
+            .ok()
+            .map(|option| (index, option))
+        }) {
+            None => None,
+            Some((found_index, option)) => {
+                *index = found_index + 1;
+                Some(option)
+            }
+        }
+    }
+}
+
+impl IntoIterator for OptionCodeSet {
+    type IntoIter = OptionCodeSetIterator;
+    type Item = dhcp_protocol::OptionCode;
+    fn into_iter(self) -> Self::IntoIter {
+        OptionCodeSetIterator { index: 0, set: self.inner }
     }
 }
 
@@ -226,8 +274,15 @@ fn collect_common_fields(
 ) -> Result<CommonIncomingMessageFields, CommonIncomingMessageError> {
     use dhcp_protocol::DhcpOption;
 
+    match op {
+        dhcp_protocol::OpCode::BOOTREQUEST => {
+            return Err(CommonIncomingMessageError::NotBootReply(op))
+        }
+        dhcp_protocol::OpCode::BOOTREPLY => (),
+    };
+
     let mut builder = CommonIncomingMessageFieldsBuilder::default();
-    builder.op_code(op).yiaddr(yiaddr);
+    builder.yiaddr(yiaddr);
 
     let mut seen_options = OptionCodeSet::new();
 
@@ -369,10 +424,12 @@ fn collect_common_fields(
 pub(crate) enum SelectingIncomingMessageError {
     #[error("{0}")]
     CommonError(#[from] CommonIncomingMessageError),
+    /// Note that `NoServerIdentifier` is intentionally distinct from
+    /// `CommonIncomingMessageError::UnspecifiedServerIdentifier`, as the latter
+    /// refers to the Server Identifier being explicitly populated as the
+    /// unspecified address, rather than simply omitted.
     #[error("no server identifier")]
     NoServerIdentifier,
-    #[error("got op = {0}, want op = BOOTREPLY")]
-    NotBootReply(dhcp_protocol::OpCode),
     #[error("got DHCP message type = {0}, wanted DHCPOFFER")]
     NotDhcpOffer(dhcp_protocol::MessageType),
     #[error("yiaddr was the unspecified address")]
@@ -385,7 +442,6 @@ pub(crate) fn fields_to_retain_from_selecting(
     message: dhcp_protocol::Message,
 ) -> Result<FieldsFromOfferToUseInRequest, SelectingIncomingMessageError> {
     let CommonIncomingMessageFields {
-        op_code,
         message_type,
         server_identifier,
         yiaddr,
@@ -396,13 +452,6 @@ pub(crate) fn fields_to_retain_from_selecting(
         message: _,
         client_identifier: _,
     } = collect_common_fields(&OptionCodeSet::new(), message)?;
-
-    match op_code {
-        dhcp_protocol::OpCode::BOOTREQUEST => {
-            return Err(SelectingIncomingMessageError::NotBootReply(op_code))
-        }
-        dhcp_protocol::OpCode::BOOTREPLY => (),
-    };
 
     match message_type {
         dhcp_protocol::MessageType::DHCPOFFER => (),
@@ -431,6 +480,102 @@ pub(crate) struct FieldsFromOfferToUseInRequest {
     pub(crate) server_identifier: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
     pub(crate) ip_address_lease_time_secs: Option<NonZeroU32>,
     pub(crate) ip_address_to_request: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum IncomingMessageDuringRequesting {
+    Ack(FieldsToRetainFromAck),
+    Nak(FieldsToRetainFromNak),
+}
+
+/// Reasons that an incoming DHCP message might be discarded during Requesting
+/// state.
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub(crate) enum RequestingIncomingMessageError {
+    #[error("{0}")]
+    CommonError(#[from] CommonIncomingMessageError),
+    #[error("got DHCP message type = {0}, wanted DHCPACK or DHCPNAK")]
+    NotDhcpAckOrNak(dhcp_protocol::MessageType),
+    #[error("yiaddr was the unspecified address")]
+    UnspecifiedYiaddr,
+    #[error("no IP address lease time")]
+    NoLeaseTime,
+    #[error("no server identifier")]
+    NoServerIdentifier,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct FieldsToRetainFromAck {
+    pub(crate) yiaddr: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    // Strictly according to RFC 2131, the Server Identifier MUST be included in
+    // the DHCPACK. However, we've observed DHCP servers in the field fail to
+    // set the Server Identifier, instead expecting the client to remember it
+    // from the DHCPOFFER (https://fxbug.dev/113194). Thus, we treat Server
+    // Identifier as optional for DHCPACK.
+    pub(crate) server_identifier: Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    pub(crate) ip_address_lease_time_secs: NonZeroU32,
+    pub(crate) renewal_time_value_secs: Option<u32>,
+    pub(crate) rebinding_time_value_secs: Option<u32>,
+    pub(crate) parameters: Vec<dhcp_protocol::DhcpOption>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct FieldsToRetainFromNak {
+    pub(crate) server_identifier: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    pub(crate) message: Option<String>,
+    pub(crate) client_identifier: Option<
+        AtLeast<
+            { dhcp_protocol::CLIENT_IDENTIFIER_MINIMUM_LENGTH },
+            AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>,
+        >,
+    >,
+}
+
+pub(crate) fn fields_to_retain_from_requesting(
+    requested_parameters: &OptionCodeSet,
+    message: dhcp_protocol::Message,
+) -> Result<IncomingMessageDuringRequesting, RequestingIncomingMessageError> {
+    let CommonIncomingMessageFields {
+        message_type,
+        server_identifier,
+        yiaddr,
+        ip_address_lease_time_secs,
+        renewal_time_value_secs,
+        rebinding_time_value_secs,
+        parameters,
+        message,
+        client_identifier,
+    } = collect_common_fields(requested_parameters, message)?;
+
+    match message_type {
+        dhcp_protocol::MessageType::DHCPACK => {
+            Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+                yiaddr: yiaddr.ok_or(RequestingIncomingMessageError::UnspecifiedYiaddr)?,
+                server_identifier,
+                ip_address_lease_time_secs: ip_address_lease_time_secs
+                    .ok_or(RequestingIncomingMessageError::NoLeaseTime)?,
+                renewal_time_value_secs,
+                rebinding_time_value_secs,
+                parameters,
+            }))
+        }
+        dhcp_protocol::MessageType::DHCPNAK => {
+            Ok(IncomingMessageDuringRequesting::Nak(FieldsToRetainFromNak {
+                server_identifier: server_identifier
+                    .ok_or(RequestingIncomingMessageError::NoServerIdentifier)?,
+                message,
+                client_identifier,
+            }))
+        }
+        dhcp_protocol::MessageType::DHCPDISCOVER
+        | dhcp_protocol::MessageType::DHCPOFFER
+        | dhcp_protocol::MessageType::DHCPREQUEST
+        | dhcp_protocol::MessageType::DHCPDECLINE
+        | dhcp_protocol::MessageType::DHCPRELEASE
+        | dhcp_protocol::MessageType::DHCPINFORM => {
+            Err(RequestingIncomingMessageError::NotDhcpAckOrNak(message_type))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -553,142 +698,435 @@ mod test {
         assert_matches!(result, Err(ParseError::WrongPort(port)) => assert_eq!(port, SERVER_PORT));
     }
 
-    #[derive(Debug)]
-    enum FieldsFromOfferCase {
-        AcceptedWithLeaseTime,
-        AcceptedWithNoLeaseTime,
-        UnspecifiedServerIdentifier,
-        NoServerIdentifier,
-        UnspecifiedYiaddr,
-        NotBootReply,
-        WrongDhcpMessageType,
-        NoDhcpMessageType,
-        DuplicateOption,
+    struct VaryingOfferFields {
+        op: dhcp_protocol::OpCode,
+        yiaddr: Ipv4Addr,
+        message_type: Option<dhcp_protocol::MessageType>,
+        server_identifier: Option<Ipv4Addr>,
+        lease_length_secs: Option<u32>,
+        include_duplicate_option: bool,
     }
 
-    #[test_case(FieldsFromOfferCase::AcceptedWithLeaseTime ; "accepts good offer with lease time")]
-    #[test_case(FieldsFromOfferCase::AcceptedWithNoLeaseTime ; "accepts good offer without lease time")]
-    #[test_case(FieldsFromOfferCase::UnspecifiedServerIdentifier ; "rejects offer with unspecified server identifier")]
-    #[test_case(FieldsFromOfferCase::NoServerIdentifier ; "rejects offer with no server identifier option")]
-    #[test_case(FieldsFromOfferCase::UnspecifiedYiaddr ; "rejects offer with unspecified yiaddr")]
-    #[test_case(FieldsFromOfferCase::NotBootReply ; "rejects offer with that isn't a bootreply")]
-    #[test_case(FieldsFromOfferCase::WrongDhcpMessageType ; "rejects offer with wrong DHCP message type")]
-    #[test_case(FieldsFromOfferCase::NoDhcpMessageType ; "rejects offer with no DHCP message type option")]
-    #[test_case(FieldsFromOfferCase::DuplicateOption ; "rejects offer with duplicate DHCP option")]
-    fn fields_from_offer_to_use_in_request(case: FieldsFromOfferCase) {
+    const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
+    const LEASE_LENGTH_SECS: u32 = 100;
+    const YIADDR: Ipv4Addr = std_ip_v4!("192.168.1.5");
+
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Ok(FieldsFromOfferToUseInRequest {
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(LEASE_LENGTH_SECS)),
+        ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
+            .try_into()
+            .expect("should be specified"),
+    }); "accepts good offer with lease time")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: None,
+        include_duplicate_option: false,
+    } => Ok(FieldsFromOfferToUseInRequest {
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        ip_address_lease_time_secs: None,
+        ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
+            .try_into()
+            .expect("should be specified"),
+    }); "accepts good offer without lease time")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(Ipv4Addr::UNSPECIFIED),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(SelectingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::UnspecifiedServerIdentifier,
+    )); "rejects offer with unspecified server identifier")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: None,
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(SelectingIncomingMessageError::NoServerIdentifier); "rejects offer with no server identifier option")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(SelectingIncomingMessageError::UnspecifiedYiaddr) ; "rejects offer with unspecified yiaddr")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREQUEST,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(SelectingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::NotBootReply(dhcp_protocol::OpCode::BOOTREQUEST),
+    )); "rejects offer that isn't a bootreply")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(
+        SelectingIncomingMessageError::NotDhcpOffer(dhcp_protocol::MessageType::DHCPACK),
+    ); "rejects offer with wrong DHCP message type")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: None,
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(SelectingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::BuilderMissingField("message_type"),
+    )); "rejects offer with no DHCP message type option")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: true,
+    } => Err(SelectingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::DuplicateOption(
+            dhcp_protocol::OptionCode::DomainName,
+        ),
+    )); "rejects offer with duplicate DHCP option")]
+    fn fields_from_offer_to_use_in_request(
+        offer_fields: VaryingOfferFields,
+    ) -> Result<FieldsFromOfferToUseInRequest, SelectingIncomingMessageError> {
         use super::fields_to_retain_from_selecting as fields;
-        const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
-        const LEASE_LENGTH_SECS: u32 = 100;
-        const YIADDR: Ipv4Addr = std_ip_v4!("192.168.1.5");
+        use dhcp_protocol::DhcpOption;
+
+        let VaryingOfferFields {
+            op,
+            yiaddr,
+            message_type,
+            server_identifier,
+            lease_length_secs,
+            include_duplicate_option,
+        } = offer_fields;
 
         let message = dhcp_protocol::Message {
-            op: match case {
-                FieldsFromOfferCase::NotBootReply => dhcp_protocol::OpCode::BOOTREQUEST,
-                _ => dhcp_protocol::OpCode::BOOTREPLY,
-            },
+            op,
             xid: 1,
             secs: 0,
             bdcast_flag: false,
             ciaddr: Ipv4Addr::UNSPECIFIED,
-            yiaddr: match case {
-                FieldsFromOfferCase::UnspecifiedYiaddr => Ipv4Addr::UNSPECIFIED,
-                _ => YIADDR,
-            },
+            yiaddr,
             siaddr: Ipv4Addr::UNSPECIFIED,
             giaddr: Ipv4Addr::UNSPECIFIED,
             chaddr: net_mac!("01:02:03:04:05:06"),
             sname: String::new(),
             file: String::new(),
-            options: (match case {
-                FieldsFromOfferCase::WrongDhcpMessageType => Some(
-                    dhcp_protocol::DhcpOption::DhcpMessageType(dhcp_protocol::MessageType::DHCPACK),
-                ),
-                FieldsFromOfferCase::NoDhcpMessageType => None,
-                _ => Some(dhcp_protocol::DhcpOption::DhcpMessageType(
-                    dhcp_protocol::MessageType::DHCPOFFER,
-                )),
-            })
-            .into_iter()
-            .chain(
-                match case {
-                    FieldsFromOfferCase::NoServerIdentifier => None,
-                    FieldsFromOfferCase::UnspecifiedServerIdentifier => Some(Ipv4Addr::UNSPECIFIED),
-                    _ => Some(SERVER_IP),
-                }
-                .map(dhcp_protocol::DhcpOption::ServerIdentifier),
-            )
-            .chain(match case {
-                FieldsFromOfferCase::AcceptedWithLeaseTime => {
-                    Some(dhcp_protocol::DhcpOption::IpAddressLeaseTime(LEASE_LENGTH_SECS))
-                }
-                _ => None,
-            })
-            .chain(
-                match case {
-                    FieldsFromOfferCase::DuplicateOption => Some([
-                        dhcp_protocol::DhcpOption::DomainName("example.com".to_owned()),
-                        dhcp_protocol::DhcpOption::DomainName("example.com".to_owned()),
-                    ]),
-                    _ => None,
-                }
+            options: message_type
+                .map(DhcpOption::DhcpMessageType)
                 .into_iter()
-                .flatten(),
-            )
-            .collect(),
+                .chain(server_identifier.map(DhcpOption::ServerIdentifier))
+                .chain(lease_length_secs.map(DhcpOption::IpAddressLeaseTime))
+                .chain(
+                    include_duplicate_option
+                        .then_some([
+                            dhcp_protocol::DhcpOption::DomainName("example.com".to_owned()),
+                            dhcp_protocol::DhcpOption::DomainName("example.com".to_owned()),
+                        ])
+                        .into_iter()
+                        .flatten(),
+                )
+                .collect(),
         };
 
-        let fields_from_offer_result = fields(message);
+        fields(message)
+    }
 
-        let expected = match case {
-            FieldsFromOfferCase::AcceptedWithLeaseTime => Ok(FieldsFromOfferToUseInRequest {
-                server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+    struct VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode,
+        yiaddr: Ipv4Addr,
+        message_type: Option<dhcp_protocol::MessageType>,
+        server_identifier: Option<Ipv4Addr>,
+        lease_length_secs: Option<u32>,
+        renewal_time_secs: Option<u32>,
+        rebinding_time_secs: Option<u32>,
+        message: Option<String>,
+        include_duplicate_option: bool,
+    }
+
+    const DOMAIN_NAME: &str = "example.com";
+    const MESSAGE: &str = "message explaining why the DHCPNAK was sent";
+    const RENEWAL_TIME_SECS: u32 = LEASE_LENGTH_SECS / 2;
+    const REBINDING_TIME_SECS: u32 = LEASE_LENGTH_SECS * 3 / 4;
+
+    #[test_case(
+        VaryingReplyToRequestFields {
+            op: dhcp_protocol::OpCode::BOOTREPLY,
+            yiaddr: YIADDR,
+            message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+            server_identifier: Some(SERVER_IP),
+            lease_length_secs: Some(LEASE_LENGTH_SECS),
+            renewal_time_secs: None,
+            rebinding_time_secs: None,
+            message: None,
+            include_duplicate_option: false,
+        } => Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+                .try_into()
+                .expect("should be specified"),
+            server_identifier: Some(
+                net_types::ip::Ipv4Addr::from(SERVER_IP)
                     .try_into()
                     .expect("should be specified"),
-                ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(LEASE_LENGTH_SECS)),
-                ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
-                    .try_into()
-                    .expect("should be specified"),
-            }),
-            FieldsFromOfferCase::AcceptedWithNoLeaseTime => Ok(FieldsFromOfferToUseInRequest {
-                server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
-                    .try_into()
-                    .expect("should be specified"),
-                ip_address_lease_time_secs: None,
-                ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
-                    .try_into()
-                    .expect("should be specified"),
-            }),
-            FieldsFromOfferCase::UnspecifiedServerIdentifier => {
-                Err(SelectingIncomingMessageError::CommonError(
-                    CommonIncomingMessageError::UnspecifiedServerIdentifier,
-                ))
-            }
-            FieldsFromOfferCase::NoServerIdentifier => {
-                Err(SelectingIncomingMessageError::NoServerIdentifier)
-            }
-            FieldsFromOfferCase::UnspecifiedYiaddr => {
-                Err(SelectingIncomingMessageError::UnspecifiedYiaddr)
-            }
-            FieldsFromOfferCase::NotBootReply => {
-                Err(SelectingIncomingMessageError::NotBootReply(dhcp_protocol::OpCode::BOOTREQUEST))
-            }
-            FieldsFromOfferCase::WrongDhcpMessageType => Err(
-                SelectingIncomingMessageError::NotDhcpOffer(dhcp_protocol::MessageType::DHCPACK),
             ),
-            FieldsFromOfferCase::NoDhcpMessageType => {
-                Err(SelectingIncomingMessageError::CommonError(
-                    CommonIncomingMessageError::BuilderMissingField("message_type"),
-                ))
-            }
-            FieldsFromOfferCase::DuplicateOption => {
-                Err(SelectingIncomingMessageError::CommonError(
-                    CommonIncomingMessageError::DuplicateOption(
-                        dhcp_protocol::OptionCode::DomainName,
-                    ),
-                ))
-            }
+            ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
+            parameters: vec![dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())],
+            renewal_time_value_secs: None,
+            rebinding_time_value_secs: None,
+        })); "accepts good DHCPACK")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: None,
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: None,
+        include_duplicate_option: false,
+    } => Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+            .try_into()
+            .expect("should be specified"),
+        server_identifier: None,
+        ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
+        parameters: vec![dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())],
+        renewal_time_value_secs: None,
+        rebinding_time_value_secs: None,
+    })); "accepts DHCPACK with no server identifier")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        renewal_time_secs: Some(RENEWAL_TIME_SECS),
+        rebinding_time_secs: Some(REBINDING_TIME_SECS),
+        message: None,
+        include_duplicate_option: false,
+    } => Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
+        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+            .try_into()
+            .expect("should be specified"),
+        server_identifier: Some(
+            net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+        ),
+        ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
+        parameters: vec![dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())],
+        renewal_time_value_secs: Some(RENEWAL_TIME_SECS),
+        rebinding_time_value_secs: Some(REBINDING_TIME_SECS),
+    })); "accepts DHCPACK with renew and rebind times")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: None,
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: Some(MESSAGE.to_owned()),
+        include_duplicate_option: false,
+    } => Ok(IncomingMessageDuringRequesting::Nak(FieldsToRetainFromNak {
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        message: Some(MESSAGE.to_owned()),
+        client_identifier: None,
+    })); "accepts good DHCPNAK")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: None,
+        renewal_time_secs: Some(RENEWAL_TIME_SECS),
+        rebinding_time_secs: Some(REBINDING_TIME_SECS),
+        message: None,
+        include_duplicate_option: false,
+    } =>  Err(RequestingIncomingMessageError::NoLeaseTime); "rejects DHCPACK with no lease time")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: Some(Ipv4Addr::UNSPECIFIED),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        renewal_time_secs: Some(RENEWAL_TIME_SECS),
+        rebinding_time_secs: Some(REBINDING_TIME_SECS),
+        message: None,
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::UnspecifiedServerIdentifier,
+    )); "rejects DHCPACK with unspecified server identifier")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        renewal_time_secs: Some(RENEWAL_TIME_SECS),
+        rebinding_time_secs: Some(REBINDING_TIME_SECS),
+        message: None,
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::UnspecifiedYiaddr); "rejects DHCPACK with unspecified yiaddr")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
+        server_identifier: Some(Ipv4Addr::UNSPECIFIED),
+        lease_length_secs: None,
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: Some(MESSAGE.to_owned()),
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::UnspecifiedServerIdentifier,
+    )); "rejects DHCPNAK with unspecified server identifier")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
+        server_identifier: None,
+        lease_length_secs: None,
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: Some(MESSAGE.to_owned()),
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::NoServerIdentifier) ; "rejects DHCPNAK with no server identifier")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREQUEST,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: None,
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: Some(MESSAGE.to_owned()),
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::NotBootReply(dhcp_protocol::OpCode::BOOTREQUEST),
+    )) ; "rejects non-bootreply")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: None,
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: Some(MESSAGE.to_owned()),
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::NotDhcpAckOrNak(
+        dhcp_protocol::MessageType::DHCPOFFER,
+    )) ; "rejects non-DHCPACK or DHCPNAK")]
+    #[test_case(VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        message_type: None,
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: None,
+        renewal_time_secs: None,
+        rebinding_time_secs: None,
+        message: Some(MESSAGE.to_owned()),
+        include_duplicate_option: false,
+    } => Err(RequestingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::BuilderMissingField("message_type"),
+    )) ; "rejects missing DHCP message type")]
+    #[test_case( VaryingReplyToRequestFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+        server_identifier: Some(SERVER_IP),
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        renewal_time_secs: Some(RENEWAL_TIME_SECS),
+        rebinding_time_secs: Some(REBINDING_TIME_SECS),
+        message: None,
+        include_duplicate_option: true,
+    } => Err(RequestingIncomingMessageError::CommonError(
+        CommonIncomingMessageError::DuplicateOption(
+            dhcp_protocol::OptionCode::DomainName,
+        ),
+    )); "rejects duplicate option")]
+    fn fields_to_retain_during_requesting(
+        incoming_fields: VaryingReplyToRequestFields,
+    ) -> Result<IncomingMessageDuringRequesting, RequestingIncomingMessageError> {
+        use super::fields_to_retain_from_requesting as fields;
+        use dhcp_protocol::DhcpOption;
+
+        let VaryingReplyToRequestFields {
+            op,
+            yiaddr,
+            message_type,
+            server_identifier,
+            lease_length_secs,
+            renewal_time_secs,
+            rebinding_time_secs,
+            message,
+            include_duplicate_option,
+        } = incoming_fields;
+
+        let message = dhcp_protocol::Message {
+            op,
+            xid: 1,
+            secs: 0,
+            bdcast_flag: false,
+            ciaddr: Ipv4Addr::UNSPECIFIED,
+            yiaddr,
+            siaddr: Ipv4Addr::UNSPECIFIED,
+            giaddr: Ipv4Addr::UNSPECIFIED,
+            chaddr: net_mac!("01:02:03:04:05:06"),
+            sname: String::new(),
+            file: String::new(),
+            options: message_type
+                .map(DhcpOption::DhcpMessageType)
+                .into_iter()
+                .chain(server_identifier.map(DhcpOption::ServerIdentifier))
+                .chain(lease_length_secs.map(DhcpOption::IpAddressLeaseTime))
+                .chain(renewal_time_secs.map(DhcpOption::RenewalTimeValue))
+                .chain(rebinding_time_secs.map(DhcpOption::RebindingTimeValue))
+                .chain(message.map(DhcpOption::Message))
+                // Include a parameter that the client didn't request so that we can
+                // assert that the client ignored it.
+                .chain(std::iter::once(dhcp_protocol::DhcpOption::InterfaceMtu(1)))
+                // Include a parameter that the client did request so that we can
+                // check that it's included in the acquired parameters map.
+                .chain(std::iter::once(dhcp_protocol::DhcpOption::DomainName(
+                    DOMAIN_NAME.to_owned(),
+                )))
+                .chain(
+                    include_duplicate_option
+                        .then_some(dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())),
+                )
+                .collect(),
         };
 
-        assert_eq!(fields_from_offer_result, expected);
+        fields(&std::iter::once(dhcp_protocol::OptionCode::DomainName).collect(), message)
     }
 }

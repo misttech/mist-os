@@ -781,8 +781,16 @@ pub enum DhcpOption {
     VendorClassIdentifier(AtLeast<1, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u8>>>),
     // Client Identifier must be at least **2** bytes long and has an 8-bit length field:
     // https://datatracker.ietf.org/doc/html/rfc2132#section-9.14
-    ClientIdentifier(AtLeast<2, AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u8>>>),
+    ClientIdentifier(
+        AtLeast<
+            { CLIENT_IDENTIFIER_MINIMUM_LENGTH },
+            AtMostBytes<{ size_constrained::U8_MAX_AS_USIZE }, Vec<u8>>,
+        >,
+    ),
 }
+
+/// The minimum length, in bytes, of the Client Identifier option.
+pub const CLIENT_IDENTIFIER_MINIMUM_LENGTH: usize = 2;
 
 /// Generates a match expression on `$option` which maps each of the supplied `DhcpOption` variants
 /// to their `OptionCode` equivalent.

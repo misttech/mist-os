@@ -87,6 +87,16 @@ impl<I: deps::Instant> State<I> {
                     RequestingOutcome::GracefulShutdown => {
                         Ok(Step::Exit(ExitReason::GracefulShutdown))
                     }
+                    RequestingOutcome::Bound(_) => todo!(
+                        "TODO(https://fxbug.dev/125104): Yield acquired leases through bindings."
+                    ),
+                    RequestingOutcome::Nak(nak) => {
+                        // Per RFC 2131 section 3.1: "If the client receives a
+                        // DHCPNAK message, the client restarts the
+                        // configuration process."
+                        tracing::warn!("Returning to Init due to DHCPNAK: {:?}", nak);
+                        Ok(Step::NextState(State::Init(Init::default())))
+                    }
                 }
             }
         }
@@ -379,7 +389,7 @@ impl<I: deps::Instant> Selecting<I> {
             futures::future::ok(match parse_result {
                 Ok(fields) => Some(fields),
                 Err(error) => {
-                    tracing::warn!("discarding incoming packet: {}", error);
+                    tracing::warn!("discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -456,10 +466,12 @@ fn validate_message(
     Ok(())
 }
 
-#[derive(Debug)]
-pub(crate) enum RequestingOutcome {
+#[derive(Debug, PartialEq)]
+pub(crate) enum RequestingOutcome<I> {
     RanOutOfRetransmits,
     GracefulShutdown,
+    Bound(Bound<I>),
+    Nak(crate::parse::FieldsToRetainFromNak),
 }
 
 /// The Requesting state as depicted in the state-transition diagram in [RFC 2131].
@@ -490,10 +502,9 @@ impl<I: deps::Instant> Requesting<I> {
         rng: &mut impl deps::RngProvider,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
-    ) -> Result<RequestingOutcome, Error> {
+    ) -> Result<RequestingOutcome<I>, Error> {
         let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
-        let Requesting { discover_options, fields_from_offer_to_use_in_request, start_time: _ } =
-            self;
+        let Requesting { discover_options, fields_from_offer_to_use_in_request, start_time } = self;
         let message =
             build_request(client_config, discover_options, fields_from_offer_to_use_in_request);
 
@@ -514,17 +525,69 @@ impl<I: deps::Instant> Requesting<I> {
         )
         .fuse();
 
-        pin_mut!(send_fut);
+        let mut recv_buf = [0u8; BUFFER_SIZE];
 
-        select! {
+        let ack_or_nak_stream = recv_stream(&socket, &mut recv_buf, |packet, src_addr| {
+            // We don't care about the src addr of incoming messages, because we
+            // identify DHCP servers via the Server Identifier option.
+            let _: net_types::ethernet::Mac = src_addr;
+            let message = crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT)
+                .context("error while parsing DHCP message from IP packet")?;
+            validate_message(discover_options, client_config, &message)
+                .context("invalid DHCP message")?;
+
+            let ClientConfig {
+                client_hardware_address: _,
+                client_identifier: _,
+                parameter_request_list,
+                preferred_lease_time_secs: _,
+                requested_ip_address: _,
+            } = client_config;
+
+            crate::parse::fields_to_retain_from_requesting(
+                &parameter_request_list
+                    .as_ref()
+                    .map(|list| list.iter())
+                    .into_iter()
+                    .flatten()
+                    .copied()
+                    .collect(),
+                message,
+            )
+            .context("error extracting needed fields from DHCP message during Requesting")
+        })
+        .try_filter_map(|parse_result| {
+            futures::future::ok(match parse_result {
+                Ok(msg) => Some(msg),
+                Err(error) => {
+                    tracing::warn!("discarding incoming packet: {:?}", error);
+                    None
+                }
+            })
+        })
+        .fuse();
+
+        pin_mut!(send_fut, ack_or_nak_stream);
+        let fields_to_retain = select! {
             send_requests_result = send_fut => {
                 send_requests_result?;
-                Ok(RequestingOutcome::RanOutOfRetransmits)
+                return Ok(RequestingOutcome::RanOutOfRetransmits)
             },
             () = stop_receiver.select_next_some() => {
-                Ok(RequestingOutcome::GracefulShutdown)
+                return Ok(RequestingOutcome::GracefulShutdown)
+            },
+            fields_to_retain_result = ack_or_nak_stream.select_next_some() => {
+                fields_to_retain_result?
             }
-            // TODO(https://fxbug.dev/123609): Implement receiving ACKs/NAKs.
+        };
+
+        match fields_to_retain {
+            crate::parse::IncomingMessageDuringRequesting::Ack(ack) => {
+                Ok(RequestingOutcome::Bound(Bound { ack, start_time: *start_time }))
+            }
+            crate::parse::IncomingMessageDuringRequesting::Nak(nak) => {
+                Ok(RequestingOutcome::Nak(nak))
+            }
         }
     }
 }
@@ -548,6 +611,15 @@ fn build_request(
             message_type: dhcp_protocol::MessageType::DHCPREQUEST,
         },
     )
+}
+
+/// The Bound state as depicted in the state-transition diagram in [RFC 2131].
+///
+/// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4.1
+#[derive(Debug, PartialEq)]
+pub struct Bound<I> {
+    ack: crate::parse::FieldsToRetainFromAck,
+    start_time: I,
 }
 
 #[cfg(test)]
@@ -582,17 +654,25 @@ mod test {
     const TEST_SERVER_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("02:02:02:02:02:02");
     const OTHER_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("03:03:03:03:03:03");
 
+    const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
+    const YIADDR: Ipv4Addr = std_ip_v4!("198.168.1.5");
+    const OTHER_ADDR: Ipv4Addr = std_ip_v4!("198.168.1.6");
+    const DEFAULT_LEASE_LENGTH_SECONDS: u32 = 100;
+    const MAX_LEASE_LENGTH_SECONDS: u32 = 200;
+
     const TEST_PARAMETER_REQUEST_LIST: [dhcp_protocol::OptionCode; 3] = [
         dhcp_protocol::OptionCode::SubnetMask,
         dhcp_protocol::OptionCode::Router,
         dhcp_protocol::OptionCode::DomainNameServer,
     ];
 
-    const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
-    const YIADDR: Ipv4Addr = std_ip_v4!("198.168.1.5");
-    const OTHER_ADDR: Ipv4Addr = std_ip_v4!("198.168.1.6");
-    const DEFAULT_LEASE_LENGTH_SECONDS: u32 = 100;
-    const MAX_LEASE_LENGTH_SECONDS: u32 = 200;
+    fn test_parameter_values() -> [dhcp_protocol::DhcpOption; 3] {
+        [
+            dhcp_protocol::DhcpOption::SubnetMask(std_ip_v4!("255.255.255.0")),
+            dhcp_protocol::DhcpOption::Router([SERVER_IP].into()),
+            dhcp_protocol::DhcpOption::DomainNameServer([SERVER_IP, std_ip_v4!("8.8.8.8")].into()),
+        ]
+    }
 
     fn test_client_config() -> ClientConfig {
         ClientConfig {
@@ -700,6 +780,34 @@ mod test {
         assert_matches!(selecting_result, Ok(SelectingOutcome::GracefulShutdown));
     }
 
+    struct VaryingOutgoingMessageFields {
+        xid: u32,
+        options: Vec<dhcp_protocol::DhcpOption>,
+    }
+
+    #[track_caller]
+    fn assert_outgoing_message(
+        got_message: &dhcp_protocol::Message,
+        fields: VaryingOutgoingMessageFields,
+    ) {
+        let VaryingOutgoingMessageFields { xid, options } = fields;
+        let want_message = dhcp_protocol::Message {
+            op: dhcp_protocol::OpCode::BOOTREQUEST,
+            xid,
+            secs: 0,
+            bdcast_flag: false,
+            ciaddr: Ipv4Addr::UNSPECIFIED,
+            yiaddr: Ipv4Addr::UNSPECIFIED,
+            siaddr: Ipv4Addr::UNSPECIFIED,
+            giaddr: Ipv4Addr::UNSPECIFIED,
+            chaddr: TEST_MAC_ADDRESS,
+            sname: String::new(),
+            file: String::new(),
+            options,
+        };
+        assert_eq!(got_message, &want_message);
+    }
+
     #[test]
     fn do_selecting_sends_discover() {
         initialize_logging();
@@ -756,29 +864,19 @@ mod test {
                 )
                 .expect("received packet should parse as DHCP message");
 
-                assert_eq!(
-                    msg,
-                    dhcp_protocol::Message {
-                        op: dhcp_protocol::OpCode::BOOTREQUEST,
+                assert_outgoing_message(
+                    &msg,
+                    VaryingOutgoingMessageFields {
                         xid: msg.xid,
-                        secs: 0,
-                        bdcast_flag: false,
-                        ciaddr: Ipv4Addr::UNSPECIFIED,
-                        yiaddr: Ipv4Addr::UNSPECIFIED,
-                        siaddr: Ipv4Addr::UNSPECIFIED,
-                        giaddr: Ipv4Addr::UNSPECIFIED,
-                        chaddr: TEST_MAC_ADDRESS,
-                        sname: String::new(),
-                        file: String::new(),
                         options: vec![
                             dhcp_protocol::DhcpOption::ParameterRequestList(
-                                TEST_PARAMETER_REQUEST_LIST.into()
+                                TEST_PARAMETER_REQUEST_LIST.into(),
                             ),
                             dhcp_protocol::DhcpOption::DhcpMessageType(
-                                dhcp_protocol::MessageType::DHCPDISCOVER
+                                dhcp_protocol::MessageType::DHCPDISCOVER,
                             ),
                         ],
-                    }
+                    },
                 );
 
                 let received_time = time.now();
@@ -913,29 +1011,19 @@ mod test {
             };
 
             let msg = parse_msg();
-            assert_eq!(
-                parse_msg(),
-                dhcp_protocol::Message {
-                    op: dhcp_protocol::OpCode::BOOTREQUEST,
+            assert_outgoing_message(
+                &parse_msg(),
+                VaryingOutgoingMessageFields {
                     xid: msg.xid,
-                    secs: 0,
-                    bdcast_flag: false,
-                    ciaddr: Ipv4Addr::UNSPECIFIED,
-                    yiaddr: Ipv4Addr::UNSPECIFIED,
-                    siaddr: Ipv4Addr::UNSPECIFIED,
-                    giaddr: Ipv4Addr::UNSPECIFIED,
-                    chaddr: TEST_MAC_ADDRESS,
-                    sname: String::new(),
-                    file: String::new(),
                     options: vec![
                         dhcp_protocol::DhcpOption::ParameterRequestList(
-                            TEST_PARAMETER_REQUEST_LIST.into()
+                            TEST_PARAMETER_REQUEST_LIST.into(),
                         ),
                         dhcp_protocol::DhcpOption::DhcpMessageType(
-                            dhcp_protocol::MessageType::DHCPDISCOVER
+                            dhcp_protocol::MessageType::DHCPDISCOVER,
                         ),
                     ],
-                }
+                },
             );
 
             let build_reply = || {
@@ -955,7 +1043,7 @@ mod test {
                         rebinding_time_value: Some(30),
                         subnet_mask: std_ip_v4!("255.255.255.0"),
                     },
-                    &dhcpv4::server::options_repo([]),
+                    &dhcpv4::server::options_repo(test_parameter_values()),
                 )
                 .expect("dhcp server crate error building offer")
             };
@@ -1144,34 +1232,24 @@ mod test {
                 )
                 .expect("received packet should parse as DHCP message");
 
-                assert_eq!(
-                    msg,
-                    dhcp_protocol::Message {
-                        op: dhcp_protocol::OpCode::BOOTREQUEST,
+                assert_outgoing_message(
+                    &msg,
+                    VaryingOutgoingMessageFields {
                         xid: msg.xid,
-                        secs: 0,
-                        bdcast_flag: false,
-                        ciaddr: Ipv4Addr::UNSPECIFIED,
-                        yiaddr: Ipv4Addr::UNSPECIFIED,
-                        siaddr: Ipv4Addr::UNSPECIFIED,
-                        giaddr: Ipv4Addr::UNSPECIFIED,
-                        chaddr: TEST_MAC_ADDRESS,
-                        sname: String::new(),
-                        file: String::new(),
                         options: vec![
                             dhcp_protocol::DhcpOption::IpAddressLeaseTime(
-                                DEFAULT_LEASE_LENGTH_SECONDS
+                                DEFAULT_LEASE_LENGTH_SECONDS,
                             ),
                             dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
                             dhcp_protocol::DhcpOption::ParameterRequestList(
-                                TEST_PARAMETER_REQUEST_LIST.into()
+                                TEST_PARAMETER_REQUEST_LIST.into(),
                             ),
                             dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                             dhcp_protocol::DhcpOption::DhcpMessageType(
-                                dhcp_protocol::MessageType::DHCPREQUEST
+                                dhcp_protocol::MessageType::DHCPREQUEST,
                             ),
                         ],
-                    }
+                    },
                 );
 
                 let received_time = time.now();
@@ -1194,5 +1272,189 @@ mod test {
             run_with_accelerated_time(&mut executor, time, &mut main_future);
 
         assert_matches!(requesting_result, Ok(RequestingOutcome::RanOutOfRetransmits));
+    }
+
+    struct VaryingIncomingMessageFields {
+        yiaddr: Ipv4Addr,
+        options: Vec<dhcp_protocol::DhcpOption>,
+    }
+
+    fn build_incoming_message(
+        xid: u32,
+        fields: VaryingIncomingMessageFields,
+    ) -> dhcp_protocol::Message {
+        let VaryingIncomingMessageFields { yiaddr, options } = fields;
+
+        dhcp_protocol::Message {
+            op: dhcp_protocol::OpCode::BOOTREPLY,
+            xid,
+            secs: 0,
+            bdcast_flag: false,
+            ciaddr: Ipv4Addr::UNSPECIFIED,
+            yiaddr,
+            siaddr: Ipv4Addr::UNSPECIFIED,
+            giaddr: Ipv4Addr::UNSPECIFIED,
+            chaddr: TEST_MAC_ADDRESS,
+            sname: String::new(),
+            file: String::new(),
+            options,
+        }
+    }
+
+    const NAK_MESSAGE: &str = "something went wrong";
+
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: YIADDR,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPACK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::IpAddressLeaseTime(
+                DEFAULT_LEASE_LENGTH_SECONDS,
+            ),
+        ]
+        .into_iter()
+        .chain(test_parameter_values())
+        .collect(),
+    } => RequestingOutcome::Bound(Bound {
+        ack: crate::parse::FieldsToRetainFromAck {
+            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+                .try_into()
+                .expect("should be specified"),
+            server_identifier: Some(
+                net_types::ip::Ipv4Addr::from(SERVER_IP)
+                    .try_into()
+                    .expect("should be specified")
+            ),
+            ip_address_lease_time_secs: DEFAULT_LEASE_LENGTH_SECONDS
+                .try_into()
+                .expect("should be nonzero"),
+            renewal_time_value_secs: None,
+            rebinding_time_value_secs: None,
+            parameters: test_parameter_values().into_iter().collect(),
+        },
+        start_time: std::time::Duration::from_secs(0),
+    }) ; "transitions to Bound after receiving DHCPACK")]
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: Ipv4Addr::UNSPECIFIED,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPNAK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::Message(NAK_MESSAGE.to_owned()),
+        ]
+        .into_iter()
+        .chain(test_parameter_values())
+        .collect(),
+    } => RequestingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        message: Some(NAK_MESSAGE.to_owned()),
+        client_identifier: None,
+    }) ; "transitions to Init after receiving DHCPNAK")]
+    fn do_requesting_transitions_on_reply(
+        incoming_message: VaryingIncomingMessageFields,
+    ) -> RequestingOutcome<std::time::Duration> {
+        initialize_logging();
+
+        let time = &FakeTimeController::new();
+
+        let requesting = build_test_requesting_state();
+        let mut rng = FakeRngProvider::new(0);
+
+        let (server_end, client_end) = FakeSocket::new_pair();
+        let test_socket_provider = FakeSocketProvider::new(client_end);
+
+        let client_config = test_client_config();
+
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+
+        let requesting_fut = requesting
+            .do_requesting(
+                &client_config,
+                &test_socket_provider,
+                &mut rng,
+                time,
+                &mut stop_receiver,
+            )
+            .fuse();
+
+        let server_fut = async {
+            let mut recv_buf = [0u8; BUFFER_SIZE];
+
+            let DatagramInfo { length, address } = server_end
+                .recv_from(&mut recv_buf)
+                .await
+                .expect("recv_from on test socket should succeed");
+            assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+
+            // `dhcp_protocol::Message` intentionally doesn't implement `Clone`,
+            // so we re-parse instead for testing purposes.
+            let parse_msg = || {
+                crate::parse::parse_dhcp_message_from_ip_packet(
+                    &recv_buf[..length],
+                    dhcp_protocol::SERVER_PORT,
+                )
+                .expect("received packet on test socket should parse as DHCP message")
+            };
+
+            let msg = parse_msg();
+
+            assert_outgoing_message(
+                &parse_msg(),
+                VaryingOutgoingMessageFields {
+                    xid: msg.xid,
+                    options: vec![
+                        dhcp_protocol::DhcpOption::IpAddressLeaseTime(DEFAULT_LEASE_LENGTH_SECONDS),
+                        dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
+                        dhcp_protocol::DhcpOption::ParameterRequestList(
+                            TEST_PARAMETER_REQUEST_LIST.into(),
+                        ),
+                        dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+                        dhcp_protocol::DhcpOption::DhcpMessageType(
+                            dhcp_protocol::MessageType::DHCPREQUEST,
+                        ),
+                    ],
+                },
+            );
+
+            let reply = build_incoming_message(msg.xid, incoming_message);
+
+            server_end
+                .send_to(
+                    crate::parse::serialize_dhcp_message_to_ip_packet(
+                        reply,
+                        SERVER_IP,
+                        SERVER_PORT,
+                        YIADDR,
+                        CLIENT_PORT,
+                    )
+                    .as_ref(),
+                    // Note that this is the address the client under test
+                    // observes in `recv_from`.
+                    TEST_SERVER_MAC_ADDRESS,
+                )
+                .await
+                .expect("send_to on test socket should succeed");
+        }
+        .fuse();
+
+        pin_mut!(requesting_fut, server_fut);
+
+        let main_future = async move {
+            let (requesting_result, ()) = join!(requesting_fut, server_fut);
+            requesting_result
+        }
+        .fuse();
+
+        pin_mut!(main_future);
+
+        let mut executor = fasync::TestExecutor::new();
+        let requesting_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
+
+        assert_matches!(requesting_result, Ok(outcome) => outcome)
     }
 }
