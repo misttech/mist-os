@@ -329,7 +329,6 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
     if (!is_in_interval) {
       is_in_interval = IfOffsetInIntervalHelper(offset, *pln, &found_interval);
       // If we found an interval, we should have found a valid interval sentinel too.
-      DEBUG_ASSERT(!is_in_interval || found_interval);
       DEBUG_ASSERT(!is_in_interval || found_interval->IsInterval());
     }
 
@@ -354,12 +353,12 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
     list_.insert(ktl::move(pl));
     pln = list_.make_iterator(raw_node);
   }
-  // Should have a valid slot at this point.
-  DEBUG_ASSERT(slot);
 
   // If offset does not lie in an interval, or if the slot is already a single page interval, there
   // is nothing more to be done. Return the slot.
   if (!is_in_interval || slot->IsIntervalSlot()) {
+    // We currently only support zero intervals.
+    DEBUG_ASSERT(!is_in_interval || slot->IsIntervalZero());
     return {slot, is_in_interval};
   }
 
@@ -468,7 +467,6 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   // other page interval types in the future, we will need to modify this to support them.
   auto mint_new_sentinel =
       [&found_interval](VmPageOrMarker::IntervalSentinel sentinel) -> VmPageOrMarker {
-    DEBUG_ASSERT(found_interval);
     // We only support zero intervals for now.
     DEBUG_ASSERT(found_interval->IsIntervalZero());
     // Preserve dirty state across the split.
@@ -619,8 +617,6 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
   const VmPageOrMarker* start = start_slot;
   const VmPageOrMarker* end = end_slot;
   auto mint_new_slot = [start, end]() -> VmPageOrMarker {
-    DEBUG_ASSERT(start->IsIntervalZero());
-    DEBUG_ASSERT(end->IsIntervalZero());
     DEBUG_ASSERT(start->GetZeroIntervalDirtyState() == end->GetZeroIntervalDirtyState());
     return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot,
                                         start->GetZeroIntervalDirtyState());
@@ -680,7 +676,6 @@ bool VmPageList::IsOffsetInZeroInterval(uint64_t offset) const {
   // Check if offset is in an interval also querying the associated sentinel.
   const VmPageOrMarker* interval = nullptr;
   bool in_interval = IfOffsetInIntervalHelper(offset, *pln, &interval);
-  DEBUG_ASSERT(!in_interval || interval);
   DEBUG_ASSERT(!in_interval || interval->IsInterval());
   return in_interval ? interval->IsIntervalZero() : false;
 }
@@ -819,8 +814,7 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
 
   // Check if we can merge this zero interval with a following one.
   bool merge_with_next = false;
-  VmPageOrMarker* next_slot = nullptr;
-  next_slot = lookup_slot(next_offset);
+  VmPageOrMarker* next_slot = lookup_slot(next_offset);
   // We can merge to the right if we find a zero interval start or slot, and the dirty state
   // matches.
   if (next_slot && next_slot->IsIntervalZero() &&
@@ -856,7 +850,6 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
 
   // Now that we've checked for all error conditions perform the actual update.
   if (merge_with_prev) {
-    DEBUG_ASSERT(prev_slot);
     if (prev_slot->IsIntervalEnd()) {
       // If the prev_slot was an interval end, we can simply extend that interval to include the new
       // interval. Free up the old interval end.
@@ -870,13 +863,11 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
     }
   } else {
     // We could not merge with an interval to the left. Start a new interval.
-    DEBUG_ASSERT(new_start);
     DEBUG_ASSERT(new_start->IsEmpty());
     *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, dirty_state);
   }
 
   if (merge_with_next) {
-    DEBUG_ASSERT(next_slot);
     if (next_slot->IsIntervalStart()) {
       // If the next_slot was an interval start, we can move back the start to include the new
       // interval. Free up the old start.
@@ -890,7 +881,6 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
     }
   } else {
     // We could not merge with an interval to the right. Install an interval end sentinel.
-    DEBUG_ASSERT(new_end);
     // If the new zero interval spans a single page, we will already have installed a start above,
     // so change it to a slot sentinel.
     if (new_end->IsIntervalStart()) {

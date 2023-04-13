@@ -1521,9 +1521,7 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
         return ZX_ERR_ALREADY_EXISTS;
       }
       // If offset was in an interval, we should have an interval slot to overwrite at this point.
-      DEBUG_ASSERT(slot);
-      DEBUG_ASSERT(slot->IsIntervalSlot());
-      DEBUG_ASSERT(slot->IsIntervalZero());
+      DEBUG_ASSERT(slot && slot->IsIntervalSlot());
     }
     page = slot;
   } else {
@@ -2240,8 +2238,6 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
 
   // Process the last remaining interval if there is one.
   if (unmatched_interval_start) {
-    DEBUG_ASSERT(interval_start_off >= start_offset);
-    DEBUG_ASSERT(interval_start_off < end_offset);
     accumulate_pages_to_dirty(interval_start_off, end_offset);
   }
 
@@ -5013,7 +5009,6 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
       DEBUG_ASSERT(status == ZX_OK);
 
       if (interval_end != UINT64_MAX) {
-        DEBUG_ASSERT(interval_end >= s);
         status = page_list_.ClipIntervalEnd(interval_end, interval_end - s + PAGE_SIZE);
         if (status != ZX_OK) {
           DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
