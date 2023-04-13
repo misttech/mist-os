@@ -74,6 +74,23 @@ impl UpdatePackagesManifest {
         }
     }
 
+    /// Change the package URLs to use this repository.
+    pub fn set_repository(&mut self, repo: RepositoryUrl) {
+        match self {
+            UpdatePackagesManifest::V1(contents) => {
+                // We can't directly modify the contents inside a `BTreeSet`, so swap the contents
+                // mutable reference with an empty set, then iterate through each one, modifying it
+                // to reference the new repository, and insert it back into the `contents` set.
+                let old_contents = std::mem::replace(contents, BTreeSet::new());
+
+                for mut url in old_contents {
+                    url.set_repository(repo.clone());
+                    contents.insert(url);
+                }
+            }
+        }
+    }
+
     /// Add a new package by |url|.
     fn add_by_url(&mut self, url: PinnedAbsolutePackageUrl) {
         match self {

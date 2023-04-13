@@ -11,6 +11,7 @@ use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util::from_reader;
 use epoch::EpochFile;
 use ffx_assembly_args::CreateUpdateArgs;
+use fuchsia_url::RepositoryUrl;
 use std::fs::File;
 
 pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
@@ -42,8 +43,16 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     if let Some(packages_path) = &args.packages {
         let mut file = File::open(packages_path)
             .with_context(|| format!("Failed to open: {packages_path}"))?;
-        let packages: UpdatePackagesManifest =
+
+        let mut packages: UpdatePackagesManifest =
             from_reader(&mut file).context("Failed to parse the packages manifest")?;
+
+        // Rewrite all the package URLs to use this repo as the repository.
+        if let Some(default_repo) = args.rewrite_default_repo {
+            let default_repo = RepositoryUrl::parse_host(default_repo)?;
+            packages.set_repository(default_repo);
+        }
+
         builder.add_packages(packages);
     }
 

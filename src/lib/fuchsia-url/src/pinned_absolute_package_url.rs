@@ -69,6 +69,12 @@ impl PinnedAbsolutePackageUrl {
     pub fn hash(&self) -> Hash {
         self.hash
     }
+
+    /// Change the repository to `repository`.
+    pub fn set_repository(&mut self, repository: RepositoryUrl) -> &mut Self {
+        self.unpinned.set_repository(repository);
+        self
+    }
 }
 
 // PinnedAbsolutePackageUrl does not maintain any invariants on its `unpinned` field in addition to

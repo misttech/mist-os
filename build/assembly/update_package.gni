@@ -129,6 +129,13 @@ template("update_package") {
       rebase_path(invoker.version_file, root_build_dir),
     ]
 
+    if (defined(invoker.rewrite_default_repo)) {
+      args += [
+        "--rewrite-default-repo",
+        invoker.rewrite_default_repo,
+      ]
+    }
+
     outputs = [
       files.update_package,
       files.update_package_manifest,

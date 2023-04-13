@@ -130,6 +130,10 @@ pub struct CreateUpdateArgs {
     #[argh(option)]
     pub epoch: u64,
 
+    /// rewrite package repository URLs to use this package URL hostname.
+    #[argh(option)]
+    pub rewrite_default_repo: Option<String>,
+
     /// name to give the Update Package.
     /// This is currently only used by OTA tests to allow publishing multiple
     /// update packages to the same amber repository without naming collisions.

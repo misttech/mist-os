@@ -44,7 +44,7 @@ if (is_fuchsia) {
     ]
 
     # Inject config file for test component.
-    test_config = "//src/security/tests/pkg_test/config/tests/core_ota.json5"
+    update_domain = "test.fuchsia.com"
 
     # Configure compatible root cert, certchain, pkg_server private key.
     root_ssl_cert = "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/ca.cert"
@@ -60,7 +60,7 @@ if (is_fuchsia) {
     ]
 
     # Inject config file for test component.
-    test_config = "//src/security/tests/pkg_test/config/tests/core_ota.json5"
+    update_domain = "test.fuchsia.com"
 
     # Configure compatible root cert, certchain, pkg_server private key.
     root_ssl_cert = "//src/sys/pkg/lib/fuchsia-pkg-testing/certs/ca.cert"
