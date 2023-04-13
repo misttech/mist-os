@@ -6,68 +6,43 @@ import("//build/host.gni")
 import("//build/sdk/sdk_host_tool.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
-import("./build/ffx.gni")
+import("//build/tools/json_merge/json_merge.gni")
 import("config.gni")
-
-# A note for developers interested in generating a Cargo.toml file for this tool:
-# FFX generates a `ffx_bin_unversioned` rule, which is what should be used as the target for
-# cargo gen. The appropriate command is:
-# `fx gen-cargo '//src/developer/ffx:ffx_bin_unversioned(//build/toolchain:host_x64)'`
 
 group("ffx") {
   testonly = true
 
   public_deps = [
+    ":ffx-defaults.json",
     ":ffx_tool",
     ":tests",
     "lib($host_toolchain)",
   ]
 }
 
+group("ffx_tool") {
+  deps = [
+    ":host",
+    "frontends/ffx:ffx_bin($host_toolchain)",
+    "tools($host_toolchain)",
+  ]
+}
+
+install_host_tools("host") {
+  deps = [ "frontends/ffx:ffx_bin" ]
+  outputs = [ "ffx" ]
+}
+
+group("runtime") {
+  deps = [
+    # The tool
+    ":host",
+  ]
+}
+
 if (is_host) {
-  ffx("ffx") {
-    version = "0.1.0"
-    edition = "2021"
-    with_unit_tests = true
-
-    plugin_deps = required_ffx_plugins + included_ffx_plugins  # from config.gni
-
-    # If `ffx_build_dual_mode_plugins_as_subtools` config is set, we won't
-    # include any plugin that doesn't have to be included, and they will be
-    # built as independent subtools instead.
-    #
-    # If you're looking to reduce build times, set the above flag and it will
-    # make it so you won't have to re-link all of ffx to build a single plugin's
-    # code.
-    if (!ffx_build_dual_mode_plugins_as_subtools) {
-      plugin_deps += dual_mode_plugins  # from config.gni
-    }
-
-    deps = [ "//third_party/rust_crates:anyhow" ]
-
-    ffx_deps = [
-      "//src/developer/ffx:ffx_lib_args",
-      "//src/developer/ffx:ffx_lib_sub_command",
-      "//src/developer/ffx:ffx_lib_suite",
-      "//src/developer/ffx/command:lib",
-      "//src/developer/ffx/config:lib",
-      "//src/developer/ffx/core:lib",
-      "//src/developer/ffx/lib/errors:lib",
-      "//src/developer/ffx/lib/fho/search:lib",
-      "//src/developer/ffx/plugins/daemon:ffx_daemon_plugin_args",
-      "//src/developer/ffx/plugins/daemon:ffx_daemon_plugin_sub_command",
-      "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:async-trait",
-      "//third_party/rust_crates:tempfile",
-    ]
-
-    args_sources = [ "src/args.rs" ]
-
-    sources = [
-      "src/lib.rs",
-      "src/main.rs",
-    ]
+  group("ffx_bin") {
+    public_deps = [ "frontends/ffx:ffx_bin" ]
   }
 
   sdk_host_tool("bin_sdk") {
@@ -79,57 +54,6 @@ if (is_host) {
     deps = [ ":ffx_bin" ]
   }
 
-  host_test("ffx-e2e-without-target") {
-    binary_path = "$root_out_dir/ffx"
-    args = [
-      # TODO(slgrady): remove when we no longer have flake fxb/84938
-      "--config",
-      "log.level=DEBUG",
-      "self-test",
-      "--include-target",
-      "false",
-    ]
-
-    deps = [ ":ffx_bin" ]
-
-    # ffx self-test seems to be buggy, so let's at least prevent it
-    # from affecting other tests by isolating it to its own shard.
-    isolated = true
-  }
-
-  host_test("ffx-e2e-with-target") {
-    binary_path = "$root_out_dir/ffx"
-    args = [
-      "--config",
-
-      # TODO(slgrady): remove log.level=DEBUG when we no longer have flake fxb/84938
-      "sdk.root=.,sdk.type=in-tree,log.level=DEBUG",
-      "self-test",
-    ]
-
-    deps = [
-      ":ffx-e2e-test-data",
-      ":ffx_bin",
-
-      # Required by the test_debug_limbo in `ffx self-test`.
-      # We cannot add it to the dependency of `ffx self-test` plugin because that will make
-      # the crasher into all production builds.
-      "//src/developer/forensics/crasher($target_toolchain)",
-    ]
-
-    # TODO(fxbug.dev/60683): split additional dimensions such as multi-device
-    # mac + device, etc.
-    environments = [
-      # XXX(fxbug.dev/64897): support arm64 HTI tests
-      # emu_env,
-      nuc_env,
-    ]
-
-    # ffx self-test seems to be buggy, so let's at least prevent it
-    # from affecting other tests by isolating it to its own shard.
-    isolated = true
-  }
-
   host_test_data("test_data") {
     deps = [ ":host" ]
     sources = [ "${host_tools_dir}/ffx" ]
@@ -137,52 +61,48 @@ if (is_host) {
 
   group("suite_test_data") {
     testonly = true
-    public_deps = [ ":test_data($host_toolchain)" ]
+    public_deps = [ ":test_data" ]
     if (ffx_build_dual_mode_plugins_as_subtools) {
       public_deps += dual_mode_subtool_test_data
     }
   }
+}
 
-  host_test_data("ffx-e2e-test-data") {
-    sources = [
-      "$root_out_dir/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json",
-      "$root_out_dir/zxdb",
-    ]
+json_merge("ffx-defaults.json") {
+  # the "DEFAULT" config level will be made up of a json merge of the following
+  # source json, some of which may be generated. Anything that's part of an
+  # ffx_plugin() definition included under the main ffx binary will automatically
+  # be merged in by that machinery, but if it comes from an external subtool or a library
+  # it has to be manually added to this list.
+  sources = [
+    rebase_path("//src/developer/ffx/data/config.json"),
+    rebase_path("//src/developer/ffx/daemon/data/config.json"),
+    rebase_path("//src/developer/ffx/lib/pbms/data/config.json"),
+  ]
+
+  # Add in the 'dual-mode' config default files if we're doing dual mode
+  if (ffx_build_dual_mode_plugins_as_subtools) {
+    foreach(config, dual_mode_defaults) {
+      sources += [ rebase_path(config) ]
+    }
   }
-}
 
-install_host_tools("host") {
-  deps = [ ":ffx_bin" ]
-  outputs = [ "ffx" ]
-}
-
-group("ffx_tool") {
+  # Add any dynamically generated config.json files (ie. from ffx plugin roots) here.
   deps = [
-    ":ffx_bin($host_toolchain)",
-    ":host",
-    "tools($host_toolchain)",
+    # This will bring in all built-in subtool config.json files.
+    "//src/developer/ffx/frontends/ffx:config.json($host_toolchain)",
   ]
-}
 
-group("runtime") {
-  deps = [
-    # The tool
-    ":host",
-  ]
+  foreach(dep, deps) {
+    sources += [ get_label_info(dep, "target_out_dir") + "/config.json" ]
+  }
 }
 
 group("tests") {
   testonly = true
   deps = [
-    # ffx end to end tests, through `ffx self-test` invocations, one includes
-    # tests that must have a target present, the other can be run without a
-    # target present.
-    ":ffx-e2e-with-target($host_toolchain)",
-    ":ffx-e2e-without-target($host_toolchain)",
-
-    # Most ffx plugin test suites are included downstream of the group defined
-    # by the ffx template above.
-    ":ffx_tests($host_toolchain)",
+    # Driver tests
+    "frontends/ffx:tests($host_toolchain)",
 
     # Subtool tests
     "tools:tests($host_toolchain)",

@@ -29,7 +29,6 @@ template("ffx") {
   ffx_plugin(suite_name) {
     original_target_name = _original_target_name
     forward_variables_from(invoker, "*", [ "test_deps" ])
-    config_data = [ "data/config.json" ]
   }
 
   rustc_binary(ffx_name + "_bin_unversioned") {
