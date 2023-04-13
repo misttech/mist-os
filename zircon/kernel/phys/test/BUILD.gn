@@ -557,22 +557,24 @@ if (current_toolchain != default_toolchain) {
 } else {  # current_toolchain == default_toolchain
   # We create mexec-chainloading variations of all of the phys ZBI tests.
   test_deps = []
-  foreach(test,
-          [
-            "zbi-backtrace-test",
-            "zbi-hello-world-test",
-            "zbi-memory-test",
-            "zbi-phys-unittests",
-            "zbi-handoff-entropy-test",
-            "zbi-decompress-test",
-          ]) {
-    mexec_zbi_test("mexec-$test") {
-      child_zbi = ":$test($phys_toolchain)"
-      child_zbi_file =
-          get_label_info(child_zbi, "target_out_dir") + "/$test.zbi"
-    }
+  if (target_cpu != "riscv64") {  # TODO(mcgrathr): No mexec on riscv64 (yet?).
+    foreach(test,
+            [
+              "zbi-backtrace-test",
+              "zbi-hello-world-test",
+              "zbi-memory-test",
+              "zbi-phys-unittests",
+              "zbi-handoff-entropy-test",
+              "zbi-decompress-test",
+            ]) {
+      mexec_zbi_test("mexec-$test") {
+        child_zbi = ":$test($phys_toolchain)"
+        child_zbi_file =
+            get_label_info(child_zbi, "target_out_dir") + "/$test.zbi"
+      }
 
-    test_deps += [ ":mexec-$test" ]
+      test_deps += [ ":mexec-$test" ]
+    }
   }
 
   group("test") {

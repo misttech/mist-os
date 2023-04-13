@@ -610,9 +610,11 @@ group("boot_tests") {
   deps = [
     "$arch_phys:tests",
     "boot-shim:boot_tests",
-    "efi:boot_tests",
     "test",
   ]
+  if (target_cpu != "riscv64") {  # TODO(mcgrathr): EFI not there yet
+    deps += [ "efi:boot_tests" ]
+  }
   if (all_cpu_phys_boot_tests) {
     foreach(cpu, standard_fuchsia_cpus) {
       deps += [ "test:$cpu" ]

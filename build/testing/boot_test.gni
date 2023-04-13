@@ -247,7 +247,12 @@ template("boot_test") {
     # sure to define a separate boot test for a $target_cpu host in order to
     # take advantage of KVM, HVF, etc.
     _boot_test("$main_target.emu") {
-      cpu_for_host = target_cpu
+      if (target_cpu == "riscv64") {
+        # TODO(mcgrathr): No riscv64 hosts are available yet.
+        cpu_for_host = host_cpu
+      } else {
+        cpu_for_host = target_cpu
+      }
       device_types = emu_types
       forward_variables_from(common_params, "*")
     }
