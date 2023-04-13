@@ -5978,7 +5978,10 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
   const uint64_t end_offset = offset + len;
 
   // Mark any AwaitingClean pages Clean. Remove AwaitingClean intervals that can be fully cleaned,
-  // otherwise clip the interval start removing the part that has been cleaned.
+  // otherwise clip the interval start removing the part that has been cleaned. Note that deleting
+  // an interval start is delayed until the corresponding end is encountered, and to ensure safe
+  // continued traversal, the start should always be released before the end, i.e. in the expected
+  // forward traversal order for RemovePages.
   VmPageOrMarker* interval_start = nullptr;
   uint64_t interval_start_off;
   // This tracks the end offset until which all zero intervals can be marked clean. This is a
@@ -6023,6 +6026,11 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
                 if (interval_start_off != off) {
                   *interval_start = VmPageOrMarker::Empty();
                   // Return the start slot as it could have come from an earlier page list node.
+                  // If the start slot came from the same node, we know that we still have a
+                  // non-empty slot in that node (the current interval end we're looking at), and so
+                  // the current node cannot be freed up, making it safe to continue traversal. The
+                  // interval start should always be released before the end, which is consistent
+                  // with forward traversal done by RemovePages.
                   page_list_.ReturnEmptySlot(interval_start_off);
                 }
                 // This empty slot with be returned by the RemovePages iterator.
