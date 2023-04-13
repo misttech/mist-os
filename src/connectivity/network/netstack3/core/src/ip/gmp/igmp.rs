@@ -526,6 +526,7 @@ impl<I: Instant> GmpStateMachine<I, Igmpv2ProtocolSpecific> {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
+    use assert_matches::assert_matches;
     use core::convert::TryInto;
 
     use net_types::{
@@ -797,23 +798,20 @@ mod tests {
         let check_report = |sync_ctx: &mut FakeSyncCtx| {
             let expected_src_ip = src_ip.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get());
 
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &GROUP_ADDR);
-                    let (body, src_ip, dst_ip, proto, ttl) =
-                        parse_ip_packet::<Ipv4>(frame).unwrap();
-                    assert_eq!(src_ip, expected_src_ip);
-                    assert_eq!(dst_ip, GROUP_ADDR.get());
-                    assert_eq!(proto, Ipv4Proto::Igmp);
-                    assert_eq!(ttl, 1);
-                    let mut bv = &body[..];
-                    assert_matches::assert_matches!(
-                        IgmpPacket::parse(&mut bv, ()).unwrap(),
-                        IgmpPacket::MembershipReportV2(msg) => {
-                            assert_eq!(msg.group_addr(), GROUP_ADDR.get());
-                        }
-                    );
+            let frames = sync_ctx.take_frames();
+            let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) = assert_matches!(
+                &frames[..], [x] => x);
+            assert_eq!(dst_ip, &GROUP_ADDR);
+            let (body, src_ip, dst_ip, proto, ttl) = parse_ip_packet::<Ipv4>(frame).unwrap();
+            assert_eq!(src_ip, expected_src_ip);
+            assert_eq!(dst_ip, GROUP_ADDR.get());
+            assert_eq!(proto, Ipv4Proto::Igmp);
+            assert_eq!(ttl, 1);
+            let mut bv = &body[..];
+            assert_matches!(
+                IgmpPacket::parse(&mut bv, ()).unwrap(),
+                IgmpPacket::MembershipReportV2(msg) => {
+                    assert_eq!(msg.group_addr(), GROUP_ADDR.get());
                 }
             );
         };
@@ -1208,25 +1206,24 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &GROUP_ADDR);
-                    let (body, src_ip, dst_ip, proto, ttl) =
-                        parse_ip_packet::<Ipv4>(frame).unwrap();
-                    assert_eq!(src_ip, MY_ADDR.get());
-                    assert_eq!(dst_ip, GROUP_ADDR.get());
-                    assert_eq!(proto, Ipv4Proto::Igmp);
-                    assert_eq!(ttl, 1);
-                    let mut bv = &body[..];
-                    assert_matches::assert_matches!(
-                        IgmpPacket::parse(&mut bv, ()).unwrap(),
-                        IgmpPacket::MembershipReportV2(msg) => {
-                            assert_eq!(msg.group_addr(), GROUP_ADDR.get());
-                        }
-                    );
-                }
-            );
+            {
+                let frames = sync_ctx.take_frames();
+                let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
+                    assert_matches!(&frames[..], [x] => x);
+                assert_eq!(dst_ip, &GROUP_ADDR);
+                let (body, src_ip, dst_ip, proto, ttl) = parse_ip_packet::<Ipv4>(frame).unwrap();
+                assert_eq!(src_ip, MY_ADDR.get());
+                assert_eq!(dst_ip, GROUP_ADDR.get());
+                assert_eq!(proto, Ipv4Proto::Igmp);
+                assert_eq!(ttl, 1);
+                let mut bv = &body[..];
+                assert_matches!(
+                    IgmpPacket::parse(&mut bv, ()).unwrap(),
+                    IgmpPacket::MembershipReportV2(msg) => {
+                        assert_eq!(msg.group_addr(), GROUP_ADDR.get());
+                    }
+                );
+            }
 
             // Should do nothing.
             sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
@@ -1236,25 +1233,24 @@ mod tests {
             // Should send done message.
             sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
             assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS);
-                    let (body, src_ip, dst_ip, proto, ttl) =
-                        parse_ip_packet::<Ipv4>(frame).unwrap();
-                    assert_eq!(src_ip, MY_ADDR.get());
-                    assert_eq!(dst_ip, Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.get());
-                    assert_eq!(proto, Ipv4Proto::Igmp);
-                    assert_eq!(ttl, 1);
-                    let mut bv = &body[..];
-                    assert_matches::assert_matches!(
-                        IgmpPacket::parse(&mut bv, ()).unwrap(),
-                        IgmpPacket::LeaveGroup(msg) => {
-                            assert_eq!(msg.group_addr(), GROUP_ADDR.get());
-                        }
-                    );
-                }
-            );
+            {
+                let frames = sync_ctx.take_frames();
+                let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
+                    assert_matches!(&frames[..], [x] => x);
+                assert_eq!(dst_ip, &Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS);
+                let (body, src_ip, dst_ip, proto, ttl) = parse_ip_packet::<Ipv4>(frame).unwrap();
+                assert_eq!(src_ip, MY_ADDR.get());
+                assert_eq!(dst_ip, Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.get());
+                assert_eq!(proto, Ipv4Proto::Igmp);
+                assert_eq!(ttl, 1);
+                let mut bv = &body[..];
+                assert_matches!(
+                    IgmpPacket::parse(&mut bv, ()).unwrap(),
+                    IgmpPacket::LeaveGroup(msg) => {
+                        assert_eq!(msg.group_addr(), GROUP_ADDR.get());
+                    }
+                );
+            }
 
             // Should do nothing.
             sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
@@ -1264,25 +1260,24 @@ mod tests {
             // Should send report message.
             sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
             assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &GROUP_ADDR);
-                    let (body, src_ip, dst_ip, proto, ttl) =
-                        parse_ip_packet::<Ipv4>(frame).unwrap();
-                    assert_eq!(src_ip, MY_ADDR.get());
-                    assert_eq!(dst_ip, GROUP_ADDR.get());
-                    assert_eq!(proto, Ipv4Proto::Igmp);
-                    assert_eq!(ttl, 1);
-                    let mut bv = &body[..];
-                    assert_matches::assert_matches!(
-                        IgmpPacket::parse(&mut bv, ()).unwrap(),
-                        IgmpPacket::MembershipReportV2(msg) => {
-                            assert_eq!(msg.group_addr(), GROUP_ADDR.get());
-                        }
-                    );
-                }
-            );
+            {
+                let frames = sync_ctx.take_frames();
+                let (IgmpPacketMetadata { device: FakeDeviceId, dst_ip }, frame) =
+                    assert_matches!(&frames[..], [x] => x);
+                assert_eq!(dst_ip, &GROUP_ADDR);
+                let (body, src_ip, dst_ip, proto, ttl) = parse_ip_packet::<Ipv4>(frame).unwrap();
+                assert_eq!(src_ip, MY_ADDR.get());
+                assert_eq!(dst_ip, GROUP_ADDR.get());
+                assert_eq!(proto, Ipv4Proto::Igmp);
+                assert_eq!(ttl, 1);
+                let mut bv = &body[..];
+                assert_matches!(
+                    IgmpPacket::parse(&mut bv, ()).unwrap(),
+                    IgmpPacket::MembershipReportV2(msg) => {
+                        assert_eq!(msg.group_addr(), GROUP_ADDR.get());
+                    }
+                );
+            }
         });
     }
 
@@ -1344,48 +1339,43 @@ mod tests {
             .unwrap();
         };
         let check_sent_report = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx| {
-            assert_matches::assert_matches!(
-                &non_sync_ctx.take_frames()[..],
-                [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &eth_device_id);
-                    let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-                        parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
-                    assert_eq!(src_mac, local_mac.get());
-                    assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS));
-                    assert_eq!(src_ip, MY_ADDR.get());
-                    assert_eq!(dst_ip, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
-                    assert_eq!(proto, Ipv4Proto::Igmp);
-                    assert_eq!(ttl, 1);
-                    let mut bv = &body[..];
-                    assert_matches::assert_matches!(
-                        IgmpPacket::parse(&mut bv, ()).unwrap(),
-                        IgmpPacket::MembershipReportV2(msg) => {
-                            assert_eq!(msg.group_addr(), Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
-                        }
-                    );
+            let frames = non_sync_ctx.take_frames();
+            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
+            assert_eq!(egress_device, &eth_device_id);
+            let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
+                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
+            assert_eq!(src_mac, local_mac.get());
+            assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS));
+            assert_eq!(src_ip, MY_ADDR.get());
+            assert_eq!(dst_ip, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
+            assert_eq!(proto, Ipv4Proto::Igmp);
+            assert_eq!(ttl, 1);
+            let mut bv = &body[..];
+            assert_matches!(
+                IgmpPacket::parse(&mut bv, ()).unwrap(),
+                IgmpPacket::MembershipReportV2(msg) => {
+                    assert_eq!(msg.group_addr(), Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
                 }
             );
         };
         let check_sent_leave = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx| {
-            assert_matches::assert_matches!(
-                &non_sync_ctx.take_frames()[..],
-                [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &eth_device_id);
-                    let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
-                        parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
-                    assert_eq!(src_mac, local_mac.get());
-                    assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS));
-                    assert_eq!(src_ip, MY_ADDR.get());
-                    assert_eq!(dst_ip, Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.get());
-                    assert_eq!(proto, Ipv4Proto::Igmp);
-                    assert_eq!(ttl, 1);
-                    let mut bv = &body[..];
-                    assert_matches::assert_matches!(
-                        IgmpPacket::parse(&mut bv, ()).unwrap(),
-                        IgmpPacket::LeaveGroup(msg) => {
-                            assert_eq!(msg.group_addr(), Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
-                        }
-                    );
+            let frames = non_sync_ctx.take_frames();
+            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
+
+            assert_eq!(egress_device, &eth_device_id);
+            let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
+                parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
+            assert_eq!(src_mac, local_mac.get());
+            assert_eq!(dst_mac, Mac::from(&Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS));
+            assert_eq!(src_ip, MY_ADDR.get());
+            assert_eq!(dst_ip, Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.get());
+            assert_eq!(proto, Ipv4Proto::Igmp);
+            assert_eq!(ttl, 1);
+            let mut bv = &body[..];
+            assert_matches!(
+                IgmpPacket::parse(&mut bv, ()).unwrap(),
+                IgmpPacket::LeaveGroup(msg) => {
+                    assert_eq!(msg.group_addr(), Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.get());
                 }
             );
         };
@@ -1420,7 +1410,7 @@ mod tests {
             TestConfig { ip_enabled: false, gmp_enabled: true },
         );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches::assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        assert_matches!(&non_sync_ctx.take_frames()[..], []);
 
         // Disable IGMP but enable IPv4.
         //
@@ -1431,7 +1421,7 @@ mod tests {
             TestConfig { ip_enabled: true, gmp_enabled: false },
         );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches::assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        assert_matches!(&non_sync_ctx.take_frames()[..], []);
 
         // Enable IGMP.
         set_config(

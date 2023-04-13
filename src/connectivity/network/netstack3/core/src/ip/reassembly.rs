@@ -1164,7 +1164,7 @@ mod tests {
         let mut buffer =
             Buf::new(body.to_vec(), ..).encapsulate(builder).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv4Packet<_>>().unwrap();
-        assert_matches::assert_matches!(
+        assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut sync_ctx, &mut non_sync_ctx, packet),
             FragmentProcessingState::NotNeeded(unfragmented) if unfragmented.body() == body
         );
@@ -1185,7 +1185,7 @@ mod tests {
         let mut buffer =
             Buf::new(vec![1, 2, 3, 4, 5], ..).encapsulate(builder).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
-        assert_matches::assert_matches!(
+        assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut sync_ctx, &mut non_sync_ctx, packet),
             FragmentProcessingState::InvalidFragment
         );

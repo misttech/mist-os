@@ -1475,7 +1475,7 @@ mod tests {
 
         // Should have sent a router solicitation.
         assert_eq!(non_sync_ctx.frames_sent().len(), 2);
-        assert_matches::assert_matches!(
+        assert_matches!(
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                 &non_sync_ctx.frames_sent()[1].1,
                 |_| {},

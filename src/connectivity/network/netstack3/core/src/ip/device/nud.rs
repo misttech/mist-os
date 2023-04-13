@@ -1405,23 +1405,19 @@ mod tests {
                 }),
             )]),
         );
-        assert_matches!(
-            &non_sync_ctx.take_frames()[..],
-            [(got_device_id, got_frame)] => {
-                assert_eq!(got_device_id, &eth_device_id);
+        let frames = non_sync_ctx.take_frames();
+        let (got_device_id, got_frame) = assert_matches!(&frames[..], [x] => x);
+        assert_eq!(got_device_id, &eth_device_id);
 
-                let (payload, src_mac, dst_mac, ether_type) = parse_ethernet_frame(got_frame)
-                    .unwrap();
-                assert_eq!(src_mac, local_mac.get());
-                assert_eq!(dst_mac, remote_mac.get());
-                assert_eq!(ether_type, Some(EtherType::Ipv6));
-                assert_eq!(payload, {
-                    let mut expected_body = [0; ETHERNET_MIN_BODY_LEN_NO_TAG];
-                    expected_body[..body.len()].copy_from_slice(&body);
-                    expected_body
-                });
-            }
-        );
+        let (payload, src_mac, dst_mac, ether_type) = parse_ethernet_frame(got_frame).unwrap();
+        assert_eq!(src_mac, local_mac.get());
+        assert_eq!(dst_mac, remote_mac.get());
+        assert_eq!(ether_type, Some(EtherType::Ipv6));
+        assert_eq!(payload, {
+            let mut expected_body = [0; ETHERNET_MIN_BODY_LEN_NO_TAG];
+            expected_body[..body.len()].copy_from_slice(&body);
+            expected_body
+        });
 
         // Disabling the device should clear the neighbor table.
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {

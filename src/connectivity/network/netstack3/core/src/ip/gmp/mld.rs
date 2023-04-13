@@ -446,6 +446,7 @@ fn send_mld_packet<
 mod tests {
     use core::convert::TryInto;
 
+    use assert_matches::assert_matches;
     use net_types::ethernet::Mac;
     use packet::ParseBuffer;
     use packet_formats::{
@@ -1158,14 +1159,19 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &GROUP_ADDR);
-                    ensure_frame(frame, Icmpv6MessageType::MulticastListenerReport.into(), GROUP_ADDR, GROUP_ADDR);
-                    ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
-                }
-            );
+            {
+                let frames = sync_ctx.take_frames();
+                let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
+                    assert_matches!(&frames[..], [x] => x);
+                assert_eq!(dst_ip, &GROUP_ADDR);
+                ensure_frame(
+                    frame,
+                    Icmpv6MessageType::MulticastListenerReport.into(),
+                    GROUP_ADDR,
+                    GROUP_ADDR,
+                );
+                ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
+            }
 
             // Should do nothing.
             sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
@@ -1177,14 +1183,19 @@ mod tests {
             sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
             assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_gmp_state!(sync_ctx, &GROUP_ADDR, NonMember);
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS);
-                    ensure_frame(frame, Icmpv6MessageType::MulticastListenerDone.into(), Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS, GROUP_ADDR);
-                    ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
-                }
-            );
+            {
+                let frames = sync_ctx.take_frames();
+                let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
+                    assert_matches!(&frames[..], [x] => x);
+                assert_eq!(dst_ip, &Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS);
+                ensure_frame(
+                    frame,
+                    Icmpv6MessageType::MulticastListenerDone.into(),
+                    Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+                    GROUP_ADDR,
+                );
+                ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
+            }
 
             // Should do nothing.
             sync_ctx.gmp_handle_disabled(&mut non_sync_ctx, &FakeDeviceId);
@@ -1196,14 +1207,17 @@ mod tests {
             sync_ctx.gmp_handle_maybe_enabled(&mut non_sync_ctx, &FakeDeviceId);
             assert_gmp_state!(sync_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_gmp_state!(sync_ctx, &GROUP_ADDR, Delaying);
-            assert_matches::assert_matches!(
-                &sync_ctx.take_frames()[..],
-                [(MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame)] => {
-                    assert_eq!(dst_ip, &GROUP_ADDR);
-                    ensure_frame(frame, Icmpv6MessageType::MulticastListenerReport.into(), GROUP_ADDR, GROUP_ADDR);
-                    ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
-                }
+            let frames = sync_ctx.take_frames();
+            let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
+                assert_matches!(&frames[..], [x] => x);
+            assert_eq!(dst_ip, &GROUP_ADDR);
+            ensure_frame(
+                frame,
+                Icmpv6MessageType::MulticastListenerReport.into(),
+                GROUP_ADDR,
+                GROUP_ADDR,
             );
+            ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
         });
     }
 
@@ -1264,42 +1278,35 @@ mod tests {
         };
         let check_sent_report = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                                  specified_source: bool| {
-            assert_matches::assert_matches!(
-                &non_sync_ctx.take_frames()[..],
-                [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &eth_device_id);
-                    let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
-                        parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-                            Ipv6,
-                            _,
-                            MulticastListenerReport,
-                            _,
-                        >(frame, |icmp| {
-                            assert_eq!(icmp.body().group_addr, snmc_addr.get());
-                        }).unwrap();
-                    assert_eq!(src_mac, local_mac.get());
-                    assert_eq!(dst_mac, Mac::from(&snmc_addr));
-                    assert_eq!(
-                        src_ip,
-                        if specified_source {
-                            ll_addr.get()
-                        } else {
-                            Ipv6::UNSPECIFIED_ADDRESS
-                        }
-                    );
-                    assert_eq!(dst_ip, snmc_addr.get());
-                    assert_eq!(ttl, 1);
-                    assert_eq!(code, IcmpUnusedCode);
-                }
+            let frames = non_sync_ctx.take_frames();
+            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
+            assert_eq!(egress_device, &eth_device_id);
+            let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
+                parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                    Ipv6,
+                    _,
+                    MulticastListenerReport,
+                    _,
+                >(frame, |icmp| {
+                    assert_eq!(icmp.body().group_addr, snmc_addr.get());
+                })
+                .unwrap();
+            assert_eq!(src_mac, local_mac.get());
+            assert_eq!(dst_mac, Mac::from(&snmc_addr));
+            assert_eq!(
+                src_ip,
+                if specified_source { ll_addr.get() } else { Ipv6::UNSPECIFIED_ADDRESS }
             );
+            assert_eq!(dst_ip, snmc_addr.get());
+            assert_eq!(ttl, 1);
+            assert_eq!(code, IcmpUnusedCode);
         };
         let check_sent_done = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                                specified_source: bool| {
-            assert_matches::assert_matches!(
-                &non_sync_ctx.take_frames()[..],
-                [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &eth_device_id);
-                    let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
+            let frames = non_sync_ctx.take_frames();
+            let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
+            assert_eq!(egress_device, &eth_device_id);
+            let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
                         parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
                             Ipv6,
                             _,
@@ -1308,21 +1315,15 @@ mod tests {
                         >(frame, |icmp| {
                             assert_eq!(icmp.body().group_addr, snmc_addr.get());
                         }).unwrap();
-                    assert_eq!(src_mac, local_mac.get());
-                    assert_eq!(dst_mac, Mac::from(&Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS));
-                    assert_eq!(
-                        src_ip,
-                        if specified_source {
-                            ll_addr.get()
-                        } else {
-                            Ipv6::UNSPECIFIED_ADDRESS
-                        }
-                    );
-                    assert_eq!(dst_ip, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.get());
-                    assert_eq!(ttl, 1);
-                    assert_eq!(code, IcmpUnusedCode);
-                }
+            assert_eq!(src_mac, local_mac.get());
+            assert_eq!(dst_mac, Mac::from(&Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS));
+            assert_eq!(
+                src_ip,
+                if specified_source { ll_addr.get() } else { Ipv6::UNSPECIFIED_ADDRESS }
             );
+            assert_eq!(dst_ip, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.get());
+            assert_eq!(ttl, 1);
+            assert_eq!(code, IcmpUnusedCode);
         };
 
         // Enable IPv6 and MLD.
@@ -1355,7 +1356,7 @@ mod tests {
             TestConfig { ip_enabled: false, gmp_enabled: true },
         );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches::assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        assert_matches!(&non_sync_ctx.take_frames()[..], []);
 
         // Disable MLD but enable IPv6.
         //
@@ -1366,7 +1367,7 @@ mod tests {
             TestConfig { ip_enabled: true, gmp_enabled: false },
         );
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches::assert_matches!(&non_sync_ctx.take_frames()[..], []);
+        assert_matches!(&non_sync_ctx.take_frames()[..], []);
 
         // Enable MLD.
         set_config(

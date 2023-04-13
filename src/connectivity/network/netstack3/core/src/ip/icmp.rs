@@ -3000,6 +3000,7 @@ fn connect_icmp_inner<I: IcmpIpExt + IpExt, D>(
 #[cfg(test)]
 mod tests {
     use alloc::{format, vec, vec::Vec};
+    use assert_matches::assert_matches;
     use core::{convert::TryInto, fmt::Debug, num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
@@ -3823,7 +3824,7 @@ mod tests {
             1
         );
         let replies = net.non_sync_ctx(LOCAL_CTX_NAME).take_icmp_replies(conn);
-        assert_matches::assert_matches!(&replies[..], [(7, body)] if *body == echo_body);
+        assert_matches!(&replies[..], [(7, body)] if *body == echo_body);
     }
 
     #[ip_test]

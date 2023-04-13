@@ -9,6 +9,7 @@ use std::{
     sync::Arc,
 };
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
@@ -466,7 +467,7 @@ impl PortHandler {
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
         let Self { id: _, port_id, inner: Inner { device: _, session, state }, _mac_proxy: _ } =
             self;
-        let _: EthernetWeakDeviceId<_, _> = assert_matches::assert_matches!(
+        let _: EthernetWeakDeviceId<_, _> = assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
         );

@@ -1857,7 +1857,7 @@ mod tests {
             small_body_serializer,
             Some(Ipv6::MINIMUM_LINK_MTU.into()),
         );
-        assert_matches::assert_matches!(res, Ok(()));
+        assert_matches!(res, Ok(()));
         check_sent_frame(&non_sync_ctx);
 
         // Send a packet on the socket while imposing an MTU which will not
@@ -1869,7 +1869,7 @@ mod tests {
             small_body_serializer,
             Some(1), // mtu
         );
-        assert_matches::assert_matches!(res, Err((_, IpSockSendError::Mtu)));
+        assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
         assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
         // Try sending a packet which will be larger than the device's MTU,
@@ -1881,7 +1881,7 @@ mod tests {
             (&[0; crate::ip::Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
             None,
         );
-        assert_matches::assert_matches!(res, Err((_, IpSockSendError::Mtu)));
+        assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
         // Make sure that sending on an unroutable socket fails.
         crate::ip::del_route::<I, _, _>(&mut Locked::new(sync_ctx), &mut non_sync_ctx, subnet)
@@ -1893,7 +1893,7 @@ mod tests {
             small_body_serializer,
             None,
         );
-        assert_matches::assert_matches!(
+        assert_matches!(
             res,
             Err((_, IpSockSendError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr)))
         );

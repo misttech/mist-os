@@ -8,6 +8,7 @@ use std::{
     ops::{Deref as _, DerefMut as _},
 };
 
+use assert_matches::assert_matches;
 use derivative::Derivative;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use futures::stream::StreamExt as _;
@@ -75,7 +76,7 @@ where
     /// IDs.
     pub fn add_device(&self, id: BindingId, core_id: C) {
         let Self { id_map, last_id: _ } = self;
-        assert_matches::assert_matches!(id_map.write().insert(id, core_id.clone()), None);
+        assert_matches!(id_map.write().insert(id, core_id.clone()), None);
     }
 
     /// Removes a device from the internal list.
