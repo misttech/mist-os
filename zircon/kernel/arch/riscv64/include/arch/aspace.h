@@ -92,8 +92,9 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
                        pte_t attrs, uint level, volatile pte_t* page_table, ConsistencyManager& cm)
       TA_REQ(lock_);
 
-  ssize_t UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size, uint level,
-                         volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
+  ssize_t UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size, EnlargeOperation enlarge,
+                         uint level, volatile pte_t* page_table, ConsistencyManager& cm)
+      TA_REQ(lock_);
 
   zx_status_t ProtectPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size_in, pte_t attrs,
                                uint level, volatile pte_t* page_table, ConsistencyManager& cm)
@@ -120,7 +121,8 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   ssize_t MapPages(vaddr_t vaddr, paddr_t paddr, size_t size, pte_t attrs, ConsistencyManager& cm)
       TA_REQ(lock_);
 
-  ssize_t UnmapPages(vaddr_t vaddr, size_t size, ConsistencyManager& cm) TA_REQ(lock_);
+  ssize_t UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge, ConsistencyManager& cm)
+      TA_REQ(lock_);
 
   zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs) TA_REQ(lock_);
   zx_status_t QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) TA_REQ(lock_);

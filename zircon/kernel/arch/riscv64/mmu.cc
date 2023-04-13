@@ -82,7 +82,7 @@ KCOUNTER(vm_mmu_protect_make_execute_calls, "vm.mmu.protect.make_execute_calls")
 KCOUNTER(vm_mmu_protect_make_execute_pages, "vm.mmu.protect.make_execute_pages")
 
 // given a va address and the level, compute the index in the current PT
-inline uint vaddr_to_index(vaddr_t va, uint level) {
+constexpr uint vaddr_to_index(vaddr_t va, uint level) {
   // levels count down from PT_LEVELS - 1
   DEBUG_ASSERT(level < RISCV64_MMU_PT_LEVELS);
 
@@ -96,17 +96,17 @@ inline uint vaddr_to_index(vaddr_t va, uint level) {
   return index;
 }
 
-uintptr_t page_size_per_level(uint level) {
+constexpr uintptr_t page_size_per_level(uint level) {
   // levels count down from PT_LEVELS - 1
   DEBUG_ASSERT(level < RISCV64_MMU_PT_LEVELS);
 
   return 1UL << (PAGE_SIZE_SHIFT + level * RISCV64_MMU_PT_SHIFT);
 }
 
-uintptr_t page_mask_per_level(uint level) { return page_size_per_level(level) - 1; }
+constexpr uintptr_t page_mask_per_level(uint level) { return page_size_per_level(level) - 1; }
 
 // Convert user level mmu flags to flags that go in L1 descriptors.
-pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
+constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   pte_t attr = RISCV64_PTE_V | RISCV64_PTE_A | RISCV64_PTE_D;
 
   attr |= (flags & ARCH_MMU_FLAG_PERM_USER) ? RISCV64_PTE_U : 0;
@@ -118,7 +118,7 @@ pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   return attr;
 }
 
-bool is_pte_valid(pte_t pte) { return pte & RISCV64_PTE_V; }
+constexpr bool is_pte_valid(pte_t pte) { return pte & RISCV64_PTE_V; }
 
 void update_pte(volatile pte_t* pte, pte_t newval) { *pte = newval; }
 
@@ -432,8 +432,8 @@ void Riscv64ArchVmAspace::FlushAsid() const {
 }
 
 ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size,
-                                            uint level, volatile pte_t* page_table,
-                                            ConsistencyManager& cm) {
+                                            EnlargeOperation enlarge, uint level,
+                                            volatile pte_t* page_table, ConsistencyManager& cm) {
   const vaddr_t block_size = page_size_per_level(level);
   const vaddr_t block_mask = block_size - 1;
 
@@ -455,6 +455,8 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
       // If the split failed then we just fall through and unmap the entire large page.
       if (likely(s == ZX_OK)) {
         pte = page_table[index];
+      } else if (enlarge == EnlargeOperation::No) {
+        return s;
       }
     }
     if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
@@ -463,7 +465,11 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
       // Recurse a level.
-      UnmapPageTable(vaddr, vaddr_rem, chunk_size, level - 1, next_page_table, cm);
+      ssize_t result =
+          UnmapPageTable(vaddr, vaddr_rem, chunk_size, enlarge, level - 1, next_page_table, cm);
+      if (result < 0) {
+        return result;
+      }
 
       LTRACEF_LEVEL(2, "exited recursion: back at level %u\n", level);
 
@@ -519,7 +525,8 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
 
   auto cleanup = fit::defer([&]() {
     AssertHeld(lock_);
-    UnmapPageTable(vaddr_in, vaddr_rel_in, size_in - size, level, page_table, cm);
+    UnmapPageTable(vaddr_in, vaddr_rel_in, size_in - size, EnlargeOperation::No, level, page_table,
+                   cm);
   });
 
   size_t mapped_size = 0;
@@ -529,9 +536,9 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
     const vaddr_t index = vaddr_to_index(vaddr_rel, level);
     pte_t pte = page_table[index];
 
-    // if we're at an unaligned address, not trying to map a block, and not at the terminal level,
+    // if we're at an unaligned address, and not trying to map a block larger than 1GB,
     // recurse one more level of the page table tree
-    if (((vaddr_rel | paddr) & block_mask) || (chunk_size != block_size) || level > 0) {
+    if (((vaddr_rel | paddr) & block_mask) || (chunk_size != block_size) || (level > 2)) {
       bool allocated_page_table = false;
       paddr_t page_table_paddr = 0;
       volatile pte_t* next_page_table = nullptr;
@@ -701,7 +708,8 @@ void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
       // Start with the assumption that we will unmap if we can.
-      UnmapPageTable(vaddr, vaddr_rem, chunk_size, level - 1, next_page_table, cm);
+      UnmapPageTable(vaddr, vaddr_rem, chunk_size, EnlargeOperation::No, level - 1, next_page_table,
+                     cm);
       DEBUG_ASSERT(page_table_is_clear(next_page_table));
       update_pte(&page_table[index], 0);
 
@@ -784,10 +792,11 @@ ssize_t Riscv64ArchVmAspace::MapPages(vaddr_t vaddr, paddr_t paddr, size_t size,
   return ret;
 }
 
-ssize_t Riscv64ArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size, ConsistencyManager& cm) {
+ssize_t Riscv64ArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge,
+                                        ConsistencyManager& cm) {
   LOCAL_KTRACE("mmu unmap", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
   uint level = RISCV64_MMU_PT_LEVELS - 1;
-  ssize_t ret = UnmapPageTable(vaddr, vaddr, size, level, tt_virt_, cm);
+  ssize_t ret = UnmapPageTable(vaddr, vaddr, size, enlarge, level, tt_virt_, cm);
   return ret;
 }
 
@@ -902,7 +911,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     ConsistencyManager cm(*this);
     auto undo = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS {
       if (idx > 0) {
-        UnmapPages(vaddr, idx * PAGE_SIZE, cm);
+        UnmapPages(vaddr, idx * PAGE_SIZE, EnlargeOperation::No, cm);
       }
     });
 
@@ -937,11 +946,6 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
-  // TODO-rvbringup: enlarge was added, add proper support
-  if (enlarge == EnlargeOperation::Yes) {
-    // PANIC_UNIMPLEMENTED;
-  }
-
   DEBUG_ASSERT(tt_virt_);
 
   DEBUG_ASSERT(IsValidVaddr(vaddr));
@@ -958,7 +962,7 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
   Guard<Mutex> a{&lock_};
 
   ConsistencyManager cm(*this);
-  ssize_t ret = UnmapPages(vaddr, count * PAGE_SIZE, cm);
+  ssize_t ret = UnmapPages(vaddr, count * PAGE_SIZE, enlarge, cm);
 
   if (unmapped) {
     *unmapped = (ret > 0) ? (ret / PAGE_SIZE) : 0u;
