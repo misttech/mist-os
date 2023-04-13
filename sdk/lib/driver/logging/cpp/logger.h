@@ -10,6 +10,8 @@
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/socket.h>
 
+#include <span>
+
 #define FDF_LOGL(severity, logger, msg...) \
   (logger).logf((FUCHSIA_LOG_##severity), nullptr, __FILE__, __LINE__, msg)
 #define FDF_LOG(severity, msg...) FDF_LOGL(severity, *logger_, msg)
@@ -49,6 +51,8 @@ class Logger {
   void logf(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
             const char* msg, ...) __PRINTFLIKE(6, 7);
   void logvf(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
+             const char* msg, va_list args);
+  void logvf(FuchsiaLogSeverity severity, cpp20::span<std::string> tags, const char* file, int line,
              const char* msg, va_list args);
 
   // Begins a structured logging record. You probably don't want to call

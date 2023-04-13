@@ -770,24 +770,81 @@ TEST_F(DriverTest, GetFragmentProtocol) {
   EXPECT_TRUE(v1_test->did_release);
 }
 
-TEST_F(GlobalLoggerListTest, GlobalLoggerList) {
-  compat::GlobalLoggerList global_list;
+TEST_F(GlobalLoggerListTest, TestWithoutNodeNames) {
+  compat::GlobalLoggerList global_list(false);
   ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
+
   auto logger_1 = NewLogger("logger_1");
-  auto* zx_driver_1 = global_list.AddLogger("path_1", logger_1);
+  auto* zx_driver_1 = global_list.AddLogger("path_1", logger_1, std::nullopt);
   ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
+  auto& node_names_res = zx_driver_1->node_names_for_testing();
+  ASSERT_EQ(0ul, node_names_res.size());
+
   auto logger_2 = NewLogger("logger_2");
-  auto* zx_driver_2 = global_list.AddLogger("path_1", logger_2);
+  auto* zx_driver_2 = global_list.AddLogger("path_1", logger_2, std::nullopt);
   ASSERT_EQ(2, global_list.loggers_count_for_testing("path_1"));
   ASSERT_EQ(zx_driver_1, zx_driver_2);
+  auto& node_names_res_2 = zx_driver_2->node_names_for_testing();
+  ASSERT_EQ(&node_names_res, &node_names_res_2);
+  ASSERT_EQ(0ul, node_names_res_2.size());
+
   auto logger_3 = NewLogger("logger_3");
-  auto* zx_driver_3 = global_list.AddLogger("path_2", logger_3);
+  auto* zx_driver_3 = global_list.AddLogger("path_2", logger_3, std::nullopt);
   ASSERT_EQ(1, global_list.loggers_count_for_testing("path_2"));
   ASSERT_NE(zx_driver_3, zx_driver_2);
-  global_list.RemoveLogger("path_2", logger_3);
+  auto& node_names_res_3 = zx_driver_3->node_names_for_testing();
+  ASSERT_NE(&node_names_res_2, &node_names_res_3);
+  ASSERT_EQ(0ul, node_names_res_3.size());
+
+  global_list.RemoveLogger("path_2", logger_3, std::nullopt);
   ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_2"));
-  global_list.RemoveLogger("path_1", logger_1);
+
+  global_list.RemoveLogger("path_1", logger_1, std::nullopt);
   ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
-  global_list.RemoveLogger("path_1", logger_2);
+  ASSERT_EQ(0ul, node_names_res_2.size());
+
+  global_list.RemoveLogger("path_1", logger_2, std::nullopt);
+  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
+}
+
+TEST_F(GlobalLoggerListTest, TestWithNodeNames) {
+  compat::GlobalLoggerList global_list(true);
+  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
+
+  auto logger_1 = NewLogger("logger_1");
+  auto* zx_driver_1 = global_list.AddLogger("path_1", logger_1, "node_1");
+  ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
+  auto& node_names_res = zx_driver_1->node_names_for_testing();
+  ASSERT_EQ(1ul, node_names_res.size());
+  ASSERT_EQ("node_1", node_names_res[0]);
+
+  auto logger_2 = NewLogger("logger_2");
+  auto* zx_driver_2 = global_list.AddLogger("path_1", logger_2, "node_2");
+  ASSERT_EQ(2, global_list.loggers_count_for_testing("path_1"));
+  ASSERT_EQ(zx_driver_1, zx_driver_2);
+  auto& node_names_res_2 = zx_driver_2->node_names_for_testing();
+  ASSERT_EQ(&node_names_res, &node_names_res_2);
+  ASSERT_EQ(2ul, node_names_res_2.size());
+  ASSERT_EQ("node_1", node_names_res_2[0]);
+  ASSERT_EQ("node_2", node_names_res_2[1]);
+
+  auto logger_3 = NewLogger("logger_3");
+  auto* zx_driver_3 = global_list.AddLogger("path_2", logger_3, "node_3");
+  ASSERT_EQ(1, global_list.loggers_count_for_testing("path_2"));
+  ASSERT_NE(zx_driver_3, zx_driver_2);
+  auto& node_names_res_3 = zx_driver_3->node_names_for_testing();
+  ASSERT_NE(&node_names_res_2, &node_names_res_3);
+  ASSERT_EQ(1ul, node_names_res_3.size());
+  ASSERT_EQ("node_3", node_names_res_3[0]);
+
+  global_list.RemoveLogger("path_2", logger_3, "node_3");
+  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_2"));
+
+  global_list.RemoveLogger("path_1", logger_1, "node_1");
+  ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
+  ASSERT_EQ(1ul, node_names_res_2.size());
+  ASSERT_EQ("node_2", node_names_res_2[0]);
+
+  global_list.RemoveLogger("path_1", logger_2, "node_2");
   ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
 }

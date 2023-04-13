@@ -160,24 +160,35 @@ class GlobalLoggerList {
   // contains all the active instances.
   class LoggerInstances {
    public:
+    explicit LoggerInstances(bool log_node_names) : log_node_names_(log_node_names) {}
     // Logs a message for the DFv1 driver.
     void Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
              const char* msg, va_list args);
     zx_driver_t* ZxDriver();
-    void AddLogger(std::shared_ptr<fdf::Logger>& logger);
-    void RemoveLogger(std::shared_ptr<fdf::Logger>& logger);
+    void AddLogger(std::shared_ptr<fdf::Logger>& logger,
+                   const std::optional<std::string>& node_name);
+    void RemoveLogger(std::shared_ptr<fdf::Logger>& logger,
+                      const std::optional<std::string>& node_name);
+
     size_t count() { return loggers_.size(); }
+    const std::vector<std::string>& node_names_for_testing() { return node_names_; }
 
    private:
+    bool log_node_names_;
     std::unordered_set<std::shared_ptr<fdf::Logger>> loggers_;
+    std::vector<std::string> node_names_;
   };
 
  public:
-  zx_driver_t* AddLogger(const std::string& driver_path, std::shared_ptr<fdf::Logger>& logger);
-  void RemoveLogger(const std::string& driver_path, std::shared_ptr<fdf::Logger>& logger);
+  explicit GlobalLoggerList(bool log_node_names) : log_node_names_(log_node_names) {}
+  zx_driver_t* AddLogger(const std::string& driver_path, std::shared_ptr<fdf::Logger>& logger,
+                         const std::optional<std::string>& node_name);
+  void RemoveLogger(const std::string& driver_path, std::shared_ptr<fdf::Logger>& logger,
+                    const std::optional<std::string>& node_name);
   std::optional<size_t> loggers_count_for_testing(const std::string& driver_path);
 
  private:
+  bool log_node_names_;
   std::unordered_map<std::string, LoggerInstances> instances_;
 };
 

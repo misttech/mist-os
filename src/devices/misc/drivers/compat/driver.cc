@@ -57,8 +57,13 @@ namespace compat {
 
 // This lock protects the global logger list.
 std::mutex kGlobalLoggerListLock;
+
 // This contains all the loggers in this driver host.
-GlobalLoggerList global_logger_list __TA_GUARDED(kGlobalLoggerListLock);
+#ifdef DRIVER_COMPAT_ADD_NODE_NAMES_TO_LOG_TAGS
+GlobalLoggerList global_logger_list __TA_GUARDED(kGlobalLoggerListLock)(true);
+#else
+GlobalLoggerList global_logger_list __TA_GUARDED(kGlobalLoggerListLock)(false);
+#endif
 
 zx_status_t AddMetadata(Device* device,
                         fidl::VectorView<fuchsia_driver_compat::wire::Metadata> data) {
@@ -113,33 +118,57 @@ void GlobalLoggerList::LoggerInstances::Log(FuchsiaLogSeverity severity, const c
   auto it = loggers_.begin();
   ZX_ASSERT_MSG(it != loggers_.end(),
                 "Invalid state. There should be at least 1 logger in this LoggerInstances.");
-  (*it)->logvf(severity, tag, file, line, msg, args);
+  if (!log_node_names_) {
+    (*it)->logvf(severity, tag, file, line, msg, args);
+    return;
+  }
+
+  if (tag) {
+    node_names_.push_back(tag);
+  }
+
+  (*it)->logvf(severity, node_names_, file, line, msg, args);
+
+  if (tag) {
+    node_names_.pop_back();
+  }
 }
 
 zx_driver_t* GlobalLoggerList::LoggerInstances::ZxDriver() {
   return static_cast<zx_driver_t*>(this);
 }
 
-void GlobalLoggerList::LoggerInstances::AddLogger(std::shared_ptr<fdf::Logger>& logger) {
+void GlobalLoggerList::LoggerInstances::AddLogger(std::shared_ptr<fdf::Logger>& logger,
+                                                  const std::optional<std::string>& node_name) {
   loggers_.insert(logger);
+  if (log_node_names_ && node_name.has_value()) {
+    node_names_.push_back(node_name.value());
+  }
 }
 
-void GlobalLoggerList::LoggerInstances::RemoveLogger(std::shared_ptr<fdf::Logger>& logger) {
+void GlobalLoggerList::LoggerInstances::RemoveLogger(std::shared_ptr<fdf::Logger>& logger,
+                                                     const std::optional<std::string>& node_name) {
   loggers_.erase(logger);
+  if (log_node_names_ && node_name.has_value()) {
+    node_names_.erase(std::remove(node_names_.begin(), node_names_.end(), node_name.value()),
+                      node_names_.end());
+  }
 }
 
 zx_driver_t* GlobalLoggerList::AddLogger(const std::string& driver_path,
-                                         std::shared_ptr<fdf::Logger>& logger) {
-  auto& instances = instances_.try_emplace(driver_path).first->second;
-  instances.AddLogger(logger);
+                                         std::shared_ptr<fdf::Logger>& logger,
+                                         const std::optional<std::string>& node_name) {
+  auto& instances = instances_.try_emplace(driver_path, log_node_names_).first->second;
+  instances.AddLogger(logger, node_name);
   return instances.ZxDriver();
 }
 
 void GlobalLoggerList::RemoveLogger(const std::string& driver_path,
-                                    std::shared_ptr<fdf::Logger>& logger) {
+                                    std::shared_ptr<fdf::Logger>& logger,
+                                    const std::optional<std::string>& node_name) {
   auto it = instances_.find(driver_path);
   if (it != instances_.end()) {
-    it->second.RemoveLogger(logger);
+    it->second.RemoveLogger(logger, node_name);
     if (it->second.count() == 0) {
       instances_.erase(it);
     }
@@ -176,7 +205,7 @@ Driver::~Driver() {
   dlclose(library_);
   {
     std::lock_guard guard(kGlobalLoggerListLock);
-    global_logger_list.RemoveLogger(driver_path(), inner_logger_);
+    global_logger_list.RemoveLogger(driver_path(), inner_logger_, node_name());
   }
 }
 
@@ -448,7 +477,7 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
   device_.set_logger(inner_logger_);
   {
     std::lock_guard guard(kGlobalLoggerListLock);
-    record_->driver = global_logger_list.AddLogger(driver_path(), inner_logger_);
+    record_->driver = global_logger_list.AddLogger(driver_path(), inner_logger_, node_name());
   }
 
   return ok();

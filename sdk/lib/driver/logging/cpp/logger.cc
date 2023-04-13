@@ -35,8 +35,8 @@ void Logger::BeginRecord(flog::LogBuffer& buffer, FuchsiaLogSeverity severity,
   static thread_local zx_koid_t tid = GetKoid(zx_thread_self());
   buffer.BeginRecord(severity, file_name, line, message, condition, is_printf, socket_.borrow(),
                      dropped, pid, tid);
-  buffer.WriteKeyValue("tag", tag_);
   buffer.WriteKeyValue("tag", "driver");
+  buffer.WriteKeyValue("tag", tag_);
 }
 
 zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
@@ -156,6 +156,16 @@ static const char* StripFile(const char* file, FuchsiaLogSeverity severity) {
 
 void Logger::logvf(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
                    const char* msg, va_list args) {
+  if (tag) {
+    std::string tag_str(tag);
+    logvf(severity, {&tag_str, 1}, file, line, msg, args);
+  } else {
+    logvf(severity, cpp20::span<std::string>(), file, line, msg, args);
+  }
+}
+
+void Logger::logvf(FuchsiaLogSeverity severity, cpp20::span<std::string> tags, const char* file,
+                   int line, const char* msg, va_list args) {
   if (!file || line <= 0) {
     // We require a file and line number for printf-style logs.
     return;
@@ -188,8 +198,7 @@ void Logger::logvf(FuchsiaLogSeverity severity, const char* tag, const char* fil
   file = StripFile(file, severity);
   flog::LogBuffer buffer;
   BeginRecord(buffer, severity, file, line, fmt_string, std::nullopt, this->socket_.get(), dropped);
-  buffer.WriteKeyValue("tag", tag_);
-  if (tag) {
+  for (const auto& tag : tags) {
     buffer.WriteKeyValue("tag", tag);
   }
   FlushRecord(buffer, dropped);

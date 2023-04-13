@@ -95,7 +95,7 @@ void CheckLogReadable(zx::socket& log_socket, flogger::LogLevelFilter severity) 
   EXPECT_LT(actual, sizeof(packet));
   auto msg = decode_log_message_to_struct(packet, actual);
   EXPECT_EQ(static_cast<int32_t>(severity), msg.message.severity);
-  EXPECT_EQ(msg.message.tags[0], kName);
+  EXPECT_EQ(msg.message.tags[1], kName);
   EXPECT_EQ(std::string(msg.document[0]["payload"]["root"]["message"]["value"].GetString()),
             kMessage);
 }
