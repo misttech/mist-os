@@ -383,8 +383,7 @@ zx::result<std::string> zx_device::GetTopologicalPath() {
 
 void zx_device::LogError(const char* error) {
   zx::result topo_path = GetTopologicalPath();
-  LOGF(ERROR, "%s (%d): %s",
-       topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(), protocol_id(),
+  LOGF(ERROR, "%s: %s", topo_path.is_ok() ? topo_path.value().c_str() : topo_path.status_string(),
        error);
 }
 
