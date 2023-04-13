@@ -84,6 +84,7 @@ fuchsia_driver("vim3-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "vim3-backlight.cc",
     "vim3-canvas.cc",
     "vim3-clk.cc",
     "vim3-cpu.cc",
@@ -94,6 +95,7 @@ fuchsia_driver("vim3-driver") {
     "vim3-gpio.cc",
     "vim3-hdmi.cc",
     "vim3-i2c.cc",
+    "vim3-lcd.cc",
     "vim3-mali.cc",
     "vim3-nna.cc",
     "vim3-power.cc",
@@ -137,6 +139,7 @@ fuchsia_driver("vim3-driver") {
     "//src/devices/bind/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp",
     "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.khadas.platform:fuchsia.khadas.platform_cpp",
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",

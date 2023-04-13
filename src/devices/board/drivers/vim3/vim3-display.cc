@@ -30,32 +30,6 @@
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-namespace {
-
-// Returns true iff the board has a MIPI-DSI display attached.
-bool Vim3HasLcd(zx_device_t* platform_bus) {
-  // It checks the availability of DSI display by checking the boot variable set
-  // by the bootloader (or overridden by build configuration).
-  //
-  // TODO(fxbug.dev/125228): Currently either this is hardcoded at build-time or
-  // it relies on the bootloader to set up the value. We should support probing
-  // LCD display availability directly in Fuchsia instead.
-  constexpr const char* kBootVariable = "driver.vim3.has_lcd";
-  char value[32];
-  zx_status_t status =
-      device_get_variable(platform_bus, kBootVariable, value, sizeof(value), nullptr);
-  if (status == ZX_OK) {
-    return strncmp(value, "true", sizeof("true")) == 0 || strncmp(value, "1", sizeof("1")) == 0;
-  }
-  if (status == ZX_ERR_NOT_FOUND) {
-    return false;
-  }
-  zxlogf(ERROR, "Cannot get boot variable (%s): %s", kBootVariable, zx_status_get_string(status));
-  return false;
-}
-
-}  // namespace
-
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
         // VBUS/VPU
@@ -131,7 +105,7 @@ zx_status_t Vim3::DisplayInit() {
     dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
     dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
     dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DISPLAY;
-    if (Vim3HasLcd(/*platform_bus=*/parent_)) {
+    if (HasLcd()) {
       dev.metadata() = std::move(display_panel_metadata);
     }
     dev.mmio() = display_mmios;
