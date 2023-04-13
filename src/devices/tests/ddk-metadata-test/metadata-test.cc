@@ -74,13 +74,25 @@ class LogSink : public zxtest::LogSink {
 };
 
 zx_status_t metadata_test_bind(void* ctx, zx_device_t* parent) {
-  zxlogf(ERROR, "HERE IN BIND");
   zxtest::Runner::GetInstance()->mutable_reporter()->set_log_sink(std::make_unique<LogSink>());
   ddk_test_dev = parent;
   if (RUN_ALL_TESTS(0, nullptr) != 0) {
     return ZX_ERR_BAD_STATE;
   }
-  return ZX_OK;
+
+  static zx_protocol_device_t proto = {
+      .version = DEVICE_OPS_VERSION,
+      .release = [](void* ctx) {},
+  };
+  device_add_args_t args = {
+      .version = DEVICE_ADD_ARGS_VERSION,
+      .name = "temp",
+      .ctx = parent,
+      .ops = &proto,
+  };
+
+  zx_device_t* out_device;
+  return device_add(parent, &args, &out_device);
 }
 
 static zx_driver_ops_t metadata_test_driver_ops = {

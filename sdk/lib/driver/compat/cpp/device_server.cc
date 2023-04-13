@@ -11,6 +11,12 @@ namespace compat {
 namespace fcd = fuchsia_component_decl;
 
 zx_status_t DeviceServer::AddMetadata(uint32_t type, const void* data, size_t size) {
+  // Constant taken from fuchsia.device.manager/METADATA_BYTES_MAX. We cannot depend on non-SDK
+  // FIDL library here so we redefined the constant instead.
+  constexpr size_t kMaxMetadataSize = 8192;
+  if (size > kMaxMetadataSize) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   Metadata metadata(size);
   auto begin = static_cast<const uint8_t*>(data);
   std::copy(begin, begin + size, metadata.begin());
@@ -29,11 +35,14 @@ zx_status_t DeviceServer::GetMetadata(uint32_t type, void* buf, size_t buflen, s
   }
   auto& [_, metadata] = *it;
 
+  *actual = metadata.size();
+  if (buflen < metadata.size()) {
+    return ZX_ERR_BUFFER_TOO_SMALL;
+  }
   auto size = std::min(buflen, metadata.size());
   auto begin = metadata.begin();
   std::copy(begin, begin + size, static_cast<uint8_t*>(buf));
 
-  *actual = metadata.size();
   return ZX_OK;
 }
 

@@ -8,8 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("metadata-test-bind") {
-  disable_autobind = true
+  rules = "metadata-test.bind"
   header_output = "metadata-test-bind.h"
+  deps = [ "//src/devices/bind/fuchsia.compat" ]
 }
 
 fuchsia_driver("fuchsia_driver") {
