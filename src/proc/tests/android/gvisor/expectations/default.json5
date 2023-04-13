@@ -170,9 +170,6 @@
                 "FifoTest.OpenBlockedAndInterrupted",
                 "FcntlLockTest.GetLockRespectsPIDNamespace",
 
-                // flock_test
-                "FlockTestNoFixture.FlockSymlink",
-
                 // fork_test
                 "ForkTest.Alarm",
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",

@@ -151,6 +151,76 @@ impl FlockOperation {
     }
 }
 
+impl FileObject {
+    /// Advisory locking.
+    ///
+    /// See flock(2).
+    pub fn flock(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        operation: FlockOperation,
+    ) -> Result<(), Errno> {
+        if self.flags().contains(OpenFlags::PATH) {
+            return error!(EBADF);
+        }
+        loop {
+            let mut flock_info = self.name.entry.node.flock_info.lock();
+            if operation.is_unlock() {
+                flock_info.retain(|fh| !Arc::ptr_eq(&fh, self));
+                return Ok(());
+            }
+            // Operation is a locking operation.
+            // 1. File is not locked
+            if flock_info.locked_exclusive.is_none() {
+                flock_info.locked_exclusive = Some(operation.is_lock_exclusive());
+                flock_info.locking_handles.push(Arc::downgrade(self));
+                return Ok(());
+            }
+
+            let file_lock_is_exclusive = flock_info.locked_exclusive == Some(true);
+            let fd_has_lock = flock_info
+                .locking_handles
+                .iter()
+                .find_map(|w| {
+                    w.upgrade().and_then(|fh| if Arc::ptr_eq(&fh, self) { Some(()) } else { None })
+                })
+                .is_some();
+
+            // 2. File is locked, but fd already have a lock
+            if fd_has_lock {
+                if operation.is_lock_exclusive() == file_lock_is_exclusive {
+                    // Correct lock is already held, return.
+                    return Ok(());
+                } else {
+                    // Incorrect lock is held. Release the lock and loop back to try to reacquire
+                    // it. flock doesn't guarantee atomic lock type switching.
+                    flock_info.retain(|fh| !Arc::ptr_eq(&fh, self));
+                    continue;
+                }
+            }
+
+            // 3. File is locked, and fd doesn't have a lock.
+            if !file_lock_is_exclusive && !operation.is_lock_exclusive() {
+                // The lock is not exclusive, let's grab it.
+                flock_info.locking_handles.push(Arc::downgrade(self));
+                return Ok(());
+            }
+
+            // 4. The operation cannot be done at this time.
+            if !operation.is_blocking() {
+                return error!(EWOULDBLOCK);
+            }
+
+            // Register a waiter to be notified when the lock is released. Release the lock on
+            // FlockInfo, and wait.
+            let waiter = Waiter::new();
+            flock_info.wait_queue.wait_async(&waiter);
+            std::mem::drop(flock_info);
+            waiter.wait(current_task)?;
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UnlinkKind {
     /// Unlink a directory.
@@ -513,79 +583,6 @@ impl FsNode {
     pub fn on_file_closed(&self) {
         let mut flock_info = self.flock_info.lock();
         flock_info.retain(|_| true);
-    }
-
-    /// Lock/Unlock the current node.
-    ///
-    /// See flock(2).
-    pub fn flock(
-        &self,
-        current_task: &CurrentTask,
-        file_handle: &FileHandle,
-        operation: FlockOperation,
-    ) -> Result<(), Errno> {
-        loop {
-            self.check_access(current_task, Access::READ)?;
-            let mut flock_info = self.flock_info.lock();
-            if operation.is_unlock() {
-                flock_info.retain(|fh| !Arc::ptr_eq(&fh, file_handle));
-                return Ok(());
-            }
-            // Operation is a locking operation.
-            // 1. File is not locked
-            if flock_info.locked_exclusive.is_none() {
-                flock_info.locked_exclusive = Some(operation.is_lock_exclusive());
-                flock_info.locking_handles.push(Arc::downgrade(file_handle));
-                return Ok(());
-            }
-
-            let file_lock_is_exclusive = flock_info.locked_exclusive == Some(true);
-            let fd_has_lock = flock_info
-                .locking_handles
-                .iter()
-                .find_map(|w| {
-                    w.upgrade().and_then(|fh| {
-                        if Arc::ptr_eq(&fh, file_handle) {
-                            Some(())
-                        } else {
-                            None
-                        }
-                    })
-                })
-                .is_some();
-
-            // 2. File is locked, but fd already have a lock
-            if fd_has_lock {
-                if operation.is_lock_exclusive() == file_lock_is_exclusive {
-                    // Correct lock is already held, return.
-                    return Ok(());
-                } else {
-                    // Incorrect lock is held. Release the lock and loop back to try to reacquire
-                    // it. flock doesn't guarantee atomic lock type switching.
-                    flock_info.retain(|fh| !Arc::ptr_eq(&fh, file_handle));
-                    continue;
-                }
-            }
-
-            // 3. File is locked, and fd doesn't have a lock.
-            if !file_lock_is_exclusive && !operation.is_lock_exclusive() {
-                // The lock is not exclusive, let's grab it.
-                flock_info.locking_handles.push(Arc::downgrade(file_handle));
-                return Ok(());
-            }
-
-            // 4. The operation cannot be done at this time.
-            if !operation.is_blocking() {
-                return error!(EWOULDBLOCK);
-            }
-
-            // Register a waiter to be notified when the lock is released. Release the lock on
-            // FlockInfo, and wait.
-            let waiter = Waiter::new();
-            flock_info.wait_queue.wait_async(&waiter);
-            std::mem::drop(flock_info);
-            waiter.wait(current_task)?;
-        }
     }
 
     pub fn record_lock(

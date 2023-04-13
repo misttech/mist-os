@@ -1828,7 +1828,7 @@ pub fn sys_ppoll(
 pub fn sys_flock(current_task: &CurrentTask, fd: FdNumber, operation: u32) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let operation = FlockOperation::from_flags(operation)?;
-    file.name.entry.node.flock(current_task, &file, operation)
+    file.flock(current_task, operation)
 }
 
 pub fn sys_fsync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
