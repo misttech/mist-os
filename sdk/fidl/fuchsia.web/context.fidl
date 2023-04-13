@@ -5,6 +5,7 @@ library fuchsia.web;
 
 using fuchsia.io;
 using fuchsia.mem;
+using fuchsia.net.http;
 
 type ContextError = strict enum : int32 {
     /// The remote debugging service was not opened.
@@ -210,7 +211,7 @@ type CreateContextParams = resource table {
 
     /// Specifies a set of header names for which [Cross-Origin Resource Sharing
     /// (CORS)](https://www.w3.org/TR/cors/) checks should not be enforced.
-   10: cors_exempt_headers vector<vector<uint8>:MAX>:MAX;
+   10: cors_exempt_headers vector<fuchsia.net.http.HeaderName>:MAX;
 
     /// Specifies the storage to use to persistent content licensing related data (e.g.
     /// provisioning data, persistent session data). By default these data will be placed under the

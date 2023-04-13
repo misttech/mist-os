@@ -29,13 +29,19 @@ type Error = strict enum {
     DEADLINE_EXCEEDED = 5;
 };
 
+/// Friendly alias for a vector of bytes containing a header name.
+alias HeaderName = vector<uint8>:MAX;
+
+/// Friendly alias for a vector of bytes containing a header value.
+alias HeaderValue = vector<uint8>:MAX;
+
 /// An HTTP header field.
 type Header = struct {
     /// The name of the header field.
-    name vector<uint8>:MAX;
+    name HeaderName;
 
     /// The value of the header field.
-    value vector<uint8>:MAX;
+    value HeaderValue;
 };
 
 /// The body of an HTTP request.

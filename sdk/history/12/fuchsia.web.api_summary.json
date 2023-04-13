@@ -1444,7 +1444,7 @@
         "kind": "table/member",
         "name": "fuchsia.web/UrlRequestRewriteRemoveHeader.header_name",
         "ordinal": "2",
-        "type": "vector<uint8>:4096"
+        "type": "vector<uint8>"
     },
     {
         "kind": "table/member",

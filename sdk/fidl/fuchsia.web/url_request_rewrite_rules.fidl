@@ -63,7 +63,10 @@ type UrlRequestRewriteAddHeaders = table {
 ///   [RFC 7230 section 3.2](https://tools.ietf.org/html/rfc7230#section-3.2).
 type UrlRequestRewriteRemoveHeader = table {
     1: query_pattern Url;
+    @available(removed=12)
     2: header_name vector<uint8>:MAX_HEADERS_COUNT;
+    @available(added=12)
+    2: header_name fuchsia.net.http.HeaderName;
 };
 
 /// If `pattern` is found in the URL's query, replaces it with `substitution`.
