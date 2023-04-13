@@ -198,6 +198,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             cobalt_sender.clone(),
             data_proxy.clone(),
             config_proxy,
+            structured_config.create_ota_channel_rewrite_rule,
         )
         .await,
     ));
@@ -433,6 +434,7 @@ async fn load_rewrite_manager(
     cobalt_sender: ProtocolSender<MetricEvent>,
     data_proxy: Option<fio::DirectoryProxy>,
     config_proxy: Option<fio::DirectoryProxy>,
+    create_ota_channel_rewrite_rule: bool,
 ) -> RewriteManager {
     let dynamic_rules_path =
         if config.enable_dynamic_configuration() { Some(DYNAMIC_RULES_PATH) } else { None };
@@ -471,28 +473,32 @@ async fn load_rewrite_manager(
             builder
         });
 
-    // If we have a channel in vbmeta, we don't want to load the dynamic configs. Instead, we'll
-    // construct a unique rule for that channel.
-    match crate::ota_channel::create_rewrite_rule_for_ota_channel(
-        channel_inspect_state,
-        #[allow(clippy::deref_addrof)]
-        #[allow(clippy::borrow_deref_ref)]
-        &*&repo_manager.read().await,
-        cobalt_sender.clone(),
-    )
-    .await
-    {
-        Ok(Some(rule)) => {
-            info!("Created rewrite rule for ota channel: {:?}", rule);
-            builder.replace_dynamic_rules(vec![rule]).build()
+    if create_ota_channel_rewrite_rule {
+        // If we have a channel in vbmeta, we don't want to load the dynamic configs. Instead, we'll
+        // construct a unique rule for that channel.
+        match crate::ota_channel::create_rewrite_rule_for_ota_channel(
+            channel_inspect_state,
+            #[allow(clippy::deref_addrof)]
+            #[allow(clippy::borrow_deref_ref)]
+            &*&repo_manager.read().await,
+            cobalt_sender.clone(),
+        )
+        .await
+        {
+            Ok(Some(rule)) => {
+                info!("Created rewrite rule for ota channel: {:?}", rule);
+                builder.replace_dynamic_rules(vec![rule]).build()
+            }
+            Ok(None) => {
+                info!("No ota channel present, so not creating rewrite rule.");
+                builder.build()
+            }
+            Err(err) => {
+                error!("Failed to create rewrite rule for ota channel with error, falling back to defaults. {:#}", anyhow!(err));
+                builder.build()
+            }
         }
-        Ok(None) => {
-            info!("No ota channel present, so not creating rewrite rule.");
-            builder.build()
-        }
-        Err(err) => {
-            error!("Failed to create rewrite rule for ota channel with error, falling back to defaults. {:#}", anyhow!(err));
-            builder.build()
-        }
+    } else {
+        builder.build()
     }
 }
