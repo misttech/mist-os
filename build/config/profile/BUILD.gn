@@ -81,6 +81,23 @@ variant("coverage") {
   }
 }
 
+# This can be appended with:
+# ```
+#   configs += [ "//build/config/profile:no-coverage" ]
+# ```
+# in any particular target where the coverage information is never
+# worth collecting, such as certain kinds of generated code.
+config("no-coverage") {
+  if (toolchain_variant.tags + [ "coverage" ] - [ "coverage" ] !=
+      toolchain_variant.tags) {
+    cflags = [
+      "-fno-profile-instr-generate",
+      "-fno-coverage-mapping",
+    ]
+    rustflags = [ "-Cno-instrument-coverage" ]
+  }
+}
+
 # This variant is similar to `coverage` but only instruments sources that are
 # interesting for measuring CTS coverage.
 variant("coverage-cts") {
