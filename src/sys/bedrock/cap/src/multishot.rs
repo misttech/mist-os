@@ -7,12 +7,11 @@ use {
     fidl::endpoints::{create_request_stream, ControlHandle, Responder},
     fidl_fuchsia_component_bedrock as fbedrock, fuchsia_async as fasync, fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
-    futures::channel::mpsc,
     futures::{future::BoxFuture, FutureExt, StreamExt, TryStreamExt},
 };
 
 #[derive(Debug)]
-pub struct Sender<T: Capability>(pub mpsc::UnboundedSender<T>);
+pub struct Sender<T: Capability>(pub async_channel::Sender<T>);
 
 impl<T: Capability + TryFrom<zx::Handle>> Capability for Sender<T> {}
 
@@ -33,7 +32,7 @@ impl<T: Capability + TryFrom<zx::Handle>> Sender<T> {
                         }
                     };
 
-                    if self.0.unbounded_send(capability).is_err() {
+                    if self.0.send(capability).await.is_err() {
                         responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_STATE);
                         continue;
                     }
@@ -67,7 +66,7 @@ impl<T: Capability> Clone for Sender<T> {
 }
 
 #[derive(Debug)]
-pub struct Receiver<T: Capability>(pub mpsc::UnboundedReceiver<T>);
+pub struct Receiver<T: Capability>(pub async_channel::Receiver<T>);
 
 impl<T: Capability> Capability for Receiver<T> {}
 
@@ -115,9 +114,15 @@ impl<T: Capability> Remote for Receiver<T> {
     }
 }
 
+impl<T: Capability> Clone for Receiver<T> {
+    fn clone(&self) -> Self {
+        Receiver(self.0.clone())
+    }
+}
+
 /// A stream of capabilities from a sender to a receiver.
 pub fn multishot<T: Capability>() -> (Sender<T>, Receiver<T>) {
-    let (sender, receiver) = mpsc::unbounded::<T>();
+    let (sender, receiver) = async_channel::unbounded::<T>();
     (Sender(sender), Receiver(receiver))
 }
 
@@ -181,7 +186,7 @@ mod tests {
 
         // Send the event through the Sender.
         let handle = Handle::from(event.into_handle());
-        sender.0.unbounded_send(handle).unwrap();
+        sender.0.send(handle).await.unwrap();
 
         let client = async move {
             let handle = receiver_proxy.receive().await.context("failed to call Receive")?;

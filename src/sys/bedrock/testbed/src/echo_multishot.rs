@@ -23,7 +23,7 @@ use {
     exec::{Lifecycle, Start, Stop},
     fidl::{endpoints::ServerEnd, HandleBased},
     fidl_fuchsia_examples as fexamples, fuchsia_zircon as zx,
-    futures::{SinkExt, StreamExt},
+    futures::StreamExt,
     tracing::info,
 };
 
