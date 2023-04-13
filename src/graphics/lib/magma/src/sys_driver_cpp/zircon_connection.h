@@ -97,7 +97,11 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     delegate_->SetNotificationCallback(this);
   }
 
-  ~ZirconConnection() override { delegate_->SetNotificationCallback(nullptr); }
+  ~ZirconConnection() override {
+    delegate_->SetNotificationCallback(nullptr);
+    async_loop_.Shutdown();
+    delegate_.reset();
+  }
 
   bool Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary);
 
