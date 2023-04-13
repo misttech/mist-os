@@ -37,6 +37,7 @@
 #include <linux/netlink.h>
 #include <linux/poll.h>
 #include <linux/prctl.h>
+#include <linux/random.h>
 #include <linux/reboot.h>
 #include <linux/resource.h>
 #include <linux/sched.h>

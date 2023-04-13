@@ -27,7 +27,6 @@
                 "sys_prctl.pr_cap_ambient",
                 "sys_ptrace.watchpoint_imprecise",
                 "sys_ptrace.hardware_breakpoint",
-                "sys_random.getrandom_EINVAL",
                 "sys_sem.smoke",
                 "sys_sendfile.sendfile",
                 "sys_sendfile.sendfile64_smoke",

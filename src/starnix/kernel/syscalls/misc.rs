@@ -97,8 +97,11 @@ pub fn sys_getrandom(
     current_task: &CurrentTask,
     buf_addr: UserAddress,
     size: usize,
-    _flags: i32,
+    flags: u32,
 ) -> Result<usize, Errno> {
+    if flags & !(GRND_RANDOM | GRND_NONBLOCK) != 0 {
+        return error!(EINVAL);
+    }
     let mut buf = vec![0; size];
     zx::cprng_draw(&mut buf);
     current_task.mm.write_memory(buf_addr, &buf[0..size])?;
