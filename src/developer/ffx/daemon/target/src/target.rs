@@ -1243,7 +1243,8 @@ mod test {
     use fidl_fuchsia_developer_remotecontrol as rcs;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fidl_fuchsia_overnet_protocol::NodeId;
-    use futures::prelude::*;
+    use fuchsia_async::Timer;
+    use futures::{channel, prelude::*};
     use hoist::Hoist;
     use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
@@ -1294,6 +1295,23 @@ mod test {
                     _ => assert!(false),
                 }
             }
+        })
+        .detach();
+
+        proxy
+    }
+
+    fn setup_fake_unresponsive_remote_control_service(
+        done: channel::oneshot::Receiver<()>,
+    ) -> RemoteControlProxy {
+        let (proxy, mut stream) =
+            fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+
+        fuchsia_async::Task::local(async move {
+            while let Ok(Some(_req)) = stream.try_next().await {}
+            // Dropping the request immediately would also drop the responder,
+            // resulting in the other side receiving a PEER_CLOSED
+            let _ = done.await;
         })
         .detach();
 
@@ -2111,5 +2129,27 @@ mod test {
 
         assert_eq!(TargetConnectionState::Disconnected, target.get_connection_state());
         assert!(target.host_pipe.borrow().is_none());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_host_pipe_state_borrow() {
+        let local_hoist = Hoist::new().unwrap();
+        let (done_send, done_recv) = channel::oneshot::channel::<()>();
+
+        let target = Target::new();
+        // We want run_host_pipe() to reach the point of knock_rcs(), so we
+        // need to set up an RCS first. But we'll set it up so it doesn't respond
+        let conn = RcsConnection::new_with_proxy(
+            &local_hoist,
+            setup_fake_unresponsive_remote_control_service(done_recv),
+            &NodeId { id: 1234 },
+        );
+        target.set_state(TargetConnectionState::Rcs(conn));
+        target.run_host_pipe();
+        // Let run_host_pipe()'s spawned task run
+        Timer::new(Duration::from_millis(50)).await;
+        target.update_connection_state(|_| TargetConnectionState::Disconnected);
+        done_send.send(()).expect("send failed")
+        // No assertion -- we are making sure run_host_pipe() doesn't panic
     }
 }
