@@ -155,6 +155,12 @@ impl Partition {
         if label.starts_with("zircon-") && label.len() == "zircon-x".len() {
             let configuration = Partition::letter_to_configuration(label.chars().last().unwrap());
             Some(PartitionPaveType::Asset { r#type: Asset::Kernel, config: configuration })
+        } else if label.starts_with("vbmeta_") && label.len() == "vbmeta_x".len() {
+            let configuration = Partition::letter_to_configuration(label.chars().last().unwrap());
+            Some(PartitionPaveType::Asset {
+                r#type: Asset::VerifiedBootMetadata,
+                config: configuration,
+            })
         } else if label.starts_with("efi") || label.starts_with("fuchsia.esp") {
             Some(PartitionPaveType::Bootloader)
         } else {
@@ -388,7 +394,7 @@ impl fmt::Debug for Partition {
 mod tests {
     use {
         super::*,
-        fidl_fuchsia_hardware_block::BlockInfo,
+        fidl_fuchsia_hardware_block::{BlockInfo, Flag},
         fidl_fuchsia_hardware_block_partition::{
             Guid, PartitionMarker, PartitionRequest, PartitionRequestStream,
         },
@@ -410,7 +416,7 @@ mod tests {
                     block_count,
                     block_size,
                     max_transfer_size: 0,
-                    flags: 0,
+                    flags: Flag::empty(),
                 }))?,
                 PartitionRequest::GetTypeGuid { responder } => {
                     responder.send(0, Some(&mut Guid { value: guid }))?
@@ -429,8 +435,14 @@ mod tests {
     ) -> Result<PartitionProxy, Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PartitionMarker>()?;
         fasync::Task::local(
-            serve_partition(label, block_size, block_count, guid, stream)
-                .unwrap_or_else(|e| panic!("Error while serving fake block device: {}", e)),
+            serve_partition(
+                label,
+                block_size.try_into().unwrap(),
+                block_count.try_into().unwrap(),
+                guid,
+                stream,
+            )
+            .unwrap_or_else(|e| panic!("Error while serving fake block device: {}", e)),
         )
         .detach();
         Ok(proxy)
@@ -490,6 +502,43 @@ mod tests {
         assert_eq!(part.src, "zircon-r");
         assert!(!part.is_ab());
         Ok(())
+    }
+
+    async fn new_partition_vbmetax_test_helper(
+        name: &'static str,
+        expected_config: Configuration,
+    ) -> Result<(), Error> {
+        let proxy = mock_partition(name, 40, 200, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new(name.to_string(), proxy, BootloaderType::Efi).await?;
+        assert!(part.is_some());
+        let part = part.unwrap();
+        assert_eq!(
+            part.pave_type,
+            PartitionPaveType::Asset {
+                r#type: Asset::VerifiedBootMetadata,
+                config: expected_config
+            }
+        );
+        assert_eq!(part.size, 40 * 200);
+        assert_eq!(part.src, name);
+        Ok(())
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_new_partition_vbmetaa() -> Result<(), Error> {
+        new_partition_vbmetax_test_helper("vbmeta_a", Configuration::A).await
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_new_partition_vbmetab() -> Result<(), Error> {
+        // 'A' and 'B' are treated the same, as the installer will install
+        // the same image to both A and B.
+        new_partition_vbmetax_test_helper("vbmeta_b", Configuration::A).await
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_new_partition_vbmetar() -> Result<(), Error> {
+        new_partition_vbmetax_test_helper("vbmeta_r", Configuration::Recovery).await
     }
 
     #[fasync::run_singlethreaded(test)]

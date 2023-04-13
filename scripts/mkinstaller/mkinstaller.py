@@ -79,11 +79,17 @@ IMAGES_RECOVERY_INSTALLER = [
     ManifestImage('recovery-installer', [VBMETA_R_GPT_GUID], 'vbmeta', 'vbmeta_r'),
     ManifestImage('fuchsia.esp', ['efi'], 'blk'),
 
+    # Installer uses `WORKSTATION_INSTALLER_GPT_GUID` to tell that it is a partition
+    # to copy over. They have to come last to prevent gigaboot++ from using them
+    # for boot(gigaboot++ finds the first match when looking up in GPT).
+
     # Standard x64 partitions
     # This is the EFI system partition that will be installed to the target.
     ManifestImage('fuchsia.esp', [WORKSTATION_INSTALLER_GPT_GUID], 'blk'),
     ManifestImage('zircon-a', [WORKSTATION_INSTALLER_GPT_GUID], 'zbi'),
+    ManifestImage('zircon-a', [WORKSTATION_INSTALLER_GPT_GUID], 'vbmeta', 'vbmeta_a'),
     ManifestImage('zircon-r', [WORKSTATION_INSTALLER_GPT_GUID], 'zbi'),
+    ManifestImage('zircon-r', [WORKSTATION_INSTALLER_GPT_GUID], 'vbmeta', 'vbmeta_r'),
 
     # ChromeOS partitions
     # The zircon-r.signed partition is used as both zedboot on the installation
