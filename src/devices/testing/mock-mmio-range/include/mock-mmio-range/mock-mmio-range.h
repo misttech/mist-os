@@ -21,10 +21,6 @@
 
 namespace i915 {
 
-// TODO(fxbug.dev/105644): Move this file to a directory where it can be reused
-//                         by all drivers, or deprecate in favor of a library in
-//                         the SDK.
-
 // An MMIO range that responds to a list of pre-determined memory accesses.
 //
 // MockMmioRange enforces a global ordering on all accesses to the mocked MMIO
