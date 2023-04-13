@@ -126,13 +126,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
 
   zx::result<DriverHost*> CreateDriverHost() override;
 
-  // Should only be called when |bind_orphan_ongoing_| is true.
   void BindInternal(
       Node& node, std::shared_ptr<BindResultTracker> result_tracker,
       BindMatchCompleteCallback match_complete_callback = []() {});
-
-  // Should only be called when |bind_orphan_ongoing_| is true and |orphaned_nodes_| is not empty.
-  void TryBindAllOrphansInternal(std::shared_ptr<BindResultTracker> tracker);
 
   // Process any pending bind requests that were queued during an ongoing bind process.
   // Should only be called when |bind_orphan_ongoing_| is true.
@@ -162,7 +158,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
 
   // True when a call to TryBindAllOrphans() or Bind() was made and not yet completed.
-  // Set to false by ProcessPendingBindRequests() when there are no more pending bind requests.
+  // Set to false by ProcessPendingBindRequests().
   bool bind_orphan_ongoing_ = false;
 
   // Queue of TryBindAllOrphans() callbacks pending for the next TryBindAllOrphans() trigger.

@@ -331,6 +331,10 @@ void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callba
 
   bind_orphan_ongoing_ = true;
 
+  // Clear our stored map of orphaned nodes. It will be repopulated with in Bind().
+  std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);
+  orphaned_nodes_ = {};
+
   // In case there is a pending call to TryBindAllOrphans() after this one, we automatically restart
   // the process and call all queued up callbacks upon completion.
   auto next_attempt =
@@ -339,9 +343,19 @@ void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callba
         result_callback(results);
         ProcessPendingBindRequests();
       };
+
   std::shared_ptr<BindResultTracker> tracker =
-      std::make_shared<BindResultTracker>(orphaned_nodes_.size(), std::move(next_attempt));
-  TryBindAllOrphansInternal(tracker);
+      std::make_shared<BindResultTracker>(orphaned_nodes.size(), std::move(next_attempt));
+
+  for (auto& [path, weak_node] : orphaned_nodes) {
+    auto node = weak_node.lock();
+    if (!node) {
+      tracker->ReportNoBind();
+      continue;
+    }
+
+    BindInternal(*node, tracker);
+  }
 }
 
 zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
@@ -442,29 +456,8 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
   BindInternal(node, result_tracker, next_attempt);
 }
 
-void DriverRunner::TryBindAllOrphansInternal(std::shared_ptr<BindResultTracker> tracker) {
-  ZX_ASSERT(bind_orphan_ongoing_);
-  ZX_ASSERT(!orphaned_nodes_.empty());
-
-  // Clear our stored map of orphaned nodes. It will be repopulated with in Bind().
-  std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);
-  orphaned_nodes_ = {};
-
-  for (auto& [path, weak_node] : orphaned_nodes) {
-    auto node = weak_node.lock();
-    if (!node) {
-      tracker->ReportNoBind();
-      continue;
-    }
-
-    BindInternal(*node, tracker);
-  }
-}
-
 void DriverRunner::BindInternal(Node& node, std::shared_ptr<BindResultTracker> result_tracker,
                                 BindMatchCompleteCallback match_complete_callback) {
-  ZX_ASSERT(bind_orphan_ongoing_);
-
   // Check the DFv1 composites first, and don't bind to others if they match.
   if (composite_device_manager_.BindNode(node.shared_from_this())) {
     if (result_tracker) {
@@ -560,6 +553,7 @@ void DriverRunner::BindInternal(Node& node, std::shared_ptr<BindResultTracker> r
         return;
       }
 
+
       // If it doesn't have a value but there was no error it just means the node was added
       // to a composite node spec but the spec is still incomplete.
       auto composite_node_and_driver = result.value();
@@ -609,54 +603,15 @@ void DriverRunner::BindInternal(Node& node, std::shared_ptr<BindResultTracker> r
 
 void DriverRunner::ProcessPendingBindRequests() {
   ZX_ASSERT(bind_orphan_ongoing_);
-  if (pending_bind_requests_.empty() && pending_orphan_rebind_callbacks_.empty()) {
-    bind_orphan_ongoing_ = false;
-    return;
-  }
-
-  bool have_bind_all_orphans_request = !pending_orphan_rebind_callbacks_.empty();
-  size_t bind_tracker_size = have_bind_all_orphans_request
-                                 ? pending_bind_requests_.size() + orphaned_nodes_.size()
-                                 : pending_bind_requests_.size();
-
-  // If there are no nodes to bind, then we'll run through all the callbacks and end the bind
-  // process.
-  if (have_bind_all_orphans_request && bind_tracker_size == 0) {
-    for (auto& callback : pending_orphan_rebind_callbacks_) {
-      fidl::Arena arena;
-      callback(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>(arena, 0));
-    }
-    pending_orphan_rebind_callbacks_.clear();
-    bind_orphan_ongoing_ = false;
-    return;
-  }
-
-  // Follow up with another ProcessPendingBindRequests() after all the pending bind calls are
-  // complete. If there are no more accumulated bind calls, then the bind process ends.
-  auto next_attempt =
-      [this, callbacks = std::move(pending_orphan_rebind_callbacks_)](
-          fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) mutable {
-        for (auto& callback : callbacks) {
-          callback(results);
-        }
-        ProcessPendingBindRequests();
-      };
-
-  std::shared_ptr<BindResultTracker> tracker =
-      std::make_shared<BindResultTracker>(bind_tracker_size, std::move(next_attempt));
+  bind_orphan_ongoing_ = false;
 
   // Go through all the pending bind requests.
   for (auto& request : pending_bind_requests_) {
     if (auto locked_node = request.node.lock()) {
-      auto match_complete_callback = [tracker]() mutable {
-        // The bind status doesn't matter for this tracker.
-        tracker->ReportNoBind();
-      };
-      BindInternal(*locked_node, request.tracker, std::move(match_complete_callback));
+      BindInternal(*locked_node, request.tracker);
       continue;
     }
 
-    LOGF(WARNING, "Node was freed before bind request is processed.");
     if (request.tracker) {
       request.tracker->ReportNoBind();
     }
@@ -664,8 +619,14 @@ void DriverRunner::ProcessPendingBindRequests() {
   pending_bind_requests_.clear();
 
   // If there are any pending callbacks for TryBindAllOrphans(), begin a new attempt.
-  if (have_bind_all_orphans_request) {
-    TryBindAllOrphansInternal(tracker);
+  if (!pending_orphan_rebind_callbacks_.empty()) {
+    TryBindAllOrphans(
+        [callbacks = std::move(pending_orphan_rebind_callbacks_)](
+            fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) mutable {
+          for (auto& callback : callbacks) {
+            callback(results);
+          }
+        });
   }
 }
 
