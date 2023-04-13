@@ -16,7 +16,7 @@ fidl("fuchsia.hardware.audio") {
     "health.fidl",
     "overview.fidl",
     "ring_buffer.fidl",
-    "stream.fidl",
+    "stream_config.fidl",
     "stream_config_connector.fidl",
   ]
   public_deps = [

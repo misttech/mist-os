@@ -23,7 +23,7 @@ struct DriverIds {
 
 // The types below have the same meaning as those described via FIDL in
 // //sdk/fidl/fuchsia.hardware.audio/codec.fidl,
-// //sdk/fidl/fuchsia.hardware.audio/stream.fidl and
+// //sdk/fidl/fuchsia.hardware.audio/stream_config.fidl and
 // //sdk/fidl/fuchsia.hardware.audio/dai_format.fidl.
 using SampleFormat = ::fuchsia::hardware::audio::DaiSampleFormat;
 using FrameFormat = ::fuchsia::hardware::audio::DaiFrameFormatStandard;

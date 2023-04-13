@@ -138,7 +138,7 @@ any on-going streaming operations in the process.
 
 All of the messages and message payloads that may be sent or received over
 stream and ring buffer channels are defined in
-[stream.fidl](/sdk/fidl/fuchsia.hardware.audio/stream.fidl)
+[stream_config.fidl](/sdk/fidl/fuchsia.hardware.audio/stream_config.fidl)
 and [ring_buffer.fidl](/sdk/fidl/fuchsia.hardware.audio/ring_buffer.fidl).
 Messages may be sent to the driver using the
 [zx_channel_write(...)](/docs/reference/syscalls/channel_write.md) syscall. If a response is
