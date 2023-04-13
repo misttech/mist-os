@@ -25,9 +25,9 @@ group("tests") {
 # We need to specify configs
 config("env") {
   rustenv = [
-    "CARGO_PKG_NAME=\"triage_lib\"",
-    "CARGO_PKG_VERSION=\"0.1\"",
-    "CARGO_MANIFEST_DIR=\"/\"",
+    "CARGO_PKG_NAME=triage_lib",
+    "CARGO_PKG_VERSION=0.1",
+    "CARGO_MANIFEST_DIR=/",
   ]
 }
 
