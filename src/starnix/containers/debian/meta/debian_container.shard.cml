@@ -1,0 +1,29 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    program: {
+        apex_hack: [],
+        features: [
+            "framebuffer",
+            "custom_artifacts",
+            "test_data",
+        ],
+        init: [],
+        init_user: "root:x:0:0",
+        kernel_cmdline: "",
+        mounts: [
+            "/:ext4:data/system.img",
+            "/data:remotefs:data",
+            "/dev:devtmpfs",
+            "/data/tmp:tmpfs",
+            "/tmp:tmpfs",
+            "/dev/pts:devpts",
+            "/sys:sysfs",
+            "/sys/fs/bpf:bpf",
+            "/proc:proc",
+        ],
+        name: "debian_test",
+        startup_file_path: "",
+    },
+}

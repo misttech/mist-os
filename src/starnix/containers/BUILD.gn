@@ -6,29 +6,33 @@ import("//build/components.gni")
 import("//src/starnix/kernel/starnix.gni")
 
 group("containers") {
+  deps = [
+    "debian",
+    "empty_container",
+  ]
   if (target_cpu == "x64" && !is_asan) {
-    deps = [
+    deps += [
       "bionic",
       "chromiumos",
-      "empty_container",
     ]
   }
 }
 
 group("release") {
+  deps = [
+    "debian",
+    "empty_container",
+  ]
   if (target_cpu == "x64" && !is_asan) {
-    deps = [
+    deps += [
       "bionic",
       "chromiumos",
-      "empty_container",
     ]
   }
 }
 
 group("tests") {
-  if (target_cpu == "x64" && !is_asan) {
-    deps = [ "empty_container" ]
-  }
+  deps = [ "empty_container" ]
 }
 
 # The default init executable. Used if the starnix kernel configuration has no init.
@@ -40,10 +44,8 @@ resource("default_init") {
   deps = [ init_label ]
 }
 
-if (target_cpu == "x64") {
-  # This target creates a placeholder in data/tmp, allowing the tests to mount things there.
-  resource("data_tmp_target") {
-    sources = [ "//src/starnix/containers/placeholder" ]
-    outputs = [ "data/tmp/.placeholder" ]
-  }
+# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+resource("data_tmp_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "data/tmp/.placeholder" ]
 }
