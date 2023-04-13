@@ -256,7 +256,21 @@ impl FakeDaemonBuilder {
             ssh_host_address: target.ssh_host_address.map(|a| a.address),
             ..Default::default()
         };
-        let _ = self.target_collection.merge_insert(Target::from_target_info(t.into()));
+        let built_target = Target::from_target_info(t.into());
+
+        // Need to set for `ssh` target testing.
+        if let Some(addr) = target.ssh_address {
+            let ssh_port = match addr.clone() {
+                ffx::TargetAddrInfo::IpPort(ip) => Some(ip.port),
+                _ => None,
+            };
+
+            built_target.addrs_insert(addr.clone().into());
+            built_target.set_ssh_port(ssh_port);
+            assert!(built_target.set_preferred_ssh_address(addr.into()));
+        }
+
+        let _ = self.target_collection.merge_insert(built_target);
         self
     }
 

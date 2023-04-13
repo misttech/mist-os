@@ -451,13 +451,14 @@ async fn handle_request(
                 }
             };
 
-            let mirror_url = match Uri::try_from(format!("http://{host_ssh_connection}")) {
-                Ok(m) => m,
-                Err(e) => {
-                    error!("invalid mirror uri conversion: {:?}", e);
-                    return status_response(StatusCode::INTERNAL_SERVER_ERROR);
-                }
-            };
+            let mirror_url =
+                match Uri::try_from(format!("http://{host_ssh_connection}/{repo_name}")) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        error!("invalid mirror uri conversion: {:?}", e);
+                        return status_response(StatusCode::INTERNAL_SERVER_ERROR);
+                    }
+                };
 
             let repo_url = match RepositoryUrl::parse(format!("fuchsia-pkg://{repo_name}").as_str())
             {
@@ -915,8 +916,8 @@ mod tests {
         tmp.persist(path).unwrap();
     }
 
-    async fn verify_repo_json(client: &HttpClient, devhost: &str, server_url: &str) {
-        let json: RepositoryConfig = serde_json::from_slice(
+    async fn verify_repo_config(client: &HttpClient, devhost: &str, server_url: &str) {
+        let config: RepositoryConfig = serde_json::from_slice(
             &get_bytes(client, &format!("{server_url}/{devhost}/repo.config")).await.unwrap(),
         )
         .unwrap();
@@ -925,7 +926,7 @@ mod tests {
             RepositoryUrl::parse(&format!("fuchsia-pkg://{devhost}")).unwrap(),
         )
         .add_mirror(
-            MirrorConfigBuilder::new(Uri::try_from(server_url).unwrap())
+            MirrorConfigBuilder::new(Uri::try_from(&format!("{server_url}/{devhost}")).unwrap())
                 .unwrap()
                 .subscribe(true)
                 .build(),
@@ -933,7 +934,7 @@ mod tests {
         .add_root_key(repo_key())
         .build();
 
-        assert_eq!(json, expected);
+        assert_eq!(config, expected);
     }
 
     async fn run_test<F, R>(manager: Arc<RepositoryManager>, test: F)
@@ -1188,7 +1189,7 @@ mod tests {
                         .unwrap()
                     );
                 }
-                verify_repo_json(client, devhost, &server_url).await;
+                verify_repo_config(client, devhost, &server_url).await;
             }
         })
         .await

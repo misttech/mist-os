@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 
 const CONFIG_KEY_REPOSITORIES: &str = "repository.repositories";
 const CONFIG_KEY_REGISTRATIONS: &str = "repository.registrations";
+const CONFIG_KEY_REGISTRATION_MODE: &str = "repository.registration-mode";
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
 const CONFIG_KEY_SERVER_MODE: &str = "repository.server.mode";
 const CONFIG_KEY_SERVER_ENABLED: &str = "repository.server.enabled";
@@ -69,6 +70,16 @@ pub async fn repository_server_mode() -> Result<String> {
         Ok(mode)
     } else {
         Ok(String::new())
+    }
+}
+
+/// Return the repository registration mode.
+pub async fn repository_registration_mode() -> Result<String> {
+    if let Some(mode) = ffx_config::get(CONFIG_KEY_REGISTRATION_MODE).await? {
+        Ok(mode)
+    } else {
+        // Default to FIDL
+        Ok(String::from("fidl"))
     }
 }
 

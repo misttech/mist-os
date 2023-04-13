@@ -35,6 +35,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
       "//src/developer/ffx/lib/pkg",
       "//src/developer/ffx/lib/protocols:lib",
+      "//src/developer/ffx/lib/ssh:lib",
       "//src/lib/analytics/rust:lib",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
@@ -49,12 +50,14 @@ if (is_host) {
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:itertools",
+      "//third_party/rust_crates:shared_child",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:tuf",
       "//third_party/rust_crates:url",
     ]
     test_deps = [
       ":empty-repo",
+      "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/addr:lib",
       "//third_party/rust_crates:assert_matches",
