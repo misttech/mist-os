@@ -11,8 +11,7 @@ pub(crate) mod raw;
 pub(crate) mod stream;
 pub(crate) mod worker;
 
-use std::convert::Infallible as Never;
-use std::num::NonZeroU64;
+use std::{convert::Infallible as Never, num::NonZeroU64, ops::Deref as _};
 
 use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net as fnet;
@@ -30,13 +29,12 @@ use netstack3_core::{
     ip::socket::{IpSockCreationError, IpSockRouteError, IpSockSendError, IpSockUnroutableError},
     socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
     transport::{tcp, udp},
-    Ctx,
 };
 
 use crate::bindings::{
     devices::{BindingId, Devices},
     util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
-    DeviceIdExt as _,
+    Ctx, DeviceIdExt as _,
 };
 
 const ZXSIO_SIGNAL_INCOMING: zx::Signals =
@@ -59,8 +57,8 @@ pub(crate) async fn serve(
             match req {
                 psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
                     let mut response = {
-                        let ctx = ctx.lock().await;
-                        let Ctx { sync_ctx: _, non_sync_ctx } = &*ctx;
+                        let ctx = ctx.clone();
+                        let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref();
                         BindingId::new(index)
                             .ok_or(DeviceNotFoundError)
                             .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
@@ -73,8 +71,8 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let mut response = {
-                        let ctx = ctx.lock().await;
-                        let Ctx { sync_ctx: _, non_sync_ctx } = &*ctx;
+                        let ctx = ctx.clone();
+                        let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref();
                         let devices = AsRef::<Devices<_>>::as_ref(&non_sync_ctx);
                         let result = devices
                             .get_device_by_name(&name)
@@ -90,7 +88,7 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
-                    stream::spawn_worker(domain, proto, ctx.clone(), request_stream).await;
+                    stream::spawn_worker(domain, proto, ctx.clone(), request_stream);
                     responder_send!(responder, &mut Ok(client));
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {

@@ -217,8 +217,7 @@ mod tests {
     use super::*;
     use crate::{
         device::DeviceId,
-        testutil::{FakeEventDispatcherBuilder, FAKE_CONFIG_V6},
-        Ctx,
+        testutil::{Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V6},
     };
 
     #[test]

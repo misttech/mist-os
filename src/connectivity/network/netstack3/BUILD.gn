@@ -99,7 +99,6 @@ rustc_binary("bin") {
   test_deps = common_test_deps
 
   sources = common_sources
-  configs += [ "//build/config/rust:async_fn_in_trait" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
@@ -114,7 +113,6 @@ rustc_binary("bin-instrumented") {
   test_deps = common_test_deps
 
   sources = common_sources
-  configs += [ "//build/config/rust:async_fn_in_trait" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
@@ -173,7 +171,6 @@ rustc_binary("netstack3-benchmarks") {
     "core:netstack3-core-benchmarks",
     "//src/developer/fuchsia-criterion",
   ]
-  configs += [ "//build/config/rust:async_fn_in_trait" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 

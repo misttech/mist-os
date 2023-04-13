@@ -29,8 +29,8 @@ use packet_formats::{
 use crate::{
     context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt},
     device::{ethernet, EthernetDeviceId},
-    testutil::DEFAULT_INTERFACE_METRIC,
-    Ctx, TimerId,
+    testutil::{Ctx, DEFAULT_INTERFACE_METRIC},
+    TimerId,
 };
 
 mod print_on_panic {

@@ -34,9 +34,9 @@ use crate::{
     device::{receive_frame, DeviceId},
     testutil::{
         benchmarks::{black_box, Bencher},
-        FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
+        Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
     },
-    Ctx, StackStateBuilder,
+    StackStateBuilder,
 };
 
 // NOTE: Extra tests that are too expensive to run during benchmarks can be

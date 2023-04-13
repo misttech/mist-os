@@ -7,6 +7,7 @@
 use alloc::{borrow::ToOwned, collections::HashMap, vec, vec::Vec};
 use core::{
     fmt::Debug,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     time::Duration,
 };
@@ -40,11 +41,36 @@ use crate::{
         tcp::{buffer::RingBuffer, socket::NonSyncContext, BufferSizes},
         udp,
     },
-    Ctx, StackStateBuilder, SyncCtx, TimerId,
+    StackStateBuilder, SyncCtx, TimerId,
 };
 
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
+
+/// Context available during the execution of the netstack.
+#[derive(Default)]
+pub(crate) struct Ctx<NonSyncCtx: crate::NonSyncContext> {
+    /// The synchronized context.
+    pub sync_ctx: SyncCtx<NonSyncCtx>,
+    /// The non-synchronized context.
+    // We put `non_sync_ctx` after `sync_ctx` to make sure that `sync_ctx` is
+    // dropped before `non-sync_ctx` so that strongly-referenced held in
+    // `non_sync_ctx` causes test failures, forcing proper cleanup of device IDs
+    // in our unit tests.
+    //
+    // Note that if strongly-referenced (device) IDs exist when dropping the
+    // primary reference, the primary reference's drop impl will panic. See
+    // `crate::sync::PrimaryRc::drop` for details.
+    pub non_sync_ctx: NonSyncCtx,
+}
+
+impl<NonSyncCtx: crate::NonSyncContext + Default> Ctx<NonSyncCtx> {
+    pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
+        let mut non_sync_ctx = Default::default();
+        let state = builder.build_with_ctx(&mut non_sync_ctx);
+        Self { sync_ctx: SyncCtx { state, non_sync_ctx_marker: PhantomData }, non_sync_ctx }
+    }
+}
 
 /// Asserts that an iterable object produces zero items.
 ///

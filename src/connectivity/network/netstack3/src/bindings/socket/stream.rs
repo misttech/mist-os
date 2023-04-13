@@ -7,7 +7,7 @@
 use std::{
     convert::Infallible as Never,
     num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
-    ops::{ControlFlow, DerefMut as _},
+    ops::{ControlFlow, Deref as _, DerefMut as _},
     sync::Arc,
     time::Duration,
 };
@@ -51,7 +51,7 @@ use netstack3_core::{
         state::Takeable,
         BufferSizes, SocketOptions,
     },
-    Ctx, SyncCtx,
+    SyncCtx,
 };
 use nonzero_ext::nonzero;
 use once_cell::sync::Lazy;
@@ -67,7 +67,7 @@ use crate::bindings::{
         ConversionContext, DeviceNotFoundError, IntoCore, IntoFidl, NeedsDataNotifier,
         NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, NetstackContext,
+    BindingsNonSyncCtxImpl, Ctx, NetstackContext,
 };
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
@@ -594,7 +594,7 @@ struct BindingData<I: IpExt> {
 
 impl<I: IpExt> BindingData<I> {
     fn new(
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         properties: SocketWorkerProperties,
     ) -> Self {
@@ -626,17 +626,17 @@ where
     type RequestStream = fposix_socket::StreamSocketRequestStream;
     type CloseResponder = fposix_socket::StreamSocketCloseResponder;
 
-    async fn handle_request(
+    fn handle_request(
         &mut self,
         ctx: &NetstackContext,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
-        RequestHandler { ctx, data: self }.handle_request(request).await
+        RequestHandler { ctx, data: self }.handle_request(request)
     }
 
     fn close(
         self,
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { id, peer: _ } = self;
@@ -656,7 +656,7 @@ where
     }
 }
 
-pub(super) async fn spawn_worker(
+pub(super) fn spawn_worker(
     domain: fposix_socket::Domain,
     proto: fposix_socket::StreamSocketProtocol,
     ctx: crate::bindings::NetstackContext,
@@ -740,8 +740,8 @@ fn spawn_send_task<I: IpExt>(
                     .await
                     .expect("failed to observe signals on zircon socket");
                 assert!(observed.contains(zx::Signals::SOCKET_READABLE));
-                let mut guard = ctx.lock().await;
-                let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+                let mut ctx = ctx.clone();
+                let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
                 netstack3_core::transport::tcp::socket::do_send::<I, _>(
                     sync_ctx,
                     non_sync_ctx,
@@ -765,13 +765,13 @@ where
     WeakDeviceId<BindingsNonSyncCtxImpl>:
         TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
 {
-    async fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
+    fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
         match *id {
             SocketId::Unbound(unbound, ref mut local_socket) => {
                 let addr = I::SocketAddress::from_sock_addr(addr)?;
-                let mut guard = ctx.lock().await;
-                let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+                let mut ctx = ctx.clone();
+                let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
                 let (addr, port) =
                     addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
                 let bound =
@@ -786,11 +786,11 @@ where
         }
     }
 
-    async fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { id, peer: _ }, ctx } = self;
+    fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
+        let Self { data: BindingData { id, peer: _ }, ctx: ns_ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+        let mut ctx = ns_ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
@@ -839,17 +839,17 @@ where
         // complete without sending and receiving packets, which can't be done
         // while the lock around the Ctx is held.
         non_sync_ctx.register_connection(connection, ConnectionStatus::InProgress);
-        spawn_send_task::<I>(ctx.clone(), socket, watcher, connection);
+        spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, connection);
         *id = SocketId::Connection(connection);
         Err(fposix::Errno::Einprogress)
     }
 
-    async fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
+    fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
         match *id {
             SocketId::Bound(bound, ref mut local_socket) => {
-                let mut guard = ctx.lock().await;
-                let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+                let mut ctx = ctx.clone();
+                let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
                 // The POSIX specification for `listen` [1] says
                 //
                 //   If listen() is called with a backlog argument value that is
@@ -892,10 +892,10 @@ where
         }
     }
 
-    async fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
+    fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let fidl = match *id {
             SocketId::Unbound(_, _) => return Err(fposix::Errno::Einval),
             SocketId::Bound(id, _) => {
@@ -916,10 +916,10 @@ where
         Ok(fidl.into_sock_addr())
     }
 
-    async fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
+    fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         match *id {
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) | SocketId::Listener(_) => {
                 Err(fposix::Errno::Enotconn)
@@ -934,18 +934,18 @@ where
         }
     }
 
-    async fn accept(
+    fn accept(
         self,
         want_addr: bool,
     ) -> Result<
         (Option<Box<fnet::SocketAddress>>, ClientEnd<fposix_socket::StreamSocketMarker>),
         fposix::Errno,
     > {
-        let Self { data: BindingData { id, peer: _ }, ctx } = self;
+        let Self { data: BindingData { id, peer: _ }, ctx: ns_ctx } = self;
         match *id {
             SocketId::Listener(listener) => {
-                let mut guard = ctx.lock().await;
-                let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+                let mut ctx = ns_ctx.clone();
+                let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
                 let (accepted, addr, peer) = accept::<I, _>(sync_ctx, non_sync_ctx, listener)
                     .map_err(IntoErrno::into_errno)?;
                 non_sync_ctx
@@ -955,8 +955,8 @@ where
                     .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"));
                 let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
                 let (client, request_stream) = crate::bindings::socket::create_request_stream();
-                spawn_send_task::<I>(ctx.clone(), socket, watcher, accepted);
-                spawn_connected_socket_task(ctx.clone(), accepted, peer, request_stream);
+                spawn_send_task::<I>(ns_ctx.clone(), socket, watcher, accepted);
+                spawn_connected_socket_task(ns_ctx.clone(), accepted, peer, request_stream);
                 Ok((want_addr.then(|| Box::new(addr.into_sock_addr())), client))
             }
             SocketId::Unbound(_, _) | SocketId::Connection(_) | SocketId::Bound(_, _) => {
@@ -965,13 +965,13 @@ where
         }
     }
 
-    async fn get_error(self) -> Result<(), fposix::Errno> {
+    fn get_error(self) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
         match *id {
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) | SocketId::Listener(_) => Ok(()),
             SocketId::Connection(conn_id) => {
-                let mut guard = ctx.lock().await;
-                let Ctx { sync_ctx: _, non_sync_ctx } = guard.deref_mut();
+                let mut ctx = ctx.clone();
+                let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref_mut();
                 non_sync_ctx.with_connection_mut(conn_id, |status| match status {
                     ConnectionStatus::InProgress => Err(fposix::Errno::Einprogress),
                     ConnectionStatus::Connected { reported: _ } => Ok(()),
@@ -988,7 +988,7 @@ where
         }
     }
 
-    async fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
+    fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer }, ctx } = self;
         match *id {
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) => Err(fposix::Errno::Enotconn),
@@ -997,8 +997,8 @@ where
                 let mut peer_disposition: Option<zx::SocketWriteDisposition> = None;
                 if mode.contains(fposix_socket::ShutdownMode::WRITE) {
                     peer_disposition = Some(zx::SocketWriteDisposition::Disabled);
-                    let mut guard = ctx.lock().await;
-                    let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+                    let mut ctx = ctx.clone();
+                    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
                     shutdown_conn::<I, _>(&sync_ctx, non_sync_ctx, conn_id)
                         .map_err(IntoErrno::into_errno)?;
                 }
@@ -1011,8 +1011,8 @@ where
             }
             SocketId::Listener(listener) => {
                 if mode.contains(fposix_socket::ShutdownMode::READ) {
-                    let mut guard = ctx.lock().await;
-                    let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+                    let mut ctx = ctx.clone();
+                    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
                     let bound = shutdown_listener::<I, _>(&sync_ctx, non_sync_ctx, listener);
                     let local = non_sync_ctx.unregister_listener(listener);
                     *id = SocketId::Bound(
@@ -1025,9 +1025,9 @@ where
         }
     }
 
-    async fn set_bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
+    fn set_bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut ctx = ctx.lock().await;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let device = device
             .map(|name| {
@@ -1051,10 +1051,10 @@ where
         .map_err(IntoErrno::into_errno)
     }
 
-    async fn set_send_buffer_size(self, new_size: u64) {
+    fn set_send_buffer_size(self, new_size: u64) {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         match *id {
@@ -1065,10 +1065,10 @@ where
         }
     }
 
-    async fn send_buffer_size(self) -> u64 {
+    fn send_buffer_size(self) -> u64 {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         match *id {
             SocketId::Unbound(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Bound(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
@@ -1083,10 +1083,10 @@ where
         .unwrap_or(u64::MAX)
     }
 
-    async fn set_receive_buffer_size(self, new_size: u64) {
+    fn set_receive_buffer_size(self, new_size: u64) {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         match *id {
@@ -1101,10 +1101,10 @@ where
         }
     }
 
-    async fn receive_buffer_size(self) -> u64 {
+    fn receive_buffer_size(self) -> u64 {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         match *id {
             SocketId::Unbound(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Bound(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
@@ -1119,10 +1119,10 @@ where
         .unwrap_or(u64::MAX)
     }
 
-    async fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
+    fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = ctx.deref_mut();
         match *id {
             SocketId::Unbound(id, _) => Ok(set_reuseaddr_unbound(sync_ctx, id, value)),
             SocketId::Bound(id, _) => {
@@ -1135,10 +1135,10 @@ where
         }
     }
 
-    async fn reuse_address(self) -> bool {
+    fn reuse_address(self) -> bool {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = ctx.deref_mut();
         match *id {
             SocketId::Unbound(id, _) => reuseaddr(sync_ctx, id),
             SocketId::Bound(id, _) => reuseaddr(sync_ctx, id),
@@ -1153,7 +1153,7 @@ where
     /// If `Some(stream)` is returned in the `Continue` case, `stream` is a new
     /// stream of events that should be polled concurrently with the parent
     /// stream.
-    async fn handle_request(
+    fn handle_request(
         self,
         request: fposix_socket::StreamSocketRequest,
     ) -> ControlFlow<
@@ -1163,10 +1163,10 @@ where
         let Self { data: BindingData { id: _, peer }, ctx: _ } = self;
         match request {
             fposix_socket::StreamSocketRequest::Bind { addr, responder } => {
-                responder_send!(responder, &mut self.bind(addr).await);
+                responder_send!(responder, &mut self.bind(addr));
             }
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
-                responder_send!(responder, &mut self.connect(addr).await.clone());
+                responder_send!(responder, &mut self.connect(addr).clone());
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
@@ -1185,10 +1185,10 @@ where
                 );
             }
             fposix_socket::StreamSocketRequest::Listen { backlog, responder } => {
-                responder_send!(responder, &mut self.listen(backlog).await);
+                responder_send!(responder, &mut self.listen(backlog));
             }
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
-                responder_send!(responder, &mut self.accept(want_addr).await);
+                responder_send!(responder, &mut self.accept(want_addr));
             }
             fposix_socket::StreamSocketRequest::Close { responder } => {
                 // We don't just close the socket because this socket worker is
@@ -1205,19 +1205,19 @@ where
             }
             fposix_socket::StreamSocketRequest::SetBindToDevice { value, responder } => {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
-                responder_send!(responder, &mut self.set_bind_to_device(identifier).await);
+                responder_send!(responder, &mut self.set_bind_to_device(identifier));
             }
             fposix_socket::StreamSocketRequest::Query { responder } => {
                 responder_send!(responder, fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes());
             }
             fposix_socket::StreamSocketRequest::SetReuseAddress { value, responder } => {
-                responder_send!(responder, &mut self.set_reuse_address(value).await);
+                responder_send!(responder, &mut self.set_reuse_address(value));
             }
             fposix_socket::StreamSocketRequest::GetReuseAddress { responder } => {
-                responder_send!(responder, &mut Ok(self.reuse_address().await));
+                responder_send!(responder, &mut Ok(self.reuse_address()));
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
-                responder_send!(responder, &mut self.get_error().await);
+                responder_send!(responder, &mut self.get_error());
             }
             fposix_socket::StreamSocketRequest::SetBroadcast { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1226,27 +1226,24 @@ where
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
-                self.set_send_buffer_size(value_bytes).await;
+                self.set_send_buffer_size(value_bytes);
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.send_buffer_size().await));
+                responder_send!(responder, &mut Ok(self.send_buffer_size()));
             }
             fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
-                responder_send!(
-                    responder,
-                    &mut Ok(self.set_receive_buffer_size(value_bytes).await)
-                );
+                responder_send!(responder, &mut Ok(self.set_receive_buffer_size(value_bytes)));
             }
             fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.receive_buffer_size().await));
+                responder_send!(responder, &mut Ok(self.receive_buffer_size()));
             }
             fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
-                self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled).await;
+                self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled);
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetKeepAlive { responder } => {
-                let enabled = self.with_socket_options(|so| so.keep_alive.enabled).await;
+                let enabled = self.with_socket_options(|so| so.keep_alive.enabled);
                 responder_send!(responder, &mut Ok(enabled));
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
@@ -1293,13 +1290,13 @@ where
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::GetSockName { responder } => {
-                responder_send!(responder, &mut self.get_sock_name().await);
+                responder_send!(responder, &mut self.get_sock_name());
             }
             fposix_socket::StreamSocketRequest::GetPeerName { responder } => {
-                responder_send!(responder, &mut self.get_peer_name().await);
+                responder_send!(responder, &mut self.get_peer_name());
             }
             fposix_socket::StreamSocketRequest::Shutdown { mode, responder } => {
-                responder_send!(responder, &mut self.shutdown(mode).await);
+                responder_send!(responder, &mut self.shutdown(mode));
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1452,12 +1449,11 @@ where
             fposix_socket::StreamSocketRequest::SetTcpNoDelay { value, responder } => {
                 self.with_socket_options_mut(|so| {
                     so.nagle_enabled = !value;
-                })
-                .await;
+                });
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpNoDelay { responder } => {
-                let nagle_enabled = self.with_socket_options(|so| so.nagle_enabled).await;
+                let nagle_enabled = self.with_socket_options(|so| so.nagle_enabled);
                 responder_send!(responder, &mut Ok(!nagle_enabled));
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
@@ -1479,8 +1475,7 @@ where
                     Some(secs) => {
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.idle = NonZeroDuration::from_nonzero_secs(secs)
-                        })
-                        .await;
+                        });
                         responder_send!(responder, &mut Ok(()));
                     }
                     None => {
@@ -1489,9 +1484,8 @@ where
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveIdle { responder } => {
-                let secs = self
-                    .with_socket_options(|so| Duration::from(so.keep_alive.idle).as_secs())
-                    .await;
+                let secs =
+                    self.with_socket_options(|so| Duration::from(so.keep_alive.idle).as_secs());
                 responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveInterval {
@@ -1504,8 +1498,7 @@ where
                     Some(secs) => {
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.interval = NonZeroDuration::from_nonzero_secs(secs)
-                        })
-                        .await;
+                        });
                         responder_send!(responder, &mut Ok(()));
                     }
                     None => {
@@ -1514,9 +1507,8 @@ where
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveInterval { responder } => {
-                let secs = self
-                    .with_socket_options(|so| Duration::from(so.keep_alive.interval).as_secs())
-                    .await;
+                let secs =
+                    self.with_socket_options(|so| Duration::from(so.keep_alive.interval).as_secs());
                 responder_send!(responder, &mut Ok(u32::try_from(secs).unwrap()));
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value, responder } => {
@@ -1528,8 +1520,7 @@ where
                     Some(count) => {
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.count = count;
-                        })
-                        .await;
+                        });
                         responder_send!(responder, &mut Ok(()));
                     }
                     None => {
@@ -1538,7 +1529,7 @@ where
                 };
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveCount { responder } => {
-                let count = self.with_socket_options(|so| so.keep_alive.count).await;
+                let count = self.with_socket_options(|so| so.keep_alive.count);
                 responder_send!(responder, &mut Ok(u32::from(u8::from(count))));
             }
             fposix_socket::StreamSocketRequest::SetTcpSynCount { value: _, responder } => {
@@ -1558,13 +1549,12 @@ where
                     });
                 self.with_socket_options_mut(|so| {
                     so.fin_wait2_timeout = fin_wait2_timeout;
-                })
-                .await;
+                });
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpLinger { responder } => {
                 let linger_secs =
-                    self.with_socket_options(|so| so.fin_wait2_timeout.map(|d| d.as_secs())).await;
+                    self.with_socket_options(|so| so.fin_wait2_timeout.map(|d| d.as_secs()));
                 let respond_value = linger_secs.map(|x| u32::try_from(x).unwrap()).into_fidl();
                 responder_send!(responder, &mut Ok(respond_value));
             }
@@ -1584,11 +1574,11 @@ where
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
             fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
-                self.with_socket_options_mut(|so| so.delayed_ack = !value).await;
+                self.with_socket_options_mut(|so| so.delayed_ack = !value);
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpQuickAck { responder } => {
-                let quick_ack = self.with_socket_options(|so| !so.delayed_ack).await;
+                let quick_ack = self.with_socket_options(|so| !so.delayed_ack);
                 responder_send!(responder, &mut Ok(quick_ack));
             }
             fposix_socket::StreamSocketRequest::SetTcpCongestion { value: _, responder } => {
@@ -1602,16 +1592,13 @@ where
                     NonZeroU64::new(value_millis.into()).map(NonZeroDuration::from_nonzero_millis);
                 self.with_socket_options_mut(|so| {
                     so.user_timeout = user_timeout;
-                })
-                .await;
+                });
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpUserTimeout { responder } => {
-                let millis = self
-                    .with_socket_options(|so| {
-                        so.user_timeout.map(|d| d.get().as_millis()).unwrap_or(0)
-                    })
-                    .await;
+                let millis = self.with_socket_options(|so| {
+                    so.user_timeout.map(|d| d.get().as_millis()).unwrap_or(0)
+                });
                 let mut result =
                     u32::try_from(millis).map_err(|_: TryFromIntError| fposix::Errno::Einval);
                 responder_send!(responder, &mut result);
@@ -1620,10 +1607,10 @@ where
         ControlFlow::Continue(None)
     }
 
-    async fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(self, f: F) -> R {
+    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(self, f: F) -> R {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         match *id {
             SocketId::Unbound(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
             SocketId::Bound(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
@@ -1632,10 +1619,10 @@ where
         }
     }
 
-    async fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
+    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
-        let guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx: _ } = &*guard;
+        let ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx: _ } = ctx.deref();
         match *id {
             SocketId::Unbound(id, _) => with_socket_options(sync_ctx, id, f),
             SocketId::Bound(id, _) => with_socket_options(sync_ctx, id, f),
@@ -1658,7 +1645,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
 {
     fasync::Task::spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
-        move |_: &mut SyncCtx<_>, _: &mut BindingsNonSyncCtxImpl, SocketWorkerProperties {}| {
+        move |_: &SyncCtx<_>, _: &mut BindingsNonSyncCtxImpl, SocketWorkerProperties {}| {
             BindingData { id: SocketId::Connection(accepted), peer }
         },
         SocketWorkerProperties {},

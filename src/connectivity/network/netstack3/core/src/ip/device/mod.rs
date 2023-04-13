@@ -1626,10 +1626,10 @@ mod tests {
         device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
         ip::gmp::GmpDelayedReportTimerId,
         testutil::{
-            assert_empty, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, Ctx, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx,
+            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx, StackStateBuilder, TimerId, TimerIdInner,
+        StackStateBuilder, TimerId, TimerIdInner,
     };
 
     #[test]

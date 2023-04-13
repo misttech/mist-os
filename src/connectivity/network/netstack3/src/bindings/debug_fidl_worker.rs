@@ -35,10 +35,10 @@ pub(crate) async fn serve_interfaces(
                 handle_get_admin(&ns, id, control).await;
             }
             fnet_debug::InterfacesRequest::GetMac { id, responder } => {
-                responder_send!(responder, &mut handle_get_mac(&ns, id).await);
+                responder_send!(responder, &mut handle_get_mac(&ns, id));
             }
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
-                handle_get_port(&ns, id, port).await;
+                handle_get_port(&ns, id, port);
             }
         }
         Ok(())
@@ -52,7 +52,7 @@ async fn handle_get_admin(
     control: ServerEnd<fnet_interfaces_admin::ControlMarker>,
 ) {
     debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetAdmin");
-    let ctx = ns.ctx.lock().await;
+    let ctx = ns.ctx.clone();
     let core_id =
         BindingId::new(interface_id).and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id));
     let core_id = match core_id {
@@ -79,9 +79,9 @@ async fn handle_get_admin(
     }
 }
 
-async fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::InterfacesGetMacResult {
+fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::InterfacesGetMacResult {
     debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetMac");
-    let ctx = ns.ctx.lock().await;
+    let ctx = ns.ctx.clone();
     BindingId::new(interface_id)
         .and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id))
         .ok_or(fnet_debug::InterfacesGetMacError::NotFound)
@@ -94,12 +94,12 @@ async fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::Interfa
         })
 }
 
-async fn handle_get_port(
+fn handle_get_port(
     ns: &Netstack,
     interface_id: u64,
     port: ServerEnd<fhardware_network::PortMarker>,
 ) {
-    let ctx = ns.ctx.lock().await;
+    let ctx = ns.ctx.clone();
     let core_id =
         BindingId::new(interface_id).and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id));
     let port_handler =

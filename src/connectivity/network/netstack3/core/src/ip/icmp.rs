@@ -3037,11 +3037,11 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, get_counter_val, handle_queued_rx_packets, DEFAULT_INTERFACE_METRIC,
+            assert_empty, get_counter_val, handle_queued_rx_packets, Ctx, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6,
         },
         transport::udp::UdpStateBuilder,
-        Ctx, StackStateBuilder,
+        StackStateBuilder,
     };
 
     trait TestIpExt: crate::testutil::TestIpExt + crate::testutil::TestutilIpExt {

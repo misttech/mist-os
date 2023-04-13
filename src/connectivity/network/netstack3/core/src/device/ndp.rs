@@ -90,11 +90,11 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, get_counter_val, handle_timer, set_logger_for_test,
+            assert_empty, get_counter_val, handle_timer, set_logger_for_test, Ctx,
             FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx, Instant, TimerId, TimerIdInner,
+        Instant, TimerId, TimerIdInner,
     };
 
     const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;

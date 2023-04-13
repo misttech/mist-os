@@ -2059,7 +2059,7 @@ pub(crate) mod testutil {
 
     use net_types::ip::IpVersion;
 
-    use crate::Ctx;
+    use crate::testutil::Ctx;
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
     pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
@@ -2214,9 +2214,8 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::{
-        testutil::{TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
-        Ctx,
+    use crate::testutil::{
+        Ctx, TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
     };
 
     #[test]

@@ -24,13 +24,13 @@ use netstack3_core::{
         },
         types::RawMetric,
     },
-    Ctx,
 };
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, DeviceId, IpDeviceConfiguration, Ipv6DeviceConfiguration,
-    Netstack, NetstackContext, NonSyncContext, StackTime, SyncCtx, DEFAULT_INTERFACE_METRIC,
+    devices, interfaces_admin, BindingId, Ctx, DeviceId, IpDeviceConfiguration,
+    Ipv6DeviceConfiguration, Netstack, NetstackContext, NonSyncContext, StackTime, SyncCtx,
+    DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -124,7 +124,7 @@ impl NetdeviceWorker {
                 Error::Client(e)
             })?;
 
-            let mut ctx = ctx.lock().await;
+            let mut ctx = ctx.clone();
             let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
 
             let Some(id) = id.upgrade() else {
@@ -260,7 +260,7 @@ impl DeviceHandler {
             }
             netdevice_client::port_slab::Entry::Vacant(e) => e,
         };
-        let ctx = &mut ns.ctx.lock().await;
+        let ctx = &mut ns.ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
 
         // Check if there already exists an interface with this name.
@@ -383,7 +383,7 @@ impl DeviceHandler {
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
 fn add_initial_routes<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {

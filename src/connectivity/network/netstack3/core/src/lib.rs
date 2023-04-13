@@ -265,50 +265,6 @@ pub struct SyncCtx<NonSyncCtx: NonSyncContext> {
     pub non_sync_ctx_marker: PhantomData<NonSyncCtx>,
 }
 
-/// Context available during the execution of the netstack.
-///
-/// `Ctx` provides access to the state of the netstack and to an event
-/// dispatcher which can be used to emit events and schedule timers. A mutable
-/// reference to a `Ctx` is passed to every function in the netstack.
-#[derive(Default)]
-pub struct Ctx<NonSyncCtx: NonSyncContext> {
-    /// The non-synchronized context.
-    // We put `non_sync_ctx` before `sync_ctx` in non-test builds to make sure
-    // that any bindings-provided state held in the non-synchronized context
-    // is dropped before the synchronized context. This is to make sure any
-    // strongly-referenced (device) IDs are dropped before dropping the
-    // `Killable` reference in `sync_ctx` which may panic if it is dropped
-    // while any `Strong` references exist.
-    #[cfg(not(test))]
-    pub non_sync_ctx: NonSyncCtx,
-    /// The synchronized context.
-    pub sync_ctx: SyncCtx<NonSyncCtx>,
-    /// The non-synchronized context.
-    // We put `non_sync_ctx` after `sync_ctx` in test builds to make sure that
-    // `sync_ctx` is dropped before `non-sync_ctx` so that strongly-referenced
-    // held in `non_sync_ctx` causes test failures, forcing proper cleanup of
-    // device IDs in our unit tests. See `non_sync_ctx` above for more details.
-    #[cfg(test)]
-    pub non_sync_ctx: NonSyncCtx,
-}
-
-impl<NonSyncCtx: NonSyncContext + Default> Ctx<NonSyncCtx> {
-    /// Constructs a new `Ctx`.
-    pub fn new(state: StackState<NonSyncCtx>) -> Ctx<NonSyncCtx> {
-        Ctx {
-            sync_ctx: SyncCtx { state, non_sync_ctx_marker: PhantomData },
-            non_sync_ctx: Default::default(),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
-        let mut non_sync_ctx = Default::default();
-        let state = builder.build_with_ctx(&mut non_sync_ctx);
-        Self { sync_ctx: SyncCtx { state, non_sync_ctx_marker: PhantomData }, non_sync_ctx }
-    }
-}
-
 /// The identifier for any timer event.
 #[derive(Derivative)]
 #[derivative(
@@ -561,7 +517,9 @@ mod tests {
             forwarding::AddRouteError,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric},
         },
-        testutil::{FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+        testutil::{
+            Ctx, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
     };
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {

@@ -9,10 +9,10 @@ use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_unknown::CloseableCloseResult;
 use futures::StreamExt as _;
 use log::error;
-use netstack3_core::{Ctx, SyncCtx};
+use netstack3_core::SyncCtx;
 
 use crate::bindings::{
-    socket::SocketWorkerProperties, util, BindingsNonSyncCtxImpl, NetstackContext,
+    socket::SocketWorkerProperties, util, BindingsNonSyncCtxImpl, Ctx, NetstackContext,
 };
 
 pub(crate) struct SocketWorker<Data> {
@@ -52,7 +52,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// - [`ControlFlow::Continue`] with `Some(new_stream)` when an operation
     ///   resulted in a new stream of requests for the same socket ("clone");
     /// - `ControlFlow::Continue(None)` otherwise.
-    async fn handle_request(
+    fn handle_request(
         &mut self,
         ctx: &NetstackContext,
         request: Self::Request,
@@ -65,7 +65,7 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// socket.
     fn close(
         self,
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     );
 }
@@ -82,7 +82,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
     /// Starts servicing events from the provided state and event stream.
     pub(crate) async fn serve_stream_with<
         F: FnOnce(
-                &mut SyncCtx<BindingsNonSyncCtxImpl>,
+                &SyncCtx<BindingsNonSyncCtxImpl>,
                 &mut BindingsNonSyncCtxImpl,
                 SocketWorkerProperties,
             ) -> H
@@ -95,8 +95,8 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         events: H::RequestStream,
     ) {
         let data = {
-            let mut guard = ctx.lock().await;
-            let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+            let mut ctx = ctx.clone();
+            let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
 
             make_data(sync_ctx, non_sync_ctx, properties)
         };
@@ -143,7 +143,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 Some(Ok(t)) => t,
             };
             let Self { ctx, data } = &mut self;
-            match data.handle_request(ctx, request).await {
+            match data.handle_request(ctx, request) {
                 ControlFlow::Continue(None) => {}
                 ControlFlow::Break(close_responder) => {
                     let respond_close = move || {
@@ -168,7 +168,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         };
 
         let Self { ctx, data } = self;
-        let mut ctx = ctx.lock().await;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         data.close(sync_ctx, non_sync_ctx);
 

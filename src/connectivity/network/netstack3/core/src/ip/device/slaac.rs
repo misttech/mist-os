@@ -1578,10 +1578,9 @@ mod tests {
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT, receive_ip_packet, testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
-            assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
+            assert_empty, Ctx, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
             DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx,
     };
 
     struct FakeSlaacContext {

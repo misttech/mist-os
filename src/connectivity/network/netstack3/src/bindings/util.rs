@@ -1119,7 +1119,7 @@ mod tests {
                     OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
                 let (event_sender, _event_receiver) = futures::channel::mpsc::unbounded();
 
-                let state = ctx.try_lock().unwrap();
+                let state = ctx.clone();
                 netstack3_core::device::add_loopback_device_with_state(
                     &state.sync_ctx,
                     DEFAULT_LOOPBACK_MTU,

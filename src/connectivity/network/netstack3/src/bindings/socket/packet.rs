@@ -25,7 +25,7 @@ use netstack3_core::{
         DeviceId, FrameDestination, WeakDeviceId,
     },
     sync::Mutex,
-    Ctx, SyncCtx,
+    SyncCtx,
 };
 
 use crate::bindings::{
@@ -39,7 +39,7 @@ use crate::bindings::{
         ConversionContext as _, DeviceNotFoundError, IntoFidl, TryIntoCoreWithContext as _,
         TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, NetstackContext,
+    BindingsNonSyncCtxImpl, Ctx, NetstackContext,
 };
 
 #[derive(Default)]
@@ -177,7 +177,7 @@ impl BodyLen for Message {
 
 impl BindingData {
     fn new(
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
@@ -219,17 +219,17 @@ impl worker::SocketWorkerHandler for BindingData {
     type RequestStream = fppacket::SocketRequestStream;
     type CloseResponder = fppacket::SocketCloseResponder;
 
-    async fn handle_request(
+    fn handle_request(
         &mut self,
         ctx: &NetstackContext,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
-        RequestHandler { ctx, data: self }.handle_request(request).await
+        RequestHandler { ctx, data: self }.handle_request(request)
     }
 
     fn close(
         self,
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { peer_event: _, state, message_queue: _ } = self;
@@ -262,7 +262,7 @@ impl<'a> RequestHandler<'a> {
         }
     }
 
-    async fn bind(
+    fn bind(
         self,
         protocol: Option<Box<fppacket::ProtocolAssociation>>,
         interface: fppacket::BoundInterfaceId,
@@ -278,8 +278,8 @@ impl<'a> RequestHandler<'a> {
             })
             .transpose()?;
         let Self { ctx, data: BindingData { peer_event: _, message_queue: _, state } } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
@@ -305,7 +305,7 @@ impl<'a> RequestHandler<'a> {
         Ok(())
     }
 
-    async fn get_info(
+    fn get_info(
         self,
     ) -> Result<
         (fppacket::Kind, Option<Box<fppacket::ProtocolAssociation>>, fppacket::BoundInterface),
@@ -315,8 +315,8 @@ impl<'a> RequestHandler<'a> {
             ctx,
             data: BindingData { peer_event: _, message_queue: _, state: State { id, kind } },
         } = self;
-        let mut guard = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
 
         let SocketInfo { device, protocol } =
             netstack3_core::device::socket::get_info(sync_ctx, id);
@@ -337,7 +337,7 @@ impl<'a> RequestHandler<'a> {
         Ok((*kind, protocol, interface))
     }
 
-    async fn receive(self) -> Result<Message, fposix::Errno> {
+    fn receive(self) -> Result<Message, fposix::Errno> {
         let Self {
             ctx: _,
             data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
@@ -347,7 +347,7 @@ impl<'a> RequestHandler<'a> {
         queue.pop().ok_or(fposix::EWOULDBLOCK)
     }
 
-    async fn set_receive_buffer(self, size: u64) {
+    fn set_receive_buffer(self, size: u64) {
         let Self {
             ctx: _,
             data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
@@ -357,7 +357,7 @@ impl<'a> RequestHandler<'a> {
         queue.set_max_available_messages_size(size.try_into().unwrap_or(usize::MAX))
     }
 
-    async fn receive_buffer(self) -> u64 {
+    fn receive_buffer(self) -> u64 {
         let Self {
             ctx: _,
             data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
@@ -367,7 +367,7 @@ impl<'a> RequestHandler<'a> {
         queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
     }
 
-    async fn handle_request(
+    fn handle_request(
         self,
         request: fppacket::SocketRequest,
     ) -> ControlFlow<fppacket::SocketCloseResponder, Option<fppacket::SocketRequestStream>> {
@@ -406,10 +406,10 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
             fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
-                responder_send!(responder, &mut Ok(self.set_receive_buffer(value_bytes).await));
+                responder_send!(responder, &mut Ok(self.set_receive_buffer(value_bytes)));
             }
             fppacket::SocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Ok(self.receive_buffer().await));
+                responder_send!(responder, &mut Ok(self.receive_buffer()));
             }
             fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
@@ -460,10 +460,10 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, self.describe());
             }
             fppacket::SocketRequest::Bind { protocol, bound_interface_id, responder } => {
-                responder_send!(responder, &mut self.bind(protocol, bound_interface_id).await)
+                responder_send!(responder, &mut self.bind(protocol, bound_interface_id))
             }
             fppacket::SocketRequest::GetInfo { responder } => {
-                responder_send!(responder, &mut self.get_info().await);
+                responder_send!(responder, &mut self.get_info());
             }
             fppacket::SocketRequest::RecvMsg {
                 want_packet_info,
@@ -473,7 +473,7 @@ impl<'a> RequestHandler<'a> {
                 responder,
             } => {
                 let params = RecvMsgParams { want_packet_info, data_len, want_control, flags };
-                let response = self.receive().await;
+                let response = self.receive();
                 responder_send!(responder, &mut response.map(|r| params.apply_to(r)))
             }
             fppacket::SocketRequest::SendMsg {

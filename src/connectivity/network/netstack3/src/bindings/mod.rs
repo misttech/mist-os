@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom as _;
 use std::future::Future;
 use std::num::NonZeroU16;
-use std::ops::DerefMut as _;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,7 +41,8 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_zircon as zx;
 use futures::{
-    channel::mpsc, lock::Mutex, FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _,
+    channel::mpsc, lock::Mutex as AsyncMutex, FutureExt as _, SinkExt as _, StreamExt as _,
+    TryStreamExt as _,
 };
 use log::{debug, error};
 use packet::{Buf, BufferMut};
@@ -83,8 +84,19 @@ use netstack3_core::{
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp,
-    Ctx, NonSyncContext, SyncCtx, TimerId,
+    NonSyncContext, SyncCtx, TimerId,
 };
+
+#[derive(Default, Clone)]
+pub(crate) struct Ctx {
+    // `non_sync_ctx` is the first member so all strongly-held references are
+    // dropped before primary references held in `sync_ctx` are dropped. Note
+    // that dropping a primary reference while holding onto strong references
+    // will cause a panic. See `netstack3_core::sync::PrimaryRc` for more
+    // details.
+    pub non_sync_ctx: BindingsNonSyncCtxImpl,
+    pub sync_ctx: Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
+}
 
 use crate::bindings::util::TryIntoFidlWithContext as _;
 
@@ -132,9 +144,8 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 
-/// Provides an implementation of [`NonSyncContext`].
 #[derive(Default)]
-pub(crate) struct BindingsNonSyncCtxImpl {
+pub(crate) struct BindingsNonSyncCtxImplInner {
     rng: RngImpl,
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
@@ -146,6 +157,19 @@ pub(crate) struct BindingsNonSyncCtxImpl {
     tcp_v4_connections: CoreMutex<IdMap<crate::bindings::socket::stream::ConnectionStatus>>,
     tcp_v6_connections: CoreMutex<IdMap<crate::bindings::socket::stream::ConnectionStatus>>,
     route_update_dispatcher: CoreMutex<routes_fidl_worker::RouteUpdateDispatcher>,
+}
+
+/// Provides an implementation of [`NonSyncContext`].
+#[derive(Clone, Default)]
+pub(crate) struct BindingsNonSyncCtxImpl(Arc<BindingsNonSyncCtxImplInner>);
+
+impl Deref for BindingsNonSyncCtxImpl {
+    type Target = BindingsNonSyncCtxImplInner;
+
+    fn deref(&self) -> &BindingsNonSyncCtxImplInner {
+        let Self(this) = self;
+        this.deref()
+    }
 }
 
 impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
@@ -172,7 +196,7 @@ impl AsRef<UdpSockets> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx<BindingsNonSyncCtxImpl> {
+impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx {
     fn handle_expired_timer(&mut self, timer: TimerId<BindingsNonSyncCtxImpl>) {
         let Ctx { sync_ctx, non_sync_ctx } = self;
         handle_timer(sync_ctx, non_sync_ctx, timer)
@@ -186,12 +210,12 @@ impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx<BindingsNonSy
 }
 
 impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
-    type Handler = Ctx<BindingsNonSyncCtxImpl>;
+    type Handler = Ctx;
 
-    type Guard<'a> = futures::lock::MutexGuard<'a, Ctx<BindingsNonSyncCtxImpl>>;
-    type Fut<'a> = futures::lock::MutexLockFuture<'a, Ctx<BindingsNonSyncCtxImpl>>;
-    fn lock(&'_ self) -> Self::Fut<'_> {
-        self.ctx.lock()
+    type Guard<'a> = NetstackContext where Self: 'a;
+    type Fut<'a> = futures::future::Ready<NetstackContext> where Self: 'a;
+    fn lock(&self) -> Self::Fut<'_> {
+        futures::future::ready(self.ctx.clone())
     }
 }
 
@@ -567,7 +591,7 @@ impl BindingsNonSyncCtxImpl {
 }
 
 fn set_interface_enabled(
-    Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<crate::bindings::BindingsNonSyncCtxImpl>,
+    Ctx { sync_ctx, non_sync_ctx }: &mut Ctx,
     id: BindingId,
     should_enable: bool,
 ) -> Result<(), fidl_net_stack::Error> {
@@ -624,7 +648,7 @@ fn set_interface_enabled(
 }
 
 fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
     loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), NetstackError> {
@@ -649,7 +673,7 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
 fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
     loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
@@ -686,7 +710,23 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
     Ok(())
 }
 
-type NetstackContext = Arc<Mutex<Ctx<BindingsNonSyncCtxImpl>>>;
+#[derive(Default, Clone)]
+pub(crate) struct NetstackContext(Ctx);
+
+impl Deref for NetstackContext {
+    type Target = Ctx;
+    fn deref(&self) -> &Self::Target {
+        let Self(this) = self;
+        this
+    }
+}
+
+impl DerefMut for NetstackContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let Self(this) = self;
+        this
+    }
+}
 
 /// The netstack.
 ///
@@ -744,19 +784,20 @@ impl Netstack {
                 stop_receiver,
                 control_receiver,
                 removable,
+                AsyncMutex::new(()),
             )
             .map(|f| f.map(|f| f()).unwrap_or(())),
         )
     }
 
-    async fn add_loopback(
+    fn add_loopback(
         &self,
     ) -> (
         futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
         BindingId,
         fasync::Task<()>,
     ) {
-        let mut ctx = self.ctx.lock().await;
+        let mut ctx = self.ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
 
         // Add and initialize the loopback interface with the IPv4 and IPv6
@@ -918,14 +959,14 @@ impl NetstackSeed {
         let Self { netstack, interfaces_worker, interfaces_watcher_sink } = self;
 
         // Start servicing timers.
-        netstack.ctx.lock().await.non_sync_ctx.timers.spawn(netstack.clone());
+        netstack.ctx.clone().non_sync_ctx.timers.spawn(netstack.clone());
 
         // The Sender is unused because Loopback should never be canceled.
         let (_sender, _, loopback_interface_control_task): (
             futures::channel::oneshot::Sender<_>,
             BindingId,
             _,
-        ) = netstack.add_loopback().await;
+        ) = netstack.add_loopback();
 
         let interfaces_worker_task = fuchsia_async::Task::spawn(async move {
             let result = interfaces_worker.run().await;
@@ -979,9 +1020,7 @@ impl NetstackSeed {
                 WorkItem::Incoming(Service::RawSocket(socket)) => {
                     socket.serve_with(|rs| socket::raw::serve(rs)).await
                 }
-                WorkItem::Incoming(Service::RoutesState(rs)) => {
-                    routes_fidl_worker::serve_state(rs).await
-                }
+                WorkItem::Incoming(Service::RoutesState(rs)) => routes_fidl_worker::serve_state(rs),
                 WorkItem::Incoming(Service::RoutesStateV4(rs)) => {
                     routes_fidl_worker::serve_state_v4(rs, netstack.clone()).await
                 }

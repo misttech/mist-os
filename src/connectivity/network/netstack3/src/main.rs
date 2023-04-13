@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 //! A networking stack.
+#![deny(clippy::unused_async)]
 #![deny(missing_docs, unreachable_patterns, unused)]
 #![recursion_limit = "256"]
-#![allow(incomplete_features)]
-#![feature(async_fn_in_trait)]
 
 #[cfg(feature = "instrumented")]
 extern crate netstack3_core_instrumented as netstack3_core;

@@ -472,10 +472,10 @@ mod tests {
             testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
-            assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
-            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, new_rng, run_with_many_seeds, Ctx, FakeEventDispatcherConfig,
+            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx, StackStateBuilder, TimerId, TimerIdInner,
+        StackStateBuilder, TimerId, TimerIdInner,
     };
 
     /// A fake [`MldContext`] that stores the [`MldInterface`] and an optional

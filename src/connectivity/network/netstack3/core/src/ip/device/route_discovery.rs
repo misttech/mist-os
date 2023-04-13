@@ -233,10 +233,10 @@ mod tests {
             IPV6_DEFAULT_SUBNET,
         },
         testutil::{
-            DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            Ctx, DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx, DeviceId, TimerId, TimerIdInner,
+        DeviceId, TimerId, TimerIdInner,
     };
 
     #[derive(Default)]

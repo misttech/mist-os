@@ -27,13 +27,12 @@ use netstack3_core::{
         device::slaac::STABLE_IID_SECRET_KEY_BYTES,
         types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
     },
-    Ctx,
 };
 
 use crate::bindings::{
     devices::{BindingId, Devices},
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    BindingsNonSyncCtxImpl, RequestStreamExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, RequestStreamExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 mod util {
@@ -233,19 +232,14 @@ impl TestStack {
 
     /// Helper function to invoke a closure that provides a locked
     /// [`Ctx< BindingsContext>`] provided by this `TestStack`.
-    pub(crate) async fn with_ctx<R, F: FnOnce(&mut Ctx<BindingsNonSyncCtxImpl>) -> R>(
-        &mut self,
-        f: F,
-    ) -> R {
-        let mut ctx = self.ctx.netstack.ctx.lock().await;
+    pub(crate) fn with_ctx<R, F: FnOnce(&mut Ctx) -> R>(&mut self, f: F) -> R {
+        let mut ctx = self.ctx.netstack.ctx.clone();
         f(ctx.deref_mut())
     }
 
-    /// Acquire a lock on this `TestStack`'s context.
-    pub(crate) async fn ctx(
-        &self,
-    ) -> impl std::ops::DerefMut<Target = Ctx<BindingsNonSyncCtxImpl>> + '_ {
-        self.ctx.netstack.ctx.lock().await
+    /// Acquire this `TestStack`'s context.
+    pub(crate) fn ctx(&self) -> impl std::ops::DerefMut<Target = Ctx> + '_ {
+        self.ctx.netstack.ctx.clone()
     }
 }
 
@@ -397,7 +391,7 @@ impl TestSetupBuilder {
             println!("Adding stack: {:?}", stack_cfg);
             let mut stack = TestStack::new();
             let (loopback_termination_sender, binding_id, loopback_interface_control_task) =
-                stack.ctx.netstack.add_loopback().await;
+                stack.ctx.netstack.add_loopback();
 
             stack.loopback_termination_sender = Some(loopback_termination_sender);
             stack.ctx.tasks.push(loopback_interface_control_task);
@@ -451,28 +445,24 @@ impl TestSetupBuilder {
                 stack.wait_for_interface_online(if_id).await;
 
                 // Disable DAD for simplicity of testing.
-                stack
-                    .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-                        let devices: &Devices<_> = non_sync_ctx.as_ref();
-                        let device = devices.get_core_id(if_id).unwrap();
-                        update_ipv6_configuration(sync_ctx, non_sync_ctx, &device, |config| {
-                            config.dad_transmits = None
-                        })
-                        .unwrap()
+                stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+                    let devices: &Devices<_> = non_sync_ctx.as_ref();
+                    let device = devices.get_core_id(if_id).unwrap();
+                    update_ipv6_configuration(sync_ctx, non_sync_ctx, &device, |config| {
+                        config.dad_transmits = None
                     })
-                    .await;
+                    .unwrap()
+                });
                 if let Some(addr) = addr {
-                    stack
-                        .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-                            let core_id =
-                                non_sync_ctx.devices.get_core_id(if_id).ok_or_else(|| {
-                                    format_err!("Failed to get device {} info", if_id)
-                                })?;
+                    stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+                        let core_id = non_sync_ctx
+                            .devices
+                            .get_core_id(if_id)
+                            .ok_or_else(|| format_err!("Failed to get device {} info", if_id))?;
 
-                            add_ip_addr_subnet(sync_ctx, non_sync_ctx, &core_id, addr)
-                                .context("add interface address")
-                        })
-                        .await?;
+                        add_ip_addr_subnet(sync_ctx, non_sync_ctx, &core_id, addr)
+                            .context("add interface address")
+                    })?;
 
                     let (_, subnet) = addr.addr_subnet();
 
@@ -634,7 +624,7 @@ async fn test_list_del_routes() {
     let if_id = test_stack.get_named_endpoint_id(EP_NAME);
     let loopback_id = test_stack.get_named_endpoint_id(LOOPBACK_NAME);
     assert_ne!(loopback_id, if_id);
-    let device = test_stack.ctx().await.non_sync_ctx.get_core_id(if_id).expect("device exists");
+    let device = test_stack.ctx().non_sync_ctx.get_core_id(if_id).expect("device exists");
     let sub1 = net_subnet_v4!("192.168.0.0/24");
     let route1: AddableEntryEither<_> = AddableEntry::without_gateway(
         sub1,
@@ -658,14 +648,12 @@ async fn test_list_del_routes() {
     )
     .into();
 
-    let () = test_stack
-        .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-            // add a couple of routes directly into core:
-            netstack3_core::add_route(sync_ctx, non_sync_ctx, route1).unwrap();
-            netstack3_core::add_route(sync_ctx, non_sync_ctx, route2).unwrap();
-            netstack3_core::add_route(sync_ctx, non_sync_ctx, route3).unwrap();
-        })
-        .await;
+    let () = test_stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+        // add a couple of routes directly into core:
+        netstack3_core::add_route(sync_ctx, non_sync_ctx, route1).unwrap();
+        netstack3_core::add_route(sync_ctx, non_sync_ctx, route2).unwrap();
+        netstack3_core::add_route(sync_ctx, non_sync_ctx, route3).unwrap();
+    });
 
     let mut route1_fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet: sub1.into_ext(),
@@ -749,8 +737,8 @@ async fn test_list_del_routes() {
         },
     ];
 
-    async fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
-        let mut ctx = ts.ctx().await;
+    fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
+        let mut ctx = ts.ctx();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         netstack3_core::ip::get_all_routes(sync_ctx)
             .into_iter()
@@ -762,7 +750,7 @@ async fn test_list_del_routes() {
             .collect()
     }
 
-    let routes = get_routing_table(test_stack).await;
+    let routes = get_routing_table(test_stack);
     assert_eq!(routes, expected_routes);
 
     // delete route1:
@@ -778,7 +766,7 @@ async fn test_list_del_routes() {
     );
 
     // check that route was deleted (should've disappeared from core)
-    let routes = get_routing_table(test_stack).await;
+    let routes = get_routing_table(test_stack);
     let expected_routes =
         expected_routes.into_iter().filter(|route| route != &route1_fwd_entry).collect::<Vec<_>>();
     assert_eq!(routes, expected_routes);
@@ -838,27 +826,22 @@ async fn test_add_remote_routes() {
     );
 }
 
-async fn get_slaac_secret<'s>(
+fn get_slaac_secret<'s>(
     test_stack: &'s mut TestStack,
     if_id: BindingId,
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
-    test_stack
-        .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-            let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
-            netstack3_core::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &device,
-                |config| {
-                    config
-                        .slaac_config
-                        .temporary_address_configuration
-                        .map(|t| t.secret_key.clone())
-                },
-            )
-            .unwrap()
-        })
-        .await
+    test_stack.with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
+        let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
+        netstack3_core::device::update_ipv6_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &device,
+            |config| {
+                config.slaac_config.temporary_address_configuration.map(|t| t.secret_key.clone())
+            },
+        )
+        .unwrap()
+    })
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -889,17 +872,16 @@ async fn test_ipv6_slaac_secret_stable() {
 
     let if_id = BindingId::new(interface_control.get_id().await.unwrap()).unwrap();
     let installed_secret =
-        get_slaac_secret(test_stack, if_id).await.expect("has temporary address secret");
+        get_slaac_secret(test_stack, if_id).expect("has temporary address secret");
 
     // Bringing the interface up does not change the secret.
     assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
-    let enabled_secret =
-        get_slaac_secret(test_stack, if_id).await.expect("has temporary address secret");
+    let enabled_secret = get_slaac_secret(test_stack, if_id).expect("has temporary address secret");
     assert_eq!(enabled_secret, installed_secret);
 
     // Bringing the interface down and up does not change the secret.
     assert_eq!(true, interface_control.disable().await.expect("FIDL call").expect("disabled"));
     assert_eq!(true, interface_control.enable().await.expect("FIDL call").expect("enabled"));
 
-    assert_eq!(get_slaac_secret(test_stack, if_id).await, Some(enabled_secret));
+    assert_eq!(get_slaac_secret(test_stack, if_id), Some(enabled_secret));
 }

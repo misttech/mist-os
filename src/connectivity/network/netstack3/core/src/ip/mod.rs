@@ -3047,11 +3047,12 @@ mod tests {
             types::{AddableEntry, AddableEntryEither, AddableMetric, Metric, RawMetric},
         },
         testutil::{
-            assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, FakeCtx,
-            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
-            FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, Ctx,
+            FakeCtx, FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt,
+            DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, FAKE_CONFIG_V6,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx, DeviceId, StackState,
+        DeviceId, StackState,
     };
 
     // Some helper functions

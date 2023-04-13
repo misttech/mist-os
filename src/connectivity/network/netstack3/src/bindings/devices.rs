@@ -22,11 +22,11 @@ use netstack3_core::{
         handle_queued_rx_packets, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    Ctx,
 };
 
 use crate::bindings::{
-    interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, DeviceIdExt as _, Netstack,
+    interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
+    Netstack,
 };
 
 pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
@@ -159,8 +159,8 @@ pub(crate) fn spawn_rx_task(
     fuchsia_async::Task::spawn(async move {
         // Loop while we are woken up to handle enqueued RX packets.
         while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
-            let mut ctx = ns.ctx.lock().await;
-            let Ctx { sync_ctx, non_sync_ctx } = &mut *ctx;
+            let mut ctx = ns.ctx.clone();
+            let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
             handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
         }
     })

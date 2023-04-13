@@ -29,7 +29,7 @@ use crate::bindings::{Ctx, Netstack};
 const MAX_PENDING_EVENTS: usize = (fnet_routes::MAX_EVENTS * 5) as usize;
 
 /// Serve the `fuchsia.net.routes/State` protocol.
-pub(crate) async fn serve_state(_rs: fnet_routes::StateRequestStream) {
+pub(crate) fn serve_state(_rs: fnet_routes::StateRequestStream) {
     // TODO(https://fxbug.dev/120878) Implement fuchsia.net.routes/State
     warn!(
         "Request to unimplemented FIDL protocol {}; sending PEER_CLOSED",
@@ -91,7 +91,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     let request_stream =
         server_end.into_stream().expect("failed to acquire request_stream from server_end");
     let watcher = {
-        let ctx = &mut ns.ctx.lock().await;
+        let mut ctx = ns.ctx.clone();
         let Ctx { sync_ctx: _, ref mut non_sync_ctx } = ctx.deref_mut();
         let x = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
         x
@@ -125,7 +125,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
     };
 
     {
-        let ctx = &mut ns.ctx.lock().await;
+        let mut ctx = ns.ctx.clone();
         let Ctx { sync_ctx: _, ref mut non_sync_ctx } = ctx.deref_mut();
         non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher.into_inner());
     }

@@ -31,8 +31,11 @@
 //! ownership semantics (removing the interface closes the protocol; closing
 //! protocol does not remove the interface).
 
-use std::collections::hash_map;
-use std::ops::DerefMut as _;
+use std::{
+    borrow::Borrow,
+    collections::hash_map,
+    ops::{Deref as _, DerefMut as _},
+};
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
@@ -43,14 +46,14 @@ use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{
-    future::FusedFuture as _, stream::FusedStream as _, FutureExt as _, SinkExt as _,
-    StreamExt as _, TryFutureExt as _, TryStreamExt as _,
+    future::FusedFuture as _, lock::Mutex as AsyncMutex, stream::FusedStream as _, FutureExt as _,
+    SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr};
-use netstack3_core::{device::DeviceId, Ctx};
+use netstack3_core::device::DeviceId;
 
 use crate::bindings::{
-    devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId,
+    devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
     DeviceIdExt as _, Netstack, NetstackContext,
 };
 
@@ -320,7 +323,11 @@ async fn run_netdevice_interface_control<
     mut device_stopped_fut: async_utils::event::EventWaitResult,
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
 ) {
-    let link_state_fut = run_link_state_watcher(ctx.clone(), id, status_stream).fuse();
+    let interface_access_synchronizer = AsyncMutex::new(());
+
+    let link_state_fut =
+        run_link_state_watcher(ctx.clone(), id, status_stream, &interface_access_synchronizer)
+            .fuse();
     let (interface_control_stop_sender, interface_control_stop_receiver) =
         futures::channel::oneshot::channel();
 
@@ -332,6 +339,7 @@ async fn run_netdevice_interface_control<
         interface_control_stop_receiver,
         control_receiver,
         removable,
+        &interface_access_synchronizer,
     )
     .fuse();
     futures::pin_mut!(link_state_fut);
@@ -369,14 +377,20 @@ async fn run_link_state_watcher<
     ctx: NetstackContext,
     id: BindingId,
     status_stream: S,
+    interface_access_synchronizer: &AsyncMutex<()>,
 ) {
     let result = status_stream
         .try_for_each(|netdevice_client::client::PortStatus { flags, mtu: _ }| {
             let ctx = &ctx;
             async move {
+                // Take the lock to synchronize with other operations that may
+                // mutate state for this device (e.g. admin up/down).
+                let guard = interface_access_synchronizer.lock().await;
+                let _: &() = guard.deref();
+
                 let online = flags.contains(fhardware_network::StatusFlags::ONLINE);
                 log::debug!("observed interface {} online = {}", id, online);
-                let mut ctx = ctx.lock().await;
+                let mut ctx = ctx.clone();
                 match ctx
                     .non_sync_ctx
                     .devices
@@ -426,7 +440,10 @@ pub(crate) async fn run_interface_control(
     >,
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
     removable: bool,
+    interface_access_synchronizer: impl Borrow<AsyncMutex<()>>,
 ) -> Option<impl FnOnce() -> ()> {
+    let interface_access_synchronizer = interface_access_synchronizer.borrow();
+
     // An event indicating that the individual control request streams should stop.
     let cancel_request_streams = async_utils::event::Event::new();
     // A struct to retain per-handle state of the individual request streams in `control_receiver`.
@@ -466,8 +483,15 @@ pub(crate) async fn run_interface_control(
                             async_utils::fold::FoldWhile::Continue(state)
                         }
                         Ok(req) => {
-                            match dispatch_control_request(req, ctx, *id, removable, owns_interface)
-                                .await
+                            match dispatch_control_request(
+                                req,
+                                ctx,
+                                *id,
+                                removable,
+                                owns_interface,
+                                interface_access_synchronizer,
+                            )
+                            .await
                             {
                                 Err(e) => {
                                     log::log!(
@@ -572,7 +596,7 @@ pub(crate) async fn run_interface_control(
     };
     // Cancel the `AddressStateProvider` workers and drive them to completion.
     let address_state_providers = {
-        let ctx = ctx.lock().await;
+        let ctx = ctx.clone();
         let core_id =
             ctx.non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
         core_id.external_state().with_common_info_mut(|i| {
@@ -607,24 +631,30 @@ async fn dispatch_control_request(
     id: BindingId,
     removable: bool,
     owns_interface: &mut bool,
+    interface_access_synchronizer: &AsyncMutex<()>,
 ) -> Result<ControlRequestResult, fidl::Error> {
     log::debug!("serving {:?}", req);
+    // Take the lock to synchronize with other operations that may mutate state
+    // for this device (e.g. phy link up/down handlers).
+    let guard = interface_access_synchronizer.lock().await;
+    let _: &() = guard.deref();
+
     match req {
         fnet_interfaces_admin::ControlRequest::AddAddress {
             address,
             parameters,
             address_state_provider,
             control_handle: _,
-        } => Ok(add_address(ctx, id, address, parameters, address_state_provider).await),
+        } => Ok(add_address(ctx, id, address, parameters, address_state_provider)),
         fnet_interfaces_admin::ControlRequest::RemoveAddress { address, responder } => {
             responder.send(&mut Ok(remove_address(ctx, id, address).await))
         }
         fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id.get()),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
-            responder.send(&mut set_configuration(ctx, id, config).await)
+            responder.send(&mut set_configuration(ctx, id, config))
         }
         fnet_interfaces_admin::ControlRequest::GetConfiguration { responder } => {
-            responder.send(&mut Ok(get_configuration(ctx, id).await))
+            responder.send(&mut Ok(get_configuration(ctx, id)))
         }
         fnet_interfaces_admin::ControlRequest::Enable { responder } => {
             responder.send(&mut Ok(set_interface_enabled(ctx, true, id).await))
@@ -656,7 +686,7 @@ async fn dispatch_control_request(
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: NetstackContext, id: BindingId) {
     let devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ } = {
-        let mut ctx = ctx.lock().await;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let core_id =
             non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
@@ -683,7 +713,7 @@ async fn set_interface_enabled(ctx: &NetstackContext, enabled: bool, id: Binding
         Netdevice(B),
     }
 
-    let mut ctx = ctx.lock().await;
+    let mut ctx = ctx.clone();
     let core_id = ctx.non_sync_ctx.devices.get_core_id(id).expect("device not present");
     let port_handler = {
         let mut info = match core_id.external_state() {
@@ -757,7 +787,7 @@ async fn remove_address(ctx: &NetstackContext, id: BindingId, address: fnet::Sub
         }
     };
     let Some((worker, cancelation_sender)) = ({
-        let ctx = ctx.lock().await;
+        let ctx = ctx.clone();
         let core_id =
             ctx.non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
         core_id.external_state().with_common_info_mut(|i| {
@@ -791,12 +821,12 @@ async fn remove_address(ctx: &NetstackContext, id: BindingId, address: fnet::Sub
 /// Sets the provided `config` on the interface with the given `id`.
 ///
 /// Returns the previously set configuration on the interface.
-async fn set_configuration(
+fn set_configuration(
     ctx: &NetstackContext,
     id: BindingId,
     config: fnet_interfaces_admin::Configuration,
 ) -> fnet_interfaces_admin::ControlSetConfigurationResult {
-    let mut ctx = ctx.lock().await;
+    let mut ctx = ctx.clone();
     let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
     let core_id = non_sync_ctx
         .devices
@@ -901,11 +931,8 @@ async fn set_configuration(
 }
 
 /// Returns the configuration used for the interface with the given `id`.
-async fn get_configuration(
-    ctx: &NetstackContext,
-    id: BindingId,
-) -> fnet_interfaces_admin::Configuration {
-    let mut ctx = ctx.lock().await;
+fn get_configuration(ctx: &NetstackContext, id: BindingId) -> fnet_interfaces_admin::Configuration {
+    let mut ctx = ctx.clone();
     let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
     let core_id = non_sync_ctx
         .devices
@@ -936,7 +963,7 @@ async fn get_configuration(
 ///
 /// If the address cannot be added, the appropriate removal reason will be sent
 /// to the address_state_provider.
-async fn add_address(
+fn add_address(
     ctx: &NetstackContext,
     id: BindingId,
     address: fnet::Subnet,
@@ -991,7 +1018,7 @@ async fn add_address(
         }
     }
 
-    let locked_ctx = ctx.lock().await;
+    let locked_ctx = ctx.clone();
     let core_id =
         locked_ctx.non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
     core_id.external_state().with_common_info_mut(|i| {
@@ -1055,7 +1082,7 @@ async fn run_address_state_provider(
     // for the address to exist in core (e.g. auto-configured addresses such as
     // loopback or SLAAC).
     let add_to_core_result = {
-        let mut ctx = ctx.lock().await;
+        let mut ctx = ctx.clone();
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
         netstack3_core::add_ip_addr_subnet(sync_ctx, non_sync_ctx, &device_id, addr_subnet_either)
@@ -1102,7 +1129,7 @@ async fn run_address_state_provider(
     };
 
     // Remove the address.
-    let mut ctx = ctx.lock().await;
+    let mut ctx = ctx.clone();
     let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
     let core_id = non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
     // Don't drop the worker yet; it's what's driving THIS function.
@@ -1192,9 +1219,7 @@ async fn address_state_provider_main_loop(
                         request,
                         &mut detached,
                         &mut watch_state,
-                    )
-                    .await
-                    {
+                    ) {
                         Ok(()) => continue,
                         Err(e) => e,
                     };
@@ -1343,7 +1368,7 @@ impl AddressAssignmentWatcherState {
 }
 
 /// Serves a `fuchsia.net.interfaces.admin/AddressStateProvider` request.
-async fn dispatch_address_state_provider_request(
+fn dispatch_address_state_provider_request(
     req: fnet_interfaces_admin::AddressStateProviderRequest,
     detached: &mut bool,
     watch_state: &mut AddressAssignmentWatcherState,
@@ -1410,7 +1435,7 @@ mod tests {
 
         // Add the interface.
         let binding_id = {
-            let mut ctx = ctx.lock().await;
+            let mut ctx = ctx.clone();
             let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
             let binding_id = non_sync_ctx.devices.alloc_new_id();
             let core_id = netstack3_core::device::add_loopback_device_with_state(
@@ -1444,8 +1469,14 @@ mod tests {
         // Start the interface control worker.
         let (_stop_sender, stop_receiver) = futures::channel::oneshot::channel();
         let removable = false;
-        let interface_control_fut =
-            run_interface_control(ctx, binding_id, stop_receiver, control_receiver, removable);
+        let interface_control_fut = run_interface_control(
+            ctx,
+            binding_id,
+            stop_receiver,
+            control_receiver,
+            removable,
+            AsyncMutex::new(()),
+        );
 
         // Add an address.
         let (asp_client_end, asp_server_end) =

@@ -548,9 +548,9 @@ mod tests {
         error::NotFoundError,
         ip::device::{state::AssignedAddress, IpDeviceIpExt, IpDeviceStateContext},
         testutil::{
-            FakeEventDispatcherConfig, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            Ctx, FakeEventDispatcherConfig, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
-        Ctx, SyncCtx,
+        SyncCtx,
     };
 
     use super::*;

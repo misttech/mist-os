@@ -1346,7 +1346,7 @@ mod tests {
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
         testutil::*,
-        Ctx, TimerContext,
+        TimerContext,
     };
 
     enum AddressType {

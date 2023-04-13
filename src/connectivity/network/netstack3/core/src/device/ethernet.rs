@@ -1150,11 +1150,10 @@ mod tests {
             testutil::is_in_ip_multicast,
         },
         testutil::{
-            add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng,
+            add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng, Ctx,
             FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Ctx,
     };
 
     struct FakeEthernetCtx {

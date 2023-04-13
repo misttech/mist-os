@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::ops::DerefMut as _;
+use core::ops::DerefMut;
 
 use super::{
     util::{IntoFidl, TryFromFidlWithContext as _, TryIntoCore as _},
-    BindingsNonSyncCtxImpl,
+    Ctx,
 };
 
 use fidl_fuchsia_net as fidl_net;
@@ -15,19 +15,19 @@ use fidl_fuchsia_net_stack::{
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error};
-use netstack3_core::{add_route, del_route, ip::types::AddableEntryEither, Ctx};
+use netstack3_core::{add_route, del_route, ip::types::AddableEntryEither};
 
 pub(crate) struct StackFidlWorker {
     netstack: crate::bindings::Netstack,
 }
 
-struct LockedFidlWorker<'a> {
-    ctx: futures::lock::MutexGuard<'a, Ctx<BindingsNonSyncCtxImpl>>,
+struct LockedFidlWorker<C> {
+    ctx: C,
 }
 
 impl StackFidlWorker {
-    async fn lock_worker(&self) -> LockedFidlWorker<'_> {
-        let ctx = self.netstack.ctx.lock().await;
+    fn lock_worker(&self) -> LockedFidlWorker<impl DerefMut<Target = Ctx> + '_> {
+        let ctx = self.netstack.ctx.clone();
         LockedFidlWorker { ctx }
     }
 
@@ -41,7 +41,7 @@ impl StackFidlWorker {
                     StackRequest::AddForwardingEntry { entry, responder } => {
                         responder_send!(
                             responder,
-                            &mut worker.lock_worker().await.fidl_add_forwarding_entry(entry)
+                            &mut worker.lock_worker().fidl_add_forwarding_entry(entry)
                         );
                     }
                     StackRequest::DelForwardingEntry {
@@ -56,7 +56,7 @@ impl StackFidlWorker {
                     } => {
                         responder_send!(
                             responder,
-                            &mut worker.lock_worker().await.fidl_del_forwarding_entry(subnet)
+                            &mut worker.lock_worker().fidl_del_forwarding_entry(subnet)
                         );
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
@@ -99,7 +99,7 @@ impl StackFidlWorker {
     }
 }
 
-impl<'a> LockedFidlWorker<'a> {
+impl<C: DerefMut<Target = Ctx>> LockedFidlWorker<C> {
     fn fidl_add_forwarding_entry(
         mut self,
         entry: ForwardingEntry,
