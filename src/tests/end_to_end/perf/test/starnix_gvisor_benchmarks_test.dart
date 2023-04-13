@@ -21,7 +21,7 @@ void main() {
     'clock_gettime_benchmark.cm':
         'fuchsia.starnix.gvisor_benchmarks.clock_gettime.txt',
     // 'death_benchmark' - not passing
-    // 'dup_benchmark' - not passing
+    'dup_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.dup.txt',
     'epoll_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.epoll.txt',
     // 'fork_benchmark' - not passing
     // 'futex_benchmark' - not passing
