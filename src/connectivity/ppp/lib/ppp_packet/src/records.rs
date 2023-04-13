@@ -16,7 +16,6 @@
 //!
 //! [`options`]: crate::wire::util::records::options
 
-use fuchsia_syslog::macros::*;
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -1171,7 +1170,7 @@ pub mod options {
             };
 
             if len < 2 || (len - 2) > bytes.len() {
-                fx_log_err!("option length {} is either too short or longer than the total buffer length of {}", len, bytes.len());
+                tracing::error!("option length {} is either too short or longer than the total buffer length of {}", len, bytes.len());
                 return Err(OptionParseErr::Internal);
             }
 

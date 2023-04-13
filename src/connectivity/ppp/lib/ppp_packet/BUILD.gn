@@ -12,9 +12,9 @@ rustc_library("ppp_packet") {
 
   deps = [
     "//src/lib/network/packet",
-    "//src/lib/syslog/rust:syslog",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
 
@@ -31,10 +31,11 @@ rustc_test("ppp_packet_test_bin") {
   edition = "2021"
 
   deps = [
+    "//src/lib/fuchsia",
     "//src/lib/network/packet",
-    "//src/lib/syslog/rust:syslog",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
 

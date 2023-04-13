@@ -467,17 +467,10 @@ mod tests {
             records::options::{Options, OptionsSerializer},
         },
         packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer},
-        std::sync::Once,
     };
 
-    static START: Once = Once::new();
-
-    #[test]
+    #[fuchsia::test]
     fn test_link_parse_serialize() {
-        START.call_once(|| {
-            fuchsia_syslog::init().unwrap();
-        });
-
         let expected_link_options = [
             link::ControlOption::MaximumReceiveUnit(0x8888),
             link::ControlOption::AddressControlFieldCompression,
@@ -531,12 +524,8 @@ mod tests {
         assert_eq!(buffer.as_ref(), EXPECT_BUFFER);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_ipv4_parse_serialize() {
-        START.call_once(|| {
-            fuchsia_syslog::init().unwrap();
-        });
-
         let expected_ipv4_options = [
             ipv4::ControlOption::Unrecognized(0xa, vec![0x01, 0x02, 0x03]),
             ipv4::ControlOption::IpAddress(0xffee_ddcc),
@@ -588,12 +577,8 @@ mod tests {
         assert_eq!(buffer.as_ref(), EXPECT_BUFFER);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_ipv6_parse_serialize() {
-        START.call_once(|| {
-            fuchsia_syslog::init().unwrap();
-        });
-
         let expected_ipv6_options = [
             ipv6::ControlOption::Unrecognized(0x5, vec![0x99]),
             ipv6::ControlOption::InterfaceIdentifier(0x0123_4567_890a_bcde),
