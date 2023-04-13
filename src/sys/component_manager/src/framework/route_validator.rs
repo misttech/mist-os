@@ -342,7 +342,7 @@ impl RouteValidator {
                         fsys::ServiceInstance {
                             instance_name: Some(e.name.clone()),
                             child_name: Some(child_name),
-                            child_instance_name: Some(e.service_instance.clone()),
+                            child_instance_name: Some(e.service_instance.to_string()),
                             ..fsys::ServiceInstance::EMPTY
                         }
                     })
@@ -1301,29 +1301,36 @@ mod tests {
         assert_eq!(results.len(), 1);
 
         let report = results.remove(0);
-        let service_instances: Vec<_> = [("a", "a"), ("a", "b"), ("b", "a"), ("b", "b")]
-            .into_iter()
-            .map(|p| {
-                let (c, i) = p;
-                fsys::ServiceInstance {
-                    instance_name: Some(format!("child_{},instance_{}", c, i)),
-                    child_name: Some(format!("coll:child_{}", c)),
-                    child_instance_name: Some(format!("instance_{}", i)),
-                    ..fsys::ServiceInstance::EMPTY
-                }
-            })
-            .collect();
         assert_matches!(
             report,
             fsys::RouteReport {
                 capability: Some(s),
                 decl_type: Some(fsys::DeclType::Use),
                 source_moniker: Some(m),
-                service_instances: Some(v),
+                service_instances: Some(_),
                 error: None,
                 ..
-            } if s == "my_service" && m == "." && v == service_instances
+            } if s == "my_service" && m == "."
         );
+        let service_instances = report.service_instances.unwrap();
+        assert_eq!(service_instances.len(), 4);
+        // (child_id, instance_id)
+        let pairs = vec![("a", "a"), ("a", "b"), ("b", "a"), ("b", "b")];
+        for (service_instance, pair) in service_instances.into_iter().zip(pairs) {
+            let (child_id, instance_id) = pair;
+            assert_matches!(
+                service_instance,
+                fsys::ServiceInstance {
+                    instance_name: Some(instance_name),
+                    child_name: Some(child_name),
+                    child_instance_name: Some(child_instance_name),
+                    ..
+                } if instance_name.len() == 32 &&
+                    instance_name.chars().all(|c| c.is_ascii_hexdigit()) &&
+                    child_name == format!("coll:child_{}", child_id) &&
+                    child_instance_name == format!("instance_{}", instance_id)
+            );
+        }
     }
 
     fn child_decl(name: &str) -> fdecl::Child {

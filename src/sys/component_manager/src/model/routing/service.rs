@@ -19,6 +19,7 @@ use {
     cm_util::channel,
     fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
     fidl_fuchsia_io as fio,
+    flyweights::FlyStr,
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_zircon as zx,
     futures::future::{join_all, BoxFuture},
@@ -456,10 +457,10 @@ impl lazy_immutable_dir::LazyDirectory for AggregateServiceDirectory {
         }?;
 
         Ok(Arc::new(ServiceInstanceDirectoryEntry {
-            name: name.to_string(),
+            name: name.into(),
             source,
-            source_child_name: component.to_string(),
-            service_instance: instance.to_string(),
+            source_child_name: component.into(),
+            service_instance: instance.into(),
             parent: self.parent.clone(),
         }))
     }
@@ -623,7 +624,7 @@ struct CollectionServiceDirectoryInner {
     ///
     /// This is used to find directory entries after they have been inserted into `dir`,
     /// as `dir` does not directly expose its entries.
-    entries: Vec<Arc<ServiceInstanceDirectoryEntry>>,
+    entries: HashMap<ServiceInstanceDirectoryKey, Arc<ServiceInstanceDirectoryEntry>>,
 }
 
 pub struct CollectionServiceDirectory {
@@ -654,7 +655,7 @@ impl CollectionServiceDirectory {
             aggregate_capability_provider,
             inner: Mutex::new(CollectionServiceDirectoryInner {
                 dir: simple_immutable_dir(),
-                entries: Vec::new(),
+                entries: HashMap::new(),
             }),
         }
     }
@@ -673,9 +674,9 @@ impl CollectionServiceDirectory {
     }
 
     /// Returns metadata about all the service instances in their original representation,
-    /// useful for exposing debug info.
+    /// useful for exposing debug info. The results are returned in no particular order.
     pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry>> {
-        self.inner.lock().await.entries.clone()
+        self.inner.lock().await.entries.values().cloned().collect()
     }
 
     /// Returns the name of the collection the instances are aggregated over
@@ -691,7 +692,7 @@ impl CollectionServiceDirectory {
             Ok(source) => {
                 // Add entries for the component `instance`, from its `source`,
                 // the service exposed by the component.
-                if let Err(err) = self.add_entries_from_capability_source(&child_name, source).await
+                if let Err(err) = self.add_entries_from_capability_source(child_name, source).await
                 {
                     parent
                         .with_logger_as_default(|| {
@@ -791,20 +792,30 @@ impl CollectionServiceDirectory {
             error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&"".into()), e);
             ModelError::open_directory_error(target.abs_moniker.clone(), child_name)
         })?;
+        let rng = &mut rand::thread_rng();
         for dirent in dirents {
-            let name = format!("{},{}", &child_name, &dirent.name);
+            let instance_key = ServiceInstanceDirectoryKey {
+                source_child_name: FlyStr::new(child_name),
+                service_instance: FlyStr::new(&dirent.name),
+            };
+            // It's possible to enter this function multiple times with the same input, so
+            // check for duplicates.
+            if inner.entries.contains_key(&instance_key) {
+                continue;
+            }
+            let name = Self::generate_instance_id(rng);
             let entry: Arc<ServiceInstanceDirectoryEntry> =
                 Arc::new(ServiceInstanceDirectoryEntry {
                     name: name.clone(),
                     source: source.clone(),
-                    source_child_name: child_name.to_string(),
-                    service_instance: dirent.name.to_string(),
+                    source_child_name: instance_key.source_child_name.clone(),
+                    service_instance: instance_key.service_instance.clone(),
                     parent: self.parent.clone(),
                 });
             inner.dir.add_node(&name, entry.clone()).map_err(|err| {
                 ModelError::CollectionServiceDirError { moniker: target.abs_moniker.clone(), err }
             })?;
-            inner.entries.push(entry);
+            inner.entries.insert(instance_key, entry);
         }
         Ok(())
     }
@@ -826,6 +837,13 @@ impl CollectionServiceDirectory {
             .await;
             Ok(())
         })
+    }
+
+    /// Generates a 128-bit uuid as a hex string.
+    fn generate_instance_id(rng: &mut impl rand::Rng) -> String {
+        let mut num: [u8; 16] = [0; 16];
+        rng.fill_bytes(&mut num);
+        num.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join("")
     }
 
     async fn on_started_async(
@@ -862,7 +880,7 @@ impl CollectionServiceDirectory {
                 .name
                 .as_str();
             let mut inner = self.inner.lock().await;
-            for entry in &inner.entries {
+            for entry in inner.entries.values() {
                 if entry.source_child_name == *target_name {
                     inner.dir.remove_node(&entry.name).map_err(|err| {
                         ModelError::CollectionServiceDirError {
@@ -872,7 +890,7 @@ impl CollectionServiceDirectory {
                     })?;
                 }
             }
-            inner.entries.retain(|entry| entry.source_child_name != *target_name);
+            inner.entries.retain(|key, _| key.source_child_name != *target_name);
         }
         Ok(())
     }
@@ -908,11 +926,20 @@ pub struct ServiceInstanceDirectoryEntry {
     /// The source of the service capability instance to route.
     source: CapabilitySource,
     /// The name of the child component that serves `source` (without the collection name).
-    pub source_child_name: String,
+    pub source_child_name: FlyStr,
     /// The name of the service instance directory to open at the source.
-    pub service_instance: String,
+    pub service_instance: FlyStr,
     /// The component that is hosting the directory.
     parent: WeakComponentInstance,
+}
+
+/// A key that uniquely identifies a ServiceInstanceDirectoryEntry.
+#[derive(Hash, PartialEq, Eq)]
+struct ServiceInstanceDirectoryKey {
+    /// The name of the child component that serves `source` (without the collection name).
+    pub source_child_name: FlyStr,
+    /// The name of the service instance directory to open at the source.
+    pub service_instance: FlyStr,
 }
 
 impl DirectoryEntry for ServiceInstanceDirectoryEntry {
@@ -933,7 +960,7 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
                 }
             };
 
-            let mut relative_path = PathBuf::from(&self.service_instance);
+            let mut relative_path = PathBuf::from(self.service_instance.as_str());
 
             // Path::join with an empty string adds a trailing slash, which some VFS implementations don't like.
             if !path.is_empty() {
@@ -979,7 +1006,6 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
 
 #[cfg(test)]
 mod tests {
-
     use {
         super::*,
         crate::{
@@ -1001,6 +1027,8 @@ mod tests {
         fuchsia_async as fasync,
         futures::StreamExt,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
+        proptest::prelude::*,
+        rand::SeedableRng,
         std::{
             collections::{HashMap, HashSet},
             convert::TryInto,
@@ -1211,6 +1239,7 @@ mod tests {
             fasync::Timer::new(std::time::Duration::from_millis(100)).await;
         }
     }
+
     async fn create_collection_service_test_realm(
         init_service_dir: bool,
     ) -> (RoutingTest, Arc<CollectionServiceDirectory>) {
@@ -1317,44 +1346,82 @@ mod tests {
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
 
-        // List the entries of the directory served by `open`.
-        let entries = fuchsia_fs::directory::readdir(&dir_proxy)
-            .await
-            .expect("failed to read directory entries");
-        let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
-        assert_eq!(instance_names.len(), 4);
+        // List the entries of the directory served by `open`, and compare them to the
+        // internal state.
+        let instance_names = {
+            let instance_names: HashSet<_> =
+                dir_arc.entries().await.into_iter().map(|e| e.name.clone()).collect();
+            let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+                .await
+                .expect("failed to read directory entries");
+            let dir_instance_names: HashSet<_> = dir_contents.into_iter().map(|d| d.name).collect();
+            assert_eq!(instance_names.len(), 4);
+            assert_eq!(dir_instance_names, instance_names);
+            instance_names
+        };
 
         // Open one of the entries.
-        let collection_dir = fuchsia_fs::directory::open_directory(
-            &dir_proxy,
-            instance_names.iter().next().expect("failed to get instance name"),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .expect("failed to open collection dir");
-
-        // Make sure we're reading the expected directory.
-        let entries = fuchsia_fs::directory::readdir(&collection_dir)
+        {
+            let instance_dir = fuchsia_fs::directory::open_directory(
+                &dir_proxy,
+                instance_names.iter().next().expect("failed to get instance name"),
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            )
             .await
-            .expect("failed to read instances of collection dir");
-        assert!(entries.iter().find(|d| d.name == "member").is_some());
+            .expect("failed to open collection dir");
+
+            // Make sure we're reading the expected directory.
+            let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
+                .await
+                .expect("failed to read instances of collection dir");
+            assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
+        }
 
         let baz_component = test
             .model
             .look_up(&vec!["coll:baz"].try_into().unwrap())
             .await
             .expect("failed to find baz instance");
-        // Test that removal of instances works
-        baz_component.stop().await.expect("failed to shutdown component");
-        let updated_entries = wait_for_dir_content_change(&dir_proxy, entries).await;
-        assert_eq!(updated_entries.len(), 2);
 
-        test.start_instance_and_wait_start(baz_component.abs_moniker())
-            .await
-            .expect("component should start");
+        // Add entries from the children again. This should be a no-op since all of them are
+        // already there and we prevent duplicates.
+        let dir_contents = {
+            let previous_entries: HashSet<_> = dir_arc
+                .entries()
+                .await
+                .into_iter()
+                .map(|e| (e.name.clone(), e.source_child_name.clone(), e.service_instance.clone()))
+                .collect();
+            dir_arc.add_entries_from_children().await.unwrap();
+            let entries: HashSet<_> = dir_arc
+                .entries()
+                .await
+                .into_iter()
+                .map(|e| (e.name.clone(), e.source_child_name.clone(), e.service_instance.clone()))
+                .collect();
+            assert_eq!(entries, previous_entries);
+            let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy)
+                .await
+                .expect("failed to read directory entries");
+            let dir_instance_names: HashSet<_> =
+                dir_contents.iter().map(|d| d.name.clone()).collect();
+            assert_eq!(dir_instance_names, instance_names);
+            dir_contents
+        };
 
-        let updated_entries = wait_for_dir_content_change(&dir_proxy, updated_entries).await;
-        assert_eq!(updated_entries.len(), 4);
+        // Test that removal of instances works.
+        {
+            baz_component.stop().await.expect("failed to shutdown component");
+            let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+            assert_eq!(dir_contents.len(), 2);
+
+            test.start_instance_and_wait_start(baz_component.abs_moniker())
+                .await
+                .expect("component should start");
+
+            let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+            assert_eq!(dir_contents.len(), 4);
+        }
     }
 
     #[fuchsia::test]
@@ -1382,6 +1449,7 @@ mod tests {
         let updated_entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(updated_entries.len(), 2);
     }
+
     #[fuchsia::test]
     async fn test_collection_service_directory_component_stopped() {
         let (test, dir_arc) = create_collection_service_test_realm(true).await;
@@ -1479,7 +1547,9 @@ mod tests {
             .expect("failed to read directory entries");
         let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
         assert_eq!(instance_names.len(), 1);
-        assert_eq!(instance_names.iter().next().unwrap(), "foo,default");
+        for instance in instance_names {
+            assert!(is_instance_id(&instance), "{}", instance);
+        }
     }
 
     #[fuchsia::test]
@@ -1560,9 +1630,28 @@ mod tests {
             .expect("failed to read directory entries");
 
         let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
-        assert!(instance_names.contains("bar,default"));
-        assert!(instance_names.contains("bar,one"));
-        assert!(instance_names.contains("foo,default"));
+        assert_eq!(instance_names.len(), 3);
+        for instance in instance_names {
+            assert!(is_instance_id(&instance), "{}", instance);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn service_instance_id(seed in 0..u64::MAX) {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+            let instance = CollectionServiceDirectory::generate_instance_id(&mut rng);
+            assert!(is_instance_id(&instance), "{}", instance);
+
+            // Verify it's random
+            let instance2 = CollectionServiceDirectory::generate_instance_id(&mut rng);
+            assert!(is_instance_id(&instance2), "{}", instance2);
+            assert_ne!(instance, instance2);
+        }
+    }
+
+    fn is_instance_id(id: &str) -> bool {
+        id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit())
     }
 
     #[fuchsia::test]

@@ -47,15 +47,13 @@ async fn list_instances_test() {
     .await
     .expect("failed to open service dir");
 
-    let mut instances: Vec<String> = fuchsia_fs::directory::readdir(&service_dir)
+    let instances: Vec<String> = fuchsia_fs::directory::readdir(&service_dir)
         .await
         .expect("failed to read entries from service dir")
         .into_iter()
         .map(|dirent| dirent.name)
         .collect();
-    instances.sort();
-
-    assert_eq!(vec!["a,default", "b,default"], instances);
+    verify_instances(instances, 2);
 }
 
 #[fuchsia::test]
@@ -114,16 +112,15 @@ async fn create_destroy_instance_test() {
     .await
     .expect("failed to open service dir");
 
-    let mut instances: Vec<String> = fuchsia_fs::directory::readdir(&service_dir)
+    let instances: Vec<String> = fuchsia_fs::directory::readdir(&service_dir)
         .await
         .expect("failed to read entries from service dir")
         .into_iter()
         .map(|dirent| dirent.name)
         .collect();
-    instances.sort();
 
     // The aggregated service directory should contain instances from the provider.
-    assert_eq!(vec!["a,default", "b,default"], instances);
+    verify_instances(instances, 2);
 
     // Destroy provider a.
     destroy_provider(&branch, PROVIDER_A_NAME).await.expect("failed to destroy provider a");
@@ -136,7 +133,7 @@ async fn create_destroy_instance_test() {
         .collect();
 
     // The provider's instances should be removed from the aggregated service directory.
-    assert_eq!(vec!["b,default"], instances);
+    verify_instances(instances, 1);
 }
 
 /// Starts a branch child component.
@@ -261,4 +258,9 @@ async fn destroy_provider(branch: &ScopedInstance, child_name: &str) -> Result<(
         .context("event sequence did not match expected")?;
 
     Ok(())
+}
+
+fn verify_instances(instances: Vec<String>, expected_len: usize) {
+    assert_eq!(instances.len(), expected_len);
+    assert!(instances.iter().all(|id| id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit())));
 }
