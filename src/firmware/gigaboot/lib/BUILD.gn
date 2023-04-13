@@ -21,6 +21,12 @@ if (is_efi_toolchain) {
     ]
     public_deps = [ ":shared" ]
 
+    # TODO(dpursell): Disabling warnings in the meantime until legacy code is removed.
+    cflags = [
+      "-Wno-shorten-64-to-32",
+      "-Wno-missing-prototypes",
+    ]
+
     # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
   }
