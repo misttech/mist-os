@@ -404,6 +404,49 @@ impl Generator<IpAddressWithPrefix<IpAddr>> for FidlGen {
     }
 }
 
+impl Generator<IpAddressWithPrefix<IpAddr>> for NetGen {
+    fn generate(input: IpAddressWithPrefix<IpAddr>) -> TokenStream {
+        let IpAddressWithPrefix { address, prefix } = input;
+        let address = Self::generate(address);
+        // SAFETY: AddrSubnetEither's invariants were already checked.
+        quote! {
+            unsafe {
+                net_types::ip::AddrSubnetEither::new_unchecked(#address, #prefix)
+            }
+        }
+    }
+}
+
+impl Generator<IpAddressWithPrefix<Ipv4Addr>> for NetGen {
+    fn generate(input: IpAddressWithPrefix<Ipv4Addr>) -> TokenStream {
+        let IpAddressWithPrefix { address, prefix } = input;
+        let address = Self::generate(address);
+        // SAFETY: AddrSubnet's invariants were already checked.
+        quote! {
+            unsafe {
+                net_types::ip::AddrSubnet::<net_types::ip::Ipv4Addr>::new_unchecked(
+                    #address, #prefix,
+                )
+            }
+        }
+    }
+}
+
+impl Generator<IpAddressWithPrefix<Ipv6Addr>> for NetGen {
+    fn generate(input: IpAddressWithPrefix<Ipv6Addr>) -> TokenStream {
+        let IpAddressWithPrefix { address, prefix } = input;
+        let address = Self::generate(address);
+        // SAFETY: AddrSubnet's invariants were already checked.
+        quote! {
+            unsafe {
+                net_types::ip::AddrSubnet::<net_types::ip::Ipv6Addr>::new_unchecked(
+                    #address, #prefix,
+                )
+            }
+        }
+    }
+}
+
 #[derive(thiserror::Error, PartialEq, Debug)]
 enum VersionedIpPrefixError {
     #[error("wrong IP version: {0}")]
@@ -582,6 +625,9 @@ declare_macro!(net_ip_v6, NetGen, Ipv6Addr);
 declare_macro!(net_mac, NetGen, MacAddress);
 declare_macro!(net_subnet_v4, NetGen, StrictSubnet<Ipv4Addr>);
 declare_macro!(net_subnet_v6, NetGen, StrictSubnet<Ipv6Addr>);
+declare_macro!(net_addr_subnet_v4, NetGen, IpAddressWithPrefix<Ipv4Addr>);
+declare_macro!(net_addr_subnet_v6, NetGen, IpAddressWithPrefix<Ipv6Addr>);
+declare_macro!(net_addr_subnet, NetGen, IpAddressWithPrefix<IpAddr>);
 
 fn net_prefix_length_impl<I: net_types::ip::Ip>(
     input: proc_macro::TokenStream,

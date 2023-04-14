@@ -2448,6 +2448,23 @@ impl<S: IpAddress, A: Witness<S> + Copy> AddrSubnet<S, A> {
         AddrSubnet::from_witness(A::new(addr).ok_or(AddrSubnetError::InvalidWitness)?, prefix)
     }
 
+    /// Creates a new `AddrSubnet` without checking for validity.
+    ///
+    /// # Safety
+    ///
+    /// Unlike [`new`], `new_unchecked` does not validate that `prefix` is in the
+    /// proper range, and does not check that `addr` is a valid value for the
+    /// witness type `A`. It is up to the caller to guarantee that `prefix` is
+    /// in the proper range, and `A::new(addr)` is not `None`.
+    ///
+    /// [`new`]: AddrSubnet::new
+    #[inline]
+    pub unsafe fn new_unchecked(addr: S, prefix: u8) -> Self {
+        let (subnet, addr) =
+            unsafe { (Subnet::new_unchecked(addr.mask(prefix), prefix), A::new_unchecked(addr)) };
+        AddrSubnet { addr, subnet }
+    }
+
     /// Creates a new `AddrSubnet` from an existing witness.
     ///
     /// `from_witness` creates a new `AddrSubnet` with the given address and
@@ -2722,6 +2739,27 @@ impl<A: IpAddrWitness> AddrSubnetEither<A> {
             IpAddr::V4(addr) => AddrSubnetEither::V4(AddrSubnet::new(addr, prefix)?),
             IpAddr::V6(addr) => AddrSubnetEither::V6(AddrSubnet::new(addr, prefix)?),
         })
+    }
+
+    /// Creates a new `AddrSubnetEither` from trusted inputs.
+    ///
+    /// # Safety
+    ///
+    /// Unlike [`new`], this assumes that the provided address satisfies the
+    /// requirements of the witness type `A`, and that `prefix` is not too large
+    /// for the IP version of the address in `addr`.
+    ///
+    /// [`new`]: AddrSubnetEither::new
+    #[inline]
+    pub unsafe fn new_unchecked(addr: IpAddr, prefix: u8) -> Self {
+        match addr {
+            IpAddr::V4(addr) => {
+                AddrSubnetEither::V4(unsafe { AddrSubnet::new_unchecked(addr, prefix) })
+            }
+            IpAddr::V6(addr) => {
+                AddrSubnetEither::V6(unsafe { AddrSubnet::new_unchecked(addr, prefix) })
+            }
+        }
     }
 
     /// Gets the IP address.

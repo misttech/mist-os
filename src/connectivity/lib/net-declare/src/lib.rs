@@ -74,6 +74,15 @@ pub use net_declare_macros::fidl_socket_addr_v6;
 /// in the form `addr/prefix`, e.g. `192.168.0.1/24` or `ff08::1/64`.
 pub use net_declare_macros::fidl_subnet;
 
+/// Declares a [`net_types::ip::AddrSubnetEither`] from a parsable IP address +
+/// prefix length string.
+pub use net_declare_macros::net_addr_subnet;
+/// Declares a [`net_types::ip::AddrSubnet<Ipv4Addr>`] from a parsable IPv4
+/// address + prefix length string.
+pub use net_declare_macros::net_addr_subnet_v4;
+/// Declares a [`net_types::ip::AddrSubnet<Ipv6Addr>`] from a parsable IPv6
+/// address + prefix length string.
+pub use net_declare_macros::net_addr_subnet_v6;
 /// Declares a [`net_types::ip::IpAddr`] from a parsable IP address (either V4
 /// or V6) string.
 pub use net_declare_macros::net_ip;
