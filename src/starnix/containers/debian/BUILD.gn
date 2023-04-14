@@ -13,6 +13,9 @@ resource("system_image") {
     sources = [ "//prebuilt/starnix/linux-amd64/amd64_system.img" ]
   } else if (target_cpu == "arm64") {
     sources = [ "//prebuilt/starnix/linux-arm64/arm64_system.img" ]
+  } else {
+    # Define an empty value to allow builds for "other" target_cpus.
+    sources = []
   }
   outputs = [ "data/system.img" ]
 }
