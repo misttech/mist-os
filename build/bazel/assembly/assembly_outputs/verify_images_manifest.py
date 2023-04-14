@@ -55,8 +55,8 @@ def rebase_bazel_path(path, root_dir, gn_root_dir):
     # so the number of ../ in the prefix is not known.
     # Match an arbitrary traversal up and remove it
     aib_prefixes = [
-        r"^\.\./assembly_input_bundles/platform_eng/",
-        r"^(\.\.\/)+build/bazel/assembly/assembly_input_bundles/platform_eng/"
+        r"^\.\./assembly_input_bundles/platform_(eng|user|userdebug)/",
+        r"^(\.\.\/)+build/bazel/assembly/assembly_input_bundles/platform_(eng|user|userdebug)/"
     ]
 
     relative_path = os.path.relpath(gn_root_dir, root_dir)
