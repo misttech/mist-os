@@ -11,8 +11,7 @@ using DirCompatibilityTest = F2fsGuestTest;
 
 TEST_F(DirCompatibilityTest, DirWidthTestLinuxToFuchsia) {
   // Mkdir on Linux
-  // TODO(fxbug.dev/115142): more children for slow test
-  constexpr int kDirWidth = 200;
+  constexpr int kDirWidth = 60;
   {
     GetEnclosedGuest().GetLinuxOperator().Mkfs();
     GetEnclosedGuest().GetLinuxOperator().Mount();
@@ -43,8 +42,7 @@ TEST_F(DirCompatibilityTest, DirWidthTestLinuxToFuchsia) {
 
 TEST_F(DirCompatibilityTest, DirWidthTestFuchsiaToLinux) {
   // Mkdir on Fuchsia
-  // TODO(fxbug.dev/115142): more children for slow test
-  constexpr int kDirWidth = 200;
+  constexpr int kDirWidth = 60;
   {
     GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
     GetEnclosedGuest().GetFuchsiaOperator().Mount();

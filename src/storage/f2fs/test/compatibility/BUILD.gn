@@ -33,6 +33,14 @@ test("f2fs-dir-compatibility-test") {
   deps = test_deps
 }
 
+test("f2fs-dir-slow-compatibility-test") {
+  testonly = true
+
+  sources = [ "dir_slow.cc" ] + test_sources
+
+  deps = test_deps
+}
+
 test("f2fs-file-attr-compatibility-test") {
   testonly = true
 
@@ -81,6 +89,12 @@ fuchsia_test_component("f2fs-dir-compatibility-test-cmp") {
   manifest = "f2fs_dir_compatibility.cml"
 }
 
+fuchsia_test_component("f2fs-dir-slow-compatibility-test-cmp") {
+  component_name = "f2fs-dir-slow-compatibility-test-cmp"
+  deps = [ ":f2fs-dir-slow-compatibility-test" ] + component_deps
+  manifest = "f2fs_dir_slow_compatibility.cml"
+}
+
 fuchsia_test_component("f2fs-file-attr-compatibility-test-cmp") {
   component_name = "f2fs-file-attr-compatibility-test-cmp"
   deps = [ ":f2fs-file-attr-compatibility-test" ] + component_deps
@@ -115,6 +129,7 @@ fuchsia_test_package("f2fs-compatibility-test-pkg") {
   package_name = "f2fs-compatibility-test-pkg"
   test_components = [
     ":f2fs-dir-compatibility-test-cmp",
+    ":f2fs-dir-slow-compatibility-test-cmp",
     ":f2fs-file-attr-compatibility-test-cmp",
     ":f2fs-file-rw-compatibility-test-cmp",
     ":f2fs-file-slow-compatibility-test-cmp",
