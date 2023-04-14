@@ -1118,33 +1118,10 @@ pub fn sys_getcwd(
     buf: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let mut cwd = current_task.fs().cwd().path();
-    let root = current_task.fs().root().path();
+    let cwd = current_task.fs().cwd();
+    let root = current_task.fs().root();
 
-    let mut user_cwd = if root == b"/" {
-        // cwd = "/foo/bar"
-        // root = "/"
-        // user_cwd = "/foo/bar"
-        cwd
-    } else if cwd == root {
-        // cwd = "/foo/bar"
-        // root = "/foo/bar"
-        // user_cwd = "/"
-        b"/".to_vec()
-    } else if cwd.starts_with(&root) {
-        // cwd = "/foo/bar/baz"
-        // root = "/foo/bar"
-        // user_cwd = "/baz"
-        cwd.drain(0..root.len());
-        cwd
-    } else {
-        // cwd = "/foo/bar"
-        // root = "/qux"
-        // user_cwd = "(unreachable)/foo/bar"
-        let mut bytes = b"(unreachable)".to_vec();
-        bytes.append(&mut cwd);
-        bytes
-    };
+    let mut user_cwd = cwd.path_from_root(&root);
     user_cwd.push(b'\0');
     if user_cwd.len() > size {
         return error!(ERANGE);
