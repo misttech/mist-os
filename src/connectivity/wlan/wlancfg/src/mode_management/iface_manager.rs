@@ -1017,7 +1017,7 @@ async fn handle_bss_selection_results_for_connect_request(
         Some(scanned_candidate) => {
             let selection = client_types::ConnectSelection {
                 target: scanned_candidate,
-                reason: client_types::ConnectReason::FidlConnectRequest,
+                reason: request.reason,
             };
             info!("Starting connection to {:?}", selection.target.network);
             let _ = iface_manager.connect(selection).await;
