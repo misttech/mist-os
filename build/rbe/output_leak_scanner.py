@@ -6,6 +6,14 @@
 
 This script is both a library and standalone binary.
 
+The build output directory is inferred as the relative path from
+the project root to the working directory.
+Reject any occurrences of the output dir:
+
+  1) in the command's tokens
+  2) in the output files' paths
+  3) in the output files' contents
+
 Usage:
   $0 [options...] [outputs...] -- command...
 """
@@ -72,7 +80,11 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     )
     # Positional args are the outputs of the command to scan.
     parser.add_argument(
-        "outputs", nargs="*", help="Outputs to scan for leaks after execution.")
+        "outputs",
+        nargs="*",
+        type=Path,
+        help="Outputs to scan for leaks after execution.",
+    )
     return parser
 
 
@@ -86,6 +98,23 @@ def _whole_word_pattern(pattern: str) -> str:
     return left + pattern + right
 
 
+class PathPattern(object):
+    """Represents a path that is used for pattern searching."""
+
+    def __init__(self, path: Path):
+        self._text = str(path)
+        # match whole-word only
+        self._re = re.compile(_whole_word_pattern(self._text))
+
+    @property
+    def text(self) -> str:
+        return self._text
+
+    @property
+    def re(self) -> re.Pattern:
+        return self._re
+
+
 # define for easy mocking
 def _open_read_text(f) -> io.TextIOBase:
     return open(f, 'rt')
@@ -97,23 +126,17 @@ def _open_read_binary(f) -> io.RawIOBase:
 
 def file_contains_subpath(
     f: Path,
-    subpath: str,
-    subpath_re: re.Pattern = None,
+    subpath: PathPattern,
 ) -> bool:
     """Detect if a subpath string appears in a file.
 
     Args:
       f: file to scan
-      subpath: path as a string to match
-      subpath_re: if given, this is should be `re.compile(subpath)`.
-          Passing this in avoids repeatedly compiling the same regex.
+      subpath: path pattern to match
 
     Returns:
       True if the file's contents contains the subpath.
     """
-    subpath_re = subpath_re or re.compile(
-        _whole_word_pattern(subpath))  # whole word match
-
     if not f.exists():
         return False
 
@@ -125,7 +148,7 @@ def file_contains_subpath(
     try:  # Try text first.
         with _open_read_text(f) as lines:
             for line in lines:  # read one line at a time
-                if subpath_re.search(line):
+                if subpath.re.search(line):
                     return True  # stop at first match
     except UnicodeDecodeError:
         # Open as binary.
@@ -135,7 +158,7 @@ def file_contains_subpath(
             s = mmap.mmap(binary_file.fileno(), 0, access=mmap.ACCESS_READ)
             # Note: This matches partial words, which risks flagging
             # false positives.
-            if s.find(subpath.encode()) != -1:
+            if s.find(subpath.text.encode()) != -1:
                 return True
 
     return False
@@ -159,26 +182,26 @@ def tokens_with_build_dir_leaks(command: Iterable[str],
 def preflight_checks(
     paths: Iterable[Path],
     command: Iterable[str],
-    pattern: re.Pattern,
+    pattern: PathPattern,
     label: str = None,
 ) -> int:
     """Checks output paths and command for build dir leaks."""
     exit_code = 0
-    output_path_leaks = list(paths_with_build_dir_leaks(paths, pattern))
+    output_path_leaks = list(paths_with_build_dir_leaks(paths, pattern.re))
     if output_path_leaks:
         for f in output_path_leaks:
             error_msg(
-                f"""Output path '{f}' contains '{pattern.pattern}'.
+                f"""Output path '{f}' contains '{pattern.text}'.
 Adding rebase_path(..., root_build_dir) in GN may fix this to be relative.
 If this command requires an absolute path, mark this action in GN with
 'no_output_dir_leaks = false'.""",
                 label=label)
             exit_code = 1
 
-    token_path_leaks = list(tokens_with_build_dir_leaks(command, pattern))
+    token_path_leaks = list(tokens_with_build_dir_leaks(command, pattern.re))
     for tok in token_path_leaks:
         error_msg(
-            f"""Command token '{tok}' contains '{pattern.pattern}'.
+            f"""Command token '{tok}' contains '{pattern.text}'.
 Adding rebase_path(..., root_build_dir) in GN may fix this to be relative.
 If this command requires an absolute path, mark this action in GN with
 'no_output_dir_leaks = false'.""",
@@ -190,17 +213,15 @@ If this command requires an absolute path, mark this action in GN with
 
 def postflight_checks(
     outputs: Iterable[Path],
-    subpath: str,
-    subpath_re: re.Pattern = None,
+    subpath: PathPattern,
     label: str = None,
 ):
-    subpath_re = subpath_re or re.compile(_whole_word_pattern(subpath))
     exit_code = 0
     # Command succeeded, scan its declared outputs.
     for f in outputs:
-        if file_contains_subpath(f, subpath, subpath_re):
+        if file_contains_subpath(f, subpath):
             error_msg(
-                f"""Output file {f} contains '{subpath}'.
+                f"""Output file {f} contains '{subpath.text}'.
 If this cannot be fixed in the tool, mark this action in GN with
 'no_output_dir_leaks = false'.""",
                 label=label)
@@ -215,7 +236,8 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     Leaks of the build-dir in commands and their output artifacts
     are harmful to action caching.
 
-    TODO: accept additional patterns to scan, e.g. 'set_by_reclient/...'
+    TODO(http://fxbug.dev/92670): accept additional patterns to scan,
+    e.g. 'set_by_reclient/...'
 
     Args:
       argv: script args, '--', then command
@@ -237,8 +259,7 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     command = argv[ddash + 1:]
 
     build_subdir = _relpath(working_dir, start=exec_root)
-    build_subdir_re = re.compile(
-        _whole_word_pattern(str(build_subdir)))  # match whole-word only
+    path_pattern = PathPattern(build_subdir)
 
     main_args = _MAIN_ARG_PARSER.parse_args(script_args)
     label = main_args.label
@@ -246,7 +267,7 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     pre_scan_exit_code = preflight_checks(
         paths=main_args.outputs,
         command=command,
-        pattern=build_subdir_re,
+        pattern=path_pattern,
         label=label)
 
     if not main_args.execute:
@@ -260,7 +281,7 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
 
     # Command succeeded, scan its declared outputs.
     post_scan_exit_code = postflight_checks(
-        main_args.outputs, build_subdir, build_subdir_re, label=label)
+        main_args.outputs, path_pattern, label=label)
 
     # return code reflects success of command and success of scans
     scan_exit_code = pre_scan_exit_code or post_scan_exit_code

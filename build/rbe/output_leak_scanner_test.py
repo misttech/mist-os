@@ -67,7 +67,7 @@ class MainArgParserTests(unittest.TestCase):
         outputs = ['foo/bar.txt', 'bar/foo.o']
         parser = output_leak_scanner._MAIN_ARG_PARSER
         args = parser.parse_args(outputs)  # positional
-        self.assertEqual(args.outputs, outputs)
+        self.assertEqual(args.outputs, _paths(outputs))
 
 
 class ErrorMsgTests(unittest.TestCase):
@@ -103,160 +103,184 @@ class FileContainsSubpathTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             self.assertFalse(
                 output_leak_scanner.file_contains_subpath(
-                    Path(td) / 'nonexistent', '.'))
+                    Path(td) / 'nonexistent',
+                    output_leak_scanner.PathPattern(Path('.'))))
 
     def test_ignore_dir(self):
         with tempfile.TemporaryDirectory() as td:
             self.assertFalse(
-                output_leak_scanner.file_contains_subpath(Path(td), '.'))
+                output_leak_scanner.file_contains_subpath(
+                    Path(td), output_leak_scanner.PathPattern(Path('.'))))
 
     def test_text_no_match(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_text_file_contents(tf, 'a\nb\nc\n')
             self.assertFalse(
-                output_leak_scanner.file_contains_subpath(tf, 'def'))
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('def'))))
 
     def test_text_match(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_text_file_contents(tf, 'a\nb\nc\n')
-            self.assertTrue(output_leak_scanner.file_contains_subpath(tf, 'b'))
+            self.assertTrue(
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('b'))))
 
     def test_text_no_match_partial_word(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_text_file_contents(tf, 'ab\nbb\nbc\n')
-            self.assertFalse(output_leak_scanner.file_contains_subpath(tf, 'b'))
-            self.assertTrue(output_leak_scanner.file_contains_subpath(tf, 'bb'))
+            self.assertFalse(
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('b'))))
+            self.assertTrue(
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('bb'))))
 
     def test_binary_no_match(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_binary_file_contents(tf, b'\xcc\n\xdd\xee\n\xff\n+abc+\n')
             self.assertFalse(
-                output_leak_scanner.file_contains_subpath(tf, 'pdq'))
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('pdq'))))
 
     def test_binary_match(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_binary_file_contents(tf, b'\xcc\n\xdd\xee\n\xff\n+abc+\n')
             self.assertTrue(
-                output_leak_scanner.file_contains_subpath(tf, 'abc'))
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('abc'))))
 
     def test_binary_match_partial(self):
         with tempfile.TemporaryDirectory() as td:
             tf = (Path(td) / __name__).with_suffix('.txt')
             _write_binary_file_contents(tf, b'\xcc\n\xdd\xee\n\xff\n+abc+\n')
-            self.assertTrue(output_leak_scanner.file_contains_subpath(tf, 'b'))
+            self.assertTrue(
+                output_leak_scanner.file_contains_subpath(
+                    tf, output_leak_scanner.PathPattern(Path('b'))))
 
 
 class PathsWithBuildDirLeaksTests(unittest.TestCase):
 
     def test_negatives(self):
+        build_dir = Path('build/me/here')
         cases = _paths(
             [
                 'build/me/there', 'out/default', 'rebuild/me/here',
                 'build/me/heretic'
             ])
-        pattern = re.compile(r'\bbuild/me/here\b')
+        pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.paths_with_build_dir_leaks(cases, pattern))
+            output_leak_scanner.paths_with_build_dir_leaks(cases, pattern.re))
         self.assertEqual(actual, [])
 
     def test_positives(self):
+        build_dir = Path('build/me/here')
         cases = _paths(
             [
                 '/tmp/build/me/here', 'build/me/here',
                 'build/me/here/foo/bar.txt'
             ])
-        pattern = re.compile(r'\bbuild/me/here\b')
+        pattern = output_leak_scanner.PathPattern(build_dir)
         actual = set(
-            output_leak_scanner.paths_with_build_dir_leaks(cases, pattern))
+            output_leak_scanner.paths_with_build_dir_leaks(cases, pattern.re))
         self.assertEqual(actual, set(cases))
 
 
 class TokensWithBuildDirLeaks(unittest.TestCase):
 
     def test_negatives(self):
+        build_dir = Path('build/here')
         cases = [
             '-f', 'build/not/here', 'out/default', 'rebuild/here',
             'build/heretic'
         ]
-        pattern = re.compile(r'\bbuild/here\b')
+        pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern))
+            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
         self.assertEqual(actual, [])
 
     def test_positives(self):
+        build_dir = Path('build/here')
         cases = ['/work/out/build/here', 'build/here', 'build/here/out.txt']
-        pattern = re.compile(r'\bbuild/here\b')
+        pattern = output_leak_scanner.PathPattern(build_dir)
         actual = list(
-            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern))
+            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
         self.assertEqual(actual, cases)
 
 
 class PreflightChecksTests(unittest.TestCase):
 
     def test_no_findings(self):
+        build_dir_pattern = output_leak_scanner.PathPattern(Path('any'))
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             return_code = output_leak_scanner.preflight_checks(
-                paths=[], command=[], pattern=re.compile('any'))
+                paths=[], command=[], pattern=build_dir_pattern)
             self.assertEqual(return_code, 0)
         self.assertEqual(stdout.getvalue(), '')  # quiet
 
     def test_path_leak(self):
+        build_dir = Path('as/df')
+        build_dir_pattern = output_leak_scanner.PathPattern(build_dir)
         stdout = io.StringIO()
-        bad = 'as/df/g.h'
+        bad = build_dir / 'g.h'
         with contextlib.redirect_stdout(stdout):
             return_code = output_leak_scanner.preflight_checks(
-                paths=[bad], command=[], pattern=re.compile(r'\bas/df\b'))
+                paths=[bad], command=[], pattern=build_dir_pattern)
             self.assertEqual(return_code, 1)
         message = stdout.getvalue()
         self.assertIn("Error", message)
-        self.assertIn(bad, message)
+        self.assertIn(str(bad), message)
 
     def test_command_leak(self):
+        build_dir = Path('zs/df')
+        build_dir_pattern = output_leak_scanner.PathPattern(build_dir)
         stdout = io.StringIO()
-        bad = 'zs/df/g.h'
+        bad = build_dir / 'g.h'
         with contextlib.redirect_stdout(stdout):
             return_code = output_leak_scanner.preflight_checks(
                 paths=[],
-                command=['touch', bad],
-                pattern=re.compile(r'\bzs/df\b'))
+                command=_strs(['touch', bad]),
+                pattern=build_dir_pattern)
             self.assertEqual(return_code, 1)
         message = stdout.getvalue()
         self.assertIn("Error", message)
-        self.assertIn(bad, message)
+        self.assertIn(str(bad), message)
 
 
 class PostflightChecksTests(unittest.TestCase):
 
     def test_no_findings(self):
+        build_dir_pattern = output_leak_scanner.PathPattern(Path('out/f/b'))
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             with mock.patch.object(output_leak_scanner, 'file_contains_subpath',
                                    return_value=False) as mock_search:
                 return_code = output_leak_scanner.postflight_checks(
-                    outputs=['foo.o'], subpath='out/f/b')
+                    outputs=['foo.o'], subpath=build_dir_pattern)
                 self.assertEqual(return_code, 0)
         mock_search.assert_called_once()
         self.assertEqual(stdout.getvalue(), '')
 
     def test_has_findings(self):
+        build_dir = Path('out/f/b')
+        build_dir_pattern = output_leak_scanner.PathPattern(build_dir)
         stdout = io.StringIO()
-        build_dir = 'out/f/b'
         with contextlib.redirect_stdout(stdout):
             with mock.patch.object(output_leak_scanner, 'file_contains_subpath',
                                    return_value=True) as mock_search:
                 return_code = output_leak_scanner.postflight_checks(
-                    outputs=['foo.o'], subpath=build_dir)
+                    outputs=['foo.o'], subpath=build_dir_pattern)
                 self.assertEqual(return_code, 1)
         mock_search.assert_called_once()
         message = stdout.getvalue()
         self.assertIn("Error", message)
-        self.assertIn(build_dir, message)
+        self.assertIn(str(build_dir), message)
 
 
 class ScanLeaksTests(unittest.TestCase):
@@ -269,8 +293,8 @@ class ScanLeaksTests(unittest.TestCase):
             with mock.patch.object(sys, 'exit') as mock_exit:
                 return_code = output_leak_scanner.scan_leaks(
                     [],
-                    exec_root='/home',
-                    working_dir='/home/build',
+                    exec_root=Path('/home'),
+                    working_dir=Path('/home/build'),
                 )
         mock_exit.assert_called_once()
         self.assertEqual(return_code, 1)
@@ -287,8 +311,8 @@ class ScanLeaksTests(unittest.TestCase):
                                        return_value=1) as mock_call:
                     return_code = output_leak_scanner.scan_leaks(
                         ['--no-execute', '--', 'touch', 'down.txt'],
-                        exec_root='/home',
-                        working_dir='/home/build',
+                        exec_root=Path('/home'),
+                        working_dir=Path('/home/build'),
                     )
             mock_pre_check.assert_called_once()
             mock_call.assert_not_called()
@@ -304,8 +328,8 @@ class ScanLeaksTests(unittest.TestCase):
                                    return_value=2) as mock_call:
                 return_code = output_leak_scanner.scan_leaks(
                     [output, '--', 'touch', output],
-                    exec_root='/home',
-                    working_dir='/home/build',
+                    exec_root=Path('/home'),
+                    working_dir=Path('/home/build'),
                 )
             mock_call.assert_called_once()
         self.assertEqual(return_code, 2)
@@ -324,8 +348,8 @@ class ScanLeaksTests(unittest.TestCase):
                                            return_value=0) as mock_call:
                         return_code = output_leak_scanner.scan_leaks(
                             [output, '--', 'touch', output],
-                            exec_root='/home',
-                            working_dir='/home/build',
+                            exec_root=Path('/home'),
+                            working_dir=Path('/home/build'),
                         )
             mock_pre_check.assert_called_once()
             mock_call.assert_called_once()
@@ -334,7 +358,7 @@ class ScanLeaksTests(unittest.TestCase):
 
     def test_execute_success_postflight_error(self):
         stdout = io.StringIO()
-        output = 'down.txt'
+        output = Path('down.txt')
         with contextlib.redirect_stdout(stdout):
             with mock.patch.object(output_leak_scanner, 'preflight_checks',
                                    return_value=0) as mock_pre_check:
@@ -343,9 +367,9 @@ class ScanLeaksTests(unittest.TestCase):
                     with mock.patch.object(subprocess, 'call',
                                            return_value=0) as mock_call:
                         return_code = output_leak_scanner.scan_leaks(
-                            [output, '--', 'touch', output],
-                            exec_root='/home',
-                            working_dir='/home/build',
+                            _strs([output, '--', 'touch', output]),
+                            exec_root=Path('/home'),
+                            working_dir=Path('/home/build'),
                         )
             mock_pre_check.assert_called_once()
             mock_call.assert_called_once()
@@ -354,7 +378,7 @@ class ScanLeaksTests(unittest.TestCase):
 
     def test_execute_success_scans_clean(self):
         stdout = io.StringIO()
-        output = 'down.txt'
+        output = Path('down.txt')
         with contextlib.redirect_stdout(stdout):
             with mock.patch.object(output_leak_scanner, 'preflight_checks',
                                    return_value=0) as mock_pre_check:
@@ -363,9 +387,9 @@ class ScanLeaksTests(unittest.TestCase):
                     with mock.patch.object(subprocess, 'call',
                                            return_value=0) as mock_call:
                         return_code = output_leak_scanner.scan_leaks(
-                            [output, '--', 'touch', output],
-                            exec_root='/home',
-                            working_dir='/home/build',
+                            _strs([output, '--', 'touch', output]),
+                            exec_root=Path('/home'),
+                            working_dir=Path('/home/build'),
                         )
             mock_pre_check.assert_called_once()
             mock_call.assert_called_once()
