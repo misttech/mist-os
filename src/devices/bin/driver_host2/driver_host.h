@@ -40,10 +40,10 @@ class DriverHost : public fidl::Server<fuchsia_driver_host::DriverHost> {
   void InstallLoader(InstallLoaderRequest& request,
                      InstallLoaderCompleter::Sync& completer) override;
 
-  zx::result<> StartDriver(fbl::RefPtr<Driver> driver,
-                           fuchsia_driver_framework::DriverStartArgs start_args,
-                           fdf::Dispatcher dispatcher,
-                           fidl::ServerEnd<fuchsia_driver_host::Driver> driver_request);
+  void StartDriver(fbl::RefPtr<Driver> driver, fuchsia_driver_framework::DriverStartArgs start_args,
+                   fdf::Dispatcher dispatcher,
+                   fidl::ServerEnd<fuchsia_driver_host::Driver> driver_request,
+                   fit::callback<void(zx::result<>)> cb);
   void ShutdownDriver(Driver* driver, fidl::ServerEnd<fuchsia_driver_host::Driver> server);
 
   async::Loop& loop_;

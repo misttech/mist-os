@@ -65,7 +65,7 @@ void DriverHost::Start(StartRequest& request, StartCompleter::Sync& completer) {
   auto callback = [this, request = std::move(request.driver()),
                    completer = completer.ToAsync()](zx::result<LoadedDriver> loaded) mutable {
     if (loaded.is_error()) {
-      completer.Close(loaded.error_value());
+      completer.Reply(loaded.take_error());
       return;
     }
     async_dispatcher_t* driver_async_dispatcher = loaded->dispatcher.async_dispatcher();
@@ -73,11 +73,11 @@ void DriverHost::Start(StartRequest& request, StartCompleter::Sync& completer) {
     // Task to start the driver. Post this to the driver dispatcher thread.
     auto start_task = [this, request = std::move(request), completer = std::move(completer),
                        loaded = std::move(*loaded)]() mutable {
-      auto status = StartDriver(std::move(loaded.driver), std::move(loaded.start_args),
-                                std::move(loaded.dispatcher), std::move(request));
-      if (status.is_error()) {
-        completer.Close(status.error_value());
-      }
+      StartDriver(std::move(loaded.driver), std::move(loaded.start_args),
+                  std::move(loaded.dispatcher), std::move(request),
+                  [completer = std::move(completer)](zx::result<> status) mutable {
+                    completer.Reply(status);
+                  });
     };
     async::PostTask(driver_async_dispatcher, std::move(start_task));
   };
@@ -101,46 +101,53 @@ void DriverHost::InstallLoader(InstallLoaderRequest& request,
   zx::handle old_handle(dl_set_loader_service(request.loader().TakeChannel().release()));
 }
 
-zx::result<> DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
-                                     fuchsia_driver_framework::DriverStartArgs start_args,
-                                     fdf::Dispatcher dispatcher,
-                                     fidl::ServerEnd<fuchsia_driver_host::Driver> request) {
+void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
+                             fuchsia_driver_framework::DriverStartArgs start_args,
+                             fdf::Dispatcher dispatcher,
+                             fidl::ServerEnd<fuchsia_driver_host::Driver> request,
+                             fit::callback<void(zx::result<>)> cb) {
   // We have to add the driver to this list before calling Start in order to have an accurate
   // count of how many drivers exist in this driver host.
   {
     std::lock_guard<std::mutex> lock(mutex_);
     drivers_.push_back(driver);
   }
-  auto remove_driver = fit::defer([this, driver = driver.get()]() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    drivers_.erase(*driver);
-  });
+  auto start_callback = [this, driver, cb = std::move(cb),
+                         request = std::move(request)](zx::result<> status) mutable {
+    // Note: May be called from a random thread context, before `driver->Start` returns.
+    auto remove_driver = fit::defer([this, driver = driver.get()]() {
+      std::lock_guard<std::mutex> lock(mutex_);
+      drivers_.erase(*driver);
+    });
 
-  auto start = driver->Start(std::move(start_args), std::move(dispatcher));
-  if (start.is_error()) {
-    FX_SLOG(ERROR, "Failed to start driver", KV("url", driver->url().data()),
-            KV("status_str", start.status_string()));
-    // If we fail to start the driver, we need to initiate shutting down the dispatcher.
-    driver->ShutdownDispatcher();
-    // The dispatcher will be destroyed in the shutdown callback, when the last driver reference
-    // is released.
-    return start.take_error();
-  }
-  FX_SLOG(INFO, "Started driver", KV("url", driver->url().data()));
-
-  auto unbind_callback = [this](Driver* driver, fidl::UnbindInfo info,
-                                fidl::ServerEnd<fdh::Driver> server) {
-    if (!info.is_user_initiated()) {
-      FX_SLOG(WARNING, "Unexpected stop of driver", KV("url", driver->url().data()),
-              KV("status_str", info.FormatDescription()).data());
+    if (status.is_error()) {
+      FX_SLOG(ERROR, "Failed to start driver", KV("url", driver->url().data()),
+              KV("status_str", status.status_string()));
+      // If we fail to start the driver, we need to initiate shutting down the
+      // dispatcher.
+      driver->ShutdownDispatcher();
+      // The dispatcher will be destroyed in the shutdown callback, when the last
+      // driver reference is released.
+      cb(status);
+      return;
     }
-    ShutdownDriver(driver, std::move(server));
+    cb(zx::ok());
+
+    FX_SLOG(INFO, "Started driver", KV("url", driver->url().data()));
+    auto unbind_callback = [this](Driver* driver, fidl::UnbindInfo info,
+                                  fidl::ServerEnd<fdh::Driver> server) {
+      if (!info.is_user_initiated()) {
+        FX_SLOG(WARNING, "Unexpected stop of driver", KV("url", driver->url().data()),
+                KV("status_str", info.FormatDescription()).data());
+      }
+      ShutdownDriver(driver, std::move(server));
+    };
+    auto binding = fidl::BindServer(loop_.dispatcher(), std::move(request), driver.get(),
+                                    std::move(unbind_callback));
+    driver->set_binding(std::move(binding));
+    remove_driver.cancel();
   };
-  auto bind = fidl::BindServer(loop_.dispatcher(), std::move(request), driver.get(),
-                               std::move(unbind_callback));
-  driver->set_binding(std::move(bind));
-  remove_driver.cancel();
-  return zx::ok();
+  driver->Start(std::move(start_args), std::move(dispatcher), std::move(start_callback));
 }
 
 void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> server) {

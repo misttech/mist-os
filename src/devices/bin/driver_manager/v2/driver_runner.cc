@@ -421,10 +421,12 @@ void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& complet
   auto& [_, node] = *it;
   driver_args_.erase(it);
 
-  if (zx::result status = node.StartDriver(request->start_info, std::move(request->controller));
-      status.is_error()) {
-    completer.Close(status.error_value());
-  }
+  node.StartDriver(request->start_info, std::move(request->controller),
+                   [completer = completer.ToAsync()](auto result) mutable {
+                     if (result.is_error()) {
+                       completer.Close(result.error_value());
+                     }
+                   });
 }
 
 void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) {

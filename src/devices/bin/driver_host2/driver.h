@@ -35,9 +35,13 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
   // |status| is the status of the prepare_stop operation sent from the driver.
   void PrepareStopCompleted(zx_status_t status);
 
+  // Called by the driver to signal completion of the |start| operation.
+  // |status| is the status of the start operation sent from the driver.
+  void StartCompleted(zx_status_t status, void* opaque);
+
   // Starts the driver.
-  zx::result<> Start(fuchsia_driver_framework::DriverStartArgs start_args,
-                     fdf::Dispatcher dispatcher);
+  void Start(fuchsia_driver_framework::DriverStartArgs start_args, fdf::Dispatcher dispatcher,
+             fit::callback<void(zx::result<>)> cb);
 
   void ShutdownDispatcher() __TA_EXCLUDES(lock_) {
     fbl::AutoLock al(&lock_);
@@ -51,6 +55,7 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
 
   fbl::Mutex lock_;
   std::optional<void*> opaque_ __TA_GUARDED(lock_);
+  fit::callback<void(zx::result<>)> start_callback_ __TA_GUARDED(lock_);
 
   std::optional<fidl::ServerBindingRef<fuchsia_driver_host::Driver>> binding_ __TA_GUARDED(lock_);
 

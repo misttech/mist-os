@@ -14,15 +14,15 @@ PrepareStopCompleter::PrepareStopCompleter(PrepareStopCompleter&& other) noexcep
 }
 
 PrepareStopCompleter::~PrepareStopCompleter() {
-  if (complete_) {
-    ZX_ASSERT_MSG(called_, "PrepareStopCompleter was not called before going out of scope.");
-  }
+  ZX_ASSERT_MSG(complete_ == nullptr,
+                "PrepareStopCompleter was not called before going out of scope.");
 }
 
 void PrepareStopCompleter::operator()(zx::result<> result) {
-  ZX_ASSERT_MSG(!called_, "Cannot call PrepareStopCompleter more than once.");
+  ZX_ASSERT_MSG(complete_ != nullptr, "Cannot call PrepareStopCompleter more than once.");
   complete_(cookie_, result.status_value());
-  called_ = true;
+  complete_ = nullptr;
+  cookie_ = nullptr;
 }
 
 }  // namespace fdf

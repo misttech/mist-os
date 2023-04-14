@@ -17,7 +17,7 @@ namespace fdf {
 // |Driver| must inherit from |DriverBase|. If provided, |Factory| must implement a
 // public |CreateDriver| function with the following signature:
 // ```
-// static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
+// static void CreateDriver(
 //     DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 // ```
 //
@@ -30,7 +30,7 @@ namespace fdf {
 // ```
 // class CustomFactory {
 //  public:
-//   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
+//   static void CreateDriver(
 //       DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 //   ...construct and start driver...
 // };
@@ -46,39 +46,29 @@ class Lifecycle {
   DECLARE_HAS_MEMBER_FN(has_create_driver, CreateDriver);
   static_assert(has_create_driver_v<Factory>,
                 "Factory must implement a public static CreateDriver function.");
-  static_assert(std::is_same_v<decltype(&Factory::CreateDriver),
-                               zx::result<std::unique_ptr<DriverBase>> (*)(
-                                   DriverStartArgs start_args,
-                                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)>,
-                "CreateDriver must be a public static function with signature "
-                "'zx::result<std::unique_ptr<fdf::DriverBase>> (fdf::DriverStartArgs start_args, "
-                "fdf::UnownedSynchronizedDispatcher driver_dispatcher)'.");
+  static_assert(
+      std::is_same_v<decltype(&Factory::CreateDriver),
+                     void (*)(DriverStartArgs, fdf::UnownedSynchronizedDispatcher,
+                              fdf::StartCompleter)>,
+      "CreateDriver must be a public static function with signature "
+      "'void (fdf::DriverStartArgs start_args, "
+      "fdf::UnownedSynchronizedDispatcher driver_dispatcher, fdf::StartCompleter completer)'.");
 
  public:
-  static zx_status_t Start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
-                           void** driver) {
+  static void Start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
+                    StartCompleteCallback* complete, void* complete_cookie) {
     // Decode the incoming `msg`.
     auto wire_format_metadata =
         fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
     fdf::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
     fit::result start_args = fidl::StandaloneDecode<fuchsia_driver_framework::DriverStartArgs>(
         encoded.TakeMessage(), wire_format_metadata);
-    if (!start_args.is_ok()) {
-      ZX_DEBUG_ASSERT_MSG(false, "Failed to decode start_args: %s",
-                          start_args.error_value().FormatDescription().c_str());
-      return start_args.error_value().status();
-    }
+    ZX_ASSERT_MSG(start_args.is_ok(), "Failed to decode start_args: %s",
+                  start_args.error_value().FormatDescription().c_str());
 
-    zx::result<std::unique_ptr<DriverBase>> created_driver = Factory::CreateDriver(
-        std::move(*start_args), fdf::UnownedSynchronizedDispatcher(dispatcher));
-
-    if (created_driver.is_error()) {
-      return created_driver.status_value();
-    }
-
-    // Store `driver` pointer.
-    *driver = (*created_driver).release();
-    return ZX_OK;
+    StartCompleter completer(complete, complete_cookie);
+    Factory::CreateDriver(std::move(*start_args), fdf::UnownedSynchronizedDispatcher(dispatcher),
+                          std::move(completer));
   }
 
   static void PrepareStop(void* driver, PrepareStopCompleteCallback* complete,
@@ -96,11 +86,12 @@ class Lifecycle {
   }
 };
 
-#define FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(lifecycle) \
-  FUCHSIA_DRIVER_LIFECYCLE_V1(.start = lifecycle::Start, .stop = lifecycle::Stop)
+#define FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(lifecycle)                                \
+  FUCHSIA_DRIVER_LIFECYCLE_V3(.start = lifecycle::Start, .prepare_stop = nullptr, \
+                              .stop = lifecycle::Stop)
 
 #define FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle)                                               \
-  FUCHSIA_DRIVER_LIFECYCLE_V2(.start = lifecycle::Start, .prepare_stop = lifecycle::PrepareStop, \
+  FUCHSIA_DRIVER_LIFECYCLE_V3(.start = lifecycle::Start, .prepare_stop = lifecycle::PrepareStop, \
                               .stop = lifecycle::Stop)
 
 }  // namespace fdf

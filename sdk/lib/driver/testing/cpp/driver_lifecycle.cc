@@ -63,8 +63,28 @@ zx::result<OpaqueDriverPtr> StartDriver(fdf::DriverStartArgs start_args,
 
   zx_status_t status = ZX_ERR_INTERNAL;
   zx::result result = fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(), [&]() {
-    status = driver_lifecycle_symbol.v1.start({msg, wire_format_metadata},
-                                              driver_dispatcher.driver_dispatcher().get(), &opaque);
+    if (driver_lifecycle_symbol.version >= 3 && driver_lifecycle_symbol.v3.start != nullptr) {
+      struct Cookie {
+        zx_status_t* status;
+        void** opaque;
+      };
+      Cookie cookie = {
+          .status = &status,
+          .opaque = &opaque,
+      };
+      // TODO(https://fxbug.dev/125379): Support drivers that implement async start.
+      driver_lifecycle_symbol.v3.start(
+          {msg, wire_format_metadata}, driver_dispatcher.driver_dispatcher().get(),
+          [](void* cookie, zx_status_t status, void* opaque) {
+            auto* ctx = static_cast<Cookie*>(cookie);
+            *ctx->status = status;
+            *ctx->opaque = opaque;
+          },
+          &cookie);
+    } else {
+      status = driver_lifecycle_symbol.v1.start(
+          {msg, wire_format_metadata}, driver_dispatcher.driver_dispatcher().get(), &opaque);
+    }
   });
 
   if (result.is_error()) {

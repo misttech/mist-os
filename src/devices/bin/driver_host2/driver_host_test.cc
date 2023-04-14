@@ -112,7 +112,7 @@ class TestTransaction : public fidl::Transaction {
   }
 
   zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions) override {
-    EXPECT_TRUE(false);
+    epitaph_ = message->status();
     return ZX_OK;
   }
 
@@ -145,9 +145,6 @@ class DriverHostTest : public testing::Test {
   StartDriverResult StartDriver(std::vector<fdf::NodeSymbol> symbols = {},
                                 fidl::ClientEnd<fuchsia_driver_framework::Node>* node = nullptr,
                                 zx_status_t expected_epitaph = ZX_OK) {
-    zx_status_t epitaph = ZX_OK;
-    TestTransaction transaction(epitaph);
-
     auto pkg_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_TRUE(pkg_endpoints.is_ok());
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -182,6 +179,13 @@ class DriverHostTest : public testing::Test {
     EXPECT_TRUE(outgoing_dir_endpoints.is_ok());
     auto driver_endpoints = fidl::CreateEndpoints<fdh::Driver>();
     EXPECT_TRUE(driver_endpoints.is_ok());
+
+    auto driver_host_endpoints = fidl::CreateEndpoints<fdh::DriverHost>();
+    EXPECT_TRUE(driver_host_endpoints.is_ok());
+
+    fidl::BindServer(loop().dispatcher(), std::move(driver_host_endpoints->server), &driver_host());
+    fidl::Client client(std::move(driver_host_endpoints->client), loop().dispatcher());
+    zx_status_t epitaph = ZX_ERR_BAD_STATE;
     {
       fdata::Dictionary dictionary = {{.entries = std::move(program_entries)}};
 
@@ -193,13 +197,22 @@ class DriverHostTest : public testing::Test {
           .incoming = std::move(ns_entries),
           .outgoing_dir = std::move(std::move(outgoing_dir_endpoints->server)),
       }};
-      Completer completer(&transaction);
-      fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
-                                                    std::move(driver_endpoints->server));
-      driver_host().Start(request, completer);
+      client->Start({std::move(driver_start_args), std::move(driver_endpoints->server)})
+          .Then([&](auto result) {
+            if (result.is_ok()) {
+              epitaph = ZX_OK;
+              return;
+            }
+            if (result.error_value().is_framework_error()) {
+              epitaph = result.error_value().framework_error().status();
+              return;
+            }
+            epitaph = result.error_value().domain_error();
+          });
     }
     EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
     fdf_testing_wait_until_all_dispatchers_idle();
+    EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
     EXPECT_EQ(expected_epitaph, epitaph);
 
     return {
@@ -374,87 +387,67 @@ TEST_F(DriverHostTest, Start_DifferentDispatcher) {
 
 // Start a driver with invalid arguments.
 TEST_F(DriverHostTest, Start_InvalidStartArgs) {
-  zx_status_t epitaph = ZX_OK;
-  TestTransaction transaction(epitaph);
+  auto call_start = [&](fdf::DriverStartArgs start_args) -> zx_status_t {
+    auto driver_host_endpoints = fidl::CreateEndpoints<fdh::DriverHost>();
+
+    fidl::BindServer(loop().dispatcher(), std::move(driver_host_endpoints->server), &driver_host());
+    fidl::Client client(std::move(driver_host_endpoints->client), loop().dispatcher());
+
+    auto endpoints = fidl::CreateEndpoints<fdh::Driver>();
+    zx_status_t status = ZX_OK;
+    client->Start({std::move(start_args), std::move(endpoints->server)}).Then([&](auto result) {
+      if (result.is_ok()) {
+        status = ZX_OK;
+        return;
+      }
+      if (result.error_value().is_framework_error()) {
+        status = result.error_value().framework_error().status();
+        return;
+      }
+      status = result.error_value().domain_error();
+    });
+    loop().RunUntilIdle();
+    fdf_testing_wait_until_all_dispatchers_idle();
+    loop().RunUntilIdle();
+
+    return status;
+  };
 
   // DriverStartArgs::ns is missing "/pkg" entry.
-  auto endpoints = fidl::CreateEndpoints<fdh::Driver>();
-  ASSERT_TRUE(endpoints.is_ok());
-  {
-    Completer completer(&transaction);
-    fidl::Request<fdh::DriverHost::Start> request(fdf::DriverStartArgs(),
-                                                  std::move(endpoints->server));
-    driver_host().Start(request, completer);
-  }
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, epitaph);
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, call_start(fdf::DriverStartArgs()));
 
   // DriverStartArgs::ns not set.
-  endpoints = fidl::CreateEndpoints<fdh::Driver>();
-  ASSERT_TRUE(endpoints.is_ok());
-  {
-    Completer completer(&transaction);
-    fdf::DriverStartArgs driver_start_args{{
-        .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-    }};
-    fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
-                                                  std::move(endpoints->server));
-    driver_host().Start(request, completer);
-  }
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, epitaph);
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, call_start(fdf::DriverStartArgs{{
+                                     .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
+                                 }}));
 
   // DriverStartArgs::ns is missing "/pkg" entry.
-  endpoints = fidl::CreateEndpoints<fdh::Driver>();
-  ASSERT_TRUE(endpoints.is_ok());
-  {
-    Completer completer(&transaction);
-    fdf::DriverStartArgs driver_start_args{{
-        .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-    }};
-    driver_start_args.incoming().emplace();
-    fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
-                                                  std::move(endpoints->server));
-    driver_host().Start(request, completer);
-  }
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, epitaph);
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, call_start(fdf::DriverStartArgs{{
+                                     .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
+                                 }}));
 
-  endpoints = fidl::CreateEndpoints<fdh::Driver>();
-  ASSERT_TRUE(endpoints.is_ok());
   {
     // DriverStartArgs::program not set.
-    std::vector<frunner::ComponentNamespaceEntry> entries1;
-    entries1.push_back({{.path = "/pkg", .directory = fidl::ClientEnd<fuchsia_io::Directory>()}});
+    std::vector<frunner::ComponentNamespaceEntry> entries;
+    entries.push_back({{.path = "/pkg", .directory = fidl::ClientEnd<fuchsia_io::Directory>()}});
 
-    fdf::DriverStartArgs driver_start_args{{
-        .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-        .incoming = std::move(entries1),
-    }};
-
-    Completer completer(&transaction);
-    fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
-                                                  std::move(endpoints->server));
-    driver_host().Start(request, completer);
+    EXPECT_EQ(ZX_ERR_INVALID_ARGS, call_start(fdf::DriverStartArgs{{
+                                       .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
+                                       .incoming = std::move(entries),
+                                   }}));
   }
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, epitaph);
 
-  endpoints = fidl::CreateEndpoints<fdh::Driver>();
-  ASSERT_TRUE(endpoints.is_ok());
   {
     // DriverStartArgs::program is missing "binary" entry.
-    std::vector<frunner::ComponentNamespaceEntry> entries2;
-    entries2.push_back({{.path = "/pkg", .directory = fidl::ClientEnd<fuchsia_io::Directory>()}});
+    std::vector<frunner::ComponentNamespaceEntry> entries;
+    entries.push_back({{.path = "/pkg", .directory = fidl::ClientEnd<fuchsia_io::Directory>()}});
 
-    fdf::DriverStartArgs driver_start_args{{
-        .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-        .program = fdata::Dictionary{},
-        .incoming = std::move(entries2),
-    }};
-
-    Completer completer(&transaction);
-    fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
-                                                  std::move(endpoints->server));
-    driver_host().Start(request, completer);
+    EXPECT_EQ(ZX_ERR_INVALID_ARGS, call_start(fdf::DriverStartArgs{{
+                                       .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
+                                       .program = fdata::Dictionary{},
+                                       .incoming = std::move(entries),
+                                   }}));
   }
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, epitaph);
 }
 
 // Start a driver with an invalid client-end.
@@ -475,9 +468,6 @@ TEST_F(DriverHostTest, InvalidHandleRights) {
 
 // Start a driver with an invalid binary.
 TEST_F(DriverHostTest, Start_InvalidBinary) {
-  zx_status_t epitaph = ZX_OK;
-  TestTransaction transaction(epitaph);
-
   auto pkg_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   ASSERT_TRUE(pkg_endpoints.is_ok());
   std::vector<frunner::ComponentNamespaceEntry> ns_entries;
@@ -499,22 +489,38 @@ TEST_F(DriverHostTest, Start_InvalidBinary) {
           fdata::DictionaryValue::WithStr("driver/library.so")),
   }}};
 
+  auto driver_host_endpoints = fidl::CreateEndpoints<fdh::DriverHost>();
+
+  fidl::BindServer(loop().dispatcher(), std::move(driver_host_endpoints->server), &driver_host());
+  fidl::Client client(std::move(driver_host_endpoints->client), loop().dispatcher());
+
   auto driver_endpoints = fidl::CreateEndpoints<fdh::Driver>();
   ASSERT_TRUE(driver_endpoints.is_ok());
-  {
-    Completer completer(&transaction);
-    fdata::Dictionary dictionary{{.entries = std::move(program_entries)}};
-    fdf::DriverStartArgs driver_start_args{{
-        .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-        .program = std::move(dictionary),
-        .incoming = std::move(ns_entries),
-    }};
-    fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
-                                                  std::move(driver_endpoints->server));
-    driver_host().Start(request, completer);
-  }
+  zx_status_t status = ZX_OK;
+
+  fdata::Dictionary dictionary{{.entries = std::move(program_entries)}};
+  fdf::DriverStartArgs driver_start_args{{
+      .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
+      .program = std::move(dictionary),
+      .incoming = std::move(ns_entries),
+  }};
+  client->Start({std::move(driver_start_args), std::move(driver_endpoints->server)})
+      .Then([&](auto result) {
+        if (result.is_ok()) {
+          status = ZX_OK;
+          return;
+        }
+        if (result.error_value().is_framework_error()) {
+          status = result.error_value().framework_error().status();
+          return;
+        }
+        status = result.error_value().domain_error();
+      });
   EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
-  EXPECT_EQ(ZX_ERR_NOT_FOUND, epitaph);
+  fdf_testing_wait_until_all_dispatchers_idle();
+  EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
+
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, status);
 }
 
 // Start multiple drivers and inspect the driver host.

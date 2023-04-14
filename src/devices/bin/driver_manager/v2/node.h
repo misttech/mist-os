@@ -155,9 +155,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // node from the topology but instead bind the node again.
   void RestartNode();
 
-  zx::result<> StartDriver(
-      fuchsia_component_runner::wire::ComponentStartInfo start_info,
-      fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller);
+  void StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_info,
+                   fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+                   fit::callback<void(zx::result<>)> cb);
 
   bool IsComposite() const;
 

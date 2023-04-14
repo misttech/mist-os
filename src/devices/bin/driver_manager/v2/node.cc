@@ -874,9 +874,9 @@ void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& comple
            });
 }
 
-zx::result<> Node::StartDriver(
-    fuchsia_component_runner::wire::ComponentStartInfo start_info,
-    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller) {
+void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_info,
+                       fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+                       fit::callback<void(zx::result<>)> cb) {
   auto url = start_info.resolved_url().get();
   bool colocate = fdf::ProgramValue(start_info.program(), "colocate").value_or("") == "true";
 
@@ -885,7 +885,8 @@ zx::result<> Node::StartDriver(
          "Failed to start driver '%.*s', driver is colocated but does not have a prent with a "
          "driver host",
          static_cast<int>(url.size()), url.data());
-    return zx::error(ZX_ERR_INVALID_ARGS);
+    cb(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
 
   auto symbols = fidl::VectorView<fdf::wire::NodeSymbol>();
@@ -897,7 +898,8 @@ zx::result<> Node::StartDriver(
   if (!colocate) {
     auto result = (*node_manager_)->CreateDriverHost();
     if (result.is_error()) {
-      return result.take_error();
+      cb(result.take_error());
+      return;
     }
     driver_host_ = result.value();
   }
@@ -905,7 +907,8 @@ zx::result<> Node::StartDriver(
   // Bind the Node associated with the driver.
   auto endpoints = fidl::CreateEndpoints<fdf::Node>();
   if (endpoints.is_error()) {
-    return zx::error(endpoints.error_value());
+    cb(zx::error(endpoints.error_value()));
+    return;
   }
   node_ref_.emplace(dispatcher_, std::move(endpoints->server), this,
                     [](Node* node, fidl::UnbindInfo info) {
@@ -919,16 +922,18 @@ zx::result<> Node::StartDriver(
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
-  zx::result start = driver_host_.value()->Start(std::move(endpoints->client), name_,
-                                                 std::move(symbols), std::move(start_info));
-  if (start.is_error()) {
-    return zx::error(start.error_value());
-  }
+  driver_host_.value()->Start(
+      std::move(endpoints->client), name_, std::move(symbols), std::move(start_info),
+      [this, cb = std::move(cb), url = std::string(url), controller = std::move(controller)](
+          zx::result<fidl::ClientEnd<fuchsia_driver_host::Driver>> result) mutable {
+        if (result.is_error()) {
+          cb(result.take_error());
+          return;
+        }
 
-  driver_component_.emplace(*this, std::string(url), std::move(controller),
-                            std::move(start.value()));
-
-  return zx::ok();
+        driver_component_.emplace(*this, url, std::move(controller), std::move(result.value()));
+        cb(zx::ok());
+      });
 }
 
 void Node::ScheduleStopComponent() {

@@ -235,8 +235,10 @@ class TestDriverHost : public fdh::testing::DriverHost_TestBase {
   void SetStartHandler(StartHandler start_handler) { start_handler_ = std::move(start_handler); }
 
  private:
-  void Start(fdf::DriverStartArgs start_args, fidl::InterfaceRequest<fdh::Driver> driver) override {
+  void Start(fdf::DriverStartArgs start_args, fidl::InterfaceRequest<fdh::Driver> driver,
+             StartCallback callback) override {
     start_handler_(std::move(start_args), std::move(driver));
+    callback(fuchsia::driver::host::DriverHost_Start_Result::WithResponse({}));
   }
   void InstallLoader(fidl::InterfaceHandle<fuchsia::ldsvc::Loader> loader) override {}
 
@@ -253,8 +255,7 @@ class TestTransaction : public fidl::Transaction {
 
  private:
   std::unique_ptr<Transaction> TakeOwnership() override {
-    EXPECT_TRUE(false);
-    return nullptr;
+    return std::make_unique<TestTransaction>(close_);
   }
 
   zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) override {
@@ -913,7 +914,9 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
 
   EXPECT_TRUE(did_bind);
 
-  driver_host().SetStartHandler([](fdf::DriverStartArgs start_args, auto request) {
+  fidl::InterfaceRequest<fdh::Driver> second_driver_request;
+  fidl::InterfaceHandle<fdf::Node> second_node;
+  driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     EXPECT_FALSE(start_args.has_symbols());
     auto& entries = start_args.program().entries();
     EXPECT_EQ(2u, entries.size());
@@ -921,6 +924,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    second_driver_request = std::move(request);
+    second_node = std::move(*start_args.mutable_node());
   });
   StartDriverHost("driver-hosts");
   auto second_driver =
@@ -929,6 +934,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
                                      .binary = "driver/second-driver.so",
                                  });
 
+  second_driver_request = {};
+  second_node = {};
   StopDriverComponent(std::move(root_driver.value()));
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
@@ -987,7 +994,9 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
   EXPECT_TRUE(did_bind);
 
-  driver_host().SetStartHandler([](fdf::DriverStartArgs start_args, auto request) {
+  fidl::InterfaceRequest<fdh::Driver> second_driver_request;
+  fidl::InterfaceHandle<fdf::Node> second_node;
+  driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     auto& symbols = start_args.symbols();
     EXPECT_EQ(1u, symbols.size());
     EXPECT_EQ("sym", symbols[0].name());
@@ -998,6 +1007,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("true", entries[1].value->str());
+    second_driver_request = std::move(request);
+    second_node = std::move(*start_args.mutable_node());
   });
   auto second_driver =
       StartDriver(driver_runner, {
@@ -1006,6 +1017,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
                                      .colocate = true,
                                  });
 
+  second_driver_request = {};
+  second_node = {};
   StopDriverComponent(std::move(root_driver.value()));
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
@@ -1077,13 +1090,17 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
   auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  driver_host().SetStartHandler([](fdf::DriverStartArgs start_args, auto request) {
+  fidl::InterfaceRequest<fdh::Driver> second_driver_request;
+  fidl::InterfaceHandle<fdf::Node> second_node;
+  driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();
     EXPECT_EQ(2u, entries.size());
     EXPECT_EQ("binary", entries[0].key);
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("true", entries[1].value->str());
+    second_driver_request = std::move(request);
+    second_node = std::move(*start_args.mutable_node());
   });
   StartDriver(driver_runner, {
                                  .url = "fuchsia-boot:///#meta/second-driver.cm",
@@ -1091,6 +1108,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
                                  .colocate = true,
                              });
 
+  second_driver_request = {};
+  second_node = {};
   StopDriverComponent(std::move(root_driver.value()));
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
@@ -1151,7 +1170,9 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   RunLoopUntilIdle();
   ASSERT_EQ(0u, driver_runner.NumOrphanedNodes());
 
-  driver_host().SetStartHandler([](fdf::DriverStartArgs start_args, auto request) {
+  fidl::InterfaceRequest<fdh::Driver> second_driver_request;
+  fidl::InterfaceHandle<fdf::Node> second_node;
+  driver_host().SetStartHandler([&](fdf::DriverStartArgs start_args, auto request) {
     EXPECT_FALSE(start_args.has_symbols());
     auto& entries = start_args.program().entries();
     EXPECT_EQ(2u, entries.size());
@@ -1159,6 +1180,8 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
     EXPECT_EQ("driver/second-driver.so", entries[0].value->str());
     EXPECT_EQ("colocate", entries[1].key);
     EXPECT_EQ("false", entries[1].value->str());
+    second_driver_request = std::move(request);
+    second_node = std::move(*start_args.mutable_node());
   });
   StartDriverHost("driver-hosts");
   auto second_driver =
@@ -1167,6 +1190,8 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
                                      .binary = "driver/second-driver.so",
                                  });
 
+  second_driver_request = {};
+  second_node = {};
   StopDriverComponent(std::move(root_driver.value()));
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.child", "boot-drivers")});

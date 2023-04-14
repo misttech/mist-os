@@ -422,13 +422,32 @@ class DriverTest : public testing::Test {
          .node_name = "node"});
 
     // Start driver.
-    std::unique_ptr<compat::Driver> compat_driver;
-    auto result = compat::DriverFactory::CreateDriver(
-        std::move(start_args), driver_dispatcher_.driver_dispatcher().borrow());
-    EXPECT_EQ(ZX_OK, result.status_value());
-    auto* driver = result.value().release();
-    compat_driver.reset(static_cast<compat::Driver*>(driver));
-    return compat_driver;
+    // We know that start completes synchronously.
+    struct Context {
+      zx_status_t* status;
+      void** driver;
+    };
+    void* driver = nullptr;
+    zx_status_t status = ZX_ERR_INTERNAL;
+    Context ctx = {
+        .status = &status,
+        .driver = &driver,
+    };
+    fdf::StartCompleter start_completer(
+        [](void* context, zx_status_t status, void* driver) {
+          auto* ctx = static_cast<Context*>(context);
+          *ctx->status = status;
+          *ctx->driver = driver;
+        },
+        &ctx);
+
+    compat::DriverFactory::CreateDriver(std::move(start_args),
+                                        driver_dispatcher_.driver_dispatcher().borrow(),
+                                        std::move(start_completer));
+    EXPECT_EQ(ZX_OK, status);
+    EXPECT_NE(driver, nullptr);
+
+    return std::unique_ptr<compat::Driver>(static_cast<compat::Driver*>(driver));
   }
 
   void UnbindAndFreeDriver(std::unique_ptr<compat::Driver> driver) {

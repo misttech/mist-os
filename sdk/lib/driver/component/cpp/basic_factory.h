@@ -23,17 +23,13 @@ class BasicFactory {
       "fdf::UnownedSynchronizedDispatcher)' in order to be used with the BasicFactory.");
 
  public:
-  static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-      DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher) {
-    std::unique_ptr<DriverBase> driver =
-        std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher));
-    auto result = driver->Start();
-    if (result.is_error()) {
-      FDF_LOGL(WARNING, driver->logger(), "Failed to Start driver: %s", result.status_string());
-      return result.take_error();
-    }
-
-    return zx::ok(std::move(driver));
+  static void CreateDriver(DriverStartArgs start_args,
+                           fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+                           StartCompleter completer) {
+    auto driver = std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher));
+    DriverBase* driver_ptr = driver.get();
+    completer.set_driver(std::move(driver));
+    driver_ptr->Start(std::move(completer));
   }
 };
 

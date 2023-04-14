@@ -10,6 +10,7 @@
 #include <lib/driver/component/cpp/driver_context.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -86,7 +87,12 @@ class DriverBase {
   // Do not call Serve, as it has already been called by the |DriverBase| constructor.
   // Child nodes can be created here synchronously or asynchronously as long as all of the
   // protocols being offered to the child has been added to the outgoing directory first.
-  virtual zx::result<> Start() = 0;
+  // There are two versions of this method which may be implemented depending on whether Start would
+  // like to complete synchronously or asynchronously. The driver may override either one of these
+  // methods, but must implement one. The asynchronous version will be called over the synchronous
+  // version if both are implemented.
+  virtual zx::result<> Start() { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+  virtual void Start(StartCompleter completer) { completer(Start()); }
 
   // This provides a way for the driver to asynchronously prepare to stop. The driver should
   // initiate any teardowns that need to happen on the driver dispatchers. Once it is ready to stop,

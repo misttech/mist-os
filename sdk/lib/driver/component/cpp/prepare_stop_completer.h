@@ -30,7 +30,6 @@ class PrepareStopCompleter {
  private:
   PrepareStopCompleteCallback* complete_;
   void* cookie_;
-  bool called_ = false;
 };
 
 }  // namespace fdf

@@ -38,7 +38,7 @@ protocol DriverHost {
     Start(resource struct {
         start_args fuchsia.driver.framework.DriverStartArgs;
         driver server_end:Driver;
-    });
+    }) -> () error zx.status;
 
     /// Returns the process KOID of the driver host.
     GetProcessKoid() -> (struct {

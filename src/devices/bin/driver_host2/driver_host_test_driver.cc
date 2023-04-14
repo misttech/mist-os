@@ -65,30 +65,39 @@ class TestDriver {
   component::OutgoingDirectory outgoing_;
 };
 
-zx_status_t test_driver_start(EncodedDriverStartArgs encoded_start_args,
-                              fdf_dispatcher_t* dispatcher, void** driver) {
+void test_driver_start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
+                       StartCompleteCallback* complete, void* complete_cookie) {
   auto wire_format_metadata =
       fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
   fdf::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
   fit::result decoded = fidl::StandaloneInplaceDecode<fdf::wire::DriverStartArgs>(
       encoded.TakeMessage(), wire_format_metadata);
   if (!decoded.is_ok()) {
-    return decoded.error_value().status();
+    complete(complete_cookie, decoded.error_value().status(), nullptr);
+    return;
   }
 
   auto test_driver = std::make_unique<TestDriver>(dispatcher);
   auto init = test_driver->Init(*decoded.value());
   if (init.is_error()) {
-    return init.error_value();
+    complete(complete_cookie, init.error_value(), nullptr);
+    return;
   }
 
-  *driver = test_driver.release();
-  return ZX_OK;
+  complete(complete_cookie, ZX_OK, test_driver.release());
+}
+
+void test_driver_prepare_stop(void* driver, PrepareStopCompleteCallback* complete,
+                              void* complete_cookie) {
+  complete(complete_cookie, ZX_OK);
 }
 
 zx_status_t test_driver_stop(void* driver) {
-  delete static_cast<TestDriver*>(driver);
+  if (driver != nullptr) {
+    delete static_cast<TestDriver*>(driver);
+  }
   return ZX_OK;
 }
 
-FUCHSIA_DRIVER_LIFECYCLE_V1(.start = test_driver_start, .stop = test_driver_stop);
+FUCHSIA_DRIVER_LIFECYCLE_V3(.start = test_driver_start, .prepare_stop = test_driver_prepare_stop,
+                            .stop = test_driver_stop);

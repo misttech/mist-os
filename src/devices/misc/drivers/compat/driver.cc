@@ -187,7 +187,7 @@ std::optional<size_t> GlobalLoggerList::loggers_count_for_testing(const std::str
 Driver::Driver(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher, device_t device,
                const zx_protocol_device_t* ops, std::string_view driver_path)
-    : fdf::DriverBase("compat", std::move(start_args), std::move(driver_dispatcher)),
+    : Base("compat", std::move(start_args), std::move(driver_dispatcher)),
       executor_(dispatcher()),
       driver_path_(driver_path),
       device_(device, ops, this, std::nullopt, nullptr, dispatcher()) {
@@ -704,8 +704,9 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
   return zx::ok(std::string(result->value.data(), result->value.size()));
 }
 
-zx::result<std::unique_ptr<fdf::DriverBase>> DriverFactory::CreateDriver(
-    fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher) {
+void DriverFactory::CreateDriver(fdf::DriverStartArgs start_args,
+                                 fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+                                 fdf::StartCompleter completer) {
   auto compat_device =
       fdf::GetSymbol<const device_t*>(start_args.symbols(), kDeviceSymbol, &kDefaultDevice);
   const zx_protocol_device_t* ops =
@@ -714,17 +715,15 @@ zx::result<std::unique_ptr<fdf::DriverBase>> DriverFactory::CreateDriver(
   // Open the compat driver's binary within the package.
   auto compat = fdf::ProgramValue(start_args.program(), "compat");
   if (compat.is_error()) {
-    return compat.take_error();
+    completer(compat.take_error());
+    return;
   }
 
   auto driver = std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher),
                                          *compat_device, ops, "/pkg/" + *compat);
-
-  auto result = driver->Start();
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  return zx::ok(std::move(driver));
+  fdf::DriverBase* driver_ptr = driver.get();
+  completer.set_driver(std::move(driver));
+  driver_ptr->Start(std::move(completer));
 }
 
 zx_status_t Driver::ServeDiagnosticsDir() {

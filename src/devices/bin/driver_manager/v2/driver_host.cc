@@ -54,13 +54,14 @@ DriverHostComponent::DriverHostComponent(
     : driver_host_(std::move(driver_host), dispatcher,
                    fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })) {}
 
-zx::result<fidl::ClientEnd<fdh::Driver>> DriverHostComponent::Start(
+void DriverHostComponent::Start(
     fidl::ClientEnd<fdf::Node> client_end, std::string node_name,
     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
-    frunner::wire::ComponentStartInfo start_info) {
+    frunner::wire::ComponentStartInfo start_info, StartCallback cb) {
   auto endpoints = fidl::CreateEndpoints<fdh::Driver>();
   if (endpoints.is_error()) {
-    return endpoints.take_error();
+    cb(endpoints.take_error());
+    return;
   }
 
   auto binary = fdf::ProgramValue(start_info.program(), "binary").value_or("");
@@ -75,21 +76,31 @@ zx::result<fidl::ClientEnd<fdh::Driver>> DriverHostComponent::Start(
 
   auto status = SetEncodedConfig(args, start_info);
   if (status.is_error()) {
-    return status.take_error();
+    cb(status.take_error());
+    return;
   }
 
   if (!symbols.empty()) {
     args.symbols(symbols);
   }
 
-  auto start = driver_host_->Start(args.Build(), std::move(endpoints->server));
-  if (!start.ok()) {
-    LOGF(ERROR, "Failed to start driver '%s' in driver host: %s", binary.data(),
-         start.FormatDescription().data());
-    return zx::error(start.status());
-  }
-
-  return zx::ok(std::move(endpoints->client));
+  driver_host_->Start(args.Build(), std::move(endpoints->server))
+      .ThenExactlyOnce([cb = std::move(cb), binary = std::move(binary),
+                        client = std::move(endpoints->client)](auto& result) mutable {
+        if (!result.ok()) {
+          LOGF(ERROR, "Failed to start driver '%s' in driver host: %s", binary.c_str(),
+               result.FormatDescription().c_str());
+          cb(zx::error(result.status()));
+          return;
+        }
+        if (result->is_error()) {
+          LOGF(ERROR, "Failed to start driver '%s' in driver host: %s", binary.c_str(),
+               zx_status_get_string(result->error_value()));
+          cb(result->take_error());
+          return;
+        }
+        cb(zx::ok(std::move(client)));
+      });
 }
 
 zx::result<uint64_t> DriverHostComponent::GetProcessKoid() const {

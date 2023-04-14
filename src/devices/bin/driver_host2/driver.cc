@@ -100,7 +100,7 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo) {
     LOGF(ERROR, "Failed to start driver '%s', driver lifecycle not found", url.data());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  if (lifecycle->version < 1 || lifecycle->version > 2) {
+  if (lifecycle->version < 1 || lifecycle->version > DRIVER_LIFECYCLE_VERSION_MAX) {
     LOGF(ERROR, "Failed to start driver '%s', unknown driver lifecycle version: %lu", url.data(),
          lifecycle->version);
     return zx::error(ZX_ERR_WRONG_TYPE);
@@ -133,7 +133,7 @@ void Driver::set_binding(fidl::ServerBindingRef<fdh::Driver> binding) {
 
 void Driver::Stop(StopCompleter::Sync& completer) {
   // Prepare stop was added in version 2.
-  if (lifecycle_->version >= 2) {
+  if (lifecycle_->version >= 2 && lifecycle_->v2.prepare_stop != nullptr) {
     // We synchronize this task with start by posting it against the dispatcher used in Start.
     async_dispatcher_t* dispatcher;
     {
@@ -178,8 +178,24 @@ void Driver::PrepareStopCompleted(zx_status_t status) {
   }
 }
 
-zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
-                           ::fdf::Dispatcher dispatcher) {
+void Driver::StartCompleted(zx_status_t status, void* opaque) {
+  // Note: May be called from a random thread context, before `lifecycle_->v3.start` returns.
+  fit::callback<void(zx::result<>)> cb;
+  {
+    fbl::AutoLock al(&lock_);
+    cb = std::move(start_callback_);
+    if (!cb) {
+      LOGF(ERROR, "Start completed multiple times.");
+      return;
+    }
+    opaque_.emplace(opaque);
+  }
+
+  cb(zx::make_result(status));
+}
+
+void Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
+                   ::fdf::Dispatcher dispatcher, fit::callback<void(zx::result<>)> cb) {
   fdf_dispatcher_t* initial_dispatcher = dispatcher.get();
   {
     fbl::AutoLock al(&lock_);
@@ -190,7 +206,8 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
   if (!encoded.message().ok()) {
     LOGF(ERROR, "Failed to start driver, could not encode start args: %s",
          encoded.message().FormatDescription().data());
-    return zx::error(encoded.message().status());
+    cb(zx::error(encoded.message().status()));
+    return;
   }
   fidl_opaque_wire_format_metadata_t wire_format_metadata =
       encoded.wire_format_metadata().ToOpaque();
@@ -201,7 +218,8 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
   if (!converted_message.ok()) {
     LOGF(ERROR, "Failed to start driver, could not convert start args: %s",
          converted_message.FormatDescription().data());
-    return zx::error(converted_message.status());
+    cb(zx::error(converted_message.status()));
+    return;
   }
 
   // After calling |lifecycle_->start|, we assume it has taken ownership of
@@ -214,16 +232,33 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
       .num_handles = c_msg.num_handles,
   };
   void* opaque = nullptr;
-  zx_status_t status =
-      lifecycle_->v1.start({msg, wire_format_metadata}, initial_dispatcher, &opaque);
-  if (status != ZX_OK) {
-    return zx::error(status);
+
+  // Async start was added in version 3.
+  if (lifecycle_->version >= 3 && lifecycle_->v3.start != nullptr) {
+    {
+      fbl::AutoLock al(&lock_);
+      start_callback_ = std::move(cb);
+    }
+    lifecycle_->v3.start(
+        {msg, wire_format_metadata}, initial_dispatcher,
+        [](void* cookie, zx_status_t status, void* opaque) {
+          static_cast<Driver*>(cookie)->StartCompleted(status, opaque);
+        },
+        this);
+
+  } else {
+    zx_status_t status =
+        lifecycle_->v1.start({msg, wire_format_metadata}, initial_dispatcher, &opaque);
+    if (status != ZX_OK) {
+      cb(zx::error(status));
+      return;
+    }
+    cb(zx::ok());
+    {
+      fbl::AutoLock al(&lock_);
+      opaque_.emplace(opaque);
+    }
   }
-  {
-    fbl::AutoLock al(&lock_);
-    opaque_.emplace(opaque);
-  }
-  return zx::ok();
 }
 
 uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& program) {

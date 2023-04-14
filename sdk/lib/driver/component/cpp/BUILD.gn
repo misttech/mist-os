@@ -30,6 +30,8 @@ sdk_source_set("cpp") {
     "prepare_stop_completer.cc",
     "prepare_stop_completer.h",
     "start_args.h",
+    "start_completer.cc",
+    "start_completer.h",
   ]
 
   public_deps = [

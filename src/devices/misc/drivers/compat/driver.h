@@ -28,12 +28,15 @@ namespace compat {
 
 // Driver is the compatibility driver that loads DFv1 drivers.
 class Driver : public fdf::DriverBase {
+  using Base = fdf::DriverBase;
+
  public:
   Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher,
          device_t device, const zx_protocol_device_t* ops, std::string_view driver_path);
   ~Driver() override;
 
   zx::result<> Start() override;
+  using Base::Start;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // Returns the context that DFv1 driver provided.
@@ -56,8 +59,8 @@ class Driver : public fdf::DriverBase {
 
   // These accessors are used by other classes in the compat driver so we want to expose
   // them publicly since they are protected in DriverBase.
-  async_dispatcher_t* dispatcher() { return fdf::DriverBase::dispatcher(); }
-  const async_dispatcher_t* dispatcher() const { return fdf::DriverBase::dispatcher(); }
+  async_dispatcher_t* dispatcher() { return Base::dispatcher(); }
+  const async_dispatcher_t* dispatcher() const { return Base::dispatcher(); }
   const fdf::Namespace& driver_namespace() { return *context().incoming(); }
   fdf::OutgoingDirectory& outgoing() { return *context().outgoing(); }
 
@@ -148,8 +151,9 @@ class Driver : public fdf::DriverBase {
 
 class DriverFactory {
  public:
-  static zx::result<std::unique_ptr<fdf::DriverBase>> CreateDriver(
-      fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  static void CreateDriver(fdf::DriverStartArgs start_args,
+                           fdf::UnownedSynchronizedDispatcher driver_dispatcher,
+                           fdf::StartCompleter completer);
 };
 
 // |GlobalLoggerList| is global for the entire driver host process. It maintains a

@@ -13,10 +13,13 @@ namespace dfv2 {
 
 class DriverHost {
  public:
-  virtual zx::result<fidl::ClientEnd<fuchsia_driver_host::Driver>> Start(
-      fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_node,
-      fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
-      fuchsia_component_runner::wire::ComponentStartInfo start_info) = 0;
+  using StartCallback =
+      fit::callback<void(zx::result<fidl::ClientEnd<fuchsia_driver_host::Driver>>)>;
+  virtual void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end,
+                     std::string node_node,
+                     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+                     fuchsia_component_runner::wire::ComponentStartInfo start_info,
+                     StartCallback cb) = 0;
 
   virtual zx::result<uint64_t> GetProcessKoid() const = 0;
 };
@@ -29,10 +32,10 @@ class DriverHostComponent final
                       async_dispatcher_t* dispatcher,
                       fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>* driver_hosts);
 
-  zx::result<fidl::ClientEnd<fuchsia_driver_host::Driver>> Start(
-      fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
-      fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
-      fuchsia_component_runner::wire::ComponentStartInfo start_info) override;
+  void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
+             fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+             fuchsia_component_runner::wire::ComponentStartInfo start_info,
+             StartCallback cb) override;
 
   zx::result<uint64_t> GetProcessKoid() const override;
 
