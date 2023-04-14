@@ -43,7 +43,10 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         argument_default=[],
     )
     remote_action.inherit_main_arg_parser_flags(parser)
-    group = parser.add_argument_group("C++ remote action options")
+    group = parser.add_argument_group(
+        title="C++ remote wrapper",
+        description="C++ remote action options",
+    )
     group.add_argument(
         "--cpp-strategy",
         type=str,
@@ -87,26 +90,17 @@ class CxxRemoteAction(object):
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
-        try:
-            ddash = argv.index('--')
-            remote_prefix = argv[:ddash]
-            unfiltered_command = argv[ddash + 1:]
-        except ValueError:  # '--' not found
-            remote_prefix = argv + ['--help']  # Trigger help and exit
-            unfiltered_command = []
-
         # Propagate --remote-flag=... options to the remote prefix,
         # as if they appeared before '--'.
         # Forwarded rewrapper options with values must be written as '--flag=value',
         # not '--flag value' because argparse doesn't know what unhandled flags
         # expect values.
-        self._forwarded_remote_args, filtered_command = remote_action.REMOTE_FLAG_ARG_PARSER.parse_known_args(
-            unfiltered_command)
+        main_argv, filtered_command = remote_action.forward_remote_flags(argv)
 
         # forward all unknown flags to rewrapper
         # --help here will result in early exit()
         self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
-            remote_prefix + self._forwarded_remote_args.flags)
+            main_argv)
 
         if not filtered_command:  # there is no command, bail out early
             return
@@ -146,6 +140,18 @@ class CxxRemoteAction(object):
                 f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563565 for how to fetch the needed packages."
             )
 
+    @property
+    def command_line_inputs(self) -> Sequence[Path]:
+        return [Path(p) for p in cl_utils.flatten_comma_list(self._main_args.inputs)]
+
+    @property
+    def command_line_output_files(self) -> Sequence[Path]:
+        return [Path(p) for p in cl_utils.flatten_comma_list(self._main_args.output_files)]
+
+    @property
+    def command_line_output_dirs(self) -> Sequence[Path]:
+        return [Path(p) for p in cl_utils.flatten_comma_list(self._main_args.output_directories)]
+
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
         if self._prepare_status is not None:
@@ -158,7 +164,7 @@ class CxxRemoteAction(object):
         self._local_preprocess_command, self._compile_preprocessed_command = self.cxx_action.split_preprocessing(
         )
 
-        remote_inputs = self._forwarded_remote_args.inputs.copy()
+        remote_inputs = self.command_line_inputs
         if self.cpp_strategy == 'local':
             # preprocess locally, then compile the result remotely
             preprocessed_source = self.cxx_action.preprocessed_output
@@ -176,7 +182,7 @@ class CxxRemoteAction(object):
             #   ZX_DEBUG_ASSERT.
 
         # Prepare remote compile action
-        remote_output_dirs = self._forwarded_remote_args.output_dirs.copy()
+        remote_output_dirs = self.command_line_output_dirs
         remote_options = [
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
@@ -187,12 +193,10 @@ class CxxRemoteAction(object):
         # to use the output file name for other auxiliary files.
         remote_output_files = [
             self.cxx_action.output_file
-        ] + self._forwarded_remote_args.output_files
+        ] + self.command_line_output_files
 
         if self.cxx_action.crash_diagnostics_dir:
             remote_output_dirs.append(self.cxx_action.crash_diagnostics_dir)
-
-        remote_options.extend(self._forwarded_remote_args.flags)
 
         # Support for remote cross-compilation:
         if self.host_platform != fuchsia.REMOTE_PLATFORM:

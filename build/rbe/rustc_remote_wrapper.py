@@ -159,26 +159,17 @@ class RustRemoteAction(object):
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
-        try:
-            ddash = argv.index('--')
-            remote_prefix = argv[:ddash]
-            unfiltered_command = argv[ddash + 1:]
-        except ValueError:  # '--' not found
-            remote_prefix = argv + ['--help']  # Trigger help and exit
-            unfiltered_command = []
-
         # Propagate --remote-flag=... options to the remote prefix,
         # as if they appeared before '--'.
         # Forwarded rewrapper options with values must be written as '--flag=value',
         # not '--flag value' because argparse doesn't know what unhandled flags
         # expect values.
-        self._forwarded_remote_args, filtered_command = remote_action.REMOTE_FLAG_ARG_PARSER.parse_known_args(
-            unfiltered_command)
+        main_argv, filtered_command = remote_action.forward_remote_flags(argv)
 
         # Forward all unknown flags to rewrapper
         # --help here will result in early exit()
         self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
-            remote_prefix + self._forwarded_remote_args.flags)
+            main_argv)
 
         if not filtered_command:  # there is no command, bail out early
             return
@@ -397,7 +388,7 @@ class RustRemoteAction(object):
 
         yield from self.yield_verbose(
             'forwarded inputs',
-            _flatten_comma_list_to_paths(self._forwarded_remote_args.inputs))
+            _flatten_comma_list_to_paths(self._main_args.inputs))
 
     def _remote_output_files(self) -> Iterable[Path]:
         """Remote output files are relative to current working dir."""
@@ -412,14 +403,12 @@ class RustRemoteAction(object):
 
         yield from self.yield_verbose(
             'forwarded output files',
-            _flatten_comma_list_to_paths(
-                self._forwarded_remote_args.output_files))
+            _flatten_comma_list_to_paths(self._main_args.output_files))
 
     def _remote_output_dirs(self) -> Iterable[Path]:
         yield from self.yield_verbose(
             'forwarded output dirs',
-            _flatten_comma_list_to_paths(
-                self._forwarded_remote_args.output_dirs))
+            _flatten_comma_list_to_paths(self._main_args.output_directories))
 
     @property
     def remote_options(self) -> Sequence[str]:

@@ -32,7 +32,6 @@ _SCRIPT_BASENAME = Path(__file__).name
 
 PROJECT_ROOT = fuchsia.project_root_dir()
 
-
 # Needs to be computed with os.path.relpath instead of Path.relative_to
 # to support testing a fake (test-only) value of PROJECT_ROOT.
 PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
@@ -461,6 +460,7 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
 
     # TODO: further analyze remote failures in --action_log (.rrpl)
 
+
 def make_download_stubs(
     files: Iterable[Path],
     dirs: Iterable[Path],
@@ -482,7 +482,9 @@ def make_download_stubs(
     for d in dirs:
         cl_utils.symlink_relative(src=d, dest=rrpl)
 
+
 # TODO(http://fxbug.dev/123178): download using stub links
+
 
 class RemoteAction(object):
     """RemoteAction represents a command that is to be executed remotely."""
@@ -499,6 +501,7 @@ class RemoteAction(object):
         inputs: Sequence[Path] = None,
         output_files: Sequence[Path] = None,
         output_dirs: Sequence[Path] = None,
+        disable: bool = False,
         save_temps: bool = False,
         auto_reproxy: bool = False,
         remote_log: str = "",
@@ -522,6 +525,7 @@ class RemoteAction(object):
             current working dir.
           output_dirs: directories to be fetched after remote execution, relative to the
             current working dir.
+          disable: if true, execute locally.
           save_temps: if true, keep around temporarily generated files after execution.
           auto_reproxy: if true, launch reproxy around the rewrapper invocation.
             This is not needed if reproxy is already running.
@@ -554,10 +558,9 @@ class RemoteAction(object):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or PROJECT_ROOT).absolute()
         # Parse and strip out --remote-* flags from command.
-        remote_args, self._remote_command = REMOTE_FLAG_ARG_PARSER.parse_known_args(
-            command)
-        self._remote_disable = remote_args.disable
-        self._options = (options or []) + remote_args.flags
+        self._remote_command = command
+        self._remote_disable = disable
+        self._options = (options or [])
 
         # Detect some known rewrapper options
         self._rewrapper_known_options, _ = _REWRAPPER_ARG_PARSER.parse_known_args(
@@ -567,17 +570,9 @@ class RemoteAction(object):
         # but they will be relativized to exec_root for rewrapper.
         # It is more natural to copy input/output paths that are relative to the
         # current working directory.
-        self._inputs = (inputs or []) + [
-            Path(p) for p in cl_utils.flatten_comma_list(remote_args.inputs)
-        ]
-        self._output_files = (output_files or []) + [
-            Path(p)
-            for p in cl_utils.flatten_comma_list(remote_args.output_files)
-        ]
-        self._output_dirs = (output_dirs or []) + [
-            Path(p)
-            for p in cl_utils.flatten_comma_list(remote_args.output_dirs)
-        ]
+        self._inputs = inputs or []
+        self._output_files = output_files or []
+        self._output_dirs = output_dirs or []
 
         # Amend input/outputs when logging remotely.
         self._remote_log_name = self._name_remote_log(remote_log)
@@ -1101,68 +1096,13 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
         type=cl_utils.bool_golang_flag,
         default=True,
         help=
-        "Set to false to avoid downloading outputs after remote execution succeeds.""",
+        "Set to false to avoid downloading outputs after remote execution succeeds."
+        "",
     )
     return parser
 
 
 _REWRAPPER_ARG_PARSER = _rewrapper_arg_parser()
-
-
-def _remote_flag_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description=
-        "Extracts flags that are intended for the remote execution wrapper from a local command.  This allows control of remote execution behavior in a otherwise remote-execution-oblivious command.  All flags start with '--remote'.  Call `parse_known_args()` to remove these remote flags from the rest of the command.",
-        argument_default=[],
-    )
-    parser.add_argument(
-        "--remote-disable",
-        dest='disable',
-        action="store_true",
-        default=False,
-        help="Disable remote execution, run the original command locally.",
-    )
-    parser.add_argument(
-        "--remote-inputs",
-        dest='inputs',
-        action='append',
-        # leave the type as [str], so commas can be processed downstream
-        default=[],
-        metavar="PATHS",
-        help=
-        "Specify additional remote inputs, comma-separated, relative to the current working dir (repeatable, cumulative).",
-    )
-    parser.add_argument(
-        "--remote-outputs",  # TODO: rename this to --remote-output-files
-        dest='output_files',
-        action='append',
-        # leave the type as [str], so commas can be processed downstream
-        default=[],
-        metavar="FILE",
-        help="Specify additional remote output files, comma-separated, relative to the current working dir (repeatable, cumulative).",
-    )
-    parser.add_argument(
-        "--remote-output-dirs",
-        action='append',
-        dest='output_dirs',
-        # leave the type as [str], so commas can be processed downstream
-        default=[],
-        metavar="DIR",
-        help=
-        "Specify additional remote output directories, comma-separated, relative to the current working dir (repeatable, cumulative).",
-    )
-    parser.add_argument(
-        "--remote-flag",
-        action='append',
-        dest='flags',
-        default=[],
-        metavar="FLAG",
-        help="Forward these flags to the rewrapper (repeatable, cumulative).",
-    )
-    return parser
-
-
-REMOTE_FLAG_ARG_PARSER = _remote_flag_arg_parser()
 
 
 def inherit_main_arg_parser_flags(
@@ -1178,45 +1118,88 @@ def inherit_main_arg_parser_flags(
         PROJECT_ROOT_REL, 'build', 'rbe', 'fuchsia-rewrapper.cfg')
     default_bindir = default_bindir or Path(
         PROJECT_ROOT_REL, fuchsia.RECLIENT_BINDIR)
-    group = parser.add_argument_group("Generic remote action options")
-    group.add_argument(
+
+    rewrapper_group = parser.add_argument_group(
+        title="rewrapper",
+        description="rewrapper options that are intercepted and processed",
+    )
+    rewrapper_group.add_argument(
         "--cfg",
         type=Path,
         default=default_cfg,
         help="rewrapper config file.",
     )
-    group.add_argument(
+    rewrapper_group.add_argument(
         "--exec_strategy",
         type=str,
         choices=['local', 'remote', 'remote_local_fallback', 'racing'],
         help="rewrapper execution strategy.",
     )
-    group.add_argument(
+    rewrapper_group.add_argument(
+        "--inputs",
+        action='append',
+        # leave the type as [str], so commas can be processed downstream
+        default=[],
+        metavar="PATHS",
+        help=
+        "Specify additional remote inputs, comma-separated, relative to the current working dir (repeatable, cumulative).  Note: This is different than `rewrapper --inputs`, which expects exec_root-relative paths.",
+    )
+    rewrapper_group.add_argument(
+        "--output_files",
+        action='append',
+        # leave the type as [str], so commas can be processed downstream
+        default=[],
+        metavar="FILES",
+        help=
+        "Specify additional remote output files, comma-separated, relative to the current working dir (repeatable, cumulative).  Note: This is different than `rewrapper --output_files`, which expects exec_root-relative paths.",
+    )
+    rewrapper_group.add_argument(
+        "--output_directories",
+        action='append',
+        # leave the type as [str], so commas can be processed downstream
+        default=[],
+        metavar="DIRS",
+        help=
+        "Specify additional remote output directories, comma-separated, relative to the current working dir (repeatable, cumulative).  Note: This is different than `rewrapper --output_directories`, which expects exec_root-relative paths.",
+    )
+
+    main_group = parser.add_argument_group(
+        title="common",
+        description="Generic remote action options",
+    )
+    main_group.add_argument(
         "--bindir",
         type=Path,
         default=default_bindir,
         metavar="PATH",
         help="Path to reclient tools like rewrapper, reproxy.",
     )
-    group.add_argument(
+    main_group.add_argument(
+        "--disable",
+        dest='disable',
+        action="store_true",
+        default=False,
+        help="Disable remote execution, run the original command locally.",
+    )
+    main_group.add_argument(
         "--dry-run",
         action="store_true",
         default=False,
         help="Show final rewrapper command and exit.",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--verbose",
         action="store_true",
         default=False,
         help="Print additional debug information while running.",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--label",
         type=str,
         default="",
         help="Build system identifier, for diagnostic messages",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--log",
         type=str,
         dest="remote_log",
@@ -1228,33 +1211,33 @@ def inherit_main_arg_parser_flags(
 If a name argument BASE is given, the output will be 'BASE.remote-log'.
 Otherwise, BASE will default to the first output file named.""",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--save-temps",
         action="store_true",
         default=False,
         help="Keep around intermediate files that are normally cleaned up.",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--auto-reproxy",
         action="store_true",
         default=False,
         help="Startup and shutdown reproxy around the rewrapper invocation.",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--fsatrace-path",
         type=Path,
         default=None,  # None means do not trace
         metavar="PATH",
         help="""Given a path to an fsatrace tool (located under exec_root), this will trace a remote execution's file accesses.  This is useful for diagnosing unexpected differences between local and remote builds.  The trace file will be named '{output_files[0]}.remote-fsatrace' (if there is at least one output), otherwise 'remote-action-output.remote-fsatrace'.""",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--compare",
         action="store_true",
         default=False,
         help=
         "In 'compare' mode, run both locally and remotely (sequentially) and compare outputs.  Exit non-zero (failure) if any of the outputs differs between the local and remote execution, even if those executions succeeded.  When used with --fsatrace-path, also compare file access traces.",
     )
-    group.add_argument(
+    main_group.add_argument(
         "--diagnose-nonzero",
         action="store_true",
         default=False,
@@ -1283,15 +1266,33 @@ def remote_action_from_args(
         main_args: argparse.Namespace,
         remote_options: Sequence[str] = None,
         command: Sequence[str] = None,
+        # These inputs and outputs can come from application-specific logic.
+        inputs: Sequence[Path] = None,
+        output_files: Sequence[Path] = None,
+        output_dirs: Sequence[Path] = None,
         **kwargs,  # other RemoteAction __init__ params
 ) -> RemoteAction:
     """Construct a remote action based on argparse parameters."""
+    inputs = (inputs or []) + [
+        Path(p) for p in cl_utils.flatten_comma_list(main_args.inputs)
+    ]
+    output_files = (output_files or []) + [
+        Path(p) for p in cl_utils.flatten_comma_list(main_args.output_files)
+    ]
+    output_dirs = (output_dirs or []) + [
+        Path(p)
+        for p in cl_utils.flatten_comma_list(main_args.output_directories)
+    ]
     return RemoteAction(
         rewrapper=main_args.bindir / "rewrapper",
         options=(remote_options or []),
         command=command or main_args.command,
         cfg=main_args.cfg,
         exec_strategy=main_args.exec_strategy,
+        inputs=inputs,
+        output_files=output_files,
+        output_dirs=output_dirs,
+        disable=main_args.disable,
         save_temps=main_args.save_temps,
         auto_reproxy=main_args.auto_reproxy,
         remote_log=main_args.remote_log,
@@ -1301,16 +1302,83 @@ def remote_action_from_args(
     )
 
 
+_FORWARDED_REMOTE_FLAGS = cl_utils.FlagForwarder(
+    [
+        cl_utils.ForwardedFlag(
+            name="--remote-disable",
+            has_optarg=False,
+            mapped_name="--disable",
+        ),
+        cl_utils.ForwardedFlag(
+            name="--remote-inputs",
+            has_optarg=True,
+            mapped_name="--inputs",
+        ),
+        cl_utils.ForwardedFlag(
+            name="--remote-outputs",
+            has_optarg=True,
+            mapped_name="--output_files",
+        ),
+        cl_utils.ForwardedFlag(
+            name="--remote-output-dirs",
+            has_optarg=True,
+            mapped_name="--output_directories",
+        ),
+        cl_utils.ForwardedFlag(
+            name="--remote-flag",
+            has_optarg=True,
+            mapped_name="",
+        ),
+    ])
+
+
+def forward_remote_flags(
+        argv: Sequence[str]) -> Tuple[Sequence[str], Sequence[str]]:
+    """Propagate --remote-* flags from the wrapped command to main args.
+
+    This allows late-appended flags to influence wrapper scripts' behavior.
+    This works around limitations and difficulties of specifying
+    tool options in some build systems.
+    This should be done *before* passing argv to _MAIN_ARG_PARSER.
+    Unlike using argparse.ArgumentParser, this forwarding approache
+    preserves the left-to-right order in which flags appear.
+
+    Args:
+      argv: the full command sequence seen my main, like sys.argv[1:]
+          Script args appear before the first '--', and the wrapped command
+          is considered everything thereafter.
+
+    Returns:
+      1) main script args, including those propagated from the wrapped command.
+      2) wrapped command, but with --remote-* flags filtered out.
+    """
+    try:
+        # Split the whole command around '--'.
+        ddash = argv.index('--')
+        script_args = argv[:ddash]
+        unfiltered_command = argv[ddash + 1:]
+    except ValueError:  # '--' not found
+        return (['--help'], [])  # Tell the caller to trigger help and exit
+
+    forwarded_flags, filtered_command = _FORWARDED_REMOTE_FLAGS.sift(
+        unfiltered_command)
+    return script_args + forwarded_flags, filtered_command
+
+
 def main(argv: Sequence[str]) -> int:
-    main_args, other_remote_options = _MAIN_ARG_PARSER.parse_known_args(argv)
+    main_argv, filtered_command = forward_remote_flags(argv)
+    main_args, other_remote_options = _MAIN_ARG_PARSER.parse_known_args(
+        main_argv)
     # forward all unknown flags to rewrapper
     # forwarded rewrapper options with values must be written as '--flag=value',
     # not '--flag value' because argparse doesn't know what unhandled flags
     # expect values.
 
     remote_action = remote_action_from_args(
-        main_args=main_args, remote_options=other_remote_options)
-
+        main_args=main_args,
+        remote_options=other_remote_options,
+        command=filtered_command,
+    )
     return remote_action.run_with_main_args(main_args)
 
 

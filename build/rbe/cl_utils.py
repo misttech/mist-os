@@ -8,6 +8,7 @@
 import argparse
 import asyncio
 import collections
+import dataclasses
 import io
 import os
 import shlex
@@ -15,7 +16,7 @@ import sys
 import platform
 
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence, Tuple
 
 # Local subprocess and remote environment calls need this when a
 # command is prefixed with an X=Y environment variable.
@@ -170,6 +171,72 @@ def last_value_of_dict_flag(
     return last_value_or_default(d.get(key, []), default)
 
 
+@dataclasses.dataclass
+class ForwardedFlag(object):
+    # The original name of the flag to match (including leading '-' or '--').
+    name: str
+
+    # If true, expect the following token to be the VALUE of --flag VALUE.
+    has_optarg: bool
+
+    # Substitute the original flag name with this name.
+    # If this is "", then delete the flag name (still forward its optarg if
+    # applicable)
+    mapped_name: str
+
+
+class FlagForwarder(object):
+    """Separate and transform (rename) a set of flags and their values.
+
+    Unlike using argparse.ArgumentParser, this forwarding approach
+    preserves the left-to-right order in which flags appear.
+    """
+
+    def __init__(self, flag_mappings: Iterable[ForwardedFlag]):
+        self._map = {m.name: m for m in flag_mappings}
+
+    def sift(self, argv: Iterable[str]) -> Tuple[Sequence[str], Sequence[str]]:
+        """Sifts out known flags while transforming them.
+
+        Args:
+          argv: command tokens
+
+        Returns:
+          1) forwarded and transformed flags and args
+          2) filtered out copy of argv
+        """
+        forwarded_flags = []
+        filtered_argv = []
+
+        next_token_is_optarg = False
+        for tok in argv:
+            if next_token_is_optarg:
+                forwarded_flags.append(tok)
+                next_token_is_optarg = False
+                continue
+
+            # match --flag without optarg
+            flag = self._map.get(tok, None)
+            if flag:
+                if flag.mapped_name:
+                    forwarded_flags.append(flag.mapped_name)
+                next_token_is_optarg = flag.has_optarg
+                continue
+
+            # check for --flag=optarg
+            left, sep, right = tok.partition('=')
+            if sep == '=':
+                left_flag = self._map.get(left, None)
+                if left_flag:
+                    prefix = left_flag.mapped_name + '=' if left_flag.mapped_name else ''
+                    forwarded_flags.append(prefix + right)
+                    continue
+
+            filtered_argv.append(tok)
+
+        return forwarded_flags, filtered_argv
+
+
 def relpath(path: Path, start: Path) -> Path:
     """Relative path (using Path objects).
 
@@ -200,9 +267,11 @@ def symlink_relative(dest: Path, src: Path):
     src.parent.mkdir(parents=True, exist_ok=True)
     src.symlink_to(relpath(dest, start=src.parent))
 
+
 #####################################################################
 # The following code implements subprocess 'tee' behavior based on:
 # https://stackoverflow.com/questions/2996887/how-to-replicate-tee-behavior-in-python-when-using-subprocess
+
 
 class SubprocessResult(object):
 
@@ -312,6 +381,7 @@ def subprocess_call(
             **kwargs,
         ))
     return result
+
 
 # end of subprocess_call section
 #####################################################################

@@ -271,6 +271,73 @@ class LastValueOfDictFlagTests(unittest.TestCase):
         )
 
 
+class FlagForwarderTests(unittest.TestCase):
+
+    def test_no_transform(self):
+        f = cl_utils.FlagForwarder([])
+        command = ['a', 'b', '-c', 'd', '--e', 'f', '--g=h']
+        forwarded, filtered = f.sift(command)
+        self.assertEqual(forwarded, [])
+        self.assertEqual(filtered, command)
+
+    def test_renamed_no_optarg(self):
+        f = cl_utils.FlagForwarder(
+            [
+                cl_utils.ForwardedFlag(
+                    name="--old", has_optarg=False, mapped_name="--new")
+            ])
+        command = ['a', 'b', '--old', 'd', '--old', 'f', '--g=h']
+        forwarded, filtered = f.sift(command)
+        self.assertEqual(forwarded, ['--new', '--new'])
+        self.assertEqual(filtered, ['a', 'b', 'd', 'f', '--g=h'])
+
+    def test_renamed_with_optarg(self):
+        f = cl_utils.FlagForwarder(
+            [
+                cl_utils.ForwardedFlag(
+                    name="--old", has_optarg=True, mapped_name="--new")
+            ])
+        command = ['a', 'b', '--old', 'd', '--old=f', '--g=h']
+        forwarded, filtered = f.sift(command)
+        self.assertEqual(forwarded, ['--new', 'd', '--new=f'])
+        self.assertEqual(filtered, ['a', 'b', '--g=h'])
+
+    def test_deleted_no_optarg(self):
+        f = cl_utils.FlagForwarder(
+            [
+                cl_utils.ForwardedFlag(
+                    name="--old", has_optarg=False, mapped_name="")
+            ])
+        command = ['a', 'b', '--old', 'd', '--old', 'f', '--g=h']
+        forwarded, filtered = f.sift(command)
+        self.assertEqual(forwarded, [])
+        self.assertEqual(filtered, ['a', 'b', 'd', 'f', '--g=h'])
+
+    def test_deleted_with_optarg(self):
+        f = cl_utils.FlagForwarder(
+            [
+                cl_utils.ForwardedFlag(
+                    name="--old", has_optarg=True, mapped_name="")
+            ])
+        command = ['a', 'b', '--old', '--eek', '--old=-f=z', '--g=h']
+        forwarded, filtered = f.sift(command)
+        self.assertEqual(forwarded, ['--eek', '-f=z'])
+        self.assertEqual(filtered, ['a', 'b', '--g=h'])
+
+    def test_multiple_transforms(self):
+        f = cl_utils.FlagForwarder(
+            [
+                cl_utils.ForwardedFlag(
+                    name="--bad", has_optarg=True, mapped_name="--ugly"),
+                cl_utils.ForwardedFlag(
+                    name="--old", has_optarg=True, mapped_name=""),
+            ])
+        command = ['a', 'b', '--old', 'd', '--bad=f', '--g=h']
+        forwarded, filtered = f.sift(command)
+        self.assertEqual(forwarded, ['d', '--ugly=f'])
+        self.assertEqual(filtered, ['a', 'b', '--g=h'])
+
+
 class RelpathTests(unittest.TestCase):
 
     def test_identity(self):
@@ -351,7 +418,8 @@ class SymlinkRelativeTests(unittest.TestCase):
             destdir = Path(td) / 'trash' / 'bin'
             dest = destdir / 'garbage.txt'  # doesn't exist
             srcdir = Path(td) / 'must' / 'go' / 'deeper'
-            srcdir.mkdir(parents=True)  # srcdir exists ahead of symlink_relative
+            srcdir.mkdir(
+                parents=True)  # srcdir exists ahead of symlink_relative
             src = srcdir / 'log.link'
             cl_utils.symlink_relative(dest, src)
             self.assertTrue(src.is_symlink())

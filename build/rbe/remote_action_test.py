@@ -851,51 +851,55 @@ class RemoteActionMainParserTests(unittest.TestCase):
 
 class RemoteActionFlagParserTests(unittest.TestCase):
 
+    def _forward_and_parse(self, command):
+        forwarded, filtered = remote_action.forward_remote_flags(
+            ['--'] + command)
+        main_args, unknown = remote_action._MAIN_ARG_PARSER.parse_known_args(
+            forwarded)
+        return main_args, unknown, filtered
+
     def test_defaults(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args([])
+        remote_args, unknown, other = self._forward_and_parse([])
         self.assertFalse(remote_args.disable)
         self.assertEqual(remote_args.inputs, [])
         self.assertEqual(remote_args.output_files, [])
-        self.assertEqual(remote_args.output_dirs, [])
-        self.assertEqual(remote_args.flags, [])
+        self.assertEqual(remote_args.output_directories, [])
+        self.assertEqual(unknown, [])
         self.assertEqual(other, [])
 
     def test_command_without_forwarding(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
         command = [
             'clang++', '--target=powerpc-apple-darwin8',
             '-fcrash-diagnostics-dir=nothing/to/see/here', '-c', 'hello.cxx',
             '-o', 'hello.o'
         ]
-        remote_args, other = p.parse_known_args(command)
+        remote_args, unknown, other = self._forward_and_parse(command)
         self.assertFalse(remote_args.disable)
         self.assertEqual(remote_args.inputs, [])
         self.assertEqual(remote_args.output_files, [])
-        self.assertEqual(remote_args.output_dirs, [])
-        self.assertEqual(remote_args.flags, [])
+        self.assertEqual(remote_args.output_directories, [])
+        self.assertEqual(unknown, [])
         self.assertEqual(other, command)
 
     def test_disable(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args(
+        remote_args, unknown, other = self._forward_and_parse(
             ['cat', 'foo.txt', '--remote-disable'])
         self.assertTrue(remote_args.disable)
+        self.assertEqual(unknown, [])
         self.assertEqual(other, ['cat', 'foo.txt'])
 
     def test_inputs(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args(
+        remote_args, unknown, other = self._forward_and_parse(
             [
                 'cat', '--remote-inputs=bar.txt', 'bar.txt',
                 '--remote-inputs=quux.txt', 'quux.txt'
             ])
         self.assertEqual(remote_args.inputs, ['bar.txt', 'quux.txt'])
+        self.assertEqual(unknown, [])
         self.assertEqual(other, ['cat', 'bar.txt', 'quux.txt'])
 
     def test_inputs_comma(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args(
+        remote_args, unknown, other = self._forward_and_parse(
             [
                 'cat', '--remote-inputs=w,x', 'bar.txt', '--remote-inputs=y,z',
                 'quux.txt'
@@ -903,11 +907,11 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(
             list(cl_utils.flatten_comma_list(remote_args.inputs)),
             ['w', 'x', 'y', 'z'])
+        self.assertEqual(unknown, [])
         self.assertEqual(other, ['cat', 'bar.txt', 'quux.txt'])
 
     def test_output_files_comma(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args(
+        remote_args, unknown, other = self._forward_and_parse(
             [
                 './generate.sh', '--remote-outputs=w,x', 'bar.txt',
                 '--remote-outputs=y,z', 'quux.txt'
@@ -915,28 +919,28 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(
             list(cl_utils.flatten_comma_list(remote_args.output_files)),
             ['w', 'x', 'y', 'z'])
+        self.assertEqual(unknown, [])
         self.assertEqual(other, ['./generate.sh', 'bar.txt', 'quux.txt'])
 
     def test_output_dirs_comma(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args(
+        remote_args, unknown, other = self._forward_and_parse(
             [
                 './generate_dirs.sh', '--remote-output-dirs=w,x', 'bar.txt',
                 '--remote-output-dirs=y,z', 'quux.txt'
             ])
         self.assertEqual(
-            list(cl_utils.flatten_comma_list(remote_args.output_dirs)),
+            list(cl_utils.flatten_comma_list(remote_args.output_directories)),
             ['w', 'x', 'y', 'z'])
+        self.assertEqual(unknown, [])
         self.assertEqual(other, ['./generate_dirs.sh', 'bar.txt', 'quux.txt'])
 
     def test_flags(self):
-        p = remote_action.REMOTE_FLAG_ARG_PARSER
-        remote_args, other = p.parse_known_args(
+        remote_args, unknown, other = self._forward_and_parse(
             [
                 'cat', '--remote-flag=--foo=bar', 'bar.txt',
                 '--remote-flag=--opt=quux', 'quux.txt'
             ])
-        self.assertEqual(remote_args.flags, ['--foo=bar', '--opt=quux'])
+        self.assertEqual(unknown, ['--foo=bar', '--opt=quux'])
         self.assertEqual(other, ['cat', 'bar.txt', 'quux.txt'])
 
 
@@ -968,7 +972,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_minimal(self):
         command = ['cat', 'meow.txt']
-        action = self._make_remote_action(command=command,)
+        action = self._make_remote_action(command=command)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
         self.assertEqual(action.exec_root_rel, Path('..'))
@@ -1071,17 +1075,20 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 mock_call.assert_called_once()
                 mock_cleanup.assert_not_called()
 
-    def test_flag_forwarding(self):
+    def test_flag_forwarding_pass_through(self):
+        # RemoteAction construction no longer forwards --remote-* flags;
+        # that responsibility has been moved to
+        # remote_action.forward_remote_flags().
         command = [
             'cat', '--remote-flag=--exec_strategy=racing', '../src/cow/moo.txt'
         ]
-        action = self._make_remote_action(command=command,)
-        self.assertEqual(action.local_command, ['cat', '../src/cow/moo.txt'])
-        self.assertEqual(action.options, ['--exec_strategy=racing'])
+        action = self._make_remote_action(command=command)
+        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.options, [])
 
     def test_fail_no_retry(self):
         command = ['echo', 'hello']
-        action = self._make_remote_action(command=command,)
+        action = self._make_remote_action(command=command)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1099,7 +1106,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_file_not_found_no_retry(self):
         command = ['echo', 'hello']
-        action = self._make_remote_action(command=command,)
+        action = self._make_remote_action(command=command)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1119,7 +1126,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_retry_once_successful(self):
         command = ['echo', 'hello']
-        action = self._make_remote_action(command=command,)
+        action = self._make_remote_action(command=command)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1143,7 +1150,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_retry_once_fails_again(self):
         command = ['echo', 'hello']
-        action = self._make_remote_action(command=command,)
+        action = self._make_remote_action(command=command)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1411,6 +1418,49 @@ class MainTests(unittest.TestCase):
                                        'run_with_main_args', return_value=0):
                     self.assertEqual(remote_action.main(['--help']), 0)
             mock_exit.assert_called_with(0)
+
+    def test_main_args_remote_inputs(self):
+        command = ['--inputs', 'src/in.txt', '--', 'echo', 'hello']
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=0) as mock_run:
+            self.assertEqual(remote_action.main(command), 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        main_args = args[0]
+        self.assertEqual(main_args.inputs, ['src/in.txt'])
+
+    def test_main_args_remote_inputs_repeated(self):
+        command = [
+            '--inputs', 'src/in.txt', '--inputs=another.s', '--', 'echo',
+            'hello'
+        ]
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=0) as mock_run:
+            self.assertEqual(remote_action.main(command), 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        main_args = args[0]
+        self.assertEqual(main_args.inputs, ['src/in.txt', 'another.s'])
+
+    def test_main_args_remote_disable(self):
+        command = ['--disable', '--', 'echo', 'hello']
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=0) as mock_run:
+            self.assertEqual(remote_action.main(command), 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        main_args = args[0]
+        self.assertTrue(main_args.disable)
+
+    def test_flag_forwarding_remote_disable(self):
+        command = ['--', 'echo', '--remote-disable', 'hello']
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=0) as mock_run:
+            self.assertEqual(remote_action.main(command), 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        main_args = args[0]
+        self.assertTrue(main_args.disable)
 
 
 if __name__ == '__main__':
