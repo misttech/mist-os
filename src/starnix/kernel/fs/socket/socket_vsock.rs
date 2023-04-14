@@ -396,7 +396,7 @@ mod tests {
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
         let socket = Socket::new_file(&current_task, socket_object, OpenFlags::RDWR);
 
-        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT);
+        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
@@ -408,13 +408,16 @@ mod tests {
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
 
-        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLIN);
+        assert_eq!(
+            socket.query_events(&current_task),
+            FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM
+        );
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(socket.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
-        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT);
+        assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
         assert!(fds.is_empty());
     }

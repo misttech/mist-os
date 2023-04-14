@@ -56,6 +56,21 @@ impl<T> BlockableOpsResult<T> {
     }
 }
 
+/// This function adds `POLLRDNORM` and `POLLWRNORM` to the FdEvents
+/// return from the FileOps because these FdEvents are equivalent to
+/// `POLLIN` and `POLLOUT`, respectively, in the Linux UAPI.
+///
+/// See https://linux.die.net/man/2/poll
+fn add_equivalent_fd_events(mut events: FdEvents) -> FdEvents {
+    if events.contains(FdEvents::POLLIN) {
+        events |= FdEvents::POLLRDNORM;
+    }
+    if events.contains(FdEvents::POLLOUT) {
+        events |= FdEvents::POLLWRNORM;
+    }
+    events
+}
+
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Called when the FileObject is closed.
@@ -203,6 +218,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         None
     }
 
+    /// The events currently active on this file.
+    ///
+    /// If this function returns `POLLIN` or `POLLOUT`, then FileObject will
+    /// add `POLLRDNORM` and `POLLWRNORM`, respective, which are equivalent in
+    /// the Linux UAPI.
+    ///
+    /// See https://linux.die.net/man/2/poll
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::POLLIN | FdEvents::POLLOUT
     }
@@ -659,7 +681,7 @@ impl FileObject {
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
-            self.ops().wait_async(self, current_task, &waiter, events, WaitCallback::none());
+            self.wait_async(current_task, &waiter, events, WaitCallback::none());
             let result = op();
             if !is_partial(&result) {
                 return result.map(BlockableOpsResult::value);
@@ -896,12 +918,18 @@ impl FileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        self.ops().wait_async(self, current_task, waiter, events, handler)
+        self.ops().wait_async(
+            self,
+            current_task,
+            waiter,
+            events,
+            Box::new(|observed| handler(add_equivalent_fd_events(observed))),
+        )
     }
 
-    // Return the events currently active
+    /// The events currently active on this file.
     pub fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
-        self.ops().query_events(current_task)
+        add_equivalent_fd_events(self.ops().query_events(current_task))
     }
 
     //

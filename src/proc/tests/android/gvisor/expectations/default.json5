@@ -521,14 +521,6 @@
                 "PivotRootTest.ChangesCwdForAllProcesses",
                 "PivotRootTest.MovesOldRoot",
 
-                // poll_test - https://fxbug.dev/79315
-                "PollTest.NonBlockingEventPOLLRDNORM",
-                "PollTest.NonBlockingEventPOLLRDNORM_POLLIN",
-                "PollTest.BlockingEventPOLLRDNORM_POLLIN",
-                "PollTest.NonBlockingEventPOLLWRNORM",
-                "PollTest.NonBlockingEventPOLLWRNORM_POLLOUT",
-                "PollTest.BlockingEventPOLLWRNORM_POLLOUT",
-
                 // ppoll_test - https://fxbug.dev/79316
                 // InvalidMaskSize requires an additional parameter to ppoll, need to determine
                 // the validity of that.
@@ -1071,7 +1063,6 @@
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
                 "AllInetTests/TcpSocketTest.Tiocinq/*",
                 "AllInetTests/TcpSocketTest.TcpInq/*",
-                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm/*",
                 "AllInetTests/SimpleTcpSocketTest.CleanupOnConnectionRefused/*",
                 "AllInetTests/SimpleTcpSocketTest.BlockingConnectRefused/*",
                 "AllInetTests/SimpleTcpSocketTest.SetSocketAttachDetachFilter/*",
@@ -1080,7 +1071,6 @@
                 "AllInetTests/SimpleTcpSocketTest.ShutdownWriteConnectingSocket/*",
                 "AllInetTests/SimpleTcpSocketTest.OnlyAcknowledgeBacklogConnections/*",
                 "AllInetTests/SimpleTcpSocketTest.ShutdownReadConnectingSocket/*",
-                "AllInetTests/SimpleTcpSocketTest.SynRcvdOnListenerShutdown/*",
 
                 // timerfd_test - https://fxbug.dev/79430
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_MONOTONIC",
