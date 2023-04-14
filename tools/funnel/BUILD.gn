@@ -29,6 +29,7 @@ rustc_binary("funnel_bin") {
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:pretty_assertions",
   ]
 }
