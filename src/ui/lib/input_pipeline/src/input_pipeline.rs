@@ -13,6 +13,7 @@ use {
     focus_chain_provider::FocusChainProviderPublisher,
     fuchsia_async as fasync,
     fuchsia_fs::directory::{WatchEvent, Watcher},
+    fuchsia_inspect::health::Reporter,
     fuchsia_inspect::{NumericProperty, Property},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{self, Receiver, Sender, UnboundedReceiver, UnboundedSender},
@@ -611,6 +612,11 @@ async fn add_device_bindings(
                 filename,
                 device_types
             );
+            let device_node = input_devices_node.create_child(format!("{}_Unsupported", filename));
+            let mut health = fuchsia_inspect::health::Node::new(&device_node);
+            health.set_unhealthy("Unsupported device type.");
+            device_node.record(health);
+            input_devices_node.record(device_node);
             return;
         }
     } else {
@@ -1127,6 +1133,15 @@ mod tests {
                 input_devices: {
                     devices_discovered: 1u64,
                     devices_connected: 0u64,
+                    "001_Unsupported": {
+                        "fuchsia.inspect.Health": {
+                            status: "UNHEALTHY",
+                            message: "Unsupported device type.",
+                            // Timestamp value is unpredictable and not relevant in this context,
+                            // so we only assert that the property is present.
+                            start_timestamp_nanos: AnyProperty
+                        },
+                    }
                 }
             }
         });
