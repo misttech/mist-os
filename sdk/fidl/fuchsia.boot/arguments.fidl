@@ -7,7 +7,7 @@ const MAX_ARGS_NAME_LENGTH uint8 = 64;
 const MAX_ARGS_VALUE_LENGTH uint8 = 128;
 // MAX_ARGS_NAME_LENGTH + MAX_ARGS_VALUE_LENGTH + 1 (for '=')
 const MAX_ARGS_COLLECT_LENGTH uint8 = 193;
-const MAX_ARGS_VECTOR_LENGTH uint8 = 32;
+const MAX_ARGS_VECTOR_LENGTH uint8 = 255;
 
 type BoolPair = struct {
     key string:MAX_ARGS_NAME_LENGTH;
@@ -28,7 +28,7 @@ protocol Arguments {
     GetStrings(struct {
         keys vector<string:MAX_ARGS_NAME_LENGTH>:MAX_ARGS_VECTOR_LENGTH;
     }) -> (struct {
-        values vector<string:<MAX_ARGS_VALUE_LENGTH, optional>>:MAX_ARGS_COLLECT_LENGTH;
+        values vector<string:<MAX_ARGS_VALUE_LENGTH, optional>>:MAX_ARGS_VECTOR_LENGTH;
     });
 
     /// Get the boolean value of a boot argument `keys`,
