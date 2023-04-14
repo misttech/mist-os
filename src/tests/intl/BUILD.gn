@@ -4,17 +4,10 @@
 
 group("intl") {
   testonly = true
-  public_deps = [
-    ":tests",
-    "timestamp-server-dart",
-  ]
+  public_deps = [ ":tests" ]
 }
 
 group("tests") {
   testonly = true
-  public_deps = [
-    "timestamp-server-dart",
-    "timezone:tests",
-    "tzdata:tests",
-  ]
+  public_deps = [ "tzdata:tests" ]
 }

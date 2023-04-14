@@ -30,14 +30,6 @@ to read the preferred timezone, use the
 determine the timezone offset, and then apply this offset to the current UTC
 time.
 
-The Dart and Flutter runners do support local time directly (because they are
-wired up to a `fuchsia.intl.PropertyProvider`). If you are writing a Dart or
-Flutter component you may use
-[`DateTime.now().toLocal()`](https://api.flutter.dev/flutter/dart-core/DateTime/DateTime.now.html)
-to read the current local time. The [intl/timezone](/src/tests/intl/timezone/)
-tests ensure that a Dart component on a Fuchsia device can read the same local
-time as a host device.
-
 As with UTC, a Fuchsia device cannot produce a valid local time until it has
 received a valid time from either the network or a real time clock. The time
 zone is usually set based on user input so you should assume that the time zone

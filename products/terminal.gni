@@ -116,9 +116,6 @@ legacy_universe_package_labels += [
   "//src/tests/end_to_end/sl4f:test",
   "//src/tests/end_to_end/perf:test",
   "//src/tests/end_to_end/time_sync:test",
-
-  # Only for products in which Flutter is supported.
-  "//src/tests/intl/timezone:tests-for-flutter",
 ]
 
 # Add Test UI Stack for use in tests.

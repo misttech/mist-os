@@ -57,9 +57,6 @@ group("workstation_host_tests") {
 group("workstation") {
   testonly = true
   deps = [
-    # Only for products in which Flutter is supported.
-    "//src/tests/intl/timezone:tests-for-flutter",
-
     # CFv2 test framework.
     "//src/sys/run_test_suite",
 
