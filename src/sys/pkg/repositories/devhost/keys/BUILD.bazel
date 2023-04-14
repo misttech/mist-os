@@ -12,5 +12,8 @@ fuchsia_repository_keys(
         "targets.json",
         "timestamp.json",
     ],
-    visibility = ["//vendor/google:__subpackages__"],
+    visibility = [
+        "//build/bazel/assembly:__subpackages__",
+        "//vendor/google:__subpackages__",
+    ],
 )

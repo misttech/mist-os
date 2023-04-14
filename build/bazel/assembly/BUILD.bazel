@@ -2,36 +2,26 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_product_image")
-
-fuchsia_product_image(
-    name = "bringup",
-    image = "//build/bazel/assembly/images_configurations:bringup",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_bringup",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = "//build/bazel/assembly/product_configurations:default",
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "fuchsia_product_bundle",
+    "fuchsia_product_image",
 )
 
 fuchsia_product_image(
-    name = "minimal",
+    name = "product_image_minimal.x64",
     image = "//build/bazel/assembly/images_configurations:fuchsia",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = "//build/bazel/assembly/product_configurations:minimal",
 )
 
-fuchsia_product_image(
-    name = "core",
-    image = "//build/bazel/assembly/images_configurations:fuchsia",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = "//build/bazel/assembly/product_configurations:core",
-)
-
-fuchsia_product_image(
-    name = "workstation_eng",
-    image = "//build/bazel/assembly/images_configurations:fuchsia",
-    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = "//build/bazel/assembly/product_configurations:workstation_eng",
+fuchsia_product_bundle(
+    name = "minimal.x64",
+    board_name = "x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
+    product_image = ":product_image_minimal.x64",
+    product_name = "fuchsia",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
 )

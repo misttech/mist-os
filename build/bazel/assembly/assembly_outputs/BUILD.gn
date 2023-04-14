@@ -28,7 +28,7 @@ if (use_bringup_assembly) {
     gn_assembled_system_target =
         "//build/images/fuchsia:fuchsia($default_toolchain)"
     bazel_assembled_system_target =
-        "//build/bazel/assembly:minimal($default_toolchain)"
+        "//build/bazel/assembly:minimal.x64_create_system($default_toolchain)"
 
     exclude_packages = [
       # TODO(124454): Address these diffs
