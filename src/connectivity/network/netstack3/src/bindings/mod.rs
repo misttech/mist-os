@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom as _;
 use std::future::Future;
 use std::num::NonZeroU16;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -212,8 +212,7 @@ impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx {
 impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
     type Handler = Ctx;
     fn handler(&self) -> Ctx {
-        let NetstackContext(ctx) = &self.ctx;
-        ctx.clone()
+        self.ctx.clone()
     }
 }
 
@@ -708,31 +707,13 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
     Ok(())
 }
 
-#[derive(Default, Clone)]
-pub(crate) struct NetstackContext(Ctx);
-
-impl Deref for NetstackContext {
-    type Target = Ctx;
-    fn deref(&self) -> &Self::Target {
-        let Self(this) = self;
-        this
-    }
-}
-
-impl DerefMut for NetstackContext {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        let Self(this) = self;
-        this
-    }
-}
-
 /// The netstack.
 ///
 /// Provides the entry point for creating a netstack to be served as a
 /// component.
 #[derive(Clone)]
 pub struct Netstack {
-    ctx: NetstackContext,
+    ctx: Ctx,
     interfaces_event_sink: interfaces_watcher::WorkerInterfaceSink,
 }
 
@@ -796,7 +777,7 @@ impl Netstack {
         fasync::Task<()>,
     ) {
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.

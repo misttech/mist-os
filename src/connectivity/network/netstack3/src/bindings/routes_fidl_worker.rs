@@ -4,7 +4,7 @@
 
 //! FIDL Worker for the `fuchsia.net.routes` suite of protocols.
 
-use std::{collections::HashSet, ops::DerefMut};
+use std::collections::HashSet;
 
 use async_utils::event::Event;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _};
@@ -91,7 +91,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
         server_end.into_stream().expect("failed to acquire request_stream from server_end");
     let watcher = {
         let mut ctx = ns.ctx.clone();
-        let Ctx { sync_ctx: _, ref mut non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx: _, ref mut non_sync_ctx } = &mut ctx;
         let x = non_sync_ctx.route_update_dispatcher.lock().connect_new_client::<I>();
         x
     };
@@ -125,7 +125,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
 
     {
         let mut ctx = ns.ctx.clone();
-        let Ctx { sync_ctx: _, ref mut non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx: _, ref mut non_sync_ctx } = &mut ctx;
         non_sync_ctx.route_update_dispatcher.lock().disconnect_client::<I>(watcher.into_inner());
     }
 

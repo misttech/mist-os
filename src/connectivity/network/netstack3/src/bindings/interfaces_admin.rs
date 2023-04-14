@@ -54,7 +54,7 @@ use netstack3_core::device::DeviceId;
 
 use crate::bindings::{
     devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
-    DeviceIdExt as _, Netstack, NetstackContext,
+    DeviceIdExt as _, Netstack,
 };
 
 pub(crate) fn serve(
@@ -317,7 +317,7 @@ async fn create_interface(
 async fn run_netdevice_interface_control<
     S: futures::Stream<Item = netdevice_client::Result<netdevice_client::client::PortStatus>>,
 >(
-    ctx: NetstackContext,
+    ctx: Ctx,
     id: BindingId,
     status_stream: S,
     mut device_stopped_fut: async_utils::event::EventWaitResult,
@@ -374,7 +374,7 @@ async fn run_netdevice_interface_control<
 async fn run_link_state_watcher<
     S: futures::Stream<Item = netdevice_client::Result<netdevice_client::client::PortStatus>>,
 >(
-    ctx: NetstackContext,
+    ctx: Ctx,
     id: BindingId,
     status_stream: S,
     interface_access_synchronizer: &AsyncMutex<()>,
@@ -433,7 +433,7 @@ async fn run_link_state_watcher<
 /// Returns a function that must be called after the interface has been removed
 /// to notify all clients of removal.
 pub(crate) async fn run_interface_control(
-    ctx: NetstackContext,
+    ctx: Ctx,
     id: BindingId,
     mut stop_receiver: futures::channel::oneshot::Receiver<
         fnet_interfaces_admin::InterfaceRemovedReason,
@@ -450,7 +450,7 @@ pub(crate) async fn run_interface_control(
     struct ReqStreamState {
         owns_interface: bool,
         control_handle: fnet_interfaces_admin::ControlControlHandle,
-        ctx: NetstackContext,
+        ctx: Ctx,
         id: BindingId,
     }
     // Convert `control_receiver` (a stream-of-streams) into a stream of futures, where each future
@@ -627,7 +627,7 @@ enum ControlRequestResult {
 /// Serves a `fuchsia.net.interfaces.admin/Control` Request.
 async fn dispatch_control_request(
     req: fnet_interfaces_admin::ControlRequest,
-    ctx: &NetstackContext,
+    ctx: &Ctx,
     id: BindingId,
     removable: bool,
     owns_interface: &mut bool,
@@ -684,10 +684,10 @@ async fn dispatch_control_request(
 /// # Panics
 ///
 /// Panics if `id` points to a loopback device.
-async fn remove_interface(ctx: NetstackContext, id: BindingId) {
+async fn remove_interface(ctx: Ctx, id: BindingId) {
     let devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ } = {
         let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let core_id =
             non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
         match core_id {
@@ -707,7 +707,7 @@ async fn remove_interface(ctx: NetstackContext, id: BindingId) {
 ///
 /// Returns `true` if the value of `admin_enabled` changed in response to
 /// this call.
-async fn set_interface_enabled(ctx: &NetstackContext, enabled: bool, id: BindingId) -> bool {
+async fn set_interface_enabled(ctx: &Ctx, enabled: bool, id: BindingId) -> bool {
     enum Info<A, B> {
         Loopback(A),
         Netdevice(B),
@@ -778,7 +778,7 @@ async fn set_interface_enabled(ctx: &NetstackContext, enabled: bool, id: Binding
 /// Removes the given `address` from the interface with the given `id`.
 ///
 /// Returns `true` if the address existed and was removed; otherwise `false`.
-async fn remove_address(ctx: &NetstackContext, id: BindingId, address: fnet::Subnet) -> bool {
+async fn remove_address(ctx: &Ctx, id: BindingId, address: fnet::Subnet) -> bool {
     let specified_addr = match address.addr.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
@@ -822,12 +822,12 @@ async fn remove_address(ctx: &NetstackContext, id: BindingId, address: fnet::Sub
 ///
 /// Returns the previously set configuration on the interface.
 fn set_configuration(
-    ctx: &NetstackContext,
+    ctx: &Ctx,
     id: BindingId,
     config: fnet_interfaces_admin::Configuration,
 ) -> fnet_interfaces_admin::ControlSetConfigurationResult {
     let mut ctx = ctx.clone();
-    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+    let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
     let core_id = non_sync_ctx
         .devices
         .get_core_id(id)
@@ -931,9 +931,9 @@ fn set_configuration(
 }
 
 /// Returns the configuration used for the interface with the given `id`.
-fn get_configuration(ctx: &NetstackContext, id: BindingId) -> fnet_interfaces_admin::Configuration {
+fn get_configuration(ctx: &Ctx, id: BindingId) -> fnet_interfaces_admin::Configuration {
     let mut ctx = ctx.clone();
-    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+    let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
     let core_id = non_sync_ctx
         .devices
         .get_core_id(id)
@@ -964,7 +964,7 @@ fn get_configuration(ctx: &NetstackContext, id: BindingId) -> fnet_interfaces_ad
 /// If the address cannot be added, the appropriate removal reason will be sent
 /// to the address_state_provider.
 fn add_address(
-    ctx: &NetstackContext,
+    ctx: &Ctx,
     id: BindingId,
     address: fnet::Subnet,
     params: fnet_interfaces_admin::AddressParameters,
@@ -1064,7 +1064,7 @@ fn add_address(
 
 /// A worker for `fuchsia.net.interfaces.admin/AddressStateProvider`.
 async fn run_address_state_provider(
-    ctx: NetstackContext,
+    ctx: Ctx,
     addr_subnet_either: AddrSubnetEither,
     id: BindingId,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
@@ -1083,7 +1083,7 @@ async fn run_address_state_provider(
     // loopback or SLAAC).
     let add_to_core_result = {
         let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
         netstack3_core::add_ip_addr_subnet(sync_ctx, non_sync_ctx, &device_id, addr_subnet_either)
     };
@@ -1130,7 +1130,7 @@ async fn run_address_state_provider(
 
     // Remove the address.
     let mut ctx = ctx.clone();
-    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+    let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
     let core_id = non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
     // Don't drop the worker yet; it's what's driving THIS function.
     let _worker: futures::future::Shared<fuchsia_async::Task<()>> =
@@ -1418,7 +1418,7 @@ mod tests {
 
     use crate::bindings::{
         interfaces_watcher::InterfaceEvent, interfaces_watcher::InterfaceUpdate, util::IntoFidl,
-        InterfaceEventProducer, NetstackContext, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
+        Ctx, InterfaceEventProducer, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
     };
 
     // Verifies that when an an interface is removed, its addresses are
@@ -1426,7 +1426,7 @@ mod tests {
     // removal would be redundant and is unnecessary.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn implicit_address_removal_on_interface_removal() {
-        let ctx: NetstackContext = Default::default();
+        let ctx: Ctx = Default::default();
         let (control_client_end, control_server_end) =
             fnet_interfaces_ext::admin::Control::create_endpoints().expect("create control proxy");
         let (control_sender, control_receiver) =
@@ -1436,7 +1436,7 @@ mod tests {
         // Add the interface.
         let binding_id = {
             let mut ctx = ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
             let binding_id = non_sync_ctx.devices.alloc_new_id();
             let core_id = netstack3_core::device::add_loopback_device_with_state(
                 sync_ctx,

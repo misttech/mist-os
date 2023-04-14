@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::ops::DerefMut;
-
 use super::{
     util::{IntoFidl, TryFromFidlWithContext as _, TryIntoCore as _},
     Ctx,
@@ -21,27 +19,18 @@ pub(crate) struct StackFidlWorker {
     netstack: crate::bindings::Netstack,
 }
 
-struct LockedFidlWorker<C> {
-    ctx: C,
-}
-
 impl StackFidlWorker {
-    fn lock_worker(&self) -> LockedFidlWorker<impl DerefMut<Target = Ctx> + '_> {
-        let ctx = self.netstack.ctx.clone();
-        LockedFidlWorker { ctx }
-    }
-
     pub(crate) async fn serve(
         netstack: crate::bindings::Netstack,
         stream: StackRequestStream,
     ) -> Result<(), fidl::Error> {
         stream
-            .try_fold(Self { netstack }, |worker, req| async {
+            .try_fold(Self { netstack }, |mut worker, req| async {
                 match req {
                     StackRequest::AddForwardingEntry { entry, responder } => {
                         responder_send!(
                             responder,
-                            &mut worker.lock_worker().fidl_add_forwarding_entry(entry)
+                            &mut worker.fidl_add_forwarding_entry(entry)
                         );
                     }
                     StackRequest::DelForwardingEntry {
@@ -56,7 +45,7 @@ impl StackFidlWorker {
                     } => {
                         responder_send!(
                             responder,
-                            &mut worker.lock_worker().fidl_del_forwarding_entry(subnet)
+                            &mut worker.fidl_del_forwarding_entry(subnet)
                         );
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
@@ -97,14 +86,12 @@ impl StackFidlWorker {
             .map_ok(|Self { netstack: _ }| ())
             .await
     }
-}
 
-impl<C: DerefMut<Target = Ctx>> LockedFidlWorker<C> {
     fn fidl_add_forwarding_entry(
-        mut self,
+        &mut self,
         entry: ForwardingEntry,
     ) -> Result<(), fidl_net_stack::Error> {
-        let Ctx { sync_ctx, non_sync_ctx } = self.ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut self.netstack.ctx;
 
         let entry = match AddableEntryEither::try_from_fidl_with_ctx(&non_sync_ctx, entry) {
             Ok(entry) => entry,
@@ -114,10 +101,10 @@ impl<C: DerefMut<Target = Ctx>> LockedFidlWorker<C> {
     }
 
     fn fidl_del_forwarding_entry(
-        mut self,
+        &mut self,
         subnet: fidl_net::Subnet,
     ) -> Result<(), fidl_net_stack::Error> {
-        let Ctx { sync_ctx, non_sync_ctx } = self.ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut self.netstack.ctx;
 
         if let Ok(subnet) = subnet.try_into_core() {
             del_route(sync_ctx, non_sync_ctx, subnet).map_err(IntoFidl::into_fidl)

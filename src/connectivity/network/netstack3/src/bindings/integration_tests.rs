@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
-use std::ops::DerefMut as _;
 use std::sync::Once;
 
 use anyhow::{format_err, Context as _, Error};
@@ -234,11 +233,11 @@ impl TestStack {
     /// [`Ctx< BindingsContext>`] provided by this `TestStack`.
     pub(crate) fn with_ctx<R, F: FnOnce(&mut Ctx) -> R>(&mut self, f: F) -> R {
         let mut ctx = self.ctx.netstack.ctx.clone();
-        f(ctx.deref_mut())
+        f(&mut ctx)
     }
 
     /// Acquire this `TestStack`'s context.
-    pub(crate) fn ctx(&self) -> impl std::ops::DerefMut<Target = Ctx> + '_ {
+    pub(crate) fn ctx(&self) -> Ctx {
         self.ctx.netstack.ctx.clone()
     }
 }
@@ -739,7 +738,7 @@ async fn test_list_del_routes() {
 
     fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
         let mut ctx = ts.ctx();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         netstack3_core::ip::get_all_routes(sync_ctx)
             .into_iter()
             .map(|entry| {

@@ -11,7 +11,7 @@ pub(crate) mod raw;
 pub(crate) mod stream;
 pub(crate) mod worker;
 
-use std::{convert::Infallible as Never, num::NonZeroU64, ops::Deref as _};
+use std::{convert::Infallible as Never, num::NonZeroU64};
 
 use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net as fnet;
@@ -49,7 +49,7 @@ const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
 pub(crate) struct SocketWorkerProperties {}
 
 pub(crate) async fn serve(
-    ctx: crate::bindings::NetstackContext,
+    ctx: crate::bindings::Ctx,
     stream: psocket::ProviderRequestStream,
 ) -> Result<(), fidl::Error> {
     stream
@@ -58,7 +58,7 @@ pub(crate) async fn serve(
                 psocket::ProviderRequest::InterfaceIndexToName { index, responder } => {
                     let mut response = {
                         let ctx = ctx.clone();
-                        let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref();
+                        let Ctx { sync_ctx: _, non_sync_ctx } = &ctx;
                         BindingId::new(index)
                             .ok_or(DeviceNotFoundError)
                             .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
@@ -72,7 +72,7 @@ pub(crate) async fn serve(
                 psocket::ProviderRequest::InterfaceNameToIndex { name, responder } => {
                     let mut response = {
                         let ctx = ctx.clone();
-                        let Ctx { sync_ctx: _, non_sync_ctx } = ctx.deref();
+                        let Ctx { sync_ctx: _, non_sync_ctx } = &ctx;
                         let devices = AsRef::<Devices<_>>::as_ref(&non_sync_ctx);
                         let result = devices
                             .get_device_by_name(&name)
@@ -128,7 +128,7 @@ pub(crate) async fn serve(
             }
             Ok(ctx)
         })
-        .map_ok(|_: crate::bindings::NetstackContext| ())
+        .map_ok(|_: crate::bindings::Ctx| ())
         .await
 }
 

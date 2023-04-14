@@ -39,7 +39,7 @@ use crate::bindings::{
         ConversionContext as _, DeviceNotFoundError, IntoFidl, TryIntoCoreWithContext as _,
         TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx, NetstackContext,
+    BindingsNonSyncCtxImpl, Ctx,
 };
 
 #[derive(Default)]
@@ -97,7 +97,7 @@ impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
 }
 
 pub(crate) async fn serve(
-    ctx: NetstackContext,
+    ctx: Ctx,
     stream: fppacket::ProviderRequestStream,
 ) -> Result<(), fidl::Error> {
     let ctx = &ctx;
@@ -221,7 +221,7 @@ impl worker::SocketWorkerHandler for BindingData {
 
     fn handle_request(
         &mut self,
-        ctx: &NetstackContext,
+        ctx: &Ctx,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
@@ -242,7 +242,7 @@ impl worker::SocketWorkerHandler for BindingData {
 }
 
 struct RequestHandler<'a> {
-    ctx: &'a NetstackContext,
+    ctx: &'a Ctx,
     data: &'a mut BindingData,
 }
 
@@ -279,7 +279,7 @@ impl<'a> RequestHandler<'a> {
             .transpose()?;
         let Self { ctx, data: BindingData { peer_event: _, message_queue: _, state } } = self;
         let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
@@ -316,7 +316,7 @@ impl<'a> RequestHandler<'a> {
             data: BindingData { peer_event: _, message_queue: _, state: State { id, kind } },
         } = self;
         let mut ctx = ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let SocketInfo { device, protocol } =
             netstack3_core::device::socket::get_info(sync_ctx, id);

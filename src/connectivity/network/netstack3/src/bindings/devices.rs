@@ -161,7 +161,7 @@ pub(crate) fn spawn_rx_task(
         // Loop while we are woken up to handle enqueued RX packets.
         while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
             let mut ctx = ns.ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
             handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
         }
     })

@@ -1085,8 +1085,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::bindings::{
-        devices, interfaces_admin::OwnedControlHandle, DeviceIdExt as _, InterfaceEventProducer,
-        NetstackContext, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
+        devices, interfaces_admin::OwnedControlHandle, Ctx, DeviceIdExt as _,
+        InterfaceEventProducer, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
     };
 
     use super::*;
@@ -1101,7 +1101,7 @@ mod tests {
         // the internal reference to the device is dropped. We include netstack
         // here (at the bottom of this struct) to make sure it is only dropped
         // after the device IDs are dropped.
-        _netstack: NetstackContext,
+        _netstack: Ctx,
     }
 
     impl FakeConversionContext {
@@ -1109,7 +1109,7 @@ mod tests {
             // We need a valid context to be able to create DeviceIds, so
             // we just create it, get the device id, and then destroy
             // everything.
-            let ctx = NetstackContext::default();
+            let ctx = Ctx::default();
             let binding = BindingId::MIN;
             let core = {
                 let (_control_client_end, control_server_end) =

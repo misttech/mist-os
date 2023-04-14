@@ -5,7 +5,6 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom as _, TryInto as _},
-    ops::DerefMut as _,
     sync::Arc,
 };
 
@@ -30,7 +29,7 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, BindingId, Ctx, DeviceId, IpDeviceConfiguration,
-    Ipv6DeviceConfiguration, Netstack, NetstackContext, NonSyncContext, StackTime, SyncCtx,
+    Ipv6DeviceConfiguration, Netstack, NonSyncContext, StackTime, SyncCtx,
     DEFAULT_INTERFACE_METRIC,
 };
 
@@ -46,7 +45,7 @@ struct Inner {
 /// The worker that receives messages from the ethernet device, and passes them
 /// on to the main event loop.
 pub(crate) struct NetdeviceWorker {
-    ctx: NetstackContext,
+    ctx: Ctx,
     task: netdevice_client::Task,
     inner: Inner,
 }
@@ -79,7 +78,7 @@ const DEFAULT_BUFFER_LENGTH: usize = 2048;
 // device debug information to disambiguate.
 impl NetdeviceWorker {
     pub async fn new(
-        ctx: NetstackContext,
+        ctx: Ctx,
         device: fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>,
     ) -> Result<Self, Error> {
         let device =
@@ -126,7 +125,7 @@ impl NetdeviceWorker {
             })?;
 
             let mut ctx = ctx.clone();
-            let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
             let Some(id) = id.upgrade() else {
                 // This is okay because we hold a weak reference; the device may
@@ -261,8 +260,8 @@ impl DeviceHandler {
             }
             netdevice_client::port_slab::Entry::Vacant(e) => e,
         };
-        let ctx = &mut ns.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let mut ctx = &mut ns.ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         // Check if there already exists an interface with this name.
         // Interface names are unique.

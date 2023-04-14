@@ -9,7 +9,7 @@ use std::{
     fmt::Debug,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
-    ops::{ControlFlow, Deref as _, DerefMut as _},
+    ops::ControlFlow,
     sync::Arc,
 };
 
@@ -61,7 +61,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _, NetstackContext, StaticCommonInfo,
+    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _, StaticCommonInfo,
 };
 
 use super::{
@@ -1381,7 +1381,7 @@ where
 pub(super) fn spawn_worker(
     domain: fposix_socket::Domain,
     proto: fposix_socket::DatagramSocketProtocol,
-    ctx: crate::bindings::NetstackContext,
+    ctx: crate::bindings::Ctx,
     events: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
 ) -> Result<(), fposix::Errno> {
@@ -1449,7 +1449,7 @@ where
 
     fn handle_request(
         &mut self,
-        ctx: &NetstackContext,
+        ctx: &Ctx,
         request: Self::Request,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
@@ -1514,7 +1514,7 @@ where
 }
 /// A borrow into a [`SocketWorker`]'s state.
 struct RequestHandler<'a, I: Ip, T: Transport<I>> {
-    ctx: &'a crate::bindings::NetstackContext,
+    ctx: &'a crate::bindings::Ctx,
     data: &'a mut BindingData<I, T>,
 }
 
@@ -1959,7 +1959,7 @@ where
     /// [POSIX socket connect request]: fposix_socket::SynchronousDatagramSocketRequest::Connect
     fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let sockaddr = I::SocketAddress::from_sock_addr(addr)?;
         trace!("connect sockaddr: {:?}", sockaddr);
         let (remote_addr, remote_port) =
@@ -2058,7 +2058,7 @@ where
         trace!("bind sockaddr: {:?}", sockaddr);
 
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let (sockaddr, port) =
             TryFromFidlWithContext::try_from_fidl_with_ctx(&non_sync_ctx, sockaddr)
@@ -2110,7 +2110,7 @@ where
         trace!("disconnect socket");
 
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let (listener_id, messages) = match self.data.info.state {
             SocketState::Unbound { unbound_id: _ }
@@ -2137,7 +2137,7 @@ where
     /// [POSIX socket get_sock_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetSockName
     fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         match self.data.info.state {
             SocketState::Unbound { .. } => {
                 return Err(fposix::Errno::Enotsock);
@@ -2184,7 +2184,7 @@ where
     /// [POSIX socket get_peer_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetPeerName
     fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         match self.data.info.state {
             SocketState::Unbound { .. } => {
                 return Err(fposix::Errno::Enotsock);
@@ -2275,7 +2275,7 @@ where
         let remote_addr = addr.map(I::SocketAddress::from_sock_addr).transpose()?;
 
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let remote = match remote_addr {
             Some(remote_addr) => {
                 let (remote_addr, port) =
@@ -2340,7 +2340,7 @@ where
 
     fn bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         let device = device
             .map(|name| {
                 non_sync_ctx
@@ -2359,7 +2359,7 @@ where
 
     fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
         let ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref();
+        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
         let state: &SocketState<_, _> = &self.data.info.state;
         let id = state.into();
 
@@ -2379,7 +2379,7 @@ where
 
     fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         match self.data.info.state {
             SocketState::Unbound { unbound_id } => {
                 T::set_reuse_port(sync_ctx, non_sync_ctx, unbound_id, reuse_port);
@@ -2394,7 +2394,7 @@ where
 
     fn get_reuse_port(self) -> bool {
         let ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref();
+        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
 
         T::get_reuse_port(sync_ctx, non_sync_ctx, (&self.data.info.state).into())
     }
@@ -2450,7 +2450,7 @@ where
         let id = (&self.data.info.state).into();
 
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
         let interface =
             interface.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
@@ -2484,7 +2484,7 @@ where
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
 
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         T::set_unicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
         Ok(())
     }
@@ -2509,7 +2509,7 @@ where
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
 
         let mut ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
         T::set_multicast_hop_limit(sync_ctx, non_sync_ctx, id, hop_limit);
         Ok(())
     }
@@ -2524,7 +2524,7 @@ where
         let id = (&self.data.info.state).into();
 
         let ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref();
+        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
         Ok(T::get_unicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
 
@@ -2538,7 +2538,7 @@ where
         let id = (&self.data.info.state).into();
 
         let ctx = self.ctx.clone();
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref();
+        let Ctx { sync_ctx, non_sync_ctx } = &ctx;
 
         Ok(T::get_multicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
