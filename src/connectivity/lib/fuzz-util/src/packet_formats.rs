@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! Arbitrary packet generators.
+
 use arbitrary::{Arbitrary, Result, Unstructured};
 use net_types::{
     ethernet::Mac,
@@ -48,6 +50,7 @@ impl<'a> Arbitrary<'a> for Fuzzed<EthernetFrameBuilder> {
             Mac::arbitrary_from_bytes(u)?,
             Mac::arbitrary_from_bytes(u)?,
             Fuzzed::<EtherType>::arbitrary(u)?.into(),
+            u8::arbitrary(u)?.into(),
         )))
     }
 }

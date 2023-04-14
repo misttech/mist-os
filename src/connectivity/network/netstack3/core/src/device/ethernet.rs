@@ -23,7 +23,7 @@ use packet_formats::{
     arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
     ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
-        ETHERNET_HDR_LEN_NO_TAG,
+        ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG,
     },
     icmp::{
         ndp::{options::NdpOptionBuilder, NeighborSolicitation, OptionSequenceBuilder},
@@ -279,7 +279,12 @@ fn send_ip_frame_to_dst<
         ctx,
         device_id,
         (),
-        body.encapsulate(EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type)),
+        body.encapsulate(EthernetFrameBuilder::new(
+            local_mac.get(),
+            dst_mac,
+            ether_type,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        )),
     ) {
         Ok(()) => Ok(()),
         Err(TransmitQueueFrameError::NoQueue(e)) => {
@@ -1126,6 +1131,7 @@ mod tests {
     use net_types::ip::{AddrSubnet, Ip, IpAddr, IpVersion};
     use packet::Buf;
     use packet_formats::{
+        ethernet::ETHERNET_MIN_BODY_LEN_NO_TAG,
         icmp::IcmpDestUnreachable,
         ip::{IpExt, IpPacketBuilder, IpProto},
         testdata::{dns_request_v4, dns_request_v6},
@@ -1662,6 +1668,7 @@ mod tests {
                 config.remote_mac.get(),
                 config.local_mac.get(),
                 I::ETHER_TYPE,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .ok()
@@ -1696,6 +1703,7 @@ mod tests {
                 config.remote_mac.get(),
                 other_mac.get(),
                 I::ETHER_TYPE,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .ok()

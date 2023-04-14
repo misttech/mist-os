@@ -211,22 +211,39 @@ impl<B: ByteSlice> EthernetFrame<B> {
             src_mac: self.src_mac(),
             dst_mac: self.dst_mac(),
             ethertype: self.ethertype.get(),
+            min_body_len: ETHERNET_MIN_BODY_LEN_NO_TAG,
         }
     }
 }
 
 /// A builder for Ethernet frames.
+///
+/// A [`PacketBuilder`] that serializes into an Ethernet frame. The padding
+/// parameter `P` can be used to choose how the body of the frame is padded.
 #[derive(Debug)]
 pub struct EthernetFrameBuilder {
     src_mac: Mac,
     dst_mac: Mac,
     ethertype: u16,
+    min_body_len: usize,
 }
 
 impl EthernetFrameBuilder {
     /// Construct a new `EthernetFrameBuilder`.
-    pub fn new(src_mac: Mac, dst_mac: Mac, ethertype: EtherType) -> EthernetFrameBuilder {
-        EthernetFrameBuilder { src_mac, dst_mac, ethertype: ethertype.into() }
+    ///
+    /// The provided source and destination [`Mac`] addresses and [`EtherType`]
+    /// will be placed in the Ethernet frame header. The `min_body_len`
+    /// parameter sets the minimum length of the frame's body in bytes. If,
+    /// during serialization, the inner packet builder produces a smaller body
+    /// than `min_body_len`, it will be padded with trailing zero bytes up to
+    /// `min_body_len`.
+    pub fn new(
+        src_mac: Mac,
+        dst_mac: Mac,
+        ethertype: EtherType,
+        min_body_len: usize,
+    ) -> EthernetFrameBuilder {
+        EthernetFrameBuilder { src_mac, dst_mac, ethertype: ethertype.into(), min_body_len }
     }
 }
 
@@ -237,12 +254,7 @@ impl EthernetFrameBuilder {
 
 impl PacketBuilder for EthernetFrameBuilder {
     fn constraints(&self) -> PacketConstraints {
-        PacketConstraints::new(
-            ETHERNET_HDR_LEN_NO_TAG,
-            0,
-            ETHERNET_MIN_BODY_LEN_NO_TAG,
-            core::usize::MAX,
-        )
+        PacketConstraints::new(ETHERNET_HDR_LEN_NO_TAG, 0, self.min_body_len, core::usize::MAX)
     }
 
     fn serialize(&self, buffer: &mut SerializeBuffer<'_, '_>) {
@@ -264,9 +276,7 @@ impl PacketBuilder for EthernetFrameBuilder {
 
         // NOTE(joshlf): This doesn't include the tag. If we ever add support
         // for serializing tags, we will need to update this.
-        let min_frame_size = ETHERNET_MIN_BODY_LEN_NO_TAG
-            + core::mem::size_of::<HeaderPrefix>()
-            + core::mem::size_of::<U16>();
+        let min_frame_size = self.min_body_len + ETHERNET_HDR_LEN_NO_TAG;
 
         // Assert this here so that if there isn't enough space for even an
         // Ethernet header, we report that more specific error.
@@ -301,6 +311,7 @@ pub mod testutil {
 mod tests {
     use packet::{
         AsFragmentedByteSlice, Buf, InnerPacketBuilder, ParseBuffer, SerializeBuffer, Serializer,
+        TargetBuffer,
     };
     use zerocopy::byteorder::{ByteOrder, NetworkEndian};
 
@@ -429,6 +440,7 @@ mod tests {
                 DEFAULT_DST_MAC,
                 DEFAULT_SRC_MAC,
                 EtherType::Arp,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .unwrap();
@@ -448,6 +460,7 @@ mod tests {
                 DEFAULT_SRC_MAC,
                 DEFAULT_DST_MAC,
                 EtherType::Arp,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .unwrap()
@@ -459,6 +472,7 @@ mod tests {
                 DEFAULT_SRC_MAC,
                 DEFAULT_DST_MAC,
                 EtherType::Arp,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .unwrap()
@@ -525,7 +539,44 @@ mod tests {
             Mac::new([0, 1, 2, 3, 4, 5]),
             Mac::new([6, 7, 8, 9, 10, 11]),
             EtherType::Arp,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
         )
         .serialize(&mut buffer);
+    }
+
+    #[test]
+    fn test_custom_min_body_len() {
+        const MIN_BODY_LEN: usize = 4;
+        const UNWRITTEN_BYTE: u8 = 0xAA;
+
+        let builder = EthernetFrameBuilder::new(
+            Mac::new([0, 1, 2, 3, 4, 5]),
+            Mac::new([6, 7, 8, 9, 10, 11]),
+            EtherType::Arp,
+            MIN_BODY_LEN,
+        );
+
+        let mut buffer = [UNWRITTEN_BYTE; ETHERNET_MIN_FRAME_LEN];
+        TargetBuffer::serialize(
+            &mut Buf::new(&mut buffer[..], ETHERNET_HDR_LEN_NO_TAG..ETHERNET_HDR_LEN_NO_TAG),
+            builder.constraints(),
+            builder,
+        );
+
+        let (header, tail) = buffer.split_at(ETHERNET_HDR_LEN_NO_TAG);
+        let (padding, unwritten) = tail.split_at(MIN_BODY_LEN);
+        assert_eq!(
+            header,
+            &[
+                6, 7, 8, 9, 10, 11, // dst_mac
+                0, 1, 2, 3, 4, 5, // src_mac
+                08, 06, // ethertype
+            ]
+        );
+        assert_eq!(padding, &[0; MIN_BODY_LEN]);
+        assert_eq!(
+            unwritten,
+            &[UNWRITTEN_BYTE; ETHERNET_MIN_FRAME_LEN - MIN_BODY_LEN - ETHERNET_HDR_LEN_NO_TAG]
+        );
     }
 }

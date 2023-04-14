@@ -27,7 +27,9 @@ use netstack_testing_macros::netstack_test;
 use packet::{serialize::Serializer as _, ParsablePacket as _};
 use packet_formats::{
     error::ParseError,
-    ethernet::{EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck},
+    ethernet::{
+        EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    },
     icmp::{
         IcmpEchoRequest, IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketBuilder, IcmpParseArgs,
         IcmpUnusedCode, MessageBody as _, OriginalPacket,
@@ -468,6 +470,7 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
             net_types::ethernet::Mac::new([1, 2, 3, 4, 5, 6]),
             net_types::ethernet::Mac::BROADCAST,
             I::ETHER_TYPE,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
         ))
         .serialize_vec_outer()
         .expect("serialize ICMP packet")

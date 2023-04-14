@@ -36,7 +36,10 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use packet::{EmptyBuf, InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
-    ethernet::{EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck},
+    ethernet::{
+        EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+        ETHERNET_MIN_BODY_LEN_NO_TAG,
+    },
     ip::{IpProto, Ipv6Proto},
     ipv6::Ipv6PacketBuilder,
     testutil::parse_ip_packet,
@@ -961,6 +964,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
                     Mac::BROADCAST,
                     Mac::BROADCAST,
                     EtherType::Ipv6,
+                    ETHERNET_MIN_BODY_LEN_NO_TAG,
                 ))
                 .serialize_vec_outer()
                 .expect("error serializing dhcpv6 packet");

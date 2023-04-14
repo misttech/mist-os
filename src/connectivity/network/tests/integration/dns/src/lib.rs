@@ -45,7 +45,7 @@ use packet::{
 use packet_formats::{
     ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
-        EthernetIpExt as _,
+        EthernetIpExt as _, ETHERNET_MIN_BODY_LEN_NO_TAG,
     },
     icmp::ndp::options::{NdpOptionBuilder, RecursiveDnsServer},
     ip::{IpPacket as _, IpProto, Ipv6Proto},
@@ -464,7 +464,12 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
             ipv6_consts::DEFAULT_HOP_LIMIT,
             IpProto::Udp.into(),
         ))
-        .encapsulate(EthernetFrameBuilder::new(dst_mac, src_mac, EtherType::Ipv6))
+        .encapsulate(EthernetFrameBuilder::new(
+            dst_mac,
+            src_mac,
+            EtherType::Ipv6,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        ))
         .serialize_vec_outer()
         .unwrap_or_else(|(err, _serializer)| panic!("failed to serialize DHCPv6 packet: {:?}", err))
         .unwrap_b();

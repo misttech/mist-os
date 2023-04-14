@@ -29,7 +29,7 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder},
+    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
     icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, MessageBody as _},
     ip::{Ipv4Proto, Ipv6Proto},
     ipv4::Ipv4PacketBuilder,
@@ -126,7 +126,12 @@ fn reply_if_echo_request(
                         ipv4_consts::DEFAULT_TTL,
                         Ipv4Proto::Icmp,
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(dst_mac, src_mac, EtherType::Ipv4))
+                    .encapsulate(EthernetFrameBuilder::new(
+                        dst_mac,
+                        src_mac,
+                        EtherType::Ipv4,
+                        ETHERNET_MIN_BODY_LEN_NO_TAG,
+                    ))
                     .serialize_vec_outer()
                     .expect("failed to serialize ICMPv4 packet")
                     .unwrap_b()
@@ -171,7 +176,12 @@ fn reply_if_echo_request(
                         ipv6_consts::DEFAULT_HOP_LIMIT,
                         Ipv6Proto::Icmpv6,
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(dst_mac, src_mac, EtherType::Ipv6))
+                    .encapsulate(EthernetFrameBuilder::new(
+                        dst_mac,
+                        src_mac,
+                        EtherType::Ipv6,
+                        ETHERNET_MIN_BODY_LEN_NO_TAG,
+                    ))
                     .serialize_vec_outer()
                     .expect("failed to serialize ICMPv6 packet")
                     .unwrap_b()

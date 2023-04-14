@@ -7,7 +7,7 @@
 
 #![deny(missing_docs)]
 
-mod packet_formats;
+pub mod packet_formats;
 pub mod zerocopy;
 
 /// A wrapper type that can be used to generate arbitrary `A`s for fuzzing by

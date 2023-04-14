@@ -3024,7 +3024,10 @@ mod tests {
     };
     use packet::{Buf, ParseBuffer};
     use packet_formats::{
-        ethernet::{EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck},
+        ethernet::{
+            EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        },
         icmp::{
             IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
             Icmpv4DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig,
@@ -4304,7 +4307,12 @@ mod tests {
                 64,
                 IpProto::Udp.into(),
             ))
-            .encapsulate(EthernetFrameBuilder::new(config.remote_mac.get(), dst_mac, I::ETHER_TYPE))
+            .encapsulate(EthernetFrameBuilder::new(
+                config.remote_mac.get(),
+                dst_mac,
+                I::ETHER_TYPE,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
+            ))
             .serialize_vec_outer()
             .ok()
             .unwrap()

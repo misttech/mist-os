@@ -1128,6 +1128,7 @@ mod tests {
     use super::*;
     use crate::ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+        ETHERNET_MIN_BODY_LEN_NO_TAG,
     };
     use crate::ip::IpProto;
     use crate::testutil::*;
@@ -1239,6 +1240,7 @@ mod tests {
                 DEFAULT_SRC_MAC,
                 DEFAULT_DST_MAC,
                 EtherType::Ipv4,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .unwrap();

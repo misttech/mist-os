@@ -18,6 +18,7 @@ use net_types::{ethernet::Mac, ip::IpAddress, SpecifiedAddr};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
+    ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 
 use crate::{
@@ -300,6 +301,7 @@ where
         LOOPBACK_MAC,
         LOOPBACK_MAC,
         <A::Version as EthernetIpExt>::ETHER_TYPE,
+        ETHERNET_MIN_BODY_LEN_NO_TAG,
     ));
 
     match BufferTransmitQueueHandler::<LoopbackDevice, _, _>::queue_tx_frame(

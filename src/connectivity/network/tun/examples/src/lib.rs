@@ -327,7 +327,10 @@ mod helpers {
     use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
     use packet_formats::{
         arp::{ArpOp, ArpPacket, ArpPacketBuilder},
-        ethernet::{EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck},
+        ethernet::{
+            EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        },
         icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode, Icmpv4Packet},
         ip::Ipv4Proto,
         ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
@@ -368,6 +371,7 @@ mod helpers {
                 mac(config.bob_mac),
                 mac(config.alice_mac),
                 EtherType::Ipv4,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .expect("serialization failed")
@@ -497,6 +501,7 @@ mod helpers {
             mac(config.bob_mac),
             mac(config.alice_mac),
             EtherType::Arp,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
         ))
         .serialize_vec_outer()
         .expect("serialization failed")

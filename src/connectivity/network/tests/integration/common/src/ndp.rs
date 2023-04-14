@@ -11,7 +11,7 @@ use futures::{future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _}
 use net_types::{ip::Ip as _, Witness as _};
 use packet::serialize::{InnerPacketBuilder, Serializer};
 use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder},
+    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
     icmp::{
         ndp::{
             options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
@@ -52,7 +52,12 @@ pub async fn write_message<
         .into_serializer()
         .encapsulate(IcmpPacketBuilder::<_, B, _>::new(src_ip, dst_ip, IcmpUnusedCode, message))
         .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, MESSAGE_TTL, Ipv6Proto::Icmpv6))
-        .encapsulate(EthernetFrameBuilder::new(src_mac, dst_mac, EtherType::Ipv6))
+        .encapsulate(EthernetFrameBuilder::new(
+            src_mac,
+            dst_mac,
+            EtherType::Ipv6,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        ))
         .serialize_vec_outer()
         .map_err(|e| anyhow::anyhow!("failed to serialize NDP packet: {:?}", e))?
         .unwrap_b();

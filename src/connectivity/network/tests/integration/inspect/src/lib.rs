@@ -23,7 +23,10 @@ use netstack_testing_macros::netstack_test;
 use nonzero_ext::nonzero;
 use packet::{ParsablePacket as _, Serializer as _};
 use packet_formats::{
-    ethernet::{testutil::ETHERNET_HDR_LEN_NO_TAG, EtherType, EthernetFrameBuilder},
+    ethernet::{
+        testutil::ETHERNET_HDR_LEN_NO_TAG, EtherType, EthernetFrameBuilder,
+        ETHERNET_MIN_BODY_LEN_NO_TAG,
+    },
     ipv4::{Ipv4Header as _, Ipv4PacketBuilder},
     udp::{UdpPacketBuilder, UdpParseArgs},
 };
@@ -504,6 +507,7 @@ async fn inspect_dhcp<N: Netstack>(
                 constants::eth::MAC_ADDR,            /* src_mac */
                 net_types::ethernet::Mac::BROADCAST, /* dst_mac */
                 EtherType::Ipv4,
+                ETHERNET_MIN_BODY_LEN_NO_TAG,
             ))
             .serialize_vec_outer()
             .expect("failed to serialize UDP packet")

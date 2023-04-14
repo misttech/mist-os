@@ -85,6 +85,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
             FAKE_CONFIG_V4.remote_mac.get(),
             FAKE_CONFIG_V4.local_mac.get(),
             EtherType::Ipv4,
+            ETHERNET_HDR_LEN_NO_TAG,
         ))
         .serialize_vec_outer()
         .unwrap();

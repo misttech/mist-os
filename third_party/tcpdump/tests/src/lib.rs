@@ -31,7 +31,7 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, Serializer};
 use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder},
+    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
     ip::{IpProto, Ipv4Proto},
     ipv4::Ipv4PacketBuilder,
     udp::UdpPacketBuilder,
@@ -391,6 +391,7 @@ async fn bridged_packet_test(name: &str) {
                     net_types_mac(REMOTE_MAC),
                     net_types_mac(*local_mac),
                     EtherType::Ipv4,
+                    ETHERNET_MIN_BODY_LEN_NO_TAG,
                 ))
                 .serialize_vec_outer()
                 .expect("error serializing UDP packet")
