@@ -43,7 +43,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    @Subdir sdk
    fuchsia/sdk/core/${platform} latest
    @Subdir sysroot/linux
-   fuchsia/third_party/sysroot/linux latest
+   fuchsia/third_party/sysroot/linux git_revision:db18eec0b4f14b6b16174aa2b91e016663157376
    @Subdir clang
    fuchsia/third_party/clang/${platform} integration
    EOF
