@@ -296,6 +296,12 @@ fuchsia_component("manifest-test-driver") {
   manifest = "meta/manifest-test-driver.cml"
 }
 
+fuchsia_component("manifest-with-scheduler-role") {
+  testonly = true
+  component_name = "manifest-with-scheduler-role"
+  manifest = "meta/manifest-with-scheduler-role.cml"
+}
+
 fuchsia_component("manifest-missing-driver") {
   testonly = true
   component_name = "manifest-missing-driver"
@@ -313,6 +319,7 @@ fuchsia_unittest_component("manifest_parser_test_component") {
     ":manifest-missing-driver",
     ":manifest-no-services",
     ":manifest-test-driver",
+    ":manifest-with-scheduler-role",
     ":manifest_parser_test",
   ]
 }

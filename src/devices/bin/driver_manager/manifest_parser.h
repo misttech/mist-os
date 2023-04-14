@@ -26,6 +26,7 @@ bool IsFuchsiaBootScheme(std::string_view url);
 struct ManifestContent {
   std::string driver_url;
   std::vector<std::string> service_uses;
+  std::string default_dispatcher_scheduler_role;
 };
 
 // Parse out important fields from the component manifest.

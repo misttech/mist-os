@@ -12,13 +12,15 @@
 
 #include "lib/fdf/dispatcher.h"
 
-zx::result<fbl::RefPtr<Driver>> Driver::Create(zx_driver_t* zx_driver) {
+zx::result<fbl::RefPtr<Driver>> Driver::Create(zx_driver_t* zx_driver,
+                                               std::string_view default_dispatcher_scheduler_role) {
   auto driver = fbl::MakeRefCounted<Driver>(zx_driver);
 
   auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
       driver.get(), fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
       fbl::StringPrintf("%s-default-%p", zx_driver->name(), driver.get()),
-      [driver = driver.get()](fdf_dispatcher_t* dispatcher) { driver->released_.Signal(); });
+      [driver = driver.get()](fdf_dispatcher_t* dispatcher) { driver->released_.Signal(); },
+      default_dispatcher_scheduler_role);
   if (dispatcher.is_error()) {
     return dispatcher.take_error();
   }

@@ -80,6 +80,7 @@ zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::stri
     return zx::error(status);
   }
   driver->package_dir = std::move(package_dir_fd);
+  driver->default_dispatcher_scheduler_role = manifest->default_dispatcher_scheduler_role;
   return zx::ok(std::unique_ptr<Driver>(driver));
 }
 

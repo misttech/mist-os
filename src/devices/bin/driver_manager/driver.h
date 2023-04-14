@@ -25,6 +25,9 @@ struct Driver {
 
   // The name for this driver, parsed out of the driver's ELF header.
   fbl::String name;
+  // The scheduler role to set for the default dispatcher created for the driver.
+  // This may be an empty string.
+  fbl::String default_dispatcher_scheduler_role;
 
   // The URL for this driver. It points to the driver's component manifest.
   fbl::String url;

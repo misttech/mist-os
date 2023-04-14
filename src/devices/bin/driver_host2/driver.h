@@ -70,7 +70,7 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
 uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& program);
 
 zx::result<fdf::Dispatcher> CreateDispatcher(const fbl::RefPtr<Driver>& driver,
-                                             uint32_t dispatcher_opts);
+                                             uint32_t dispatcher_opts, std::string scheduler_role);
 
 struct LoadedDriver {
   fbl::RefPtr<Driver> driver;

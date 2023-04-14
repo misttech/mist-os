@@ -20,7 +20,10 @@
 class Driver : public fbl::RefCounted<Driver> {
  public:
   // |zx_driver| must outlive |Driver|.
-  static zx::result<fbl::RefPtr<Driver>> Create(zx_driver_t* zx_driver);
+  // |default_dispatcher_scheduler_role| is the scheduler role to set for the default dispatcher
+  // created for the driver. It may be an empty string.
+  static zx::result<fbl::RefPtr<Driver>> Create(
+      zx_driver_t* zx_driver, std::string_view default_dispatcher_scheduler_role = "");
 
   explicit Driver(zx_driver_t* zx_driver) : zx_driver_(zx_driver) {}
 

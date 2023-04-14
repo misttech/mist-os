@@ -103,8 +103,9 @@ class DriverHostContext {
   zx_status_t DeviceAddCompositeNodeSpec(const fbl::RefPtr<zx_device_t>& dev, std::string_view name,
                                          const composite_node_spec_t* spec) TA_REQ(api_lock_);
 
-  zx_status_t FindDriver(std::string_view libname, zx::vmo vmo, fbl::RefPtr<zx_driver_t>* out,
-                         fbl::RefPtr<Driver>* out_driver);
+  zx_status_t FindDriver(std::string_view libname, zx::vmo vmo,
+                         std::string_view default_dispatcher_scheduler_role,
+                         fbl::RefPtr<zx_driver_t>* out, fbl::RefPtr<Driver>* out_driver);
 
   zx_status_t ConnectFidlProtocol(const fbl::RefPtr<zx_device_t>& dev,
                                   std::string_view fragment_name, std::string_view service_name,

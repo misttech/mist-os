@@ -87,6 +87,9 @@ const DEVICE_FRAGMENT_PART_INSTRUCTIONS_MAX uint32 = 32;
 // Maximum number of instructions in a driver bind program
 const BIND_RULES_INSTRUCTIONS_MAX uint32 = 256;
 
+/// Maximum length of a dispatcher scheduler role.
+const MAX_SCHEDULER_ROLE_LENGTH uint32 = 2048;
+
 /// Bit flags for device add configuration
 type AddDeviceConfig = strict bits : uint32 {
     /// Device can be a fragment in multiple composite devices
@@ -160,9 +163,18 @@ protocol DeviceController {
     /// and optionally a channel to the driver's test output. `test_output` will be
     /// not present unless the driver is configured to run its run_unit_tests hook, in
     /// which case the other end of the channel will have been passed to the driver.
+    ///
+    /// + request `default_dispatcher_scheduler_role` the scheduler role to set for
+    /// the default dispatcher created for the driver. The scheduler role determines
+    /// the thread pool that the dispatcher will be serviced by. This may be an empty
+    /// string if the driver does not require the dispatcher to run in a specific
+    /// thread pool. Setting a scheduler role is on a best-effort basis. If an invalid
+    /// scheduler role is specified, the dispatcher will be serviced by the default
+    /// thread pool, and this will not cause an error to be returned.
     BindDriver(resource struct {
         driver_path string:DEVICE_PATH_MAX;
         driver zx.handle:VMO;
+        default_dispatcher_scheduler_role string:MAX_SCHEDULER_ROLE_LENGTH;
     }) -> (resource struct {
         status zx.status;
         test_output zx.handle:<CHANNEL, optional>;

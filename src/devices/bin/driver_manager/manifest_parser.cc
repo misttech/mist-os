@@ -95,6 +95,7 @@ zx::result<ManifestContent> ParseComponentManifest(zx::vmo vmo) {
   auto& entries = info.entries().value();
 
   std::string driver_url;
+  std::string scheduler_role;
   for (const auto& entry : entries) {
     if (entry.key() == "compat") {
       if (!entry.value()->str().has_value()) {
@@ -102,7 +103,12 @@ zx::result<ManifestContent> ParseComponentManifest(zx::vmo vmo) {
         return zx::error(ZX_ERR_NOT_FOUND);
       }
       driver_url = std::string("#") + entry.value()->str().value();
-      break;
+    } else if (entry.key() == "default_dispatcher_scheduler_role") {
+      if (!entry.value()->str().has_value()) {
+        LOGF(ERROR, "dictionary value for program.default_dispatcher_scheduler_role is not string");
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
+      scheduler_role = entry.value()->str().value();
     }
   }
   if (driver_url.empty()) {
@@ -113,6 +119,7 @@ zx::result<ManifestContent> ParseComponentManifest(zx::vmo vmo) {
   ManifestContent content{
       .driver_url = driver_url,
       .service_uses = {},
+      .default_dispatcher_scheduler_role = scheduler_role,
   };
 
   if (!component_decl->uses().has_value()) {

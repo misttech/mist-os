@@ -447,6 +447,7 @@ void DriverHostContext::ProxyIosDestroy(const fbl::RefPtr<zx_device_t>& dev) {
 }
 
 zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
+                                          std::string_view default_dispatcher_scheduler_role,
                                           fbl::RefPtr<zx_driver_t>* out,
                                           fbl::RefPtr<Driver>* out_driver) {
   // Create unique context for the new driver instance.
@@ -455,7 +456,7 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
     if (!libname.compare(drv.libname())) {
       *out = fbl::RefPtr(&drv);
 
-      auto driver = Driver::Create(&drv);
+      auto driver = Driver::Create(&drv, default_dispatcher_scheduler_role);
       if (driver.is_error()) {
         LOGF(ERROR, "Failed to create driver: %s", driver.status_string());
         return driver.status_value();
@@ -472,7 +473,7 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
     return status;
   }
 
-  auto driver = Driver::Create(new_driver.get());
+  auto driver = Driver::Create(new_driver.get(), default_dispatcher_scheduler_role);
   if (driver.is_error()) {
     LOGF(ERROR, "Failed to create driver: %s", driver.status_string());
     return driver.status_value();
@@ -657,8 +658,9 @@ StatusOrConn DriverHostControllerConnection::CreateProxyDevice(CreateDeviceReque
   // named driver -- ask it to create the device
   fbl::RefPtr<zx_driver_t> drv;
   fbl::RefPtr<Driver> driver;
-  zx_status_t status = driver_host_context_->FindDriver(proxy.driver_path.get(),
-                                                        std::move(proxy.driver), &drv, &driver);
+  zx_status_t status =
+      driver_host_context_->FindDriver(proxy.driver_path.get(), std::move(proxy.driver),
+                                       "" /* default_dispatcher_scheduler_role */, &drv, &driver);
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to load driver '%.*s': %s", static_cast<int>(proxy.driver_path.size()),
          proxy.driver_path.data(), zx_status_get_string(status));

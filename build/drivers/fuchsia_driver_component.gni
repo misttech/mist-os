@@ -69,6 +69,11 @@ import("//tools/cmc/build/cmc.gni")
 #     created with these options.
 #     Type: array of strings
 #     Default: []
+#   default_dispatcher_scheduler_role (optional)
+#     If this is set, then the default dispatcher for the driver will be
+#     created with this scheduler role.
+#     Type: string
+#     Default: ""
 #   info (mandatory for //src and //zircon)
 #     Name of the file containing the driver information file.
 #     Type: file
@@ -162,6 +167,12 @@ template("fuchsia_driver_component") {
         if (defined(invoker.default_dispatcher_opts)) {
           args += [ "--default_dispatcher_opts" ]
           args += invoker.default_dispatcher_opts
+        }
+        if (defined(invoker.default_dispatcher_scheduler_role)) {
+          args += [
+            "--default_dispatcher_scheduler_role",
+            invoker.default_dispatcher_scheduler_role,
+          ]
         }
       }
 

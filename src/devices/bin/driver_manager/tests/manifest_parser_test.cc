@@ -56,6 +56,19 @@ TEST(ManifestParserTest, ParseComponentManifest) {
   EXPECT_EQ(manifest->service_uses, kExpectedUses);
 }
 
+TEST(ManifestParserTest, ParseComponentManifest_SchedulerRole) {
+  constexpr const char kDriverManifestPath[] = "meta/manifest-with-scheduler-role.cm";
+  zx::result pkg_dir_result = GetCurrentPackageDirectory();
+  ASSERT_OK(pkg_dir_result.status_value());
+
+  zx::result manifest_vmo = load_manifest_vmo(pkg_dir_result.value(), kDriverManifestPath);
+  ASSERT_OK(manifest_vmo.status_value());
+
+  zx::result manifest = ParseComponentManifest(std::move(manifest_vmo.value()));
+  ASSERT_OK(manifest.status_value());
+  EXPECT_EQ(manifest->default_dispatcher_scheduler_role, "fuchsia.test-role:ok");
+}
+
 TEST(ManifestParserTest, ParseComponentManifest_InvalidVmo) {
   zx::result manifest = ParseComponentManifest(zx::vmo{});
   ASSERT_NOT_OK(manifest.status_value());

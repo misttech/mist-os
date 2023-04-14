@@ -130,7 +130,7 @@ TEST(DeviceControllerConnectionTestCase, PeerClosedDuringReply) {
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(0, 0, &vmo));
-  client->BindDriver(::fidl::StringView(""), std::move(vmo))
+  client->BindDriver(::fidl::StringView(""), std::move(vmo), ::fidl::StringView(""))
       .ThenExactlyOnce(
           [](fidl::WireUnownedResult<fuchsia_device_manager::DeviceController::BindDriver>&
                  result) { ASSERT_TRUE(result.is_canceled()); });

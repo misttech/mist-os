@@ -41,6 +41,8 @@ type DriverStartArgs = resource table {
     ///      of the following:
     ///      * `allow_sync_calls`: allows synchronous calls to be done on the
     ///      default dispatcher's thread.
+    ///   4. "default_dispatcher_scheduler_role" (optional): the scheduler role to
+    ///      set for the default dispatcher created for the driver.
     4: program fuchsia.data.Dictionary;
 
     /// Incoming namespace provided to the driver.

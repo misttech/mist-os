@@ -278,7 +278,7 @@ uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& prog
 }
 
 zx::result<fdf::Dispatcher> CreateDispatcher(const fbl::RefPtr<Driver>& driver,
-                                             uint32_t dispatcher_opts) {
+                                             uint32_t dispatcher_opts, std::string scheduler_role) {
   auto name = GetManifest(driver->url());
   // The dispatcher must be shutdown before the dispatcher is destroyed.
   // Usually we will wait for the callback from |fdf_env::DriverShutdown| before destroying
@@ -295,7 +295,7 @@ zx::result<fdf::Dispatcher> CreateDispatcher(const fbl::RefPtr<Driver>& driver,
       driver.get(), fdf::SynchronizedDispatcher::Options{.value = dispatcher_opts},
       fbl::StringPrintf("%.*s-default-%p", static_cast<int>(name.size()), name.data(),
                         driver.get()),
-      [driver_ref = driver](fdf_dispatcher_t* dispatcher) {});
+      [driver_ref = driver](fdf_dispatcher_t* dispatcher) {}, scheduler_role);
 }
 
 void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
@@ -323,6 +323,15 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
   }
 
   uint32_t default_dispatcher_opts = dfv2::ExtractDefaultDispatcherOpts(wire_program);
+  std::string default_dispatcher_scheduler_role = "";
+  {
+    auto scheduler_role = fdf::ProgramValue(wire_program, "default_dispatcher_scheduler_role");
+    if (scheduler_role.is_ok()) {
+      default_dispatcher_scheduler_role = *scheduler_role;
+    } else if (scheduler_role.status_value() != ZX_ERR_NOT_FOUND) {
+      LOGF(ERROR, "Failed to parse scheduler role: %s", scheduler_role.status_string());
+    }
+  }
 
   // Once we receive the VMO from the call to GetBackingMemory, we can load the driver into this
   // driver host. We move the storage and encoded for start_args into this callback to extend its
@@ -330,7 +339,8 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
   fidl::SharedClient file(std::move(*driver_file), dispatcher,
                           std::make_unique<FileEventHandler>(url));
   auto vmo_callback =
-      [start_args = std::move(start_args), default_dispatcher_opts, callback = std::move(callback),
+      [start_args = std::move(start_args), default_dispatcher_opts,
+       default_dispatcher_scheduler_role, callback = std::move(callback),
        _ = file.Clone()](fidl::Result<fio::File::GetBackingMemory>& result) mutable {
         const std::string& url = *start_args.url();
         if (!result.is_ok()) {
@@ -351,7 +361,7 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
         }
 
         zx::result<fdf::Dispatcher> driver_dispatcher =
-            CreateDispatcher(*driver, default_dispatcher_opts);
+            CreateDispatcher(*driver, default_dispatcher_opts, default_dispatcher_scheduler_role);
         if (driver_dispatcher.is_error()) {
           LOGF(ERROR, "Failed to start driver '%s', could not create dispatcher: %s", url.c_str(),
                driver_dispatcher.status_string());

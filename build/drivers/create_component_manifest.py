@@ -70,6 +70,11 @@ def main():
         help=
         'A space separated list of options for creating the default dispatcher',
     )
+    parser.add_argument(
+        '--default_dispatcher_scheduler_role',
+        help=
+        "The scheduler role to set for the default dispatcher created for the driver",
+    )
 
     args = parser.parse_args()
 
@@ -139,6 +144,9 @@ def main():
     if args.default_dispatcher_opts:
         manifest["program"][
             "default_dispatcher_opts"] = args.default_dispatcher_opts
+    if args.default_dispatcher_scheduler_role:
+        manifest["program"][
+            "default_dispatcher_scheduler_role"] = args.default_dispatcher_scheduler_role
 
     json_manifest = json.dumps(manifest)
     args.output.write(json_manifest)

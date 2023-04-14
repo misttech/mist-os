@@ -135,6 +135,9 @@ void DeviceControllerConnection::BindDriver(BindDriverRequestView request,
                                             BindDriverCompleter::Sync& completer) {
   const auto& dev = this->dev();
   std::string_view driver_path(request->driver_path.data(), request->driver_path.size());
+  std::string_view default_dispatcher_scheduler_role(
+      request->default_dispatcher_scheduler_role.data(),
+      request->default_dispatcher_scheduler_role.size());
 
   // TODO: api lock integration
   if (driver_path != "#meta/fragment.cm" && driver_path != "#meta/fragment.proxy.cm") {
@@ -154,8 +157,8 @@ void DeviceControllerConnection::BindDriver(BindDriverRequestView request,
 
   fbl::RefPtr<zx_driver_t> drv;
   fbl::RefPtr<Driver> driver;
-  zx_status_t r =
-      driver_host_context_->FindDriver(driver_path, std::move(request->driver), &drv, &driver);
+  zx_status_t r = driver_host_context_->FindDriver(
+      driver_path, std::move(request->driver), default_dispatcher_scheduler_role, &drv, &driver);
   if (r != ZX_OK) {
     LOGD(ERROR, *dev, "Failed to load driver '%.*s': %s", static_cast<int>(driver_path.size()),
          driver_path.data(), zx_status_get_string(r));
