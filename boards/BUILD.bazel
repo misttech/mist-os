@@ -1,0 +1,17 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_board_configuration")
+
+package(
+    default_visibility = [
+        "//build/bazel/assembly:__subpackages__",
+    ],
+)
+
+fuchsia_board_configuration(
+    name = "x64",
+    board_name = "x64",
+    provided_features = ["fuchsia::wlan_softmac"],
+)

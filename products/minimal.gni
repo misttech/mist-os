@@ -42,3 +42,7 @@ fuchsia_product_assembly_config_label = "//products/minimal"
 
 fuchsia_structured_config_policy =
     "//products/minimal/minimal_user_structured_config_policy.json5"
+
+bazel_product_bundle_prefix = "//build/bazel/assembly:minimal"
+extra_bazel_assembly_targets =
+    [ "//build/bazel/assembly/assembly_outputs:verifications" ]

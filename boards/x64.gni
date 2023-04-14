@@ -94,3 +94,5 @@ images_config_label = "//boards/images:x64"
 zedboot_images_config_label = "//boards/images:zedboot_default"
 partitions_config_label = "//boards/partitions:x64"
 partitions_config_contents += [ "$root_build_dir/fuchsia.esp.blk" ]
+
+bazel_product_bundle_board = "x64"

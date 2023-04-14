@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/assembly/assembly_outputs/verify_images_manifest.gni")
+import("//build/images/args.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
 
@@ -28,18 +29,13 @@ if (use_bringup_assembly) {
     gn_assembled_system_target =
         "//build/images/fuchsia:fuchsia($default_toolchain)"
     bazel_assembled_system_target =
-        "//build/bazel/assembly:minimal.x64_create_system($default_toolchain)"
+        "${bazel_product_bundle_target}_create_system"
 
     exclude_packages = [
       # TODO(124454): Address these diffs
       "core",
-      "wlancfg",
-      "wlandevicemonitor",
-      "wlansoftmac",
-      "regulatory_region",
 
       ## Assembly-generated packages with diffs
-      "driver-manager-base-config",
       "system_image",
     ]
 
