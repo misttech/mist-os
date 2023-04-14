@@ -311,7 +311,7 @@ impl ImageAssemblyConfigBuilder {
                     if !config_data.is_empty() {
                         self.config_data
                             .entry(package_manifest_name)
-                            .or_default()
+                            .or_insert(FileEntryMap::new("config data"))
                             .add_all(config_data)?;
                     };
                 }
@@ -377,7 +377,10 @@ impl ImageAssemblyConfigBuilder {
     /// Add an entry to `config_data` for the given package.  If the entry
     /// duplicates an existing entry, return an error.
     fn add_config_data_entry(&mut self, package: impl AsRef<str>, entry: FileEntry) -> Result<()> {
-        self.config_data.entry(package.as_ref().into()).or_default().add_entry(entry)
+        self.config_data
+            .entry(package.as_ref().into())
+            .or_insert_with(|| FileEntryMap::new("config data"))
+            .add_entry(entry)
     }
 
     fn add_shell_command_entry(
@@ -635,9 +638,8 @@ impl PackageEntry {
     }
 }
 
-#[derive(Default, Debug, Serialize)]
 /// A named set of things, which are mapped by a String key.
-
+#[derive(Debug, Serialize)]
 struct NamedMap<T> {
     /// The name of the Map.
     name: String,
