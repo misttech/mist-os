@@ -202,4 +202,28 @@ TEST(VmoManagerTest, WriteTooMuchDataToVmo) {
   EXPECT_EQ(vmo_id.error_value(), fuchsia_hardware_radar::wire::StatusCode::kVmoTooSmall);
 }
 
+TEST(VmoManagerTest, RegistrationVectorInterface) {
+  VmoManager manager(kTestBurstSize);
+
+  std::vector<uint32_t> vmo_ids;
+
+  {
+    std::vector<zx::vmo> vmos;
+    for (uint32_t i = 0; i < 10; i++) {
+      zx::vmo::create(kTestBurstSize, 0, &vmos.emplace_back());
+      ASSERT_TRUE(vmos.back());
+      vmo_ids.emplace_back(i + 1);
+    }
+
+    const auto result = manager.RegisterVmos(vmo_ids, std::move(vmos));
+    EXPECT_TRUE(result.is_ok());
+  }
+
+  {
+    const auto result = manager.UnregisterVmos(vmo_ids);
+    ASSERT_TRUE(result.is_ok());
+    EXPECT_EQ(result->size(), 10);
+  }
+}
+
 }  // namespace radar

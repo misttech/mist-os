@@ -176,7 +176,7 @@ StatusCode VmoManager::UnregisterVmos(fidl::VectorView<uint32_t> vmo_ids,
 fit::result<StatusCode, std::vector<zx::vmo>> VmoManager::UnregisterVmos(
     const std::vector<uint32_t>& vmo_ids) {
   std::vector<zx::vmo> vmos;
-  vmos.resize({});
+  vmos.resize(vmo_ids.size());
 
   const StatusCode status =
       UnregisterVmos(fidl::VectorView<const uint32_t>::FromExternal(vmo_ids.data(), vmo_ids.size()),
