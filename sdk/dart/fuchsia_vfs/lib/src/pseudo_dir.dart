@@ -400,12 +400,6 @@ class _DirConnection extends Directory {
   }
 
   @override
-  Future<void> addInotifyFilter(
-      String path, InotifyWatchMask filters, int wd, Socket socket) async {
-    return;
-  }
-
-  @override
   Future<void> open(OpenFlags flags, ModeType mode, String path,
       fidl.InterfaceRequest<Node> object) async {
     if (!Flags.inputPrecondition(flags)) {
