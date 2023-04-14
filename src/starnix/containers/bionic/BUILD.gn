@@ -4,10 +4,6 @@
 
 import("//build/components.gni")
 
-group("bionic") {
-  deps = [ ":bionic_package" ]
-}
-
 # The system image for the container.
 resource("system_image") {
   sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
@@ -19,12 +15,4 @@ resource("system_image") {
 resource("testcases_image") {
   sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
   outputs = [ "data/testcases.img" ]
-}
-
-fuchsia_package_with_single_component("bionic_package") {
-  manifest = "meta/bionic_container.cml"
-  package_name = "starbionic"
-  component_name = "bionic_container"
-
-  deps = [ ":system_image" ]
 }

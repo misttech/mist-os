@@ -9,11 +9,6 @@
     },
     children: [
         {
-            name: "bionic",
-            url: "fuchsia-pkg://fuchsia.com/starbionic#meta/bionic_container.cm",
-            environment: "#container-env",
-        },
-        {
             name: "stardroid",
             url: "fuchsia-pkg://fuchsia.com/stardroid#meta/stardroid.cm",
             environment: "#container-env",
@@ -59,12 +54,6 @@
         },
     ],
     use: [
-        {
-            protocol: "fuchsia.starnix.container.Controller",
-            from: "#bionic",
-            path: "/bionic/fuchsia.starnix.container.Controller",
-            dependency: "weak",
-        },
         {
             protocol: "fuchsia.starnix.container.Controller",
             from: "#stardroid",
@@ -135,11 +124,6 @@
     expose: [
         {
             runner: "starnix",
-            from: "#bionic",
-            as: "starnix_bionic",
-        },
-        {
-            runner: "starnix",
             from: "#stardroid",
             as: "stardroid",
         },
@@ -167,11 +151,6 @@
             name: "starnix-env",
             extends: "realm",
             runners: [
-                {
-                    runner: "starnix",
-                    from: "#bionic",
-                    as: "starnix_bionic",
-                },
                 {
                     runner: "starnix",
                     from: "#chromiumos",

@@ -11,10 +11,7 @@ group("containers") {
     "empty_container",
   ]
   if (target_cpu == "x64" && !is_asan) {
-    deps += [
-      "bionic",
-      "chromiumos",
-    ]
+    deps += [ "chromiumos" ]
   }
 }
 
@@ -24,10 +21,7 @@ group("release") {
     "empty_container",
   ]
   if (target_cpu == "x64" && !is_asan) {
-    deps += [
-      "bionic",
-      "chromiumos",
-    ]
+    deps += [ "chromiumos" ]
   }
 }
 

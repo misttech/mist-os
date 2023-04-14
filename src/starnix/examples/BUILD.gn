@@ -5,10 +5,7 @@
 group("examples") {
   deps = [ "hello_starnix:hello-starnix" ]
   if (target_cpu == "x64") {
-    deps += [
-      "android",
-      "chromiumos",
-    ]
+    deps += [ "chromiumos" ]
   }
 }
 
