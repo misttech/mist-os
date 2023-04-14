@@ -119,6 +119,10 @@ template("license_data") {
       "--gen_output",
       rebase_path(outputs[0], root_build_dir),
     ]
+
+    # output JSON names the build output directory
+    # TODO(http://fxbug.dev/125423): fix tool to not leak the output directory
+    no_output_dir_leaks = false
   }
 
   # Step 3: Generate target data file.
@@ -150,6 +154,10 @@ template("license_data") {
         string_join(",", invoker.prune_targets),
       ]
     }
+
+    # output JSON names the build output directory
+    # TODO(http://fxbug.dev/125423): fix tool to not leak the output directory
+    no_output_dir_leaks = false
   }
 
   compiled_action(check_licenses_target) {
