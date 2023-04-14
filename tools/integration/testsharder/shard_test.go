@@ -6,11 +6,15 @@ package testsharder
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	pm_build "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
 // Note that just printing a list of shard pointers will print a list of memory addresses,
@@ -269,6 +273,107 @@ func TestMakeShards(t *testing.T) {
 				Env:   env2,
 			},
 		}
+		assertEqual(t, expected, actual)
+	})
+
+	t.Run("shard with package repo", func(t *testing.T) {
+		buildDir := t.TempDir()
+		var blobMerkle pm_build.MerkleRoot
+		for i := 0; i < 32; i++ {
+			blobMerkle[i] = byte(1)
+		}
+		withPackageManifest := func(test build.TestSpec) build.TestSpec {
+			test.PackageManifests = []string{fmt.Sprintf("path/to/%s/package_manifest.json", test.Name)}
+			absPath := filepath.Join(buildDir, test.PackageManifests[0])
+			if err := os.MkdirAll(filepath.Dir(absPath), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			packageManifest := pm_build.PackageManifest{
+				Version: "1",
+				Blobs: []pm_build.PackageBlobInfo{
+					{Merkle: blobMerkle},
+				},
+			}
+			if err := jsonutil.WriteToFile(absPath, packageManifest); err != nil {
+				t.Fatal(err)
+			}
+			return test
+		}
+
+		actual := MakeShards(
+			[]build.TestSpec{
+				withPackageManifest(spec(1, env1, env2)),
+				spec(2, env1),
+				spec(3, env1),
+			},
+			nil,
+			basicOpts,
+		)
+
+		// Create regular blob.
+		writeBlob := func(blobsDir string) {
+			if err := os.MkdirAll(blobsDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(blobsDir, blobMerkle.String()), []byte("blob"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeBlob(filepath.Join(buildDir, blobsDirName))
+		for _, s := range actual {
+			if err := s.CreatePackageRepo(buildDir, "", true); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(buildDir, s.PkgRepo, blobsDirName, blobMerkle.String())); err != nil {
+				t.Error(err)
+			}
+		}
+
+		makeTestWithPackageManifest := func(id int) Test {
+			test := makeTest(id, "fuchsia")
+			test.PackageManifests = []string{fmt.Sprintf("path/to/%s/package_manifest.json", test.Name)}
+			return test
+		}
+		expected := []*Shard{
+			{
+				Name:    environmentName(env1),
+				Tests:   []Test{makeTestWithPackageManifest(1), makeTest(2, "fuchsia"), makeTest(3, "fuchsia")},
+				Env:     env1,
+				PkgRepo: fmt.Sprintf("repo_%s", environmentName(env1)),
+				Deps:    []string{fmt.Sprintf("repo_%s", environmentName(env1))},
+			}, {
+				Name:    environmentName(env2),
+				Tests:   []Test{makeTestWithPackageManifest(1)},
+				Env:     env2,
+				PkgRepo: fmt.Sprintf("repo_%s", environmentName(env2)),
+				Deps:    []string{fmt.Sprintf("repo_%s", environmentName(env2))},
+			},
+		}
+		assertEqual(t, expected, actual)
+
+		// Create delivery blobs.
+		deliveryBlobConfig := struct {
+			Type int `json:"type"`
+		}{
+			Type: 1,
+		}
+		if err := jsonutil.WriteToFile(filepath.Join(buildDir, deliveryBlobConfigName), deliveryBlobConfig); err != nil {
+			t.Fatal(err)
+		}
+		writeBlob(filepath.Join(buildDir, blobsDirName, "1"))
+		for _, s := range actual {
+			if err := s.CreatePackageRepo(buildDir, "", true); err != nil {
+				t.Fatal(err)
+			}
+			// Check that delivery blobs are used.
+			if _, err := os.Stat(filepath.Join(buildDir, s.PkgRepo, blobsDirName, "1", blobMerkle.String())); err != nil {
+				t.Error(err)
+			}
+			if _, err := os.Stat(filepath.Join(buildDir, s.PkgRepo, blobsDirName, blobMerkle.String())); !os.IsNotExist(err) {
+				t.Errorf("got err: %s; want file not exist err", err)
+			}
+		}
+		// The PkgRepo dirname should be the same so no change is expected in the shards.
 		assertEqual(t, expected, actual)
 	})
 }

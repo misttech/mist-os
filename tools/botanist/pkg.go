@@ -188,7 +188,7 @@ func (c *cachedPkgRepo) fetchFromGCS(w http.ResponseWriter, r *http.Request, loc
 	// At this point, we know that the download succeeded, so move the
 	// temporary file holding the blob into the cache.
 	tf.Close()
-	if err := os.MkdirAll(filepath.Base(localPath), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(localPath), os.ModePerm); err != nil {
 		c.logf("failed to create parent dir for blob %s: %s", localPath, err)
 		return
 	}
