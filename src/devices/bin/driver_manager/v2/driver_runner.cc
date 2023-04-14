@@ -477,137 +477,142 @@ void DriverRunner::BindInternal(Node& node, std::shared_ptr<BindResultTracker> r
     return;
   }
 
-  auto match_callback = [this, weak_node = node.weak_from_this(), result_tracker,
-                         match_complete_callback = std::move(match_complete_callback)](
-                            fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>&
-                                result) mutable {
-    auto shared_node = weak_node.lock();
-
-    auto report_no_bind = fit::defer([&result_tracker]() {
-      if (result_tracker) {
-        result_tracker->ReportNoBind();
-      }
-    });
-
-    // TODO(fxb/125100): Add an additional guard to ensure that the node is still available for
-    // binding when the match callback is fired. Currently, there are no issues from it, but it
-    // is something we should address.
-    if (!shared_node) {
-      LOGF(WARNING, "Node was freed before it could be bound");
-      match_complete_callback();
-      return;
-    }
-
-    Node& node = *shared_node;
-    auto driver_node = &node;
-    auto orphaned = [this, &driver_node, &match_complete_callback] {
-      orphaned_nodes_.emplace(driver_node->MakeComponentMoniker(), driver_node->weak_from_this());
-      match_complete_callback();
-    };
-
-    if (!result.ok()) {
-      orphaned();
-      LOGF(ERROR, "Failed to call match Node '%s': %s", node.name().c_str(),
-           result.error().FormatDescription().data());
-      return;
-    }
-
-    if (result->is_error()) {
-      orphaned();
-      // Log the failed MatchDriver only if we are not tracking the results with a tracker
-      // or if the error is not a ZX_ERR_NOT_FOUND error (meaning it could not find a driver).
-      // When we have a tracker, the bind is happening for all the orphan nodes and the
-      // not found errors get very noisy.
-      zx_status_t match_error = result->error_value();
-      if (!result_tracker || match_error != ZX_ERR_NOT_FOUND) {
-        // TODO(fxb/123392): We're logging the topological path to debug test flakes. Once that's
-        // resolved, we should just log the name.
-        LOGF(WARNING, "Failed to match Node '%s': %s", driver_node->MakeTopologicalPath().c_str(),
-             zx_status_get_string(match_error));
-      }
-
-      return;
-    }
-
-    auto& matched_driver = result->value()->driver;
-    if (!matched_driver.is_driver() && !matched_driver.is_parent_spec()) {
-      orphaned();
-      LOGF(WARNING,
-           "Failed to match Node '%s', the MatchedDriver is not a normal driver or a "
-           "parent spec.",
-           driver_node->name().c_str());
-      return;
-    }
-
-    if (matched_driver.is_parent_spec() && !matched_driver.parent_spec().has_specs()) {
-      orphaned();
-      LOGF(
-          WARNING,
-          "Failed to match Node '%s', the MatchedDriver is missing the composite node specs in the "
-          "parent spec.",
-          driver_node->name().c_str());
-      return;
-    }
-
-    // If this is a composite node spec match, bind the node into the spec. If the spec is
-    // completed, use the returned node and driver to start the driver.
-    fdi::wire::MatchedDriverInfo driver_info;
-    if (matched_driver.is_parent_spec()) {
-      auto node_groups = matched_driver.parent_spec();
-      auto result =
-          composite_node_spec_manager_.BindParentSpec(node_groups, driver_node->weak_from_this());
-      if (result.is_error()) {
-        orphaned();
-        LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
-             driver_node->name().c_str());
-        return;
-      }
-
-      // If it doesn't have a value but there was no error it just means the node was added
-      // to a composite node spec but the spec is still incomplete.
-      auto composite_node_and_driver = result.value();
-      if (!composite_node_and_driver.has_value()) {
-        match_complete_callback();
-        return;
-      }
-
-      auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver->node);
-      auto locked_composite_node = composite_node.lock();
-      ZX_ASSERT(locked_composite_node);
-      driver_node = locked_composite_node.get();
-      driver_info = composite_node_and_driver->driver;
-    } else {
-      driver_info = matched_driver.driver();
-    }
-
-    if (!driver_info.has_url()) {
-      orphaned();
-      LOGF(ERROR, "Failed to match Node '%s', the driver URL is missing",
-           driver_node->name().c_str());
-      return;
-    }
-
-    auto pkg_type =
-        driver_info.has_package_type() ? driver_info.package_type() : fdi::DriverPackageType::kBase;
-    auto start_result = StartDriver(*driver_node, driver_info.url().get(), pkg_type);
-    if (start_result.is_error()) {
-      orphaned();
-      LOGF(ERROR, "Failed to start driver '%s': %s", driver_node->name().c_str(),
-           zx_status_get_string(start_result.error_value()));
-      return;
-    }
-
-    driver_node->OnBind();
-    orphaned_nodes_.erase(driver_node->MakeComponentMoniker());
-    report_no_bind.cancel();
-    if (result_tracker) {
-      result_tracker->ReportSuccessfulBind(driver_node->MakeComponentMoniker(),
-                                           driver_info.url().get());
-    }
-    match_complete_callback();
-  };
+  auto match_callback =
+      [this, weak_node = node.weak_from_this(), result_tracker,
+       match_complete_callback = std::move(match_complete_callback)](
+          fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result) mutable {
+        OnMatchDriverCallback(weak_node, result, result_tracker,
+                              std::move(match_complete_callback));
+      };
   fidl::Arena<> arena;
   driver_index_->MatchDriver(node.CreateMatchArgs(arena)).Then(std::move(match_callback));
+}
+
+void DriverRunner::OnMatchDriverCallback(
+    std::weak_ptr<Node> weak_node, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
+    std::shared_ptr<BindResultTracker> result_tracker,
+    BindMatchCompleteCallback match_complete_callback) {
+  auto report_no_bind =
+      fit::defer([&result_tracker, callback = match_complete_callback.share()]() mutable {
+        if (result_tracker) {
+          result_tracker->ReportNoBind();
+        }
+        callback();
+      });
+
+  auto node = weak_node.lock();
+
+  // TODO(fxb/125100): Add an additional guard to ensure that the node is still available for
+  // binding when the match callback is fired. Currently, there are no issues from it, but it
+  // is something we should address.
+  if (!node) {
+    LOGF(WARNING, "Node was freed before it could be bound");
+    report_no_bind.call();
+    return;
+  }
+
+  auto driver_url = BindNodeToResult(*node, result, result_tracker != nullptr);
+  if (driver_url == std::nullopt) {
+    orphaned_nodes_.emplace(node->MakeComponentMoniker(), weak_node);
+    report_no_bind.call();
+    return;
+  }
+
+  orphaned_nodes_.erase(node->MakeComponentMoniker());
+  report_no_bind.cancel();
+  if (result_tracker) {
+    result_tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value());
+  }
+  match_complete_callback();
+}
+
+std::optional<std::string> DriverRunner::BindNodeToResult(
+    Node& node, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result, bool has_tracker) {
+  if (!result.ok()) {
+    LOGF(ERROR, "Failed to call match Node '%s': %s", node.name().c_str(),
+         result.error().FormatDescription().data());
+    return std::nullopt;
+  }
+
+  if (result->is_error()) {
+    // Log the failed MatchDriver only if we are not tracking the results with a tracker
+    // or if the error is not a ZX_ERR_NOT_FOUND error (meaning it could not find a driver).
+    // When we have a tracker, the bind is happening for all the orphan nodes and the
+    // not found errors get very noisy.
+    zx_status_t match_error = result->error_value();
+    if (match_error != ZX_ERR_NOT_FOUND && !has_tracker) {
+      LOGF(WARNING, "Failed to match Node '%s': %s", node.MakeTopologicalPath().c_str(),
+           zx_status_get_string(match_error));
+    }
+
+    return std::nullopt;
+  }
+
+  auto& matched_driver = result->value()->driver;
+  if (!matched_driver.is_driver() && !matched_driver.is_parent_spec()) {
+    LOGF(WARNING,
+         "Failed to match Node '%s', the MatchedDriver is not a normal driver or a "
+         "parent spec.",
+         node.name().c_str());
+    return std::nullopt;
+  }
+
+  if (matched_driver.is_parent_spec() && !matched_driver.parent_spec().has_specs()) {
+    LOGF(WARNING,
+         "Failed to match Node '%s', the MatchedDriver is missing the composite node specs in the "
+         "parent spec.",
+         node.name().c_str());
+    return std::nullopt;
+  }
+
+  // If this is a composite node spec match, bind the node into the spec. If the spec is
+  // completed, use the returned node and driver to start the driver.
+  fdi::wire::MatchedDriverInfo driver_info;
+  Node* driver_node;
+
+  if (matched_driver.is_driver()) {
+    driver_info = matched_driver.driver();
+    driver_node = &node;
+  } else if (matched_driver.is_parent_spec()) {
+    auto node_groups = matched_driver.parent_spec();
+    auto result = composite_node_spec_manager_.BindParentSpec(node_groups, node.weak_from_this());
+    if (result.is_error()) {
+      LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
+           node.name().c_str());
+      return std::nullopt;
+    }
+
+    // If it doesn't have a value but there was no error it just means the node was added
+    // to a composite node spec but the spec is still incomplete.
+    auto composite_node_and_driver = result.value();
+    if (!composite_node_and_driver.has_value()) {
+      return "";
+    }
+
+    auto composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite_node_and_driver->node);
+    auto locked_composite_node = composite_node.lock();
+    ZX_ASSERT(locked_composite_node);
+
+    driver_info = composite_node_and_driver->driver;
+    driver_node = locked_composite_node.get();
+  }
+
+  if (!driver_info.has_url()) {
+    LOGF(ERROR, "Failed to match Node '%s', the driver URL is missing", node.name().c_str());
+    return std::nullopt;
+  }
+
+  auto pkg_type =
+      driver_info.has_package_type() ? driver_info.package_type() : fdi::DriverPackageType::kBase;
+  auto start_result = StartDriver(*driver_node, driver_info.url().get(), pkg_type);
+  if (start_result.is_error()) {
+    LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
+         zx_status_get_string(start_result.error_value()));
+    return std::nullopt;
+  }
+
+  driver_node->OnBind();
+  return std::string(driver_info.url().get().data());
 }
 
 void DriverRunner::ProcessPendingBindRequests() {
