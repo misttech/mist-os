@@ -426,6 +426,45 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             set(_paths([compiler, shlib_rel, source, env_file] + deps)))
         self.assertEqual(remote_output_files, {rlib})
 
+    def test_prepare_remote_cross_compile(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/mac-arm64/bin/rustc')
+        remote_compiler = Path('../tools/linux-x64/bin/rustc')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        command = _strs([compiler, source, '-o', rlib])
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in mocks:
+                stack.enter_context(m)
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 0)  # success
+        self.assertEqual(r.remote_compiler, remote_compiler)
+        a = r.remote_action
+        self.assertEqual(a.local_command, _strs([remote_compiler, source, '-o', rlib]))
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        self.assertEqual(
+            remote_inputs, set([remote_compiler, shlib_rel, source] + deps))
+        self.assertEqual(remote_output_files, {rlib})
+
+
     def test_post_run_actions(self):
         exec_root = Path('/home/project')
         working_dir = exec_root / 'build-here'

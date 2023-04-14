@@ -204,7 +204,7 @@ class RustAction(object):
 
     @property
     def command(self) -> Sequence[str]:
-        """The original command, but fused flags like '-Cfoo' are expanded."""
+        """The original command."""
         return self._command
 
     @property

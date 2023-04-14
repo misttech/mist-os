@@ -35,7 +35,8 @@ if (is_host) {
                            _cl_utils_sources + [ "output_leak_scanner.py" ]
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =
-      [ "cxx_remote_wrapper.py" ] + _cxx_sources + _remote_action_sources
+      [ "cxx_remote_wrapper.py" ] + _cxx_sources + _fuchsia_sources +
+      _cl_utils_sources + _remote_action_sources
   _rustc_sources = [ "rustc.py" ] + _cl_utils_sources
   _rustc_remote_wrapper_sources =
       [ "rustc_remote_wrapper.py" ] + _rustc_sources + _remote_action_sources +

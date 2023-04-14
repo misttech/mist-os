@@ -80,8 +80,9 @@ class Compiler(enum.Enum):
 class SourceLanguage(enum.Enum):
     UNKNOWN = 0
     C = 1
-    CXX = 2
-    ASM = 3
+    CXX = 2  # C++
+    OBJC = 3  # Objective-C
+    ASM = 4
 
 
 @dataclasses.dataclass
@@ -98,6 +99,8 @@ def _compile_action_sources(command: Iterable[str]) -> Iterable[Source]:
             yield Source(file=Path(tok), dialect=SourceLanguage.CXX)
         if tok.endswith('.s') or tok.endswith('.S'):
             yield Source(file=Path(tok), dialect=SourceLanguage.ASM)
+        if tok.endswith('.mm'):
+            yield Source(file=Path(tok), dialect=SourceLanguage.OBJC)
 
 
 def _infer_dialect_from_sources(sources: Iterable[Source]) -> SourceLanguage:

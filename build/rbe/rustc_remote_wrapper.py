@@ -272,8 +272,16 @@ class RustRemoteAction(object):
         return self._rust_action.depfile
 
     @property
+    def host_compiler(self) -> Path:
+        return self._rust_action.compiler
+
+    @property
     def remote_compiler(self) -> Path:
-        return fuchsia.remote_executable(self._rust_action.compiler)
+        return fuchsia.remote_executable(self.host_compiler)
+
+    def remote_compile_command(self) -> Iterable[str]:
+        for tok in self._rust_action.command:
+            yield str(self.remote_compiler) if tok == str(self.host_compiler) else tok
 
     def _cleanup(self):
         for f in self._cleanup_files:
@@ -459,7 +467,7 @@ class RustRemoteAction(object):
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
             remote_options=self.remote_options,
-            command=self._rust_action.command,
+            command=list(self.remote_compile_command()),
             inputs=remote_inputs,
             output_files=remote_output_files,
             output_dirs=remote_output_dirs,

@@ -90,6 +90,42 @@ class CxxActionTests(unittest.TestCase):
             _strs(['clang', '-c', i_file, '-o', output]),
         )
 
+    def test_simple_clang_asm(self):
+        source = Path('hello.s')
+        i_file = Path('hello.i')
+        output = Path('hello.o')
+        c = cxx.CxxAction(_strs(['clang', '-c', source, '-o', output]))
+        self.assertEqual(c.output_file, output)
+        self.assertEqual(
+            c.compiler,
+            cxx.CompilerTool(tool=Path('clang'), type=cxx.Compiler.CLANG))
+        self.assertTrue(c.compiler_is_clang)
+        self.assertFalse(c.compiler_is_gcc)
+        self.assertEqual(c.target, '')
+        self.assertEqual(
+            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.ASM)])
+        self.assertFalse(c.dialect_is_cxx)
+        self.assertFalse(c.dialect_is_c)
+        self.assertIsNone(c.crash_diagnostics_dir)
+
+    def test_simple_clang_asm_pp(self):
+        source = Path('hello.S')
+        i_file = Path('hello.i')
+        output = Path('hello.o')
+        c = cxx.CxxAction(_strs(['clang', '-c', source, '-o', output]))
+        self.assertEqual(c.output_file, output)
+        self.assertEqual(
+            c.compiler,
+            cxx.CompilerTool(tool=Path('clang'), type=cxx.Compiler.CLANG))
+        self.assertTrue(c.compiler_is_clang)
+        self.assertFalse(c.compiler_is_gcc)
+        self.assertEqual(c.target, '')
+        self.assertEqual(
+            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.ASM)])
+        self.assertFalse(c.dialect_is_cxx)
+        self.assertFalse(c.dialect_is_c)
+        self.assertIsNone(c.crash_diagnostics_dir)
+
     def test_simple_gcc_cxx(self):
         source = Path('hello.cc')
         output = Path('hello.o')

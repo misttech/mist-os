@@ -95,6 +95,25 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_with(command)  # ran locally
 
+    def test_objc_local_only(self):
+        compiler = Path('clang++')
+        source = Path('hello.mm')
+        output = Path('hello.o')
+        command = _strs(
+            [
+                compiler, '--target=riscv64-apple-darwin21', '-c', source, '-o',
+                output
+            ])
+        c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+        self.assertTrue(c.local_only)
+        with mock.patch.object(cxx_remote_wrapper,
+                               'check_missing_remote_tools') as mock_check:
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=0) as mock_call:
+                exit_code = c.run()
+        self.assertEqual(exit_code, 0)
+        mock_call.assert_called_with(command)  # ran locally
+
     def test_remote_action_paths(self):
         fake_root = Path('/home/project')
         fake_builddir = Path('out/not-default')
@@ -212,7 +231,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
 
-    def test_remote_cross_compile_clang(self):
+    def test_remote_cross_compile_clang_with_integrated_preprocessing(self):
         fake_root = remote_action.PROJECT_ROOT
         fake_builddir = Path('make-it-so')
         fake_cwd = fake_root / fake_builddir
@@ -235,21 +254,109 @@ class CxxRemoteActionTests(unittest.TestCase):
                 # Pretend host != 'linux-x64' to cross-compile
                 host_platform='mac-arm64',
             )
+            # compile command doesn't reference Mac SDK, so remote integrated
+            # preprocessing is possible.
+            self.assertEqual(c.cpp_strategy, 'integrated')
             with mock.patch.object(cxx_remote_wrapper,
                                    'check_missing_remote_tools') as mock_check:
                 self.assertEqual(c.prepare(), 0)
 
             self.assertEqual(c.remote_compiler, remote_compiler_relpath)
             self.assertEqual(
-                c.remote_compile_action.inputs_relative_to_project_root,
-                [Path('path/to/clang/linux-x64/clang++')])
+                set(c.remote_compile_action.inputs_relative_to_project_root),
+                {Path('path/to/clang/linux-x64/clang++'), compiler_swapper})
             remote_compile_command = c.remote_compile_action.launch_command
             ddash = remote_compile_command.index('--')
             rewrapper_prefix = remote_compile_command[:ddash]
             self.assertIn(
                 f'--remote_wrapper=../{compiler_swapper}', rewrapper_prefix)
 
-    def test_remote_cross_compile_gcc(self):
+        # make sure preprocessing status is propagated (if it is run)
+        for status in (0, 1):
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=status) as mock_cpp:
+                cpp_status = c.preprocess_locally()
+            self.assertEqual(cpp_status, status)
+            mock_cpp.assert_called_once()
+
+        # preprocessing integrated into remote cross compile
+        remote_status = 3
+        with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                               'preprocess_locally') as mock_cpp:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=remote_status) as mock_remote:
+                run_status = c.run()
+        self.assertEqual(run_status, remote_status)
+        mock_cpp.assert_not_called()
+        mock_remote.assert_called_once()
+
+    def test_remote_cross_compile_clang_with_local_preprocessing(self):
+        fake_root = remote_action.PROJECT_ROOT
+        fake_builddir = Path('make-it-so')
+        fake_cwd = fake_root / fake_builddir
+        compiler_relpath = Path('../path/to/clang/mac-arm64/clang++')
+        remote_compiler_relpath = Path(
+            '../path/to/clang', fuchsia.REMOTE_PLATFORM, 'clang++')
+        compiler_swapper = Path('scripts/swapperoo.sh')
+        source = Path('hello.cc')
+        output = Path('hello.o')
+        command = _strs(
+            [
+                compiler_relpath, '--target=riscv64-apple-darwin21', '-c',
+                source, '-o', output,
+                '--sysroot=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk'
+            ])
+        with mock.patch.object(cxx_remote_wrapper, 'REMOTE_COMPILER_SWAPPER',
+                               fake_root / compiler_swapper):
+            c = cxx_remote_wrapper.CxxRemoteAction(
+                [f'--exec_root={fake_root}', '--'] + command,
+                working_dir=fake_cwd,
+                # Pretend host != 'linux-x64' to cross-compile
+                host_platform='mac-arm64',
+            )
+            # compile command references Mac SDK, so preprocess locally
+            self.assertEqual(c.cpp_strategy, 'local')
+            with mock.patch.object(cxx_remote_wrapper,
+                                   'check_missing_remote_tools') as mock_check:
+                with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                       'preprocess_locally',
+                                       return_value=0) as mock_cpp:
+                    self.assertEqual(c.prepare(), 0)
+                mock_cpp.assert_called_once()
+
+            self.assertEqual(c.remote_compiler, remote_compiler_relpath)
+            self.assertEqual(
+                set(c.remote_compile_action.inputs_relative_to_project_root), {
+                    Path('path/to/clang/linux-x64/clang++'), compiler_swapper,
+                    fake_builddir / c.cxx_action.preprocessed_output
+                })
+            remote_compile_command = c.remote_compile_action.launch_command
+            ddash = remote_compile_command.index('--')
+            rewrapper_prefix = remote_compile_command[:ddash]
+            self.assertIn(
+                f'--remote_wrapper=../{compiler_swapper}', rewrapper_prefix)
+
+        # make sure preprocessing status is propagated (if it is run)
+        for status in (0, 1):
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=status) as mock_cpp:
+                cpp_status = c.preprocess_locally()
+            self.assertEqual(cpp_status, status)
+            mock_cpp.assert_called_once()
+
+        # remote cross compile
+        remote_status = 4
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=remote_status) as mock_remote:
+            with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                run_status = c.run()
+        self.assertEqual(run_status, remote_status)
+        mock_remote.assert_called_once()
+        mock_cleanup.assert_called_with()
+
+    def test_remote_cross_compile_gcc_integrated_preprocessing(self):
         fake_root = remote_action.PROJECT_ROOT
         fake_builddir = Path('make-it-so')
         fake_cwd = fake_root / fake_builddir
@@ -275,11 +382,13 @@ class CxxRemoteActionTests(unittest.TestCase):
                     # Pretend host != 'linux-x64' to cross-compile
                     host_platform='mac-arm64',
                 )
+                self.assertEqual(c.cpp_strategy, 'integrated')
                 self.assertEqual(c.prepare(), 0)
                 self.assertEqual(c.remote_compiler, remote_compiler_relpath)
                 self.assertEqual(
-                    c.remote_compile_action.inputs_relative_to_project_root,
-                    [Path('path/to/gcc/linux-x64/g++')])
+                    set(
+                        c.remote_compile_action.inputs_relative_to_project_root
+                    ), {Path('path/to/gcc/linux-x64/g++'), compiler_swapper})
                 remote_compile_command = c.remote_compile_action.launch_command
                 ddash = remote_compile_command.index('--')
                 rewrapper_prefix = remote_compile_command[:ddash]
