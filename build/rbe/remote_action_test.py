@@ -1166,6 +1166,55 @@ class RemoteActionConstructionTests(unittest.TestCase):
             self.assertEqual(len(mock_call.call_args_list), 2)
 
 
+class DownloadStubsTests(unittest.TestCase):
+
+    def test_file(self):
+        with mock.patch.object(cl_utils, 'symlink_relative') as mock_link:
+            remote_action.make_download_stubs(
+                files=['big-file.txt'], dirs=[], rrpl='action_log.rrpl')
+        mock_link.assert_called_once()
+
+    def test_dir(self):
+        with mock.patch.object(cl_utils, 'symlink_relative') as mock_link:
+            remote_action.make_download_stubs(
+                files=[], dirs=['big/bad/dir'], rrpl='action_log.rrpl')
+        mock_link.assert_called_once()
+
+    def test_made_download_stubs(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        download_option = '--download_outputs=false'
+        p = remote_action._MAIN_ARG_PARSER
+        command = ['echo']
+        output = 'out.out'
+        main_args, other = p.parse_known_args([download_option, '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            output_files=[Path(output)],
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertFalse(action.download_outputs)
+        options = action.options
+        self.assertIn(download_option, options)
+        with mock.patch.object(remote_action,
+                               'make_download_stubs') as mock_stub:
+            with mock.patch.object(
+                    remote_action.RemoteAction, '_run_maybe_remotely',
+                    return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called()
+        mock_stub.assert_called_with(
+            files=[Path(output)],
+            dirs=[],
+            rrpl=Path(output + '.rrpl'),
+        )
+
+
 class RbeDiagnosticsTests(unittest.TestCase):
 
     def _make_remote_action(self, **kwargs):

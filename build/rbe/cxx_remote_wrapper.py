@@ -13,7 +13,6 @@ Usage:
 import argparse
 import enum
 import os
-import pathlib
 import shlex
 import subprocess
 import sys

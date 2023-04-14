@@ -19,7 +19,6 @@ For full usage, see `rustc_remote_wrapper.py -h`.
 import argparse
 import glob
 import os
-import pathlib
 import subprocess
 import sys
 
@@ -32,12 +31,6 @@ from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
-
-def _relpath(path: Path, start: Path) -> Path:
-    # Path.relative_to() requires self to be a subpath of the argument,
-    # but here, the argument is often the subpath of self.
-    # Hence, we need os.path.relpath() in the general case.
-    return Path(os.path.relpath(path, start=start))
 
 
 def msg(text: str):
@@ -126,7 +119,7 @@ def depfile_inputs_by_line(lines: Iterable[str]) -> Iterable[Path]:
 def relativize_paths(paths: Iterable[Path], start: Path) -> Iterable[Path]:
     for p in paths:
         if p.is_absolute():
-            yield _relpath(p, start=start)
+            yield cl_utils.relpath(p, start=start)
         else:
             yield p  # Paths are already normalized upon construction
 
@@ -249,7 +242,7 @@ class RustRemoteAction(object):
     @property
     def exec_root_rel(self) -> Path:
         # relpath can handle cases that Path.relative_to() cannot.
-        return _relpath(self.exec_root, start=self.working_dir)
+        return cl_utils.relpath(self.exec_root, start=self.working_dir)
 
     @property
     def crate_type(self) -> rustc.CrateType:
@@ -370,7 +363,7 @@ class RustRemoteAction(object):
                 try:
                     p = Path(value)
                     if _env_file_exists(p):
-                        yield _relpath(p, start=self.working_dir)
+                        yield cl_utils.relpath(p, start=self.working_dir)
                 except ValueError:  # value is not a Path, ignore it
                     pass
 

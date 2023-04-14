@@ -3,12 +3,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import pathlib
+import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 import cl_utils
+
 
 class AutoEnvPrefixCommandTests(unittest.TestCase):
 
@@ -19,12 +21,18 @@ class AutoEnvPrefixCommandTests(unittest.TestCase):
         self.assertEqual(cl_utils.auto_env_prefix_command(['echo']), ['echo'])
 
     def test_env_looking_arg(self):
-        self.assertEqual(cl_utils.auto_env_prefix_command(['echo', 'BAR=FOO']), ['echo', 'BAR=FOO'])
+        self.assertEqual(
+            cl_utils.auto_env_prefix_command(['echo', 'BAR=FOO']),
+            ['echo', 'BAR=FOO'])
 
     def test_need_prefix(self):
-        self.assertEqual(cl_utils.auto_env_prefix_command(['FOO=BAR', 'echo']), [cl_utils._ENV, 'FOO=BAR', 'echo'])
+        self.assertEqual(
+            cl_utils.auto_env_prefix_command(['FOO=BAR', 'echo']),
+            [cl_utils._ENV, 'FOO=BAR', 'echo'])
+
 
 class BoolGolangFlagTests(unittest.TestCase):
+
     def test_true(self):
         for v in ('1', 't', 'T', 'true', 'True', 'TRUE'):
             self.assertTrue(cl_utils.bool_golang_flag(v))
@@ -261,6 +269,95 @@ class LastValueOfDictFlagTests(unittest.TestCase):
                 }, 'f', 'boring'),
             'h',
         )
+
+
+class RelpathTests(unittest.TestCase):
+
+    def test_identity(self):
+        self.assertEqual(cl_utils.relpath(Path('a'), Path('a')), Path('.'))
+
+    def test_sibling(self):
+        self.assertEqual(cl_utils.relpath(Path('a'), Path('b')), Path('../a'))
+
+    def test_ancestor(self):
+        self.assertEqual(cl_utils.relpath(Path('a'), Path('a/c')), Path('..'))
+
+    def test_subdir(self):
+        self.assertEqual(cl_utils.relpath(Path('a/d'), Path('a')), Path('d'))
+
+    def test_distant(self):
+        self.assertEqual(
+            cl_utils.relpath(Path('a/b/c'), Path('x/y/z')),
+            Path('../../../a/b/c'))
+
+    def test_common_parent(self):
+        self.assertEqual(
+            cl_utils.relpath(Path('a/b/c'), Path('a/y/z')), Path('../../b/c'))
+
+
+def _readlink(path: Path) -> str:
+    # Path.readlink() is only available in Python 3.9+
+    return os.readlink(str(path))
+
+
+class SymlinkRelativeTests(unittest.TestCase):
+
+    def test_same_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td) / 'dest.txt'  # doesn't exist
+            src = Path(td) / 'src.link'
+            cl_utils.symlink_relative(dest, src)
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(_readlink(src), 'dest.txt')  # relative
+            self.assertEqual(src.resolve(), dest)
+
+    def test_dest_in_subdir(self):
+        with tempfile.TemporaryDirectory() as td:
+            destdir = Path(td) / 'must' / 'go' / 'deeper'
+            dest = destdir / 'log.txt'  # doesn't exist
+            src = Path(td) / 'log.link'
+            cl_utils.symlink_relative(dest, src)
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(
+                _readlink(src), 'must/go/deeper/log.txt')  # relative
+            self.assertEqual(src.resolve(), dest)
+
+    def test_dest_in_parent(self):
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td) / 'log.txt'  # doesn't exist
+            srcdir = Path(td) / 'must' / 'go' / 'deeper'  # doesn't exist yet
+            src = srcdir / 'log.link'
+            cl_utils.symlink_relative(dest, src)
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(_readlink(src), '../../../log.txt')  # relative
+            self.assertEqual(src.resolve(), dest)
+
+    def test_common_parent_srcdir_does_not_exist_yet(self):
+        with tempfile.TemporaryDirectory() as td:
+            # td is the common parent to both src and dest
+            destdir = Path(td) / 'trash' / 'bin'
+            dest = destdir / 'garbage.txt'  # doesn't exist
+            srcdir = Path(td) / 'must' / 'go' / 'deeper'  # doesn't exist yet
+            src = srcdir / 'log.link'
+            cl_utils.symlink_relative(dest, src)
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(
+                _readlink(src), '../../../trash/bin/garbage.txt')  # relative
+            self.assertEqual(src.resolve(), dest)
+
+    def test_common_parent_srcdir_already_exists(self):
+        with tempfile.TemporaryDirectory() as td:
+            # td is the common parent to both src and dest
+            destdir = Path(td) / 'trash' / 'bin'
+            dest = destdir / 'garbage.txt'  # doesn't exist
+            srcdir = Path(td) / 'must' / 'go' / 'deeper'
+            srcdir.mkdir(parents=True)  # srcdir exists ahead of symlink_relative
+            src = srcdir / 'log.link'
+            cl_utils.symlink_relative(dest, src)
+            self.assertTrue(src.is_symlink())
+            self.assertEqual(
+                _readlink(src), '../../../trash/bin/garbage.txt')  # relative
+            self.assertEqual(src.resolve(), dest)
 
 
 class SubprocessCallTests(unittest.TestCase):

@@ -7,7 +7,6 @@
 import contextlib
 import io
 import os
-import pathlib
 import subprocess
 import sys
 import unittest
@@ -16,8 +15,7 @@ from pathlib import Path
 from unittest import mock
 
 import rustc_remote_wrapper
-from rustc_remote_wrapper import _relpath
-
+import cl_utils
 import fuchsia
 import remote_action
 
@@ -139,7 +137,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -174,7 +172,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -211,7 +209,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -256,7 +254,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -291,11 +289,11 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
     def test_prepare_needs_linker(self):
         exec_root = Path('/home/project')
         working_dir = exec_root / 'build-here'
-        exec_root_rel = _relpath(exec_root, start=working_dir)
+        exec_root_rel = cl_utils.relpath(exec_root, start=working_dir)
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         linker = Path('../tools/bin/linker')
         lld = Path('../tools/bin/ld.lld')
         clang_rt_libdir = Path('../fake/lib/clang/x86_64-unknown-linux')
@@ -345,7 +343,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -385,7 +383,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -433,7 +431,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         remote_compiler = Path('../tools/linux-x64/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]
@@ -471,7 +469,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         compiler = Path('../tools/bin/rustc')
         shlib = Path('tools/lib/librusteze.so')
         shlib_abs = exec_root / shlib
-        shlib_rel = _relpath(shlib_abs, start=working_dir)
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
         deps = [Path('../foo/src/other.rs')]

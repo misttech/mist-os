@@ -10,7 +10,6 @@ import collections
 import dataclasses
 import enum
 import os
-import pathlib
 
 import cl_utils
 

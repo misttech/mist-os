@@ -16,7 +16,6 @@ import dataclasses
 import filecmp
 import glob
 import os
-import pathlib
 import re
 import subprocess
 import shlex
@@ -34,16 +33,9 @@ _SCRIPT_BASENAME = Path(__file__).name
 PROJECT_ROOT = fuchsia.project_root_dir()
 
 
-def _relpath(path: Path, start: Path) -> Path:
-    # Path.relative_to() requires self to be a subpath of the argument,
-    # but here, the argument is often the subpath of self.
-    # Hence, we need os.path.relpath() in the general case.
-    return Path(os.path.relpath(path, start=start))
-
-
 # Needs to be computed with os.path.relpath instead of Path.relative_to
 # to support testing a fake (test-only) value of PROJECT_ROOT.
-PROJECT_ROOT_REL = _relpath(PROJECT_ROOT, start=os.curdir)
+PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
 
 # This is a known path where remote execution occurs.
 # This should only be used for workarounds as a last resort.
@@ -53,6 +45,8 @@ _REMOTE_PROJECT_ROOT = Path('/b/f/w')
 _REMOTE_LOG_SCRIPT = Path('build', 'rbe', 'log-it.sh')
 
 _DETAIL_DIFF_SCRIPT = Path('build', 'rbe', 'detail-diff.sh')
+
+_REMOTETOOL_SCRIPT = Path('build', 'rbe', 'remotetool.sh')
 
 _RECLIENT_ERROR_STATUS = 35
 _RBE_SERVER_ERROR_STATUS = 45
@@ -188,7 +182,7 @@ def host_tool_nonsystem_shlibs(executable: Path) -> Iterable[Path]:
 
 
 def relativize_to_exec_root(path: Path, start: Path = None) -> Path:
-    return _relpath(path, start=(_path_or_default(start, PROJECT_ROOT)))
+    return cl_utils.relpath(path, start=(_path_or_default(start, PROJECT_ROOT)))
 
 
 def _reclient_canonical_working_dir_components(
@@ -467,6 +461,28 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
 
     # TODO: further analyze remote failures in --action_log (.rrpl)
 
+def make_download_stubs(
+    files: Iterable[Path],
+    dirs: Iterable[Path],
+    rrpl: Path,
+):
+    """Establish placeholders from which real artifacts can be retrieved later.
+
+    Args:
+      files: files to create download stubs for.
+      dirs: directories to create download stubs for.
+      rrpl: single-action reproxy log (reproxy.LogRecord), which contains
+          file digests.
+    """
+    # TODO(http://fxbug.dev/123178): validate that we are creating links for
+    # paths that are covered in the .rrpl log.  This requires parsing
+    # more of the .rrpl log.
+    for f in files:
+        cl_utils.symlink_relative(src=f, dest=rrpl)
+    for d in dirs:
+        cl_utils.symlink_relative(src=d, dest=rrpl)
+
+# TODO(http://fxbug.dev/123178): download using stub links
 
 class RemoteAction(object):
     """RemoteAction represents a command that is to be executed remotely."""
@@ -658,6 +674,10 @@ class RemoteAction(object):
         return self._rewrapper_known_options.canonicalize_working_dir
 
     @property
+    def download_outputs(self) -> bool:
+        return self._rewrapper_known_options.download_outputs
+
+    @property
     def auto_reproxy(self) -> bool:
         return self._auto_reproxy
 
@@ -687,7 +707,7 @@ class RemoteAction(object):
 
     @property
     def exec_root_rel(self) -> Path:
-        return _relpath(self.exec_root, start=self.working_dir)
+        return cl_utils.relpath(self.exec_root, start=self.working_dir)
 
     @property
     def build_subdir(self) -> Path:
@@ -741,9 +761,11 @@ class RemoteAction(object):
         yield str(self._rewrapper)
         yield f"--exec_root={self.exec_root}"
 
-        if self.diagnose_nonzero:
-            # The .rrpl contains detailed information for improved
-            # diagnostics and troubleshooting.
+        # The .rrpl contains detailed information for improved
+        # diagnostics and troubleshooting.
+        # When NOT downloading outputs, we need the .rrpl file for the
+        # output digests to be able to retrieve them from the CAS later.
+        if self.diagnose_nonzero or not self.download_outputs:
             yield f"--action_log={self._action_log}"
 
         yield from self.options
@@ -787,7 +809,7 @@ class RemoteAction(object):
 
     def _generate_remote_launch_command(self) -> Iterable[str]:
         # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment
-        if self._auto_reproxy:
+        if self.auto_reproxy:  # TODO: suppress reproxy in --dry-run mode
             yield str(fuchsia.REPROXY_WRAP)
             yield '--'
 
@@ -831,8 +853,12 @@ class RemoteAction(object):
         """
         return list(self._generate_launch_command())
 
-    # features to port over from fuchsia-rbe-action.sh:
-    # TODO(http://fxbug.dev/123178): facilitate delayed downloads using --action_log
+    def _make_download_stubs(self):
+        make_download_stubs(
+            files=self.output_files_relative_to_working_dir,
+            dirs=self.output_dirs_relative_to_working_dir,
+            rrpl=self._action_log,
+        )
 
     def _cleanup(self):
         for f in self._cleanup_files:
@@ -877,6 +903,8 @@ class RemoteAction(object):
                 # TODO: output_leak_scanner.postflight_checks() here,
                 #   but only when requested, because inspecting output
                 #   contents takes time.
+                if not self.download_outputs:
+                    self._make_download_stubs()
                 return result.returncode
             if not self.diagnose_nonzero:
                 return result.returncode
@@ -1067,6 +1095,13 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
         type=cl_utils.bool_golang_flag,
         help=
         "If true, remotely execute the command in a working dir location, that has the same depth as the actual build output dir relative to the exec_root.  This makes remote actions cacheable across different output dirs.",
+    )
+    parser.add_argument(
+        "--download_outputs",
+        type=cl_utils.bool_golang_flag,
+        default=True,
+        help=
+        "Set to false to avoid downloading outputs after remote execution succeeds.""",
     )
     return parser
 

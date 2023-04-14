@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 import os
-import pathlib
 
 import unittest
 from pathlib import Path

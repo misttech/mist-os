@@ -22,7 +22,6 @@ import argparse
 import io
 import mmap
 import os
-import pathlib
 import re
 import subprocess
 import sys
@@ -36,13 +35,6 @@ from typing import Iterable, Sequence
 _SCRIPT_BASENAME = Path(__file__).name
 
 PROJECT_ROOT = fuchsia.project_root_dir()
-
-
-def _relpath(path: Path, start: Path) -> Path:
-    # Path.relative_to() requires self to be a subpath of the argument,
-    # but here, the argument is often the subpath of self.
-    # Hence, we need os.path.relpath() in the general case.
-    return Path(os.path.relpath(path, start=start))
 
 
 # This is a known path where remote execution occurs.
@@ -279,7 +271,7 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     script_args = argv[:ddash]
     command = argv[ddash + 1:]
 
-    build_subdir = _relpath(working_dir, start=exec_root)
+    build_subdir = cl_utils.relpath(working_dir, start=exec_root)
     path_pattern = PathPattern(build_subdir)
 
     main_args = _MAIN_ARG_PARSER.parse_args(script_args)

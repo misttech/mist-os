@@ -11,7 +11,6 @@ This includes information like:
 
 import glob
 import os
-import pathlib
 import platform
 import sys
 from pathlib import Path

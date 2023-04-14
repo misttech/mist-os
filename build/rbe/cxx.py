@@ -8,7 +8,6 @@
 import argparse
 import dataclasses
 import enum
-import pathlib
 
 import cl_utils
 

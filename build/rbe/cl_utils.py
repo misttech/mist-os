@@ -14,12 +14,13 @@ import shlex
 import sys
 import platform
 
+from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence
-
 
 # Local subprocess and remote environment calls need this when a
 # command is prefixed with an X=Y environment variable.
 _ENV = '/usr/bin/env'
+
 
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
     if not command:
@@ -46,6 +47,7 @@ def bool_golang_flag(value: str) -> bool:
         'true': True,
         'false': False,
     }[value.lower()]
+
 
 def command_quoted_str(command: Iterable[str]) -> str:
     return ' '.join(shlex.quote(t) for t in command)
@@ -168,9 +170,39 @@ def last_value_of_dict_flag(
     return last_value_or_default(d.get(key, []), default)
 
 
+def relpath(path: Path, start: Path) -> Path:
+    """Relative path (using Path objects).
+
+    Path.relative_to() requires self to be a subpath of the argument,
+    but here, the argument is often the subpath of self.
+    Hence, we need os.path.relpath() in the general case.
+
+    Args:
+      path (Path): target path
+      start (Path): starting directory (required, unlike os.path.relpath)
+
+    Returns:
+      relative path
+    """
+    return Path(os.path.relpath(path, start=start))
+
+
+def symlink_relative(dest: Path, src: Path):
+    """Create a relative-path symlink from src to dest.
+
+    Like os.symlink(), but using relative path.
+    Any intermediate directories to src are automatically created.
+
+    Args:
+      dest: target to link-to (not required to exist)
+      src: new symlink path pointing to dest
+    """
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.symlink_to(relpath(dest, start=src.parent))
+
+#####################################################################
 # The following code implements subprocess 'tee' behavior based on:
 # https://stackoverflow.com/questions/2996887/how-to-replicate-tee-behavior-in-python-when-using-subprocess
-
 
 class SubprocessResult(object):
 
@@ -280,3 +312,6 @@ def subprocess_call(
             **kwargs,
         ))
     return result
+
+# end of subprocess_call section
+#####################################################################
