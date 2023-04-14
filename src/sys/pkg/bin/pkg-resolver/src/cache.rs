@@ -632,6 +632,9 @@ async fn fetch_blob(
                 blob_fetch_params.blob_type(),
                 blob_fetch_params.delivery_blob_fallback(),
             ) {
+                tracing::info!(
+                    "Delivery blob {merkle} not found, falling back to uncompressed blob"
+                );
                 res = fetch_blob_http(
                     &inspect,
                     http_client,
