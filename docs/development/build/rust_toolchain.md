@@ -47,7 +47,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    @Subdir clang
    fuchsia/third_party/clang/${platform} integration
    EOF
-   $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure --root . --ensure-file cipd.ensure
+   $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure --root $DEV_ROOT --ensure-file cipd.ensure
    ```
 
    Note: these versions are not pinned, so every time you run the `cipd ensure`
