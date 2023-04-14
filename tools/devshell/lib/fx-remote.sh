@@ -93,7 +93,8 @@ function fetch_remote_artifacts {
     # with filesize to determine if the file changed (unless the --checksum
     # parameter is used). Without one of either --times or --checksum, identical
     # files will be re-transfered on each rsync invocation.
-    rsync --compress --partial --progress --relative --times "${host}:${remote_build_dir}/./${value}" "${local_dir}" || exit $?
+    # --recursive to be able to download directories
+    rsync --compress --partial --progress --relative --times --recursive "${host}:${remote_build_dir}/./${value}" "${local_dir}" || exit $?
   done
 }
 

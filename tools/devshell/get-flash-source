@@ -67,7 +67,9 @@ function _build_gn_label {
   local target="${1#//}"
   local default_toolchain_suffix="(//build/toolchain/fuchsia:x64)"
   target="${target%${default_toolchain_suffix}}"
-  fx-command-run build "${target}"
+  # Important: redirect stdout to stderr to avoid polluting this script's
+  # output. See https://fxbug.dev/125439
+  >&2 fx-command-run build "${target}"
 }
 
 use_bazel_images_only="$(_query_manifest "${ARGS_JSON}" .use_bazel_images_only)"
