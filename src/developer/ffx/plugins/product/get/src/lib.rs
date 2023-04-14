@@ -28,11 +28,22 @@ pub async fn pb_get(cmd: GetCommand) -> Result<()> {
     pb_get_impl(&cmd, &mut ui).await
 }
 
+fn deprecated() {
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+    println!("@");
+    println!("@  The `get` subcommand is deprecated/renamed");
+    println!("@");
+    println!("@  Please use `ffx product download ...` instead.");
+    println!("@");
+    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+}
+
 async fn pb_get_impl<I: structured_ui::Interface + Sync>(
     cmd: &GetCommand,
     ui: &mut I,
 ) -> Result<()> {
     let start = std::time::Instant::now();
+    deprecated();
     tracing::info!("---------------------- Begin ----------------------------");
     tracing::debug!("transfer_manifest_url Url::parse");
     let transfer_manifest_url = match url::Url::parse(&cmd.manifest_url) {
@@ -84,6 +95,7 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
     }
     ui.present(&structured_ui::Presentation::Progress(progress))?;
 
+    deprecated();
     tracing::debug!("Total ffx product get runtime {} seconds.", start.elapsed().as_secs_f32());
     tracing::debug!("End");
     Ok(())
