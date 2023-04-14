@@ -174,10 +174,31 @@ ktl::string_view Riscv64AspaceTypeName(Riscv64AspaceType type) {
   __UNREACHABLE;
 }
 
-bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
-  return (base == USER_ASPACE_BASE && size == USER_ASPACE_SIZE) ||
-         (base == USER_ASPACE_BASE && size == (USER_ASPACE_SIZE / 2)) ||
-         (base == USER_ASPACE_BASE + (USER_ASPACE_SIZE / 2) && size == (USER_ASPACE_SIZE / 2));
+constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
+  // Make sure size is > 0 and the addition of base + size is contained entirely within
+  // the user half of the canonical address space.
+  if (size == 0) {
+    return false;
+  }
+
+  if (!IS_PAGE_ALIGNED(base) || !IS_PAGE_ALIGNED(size)) {
+    return false;
+  }
+
+  if (base & kRiscv64CanonicalAddressMask) {
+    return false;
+  }
+
+  uint64_t computed_user_aspace_top = 0;
+  if (add_overflow(base, size, &computed_user_aspace_top)) {
+    return false;
+  }
+
+  if ((computed_user_aspace_top - 1) & kRiscv64CanonicalAddressMask) {
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace
@@ -1090,9 +1111,12 @@ zx_status_t Riscv64ArchVmAspace::Init() {
 
   Guard<Mutex> a{&lock_};
 
-  // Validate that the base + size is sane and doesn't wrap.
-  DEBUG_ASSERT(size_ > PAGE_SIZE);
-  DEBUG_ASSERT(base_ + size_ - 1 > base_);
+  // Validate that the base + size is valid and doesn't wrap.
+  DEBUG_ASSERT(size_ > 0);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(base_));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
+  [[maybe_unused]] uintptr_t unused;
+  DEBUG_ASSERT(!add_overflow(base_, size_ - 1, &unused));
 
   if (type_ == Riscv64AspaceType::kKernel) {
     // At the moment we can only deal with address spaces as globally defined.
@@ -1106,6 +1130,10 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     if (type_ == Riscv64AspaceType::kUser) {
       DEBUG_ASSERT_MSG(IsUserBaseSizeValid(base_, size_), "base %#" PRIxPTR " size 0x%zx", base_,
                        size_);
+      if (!IsUserBaseSizeValid(base_, size_)) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+
       auto status = asid.Alloc();
       if (status.is_error()) {
         printf("RISC-V: out of ASIDs!\n");
