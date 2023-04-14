@@ -13,7 +13,7 @@ use derivative::Derivative;
 use fuchsia_async as fasync;
 use futures::{
     channel::mpsc,
-    future::{AbortHandle, Abortable, Aborted, Future},
+    future::{AbortHandle, Abortable, Aborted},
     stream::{FuturesUnordered, StreamExt as _},
 };
 use log::{trace, warn};
@@ -39,19 +39,12 @@ struct TimerInfo {
     abort_handle: AbortHandle,
 }
 
-/// A context for specified for a timer type `T` that provides asynchronous
-/// locking to a [`TimerHandler`].
+/// A context for specified for a timer type `T` that provides access to a
+/// [`TimerHandler`].
 pub(crate) trait TimerContext<T: Hash + Eq>: 'static + Clone {
     type Handler: TimerHandler<T>;
 
-    type Guard<'a>: Deref<Target = Self::Handler> + DerefMut + Send
-    where
-        Self: 'a;
-    type Fut<'a>: Future<Output = Self::Guard<'a>> + Send
-    where
-        Self: 'a;
-
-    fn lock(&self) -> Self::Fut<'_>;
+    fn handler(&self) -> Self::Handler;
 }
 
 /// An entity responsible for receiving expired timers.
@@ -66,11 +59,6 @@ pub(crate) trait TimerHandler<T: Hash + Eq>: Sized + 'static {
     /// this `TimerHandler`. It *must* be the same `TimerDispatcher` instance
     /// for which this handler's [`TimerContext`] was spawned with
     /// [`TimerDispatcher::spawn`].
-    ///
-    /// The provided `TimerDispatcher` must exist within the same lock context
-    /// as the `TimerHandler` so it can ensure the contract that timers that are
-    /// cancelled or rescheduled are *never* passed to
-    /// [`TimerHandler::handle_expired_timer`].
     fn get_timer_dispatcher(&mut self) -> &TimerDispatcher<T>;
 }
 
@@ -170,16 +158,23 @@ where
                 // already have been aborted, in which case the version ID
                 // doesn't matter. But it may also have been already fulfilled.
                 // The race comes from the fact that we don't currently have a
-                // lock on the context, we're going to acquire the lock in case
-                // the `r` is `TimerFired` below. As we await on the lock, the
-                // timer ID we're currently holding may have be invalidated by
-                // another Task, so it must NOT be given to to the handler.
+                // lock on the context. If we are woken up to handle a timer,
+                // the timer ID we're currently holding may have been
+                // invalidated by another Task, before this task was woken up so
+                // it must NOT be given to to the handler.
+                //
+                // After this point, we know nothing else can cancel the timer
+                // since (as of writing) we use a single-threaded executor and
+                // we have no await points below.
+                //
+                // TODO(https://fxbug.dev/122725): Fix timer dispatcher race
+                // with multithreaded executor/concurrent tasks.
 
                 trace!("TimerDispatcher work: {:?}", r);
                 match r {
                     PollResult::InstallFuture(fut) => futures.push(fut),
                     PollResult::TimerFired(t) => {
-                        let mut handler = ctx.lock().await;
+                        let mut handler = ctx.handler();
                         let disp = handler.get_timer_dispatcher();
 
                         match disp.commit_timer(t) {
@@ -352,17 +347,18 @@ mod tests {
     use crate::bindings::integration_tests::set_logger_for_test;
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, DurationNum};
-    use futures::{channel::mpsc, lock::Mutex, task::Poll, Future, StreamExt};
+    use futures::{channel::mpsc, task::Poll, Future, StreamExt};
     use std::sync::Arc;
 
     type TestDispatcher = TimerDispatcher<usize>;
 
-    struct TimerData {
-        dispatcher: TestDispatcher,
+    #[derive(Clone)]
+    struct TestContext {
+        dispatcher: Arc<TestDispatcher>,
         fired: mpsc::UnboundedSender<usize>,
     }
 
-    impl TimerHandler<usize> for TimerData {
+    impl TimerHandler<usize> for TestContext {
         fn handle_expired_timer(&mut self, timer: usize) {
             self.fired.unbounded_send(timer).expect("Can't fire timer")
         }
@@ -371,31 +367,23 @@ mod tests {
         }
     }
 
-    #[derive(Clone)]
-    struct TestContext(Arc<Mutex<TimerData>>);
-
     impl TestContext {
         fn new() -> (Self, mpsc::UnboundedReceiver<usize>) {
             let (fired, receiver) = mpsc::unbounded();
-            let inner =
-                Arc::new(Mutex::new(TimerData { dispatcher: TestDispatcher::default(), fired }));
-            inner.try_lock().unwrap().dispatcher.spawn(Self(inner.clone()));
-            (Self(inner), receiver)
+            let this = TestContext { dispatcher: TestDispatcher::default().into(), fired };
+            this.dispatcher.spawn(this.clone());
+            (this, receiver)
         }
 
-        fn with_disp_sync<R, F: FnOnce(&mut TestDispatcher) -> R>(&mut self, f: F) -> R {
-            f(&mut self.0.try_lock().expect("Failed to lock dispatcher synchronously").dispatcher)
+        fn with_disp_sync<R, F: FnOnce(&TestDispatcher) -> R>(&self, f: F) -> R {
+            f(&self.dispatcher)
         }
     }
 
     impl TimerContext<usize> for TestContext {
-        type Handler = TimerData;
-
-        type Guard<'a> = futures::lock::MutexGuard<'a, TimerData> where Self: 'a;
-        type Fut<'a> = futures::lock::MutexLockFuture<'a, TimerData> where Self: 'a;
-        fn lock(&self) -> Self::Fut<'_> {
-            let Self(arc) = self;
-            arc.lock()
+        type Handler = Self;
+        fn handler(&self) -> Self {
+            self.clone()
         }
     }
 
@@ -418,19 +406,6 @@ mod tests {
         }
     }
 
-    fn run_until_stalled(executor: &mut fasync::TestExecutor) {
-        let fut = futures::future::ready(());
-        futures::pin_mut!(fut);
-        executor.wake_main_future();
-        loop {
-            match executor.run_one_step(&mut fut) {
-                Some(Poll::Ready(())) => (),
-                None => break,
-                Some(Poll::Pending) => (),
-            }
-        }
-    }
-
     #[test]
     fn test_timers_fire() {
         set_logger_for_test();
@@ -438,7 +413,7 @@ mod tests {
 
         let (t, mut fired) = TestContext::new();
         run_in_executor(&mut executor, async {
-            let d = t.lock().await;
+            let d = t.handler();
             assert_eq!(d.dispatcher.schedule_timer(1, nanos_from_now(1)), None);
             assert_eq!(d.dispatcher.schedule_timer(2, nanos_from_now(2)), None);
         });
@@ -456,8 +431,7 @@ mod tests {
         let mut _executor = fasync::TestExecutor::new_with_fake_time();
         let (t, _) = TestContext::new();
 
-        let mut lock = t.0.try_lock().unwrap();
-        let d = &mut lock.dispatcher;
+        let d = &t.dispatcher;
 
         // Timer 1 is scheduled.
         let time1 = nanos_from_now(1);
@@ -485,7 +459,7 @@ mod tests {
     fn test_cancel() {
         set_logger_for_test();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let (mut t, mut rcv) = TestContext::new();
+        let (t, mut rcv) = TestContext::new();
 
         // timer 1 and 2 are scheduled.
         // timer 1 is going to be cancelled even before we allow the loop to
@@ -521,55 +495,10 @@ mod tests {
     }
 
     #[test]
-    fn test_late_cancel() {
-        // test that late cancellation will work (meaning the internal timer
-        // future will fire, but we'll cancel it before the timer dispatcher has
-        // a chance to commit it).
-
-        let mut executor = fasync::TestExecutor::new_with_fake_time();
-
-        let time1 = nanos_from_now(1);
-        let time2 = nanos_from_now(2);
-        let time3 = nanos_from_now(3);
-
-        let (t, mut rcv) = TestContext::new();
-        {
-            let d = &mut t.0.try_lock().unwrap().dispatcher;
-            assert_eq!(d.schedule_timer(1, time1), None);
-            assert_eq!(d.schedule_timer(2, time2), None);
-            executor.set_fake_time(time1.0);
-            // run the executor until it's stalled. We're still locking the
-            // context mutex, meaning the dispatcher task is waiting for us.
-            run_until_stalled(&mut executor);
-            // now we cancel the first timer
-            assert_eq!(d.cancel_timer(&1).unwrap(), time1);
-        }
-        run_until_stalled(&mut executor);
-        assert_matches!(rcv.try_next(), Err(mpsc::TryRecvError { .. }));
-        {
-            let d = &mut t.0.try_lock().unwrap().dispatcher;
-            // do the same thing again, we'll let the timer expire, but we're
-            // holding the lock so the executor will stall waiting for the
-            // context lock.
-            executor.set_fake_time(time2.0);
-            run_until_stalled(&mut executor);
-            // reschedule timer2
-            assert_eq!(d.schedule_timer(2, time3).unwrap(), time2);
-        }
-        run_until_stalled(&mut executor);
-        assert_matches!(rcv.try_next(), Err(mpsc::TryRecvError { .. }));
-
-        // finally after setting the time to the rescheduled time, we should get
-        // the rescheduled timer 2.
-        executor.set_fake_time(time3.0);
-        assert_eq!(run_in_executor(&mut executor, rcv.next()).unwrap(), 2);
-    }
-
-    #[test]
     fn test_reschedule() {
         set_logger_for_test();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let (mut t, mut rcv) = TestContext::new();
+        let (t, mut rcv) = TestContext::new();
 
         // timer 1 and 2 are scheduled.
         // timer 1 is going to be rescheduled even before we allow the loop to
@@ -605,7 +534,7 @@ mod tests {
     fn test_cancel_with() {
         set_logger_for_test();
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let (mut t, mut rcv) = TestContext::new();
+        let (t, mut rcv) = TestContext::new();
 
         t.with_disp_sync(|d| {
             // schedule 4 timers:

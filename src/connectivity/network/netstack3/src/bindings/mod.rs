@@ -211,11 +211,9 @@ impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx {
 
 impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
     type Handler = Ctx;
-
-    type Guard<'a> = NetstackContext where Self: 'a;
-    type Fut<'a> = futures::future::Ready<NetstackContext> where Self: 'a;
-    fn lock(&self) -> Self::Fut<'_> {
-        futures::future::ready(self.ctx.clone())
+    fn handler(&self) -> Ctx {
+        let NetstackContext(ctx) = &self.ctx;
+        ctx.clone()
     }
 }
 
