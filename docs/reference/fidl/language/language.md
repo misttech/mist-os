@@ -337,7 +337,7 @@ Vectors are denoted as follows:
     _T_ ([validation error][lexicon-validate] occurs if absent)
 *   **`vector<T>:optional`** : optional vector of element type
     _T_
-*   **`vector<T>:N, vector<T>:<N, optional>?`** : vector, and optional vector,
+*   **`vector<T>:N` and `vector<T>:<N, optional>`** : vector, and optional vector,
     respectively, with maximum length of _N_ elements
 
 _T_ can be any FIDL type.
@@ -359,7 +359,7 @@ _T_ can be any FIDL type.
 Handles are denoted:
 
 *   **`zx.handle`** : required Zircon handle of unspecified type
-*   **`zx.handle?`** : optional Zircon handle of unspecified type
+*   **`zx.handle:optional`** : optional Zircon handle of unspecified type
 *   **`zx.handle:H`** : required Zircon handle of type _H_
 *   **`zx.handle:<H, optional>`** : optional Zircon handle of type _H_
 *   **`zx.handle:<H, R>`** : required Zircon handle of type _H_ with rights
