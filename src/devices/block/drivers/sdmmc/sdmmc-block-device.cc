@@ -106,46 +106,47 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 
   [[maybe_unused]] auto* placeholder = user_partition.release();
 
-  const uint32_t boot_size = raw_ext_csd_[MMC_EXT_CSD_BOOT_SIZE_MULT] * kBootSizeMultiplier;
-  const bool boot_enabled =
-      raw_ext_csd_[MMC_EXT_CSD_PARTITION_CONFIG] & MMC_EXT_CSD_BOOT_PARTITION_ENABLE_MASK;
+  if (!is_sd_) {
+    const uint32_t boot_size = raw_ext_csd_[MMC_EXT_CSD_BOOT_SIZE_MULT] * kBootSizeMultiplier;
+    const bool boot_enabled =
+        raw_ext_csd_[MMC_EXT_CSD_PARTITION_CONFIG] & MMC_EXT_CSD_BOOT_PARTITION_ENABLE_MASK;
+    if (boot_size > 0 && boot_enabled) {
+      const uint64_t boot_partition_block_count = boot_size / block_info_.block_size;
+      const block_info_t boot_info = {
+          .block_count = boot_partition_block_count,
+          .block_size = block_info_.block_size,
+          .max_transfer_size = block_info_.max_transfer_size,
+          .flags = block_info_.flags,
+      };
 
-  const uint64_t boot_partition_block_count = boot_size / block_info_.block_size;
-  const block_info_t boot_info = {
-      .block_count = boot_partition_block_count,
-      .block_size = block_info_.block_size,
-      .max_transfer_size = block_info_.max_transfer_size,
-      .flags = block_info_.flags,
-  };
+      std::unique_ptr<PartitionDevice> boot_partition_1(
+          new (&ac) PartitionDevice(zxdev(), this, boot_info, BOOT_PARTITION_1));
+      if (!ac.check()) {
+        zxlogf(ERROR, "failed to allocate device memory");
+        return ZX_ERR_NO_MEMORY;
+      }
 
-  if (!is_sd_ && boot_size > 0 && boot_enabled) {
-    std::unique_ptr<PartitionDevice> boot_partition_1(
-        new (&ac) PartitionDevice(zxdev(), this, boot_info, BOOT_PARTITION_1));
-    if (!ac.check()) {
-      zxlogf(ERROR, "failed to allocate device memory");
-      return ZX_ERR_NO_MEMORY;
+      std::unique_ptr<PartitionDevice> boot_partition_2(
+          new (&ac) PartitionDevice(zxdev(), this, boot_info, BOOT_PARTITION_2));
+      if (!ac.check()) {
+        zxlogf(ERROR, "failed to allocate device memory");
+        return ZX_ERR_NO_MEMORY;
+      }
+
+      if ((st = boot_partition_1->AddDevice()) != ZX_OK) {
+        zxlogf(ERROR, "failed to add boot partition device: %d", st);
+        return st;
+      }
+
+      placeholder = boot_partition_1.release();
+
+      if ((st = boot_partition_2->AddDevice()) != ZX_OK) {
+        zxlogf(ERROR, "failed to add boot partition device: %d", st);
+        return st;
+      }
+
+      placeholder = boot_partition_2.release();
     }
-
-    std::unique_ptr<PartitionDevice> boot_partition_2(
-        new (&ac) PartitionDevice(zxdev(), this, boot_info, BOOT_PARTITION_2));
-    if (!ac.check()) {
-      zxlogf(ERROR, "failed to allocate device memory");
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    if ((st = boot_partition_1->AddDevice()) != ZX_OK) {
-      zxlogf(ERROR, "failed to add boot partition device: %d", st);
-      return st;
-    }
-
-    placeholder = boot_partition_1.release();
-
-    if ((st = boot_partition_2->AddDevice()) != ZX_OK) {
-      zxlogf(ERROR, "failed to add boot partition device: %d", st);
-      return st;
-    }
-
-    placeholder = boot_partition_2.release();
   }
 
   if (!is_sd_ && raw_ext_csd_[MMC_EXT_CSD_RPMB_SIZE_MULT] > 0) {
@@ -274,6 +275,21 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
   }
 
   zxlogf(DEBUG, "do_txn complete");
+  return st;
+}
+
+zx_status_t SdmmcBlockDevice::Flush() {
+  if (!cache_enabled_) {
+    return ZX_OK;
+  }
+
+  // TODO(fxbug.dev/124654): Enable the cache and add flush support for SD.
+  ZX_ASSERT(!is_sd_);
+
+  zx_status_t st = MmcDoSwitch(MMC_EXT_CSD_FLUSH_CACHE, MMC_EXT_CSD_FLUSH_MASK);
+  if (st != ZX_OK) {
+    zxlogf(ERROR, "Failed to flush the cache: %s", zx_status_get_string(st));
+  }
   return st;
 }
 
@@ -464,6 +480,10 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
         BlockComplete(txn, status);
         return;
       }
+      if (btxn->command & BLOCK_FL_FORCE_ACCESS) {
+        BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
+        return;
+      }
       break;
     case BLOCK_OP_TRIM:
       if (zx_status_t status = block::CheckIoRange(btxn->trim, max); status != ZX_OK) {
@@ -569,13 +589,16 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
                          TA_INT32(bop.trim.length), "offset_dev", TA_INT64(bop.trim.offset_dev),
                          "txn_status", TA_INT32(status));
     } else if (op == BLOCK_OP_FLUSH) {
-      status = ZX_OK;
-      TRACE_INSTANT("sdmmc", "flush", TRACE_SCOPE_PROCESS, "command", TA_INT32(bop.rw.command),
-                    "txn_status", TA_INT32(status));
+      TRACE_DURATION_BEGIN("sdmmc", "flush");
+
+      status = Flush();
+
+      TRACE_DURATION_END("sdmmc", "flush", "command", TA_INT32(bop.command), "txn_status",
+                         TA_INT32(status));
     } else {
       // should not get here
       zxlogf(ERROR, "invalid block op %d", kBlockOp(btxn.operation()->command));
-      TRACE_INSTANT("sdmmc", "unknown", TRACE_SCOPE_PROCESS, "command", TA_INT32(bop.rw.command),
+      TRACE_INSTANT("sdmmc", "unknown", TRACE_SCOPE_PROCESS, "command", TA_INT32(bop.command),
                     "txn_status", TA_INT32(status));
       __UNREACHABLE;
     }

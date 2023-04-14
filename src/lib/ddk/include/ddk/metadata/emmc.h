@@ -11,6 +11,10 @@ typedef struct emmc_config {
   // If true, the discard command may be issued to eMMC devices on this bus. The default value is
   // true if no metadata is specified.
   bool enable_trim;
+
+  // If true, utilize the on-device volatile cache.  The default value is true if no metadata is
+  // specified.
+  bool enable_cache;
 } emmc_config_t;
 
 #endif  // SRC_LIB_DDK_INCLUDE_DDK_METADATA_EMMC_H_

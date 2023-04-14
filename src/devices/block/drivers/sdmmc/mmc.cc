@@ -74,6 +74,15 @@ zx_status_t DecodeCsd(const std::array<uint8_t, SDMMC_CSD_SIZE>& raw_csd) {
   return ZX_OK;
 }
 
+uint64_t GetCacheSizeBits(const std::array<uint8_t, MMC_EXT_CSD_SIZE>& raw_ext_csd) {
+  uint64_t cache_size = raw_ext_csd[MMC_EXT_CSD_CACHE_SIZE_MSB] << 24 |
+                        raw_ext_csd[MMC_EXT_CSD_CACHE_SIZE_251] << 16 |
+                        raw_ext_csd[MMC_EXT_CSD_CACHE_SIZE_250] << 8 |
+                        raw_ext_csd[MMC_EXT_CSD_CACHE_SIZE_LSB];  // In 1024-bit units.
+  cache_size *= 1024;
+  return cache_size;
+}
+
 }  // namespace
 
 namespace sdmmc {
@@ -90,16 +99,23 @@ zx_status_t SdmmcBlockDevice::MmcDoSwitch(uint8_t index, uint8_t value) {
 }
 
 zx_status_t SdmmcBlockDevice::MmcWaitForSwitch(uint8_t index, uint8_t value) {
-  // The GENERIC_CMD6_TIME field defines a maximum timeout value for CMD6 in tens of milliseconds.
-  // There does not appear to be any other way to check the status of CMD6, so just sleep for the
-  // maximum required time before issuing CMD13.
-  uint8_t switch_time = raw_ext_csd_[MMC_EXT_CSD_GENERIC_CMD6_TIME];
-  if (index == MMC_EXT_CSD_PARTITION_CONFIG &&
-      raw_ext_csd_[MMC_EXT_CSD_PARTITION_SWITCH_TIME] > 0) {
-    switch_time = raw_ext_csd_[MMC_EXT_CSD_PARTITION_SWITCH_TIME];
+  uint8_t switch_time;
+  if (index == MMC_EXT_CSD_FLUSH_CACHE) {
+    switch_time = 0;  // Rely on the SDMMC platform driver to wait for the busy signal to clear.
+  } else {
+    // The GENERIC_CMD6_TIME field defines a maximum timeout value for CMD6 in tens of milliseconds.
+    // There does not appear to be any other way to check the status of CMD6, so just sleep for the
+    // maximum required time before issuing CMD13.
+    switch_time = raw_ext_csd_[MMC_EXT_CSD_GENERIC_CMD6_TIME];
+    if (index == MMC_EXT_CSD_PARTITION_CONFIG &&
+        raw_ext_csd_[MMC_EXT_CSD_PARTITION_SWITCH_TIME] > 0) {
+      switch_time = raw_ext_csd_[MMC_EXT_CSD_PARTITION_SWITCH_TIME];
+    }
   }
 
-  zx::nanosleep(zx::deadline_after(zx::msec(kSwitchTimeMultiplierMs * switch_time)));
+  if (switch_time) {
+    zx::nanosleep(zx::deadline_after(zx::msec(kSwitchTimeMultiplierMs * switch_time)));
+  }
 
   // Check status after MMC_SWITCH
   uint32_t resp;
@@ -110,9 +126,13 @@ zx_status_t SdmmcBlockDevice::MmcWaitForSwitch(uint8_t index, uint8_t value) {
 
   if (st == ZX_OK) {
     if (resp & MMC_STATUS_SWITCH_ERR) {
-      zxlogf(ERROR, "mmc status error after MMC_SWITCH (0x%x=%d), status = 0x%08x", index, value,
+      zxlogf(ERROR, "mmc switch error after MMC_SWITCH (0x%x=%d), status = 0x%08x", index, value,
              resp);
       st = ZX_ERR_INTERNAL;
+    } else if ((index == MMC_EXT_CSD_FLUSH_CACHE) && (resp & MMC_STATUS_ERR)) {
+      zxlogf(ERROR, "mmc status error after MMC_SWITCH (0x%x=%d), status = 0x%08x", index, value,
+             resp);
+      st = ZX_ERR_IO;
     }
   } else {
     zxlogf(ERROR, "failed to MMC_SEND_STATUS (%x=%d): %s", index, value, zx_status_get_string(st));
@@ -280,7 +300,8 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
   zx_status_t st =
       device_get_metadata(parent(), DEVICE_METADATA_EMMC_CONFIG, &config, sizeof(config), &actual);
   if (st != ZX_OK || actual != sizeof(config)) {
-    config.enable_trim = true;  // Default to having trim enabled.
+    config.enable_trim = true;   // Default to having trim enabled.
+    config.enable_cache = true;  // Default to having cache enabled.
   }
 
   // Query OCR
@@ -423,12 +444,32 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
     block_info_.flags |= FLAG_TRIM_SUPPORT;
   }
 
-  // The cache should be off by default upon device power-on. Check that this is the case.
-  if (raw_ext_csd_[MMC_EXT_CSD_CACHE_CTRL] & MMC_EXT_CSD_CACHE_EN_MASK) {
-    return ZX_ERR_BAD_STATE;
+  if (GetCacheSizeBits(raw_ext_csd_) && config.enable_cache) {
+    // Enable the cache.
+    st = MmcDoSwitch(MMC_EXT_CSD_CACHE_CTRL, MMC_EXT_CSD_CACHE_EN_MASK);
+    if (st != ZX_OK) {
+      zxlogf(ERROR, "Failed to enable the cache: %s", zx_status_get_string(st));
+      return st;
+    }
+    // Read extended CSD register again to verify that the cache has been enabled.
+    if ((st = sdmmc_.MmcSendExtCsd(raw_ext_csd_)) != ZX_OK) {
+      zxlogf(ERROR, "MMC_SEND_EXT_CSD failed: %s", zx_status_get_string(st));
+      return st;
+    }
+    if (!(raw_ext_csd_[MMC_EXT_CSD_CACHE_CTRL] & MMC_EXT_CSD_CACHE_EN_MASK)) {
+      zxlogf(ERROR, "Cache is unexpectedly disabled.");
+      return ZX_ERR_BAD_STATE;
+    }
+    cache_enabled_ = true;
+  } else {
+    // The cache should be off by default upon device power-on. Check that this is the case.
+    if (raw_ext_csd_[MMC_EXT_CSD_CACHE_CTRL] & MMC_EXT_CSD_CACHE_EN_MASK) {
+      zxlogf(ERROR, "Cache is unexpectedly enabled.");
+      return ZX_ERR_BAD_STATE;
+    }
   }
-  // Since the cache is never enabled, report FUA as being supported.
-  block_info_.flags |= FLAG_FUA_SUPPORT;
+
+  // TODO(fxbug.dev/123882): Support FUA.
 
   return ZX_OK;
 }
@@ -444,16 +485,13 @@ void SdmmcBlockDevice::MmcSetInspectProperties() {
     // report useful data by choosing the valid value, if there is one.
     lifetime_max = std::min(type_a, type_b);
   }
-  uint64_t cache_size = raw_ext_csd_[MMC_EXT_CSD_CACHE_SIZE_MSB] << 24 |
-                        raw_ext_csd_[MMC_EXT_CSD_CACHE_SIZE_251] << 16 |
-                        raw_ext_csd_[MMC_EXT_CSD_CACHE_SIZE_250] << 8 |
-                        raw_ext_csd_[MMC_EXT_CSD_CACHE_SIZE_LSB];  // In 1024-bit units.
-  cache_size *= 1024;
 
   type_a_lifetime_used_ = root_.CreateUint("type_a_lifetime_used", type_a);
   type_b_lifetime_used_ = root_.CreateUint("type_b_lifetime_used", type_b);
   max_lifetime_used_ = root_.CreateUint("max_lifetime_used", lifetime_max);
-  cache_size_bits_ = root_.CreateUint("cache_size_bits", cache_size);
+  cache_size_bits_ = root_.CreateUint("cache_size_bits", GetCacheSizeBits(raw_ext_csd_));
+  cache_enabled_prop_ = root_.CreateBool("cache_enabled", cache_enabled_);
+  trim_enabled_prop_ = root_.CreateBool("trim_enabled", block_info_.flags & FLAG_TRIM_SUPPORT);
 }
 
 }  // namespace sdmmc

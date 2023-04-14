@@ -76,6 +76,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   static constexpr size_t kRoundRobinRequestCount = 16;
 
   zx_status_t ReadWrite(const block_read_write_t& txn, const EmmcPartition partition);
+  zx_status_t Flush();
   zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition);
   zx_status_t SetPartition(const EmmcPartition partition);
   zx_status_t RpmbRequest(const RpmbRequestInfo& request);
@@ -130,6 +131,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   block_info_t block_info_{};
 
   bool is_sd_ = false;
+  bool cache_enabled_ = false;
 
   inspect::Inspector inspector_;
   inspect::Node root_;
@@ -139,6 +141,8 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   inspect::UintProperty type_b_lifetime_used_;  // Set once by the init thread.
   inspect::UintProperty max_lifetime_used_;     // Set once by the init thread.
   inspect::UintProperty cache_size_bits_;       // Set once by the init thread.
+  inspect::BoolProperty cache_enabled_prop_;    // Set once by the init thread.
+  inspect::BoolProperty trim_enabled_prop_;     // Set once by the init thread.
 };
 
 }  // namespace sdmmc

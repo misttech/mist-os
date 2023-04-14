@@ -15,6 +15,7 @@
 #include <lib/zx/handle.h>
 #include <zircon/hw/gpt.h>
 
+#include <ddk/metadata/emmc.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d3/s905d3-gpio.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
@@ -57,6 +58,13 @@ static aml_sdmmc_config_t config = {
     .version_3 = true,
     .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
     .use_new_tuning = true,
+};
+
+const emmc_config_t emmc_config = {
+    // Maintain the current Nelson behavior until we determine that trim is needed.
+    .enable_trim = true,
+    // Maintain the current Nelson behavior until we determine that cache is needed.
+    .enable_cache = false,
 };
 
 static const struct {
@@ -135,6 +143,12 @@ zx_status_t Nelson::EmmcInit() {
       {{
           .type = DEVICE_METADATA_GPT_INFO,
           .data = std::move(encoded.value()),
+      }},
+      {{
+          .type = DEVICE_METADATA_EMMC_CONFIG,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&emmc_config),
+              reinterpret_cast<const uint8_t*>(&emmc_config) + sizeof(emmc_config)),
       }},
   };
 

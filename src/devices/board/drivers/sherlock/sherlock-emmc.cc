@@ -63,6 +63,8 @@ static aml_sdmmc_config_t config = {
 const emmc_config_t emmc_config = {
     // Maintain the current Sherlock behavior until we determine that trim is needed.
     .enable_trim = false,
+    // Maintain the current Sherlock behavior until we determine that cache is needed.
+    .enable_cache = false,
 };
 
 static const struct {
