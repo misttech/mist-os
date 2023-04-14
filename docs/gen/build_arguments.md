@@ -70,7 +70,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1850
+From //build/config/BUILDCONFIG.gn:1852
 
 ### allow_legacy_data_partition_names
 
@@ -307,13 +307,36 @@ When set, include the corresponding Bazel assembly targets in this build.
 
 From //build/images/args.gni:200
 
-### bazel_product_bundle_target
+### bazel_product_bundle_board
 
-When set, points to a GN bazel_product_bundle target to use in this build.
+**Current value (from the default):** `false`
 
-**Current value (from the default):** `""`
+From //build/images/args.gni:221
 
-From //build/images/args.gni:203
+### bazel_product_bundle_prefix
+
+bazel_product_bundle_[prefix|board] together identifies the
+bazel_product_bundle target in GN target to use in Bazel assembly. The
+actual target used is:
+
+  ${bazel_product_bundle_prefix}.${bazel_product_bundle_board}
+
+NOTE: bazel_product_bundle_prefix should contain the fully qualified path
+prefix to the target. Setting both arguments is a prerequisite to enable
+Bazel assembly.
+
+For example, given:
+
+  bazel_product_bundle_prefix = "//build/bazel/assembly:minimal"
+  bazel_product_bundle_board = "x64"
+
+The actual bazel_product_bundle used for Bazel assembly is:
+
+  //build/bazel/assembly:minimal.x64
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:220
 
 ### bazel_quiet
 
@@ -3028,7 +3051,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:207
+From //build/images/args.gni:225
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -3096,7 +3119,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1597
+From //build/config/BUILDCONFIG.gn:1599
 
 ### extra_vbmeta_descriptors
 
@@ -4516,7 +4539,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1401
+From //build/config/BUILDCONFIG.gn:1403
 
 ### legacy_base_driver_package_labels
 
@@ -7404,7 +7427,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"5-xRQw1e9K9D6ql9rQ9dn9ahyVQ__V_w-ypg6ovEBwcC"`
+**Current value (from the default):** `"0wVoM0do2oLU9PL1FBohoCqnqBg-fqtVrMhubzEm0oYC"`
 
 From //build/rust/config.gni:32
 
@@ -7588,7 +7611,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1840
+From //build/config/BUILDCONFIG.gn:1842
 
 ### select_variant_canonical
 
@@ -7598,7 +7621,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1845
+From //build/config/BUILDCONFIG.gn:1847
 
 ### select_variant_shortcuts
 
@@ -7650,7 +7673,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1643
+From //build/config/BUILDCONFIG.gn:1645
 
 ### size_checker_input
 
@@ -8086,7 +8109,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1627
+From //build/config/BUILDCONFIG.gn:1629
 
 ### universe_package_labels
 
