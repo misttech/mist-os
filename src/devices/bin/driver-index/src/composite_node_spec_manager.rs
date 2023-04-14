@@ -64,11 +64,13 @@ impl CompositeNodeSpecManager {
         let name = spec.name.ok_or(Status::INVALID_ARGS.into_raw())?;
         if let Ok(name_regex) = Regex::new(NAME_REGEX) {
             if !name_regex.is_match(&name) {
-                log::error!("Invalid spec name. Name can only contain [A-Za-z0-9-_] characters");
+                tracing::error!(
+                    "Invalid spec name. Name can only contain [A-Za-z0-9-_] characters"
+                );
                 return Err(Status::INVALID_ARGS.into_raw());
             }
         } else {
-            log::warn!("Regex failure. Unable to validate spec name");
+            tracing::warn!("Regex failure. Unable to validate spec name");
         }
 
         let parents = spec.parents.ok_or(Status::INVALID_ARGS.into_raw())?;
@@ -122,7 +124,7 @@ impl CompositeNodeSpecManager {
                         }),
                     },
                 );
-                log::info!(
+                tracing::info!(
                     "Matched '{}' to composite node spec '{}'",
                     get_driver_url(&matched_composite),
                     name
@@ -178,7 +180,7 @@ impl CompositeNodeSpecManager {
             let matched_composite_result =
                 match_composite_properties(&resolved_driver, &spec.nodes);
             if let Ok(Some(matched_composite)) = matched_composite_result {
-                log::info!(
+                tracing::info!(
                     "Matched '{}' to composite node spec '{}'",
                     get_driver_url(&matched_composite),
                     name
@@ -330,7 +332,7 @@ fn match_node(bind_rules: &BindRules, device_properties: &DeviceProperties) -> b
             }
             fdf::Condition::Reject => !dev_prop_contains_value,
             fdf::Condition::Unknown => {
-                log::error!("Invalid condition type in bind rules.");
+                tracing::error!("Invalid condition type in bind rules.");
                 return false;
             }
         };

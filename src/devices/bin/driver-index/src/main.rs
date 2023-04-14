@@ -47,7 +47,7 @@ fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
 }
 
 fn log_error(err: anyhow::Error) -> anyhow::Error {
-    log::error!("{:#?}", err);
+    tracing::error!("{:#?}", err);
     err
 }
 
@@ -84,15 +84,15 @@ async fn load_boot_drivers(
         let url = url::Url::parse(&url_string)?;
         let driver = load_driver(&dir, url, DriverPackageType::Boot, None).await;
         if let Err(e) = driver {
-            log::error!("Failed to load boot driver: {}: {}", url_string, e);
+            tracing::error!("Failed to load boot driver: {}: {}", url_string, e);
             continue;
         }
         if let Ok(Some(mut driver)) = driver {
             if disabled_drivers.contains(&driver.component_url) {
-                log::info!("Skipping boot driver: {}", driver.component_url.to_string());
+                tracing::info!("Skipping boot driver: {}", driver.component_url.to_string());
                 continue;
             }
-            log::info!("Found boot driver: {}", driver.component_url.to_string());
+            tracing::info!("Found boot driver: {}", driver.component_url.to_string());
             if eager_drivers.contains(&driver.component_url) {
                 driver.fallback = false;
             }
@@ -157,7 +157,7 @@ impl Indexer {
         if let BaseRepo::NotResolved(waiters) = self.base_repo.borrow_mut().deref_mut() {
             while let Some(waiter) = waiters.pop() {
                 match waiter.send().or_else(ignore_peer_closed) {
-                    Err(e) => log::error!("Error sending to base_waiter: {:?}", e),
+                    Err(e) => tracing::error!("Error sending to base_waiter: {:?}", e),
                     Ok(_) => continue,
                 }
             }
@@ -167,7 +167,7 @@ impl Indexer {
 
     fn match_driver(&self, args: fdi::MatchDriverArgs) -> fdi::DriverIndexMatchDriverResult {
         if args.properties.is_none() {
-            log::error!("Failed to match driver: empty properties");
+            tracing::error!("Failed to match driver: empty properties");
             return Err(Status::INVALID_ARGS.into_raw());
         }
         let properties = args.properties.unwrap();
@@ -221,11 +221,11 @@ impl Indexer {
             (0, 1) => Ok(fallback.pop().unwrap().1),
             (0, 0) => Err(Status::NOT_FOUND.into_raw()),
             (0, _) => {
-                log::error!("Failed to match driver: Encountered unsupported behavior: Zero non-fallback drivers and more than one fallback drivers were matched");
+                tracing::error!("Failed to match driver: Encountered unsupported behavior: Zero non-fallback drivers and more than one fallback drivers were matched");
                 Err(Status::NOT_SUPPORTED.into_raw())
             }
             _ => {
-                log::error!("Failed to match driver: Encountered unsupported behavior: Multiple non-fallback drivers were matched");
+                tracing::error!("Failed to match driver: Encountered unsupported behavior: Multiple non-fallback drivers were matched");
                 Err(Status::NOT_SUPPORTED.into_raw())
             }
         }
@@ -350,7 +350,7 @@ impl Indexer {
     ) -> Result<(), i32> {
         for boot_driver in self.boot_repo.iter() {
             if boot_driver.component_url.as_str() == pkg_url.url.as_str() {
-                log::warn!("Driver being registered already exists in boot list.");
+                tracing::warn!("Driver being registered already exists in boot list.");
                 return Err(Status::ALREADY_EXISTS.into_raw());
             }
         }
@@ -359,7 +359,7 @@ impl Indexer {
             BaseRepo::Resolved(resolved_base_drivers) => {
                 for base_driver in resolved_base_drivers {
                     if base_driver.component_url.as_str() == pkg_url.url.as_str() {
-                        log::warn!("Driver being registered already exists in base list.");
+                        tracing::warn!("Driver being registered already exists in base list.");
                         return Err(Status::ALREADY_EXISTS.into_raw());
                     }
                 }
@@ -370,7 +370,7 @@ impl Indexer {
         let url = match url::Url::parse(&pkg_url.url) {
             Ok(u) => Ok(u),
             Err(e) => {
-                log::error!("Couldn't parse driver url: {}: error: {}", &pkg_url.url, e);
+                tracing::error!("Couldn't parse driver url: {}: error: {}", &pkg_url.url, e);
                 Err(Status::ADDRESS_UNREACHABLE.into_raw())
             }
         }?;
@@ -390,9 +390,9 @@ impl Indexer {
         let existing = ephemeral_drivers.insert(pkg_url.clone(), resolved_driver);
 
         if let Some(existing_driver) = existing {
-            log::info!("Updating existing ephemeral driver {}.", existing_driver);
+            tracing::info!("Updating existing ephemeral driver {}.", existing_driver);
         } else {
-            log::info!("Registered driver successfully: {}.", pkg_url.url);
+            tracing::info!("Registered driver successfully: {}.", pkg_url.url);
         }
 
         Ok(())
@@ -611,7 +611,7 @@ async fn load_base_drivers(
         let url = match url::Url::parse(&driver.driver_url) {
             Ok(u) => u,
             Err(e) => {
-                log::error!("Found bad base driver url: {}: error: {}", driver.driver_url, e);
+                tracing::error!("Found bad base driver url: {}: error: {}", driver.driver_url, e);
                 continue;
             }
         };
@@ -623,10 +623,10 @@ async fn load_base_drivers(
 
         let mut resolved_driver = resolve.unwrap();
         if disabled_drivers.contains(&resolved_driver.component_url) {
-            log::info!("Skipping base driver: {}", resolved_driver.component_url.to_string());
+            tracing::info!("Skipping base driver: {}", resolved_driver.component_url.to_string());
             continue;
         }
-        log::info!("Found base driver: {}", resolved_driver.component_url.to_string());
+        tracing::info!("Found base driver: {}", resolved_driver.component_url.to_string());
         if eager_drivers.contains(&resolved_driver.component_url) {
             resolved_driver.fallback = false;
         }
@@ -676,10 +676,10 @@ async fn main() -> Result<(), anyhow::Error> {
         .filter_map(|url| url::Url::parse(url).ok())
         .collect();
     for driver in disabled_drivers.iter() {
-        log::info!("Disabling driver {}", driver);
+        tracing::info!("Disabling driver {}", driver);
     }
     for driver in eager_drivers.iter() {
-        log::info!("Marking driver {} as eager", driver);
+        tracing::info!("Marking driver {} as eager", driver);
     }
 
     let boot = fuchsia_fs::directory::open_in_namespace("/boot", fio::OpenFlags::RIGHT_READABLE)
@@ -694,7 +694,7 @@ async fn main() -> Result<(), anyhow::Error> {
     for argument in std::env::args() {
         if argument == "--no-base-drivers" {
             should_load_base_drivers = false;
-            log::info!("Not loading base drivers");
+            tracing::info!("Not loading base drivers");
         }
     }
 
@@ -733,7 +733,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             run_driver_registrar_server(index.clone(), stream, &full_resolver).await
                         }
                     }
-                    .unwrap_or_else(|e| log::error!("Error running index_server: {:?}", e))
+                    .unwrap_or_else(|e| tracing::error!("Error running index_server: {:?}", e))
                 })
                 .await;
         },
@@ -840,7 +840,7 @@ mod tests {
                         dir: _,
                         responder,
                     } => {
-                        log::error!(
+                        tracing::error!(
                             "ResolveWithContext is not currently implemented in driver-index"
                         );
                         responder

@@ -59,7 +59,7 @@ impl ResolvedDriver {
     ) -> Result<ResolvedDriver, fuchsia_zircon::Status> {
         let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .map_err(|e| {
-                log::warn!("Failed to create DirectoryMarker Proxy: {}", e);
+                tracing::warn!("Failed to create DirectoryMarker Proxy: {}", e);
                 fuchsia_zircon::Status::INTERNAL
             })?;
         let mut base_url = component_url.clone();
@@ -68,18 +68,18 @@ impl ResolvedDriver {
         let res = resolver
             .resolve(&base_url.as_str(), dir_server_end)
             .map_err(|e| {
-                log::warn!("Resolve call failed: {}", e);
+                tracing::warn!("Resolve call failed: {}", e);
                 fuchsia_zircon::Status::INTERNAL
             })
             .await?;
 
         res.map_err(|e| {
-            log::warn!("{}: Failed to resolve package: {:?}", component_url.as_str(), e);
+            tracing::warn!("{}: Failed to resolve package: {:?}", component_url.as_str(), e);
             map_resolve_err_to_zx_status(e)
         })?;
         let dir = fuchsia_pkg::PackageDirectory::from_proxy(dir);
         let package_hash = dir.merkle_root().await.map_err(|e| {
-            log::warn!("Failed to read package directory's hash: {}", e);
+            tracing::warn!("Failed to read package directory's hash: {}", e);
             fuchsia_zircon::Status::INTERNAL
         })?;
         let dir = dir.into_proxy();
@@ -90,12 +90,12 @@ impl ResolvedDriver {
             Some(fpkg::BlobId { merkle_root: package_hash.into() }),
         )
         .map_err(|e| {
-            log::warn!("Could not load driver: {}", e);
+            tracing::warn!("Could not load driver: {}", e);
             fuchsia_zircon::Status::INTERNAL
         })
         .await?;
         return driver.ok_or_else(|| {
-            log::warn!("{}: Component was not a driver-component", component_url.as_str());
+            tracing::warn!("{}: Component was not a driver-component", component_url.as_str());
             fuchsia_zircon::Status::INTERNAL
         });
     }
@@ -113,7 +113,7 @@ impl ResolvedDriver {
                 properties,
             )
             .map_err(|e| {
-                log::error!("Driver {}: bind error: {}", self, e);
+                tracing::error!("Driver {}: bind error: {}", self, e);
                 e
             })?;
 
