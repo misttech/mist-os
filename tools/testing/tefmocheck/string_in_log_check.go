@@ -271,6 +271,12 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// with the mute switch in the wrong position, the task may fail and we'll see this
 		// message in the log, and then an infra engineer should go flip the mute switch.
 		&stringInLogCheck{String: "Mic is muted!  (This would cause all subsequent queries to fail!)", Type: swarmingOutputType},
+		// When the DUT reboots due to out-of-memory conditions, pwrbtn-monitor emits this
+		// log line.  Since DUTs rebooting during OOM conditions are generally a sign that
+		// they won't be running tests as desired, flag that the device rebooted due to OOM.
+		// Since we have some host tests which test OOM behavior which print this string,
+		// we only consider this to trigger a failure when it appears in serial logs.
+		&stringInLogCheck{String: "received kernel OOM signal", Type: serialLogType},
 	}
 
 	oopsExceptBlocks := []*logBlock{
