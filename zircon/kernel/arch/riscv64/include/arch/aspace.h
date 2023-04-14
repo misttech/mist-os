@@ -101,7 +101,8 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
       TA_REQ(lock_);
 
   void HarvestAccessedPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, size_t size_in, uint level,
-                                NonTerminalAction action, volatile pte_t* page_table,
+                                NonTerminalAction non_terminal_action,
+                                TerminalAction terminal_action, volatile pte_t* page_table,
                                 ConsistencyManager& cm, bool* unmapped_out) TA_REQ(lock_);
 
   void MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size, uint level,

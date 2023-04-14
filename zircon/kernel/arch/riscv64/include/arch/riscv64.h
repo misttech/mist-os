@@ -7,8 +7,6 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_H_
 
-#include <arch/regs.h>  // For REGOFF
-
 #define RISCV64_CSR_SMODE_BITS (1 << 8)
 
 // These CSRs are only in user CSR space (still readable by all modes though)
@@ -94,6 +92,7 @@
 #include <zircon/types.h>
 
 #include <arch/defines.h>
+#include <arch/regs.h>
 #include <kernel/cpu.h>
 #include <syscalls/syscalls.h>
 

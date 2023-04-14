@@ -348,6 +348,14 @@ static bool vmaspace_usercopy_accessed_fault_test() {
 static bool vmaspace_free_unaccessed_page_tables_test() {
   BEGIN_TEST;
 
+  // Disable for RISC-V for now, since the ArchMmmu code for this architecture currently
+  // does not track accessed bits in intermediate page tables, and thus has no reasonable
+  // way to honor NonTerminalAction::FreeUnaccessed on harvest calls.
+#if defined(__riscv)
+  printf("Skipping on RISC-V\n");
+  return true;
+#endif
+
   AutoVmScannerDisable scanner_disable;
 
   fbl::RefPtr<VmObjectPaged> vmo;

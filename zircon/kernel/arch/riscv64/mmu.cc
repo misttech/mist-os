@@ -107,8 +107,8 @@ constexpr uintptr_t page_mask_per_level(uint level) { return page_size_per_level
 
 // Convert user level mmu flags to flags that go in L1 descriptors.
 constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
-  pte_t attr = RISCV64_PTE_V | RISCV64_PTE_A | RISCV64_PTE_D;
-
+  pte_t attr = RISCV64_PTE_V;
+  attr |= RISCV64_PTE_A | RISCV64_PTE_D;
   attr |= (flags & ARCH_MMU_FLAG_PERM_USER) ? RISCV64_PTE_U : 0;
   attr |= (flags & ARCH_MMU_FLAG_PERM_READ) ? RISCV64_PTE_R : 0;
   attr |= (flags & ARCH_MMU_FLAG_PERM_WRITE) ? RISCV64_PTE_W : 0;
@@ -436,6 +436,7 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
 // use the appropriate TLB flush instruction to globally flush the modified entry
 // terminal is set when flushing at the final level of the page table.
 void Riscv64ArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
+  LTRACEF("vaddr %#lx asid %#hx terminal %u\n", vaddr, asid_, terminal);
   unsigned long hart_mask = mask_all_but_one(riscv64_curr_hart_id());
   if (terminal) {
     __asm__ __volatile__("sfence.vma  %0, %1" ::"r"(vaddr), "r"(asid_) : "memory");
@@ -447,6 +448,7 @@ void Riscv64ArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
 }
 
 void Riscv64ArchVmAspace::FlushAsid() const {
+  LTRACEF("asid %#hx\n", asid_);
   __asm("sfence.vma  zero, %0" ::"r"(asid_) : "memory");
   unsigned long hart_mask = mask_all_but_one(riscv64_curr_hart_id());
   sbi_remote_sfence_vma_asid(&hart_mask, 0, 0, -1, asid_);
@@ -701,13 +703,18 @@ zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vadd
 }
 
 void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size,
-                                                   uint level, NonTerminalAction action,
+                                                   uint level,
+                                                   NonTerminalAction non_terminal_action,
+                                                   TerminalAction terminal_action,
                                                    volatile pte_t* page_table,
                                                    ConsistencyManager& cm, bool* unmapped_out) {
   const vaddr_t block_size = page_size_per_level(level);
   const vaddr_t block_mask = block_size - 1;
 
   vaddr_t vaddr_rel = vaddr_rel_in;
+
+  LTRACEF("vaddr 0x%lx, vaddr_rel 0x%lx, size 0x%lx, level %u, page_table %p\n", vaddr, vaddr_rel,
+          size, level, page_table);
 
   // vaddr_rel and size must be page aligned
   DEBUG_ASSERT(((vaddr_rel | size) & ((1UL << PAGE_SIZE_SHIFT) - 1)) == 0);
@@ -724,23 +731,17 @@ void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_
       // Ignore large pages, we do not support harvesting accessed bits from them. Having this empty
       // if block simplifies the overall logic.
     } else if (level > 0 && (pte & RISCV64_PTE_V) && !(pte & RISCV64_PTE_PERM_MASK)) {
+      // We're at an inner page table pointer node.
       const paddr_t page_table_paddr = RISCV64_PTE_PPN(pte);
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
-      // Start with the assumption that we will unmap if we can.
-      UnmapPageTable(vaddr, vaddr_rem, chunk_size, EnlargeOperation::No, level - 1, next_page_table,
-                     cm);
-      DEBUG_ASSERT(page_table_is_clear(next_page_table));
-      update_pte(&page_table[index], 0);
+      // NOTE: We currently cannot honor NonTerminalAction::FreeUnaccessed since accessed
+      // information is not being tracked on inner nodes.
 
-      // We can safely defer TLB flushing as the consistency manager will not return the backing
-      // page to the PMM until after the tlb is flushed.
-      cm.FlushEntry(vaddr, false);
-      FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm);
-      if (unmapped_out) {
-        *unmapped_out = true;
-      }
+      // Recurse into the next level
+      HarvestAccessedPageTable(vaddr, vaddr_rel, chunk_size, level - 1, non_terminal_action,
+                               terminal_action, next_page_table, cm, unmapped_out);
     } else if (is_pte_valid(pte) && (pte & RISCV64_PTE_A)) {
       const paddr_t pte_addr = RISCV64_PTE_PPN(pte);
       const paddr_t paddr = pte_addr + vaddr_rem;
@@ -749,17 +750,19 @@ void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_
       // Mappings for physical VMOs do not have pages associated with them and so there's no state
       // to update on an access.
       if (likely(page)) {
-        pmm_page_queues()->MarkAccessed(page);
+        pmm_page_queues()->MarkAccessedDeferredCount(page);
+
+        if (terminal_action == TerminalAction::UpdateAgeAndHarvest) {
+          // Modifying the access flag does not require break-before-make for correctness and as we
+          // do not support hardware access flag setting at the moment we do not have to deal with
+          // potential concurrent modifications.
+          pte = (pte & ~RISCV64_PTE_A);
+          LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
+          update_pte(&page_table[index], pte);
+
+          cm.FlushEntry(vaddr, true);
+        }
       }
-
-      // Modifying the access flag does not require break-before-make for correctness and as we
-      // do not support hardware access flag setting at the moment we do not have to deal with
-      // potential concurrent modifications.
-      pte = (pte & ~RISCV64_PTE_A);
-      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
-      update_pte(&page_table[index], pte);
-
-      cm.FlushEntry(vaddr, true);
     }
     vaddr += chunk_size;
     vaddr_rel += chunk_size;
@@ -775,6 +778,9 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
 
   vaddr_t vaddr_rel = vaddr_rel_in;
 
+  LTRACEF("vaddr 0x%lx, vaddr_rel 0x%lx, size 0x%lx, level %u, page_table %p\n", vaddr, vaddr_rel,
+          size, level, page_table);
+
   // vaddr_rel and size must be page aligned
   DEBUG_ASSERT(((vaddr_rel | size) & ((1UL << PAGE_SIZE_SHIFT) - 1)) == 0);
 
@@ -785,7 +791,7 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
 
     pte_t pte = page_table[index];
 
-    if (level > 0 && (pte & RISCV64_PTE_V) && (pte & RISCV64_PTE_PERM_MASK) &&
+    if (level > 0 && is_pte_valid(pte) && (pte & RISCV64_PTE_PERM_MASK) &&
         chunk_size != block_size) {
       // Ignore large pages as we don't support modifying their access flags. Having this empty if
       // block simplifies the overall logic.
@@ -794,9 +800,9 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       MarkAccessedPageTable(vaddr, vaddr_rem, chunk_size, level - 1, next_page_table, cm);
-    } else if (pte & RISCV64_PTE_V) {
+    } else if (is_pte_valid(pte)) {
       pte |= RISCV64_PTE_A;
-      page_table[index] = pte;
+      update_pte(&page_table[index], pte);
     }
     vaddr += chunk_size;
     vaddr_rel += chunk_size;
@@ -1043,12 +1049,10 @@ zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_f
 }
 
 zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
-                                                 NonTerminalAction action,
+                                                 NonTerminalAction non_terminal,
                                                  TerminalAction terminal) {
   canary_.Assert();
-
-  // TODO-rvbringup: terminal action was added, add proper support
-  // PANIC_UNIMPLEMENTED;
+  LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
   if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
@@ -1062,13 +1066,14 @@ zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
 
   ConsistencyManager cm(*this);
 
-  HarvestAccessedPageTable(vaddr, vaddr, size, RISCV64_MMU_PT_LEVELS - 1, action, tt_virt_, cm,
-                           nullptr);
+  HarvestAccessedPageTable(vaddr, vaddr, size, RISCV64_MMU_PT_LEVELS - 1, non_terminal, terminal,
+                           tt_virt_, cm, nullptr);
   return ZX_OK;
 }
 
 zx_status_t Riscv64ArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   canary_.Assert();
+  LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
   if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_OUT_OF_RANGE;
