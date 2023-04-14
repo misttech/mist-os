@@ -11,11 +11,8 @@ import(
 template("access_ota_blob_as_executable") {
   assert(defined(invoker.base_packages),
          "base_packages must be defined for $target_name")
-  assert(defined(invoker.test_config) || defined(invoker.update_domain),
-         "test_config or update_domain must be defined for $target_name")
-  assert(
-      !(defined(invoker.test_config) && defined(invoker.update_domain)),
-      "test_config and update_domain are mutually exclusive for $target_name")
+  assert(defined(invoker.update_domain),
+         "update_domain must be defined for $target_name")
   assert(defined(invoker.root_ssl_cert),
          "root_ssl_cert must be defined for $target_name")
   assert(defined(invoker.pkg_server_certchain),
@@ -32,12 +29,7 @@ template("access_ota_blob_as_executable") {
 
   # System assembly for base system version at start of test.
   assemble_security_pkg_test_system("${test_name}_v0") {
-    if (defined(invoker.update_domain)) {
-      update_domain = invoker.update_domain
-    } else {
-      test_config = invoker.test_config
-    }
-
+    update_domain = invoker.update_domain
     board_name = board_name
     root_ssl_cert = root_ssl_cert
     base_packages = [ "//src/security/tests/pkg_test/assemblies/hello_world_v0:hello_world-package" ] + assembly_base_packages
@@ -64,12 +56,7 @@ template("access_ota_blob_as_executable") {
 
   # System assembly for system version to OTA from package server.
   assemble_security_pkg_test_system("${test_name}_v1") {
-    if (defined(invoker.update_domain)) {
-      update_domain = invoker.update_domain
-    } else {
-      test_config = invoker.test_config
-    }
-
+    update_domain = invoker.update_domain
     board_name = board_name
     root_ssl_cert = root_ssl_cert
     base_packages = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ] + assembly_base_packages
@@ -96,12 +83,9 @@ template("access_ota_blob_as_executable") {
     ]
   }
 
-  if (defined(invoker.update_domain)) {
-    test_config = "${target_gen_dir}/${target_name}_test_config"
-    write_file(test_config, "{\"update_domain\":\"${invoker.update_domain}\"}")
-  } else {
-    test_config = invoker.test_config
-  }
+  # Generate the test config.
+  test_config = "${target_gen_dir}/${target_name}_test_config"
+  write_file(test_config, "{\"update_domain\":\"${invoker.update_domain}\"}")
 
   # Resources that constitute inputs to the test component.
   resource_group("${test_name}_test-resources") {

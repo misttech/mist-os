@@ -91,11 +91,8 @@ template("assemble_security_pkg_test_system") {
          "system_version_file must be defined for $target_name")
   assert(defined(invoker.packaged_assembly_directory),
          "packaged_assembly_directory must be defined for $target_name")
-  assert(defined(invoker.test_config) || defined(invoker.update_domain),
-         "test_config or update_domain must be defined for $target_name")
-  assert(
-      !(defined(invoker.test_config) && defined(invoker.update_domain)),
-      "test_config and update_domain are mutually exclusive for $target_name")
+  assert(defined(invoker.update_domain),
+         "update_domain must be defined for $target_name")
   assert(defined(invoker.root_ssl_cert),
          "root_ssl_cert must be defined for $target_name")
 
@@ -153,9 +150,6 @@ template("assemble_security_pkg_test_system") {
     partitions_json = "${directories.assembly_out}_partitions.json"
     images_json = "${directories.assembly_out}/images.json"
     build_info_version = invoker.system_version_file
-    if (defined(invoker.test_config)) {
-      test_config = invoker.test_config
-    }
 
     # TODO(fxbug.dev/88453): These should be specified `invoker` to match the
     # configured product.
@@ -240,31 +234,6 @@ template("assemble_security_pkg_test_system") {
     board_name = invoker.board_name
     bootfs_labels = []
     base_packages = packages_for_assembly
-  }
-
-  if (defined(invoker.test_config)) {
-    # Process packages.json to use a custom domain name. This mirrors the domain
-    # binding strategy used in production.
-    compiled_action(labels.packages_json) {
-      testonly = true
-      tool = "//src/security/tests/pkg_test/rewrite_packages_json_domain"
-      deps = [ ":${labels.assembly}" ]
-      inputs = [
-        files.assembly_out_packages_json,
-        files.test_config,
-      ]
-      outputs = [ files.packages_json ]
-      args = [
-        "--input",
-        rebase_path(files.assembly_out_packages_json, root_build_dir),
-        "--output",
-        rebase_path(files.packages_json, root_build_dir),
-        "--test-config",
-        rebase_path(files.test_config, root_build_dir),
-        "--in-domain",
-        "fuchsia.com",
-      ]
-    }
   }
 
   generated_partitions_config(labels.assembly_partitions_config) {
