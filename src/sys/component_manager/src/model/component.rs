@@ -2974,6 +2974,61 @@ pub mod tests {
         assert_matches!(res, Err(fcomponent::Error::InvalidArguments));
     }
 
+    // TODO(fxbug.dev/114982)
+    #[ignore]
+    #[fuchsia::test]
+    async fn creating_cycle_between_collections_fails() {
+        let static_collection_offer = OfferDecl::Service(OfferServiceDecl {
+            source: OfferSource::Collection("coll1".to_string()),
+            source_name: "foo".into(),
+            source_instance_filter: None,
+            renamed_instances: None,
+            target: OfferTarget::Collection("coll2".to_string()),
+            target_name: "foo".into(),
+            availability: Availability::Required,
+        });
+
+        let components = vec![(
+            "root",
+            ComponentDeclBuilder::new()
+                .add_collection(
+                    CollectionDeclBuilder::new_transient_collection("coll1")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
+                        .build(),
+                )
+                .add_collection(
+                    CollectionDeclBuilder::new_transient_collection("coll2")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
+                        .build(),
+                )
+                .offer(static_collection_offer.clone())
+                .build(),
+        )];
+
+        let test = ActionsTest::new("root", components, Some(AbsoluteMoniker::root())).await;
+        test.create_dynamic_child("coll2", "dynamic_src").await;
+        let cycle_res = test
+            .create_dynamic_child_with_args(
+                "coll1",
+                "dynamic_sink",
+                fcomponent::CreateChildArgs {
+                    dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "dynamic_src".into(),
+                            collection: Some("coll2".into()),
+                        })),
+                        source_name: Some("bar".to_string()),
+                        target_name: Some("bar".to_string()),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        ..fdecl::OfferProtocol::EMPTY
+                    })]),
+                    ..fcomponent::CreateChildArgs::EMPTY
+                },
+            )
+            .await;
+        assert_matches!(cycle_res, Err(fcomponent::Error::InvalidArguments));
+    }
+
     #[fuchsia::test]
     async fn creating_dynamic_child_with_offer_from_undefined_on_self_fails() {
         let components = vec![(
