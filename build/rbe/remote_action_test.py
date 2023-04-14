@@ -17,6 +17,7 @@ from unittest import mock
 import fuchsia
 import remote_action
 import cl_utils
+import output_leak_scanner
 
 from typing import Any, Sequence
 
@@ -289,10 +290,28 @@ class HostToolNonsystemShlibsTests(unittest.TestCase):
 
 class RewrapperArgParserTests(unittest.TestCase):
 
+    @property
+    def _parser(self):
+        return remote_action._REWRAPPER_ARG_PARSER
+
+    def test_default(self):
+        args, _ = self._parser.parse_known_args([])
+        self.assertIsNone(args.exec_root)
+        self.assertIsNone(args.canonicalize_working_dir)
+
     def test_exec_root(self):
-        args, _ = remote_action._REWRAPPER_ARG_PARSER.parse_known_args(
-            ['--exec_root=/foo/bar'])
+        args, _ = self._parser.parse_known_args(['--exec_root=/foo/bar'])
         self.assertEqual(args.exec_root, '/foo/bar')
+
+    def test_canonicalize_working_dir_true(self):
+        args, _ = self._parser.parse_known_args(
+            ['--canonicalize_working_dir=true'])
+        self.assertTrue(args.canonicalize_working_dir)
+
+    def test_canonicalize_working_dir_false(self):
+        args, _ = self._parser.parse_known_args(
+            ['--canonicalize_working_dir=false'])
+        self.assertFalse(args.canonicalize_working_dir)
 
 
 class RemoteActionMainParserTests(unittest.TestCase):
@@ -352,8 +371,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(['--'] + local_command)
         action = remote_action.remote_action_from_args(main_args)
-        self.assertEqual(
-            action.local_command, [cl_utils._ENV] + local_command)
+        self.assertEqual(action.local_command, [cl_utils._ENV] + local_command)
 
     def test_verbose(self):
         p = self._make_main_parser()
@@ -747,6 +765,89 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_trace_diff.assert_called_with(
             Path(local_trace + '.norm'), Path(remote_trace + '.norm'))
 
+    def test_output_leak_scan_with_canonical_working_dir_mocked(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        canonical_dir_option = '--canonicalize_working_dir=true'
+        p = self._make_main_parser()
+        command = ['echo']
+        main_args, other = p.parse_known_args(
+            [canonical_dir_option, '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertTrue(action.canonicalize_working_dir)
+        self.assertIn(canonical_dir_option, action.options)
+        with mock.patch.object(output_leak_scanner, 'preflight_checks',
+                               return_value=0) as mock_scan:
+            with mock.patch.object(
+                    remote_action.RemoteAction, '_run_maybe_remotely',
+                    return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_scan.assert_called_with(
+            paths=[],
+            command=command,
+            pattern=output_leak_scanner.PathPattern(action.build_subdir),
+        )
+        mock_run.assert_called()
+
+    def test_output_leak_scan_with_canonical_working_dir_called(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        canonical_dir_option = '--canonicalize_working_dir=true'
+        p = self._make_main_parser()
+        command = ['echo']
+        main_args, other = p.parse_known_args(
+            [canonical_dir_option, '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertTrue(action.canonicalize_working_dir)
+        self.assertIn(canonical_dir_option, action.options)
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(0)) as mock_run:
+            exit_code = action.run()
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called()
+
+    def test_output_leak_scan_with_error_stops_run(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        canonical_dir_option = '--canonicalize_working_dir=true'
+        p = self._make_main_parser()
+        command = ['echo', str(build_dir)]  # command leaks build_dir
+        main_args, other = p.parse_known_args(
+            [canonical_dir_option, '--'] + command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            remote_options=other,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertTrue(action.canonicalize_working_dir)
+        self.assertIn(canonical_dir_option, action.options)
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(0)) as mock_run:
+            exit_code = action.run()
+        self.assertEqual(exit_code, 1)  # due to output_leak_scanner
+        # The output_leak_scan error stopped execution.
+        mock_run.assert_not_called()
+
 
 class RemoteActionFlagParserTests(unittest.TestCase):
 
@@ -844,15 +945,30 @@ class RemoteActionConstructionTests(unittest.TestCase):
     _PROJECT_ROOT = Path('/my/project/root')
     _WORKING_DIR = _PROJECT_ROOT / 'build_dir'
 
-    def test_minimal(self):
-        rewrapper = '/path/to/rewrapper'
-        command = ['cat', 'meow.txt']
-        action = remote_action.RemoteAction(
-            rewrapper=rewrapper,
+    @property
+    def _rewrapper(self) -> Path:
+        return Path('/path/to/rewrapper')
+
+    def _make_remote_action(
+            self,
+            rewrapper=None,
+            command=None,
+            exec_root=None,
+            working_dir=None,
+            **kwargs,  # RemoteAction params
+    ) -> remote_action.RemoteAction:
+        """Create a RemoteAction for testing with some defaults."""
+        return remote_action.RemoteAction(
+            rewrapper=rewrapper or self._rewrapper,
             command=command,
-            exec_root=self._PROJECT_ROOT,
-            working_dir=self._WORKING_DIR,
+            exec_root=exec_root or self._PROJECT_ROOT,
+            working_dir=working_dir or self._WORKING_DIR,
+            **kwargs,
         )
+
+    def test_minimal(self):
+        command = ['cat', 'meow.txt']
+        action = self._make_remote_action(command=command,)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
         self.assertEqual(action.exec_root_rel, Path('..'))
@@ -862,7 +978,8 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.build_subdir, Path('build_dir'))
         self.assertEqual(
             action.launch_command,
-            [rewrapper, f'--exec_root={self._PROJECT_ROOT}', '--'] + command)
+            [str(self._rewrapper), f'--exec_root={self._PROJECT_ROOT}', '--'] +
+            command)
 
     def test_path_setup_implicit(self):
         command = ['beep', 'boop']
@@ -872,7 +989,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         with mock.patch.object(os, 'curdir', fake_cwd):
             with mock.patch.object(remote_action, 'PROJECT_ROOT', fake_root):
                 action = remote_action.RemoteAction(
-                    rewrapper='/path/to/rewrapper',
+                    rewrapper=self._rewrapper,
                     command=command,
                 )
                 self.assertEqual(action.exec_root, fake_root)
@@ -886,7 +1003,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         fake_cwd = fake_root / fake_builddir
         with mock.patch.object(os, 'curdir', fake_cwd):
             action = remote_action.RemoteAction(
-                rewrapper='/path/to/rewrapper',
+                rewrapper=self._rewrapper,
                 command=command,
                 exec_root=fake_root,
             )
@@ -896,11 +1013,8 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_inputs_outputs(self):
         command = ['cat', '../src/meow.txt']
-        action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
+        action = self._make_remote_action(
             command=command,
-            exec_root=self._PROJECT_ROOT,
-            working_dir=self._WORKING_DIR,
             inputs=_paths(['../src/meow.txt']),
             output_files=_paths(['obj/woof.txt']),
             output_dirs=_paths(['.debug']),
@@ -941,10 +1055,8 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_save_temps(self):
         command = ['echo', 'hello']
-        action = remote_action.RemoteAction(
-            rewrapper=Path('/path/to/rewrapper'),
+        action = self._make_remote_action(
             command=command,
-            exec_root=self._PROJECT_ROOT,
             save_temps=True,
         )
         self.assertEqual(action.local_command, command)
@@ -963,22 +1075,13 @@ class RemoteActionConstructionTests(unittest.TestCase):
         command = [
             'cat', '--remote-flag=--exec_strategy=racing', '../src/cow/moo.txt'
         ]
-        action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
-            command=command,
-            exec_root=self._PROJECT_ROOT,
-            working_dir=self._WORKING_DIR,
-        )
+        action = self._make_remote_action(command=command,)
         self.assertEqual(action.local_command, ['cat', '../src/cow/moo.txt'])
         self.assertEqual(action.options, ['--exec_strategy=racing'])
 
     def test_fail_no_retry(self):
         command = ['echo', 'hello']
-        action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
-            command=command,
-            exec_root=self._PROJECT_ROOT,
-        )
+        action = self._make_remote_action(command=command,)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -996,11 +1099,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_file_not_found_no_retry(self):
         command = ['echo', 'hello']
-        action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
-            command=command,
-            exec_root=self._PROJECT_ROOT,
-        )
+        action = self._make_remote_action(command=command,)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1020,11 +1119,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_retry_once_successful(self):
         command = ['echo', 'hello']
-        action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
-            command=command,
-            exec_root=self._PROJECT_ROOT,
-        )
+        action = self._make_remote_action(command=command,)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1048,11 +1143,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def test_retry_once_fails_again(self):
         command = ['echo', 'hello']
-        action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
-            command=command,
-            exec_root=self._PROJECT_ROOT,
-        )
+        action = self._make_remote_action(command=command,)
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
@@ -1077,7 +1168,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
 class RbeDiagnosticsTests(unittest.TestCase):
 
-    def _make_action(self, **kwargs):
+    def _make_remote_action(self, **kwargs):
         command = ['echo', 'hello']
         exec_root = Path('/path/to/project/root')
         working_dir = exec_root / 'build/stuff/here'
@@ -1090,7 +1181,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         )
 
     def test_analyze_conditions_positive(self):
-        action = self._make_action(diagnose_nonzero=True)
+        action = self._make_remote_action(diagnose_nonzero=True)
 
         with mock.patch.object(
                 remote_action.RemoteAction, '_run_maybe_remotely',
@@ -1108,7 +1199,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(kwargs["action_log"], action._action_log)
 
     def test_analyzing_not_requested(self):
-        action = self._make_action(diagnose_nonzero=False)
+        action = self._make_remote_action(diagnose_nonzero=False)
 
         with mock.patch.object(
                 remote_action.RemoteAction, '_run_maybe_remotely',
@@ -1124,7 +1215,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         mock_analyze.assert_not_called()
 
     def test_not_analyzing_on_success(self):
-        action = self._make_action(diagnose_nonzero=True)
+        action = self._make_remote_action(diagnose_nonzero=True)
 
         with mock.patch.object(
                 remote_action.RemoteAction, '_run_maybe_remotely',
@@ -1140,7 +1231,10 @@ class RbeDiagnosticsTests(unittest.TestCase):
         mock_analyze.assert_not_called()
 
     def test_not_analyzing_local_execution(self):
-        action = self._make_action(diagnose_nonzero=True, exec_strategy="local")
+        action = self._make_remote_action(
+            diagnose_nonzero=True,
+            exec_strategy="local",
+        )
 
         with mock.patch.object(
                 remote_action.RemoteAction, '_run_maybe_remotely',

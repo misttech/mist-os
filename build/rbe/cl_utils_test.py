@@ -24,6 +24,20 @@ class AutoEnvPrefixCommandTests(unittest.TestCase):
     def test_need_prefix(self):
         self.assertEqual(cl_utils.auto_env_prefix_command(['FOO=BAR', 'echo']), [cl_utils._ENV, 'FOO=BAR', 'echo'])
 
+class BoolGolangFlagTests(unittest.TestCase):
+    def test_true(self):
+        for v in ('1', 't', 'T', 'true', 'True', 'TRUE'):
+            self.assertTrue(cl_utils.bool_golang_flag(v))
+
+    def test_false(self):
+        for v in ('0', 'f', 'F', 'false', 'False', 'FALSE'):
+            self.assertFalse(cl_utils.bool_golang_flag(v))
+
+    def test_invalid(self):
+        for v in ('', 'maybe', 'true-ish', 'false-y'):
+            with self.assertRaises(KeyError):
+                cl_utils.bool_golang_flag(v)
+
 
 class FlattenCommaListTests(unittest.TestCase):
 

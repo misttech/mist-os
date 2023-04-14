@@ -5,9 +5,9 @@
 """Generic utilities for working with command lines and argparse.
 """
 
+import argparse
 import asyncio
 import collections
-
 import io
 import os
 import shlex
@@ -30,6 +30,22 @@ def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
         return [_ENV] + command
     return command
 
+
+def bool_golang_flag(value: str) -> bool:
+    """Interpret a Go-lang flag style boolean.
+
+    See https://pkg.go.dev/flag
+
+    This can be used as a 'type' parameter to 'ArgumentParser.add_argument()'
+    """
+    return {
+        '1': True,
+        '0': False,
+        't': True,
+        'f': False,
+        'true': True,
+        'false': False,
+    }[value.lower()]
 
 def command_quoted_str(command: Iterable[str]) -> str:
     return ' '.join(shlex.quote(t) for t in command)

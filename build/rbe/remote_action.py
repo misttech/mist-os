@@ -24,6 +24,7 @@ import sys
 
 import fuchsia
 import cl_utils
+import output_leak_scanner
 
 from pathlib import Path
 from typing import AbstractSet, Callable, Iterable, Optional, Sequence, Tuple
@@ -498,6 +499,8 @@ class RemoteAction(object):
           exec_strategy: rewrapper --exec_strategy (optional)
           exec_root: an absolute path location that is parent to all of this
             remote action's inputs and outputs.
+          working_dir: directory from which command is to be executed.
+            This must be a sub-directory of 'exec_root'.
           inputs: inputs needed for remote execution, relative to the current working dir.
           output_files: files to be fetched after remote execution, relative to the
             current working dir.
@@ -539,6 +542,11 @@ class RemoteAction(object):
             command)
         self._remote_disable = remote_args.disable
         self._options = (options or []) + remote_args.flags
+
+        # Detect some known rewrapper options
+        self._rewrapper_known_options, _ = _REWRAPPER_ARG_PARSER.parse_known_args(
+            self._options)
+
         # Inputs and outputs parameters are relative to current working dir,
         # but they will be relativized to exec_root for rewrapper.
         # It is more natural to copy input/output paths that are relative to the
@@ -646,6 +654,10 @@ class RemoteAction(object):
         return list(self._generate_options())
 
     @property
+    def canonicalize_working_dir(self) -> Optional[bool]:
+        return self._rewrapper_known_options.canonicalize_working_dir
+
+    @property
     def auto_reproxy(self) -> bool:
         return self._auto_reproxy
 
@@ -679,7 +691,14 @@ class RemoteAction(object):
 
     @property
     def build_subdir(self) -> Path:
-        """This is the relative path from the exec_root to the current working dir."""
+        """This is the relative path from the exec_root to the current working dir.
+
+        Note that this intentionally uses Path.relative_to(), which requires
+        that the working dir be a subpath of exec_root.
+
+        Raises:
+          ValueError if self.exec_root is not a parent of self.working_dir.
+        """
         return self.working_dir.relative_to(self.exec_root)
 
     @property
@@ -757,13 +776,14 @@ class RemoteAction(object):
         ]
 
     def _fsatrace_command_prefix(self, log: Path) -> Sequence[str]:
-        return cl_utils.auto_env_prefix_command([
-            'FSAT_BUF_SIZE=5000000',
-            str(self._fsatrace_path),
-            'erwdtmq',
-            str(log),
-            '--',
-        ])
+        return cl_utils.auto_env_prefix_command(
+            [
+                'FSAT_BUF_SIZE=5000000',
+                str(self._fsatrace_path),
+                'erwdtmq',
+                str(log),
+                '--',
+            ])
 
     def _generate_remote_launch_command(self) -> Iterable[str]:
         # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment
@@ -830,6 +850,21 @@ class RemoteAction(object):
           rewrapper's exit code, which is the remote execution exit code in most cases,
             but sometimes an re-client internal error code like 35 or 45.
         """
+        # When using a remote canonical_working_dir, make sure the command
+        # being launched does not reference the non-canonical local working
+        # dir explicitly.
+        if self.canonicalize_working_dir:
+            leak_status = output_leak_scanner.preflight_checks(
+                paths=self.output_files_relative_to_working_dir,
+                command=self.local_command,
+                pattern=output_leak_scanner.PathPattern(self.build_subdir),
+            )
+            if leak_status != 0:
+                msg(
+                    f"Error: Detected local output dir leaks '{self.build_subdir}' in the command.  Aborting remote execution."
+                )
+                return leak_status
+
         try:
             result = self._run_maybe_remotely()
 
@@ -839,6 +874,9 @@ class RemoteAction(object):
                 result = self._run_maybe_remotely()
 
             if result.returncode == 0:  # success, nothing to see
+                # TODO: output_leak_scanner.postflight_checks() here,
+                #   but only when requested, because inspecting output
+                #   contents takes time.
                 return result.returncode
             if not self.diagnose_nonzero:
                 return result.returncode
@@ -1016,14 +1054,19 @@ class RemoteAction(object):
 def _rewrapper_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         "Understand some rewrapper flags, so they may be used as attributes.",
-        argument_default=[],
+        argument_default=None,
     )
     parser.add_argument(
         "--exec_root",
         type=str,
-        default="",
         metavar="ABSPATH",
         help="Root directory from which all inputs/outputs are contained.",
+    )
+    parser.add_argument(
+        "--canonicalize_working_dir",
+        type=cl_utils.bool_golang_flag,
+        help=
+        "If true, remotely execute the command in a working dir location, that has the same depth as the actual build output dir relative to the exec_root.  This makes remote actions cacheable across different output dirs.",
     )
     return parser
 

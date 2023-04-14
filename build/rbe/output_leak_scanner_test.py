@@ -38,6 +38,26 @@ def _write_binary_file_contents(path: Path, contents: bytearray):
         f.write(contents)
 
 
+class PathPatternTests(unittest.TestCase):
+
+    def test_init(self):
+        path = Path('over/the/rainbow')
+        p = output_leak_scanner.PathPattern(path)
+        self.assertEqual(p.text, str(path))
+        self.assertTrue(p.re.search('somewhere/over/the/rainbow'))
+
+    def test_equal(self):
+        # different, but equivalent objects
+        self.assertEqual(
+            output_leak_scanner.PathPattern(Path('foo/bar')),
+            output_leak_scanner.PathPattern(Path('foo/bar')))
+
+    def test_not_equal(self):
+        self.assertNotEqual(
+            output_leak_scanner.PathPattern(Path('foo/bar')),
+            output_leak_scanner.PathPattern(Path('bar/foo')))
+
+
 class MainArgParserTests(unittest.TestCase):
 
     def test_empty(self):
@@ -211,6 +231,19 @@ class TokensWithBuildDirLeaks(unittest.TestCase):
         actual = list(
             output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
         self.assertEqual(actual, cases)
+
+    def test_exceptions(self):
+        build_dir = Path('build/here')
+        cases = [
+            f'-fdebug-prefix-map=/some/where/{build_dir}',
+            f'-ffile-prefix-map=/some/where/{build_dir}/foo',
+            f'-fmacro-prefix-map=/some/where/{build_dir}/bar',
+            f'-fcoverage-prefix-map=/some/where/{build_dir}',
+        ]
+        pattern = output_leak_scanner.PathPattern(build_dir)
+        actual = list(
+            output_leak_scanner.tokens_with_build_dir_leaks(cases, pattern.re))
+        self.assertEqual(actual, [])
 
 
 class PreflightChecksTests(unittest.TestCase):

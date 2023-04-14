@@ -28,8 +28,11 @@ if (is_host) {
   # dependency tree of libraries.  :(
   _fuchsia_sources = [ "fuchsia.py" ]
   _cl_utils_sources = [ "cl_utils.py" ]
-  _remote_action_sources =
-      [ "remote_action.py" ] + _fuchsia_sources + _cl_utils_sources
+  _output_leak_scanner_sources =
+      [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
+
+  _remote_action_sources = [ "remote_action.py" ] + _fuchsia_sources +
+                           _cl_utils_sources + [ "output_leak_scanner.py" ]
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =
       [ "cxx_remote_wrapper.py" ] + _cxx_sources + _remote_action_sources
@@ -37,9 +40,6 @@ if (is_host) {
   _rustc_remote_wrapper_sources =
       [ "rustc_remote_wrapper.py" ] + _rustc_sources + _remote_action_sources +
       _fuchsia_sources + _cl_utils_sources
-
-  _output_leak_scanner_sources =
-      [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
 
   python_library("cl_utils") {
     sources = _cl_utils_sources

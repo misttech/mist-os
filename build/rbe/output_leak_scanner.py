@@ -114,6 +114,10 @@ class PathPattern(object):
     def re(self) -> re.Pattern:
         return self._re
 
+    def __eq__(self, other) -> bool:
+        # equivalence of compiled re is implied
+        return self.text == other.text
+
 
 # define for easy mocking
 def _open_read_text(f) -> io.TextIOBase:
@@ -171,11 +175,28 @@ def paths_with_build_dir_leaks(paths: Iterable[Path],
             yield path
 
 
+def _c_compiler_flag_expects_abspath(tok: str) -> bool:
+    """The following gcc/clang flags remap paths, and expect an absolute
+    self-path as option arguments.  Commands will still work remotely,
+    but won't cache across build environments."""
+    flag, sep, value = tok.partition('=')
+    if sep != '=':
+        return False
+    return flag in {
+        '-fdebug-prefix-map',
+        '-ffile-prefix-map',
+        '-fmacro-prefix-map',
+        '-fcoverage-prefix-map',
+    }
+
+
 def tokens_with_build_dir_leaks(command: Iterable[str],
                                 pattern: re.Pattern) -> Iterable[str]:
     # TODO: lex --KEY=VALUE tokens into parts and match against the parts
     for token in command:
         if pattern.search(token):
+            if _c_compiler_flag_expects_abspath(token):
+                continue
             yield token
 
 
