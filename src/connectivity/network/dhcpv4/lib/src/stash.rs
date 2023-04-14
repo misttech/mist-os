@@ -248,7 +248,7 @@ impl Stash {
 mod tests {
     use super::*;
     use crate::configuration::{LeaseLength, ManagedAddresses};
-    use net_declare::std::ip_v4;
+    use net_declare::{net::prefix_length_v4, std::ip_v4};
 
     /// Creates a new stash instance with a randomized identifier to prevent test flakes.
     ///
@@ -333,7 +333,7 @@ mod tests {
         let accessor_client = stash.proxy.clone();
 
         let opts = vec![
-            DhcpOption::SubnetMask(ip_v4!("255.255.255.0")),
+            DhcpOption::SubnetMask(prefix_length_v4!(24)),
             DhcpOption::DomainNameServer([ip_v4!("1.2.3.4"), ip_v4!("4.3.2.1")].into()),
         ];
         let () = stash.store_options(&opts).expect("failed to store options in stash");
@@ -420,7 +420,7 @@ mod tests {
         let accessor = stash.proxy.clone();
 
         let opts = vec![
-            DhcpOption::SubnetMask(ip_v4!("255.255.255.0")),
+            DhcpOption::SubnetMask(prefix_length_v4!(24)),
             DhcpOption::DomainNameServer([ip_v4!("1.2.3.4"), ip_v4!("4.3.2.1")].into()),
         ];
         let serialized_opts = serde_json::to_string(&opts).expect("serialization failed");

@@ -634,7 +634,7 @@ mod test {
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::{join, Future};
-    use net_declare::{net_mac, std_ip_v4};
+    use net_declare::{net::prefix_length_v4, net_mac, std_ip_v4};
     use std::cell::RefCell;
     use std::rc::Rc;
     use test_case::test_case;
@@ -668,7 +668,7 @@ mod test {
 
     fn test_parameter_values() -> [dhcp_protocol::DhcpOption; 3] {
         [
-            dhcp_protocol::DhcpOption::SubnetMask(std_ip_v4!("255.255.255.0")),
+            dhcp_protocol::DhcpOption::SubnetMask(prefix_length_v4!(24)),
             dhcp_protocol::DhcpOption::Router([SERVER_IP].into()),
             dhcp_protocol::DhcpOption::DomainNameServer([SERVER_IP, std_ip_v4!("8.8.8.8")].into()),
         ]
@@ -1041,7 +1041,7 @@ mod test {
                         // remembering them from the DHCPOFFER.
                         renewal_time_value: Some(20),
                         rebinding_time_value: Some(30),
-                        subnet_mask: std_ip_v4!("255.255.255.0"),
+                        subnet_mask: prefix_length_v4!(24),
                     },
                     &dhcpv4::server::options_repo(test_parameter_values()),
                 )

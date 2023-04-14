@@ -24,7 +24,10 @@ use std::convert::TryFrom;
 #[cfg(target_os = "fuchsia")]
 use tracing::info;
 
-use net_types::ethernet::Mac as MacAddr;
+use net_types::{
+    ethernet::Mac as MacAddr,
+    ip::{Ipv4, PrefixLength},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeSet, HashMap},
@@ -798,7 +801,7 @@ pub struct OfferOptions {
     pub lease_length_config: crate::configuration::LeaseLength,
     pub renewal_time_value: Option<u32>,
     pub rebinding_time_value: Option<u32>,
-    pub subnet_mask: Ipv4Addr,
+    pub subnet_mask: PrefixLength<Ipv4>,
 }
 
 /// Builds a DHCPOFFER in response to the given DHCPDISCOVER using the provided
@@ -856,7 +859,7 @@ pub fn build_offer(
 pub fn get_requested_options(
     client_opts: &[DhcpOption],
     options_repo: &HashMap<OptionCode, DhcpOption>,
-    subnet_mask: Ipv4Addr,
+    subnet_mask: PrefixLength<Ipv4>,
 ) -> Vec<DhcpOption> {
     // TODO(https://fxbug.dev/104860): We should consider always supplying the
     // SubnetMask for all DHCPDISCOVER and DHCPREQUEST requests. ISC
@@ -1530,9 +1533,13 @@ pub mod tests {
     use anyhow::Error;
     use datastore::{ActionRecordingDataStore, DataStoreAction};
     use dhcp_protocol::{AtLeast, AtMostBytes};
+    use fidl_fuchsia_net_ext::IntoExt as _;
     use fuchsia_zircon::Status;
-    use net_declare::{fidl_ip_v4, std_ip_v4};
-    use net_types::ethernet::Mac as MacAddr;
+    use net_declare::{fidl_ip_v4, net::prefix_length_v4, std_ip_v4};
+    use net_types::{
+        ethernet::Mac as MacAddr,
+        ip::{Ipv4, PrefixLength},
+    };
     use rand::Rng;
     use std::{
         cell::RefCell,
@@ -1871,10 +1878,10 @@ pub mod tests {
         msg
     }
 
-    const DEFAULT_SUBNET_MASK: Ipv4Addr = std_ip_v4!("255.255.255.0");
+    const DEFAULT_PREFIX_LENGTH: PrefixLength<Ipv4> = prefix_length_v4!(24);
 
     fn add_server_options<DS: DataStore>(msg: &mut Message, server: &Server<DS>) {
-        msg.options.push(DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK));
+        msg.options.push(DhcpOption::SubnetMask(DEFAULT_PREFIX_LENGTH));
         if let Some(routers) = match server.options_repo.get(&OptionCode::Router) {
             Some(DhcpOption::Router(v)) => Some(v),
             _ => None,
@@ -2109,7 +2116,7 @@ pub mod tests {
                 DhcpOption::RebindingTimeValue(
                     (server.params.lease_length.default_seconds * 3) / 4,
                 ),
-                DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK),
+                DhcpOption::SubnetMask(DEFAULT_PREFIX_LENGTH),
                 DhcpOption::Router(router),
                 DhcpOption::DomainNameServer(dns_server),
             ],
@@ -2551,7 +2558,7 @@ pub mod tests {
                         DhcpOption::RebindingTimeValue(
                             (server.params.lease_length.default_seconds * 3) / 4,
                         ),
-                        DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK),
+                        DhcpOption::SubnetMask(DEFAULT_PREFIX_LENGTH),
                         DhcpOption::Router(router),
                         DhcpOption::DomainNameServer(dns_server),
                     ],
@@ -2771,7 +2778,7 @@ pub mod tests {
                         DhcpOption::RebindingTimeValue(
                             (server.params.lease_length.default_seconds * 3) / 4,
                         ),
-                        DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK),
+                        DhcpOption::SubnetMask(DEFAULT_PREFIX_LENGTH),
                         DhcpOption::Router(router),
                         DhcpOption::DomainNameServer(dns_server),
                     ],
@@ -2984,7 +2991,7 @@ pub mod tests {
                         DhcpOption::RebindingTimeValue(
                             (server.params.lease_length.default_seconds * 3) / 4,
                         ),
-                        DhcpOption::SubnetMask(DEFAULT_SUBNET_MASK),
+                        DhcpOption::SubnetMask(DEFAULT_PREFIX_LENGTH),
                         DhcpOption::Router(router),
                         DhcpOption::DomainNameServer(dns_server),
                     ],
@@ -3842,10 +3849,9 @@ pub mod tests {
 
     #[test]
     fn server_dispatcher_set_option_saves_to_stash() {
-        let mask = [255, 255, 255, 0];
-        let fidl_mask = fidl_fuchsia_net_dhcp::Option_::SubnetMask(fidl_fuchsia_net::Ipv4Address {
-            addr: mask,
-        });
+        let prefix_length = DEFAULT_PREFIX_LENGTH;
+        let fidl_mask =
+            fidl_fuchsia_net_dhcp::Option_::SubnetMask(prefix_length.get_mask().into_ext());
         let params = default_server_params().expect("failed to get default serve parameters");
         let mut server: Server = super::Server {
             records: HashMap::new(),
@@ -3860,7 +3866,7 @@ pub mod tests {
             server.store.expect("missing store").actions().as_slice(),
             [
                 DataStoreAction::StoreOptions { opts },
-            ] if *opts == vec![DhcpOption::SubnetMask(Ipv4Addr::from(mask))]
+            ] if *opts == vec![DhcpOption::SubnetMask(prefix_length)]
         );
     }
 
@@ -3948,7 +3954,9 @@ pub mod tests {
     #[test]
     fn server_dispatcher_list_options_returns_set_options() {
         let mut server = new_test_minimal_server();
-        let mask = || fidl_fuchsia_net_dhcp::Option_::SubnetMask(fidl_ip_v4!("255.255.255.0"));
+        let mask = || {
+            fidl_fuchsia_net_dhcp::Option_::SubnetMask(DEFAULT_PREFIX_LENGTH.get_mask().into_ext())
+        };
         let hostname = || fidl_fuchsia_net_dhcp::Option_::HostName(String::from("testhostname"));
         assert_matches::assert_matches!(
             server.options_repo.insert(
@@ -4314,7 +4322,7 @@ pub mod tests {
             requested_lease_length.map(DhcpOption::IpAddressLeaseTime).into_iter(),
         );
         let offered_ip = random_ipv4_generator();
-        let subnet_mask = std_ip_v4!("255.255.255.0");
+        let subnet_mask = DEFAULT_PREFIX_LENGTH;
         let server_ip = random_ipv4_generator();
         const DEFAULT_LEASE_LENGTH_SECONDS: u32 = 100;
         const MAX_LEASE_LENGTH_SECONDS: u32 = 200;

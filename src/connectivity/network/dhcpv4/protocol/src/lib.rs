@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use net_types::ethernet::Mac as MacAddr;
+use net_types::{
+    ethernet::Mac as MacAddr,
+    ip::{Ipv4, NotSubnetMaskError, PrefixLength},
+};
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -583,6 +586,31 @@ impl fmt::Display for OptionCode {
     }
 }
 
+mod prefix_length {
+    use std::net::Ipv4Addr;
+
+    use net_types::ip::{Ipv4, NotSubnetMaskError, PrefixLength};
+    use serde::{
+        de::{Deserialize as _, Error},
+        Serialize as _,
+    };
+
+    pub(super) fn serialize<S: serde::Serializer>(
+        prefix_length: &PrefixLength<Ipv4>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        Ipv4Addr::serialize(&Ipv4Addr::from(prefix_length.get_mask()), serializer)
+    }
+
+    pub(super) fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<PrefixLength<Ipv4>, D::Error> {
+        let addr = Ipv4Addr::deserialize(deserializer)?;
+        PrefixLength::try_from_subnet_mask(addr.into())
+            .map_err(|NotSubnetMaskError| D::Error::custom("not a valid subnet mask"))
+    }
+}
+
 /// A DHCP Option as defined in RFC 2132.
 /// DHCP Options provide a mechanism for transmitting configuration parameters
 /// between the Server and Client and vice-versa. DHCP Options also include
@@ -593,7 +621,8 @@ impl fmt::Display for OptionCode {
 pub enum DhcpOption {
     Pad(),
     End(),
-    SubnetMask(Ipv4Addr),
+    #[serde(with = "prefix_length")]
+    SubnetMask(PrefixLength<Ipv4>),
     TimeOffset(i32),
     // Router must have at least 1 element and has an 8-bit length field:
     // https://datatracker.ietf.org/doc/html/rfc2132#section-3.5
@@ -807,7 +836,14 @@ impl DhcpOption {
         match code {
             OptionCode::Pad => Ok(DhcpOption::Pad()),
             OptionCode::End => Ok(DhcpOption::End()),
-            OptionCode::SubnetMask => Ok(DhcpOption::SubnetMask(bytes_to_addr(val)?)),
+            OptionCode::SubnetMask => {
+                let addr = bytes_to_addr(val)?;
+                Ok(DhcpOption::SubnetMask(
+                    PrefixLength::try_from_subnet_mask(addr.into()).map_err(
+                        |NotSubnetMaskError| ProtocolError::InvalidOptionValue(code, val.to_vec()),
+                    )?,
+                ))
+            }
             OptionCode::TimeOffset => {
                 let offset = get_byte_array::<4>(val).map(i32::from_be_bytes)?;
                 Ok(DhcpOption::TimeOffset(offset))
@@ -1087,7 +1123,7 @@ impl DhcpOption {
         match self {
             DhcpOption::Pad() => buf.push(code.into()),
             DhcpOption::End() => buf.push(code.into()),
-            DhcpOption::SubnetMask(v) => serialize_address(code, v, buf),
+            DhcpOption::SubnetMask(v) => serialize_address(code, v.get_mask().into(), buf),
             DhcpOption::TimeOffset(v) => {
                 let size = std::mem::size_of::<i32>();
                 buf.push(code.into());
@@ -1416,9 +1452,9 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
         match self {
             DhcpOption::Pad() => Err(Self::IntoError::InvalidFidlOption(self)),
             DhcpOption::End() => Err(Self::IntoError::InvalidFidlOption(self)),
-            DhcpOption::SubnetMask(v) => {
-                Ok(fidl_fuchsia_net_dhcp::Option_::SubnetMask(v.into_fidl()))
-            }
+            DhcpOption::SubnetMask(v) => Ok(fidl_fuchsia_net_dhcp::Option_::SubnetMask(
+                Ipv4Addr::from(v.get_mask()).into_fidl(),
+            )),
             DhcpOption::TimeOffset(v) => Ok(fidl_fuchsia_net_dhcp::Option_::TimeOffset(v)),
             DhcpOption::Router(v) => {
                 Ok(fidl_fuchsia_net_dhcp::Option_::Router(Vec::from(v).into_fidl()))
@@ -1616,7 +1652,17 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
     fn try_from_fidl(v: fidl_fuchsia_net_dhcp::Option_) -> Result<Self, Self::FromError> {
         match v {
             fidl_fuchsia_net_dhcp::Option_::SubnetMask(v) => {
-                Ok(DhcpOption::SubnetMask(Ipv4Addr::from_fidl(v)))
+                let addr = Ipv4Addr::from_fidl(v);
+                Ok(DhcpOption::SubnetMask(
+                    PrefixLength::try_from_subnet_mask(addr.into()).map_err(
+                        |NotSubnetMaskError| {
+                            ProtocolError::InvalidOptionValue(
+                                OptionCode::SubnetMask,
+                                addr.octets().to_vec(),
+                            )
+                        },
+                    )?,
+                ))
             }
             fidl_fuchsia_net_dhcp::Option_::TimeOffset(v) => Ok(DhcpOption::TimeOffset(v)),
             fidl_fuchsia_net_dhcp::Option_::Router(v) => Ok(DhcpOption::Router({
@@ -2311,13 +2357,13 @@ fn trunc_string_to_n_and_push(s: &str, n: usize, buffer: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod tests {
-    use net_declare::std::ip_v4;
+    use net_declare::{net::prefix_length_v4, std::ip_v4};
     use rand::Rng as _;
     use std::{net::Ipv4Addr, str::FromStr};
     use test_case::test_case;
     use {super::identifier::ClientIdentifier, super::*};
 
-    const DEFAULT_SUBNET_MASK: Ipv4Addr = ip_v4!("255.255.255.0");
+    const DEFAULT_SUBNET_MASK: PrefixLength<Ipv4> = prefix_length_v4!(24);
 
     fn new_test_msg() -> Message {
         Message {
@@ -2392,7 +2438,7 @@ mod tests {
         buf.resize(old_len + unused_bytes, 0u8);
         buf.extend_from_slice(&MAGIC_COOKIE);
         buf.extend_from_slice(b"\x01\x04");
-        buf.extend_from_slice(&DEFAULT_SUBNET_MASK.octets()[..]);
+        buf.extend_from_slice(&DEFAULT_SUBNET_MASK.get_mask().ipv4_bytes()[..]);
         buf.extend_from_slice(b"\x00");
         buf.extend_from_slice(b"\x00");
         buf.extend_from_slice(b"\x36\x04");
@@ -2672,6 +2718,16 @@ mod tests {
         let val = (min_size - 1).to_be_bytes().to_vec();
         let option = DhcpOption::from_raw_parts(code, &val);
         assert_eq!(Err(ProtocolError::InvalidOptionValue(code, val)), option);
+    }
+
+    #[test]
+    fn rejects_invalid_subnet_mask() {
+        let mask = vec![255, 254, 255, 0];
+
+        assert_eq!(
+            DhcpOption::from_raw_parts(OptionCode::SubnetMask, &mask),
+            Err(ProtocolError::InvalidOptionValue(OptionCode::SubnetMask, mask))
+        )
     }
 
     #[test]

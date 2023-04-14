@@ -11,6 +11,7 @@ use anyhow::Context;
 #[cfg(target_os = "fuchsia")]
 use std::convert::Infallible as Never;
 
+use net_types::ip::{Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -388,9 +389,16 @@ impl FidlCompatible<fidl_fuchsia_net::Ipv4Address> for SubnetMask {
     }
 }
 
-impl Into<Ipv4Addr> for SubnetMask {
-    fn into(self) -> Ipv4Addr {
-        Ipv4Addr::from(self.to_u32())
+impl From<SubnetMask> for Ipv4Addr {
+    fn from(value: SubnetMask) -> Self {
+        Self::from(value.to_u32())
+    }
+}
+
+impl From<SubnetMask> for PrefixLength<Ipv4> {
+    fn from(value: SubnetMask) -> Self {
+        PrefixLength::try_from_subnet_mask(Ipv4Addr::from(value).into())
+            .expect("known to be valid subnet mask")
     }
 }
 
