@@ -199,7 +199,7 @@
     - description: 'fuchsia.input.*'
 
 - name: 'Identity'
-  api_primary: 'jsankey@google.com'
+  api_primary: ''
   api_secondary: ''
   description: |
     The set of APIs used to manage user accounts, authentication, and identity
@@ -422,8 +422,8 @@
     - description: 'View/scene connection signals in fuchsia.ui.gfx.Event'
 
 - name: 'Virtualization'
-  api_primary: 'abdulla@google.com'
-  api_secondary: 'tjdetwiler@google.com'
+  api_primary: 'tjdetwiler@google.com'
+  api_secondary: ''
   description: |
     <p>Virtualization is the combination of:</p>
     <ul>
