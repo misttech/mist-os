@@ -159,8 +159,8 @@ enum iwl_nvm_info_general_flags {
 struct iwl_nvm_get_info_general {
   __le32 flags;
   __le16 nvm_version;
-  uint8_t board_type;
-  uint8_t n_hw_addrs;
+	u8 board_type;
+	u8 n_hw_addrs;
 } __packed; /* REGULATORY_NVM_GET_INFO_GENERAL_S_VER_2 */
 
 /**
@@ -207,7 +207,8 @@ struct iwl_nvm_get_info_phy {
   __le32 rx_chains;
 } __packed; /* REGULATORY_NVM_GET_INFO_PHY_SKU_SECTION_S_VER_1 */
 
-#define IWL_NUM_CHANNELS (51)
+#define IWL_NUM_CHANNELS_V1	51
+#define IWL_NUM_CHANNELS	110
 
 /**
  * struct iwl_nvm_get_info_regulatory - regulatory information
@@ -215,11 +216,37 @@ struct iwl_nvm_get_info_phy {
  * @channel_profile: regulatory data of this channel
  * @reserved: reserved
  */
-struct iwl_nvm_get_info_regulatory {
+struct iwl_nvm_get_info_regulatory_v1 {
   __le32 lar_enabled;
-  __le16 channel_profile[IWL_NUM_CHANNELS];
+	__le16 channel_profile[IWL_NUM_CHANNELS_V1];
   __le16 reserved;
 } __packed; /* REGULATORY_NVM_GET_INFO_REGULATORY_S_VER_1 */
+
+/**
+ * struct iwl_nvm_get_info_regulatory - regulatory information
+ * @lar_enabled: is LAR enabled
+ * @n_channels: number of valid channels in the array
+ * @channel_profile: regulatory data of this channel
+ */
+struct iwl_nvm_get_info_regulatory {
+	__le32 lar_enabled;
+	__le32 n_channels;
+	__le32 channel_profile[IWL_NUM_CHANNELS];
+} __packed; /* REGULATORY_NVM_GET_INFO_REGULATORY_S_VER_2 */
+
+/**
+ * struct iwl_nvm_get_info_rsp_v3 - response to get NVM data
+ * @general: general NVM data
+ * @mac_sku: data relating to MAC sku
+ * @phy_sku: data relating to PHY sku
+ * @regulatory: regulatory data
+ */
+struct iwl_nvm_get_info_rsp_v3 {
+	struct iwl_nvm_get_info_general general;
+	struct iwl_nvm_get_info_sku mac_sku;
+	struct iwl_nvm_get_info_phy phy_sku;
+	struct iwl_nvm_get_info_regulatory_v1 regulatory;
+} __packed; /* REGULATORY_NVM_GET_INFO_RSP_API_S_VER_3 */
 
 /**
  * struct iwl_nvm_get_info_rsp - response to get NVM data
@@ -233,7 +260,7 @@ struct iwl_nvm_get_info_rsp {
   struct iwl_nvm_get_info_sku mac_sku;
   struct iwl_nvm_get_info_phy phy_sku;
   struct iwl_nvm_get_info_regulatory regulatory;
-} __packed; /* REGULATORY_NVM_GET_INFO_RSP_API_S_VER_3 */
+} __packed; /* REGULATORY_NVM_GET_INFO_RSP_API_S_VER_4 */
 
 /**
  * struct iwl_nvm_access_complete_cmd - NVM_ACCESS commands are completed
@@ -257,10 +284,10 @@ struct iwl_nvm_access_complete_cmd {
  */
 struct iwl_mcc_update_cmd {
   __le16 mcc;
-  uint8_t source_id;
-  uint8_t reserved;
+	u8 source_id;
+	u8 reserved;
   __le32 key;
-  uint8_t reserved2[20];
+	u8 reserved2[20];
 } __packed; /* LAR_UPDATE_MCC_CMD_API_S_VER_2 */
 
 /**
@@ -293,12 +320,12 @@ enum iwl_geo_information {
 struct iwl_mcc_update_resp_v3 {
   __le32 status;
   __le16 mcc;
-  uint8_t cap;
-  uint8_t source_id;
+	u8 cap;
+	u8 source_id;
   __le16 time;
   __le16 geo_info;
   __le32 n_channels;
-  __le32 channels[0];
+	__le32 channels[];
 } __packed; /* LAR_UPDATE_MCC_CMD_RESP_S_VER_3 */
 
 /**
@@ -324,10 +351,10 @@ struct iwl_mcc_update_resp {
   __le16 cap;
   __le16 time;
   __le16 geo_info;
-  uint8_t source_id;
-  uint8_t reserved[3];
+	u8 source_id;
+	u8 reserved[3];
   __le32 n_channels;
-  __le32 channels[0];
+	__le32 channels[];
 } __packed; /* LAR_UPDATE_MCC_CMD_RESP_S_VER_4 */
 
 /**
@@ -347,8 +374,8 @@ struct iwl_mcc_update_resp {
  */
 struct iwl_mcc_chub_notif {
   __le16 mcc;
-  uint8_t source_id;
-  uint8_t reserved1;
+	u8 source_id;
+	u8 reserved1;
 } __packed; /* LAR_MCC_NOTIFY_S */
 
 enum iwl_mcc_update_status {
@@ -377,5 +404,184 @@ enum iwl_mcc_source {
   MCC_SOURCE_GET_CURRENT = 0x10,
   MCC_SOURCE_GETTING_MCC_TEST_MODE = 0x11,
 };
+
+#define IWL_TAS_BLOCK_LIST_MAX 16
+/**
+ * struct iwl_tas_config_cmd_v2 - configures the TAS
+ * @block_list_size: size of relevant field in block_list_array
+ * @block_list_array: list of countries where TAS must be disabled
+ */
+struct iwl_tas_config_cmd_v2 {
+	__le32 block_list_size;
+	__le32 block_list_array[IWL_TAS_BLOCK_LIST_MAX];
+} __packed; /* TAS_CONFIG_CMD_API_S_VER_2 */
+
+/**
+ * struct iwl_tas_config_cmd_v3 - configures the TAS
+ * @block_list_size: size of relevant field in block_list_array
+ * @block_list_array: list of countries where TAS must be disabled
+ * @override_tas_iec: indicates whether to override default value of IEC regulatory
+ * @enable_tas_iec: in case override_tas_iec is set -
+ *	indicates whether IEC regulatory is enabled or disabled
+ */
+struct iwl_tas_config_cmd_v3 {
+	__le32 block_list_size;
+	__le32 block_list_array[IWL_TAS_BLOCK_LIST_MAX];
+	__le16 override_tas_iec;
+	__le16 enable_tas_iec;
+} __packed; /* TAS_CONFIG_CMD_API_S_VER_3 */
+
+/**
+ * struct iwl_tas_config_cmd_v3 - configures the TAS
+ * @block_list_size: size of relevant field in block_list_array
+ * @block_list_array: list of countries where TAS must be disabled
+ * @override_tas_iec: indicates whether to override default value of IEC regulatory
+ * @enable_tas_iec: in case override_tas_iec is set -
+ *	indicates whether IEC regulatory is enabled or disabled
+ * @usa_tas_uhb_allowed: if set, allow TAS UHB in the USA
+ * @reserved: reserved
+*/
+struct iwl_tas_config_cmd_v4 {
+	__le32 block_list_size;
+	__le32 block_list_array[IWL_TAS_BLOCK_LIST_MAX];
+	u8 override_tas_iec;
+	u8 enable_tas_iec;
+	u8 usa_tas_uhb_allowed;
+	u8 reserved;
+} __packed; /* TAS_CONFIG_CMD_API_S_VER_4 */
+
+union iwl_tas_config_cmd {
+	struct iwl_tas_config_cmd_v2 v2;
+	struct iwl_tas_config_cmd_v3 v3;
+	struct iwl_tas_config_cmd_v4 v4;
+};
+/**
+ * enum iwl_lari_configs - bit masks for the various LARI config operations
+ * @LARI_CONFIG_DISABLE_11AC_UKRAINE_MSK: disable 11ac in ukraine
+ * @LARI_CONFIG_CHANGE_ETSI_TO_PASSIVE_MSK: ETSI 5.8GHz SRD passive scan
+ * @LARI_CONFIG_CHANGE_ETSI_TO_DISABLED_MSK: ETSI 5.8GHz SRD disabled
+ * @LARI_CONFIG_ENABLE_5G2_IN_INDONESIA_MSK: enable 5.15/5.35GHz bands in
+ * 	Indonesia
+ */
+enum iwl_lari_config_masks {
+	LARI_CONFIG_DISABLE_11AC_UKRAINE_MSK		= BIT(0),
+	LARI_CONFIG_CHANGE_ETSI_TO_PASSIVE_MSK		= BIT(1),
+	LARI_CONFIG_CHANGE_ETSI_TO_DISABLED_MSK		= BIT(2),
+	LARI_CONFIG_ENABLE_5G2_IN_INDONESIA_MSK		= BIT(3),
+};
+
+#define IWL_11AX_UKRAINE_MASK 3
+#define IWL_11AX_UKRAINE_SHIFT 8
+
+/**
+ * struct iwl_lari_config_change_cmd_v1 - change LARI configuration
+ * @config_bitmap: bit map of the config commands. each bit will trigger a
+ * different predefined FW config operation
+ */
+struct iwl_lari_config_change_cmd_v1 {
+	__le32 config_bitmap;
+} __packed; /* LARI_CHANGE_CONF_CMD_S_VER_1 */
+
+/**
+ * struct iwl_lari_config_change_cmd_v2 - change LARI configuration
+ * @config_bitmap: bit map of the config commands. each bit will trigger a
+ * different predefined FW config operation
+ * @oem_uhb_allow_bitmap: bitmap of UHB enabled MCC sets
+ */
+struct iwl_lari_config_change_cmd_v2 {
+	__le32 config_bitmap;
+	__le32 oem_uhb_allow_bitmap;
+} __packed; /* LARI_CHANGE_CONF_CMD_S_VER_2 */
+
+/**
+ * struct iwl_lari_config_change_cmd_v3 - change LARI configuration
+ * @config_bitmap: bit map of the config commands. each bit will trigger a
+ * different predefined FW config operation
+ * @oem_uhb_allow_bitmap: bitmap of UHB enabled MCC sets
+ * @oem_11ax_allow_bitmap: bitmap of 11ax allowed MCCs.
+ * For each supported country, a pair of regulatory override bit and 11ax mode exist
+ * in the bit field.
+ */
+struct iwl_lari_config_change_cmd_v3 {
+	__le32 config_bitmap;
+	__le32 oem_uhb_allow_bitmap;
+	__le32 oem_11ax_allow_bitmap;
+} __packed; /* LARI_CHANGE_CONF_CMD_S_VER_3 */
+
+/**
+ * struct iwl_lari_config_change_cmd_v4 - change LARI configuration
+ * @config_bitmap: Bitmap of the config commands. Each bit will trigger a
+ *     different predefined FW config operation.
+ * @oem_uhb_allow_bitmap: Bitmap of UHB enabled MCC sets.
+ * @oem_11ax_allow_bitmap: Bitmap of 11ax allowed MCCs. There are two bits
+ *     per country, one to indicate whether to override and the other to
+ *     indicate the value to use.
+ * @oem_unii4_allow_bitmap: Bitmap of unii4 allowed MCCs.There are two bits
+ *     per country, one to indicate whether to override and the other to
+ *     indicate allow/disallow unii4 channels.
+ */
+struct iwl_lari_config_change_cmd_v4 {
+	__le32 config_bitmap;
+	__le32 oem_uhb_allow_bitmap;
+	__le32 oem_11ax_allow_bitmap;
+	__le32 oem_unii4_allow_bitmap;
+} __packed; /* LARI_CHANGE_CONF_CMD_S_VER_4 */
+
+/**
+ * struct iwl_lari_config_change_cmd_v5 - change LARI configuration
+ * @config_bitmap: Bitmap of the config commands. Each bit will trigger a
+ *     different predefined FW config operation.
+ * @oem_uhb_allow_bitmap: Bitmap of UHB enabled MCC sets.
+ * @oem_11ax_allow_bitmap: Bitmap of 11ax allowed MCCs. There are two bits
+ *     per country, one to indicate whether to override and the other to
+ *     indicate the value to use.
+ * @oem_unii4_allow_bitmap: Bitmap of unii4 allowed MCCs.There are two bits
+ *     per country, one to indicate whether to override and the other to
+ *     indicate allow/disallow unii4 channels.
+ * @chan_state_active_bitmap: Bitmap for overriding channel state to active.
+ *     Each bit represents a country or region to activate, according to the BIOS
+ *     definitions.
+ */
+struct iwl_lari_config_change_cmd_v5 {
+	__le32 config_bitmap;
+	__le32 oem_uhb_allow_bitmap;
+	__le32 oem_11ax_allow_bitmap;
+	__le32 oem_unii4_allow_bitmap;
+	__le32 chan_state_active_bitmap;
+} __packed; /* LARI_CHANGE_CONF_CMD_S_VER_5 */
+
+/**
+ * struct iwl_lari_config_change_cmd_v6 - change LARI configuration
+ * @config_bitmap: Bitmap of the config commands. Each bit will trigger a
+ *     different predefined FW config operation.
+ * @oem_uhb_allow_bitmap: Bitmap of UHB enabled MCC sets.
+ * @oem_11ax_allow_bitmap: Bitmap of 11ax allowed MCCs. There are two bits
+ *     per country, one to indicate whether to override and the other to
+ *     indicate the value to use.
+ * @oem_unii4_allow_bitmap: Bitmap of unii4 allowed MCCs.There are two bits
+ *     per country, one to indicate whether to override and the other to
+ *     indicate allow/disallow unii4 channels.
+ * @chan_state_active_bitmap: Bitmap for overriding channel state to active.
+ *     Each bit represents a country or region to activate, according to the BIOS
+ *     definitions.
+ * @force_disable_channels_bitmap: Bitmap of disabled bands/channels.
+ *     Each bit represents a set of channels in a specific band that should be disabled
+ */
+struct iwl_lari_config_change_cmd_v6 {
+	__le32 config_bitmap;
+	__le32 oem_uhb_allow_bitmap;
+	__le32 oem_11ax_allow_bitmap;
+	__le32 oem_unii4_allow_bitmap;
+	__le32 chan_state_active_bitmap;
+	__le32 force_disable_channels_bitmap;
+} __packed; /* LARI_CHANGE_CONF_CMD_S_VER_6 */
+
+/**
+ * struct iwl_pnvm_init_complete_ntfy - PNVM initialization complete
+ * @status: PNVM image loading status
+ */
+struct iwl_pnvm_init_complete_ntfy {
+	__le32 status;
+} __packed; /* PNVM_INIT_COMPLETE_NTFY_S_VER_1 */
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_API_NVM_REG_H_
