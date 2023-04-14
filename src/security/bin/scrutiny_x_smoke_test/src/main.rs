@@ -9,10 +9,12 @@ use anyhow::Result;
 use argh::FromArgs;
 use scrutiny_x::Blob;
 use scrutiny_x::DataSource;
+use scrutiny_x::Package;
 use scrutiny_x::ProductBundleBuilder;
 use scrutiny_x::Scrutiny;
 use scrutiny_x::ScrutinyBuilder;
 use scrutiny_x::SystemSlot;
+use std::fmt::Debug;
 use std::fs::read_dir;
 use std::fs::write;
 use std::fs::File;
@@ -69,6 +71,7 @@ fn run_smoke_test(args: Args) -> Result<()> {
 
     output_data_sources(&scrutiny);
     output_blobs(&scrutiny);
+    output_packages(&scrutiny);
 
     if let (Some(depfile), Some(stamp)) = (depfile, stamp) {
         let depfile = File::create(depfile).context("creating depfile")?;
@@ -123,6 +126,23 @@ fn output_data_source<P: AsRef<Path>>(
 fn output_blobs<S: Scrutiny>(scrutiny: &S) {
     for blob in scrutiny.blobs() {
         debug!("Blob: {:?}", blob.hash());
+    }
+}
+
+#[tracing::instrument(level = "trace", skip_all)]
+fn output_packages<S: Scrutiny>(scrutiny: &S) {
+    for package in scrutiny.packages() {
+        output_package(&package);
+    }
+}
+
+fn output_package<P: Package>(package: &P) {
+    debug!("Package: {:?}", package.hash());
+    for (path, meta_blob) in package.meta_blobs() {
+        debug!("  Meta blob at {:?}: {:?}", path.as_ref(), meta_blob.hash());
+    }
+    for (path, content_blob) in package.content_blobs() {
+        debug!("  Content blob at {:?}: {:?}", path.as_ref(), content_blob.hash());
     }
 }
 
