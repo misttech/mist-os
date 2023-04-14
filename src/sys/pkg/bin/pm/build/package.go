@@ -302,6 +302,10 @@ func readABIRevision(manifest *Manifest) (*uint64, error) {
 		return nil, nil
 	}
 
+	return ReadABIRevisionFromFile(abiPath)
+}
+
+func ReadABIRevisionFromFile(abiPath string) (*uint64, error) {
 	f, err := os.Open(abiPath)
 	if err != nil {
 		return nil, err

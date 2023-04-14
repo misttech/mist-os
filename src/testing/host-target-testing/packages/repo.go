@@ -5,6 +5,7 @@
 package packages
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,7 +14,9 @@ import (
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/repo"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -255,4 +258,108 @@ func (r *Repository) EditPackage(ctx context.Context, srcPackagePath string, dst
 	}
 
 	return pkg, nil
+}
+
+// Extracts the update package into a temporary directory, and injects the
+// specified vbmeta property files into the vbmeta.
+func (r *Repository) EditUpdatePackageWithVBMetaProperties(
+	ctx context.Context,
+	avbTool *avb.AVBTool,
+	srcUpdatePackage string,
+	dstUpdatePackage string,
+	repoName string,
+	vbmetaPropertyFiles map[string]string,
+	editFunc func(path string) error) (Package, error) {
+	return r.EditPackage(ctx, srcUpdatePackage, dstUpdatePackage, func(tempDir string) error {
+
+		if err := editFunc(tempDir); err != nil {
+			return err
+		}
+
+		packagesJsonPath := filepath.Join(tempDir, "packages.json")
+		err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
+			src, err := os.Open(packagesJsonPath)
+			if err != nil {
+				return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
+			}
+
+			if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
+				return fmt.Errorf("failed to rehost package.json: %w", err)
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
+		}
+
+		logger.Infof(ctx, "host name in %q set to %q", packagesJsonPath, repoName)
+
+		srcVbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
+
+		if _, err := os.Stat(srcVbmetaPath); err != nil {
+			return fmt.Errorf("vbmeta %q does not exist in repo: %w", srcVbmetaPath, err)
+		}
+
+		err = util.AtomicallyWriteFile(srcVbmetaPath, 0600, func(f *os.File) error {
+			if err := avbTool.MakeVBMetaImage(ctx, f.Name(), srcVbmetaPath, vbmetaPropertyFiles); err != nil {
+				return fmt.Errorf("failed to update vbmeta: %w", err)
+			}
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to atomically overwrite %q: %w", srcVbmetaPath, err)
+		}
+
+		return nil
+	})
+}
+
+// Extract the update package `srcUpdatePackage` into a temporary directory,
+// then build and publish it to the repository as the `dstUpdatePackage` name.
+// It will automatically rewrite the `packages.json` file to use `repoName`
+// path, to avoid collisions with the `fuchsia.com` repository name.
+func (r *Repository) EditUpdatePackage(
+	ctx context.Context,
+	avbTool *avb.AVBTool,
+	zbiTool *zbi.ZBITool,
+	srcUpdatePackage string,
+	dstUpdatePackage string,
+	repoName string,
+	editFunc func(path string) error) (Package, error) {
+
+	vbmetaPropertyFiles := map[string]string{}
+	return r.EditUpdatePackageWithVBMetaProperties(
+		ctx,
+		avbTool,
+		srcUpdatePackage,
+		dstUpdatePackage,
+		repoName,
+		vbmetaPropertyFiles,
+		func(path string) error {
+			return editFunc(path)
+		})
+}
+
+func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
+	ctx context.Context,
+	avbTool *avb.AVBTool,
+	zbiTool *zbi.ZBITool,
+	systemImageMerkle string,
+	srcUpdatePackagePath string,
+	dstUpdatePackagePath string,
+	editFunc func(path string) error) (Package, error) {
+	return r.EditUpdatePackage(ctx,
+		avbTool, zbiTool,
+		srcUpdatePackagePath,
+		dstUpdatePackagePath,
+		"testrepository",
+		func(tempDir string) error {
+			if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(ctx, systemImageMerkle, tempDir); err != nil {
+				return err
+			}
+			return editFunc(tempDir)
+		})
 }

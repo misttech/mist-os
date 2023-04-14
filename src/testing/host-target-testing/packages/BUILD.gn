@@ -9,7 +9,9 @@ if (is_host) {
   go_library("packages") {
     testonly = true
     deps = [
+      "../avb",
       "../util",
+      "../zbi",
       "//src/lib/versioning/version-history/go:version-history",
       "//src/sys/pkg/bin/pm/build",
       "//src/sys/pkg/bin/pm/pkg",

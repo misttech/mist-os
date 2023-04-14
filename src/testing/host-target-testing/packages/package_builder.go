@@ -185,6 +185,20 @@ func (p *PackageBuilder) Publish(ctx context.Context, pkgRepo *Repository) (stri
 		}
 	}
 
+	manifest, err := cfg.Manifest()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create mainfest: %w", err)
+	}
+
+	abiPath, ok := manifest.Meta()["meta/fuchsia.abi/abi-revision"]
+	if ok {
+		abiRevision, err := build.ReadABIRevisionFromFile(abiPath)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get abi revision: %w", err)
+		}
+		cfg.PkgABIRevision = *abiRevision
+	}
+
 	// Save changes to config.
 	if err := build.Update(cfg); err != nil {
 		return "", "", fmt.Errorf("failed to update config: %w", err)
