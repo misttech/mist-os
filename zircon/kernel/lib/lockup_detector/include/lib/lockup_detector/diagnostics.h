@@ -8,9 +8,11 @@
 #define ZIRCON_KERNEL_LIB_LOCKUP_DETECTOR_INCLUDE_LIB_LOCKUP_DETECTOR_DIAGNOSTICS_H_
 
 #include <inttypes.h>
+#include <stdio.h>
 
 #include <arch/defines.h>
 #include <arch/vm.h>
+#include <kernel/cpu.h>
 
 #if defined(__aarch64__)
 #include <arch/arm64/dap.h>

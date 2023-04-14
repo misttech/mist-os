@@ -9,24 +9,39 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <zircon/compiler.h>
 
-#include <vm/vm.h>
+#include <arch/kernel_aspace.h>
 
-inline bool is_kernel_address(vaddr_t va) {
+constexpr bool is_kernel_address(vaddr_t va) {
   return (va >= (vaddr_t)KERNEL_ASPACE_BASE &&
           va - (vaddr_t)KERNEL_ASPACE_BASE < (vaddr_t)KERNEL_ASPACE_SIZE);
 }
 
-inline constexpr uint8_t kHighVABit = 55;
-inline constexpr uint64_t kUserBitMask = UINT64_C(1) << kHighVABit;
+constexpr uint8_t kRiscv64VaddrBits = 39;
+// Canonical addresses (to use an x86 term) are addresses where the top bits
+// from 63 down to (kRiscv64VaddrBits-1) are all either 0 or 1.
+// This means user area is [ 0 ... (1<<(kRiscv64VAddrBits-1)) )
+constexpr uint64_t kRiscv64CanonicalAddressMask = ~((1UL << (kRiscv64VaddrBits - 1)) - 1UL);
+static_assert(kRiscv64CanonicalAddressMask == 0xffffffc000000000);
 
-// This address refers to userspace if bit 55 is zero.
-inline bool is_user_accessible(vaddr_t va) { return (va & kUserBitMask) == 0; }
+// Assert that the kernel aspace #defines lines up with this notion, since it'll
+// start at the first available address in the kernel half of the address space and
+// extend to the highest 64bit value.
+static_assert(kRiscv64CanonicalAddressMask == KERNEL_ASPACE_BASE);
+static_assert(~kRiscv64CanonicalAddressMask == KERNEL_ASPACE_SIZE - 1);
+
+constexpr bool is_user_accessible(vaddr_t va) {
+  // This address refers to userspace if it is in the lower half of the
+  // canonical addresses.  IOW - if all of the bits in the canonical address
+  // mask are zero.
+  return (va & kRiscv64CanonicalAddressMask) == 0;
+}
 
 // Check that the continuous range of addresses in [va, va+len) are all
 // accessible to the user.
-inline bool is_user_accessible_range(vaddr_t va, size_t len) {
-  vaddr_t end;
+constexpr bool is_user_accessible_range(vaddr_t va, size_t len) {
+  vaddr_t end = 0;
 
   // Check for normal overflow which implies the range is not continuous.
   if (add_overflow(va, len, &end)) {
@@ -38,23 +53,13 @@ inline bool is_user_accessible_range(vaddr_t va, size_t len) {
     return false;
   }
 
-  // Cover the corner case where the start and end are accessible
-  // (bit 55 == 0), but there could be a value within the range that could have
-  // bit 55 == 1. In this case, the difference between start and end must be
-  // at least 2^55.
-  if (len >= kUserBitMask) {
-    return false;
-  }
-
   return true;
 }
 
 // Userspace threads can only set an entry point to userspace addresses, or
 // the null pointer (for testing a thread that will always fail).
-inline bool arch_is_valid_user_pc(vaddr_t pc) {
+constexpr bool arch_is_valid_user_pc(vaddr_t pc) {
   return (pc == 0) || (is_user_accessible(pc) && !is_kernel_address(pc));
 }
-
-inline uintptr_t arch_detag_ptr(uintptr_t ptr) { return ptr; }
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_VM_H_
