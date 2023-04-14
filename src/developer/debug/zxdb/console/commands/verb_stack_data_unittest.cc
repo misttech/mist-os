@@ -25,7 +25,7 @@ class MemoryMockRemoteAPI : public MockRemoteAPI {
   }
 };
 
-class VerbsMemoryTest : public RemoteAPITest {
+class VerbsStackData : public RemoteAPITest {
  public:
   std::unique_ptr<RemoteAPI> GetRemoteAPIImpl() {
     auto remote_api = std::make_unique<MemoryMockRemoteAPI>();
@@ -41,18 +41,17 @@ class VerbsMemoryTest : public RemoteAPITest {
 
 }  // namespace
 
-// This tests that the stack command is hooked up. The register and memory decoding are tested by
-// the analyze memory tests.
-//
-// TODO(brettw) convert to a ConsoleTest to remove some boilerplate.
-TEST_F(VerbsMemoryTest, Stack) {
+// This tests that the stack-data command is hooked up. The register and memory decoding are tested
+// by the analyze memory tests.
+TEST_F(VerbsStackData, Stack) {
   MockConsole console(&session());
 
   // Error case with nothing running.
   console.ProcessInputLine("stack-data");
   auto event = console.GetOutputEvent();
   ASSERT_EQ(MockConsole::OutputEvent::Type::kOutput, event.type);
-  ASSERT_EQ("\"stack-data\" requires a thread but there is no current thread.", event.output.AsString());
+  ASSERT_EQ("\"stack-data\" requires a thread but there is no current thread.",
+            event.output.AsString());
 
   // Inject a fake running process.
   constexpr uint64_t kProcessKoid = 1234;

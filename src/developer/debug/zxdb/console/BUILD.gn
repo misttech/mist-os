@@ -242,6 +242,7 @@ source_set("tests") {
     "commands/verb_print_unittest.cc",
     "commands/verb_ps_unittest.cc",
     "commands/verb_quit_unittest.cc",
+    "commands/verb_stack_data_unittest.cc",
     "commands/verb_stack_usage_unittest.cc",
     "commands/verb_status_unittest.cc",
     "commands/verb_steps_unittest.cc",
@@ -273,7 +274,6 @@ source_set("tests") {
     "output_buffer_unittest.cc",
     "string_formatters_unittest.cc",
     "string_util_unittest.cc",
-    "verbs_memory_unittest.cc",
     "verbs_settings_unittest.cc",
   ]
 
