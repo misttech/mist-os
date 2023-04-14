@@ -126,6 +126,8 @@ struct CommonIncomingMessageFields {
     message: Option<String>,
     #[builder(setter(strip_option), default)]
     client_identifier: Option<AtLeast<2, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>>>,
+    #[builder(setter(custom))]
+    seen_option_codes: OptionCodeSet,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -158,6 +160,13 @@ impl CommonIncomingMessageFieldsBuilder {
         parameters.push(option)
     }
 
+    fn add_seen_option_and_return_whether_newly_added(
+        &mut self,
+        option_code: dhcp_protocol::OptionCode,
+    ) -> bool {
+        self.seen_option_codes.get_or_insert_with(Default::default).insert(option_code)
+    }
+
     fn server_identifier(&mut self, addr: Ipv4Addr) -> Result<(), CommonIncomingMessageError> {
         self.server_identifier = Some(Some(
             net_types::SpecifiedAddr::new(net_types::ip::Ipv4Addr::from(addr))
@@ -182,29 +191,81 @@ impl CommonIncomingMessageFieldsBuilder {
     }
 }
 
-/// Represents a set of OptionCodes as an array of booleans.
-pub(crate) struct OptionCodeSet {
-    inner: [bool; dhcp_protocol::U8_MAX_AS_USIZE],
+/// Represents a `Map<OptionCode, T>` as an array of booleans.
+#[derive(Clone, PartialEq, Debug)]
+pub struct OptionCodeMap<T> {
+    inner: [Option<T>; dhcp_protocol::U8_MAX_AS_USIZE],
 }
 
-impl OptionCodeSet {
-    pub(crate) fn new() -> Self {
-        OptionCodeSet { inner: [false; dhcp_protocol::U8_MAX_AS_USIZE] }
+impl<T: Copy> OptionCodeMap<T> {
+    /// Constructs an empty `OptionCodeMap`.
+    pub fn new() -> Self {
+        OptionCodeMap { inner: [None; dhcp_protocol::U8_MAX_AS_USIZE] }
     }
 
-    /// Inserts `option_code` into the set, returning whether it was newly added.
-    pub(crate) fn insert(&mut self, option_code: dhcp_protocol::OptionCode) -> bool {
-        let option_code_index = usize::from(u8::from(option_code));
-        if self.inner[option_code_index] {
-            return false;
-        }
-
-        self.inner[option_code_index] = true;
-        true
+    /// Puts `(option_code, value)` into the map, returning the previously-associated
+    /// value if is one.
+    pub fn put(&mut self, option_code: dhcp_protocol::OptionCode, value: T) -> Option<T> {
+        std::mem::replace(&mut self.inner[usize::from(u8::from(option_code))], Some(value))
     }
 
-    pub(crate) fn contains(&self, option_code: dhcp_protocol::OptionCode) -> bool {
+    /// Gets the value associated with `option_code` from the map, if there is one.
+    pub fn get(&self, option_code: dhcp_protocol::OptionCode) -> Option<T> {
         self.inner[usize::from(u8::from(option_code))]
+    }
+
+    /// Checks if `option_code` is present in the map.
+    pub fn contains(&self, option_code: dhcp_protocol::OptionCode) -> bool {
+        self.get(option_code).is_some()
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (dhcp_protocol::OptionCode, T)> + '_ {
+        self.inner.iter().enumerate().filter_map(|(index, value)| {
+            let option_code = u8::try_from(index)
+                .ok()
+                .and_then(|i| dhcp_protocol::OptionCode::try_from(i).ok())?;
+            let value = *value.as_ref()?;
+            Some((option_code, value))
+        })
+    }
+
+    pub(crate) fn iter_keys(&self) -> impl Iterator<Item = dhcp_protocol::OptionCode> + '_ {
+        self.iter().map(|(key, _)| key)
+    }
+}
+
+impl<V: Copy> FromIterator<(dhcp_protocol::OptionCode, V)> for OptionCodeMap<V> {
+    fn from_iter<T: IntoIterator<Item = (dhcp_protocol::OptionCode, V)>>(iter: T) -> Self {
+        let mut map = Self::new();
+        for (option_code, value) in iter {
+            let _: Option<_> = map.put(option_code, value);
+        }
+        map
+    }
+}
+
+impl<T: Copy> Default for OptionCodeMap<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OptionCodeMap<OptionRequested> {
+    fn iter_required(&self) -> impl Iterator<Item = dhcp_protocol::OptionCode> + '_ {
+        self.iter().filter_map(|(key, val)| match val {
+            OptionRequested::Required => Some(key),
+            OptionRequested::Optional => None,
+        })
+    }
+}
+
+/// Represents a set of OptionCodes as an array of booleans.
+pub type OptionCodeSet = OptionCodeMap<()>;
+
+impl OptionCodeSet {
+    /// Inserts `option_code` into the set, returning whether it was newly added.
+    pub fn insert(&mut self, option_code: dhcp_protocol::OptionCode) -> bool {
+        self.put(option_code, ()).is_none()
     }
 }
 
@@ -218,45 +279,18 @@ impl FromIterator<dhcp_protocol::OptionCode> for OptionCodeSet {
     }
 }
 
-pub(crate) struct OptionCodeSetIterator {
-    index: usize,
-    set: [bool; dhcp_protocol::U8_MAX_AS_USIZE],
+/// Denotes whether a requested option is required or optional.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum OptionRequested {
+    /// The option is required; incoming DHCPOFFERs and DHCPACKs lacking this
+    /// option will be discarded.
+    Required,
+    /// The option is optional.
+    Optional,
 }
 
-impl Iterator for OptionCodeSetIterator {
-    type Item = dhcp_protocol::OptionCode;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let Self { index, set } = self;
-        match (*index..set.len()).find_map(|index| {
-            if !set[index] {
-                return None;
-            }
-            dhcp_protocol::OptionCode::try_from(
-                u8::try_from(index).expect("index known to be at most u8::MAX"),
-            )
-            .ok()
-            .map(|option| (index, option))
-        }) {
-            None => None,
-            Some((found_index, option)) => {
-                *index = found_index + 1;
-                Some(option)
-            }
-        }
-    }
-}
-
-impl IntoIterator for OptionCodeSet {
-    type IntoIter = OptionCodeSetIterator;
-    type Item = dhcp_protocol::OptionCode;
-    fn into_iter(self) -> Self::IntoIter {
-        OptionCodeSetIterator { index: 0, set: self.inner }
-    }
-}
-
-fn collect_common_fields(
-    requested_parameters: &OptionCodeSet,
+fn collect_common_fields<T: Copy>(
+    requested_parameters: &OptionCodeMap<T>,
     dhcp_protocol::Message {
         op,
         xid: _,
@@ -284,10 +318,8 @@ fn collect_common_fields(
     let mut builder = CommonIncomingMessageFieldsBuilder::default();
     builder.yiaddr(yiaddr);
 
-    let mut seen_options = OptionCodeSet::new();
-
     for option in options {
-        let newly_seen = seen_options.insert(option.code());
+        let newly_seen = builder.add_seen_option_and_return_whether_newly_added(option.code());
         if !newly_seen {
             return Err(CommonIncomingMessageError::DuplicateOption(option.code()));
         }
@@ -434,11 +466,14 @@ pub(crate) enum SelectingIncomingMessageError {
     NotDhcpOffer(dhcp_protocol::MessageType),
     #[error("yiaddr was the unspecified address")]
     UnspecifiedYiaddr,
+    #[error("missing required option: {0:?}")]
+    MissingRequiredOption(dhcp_protocol::OptionCode),
 }
 
 /// Extracts the fields from a DHCP message incoming during Selecting state that
 /// should be used during Requesting state.
 pub(crate) fn fields_to_retain_from_selecting(
+    requested_parameters: &OptionCodeMap<OptionRequested>,
     message: dhcp_protocol::Message,
 ) -> Result<FieldsFromOfferToUseInRequest, SelectingIncomingMessageError> {
     let CommonIncomingMessageFields {
@@ -449,9 +484,10 @@ pub(crate) fn fields_to_retain_from_selecting(
         renewal_time_value_secs: _,
         rebinding_time_value_secs: _,
         parameters: _,
+        seen_option_codes,
         message: _,
         client_identifier: _,
-    } = collect_common_fields(&OptionCodeSet::new(), message)?;
+    } = collect_common_fields(requested_parameters, message)?;
 
     match message_type {
         dhcp_protocol::MessageType::DHCPOFFER => (),
@@ -465,6 +501,12 @@ pub(crate) fn fields_to_retain_from_selecting(
             return Err(SelectingIncomingMessageError::NotDhcpOffer(message_type))
         }
     };
+
+    if let Some(missing_option_code) =
+        requested_parameters.iter_required().find(|code| !seen_option_codes.contains(*code))
+    {
+        return Err(SelectingIncomingMessageError::MissingRequiredOption(missing_option_code));
+    }
 
     Ok(FieldsFromOfferToUseInRequest {
         server_identifier: server_identifier
@@ -502,6 +544,8 @@ pub(crate) enum RequestingIncomingMessageError {
     NoLeaseTime,
     #[error("no server identifier")]
     NoServerIdentifier,
+    #[error("missing required option: {0:?}")]
+    MissingRequiredOption(dhcp_protocol::OptionCode),
 }
 
 #[derive(Debug, PartialEq)]
@@ -532,7 +576,7 @@ pub(crate) struct FieldsToRetainFromNak {
 }
 
 pub(crate) fn fields_to_retain_from_requesting(
-    requested_parameters: &OptionCodeSet,
+    requested_parameters: &OptionCodeMap<OptionRequested>,
     message: dhcp_protocol::Message,
 ) -> Result<IncomingMessageDuringRequesting, RequestingIncomingMessageError> {
     let CommonIncomingMessageFields {
@@ -543,12 +587,23 @@ pub(crate) fn fields_to_retain_from_requesting(
         renewal_time_value_secs,
         rebinding_time_value_secs,
         parameters,
+        seen_option_codes,
         message,
         client_identifier,
     } = collect_common_fields(requested_parameters, message)?;
 
     match message_type {
         dhcp_protocol::MessageType::DHCPACK => {
+            // Only enforce required parameters for ACKs, since NAKs aren't
+            // expected to include any configuration at all.
+
+            if let Some(missing_option_code) =
+                requested_parameters.iter_required().find(|code| !seen_option_codes.contains(*code))
+            {
+                return Err(RequestingIncomingMessageError::MissingRequiredOption(
+                    missing_option_code,
+                ));
+            }
             Ok(IncomingMessageDuringRequesting::Ack(FieldsToRetainFromAck {
                 yiaddr: yiaddr.ok_or(RequestingIncomingMessageError::UnspecifiedYiaddr)?,
                 server_identifier,
@@ -583,7 +638,8 @@ mod test {
     use super::*;
     use assert_matches::assert_matches;
     use dhcp_protocol::{CLIENT_PORT, SERVER_PORT};
-    use net_declare::{net_ip_v4, net_mac, std_ip_v4};
+    use net_declare::{net::prefix_length_v4, net_ip_v4, net_mac, std_ip_v4};
+    use net_types::ip::{Ipv4, PrefixLength};
     use std::net::Ipv4Addr;
     use test_case::test_case;
 
@@ -703,11 +759,13 @@ mod test {
         yiaddr: Ipv4Addr,
         message_type: Option<dhcp_protocol::MessageType>,
         server_identifier: Option<Ipv4Addr>,
+        subnet_mask: Option<PrefixLength<Ipv4>>,
         lease_length_secs: Option<u32>,
         include_duplicate_option: bool,
     }
 
     const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
+    const TEST_SUBNET_MASK: PrefixLength<Ipv4> = prefix_length_v4!(24);
     const LEASE_LENGTH_SECS: u32 = 100;
     const YIADDR: Ipv4Addr = std_ip_v4!("192.168.1.5");
 
@@ -716,6 +774,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Ok(FieldsFromOfferToUseInRequest {
@@ -732,6 +791,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: None,
         include_duplicate_option: false,
     } => Ok(FieldsFromOfferToUseInRequest {
@@ -748,6 +808,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(Ipv4Addr::UNSPECIFIED),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Err(SelectingIncomingMessageError::CommonError(
@@ -757,7 +818,19 @@ mod test {
         op: dhcp_protocol::OpCode::BOOTREPLY,
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
+        server_identifier: Some(SERVER_IP),
+        subnet_mask: None,
+        lease_length_secs: Some(LEASE_LENGTH_SECS),
+        include_duplicate_option: false,
+    } => Err(SelectingIncomingMessageError::MissingRequiredOption(
+        dhcp_protocol::OptionCode::SubnetMask,
+    )); "rejects offer without required subnet mask")]
+    #[test_case(VaryingOfferFields {
+        op: dhcp_protocol::OpCode::BOOTREPLY,
+        yiaddr: YIADDR,
+        message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: None,
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Err(SelectingIncomingMessageError::NoServerIdentifier); "rejects offer with no server identifier option")]
@@ -766,6 +839,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Err(SelectingIncomingMessageError::UnspecifiedYiaddr) ; "rejects offer with unspecified yiaddr")]
@@ -774,6 +848,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Err(SelectingIncomingMessageError::CommonError(
@@ -784,6 +859,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Err(
@@ -794,6 +870,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: None,
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: false,
     } => Err(SelectingIncomingMessageError::CommonError(
@@ -804,6 +881,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         include_duplicate_option: true,
     } => Err(SelectingIncomingMessageError::CommonError(
@@ -822,6 +900,7 @@ mod test {
             yiaddr,
             message_type,
             server_identifier,
+            subnet_mask,
             lease_length_secs,
             include_duplicate_option,
         } = offer_fields;
@@ -842,6 +921,7 @@ mod test {
                 .map(DhcpOption::DhcpMessageType)
                 .into_iter()
                 .chain(server_identifier.map(DhcpOption::ServerIdentifier))
+                .chain(subnet_mask.map(DhcpOption::SubnetMask))
                 .chain(lease_length_secs.map(DhcpOption::IpAddressLeaseTime))
                 .chain(
                     include_duplicate_option
@@ -855,7 +935,11 @@ mod test {
                 .collect(),
         };
 
-        fields(message)
+        fields(
+            &std::iter::once((dhcp_protocol::OptionCode::SubnetMask, OptionRequested::Required))
+                .collect(),
+            message,
+        )
     }
 
     struct VaryingReplyToRequestFields {
@@ -863,6 +947,7 @@ mod test {
         yiaddr: Ipv4Addr,
         message_type: Option<dhcp_protocol::MessageType>,
         server_identifier: Option<Ipv4Addr>,
+        subnet_mask: Option<PrefixLength<Ipv4>>,
         lease_length_secs: Option<u32>,
         renewal_time_secs: Option<u32>,
         rebinding_time_secs: Option<u32>,
@@ -881,6 +966,7 @@ mod test {
             yiaddr: YIADDR,
             message_type: Some(dhcp_protocol::MessageType::DHCPACK),
             server_identifier: Some(SERVER_IP),
+            subnet_mask: Some(TEST_SUBNET_MASK),
             lease_length_secs: Some(LEASE_LENGTH_SECS),
             renewal_time_secs: None,
             rebinding_time_secs: None,
@@ -896,7 +982,10 @@ mod test {
                     .expect("should be specified"),
             ),
             ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
-            parameters: vec![dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())],
+            parameters: vec![
+                dhcp_protocol::DhcpOption::SubnetMask(TEST_SUBNET_MASK),
+                dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())
+            ],
             renewal_time_value_secs: None,
             rebinding_time_value_secs: None,
         })); "accepts good DHCPACK")]
@@ -905,6 +994,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: None,
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -916,7 +1006,10 @@ mod test {
             .expect("should be specified"),
         server_identifier: None,
         ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
-        parameters: vec![dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())],
+        parameters: vec![
+            dhcp_protocol::DhcpOption::SubnetMask(TEST_SUBNET_MASK),
+            dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())
+        ],
         renewal_time_value_secs: None,
         rebinding_time_value_secs: None,
     })); "accepts DHCPACK with no server identifier")]
@@ -925,6 +1018,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         renewal_time_secs: Some(RENEWAL_TIME_SECS),
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
@@ -940,7 +1034,10 @@ mod test {
                 .expect("should be specified"),
         ),
         ip_address_lease_time_secs: nonzero_ext::nonzero!(LEASE_LENGTH_SECS),
-        parameters: vec![dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())],
+        parameters: vec![
+            dhcp_protocol::DhcpOption::SubnetMask(TEST_SUBNET_MASK),
+            dhcp_protocol::DhcpOption::DomainName(DOMAIN_NAME.to_owned())
+        ],
         renewal_time_value_secs: Some(RENEWAL_TIME_SECS),
         rebinding_time_value_secs: Some(REBINDING_TIME_SECS),
     })); "accepts DHCPACK with renew and rebind times")]
@@ -949,6 +1046,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: None,
         lease_length_secs: None,
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -966,17 +1064,34 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: None,
         renewal_time_secs: Some(RENEWAL_TIME_SECS),
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
         message: None,
         include_duplicate_option: false,
     } =>  Err(RequestingIncomingMessageError::NoLeaseTime); "rejects DHCPACK with no lease time")]
+    #[test_case(
+        VaryingReplyToRequestFields {
+            op: dhcp_protocol::OpCode::BOOTREPLY,
+            yiaddr: YIADDR,
+            message_type: Some(dhcp_protocol::MessageType::DHCPACK),
+            server_identifier: Some(SERVER_IP),
+            subnet_mask: None,
+            lease_length_secs: Some(LEASE_LENGTH_SECS),
+            renewal_time_secs: None,
+            rebinding_time_secs: None,
+            message: None,
+            include_duplicate_option: false,
+        } => Err(RequestingIncomingMessageError::MissingRequiredOption(
+            dhcp_protocol::OptionCode::SubnetMask
+        )); "rejects DHCPACK without required subnet mask")]
     #[test_case(VaryingReplyToRequestFields {
         op: dhcp_protocol::OpCode::BOOTREPLY,
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: Some(Ipv4Addr::UNSPECIFIED),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         renewal_time_secs: Some(RENEWAL_TIME_SECS),
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
@@ -990,6 +1105,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         renewal_time_secs: Some(RENEWAL_TIME_SECS),
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
@@ -1001,6 +1117,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
         server_identifier: Some(Ipv4Addr::UNSPECIFIED),
+        subnet_mask: None,
         lease_length_secs: None,
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -1014,6 +1131,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
         server_identifier: None,
+        subnet_mask: None,
         lease_length_secs: None,
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -1025,6 +1143,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPNAK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: None,
         lease_length_secs: None,
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -1038,6 +1157,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: Some(dhcp_protocol::MessageType::DHCPOFFER),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: None,
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -1051,6 +1171,7 @@ mod test {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         message_type: None,
         server_identifier: Some(SERVER_IP),
+        subnet_mask: None,
         lease_length_secs: None,
         renewal_time_secs: None,
         rebinding_time_secs: None,
@@ -1064,6 +1185,7 @@ mod test {
         yiaddr: YIADDR,
         message_type: Some(dhcp_protocol::MessageType::DHCPACK),
         server_identifier: Some(SERVER_IP),
+        subnet_mask: Some(TEST_SUBNET_MASK),
         lease_length_secs: Some(LEASE_LENGTH_SECS),
         renewal_time_secs: Some(RENEWAL_TIME_SECS),
         rebinding_time_secs: Some(REBINDING_TIME_SECS),
@@ -1085,6 +1207,7 @@ mod test {
             yiaddr,
             message_type,
             server_identifier,
+            subnet_mask,
             lease_length_secs,
             renewal_time_secs,
             rebinding_time_secs,
@@ -1104,10 +1227,10 @@ mod test {
             chaddr: net_mac!("01:02:03:04:05:06"),
             sname: String::new(),
             file: String::new(),
-            options: message_type
-                .map(DhcpOption::DhcpMessageType)
-                .into_iter()
+            options: std::iter::empty()
+                .chain(message_type.map(DhcpOption::DhcpMessageType))
                 .chain(server_identifier.map(DhcpOption::ServerIdentifier))
+                .chain(subnet_mask.map(DhcpOption::SubnetMask))
                 .chain(lease_length_secs.map(DhcpOption::IpAddressLeaseTime))
                 .chain(renewal_time_secs.map(DhcpOption::RenewalTimeValue))
                 .chain(rebinding_time_secs.map(DhcpOption::RebindingTimeValue))
@@ -1127,6 +1250,14 @@ mod test {
                 .collect(),
         };
 
-        fields(&std::iter::once(dhcp_protocol::OptionCode::DomainName).collect(), message)
+        fields(
+            &[
+                (dhcp_protocol::OptionCode::SubnetMask, OptionRequested::Required),
+                (dhcp_protocol::OptionCode::DomainName, OptionRequested::Optional),
+            ]
+            .into_iter()
+            .collect(),
+            message,
+        )
     }
 }

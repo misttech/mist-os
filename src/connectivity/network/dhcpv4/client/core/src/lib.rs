@@ -12,4 +12,6 @@ pub mod client;
 /// Defines abstractions for platform dependencies such as sockets and time.
 pub mod deps;
 
-mod parse;
+/// Defines types and utilities for parsing DHCP messages received by the
+/// client and serializing DHCP messages sent by the client.
+pub mod parse;

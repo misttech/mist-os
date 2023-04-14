@@ -5,14 +5,15 @@
 //! Implements the DHCP client state machine.
 
 use crate::deps::{self, DatagramInfo, Instant as _};
+use crate::parse::{OptionCodeMap, OptionRequested};
 use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
 use futures::{
     channel::mpsc, pin_mut, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _,
 };
-use net_types::Witness as _;
+use net_types::{ethernet::Mac, Witness as _};
 use rand::Rng as _;
-use std::{net::Ipv4Addr, num::NonZeroU32};
+use std::{net::Ipv4Addr, num::NonZeroU32, time::Duration};
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
 #[derive(thiserror::Error, Debug)]
@@ -114,15 +115,13 @@ impl<I> Default for State<I> {
 #[derive(Clone)]
 pub struct ClientConfig {
     /// The hardware address of the interface on which the DHCP client is run.
-    pub client_hardware_address: net_types::ethernet::Mac,
+    pub client_hardware_address: Mac,
     /// If set, a unique-on-the-local-network string to be used to identify this
     /// device while negotiating with DHCP servers.
     pub client_identifier:
         Option<AtLeast<2, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>>>,
-    /// A list of parameters to request from DHCP servers.
-    pub parameter_request_list: Option<
-        AtLeast<1, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<dhcp_protocol::OptionCode>>>,
-    >,
+    /// Parameters to request from DHCP servers.
+    pub requested_parameters: OptionCodeMap<OptionRequested>,
     /// If set, the preferred IP address lease time in seconds.
     pub preferred_lease_time_secs: Option<NonZeroU32>,
     /// If set, the IP address to request from DHCP servers.
@@ -177,7 +176,7 @@ impl Init {
 
 async fn send_with_retransmits<T: Clone + Send>(
     time: &impl deps::Clock,
-    retransmit_schedule: impl Iterator<Item = std::time::Duration>,
+    retransmit_schedule: impl Iterator<Item = Duration>,
     message: &[u8],
     socket: &impl deps::Socket<T>,
     dest: T,
@@ -195,7 +194,7 @@ async fn send_with_retransmits<T: Clone + Send>(
 
 fn default_retransmit_schedule(
     rng: &mut (impl rand::Rng + ?Sized),
-) -> impl Iterator<Item = std::time::Duration> + '_ {
+) -> impl Iterator<Item = Duration> + '_ {
     const MILLISECONDS_PER_SECOND: i32 = 1000;
     [4i32, 8, 16, 32]
         .into_iter()
@@ -213,7 +212,7 @@ fn default_retransmit_schedule(
         .map(|(base_seconds, jitter_millis)| {
             let millis = u64::try_from(base_seconds * MILLISECONDS_PER_SECOND + jitter_millis)
                 .expect("retransmit wait is never negative");
-            std::time::Duration::from_millis(millis)
+            Duration::from_millis(millis)
         })
 }
 
@@ -250,7 +249,7 @@ fn build_outgoing_message_while_not_assigned_address(
     ClientConfig {
         client_hardware_address,
         client_identifier,
-        parameter_request_list,
+        requested_parameters,
         preferred_lease_time_secs,
         requested_ip_address,
     }: &ClientConfig,
@@ -292,7 +291,20 @@ fn build_outgoing_message_while_not_assigned_address(
                 .map(|n| DhcpOption::IpAddressLeaseTime(n.get())),
             offered_ip_address.or(*requested_ip_address).map(DhcpOption::RequestedIpAddress),
             // TODO(https://fxbug.dev/122602): Avoid cloning
-            parameter_request_list.clone().map(DhcpOption::ParameterRequestList),
+            {
+                match AtLeast::try_from(requested_parameters.iter_keys().collect::<Vec<_>>()) {
+                    Ok(parameters) => Some(DhcpOption::ParameterRequestList(parameters)),
+                    Err((
+                        dhcp_protocol::SizeConstrainedError::SizeConstraintViolated,
+                        parameters,
+                    )) => {
+                        // This can only have happened because parameters is empty.
+                        assert_eq!(parameters, Vec::new());
+                        // Thus, we must omit the ParameterRequestList option.
+                        None
+                    }
+                }
+            },
             client_identifier.clone().map(DhcpOption::ClientIdentifier),
             server_identifier.map(DhcpOption::ServerIdentifier),
         ]
@@ -356,6 +368,14 @@ impl<I: deps::Instant> Selecting<I> {
         let Selecting { discover_options, start_time } = self;
         let message = build_discover(client_config, discover_options);
 
+        let ClientConfig {
+            client_hardware_address: _,
+            client_identifier: _,
+            requested_parameters,
+            preferred_lease_time_secs: _,
+            requested_ip_address: _,
+        } = client_config;
+
         let message = crate::parse::serialize_dhcp_message_to_ip_packet(
             message,
             Ipv4Addr::UNSPECIFIED, // src_ip
@@ -369,7 +389,7 @@ impl<I: deps::Instant> Selecting<I> {
             default_retransmit_schedule(rng.get_rng()),
             message.as_ref(),
             &socket,
-            /* dest= */ net_types::ethernet::Mac::BROADCAST,
+            /* dest= */ Mac::BROADCAST,
         )
         .fuse();
 
@@ -377,12 +397,12 @@ impl<I: deps::Instant> Selecting<I> {
         let offer_fields_stream = recv_stream(&socket, &mut recv_buf, |packet, src_addr| {
             // We don't care about the src addr of incoming offers, because we
             // identify DHCP servers via the Server Identifier option.
-            let _: net_types::ethernet::Mac = src_addr;
+            let _: Mac = src_addr;
             let message = crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT)
                 .context("error while parsing DHCP message from IP packet")?;
             validate_message(discover_options, client_config, &message)
                 .context("invalid DHCP message")?;
-            crate::parse::fields_to_retain_from_selecting(message)
+            crate::parse::fields_to_retain_from_selecting(requested_parameters, message)
                 .context("error while retrieving fields to use in DHCPREQUEST from DHCP message")
         })
         .try_filter_map(|parse_result| {
@@ -426,7 +446,7 @@ enum ValidateMessageError {
     #[error("xid {actual} doesn't match expected xid {expected}")]
     WrongXid { expected: u32, actual: u32 },
     #[error("chaddr {actual} doesn't match expected chaddr {expected}")]
-    WrongChaddr { expected: net_types::ethernet::Mac, actual: net_types::ethernet::Mac },
+    WrongChaddr { expected: Mac, actual: Mac },
 }
 
 fn validate_message(
@@ -434,7 +454,7 @@ fn validate_message(
     ClientConfig {
         client_hardware_address: my_chaddr,
         client_identifier: _,
-        parameter_request_list: _,
+        requested_parameters: _,
         preferred_lease_time_secs: _,
         requested_ip_address: _,
     }: &ClientConfig,
@@ -521,40 +541,31 @@ impl<I: deps::Instant> Requesting<I> {
             default_retransmit_schedule(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
             message.as_ref(),
             &socket,
-            net_types::ethernet::Mac::BROADCAST,
+            Mac::BROADCAST,
         )
         .fuse();
+
+        let ClientConfig {
+            client_hardware_address: _,
+            client_identifier: _,
+            requested_parameters,
+            preferred_lease_time_secs: _,
+            requested_ip_address: _,
+        } = client_config;
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
 
         let ack_or_nak_stream = recv_stream(&socket, &mut recv_buf, |packet, src_addr| {
             // We don't care about the src addr of incoming messages, because we
             // identify DHCP servers via the Server Identifier option.
-            let _: net_types::ethernet::Mac = src_addr;
+            let _: Mac = src_addr;
             let message = crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT)
                 .context("error while parsing DHCP message from IP packet")?;
             validate_message(discover_options, client_config, &message)
                 .context("invalid DHCP message")?;
 
-            let ClientConfig {
-                client_hardware_address: _,
-                client_identifier: _,
-                parameter_request_list,
-                preferred_lease_time_secs: _,
-                requested_ip_address: _,
-            } = client_config;
-
-            crate::parse::fields_to_retain_from_requesting(
-                &parameter_request_list
-                    .as_ref()
-                    .map(|list| list.iter())
-                    .into_iter()
-                    .flatten()
-                    .copied()
-                    .collect(),
-                message,
-            )
-            .context("error extracting needed fields from DHCP message during Requesting")
+            crate::parse::fields_to_retain_from_requesting(requested_parameters, message)
+                .context("error extracting needed fields from DHCP message during Requesting")
         })
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
@@ -634,7 +645,10 @@ mod test {
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::{join, Future};
+    use itertools::Itertools as _;
     use net_declare::{net::prefix_length_v4, net_mac, std_ip_v4};
+    use net_types::ethernet::Mac;
+    use net_types::ip::{Ipv4, PrefixLength};
     use std::cell::RefCell;
     use std::rc::Rc;
     use test_case::test_case;
@@ -650,35 +664,45 @@ mod test {
         let _: Result<_, _> = tracing::subscriber::set_global_default(subscriber);
     }
 
-    const TEST_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("01:01:01:01:01:01");
-    const TEST_SERVER_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("02:02:02:02:02:02");
-    const OTHER_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("03:03:03:03:03:03");
+    const TEST_MAC_ADDRESS: Mac = net_mac!("01:01:01:01:01:01");
+    const TEST_SERVER_MAC_ADDRESS: Mac = net_mac!("02:02:02:02:02:02");
+    const OTHER_MAC_ADDRESS: Mac = net_mac!("03:03:03:03:03:03");
 
     const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
     const YIADDR: Ipv4Addr = std_ip_v4!("198.168.1.5");
     const OTHER_ADDR: Ipv4Addr = std_ip_v4!("198.168.1.6");
     const DEFAULT_LEASE_LENGTH_SECONDS: u32 = 100;
     const MAX_LEASE_LENGTH_SECONDS: u32 = 200;
+    const TEST_PREFIX_LENGTH: PrefixLength<Ipv4> = prefix_length_v4!(24);
 
-    const TEST_PARAMETER_REQUEST_LIST: [dhcp_protocol::OptionCode; 3] = [
-        dhcp_protocol::OptionCode::SubnetMask,
-        dhcp_protocol::OptionCode::Router,
-        dhcp_protocol::OptionCode::DomainNameServer,
-    ];
-
-    fn test_parameter_values() -> [dhcp_protocol::DhcpOption; 3] {
+    fn test_requested_parameters() -> OptionCodeMap<OptionRequested> {
+        use dhcp_protocol::OptionCode;
         [
-            dhcp_protocol::DhcpOption::SubnetMask(prefix_length_v4!(24)),
+            (OptionCode::SubnetMask, OptionRequested::Required),
+            (OptionCode::Router, OptionRequested::Optional),
+            (OptionCode::DomainNameServer, OptionRequested::Optional),
+        ]
+        .into_iter()
+        .collect::<OptionCodeMap<_>>()
+    }
+
+    fn test_parameter_values_excluding_subnet_mask() -> [dhcp_protocol::DhcpOption; 2] {
+        [
             dhcp_protocol::DhcpOption::Router([SERVER_IP].into()),
             dhcp_protocol::DhcpOption::DomainNameServer([SERVER_IP, std_ip_v4!("8.8.8.8")].into()),
         ]
+    }
+
+    fn test_parameter_values() -> impl IntoIterator<Item = dhcp_protocol::DhcpOption> {
+        std::iter::once(dhcp_protocol::DhcpOption::SubnetMask(TEST_PREFIX_LENGTH))
+            .chain(test_parameter_values_excluding_subnet_mask())
     }
 
     fn test_client_config() -> ClientConfig {
         ClientConfig {
             client_hardware_address: TEST_MAC_ADDRESS,
             client_identifier: None,
-            parameter_request_list: Some(TEST_PARAMETER_REQUEST_LIST.into()),
+            requested_parameters: test_requested_parameters(),
             preferred_lease_time_secs: None,
             requested_ip_address: None,
         }
@@ -856,7 +880,7 @@ mod test {
                     .await
                     .expect("recv_from on test socket should succeed");
 
-                assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+                assert_eq!(address, Mac::BROADCAST);
 
                 let msg = crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
@@ -870,7 +894,11 @@ mod test {
                         xid: msg.xid,
                         options: vec![
                             dhcp_protocol::DhcpOption::ParameterRequestList(
-                                TEST_PARAMETER_REQUEST_LIST.into(),
+                                test_requested_parameters()
+                                    .iter_keys()
+                                    .collect::<Vec<_>>()
+                                    .try_into()
+                                    .expect("should fit parameter request list size constraints"),
                             ),
                             dhcp_protocol::DhcpOption::DhcpMessageType(
                                 dhcp_protocol::MessageType::DHCPDISCOVER,
@@ -917,13 +945,13 @@ mod test {
         }) ; "rejects wrong xid")]
     fn test_validate_message(
         message_xid: u32,
-        message_chaddr: net_types::ethernet::Mac,
+        message_chaddr: Mac,
     ) -> Result<(), ValidateMessageError> {
         let discover_options = DiscoverOptions { xid: TransactionId(XID) };
         let client_config = ClientConfig {
             client_hardware_address: TEST_MAC_ADDRESS,
             client_identifier: None,
-            parameter_request_list: Some(TEST_PARAMETER_REQUEST_LIST.into()),
+            requested_parameters: test_requested_parameters(),
             preferred_lease_time_secs: None,
             requested_ip_address: None,
         };
@@ -961,7 +989,7 @@ mod test {
         let selecting = Init {}.do_init(&mut rng, &time);
         let TransactionId(xid) = selecting.discover_options.xid;
 
-        let (server_end, client_end) = FakeSocket::<net_types::ethernet::Mac>::new_pair();
+        let (server_end, client_end) = FakeSocket::<Mac>::new_pair();
         let test_socket_provider = FakeSocketProvider::new(client_end);
 
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
@@ -986,7 +1014,7 @@ mod test {
                     .recv_from(&mut recv_buf)
                     .await
                     .expect("recv_from on test socket should succeed");
-                assert_eq!(dst_addr, net_types::ethernet::Mac::BROADCAST);
+                assert_eq!(dst_addr, Mac::BROADCAST);
 
                 server_end
                     .send_to(b"hello", OTHER_MAC_ADDRESS)
@@ -998,7 +1026,7 @@ mod test {
                 .recv_from(&mut recv_buf)
                 .await
                 .expect("recv_from on test socket should succeed");
-            assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+            assert_eq!(address, Mac::BROADCAST);
 
             // `dhcp_protocol::Message` intentionally doesn't implement `Clone`,
             // so we re-parse instead for testing purposes.
@@ -1017,7 +1045,11 @@ mod test {
                     xid: msg.xid,
                     options: vec![
                         dhcp_protocol::DhcpOption::ParameterRequestList(
-                            TEST_PARAMETER_REQUEST_LIST.into(),
+                            test_requested_parameters()
+                                .iter_keys()
+                                .collect::<Vec<_>>()
+                                .try_into()
+                                .expect("should fit parameter request list size constraints"),
                         ),
                         dhcp_protocol::DhcpOption::DhcpMessageType(
                             dhcp_protocol::MessageType::DHCPDISCOVER,
@@ -1041,20 +1073,41 @@ mod test {
                         // remembering them from the DHCPOFFER.
                         renewal_time_value: Some(20),
                         rebinding_time_value: Some(30),
-                        subnet_mask: prefix_length_v4!(24),
+                        subnet_mask: TEST_PREFIX_LENGTH,
                     },
                     &dhcpv4::server::options_repo(test_parameter_values()),
                 )
                 .expect("dhcp server crate error building offer")
             };
 
-            let bad_reply = dhcp_protocol::Message {
+            let reply_with_wrong_xid = dhcp_protocol::Message {
                 xid: (u32::from(xid).wrapping_add(1)),
                 // Provide a different yiaddr in order to distinguish whether
                 // the client correctly discarded this one, since we check which
                 // `yiaddr` the client uses as its requested IP address later.
                 yiaddr: OTHER_ADDR,
                 ..build_reply()
+            };
+
+            let reply_without_subnet_mask = {
+                let mut reply = build_reply();
+                let options = std::mem::take(&mut reply.options);
+                let (subnet_masks, other_options): (Vec<_>, Vec<_>) =
+                    options.into_iter().partition_map(|option| match option {
+                        dhcp_protocol::DhcpOption::SubnetMask(_) => itertools::Either::Left(option),
+                        _ => itertools::Either::Right(option),
+                    });
+                assert_matches!(
+                    &subnet_masks[..],
+                    &[dhcp_protocol::DhcpOption::SubnetMask(TEST_PREFIX_LENGTH)]
+                );
+                reply.options = other_options;
+
+                // Provide a different yiaddr in order to distinguish whether
+                // the client correctly discarded this one, since we check which
+                // `yiaddr` the client uses as its requested IP address later.
+                reply.yiaddr = OTHER_ADDR;
+                reply
             };
 
             let good_reply = build_reply();
@@ -1080,7 +1133,11 @@ mod test {
             };
 
             // The DHCP client should ignore the reply with an incorrect xid.
-            send_reply(bad_reply).await;
+            send_reply(reply_with_wrong_xid).await;
+
+            // The DHCP client should ignore the reply without a subnet mask.
+            send_reply(reply_without_subnet_mask).await;
+
             send_reply(good_reply).await;
         }
         .fuse();
@@ -1224,7 +1281,7 @@ mod test {
                     .await
                     .expect("recv_from on test socket should succeed");
 
-                assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+                assert_eq!(address, Mac::BROADCAST);
 
                 let msg = crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
@@ -1242,7 +1299,11 @@ mod test {
                             ),
                             dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
                             dhcp_protocol::DhcpOption::ParameterRequestList(
-                                TEST_PARAMETER_REQUEST_LIST.into(),
+                                test_requested_parameters()
+                                    .iter_keys()
+                                    .collect::<Vec<_>>()
+                                    .try_into()
+                                    .expect("should fit parameter request list size constraints"),
                             ),
                             dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                             dhcp_protocol::DhcpOption::DhcpMessageType(
@@ -1322,11 +1383,9 @@ mod test {
             yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
                 .try_into()
                 .expect("should be specified"),
-            server_identifier: Some(
-                net_types::ip::Ipv4Addr::from(SERVER_IP)
-                    .try_into()
-                    .expect("should be specified")
-            ),
+            server_identifier: Some(net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified")),
             ip_address_lease_time_secs: DEFAULT_LEASE_LENGTH_SECONDS
                 .try_into()
                 .expect("should be nonzero"),
@@ -1336,6 +1395,21 @@ mod test {
         },
         start_time: std::time::Duration::from_secs(0),
     }) ; "transitions to Bound after receiving DHCPACK")]
+    #[test_case(VaryingIncomingMessageFields {
+        yiaddr: YIADDR,
+        options: [
+            dhcp_protocol::DhcpOption::DhcpMessageType(
+                dhcp_protocol::MessageType::DHCPACK,
+            ),
+            dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
+            dhcp_protocol::DhcpOption::IpAddressLeaseTime(
+                DEFAULT_LEASE_LENGTH_SECONDS,
+            ),
+        ]
+        .into_iter()
+        .chain(test_parameter_values_excluding_subnet_mask())
+        .collect(),
+    } => RequestingOutcome::RanOutOfRetransmits ; "ignores replies lacking required option SubnetMask")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         options: [
@@ -1389,7 +1463,7 @@ mod test {
                 .recv_from(&mut recv_buf)
                 .await
                 .expect("recv_from on test socket should succeed");
-            assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+            assert_eq!(address, Mac::BROADCAST);
 
             // `dhcp_protocol::Message` intentionally doesn't implement `Clone`,
             // so we re-parse instead for testing purposes.
@@ -1411,7 +1485,11 @@ mod test {
                         dhcp_protocol::DhcpOption::IpAddressLeaseTime(DEFAULT_LEASE_LENGTH_SECONDS),
                         dhcp_protocol::DhcpOption::RequestedIpAddress(YIADDR),
                         dhcp_protocol::DhcpOption::ParameterRequestList(
-                            TEST_PARAMETER_REQUEST_LIST.into(),
+                            test_requested_parameters()
+                                .iter_keys()
+                                .collect::<Vec<_>>()
+                                .try_into()
+                                .expect("should fit parameter request list size constraints"),
                         ),
                         dhcp_protocol::DhcpOption::ServerIdentifier(SERVER_IP),
                         dhcp_protocol::DhcpOption::DhcpMessageType(

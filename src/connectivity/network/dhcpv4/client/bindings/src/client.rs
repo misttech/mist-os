@@ -119,20 +119,19 @@ impl Client {
         let config = dhcp_client_core::client::ClientConfig {
             client_hardware_address: mac,
             client_identifier: None,
-            parameter_request_list: Some(
-                std::iter::once(dhcp_protocol::OptionCode::SubnetMask)
-                    .chain(routers.unwrap_or(false).then_some(dhcp_protocol::OptionCode::Router))
-                    .chain(
-                        dns_servers
-                            .unwrap_or(false)
-                            .then_some(dhcp_protocol::OptionCode::DomainNameServer),
-                    )
-                    .collect::<Vec<_>>()
-                    .try_into()
-                    .unwrap_or_else(|(dhcp_protocol::SizeConstrainedError::SizeConstraintViolated, entries)| {
-                        panic!("parameter request list should be known to have between 1 and u8::MAX entries: {:#?}", entries);
-                    }),
-            ),
+            requested_parameters: std::iter::once((
+                dhcp_protocol::OptionCode::SubnetMask,
+                dhcp_client_core::parse::OptionRequested::Required,
+            ))
+            .chain(routers.unwrap_or(false).then_some((
+                dhcp_protocol::OptionCode::Router,
+                dhcp_client_core::parse::OptionRequested::Optional,
+            )))
+            .chain(dns_servers.unwrap_or(false).then_some((
+                dhcp_protocol::OptionCode::DomainNameServer,
+                dhcp_client_core::parse::OptionRequested::Optional,
+            )))
+            .collect::<dhcp_client_core::parse::OptionCodeMap<_>>(),
             preferred_lease_time_secs: None,
             requested_ip_address: None,
         };

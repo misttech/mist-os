@@ -790,7 +790,9 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
 }
 
 /// Helper for constructing a repo of `DhcpOption`s.
-pub fn options_repo<const N: usize>(options: [DhcpOption; N]) -> HashMap<OptionCode, DhcpOption> {
+pub fn options_repo(
+    options: impl IntoIterator<Item = DhcpOption>,
+) -> HashMap<OptionCode, DhcpOption> {
     options.into_iter().map(|option| (option.code(), option)).collect()
 }
 
