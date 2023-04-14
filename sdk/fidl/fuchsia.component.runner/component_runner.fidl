@@ -121,7 +121,7 @@ type ComponentStartInfo = resource table {
     /// ensure that runtime_dir is served before waiting on this eventpair.
     /// ELF debuggers can query the runtime_dir to decide whether to attach before
     /// they drop the other side of the eventpair, which is sent in the payload of
-    /// the DebugStarted event in fuchsia.sys2.events.
+    /// the DebugStarted event in fuchsia.component.events.
     8: break_on_start zx.handle:EVENTPAIR;
 };
 

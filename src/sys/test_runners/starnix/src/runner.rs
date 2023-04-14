@@ -70,6 +70,9 @@ async fn serve_test_suite(
     let outgoing_dir_server_end =
         start_info.outgoing_dir.take().ok_or(anyhow!("Missing outgoing directory"))?;
 
+    // Drop the runtime_dir handle because it's not supported for now.
+    start_info.runtime_dir.take();
+
     // Wrap controller in an option, since closing it will consume the server end.
     let controller = Arc::new(Mutex::new(Some(controller)));
     let start_info = Arc::new(Mutex::new(start_info));
