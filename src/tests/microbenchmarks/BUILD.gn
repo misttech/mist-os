@@ -250,7 +250,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     if (target_cpu == "x64") {
       deps = [
         ":data_tmp_target",
-        "//src/proc/tests/chromiumos/syscalls:container_resources",
+        "//src/proc/tests/syscalls:container_resources",
         "//src/starnix/containers:default_init",
       ]
     }

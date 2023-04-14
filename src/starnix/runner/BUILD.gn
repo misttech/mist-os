@@ -8,10 +8,10 @@ import("//src/starnix/kernel/starnix.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("runner") {
-  deps = [ ":starnix_package" ]
-  if (target_cpu == "x64") {
-    deps += [ "//src/starnix/kernel:starnix_kernel_package" ]
-  }
+  deps = [
+    ":starnix_package",
+    "//src/starnix/kernel:starnix_kernel_package",
+  ]
 }
 
 rustc_binary("starnix_runner_bin") {
