@@ -248,7 +248,8 @@ impl SmeForScan {
 }
 
 // A request to connect to a specific candidate, and count of attempts to find a BSS.
-#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ConnectAttemptRequest {
     pub network: client_types::NetworkIdentifier,
     pub credential: Credential,

@@ -15,14 +15,14 @@ use {
 
 pub use ieee80211::Ssid;
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub struct DisconnectRequest {
     pub network_id: ap_types::NetworkIdentifier,
     pub reason: client_types::DisconnectReason,
     pub responder: oneshot::Sender<Result<(), Error>>,
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub struct ConnectRequest {
     pub request: api::ConnectAttemptRequest,
     pub responder: oneshot::Sender<Result<(), Error>>,
@@ -67,13 +67,13 @@ pub struct StartClientConnectionsRequest {
     pub responder: oneshot::Sender<Result<(), Error>>,
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub struct StartApRequest {
     pub config: ap_fsm::ApConfig,
     pub responder: oneshot::Sender<Result<oneshot::Receiver<()>, Error>>,
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub struct StopApRequest {
     pub ssid: Ssid,
     pub password: Vec<u8>,
@@ -98,7 +98,7 @@ pub struct SetCountryRequest {
 
 // The following operations all require interaction with the interface state machines.  While
 // servicing these operations, IfaceManager should not accept other outside requests.
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub enum AtomicOperation {
     Disconnect(DisconnectRequest),
     StopClientConnections(StopClientConnectionsRequest),
@@ -107,7 +107,7 @@ pub enum AtomicOperation {
     SetCountry(SetCountryRequest),
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub enum IfaceManagerRequest {
     Connect(ConnectRequest),
     RecordIdleIface(RecordIdleIfaceRequest),
@@ -121,7 +121,7 @@ pub enum IfaceManagerRequest {
     AtomicOperation(AtomicOperation),
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub(crate) struct SetCountryOperationState {
     pub client_connections_initially_enabled: bool,
     pub initial_ap_configs: Vec<ap_fsm::ApConfig>,
@@ -129,14 +129,14 @@ pub(crate) struct SetCountryOperationState {
     pub responder: oneshot::Sender<Result<(), Error>>,
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub(crate) enum IfaceManagerOperation {
     ConfigureStateMachine,
     SetCountry(SetCountryOperationState),
     ReportDefect,
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug))]
 pub enum BssSelectionOperation {
     FulfillConnectRequest(api::ConnectAttemptRequest, Option<client_types::ScannedCandidate>),
     _LocalRoam(Option<client_types::ScannedCandidate>),

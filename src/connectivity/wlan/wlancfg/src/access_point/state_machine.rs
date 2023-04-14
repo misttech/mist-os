@@ -100,7 +100,9 @@ pub enum ManualRequest {
     Exit(oneshot::Sender<()>),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+// To avoid printing PII, only allow Debug in tests, runtime logging should use Display
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ApConfig {
     pub id: types::NetworkIdentifier,
     pub credential: Vec<u8>,

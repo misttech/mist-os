@@ -11,6 +11,7 @@ use {
     fuchsia_async as fasync,
     futures::{channel::mpsc, lock::Mutex, Future},
     std::{convert::Infallible, sync::Arc},
+    wlan_common::hasher::WlanHasher,
 };
 
 pub mod device_monitor;
@@ -28,6 +29,7 @@ pub fn create_iface_manager(
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     network_selector: Arc<NetworkSelector>,
     telemetry_sender: TelemetrySender,
+    hasher: WlanHasher,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
 {
     let (sender, receiver) = mpsc::channel(0);
@@ -43,6 +45,7 @@ pub fn create_iface_manager(
         telemetry_sender,
         stats_sender,
         defect_sender,
+        hasher,
     );
     let iface_manager_service = iface_manager::serve_iface_manager_requests(
         iface_manager,

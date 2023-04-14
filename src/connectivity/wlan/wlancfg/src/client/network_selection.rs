@@ -238,7 +238,7 @@ impl NetworkSelector {
             .filter(|&candidate| {
                 // Filter out incompatible BSSs
                 if !candidate.bss.is_compatible() {
-                    trace!("BSS is incompatible, filtering: {:?}", candidate);
+                    trace!("BSS is incompatible, filtering: {}", candidate.to_string_without_pii());
                     return false;
                 };
                 true

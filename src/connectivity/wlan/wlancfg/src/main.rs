@@ -350,7 +350,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let network_selector = Arc::new(NetworkSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
-        hasher,
+        hasher.clone(),
         component::inspector().root().create_child("network_selector"),
         persistence_req_sender.clone(),
         telemetry_sender.clone(),
@@ -377,6 +377,7 @@ async fn run_all_futures() -> Result<(), Error> {
         saved_networks.clone(),
         network_selector.clone(),
         telemetry_sender.clone(),
+        hasher,
     );
 
     let scanning_service = scan::serve_scanning_loop(

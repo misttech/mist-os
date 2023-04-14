@@ -23,12 +23,14 @@ impl From<ConnectedClientInformation> for fidl_policy::ConnectedClientInformatio
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ApStatesUpdate {
     pub access_points: Vec<ApStateUpdate>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ApStateUpdate {
     pub id: types::NetworkIdentifier,
     pub state: types::OperatingState,

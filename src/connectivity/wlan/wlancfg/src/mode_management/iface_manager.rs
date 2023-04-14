@@ -37,6 +37,7 @@ use {
     },
     log::{debug, error, info, warn},
     std::{convert::Infallible, fmt::Debug, sync::Arc, unimplemented},
+    wlan_common::hasher::WlanHasher,
 };
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
@@ -149,6 +150,7 @@ pub(crate) struct IfaceManagerService {
     stats_sender: ConnectionStatsSender,
     // A sender to be cloned for state machines to report defects to the IfaceManager.
     defect_sender: mpsc::UnboundedSender<Defect>,
+    hasher: WlanHasher,
 }
 
 impl IfaceManagerService {
@@ -161,6 +163,7 @@ impl IfaceManagerService {
         telemetry_sender: TelemetrySender,
         stats_sender: ConnectionStatsSender,
         defect_sender: mpsc::UnboundedSender<Defect>,
+        hasher: WlanHasher,
     ) -> Self {
         IfaceManagerService {
             phy_manager: phy_manager.clone(),
@@ -176,6 +179,7 @@ impl IfaceManagerService {
             telemetry_sender,
             stats_sender,
             defect_sender,
+            hasher,
         }
     }
 
@@ -1019,7 +1023,10 @@ async fn handle_bss_selection_results_for_connect_request(
                 target: scanned_candidate,
                 reason: request.reason,
             };
-            info!("Starting connection to {:?}", selection.target.network);
+            info!(
+                "Starting connection to {}",
+                iface_manager.hasher.hash_mac_addr(&selection.target.bss.bssid.0)
+            );
             let _ = iface_manager.connect(selection).await;
         }
         None => {
@@ -1339,7 +1346,7 @@ async fn handle_iface_manager_request(
 
 // Bundle the operations of running the caller's future with dropping of the `AtomicOneshotStream`
 // `Token`
-fn attempt_atomic_operation<T: Debug + 'static>(
+fn attempt_atomic_operation<T: 'static>(
     fut: BoxFuture<'static, T>,
     token: atomic_oneshot_stream::Token,
 ) -> BoxFuture<'static, T> {
@@ -1524,6 +1531,7 @@ mod tests {
         pub stats_receiver: ConnectionStatsReceiver,
         pub defect_sender: mpsc::UnboundedSender<Defect>,
         pub defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        pub hasher: WlanHasher,
     }
 
     /// Create a TestValues for a unit test.
@@ -1547,10 +1555,11 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let scan_requester = Arc::new(FakeScanRequester::new());
+        let hasher = create_wlan_hasher();
         let network_selector = Arc::new(NetworkSelector::new(
             saved_networks.clone(),
             scan_requester.clone(),
-            create_wlan_hasher(),
+            hasher.clone(),
             inspector.root().create_child("network_selection"),
             persistence_req_sender,
             telemetry_sender.clone(),
@@ -1575,6 +1584,7 @@ mod tests {
             stats_receiver,
             defect_sender,
             defect_receiver,
+            hasher,
         }
     }
 
@@ -1818,6 +1828,7 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.hasher.clone(),
         );
 
         if configured {
@@ -1875,6 +1886,7 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.hasher.clone(),
         );
 
         iface_manager.aps.push(ap_container);
@@ -2416,6 +2428,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Call connect on the IfaceManager
@@ -2454,6 +2467,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Create a NetworkSelector
@@ -2462,7 +2476,7 @@ mod tests {
         let selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks,
             test_values.scan_requester.clone(),
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -2609,6 +2623,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Call disconnect on the IfaceManager
@@ -2744,6 +2759,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Call stop_client_connections.
@@ -2856,6 +2872,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Call stop_client_connections.
@@ -2986,6 +3003,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         {
@@ -3192,6 +3210,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Call start_ap.
@@ -3326,6 +3345,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
         let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
         pin_mut!(fut);
@@ -3474,6 +3494,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         let fut = iface_manager.stop_all_aps();
@@ -3783,6 +3804,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         {
@@ -3889,6 +3911,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         {
@@ -3959,6 +3982,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         {
@@ -4322,7 +4346,7 @@ mod tests {
         let network_selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4381,7 +4405,7 @@ mod tests {
         let network_selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4429,7 +4453,7 @@ mod tests {
         let network_selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4566,6 +4590,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Create other components to run the service.
@@ -4575,7 +4600,7 @@ mod tests {
         let network_selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4700,6 +4725,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Report a new interface.
@@ -4804,6 +4830,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Make start client connections request
@@ -4881,6 +4908,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Make stop client connections request
@@ -5110,6 +5138,7 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // Update the saved networks with knowledge of the test SSID and credentials.
@@ -5231,7 +5260,7 @@ mod tests {
         let selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -5528,7 +5557,7 @@ mod tests {
         let selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -5572,7 +5601,7 @@ mod tests {
         let selector = Arc::new(NetworkSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
-            create_wlan_hasher(),
+            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("network_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -5719,6 +5748,7 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender,
             test_values.defect_sender,
+            test_values.hasher.clone(),
         );
 
         // If the test calls for it, create an AP interface to test that the IfaceManager preserves
@@ -5843,6 +5873,7 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.hasher.clone(),
         );
 
         // Send a defect to the IfaceManager service loop.

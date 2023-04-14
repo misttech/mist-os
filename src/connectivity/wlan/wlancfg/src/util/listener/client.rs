@@ -9,7 +9,8 @@ use {
     futures::{channel::mpsc, future::BoxFuture, prelude::*},
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
 pub struct ClientNetworkState {
     pub id: client_types::NetworkIdentifier,
     pub state: client_types::ConnectionState,
@@ -27,7 +28,8 @@ impl From<ClientNetworkState> for fidl_policy::NetworkState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ClientStateUpdate {
     pub state: fidl_policy::WlanClientState,
     pub networks: Vec<ClientNetworkState>,

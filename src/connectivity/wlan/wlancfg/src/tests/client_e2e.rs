@@ -179,10 +179,11 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
     let (scan_request_sender, scan_request_receiver) =
         mpsc::channel(scan::SCAN_REQUEST_BUFFER_SIZE);
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
+    let hasher = create_wlan_hasher();
     let network_selector = Arc::new(network_selection::NetworkSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
-        create_wlan_hasher(),
+        hasher.clone(),
         inspect::Inspector::default().root().create_child("network_selector"),
         persistence_req_sender,
         telemetry_sender.clone(),
@@ -209,6 +210,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         saved_networks.clone(),
         network_selector.clone(),
         telemetry_sender.clone(),
+        hasher.clone(),
     );
     let iface_manager_service = Box::pin(iface_manager_service);
     let scan_manager_service = Box::pin(

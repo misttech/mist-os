@@ -48,14 +48,14 @@ impl Drop for Token {
 // underlying stream produces an item.  This token can be held by the caller to prevent the
 // AtomicOneshotStream from giving out non-complete streams.  Once the token is dropped, future
 // streams produced by the AtomicOneshotStream will be capable of producing items.
-pub struct AtomicOneshotStream<S: FusedStream + Unpin + Debug> {
+pub struct AtomicOneshotStream<S: FusedStream + Unpin> {
     stream: S,
     status: SharedAtomicOperationStatus,
 }
 
 impl<S> AtomicOneshotStream<S>
 where
-    S: FusedStream + Unpin + Debug,
+    S: FusedStream + Unpin,
 {
     pub fn new(stream: S) -> Self {
         let status = Arc::new(RwLock::new(StreamStatus::Ready));

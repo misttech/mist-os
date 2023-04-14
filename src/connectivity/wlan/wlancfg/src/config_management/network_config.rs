@@ -560,8 +560,11 @@ impl SecurityType {
 
 /// The network identifier is the SSID and security policy of the network, and it is used to
 /// distinguish networks. It mirrors the NetworkIdentifier in fidl_fuchsia_wlan_policy.
-#[derive(Arbitrary)] // Derive Arbitrary for fuzzer
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Arbitrary)]
+// Derive Arbitrary for fuzzer
+// To avoid printing PII, only allow Debug in tests, runtime logging should use Display
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct NetworkIdentifier {
     pub ssid: client_types::Ssid,
     pub security_type: SecurityType,

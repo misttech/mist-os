@@ -72,7 +72,9 @@ pub fn convert_to_sme_disconnect_reason(
 }
 
 // An internal version of fidl_policy::ScanResult that can be cloned
-#[derive(Debug, Clone, PartialEq)]
+// To avoid printing PII, only allow Debug in tests, runtime logging should use Display
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct ScanResult {
     /// Network properties used to distinguish between networks and to group
     /// individual APs.
@@ -99,7 +101,9 @@ pub enum ScanObservation {
 }
 
 // An internal version of fidl_policy::Bss with extended information
-#[derive(Debug, Clone, PartialEq)]
+// To avoid printing PII, only allow Debug in tests, runtime logging should use Display
+#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub struct Bss {
     /// MAC address for the AP interface.
     pub bssid: Bssid,
@@ -180,7 +184,9 @@ pub struct InternalSavedNetworkData {
     pub recent_failures: Vec<config_management::ConnectFailure>,
     pub past_connections: config_management::PastConnectionsByBssid,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+// To avoid printing PII, only allow Debug in tests, runtime logging should use Display
+#[cfg_attr(test, derive(Debug))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ScannedCandidate {
     pub network: NetworkIdentifier,
@@ -197,7 +203,9 @@ pub struct ScannedCandidate {
 ///
 /// This type is a promotion of a scanned candidate and provides the necessary data required to
 /// establish a connection.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+// To avoid printing PII, only allow Debug in tests, runtime logging should use Display
+#[cfg_attr(test, derive(Debug))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConnectSelection {
     pub target: ScannedCandidate,
