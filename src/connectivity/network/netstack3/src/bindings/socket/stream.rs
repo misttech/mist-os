@@ -1171,7 +1171,7 @@ where
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
                     .duplicate_handle(
-                        (zx::Rights::BASIC | zx::Rights::IO | zx::Rights::PROPERTY)
+                        (zx::Rights::BASIC | zx::Rights::IO)
                         // Don't allow the peer to duplicate the stream.
                         & !zx::Rights::DUPLICATE,
                     )

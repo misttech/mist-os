@@ -3021,3 +3021,92 @@ async fn tcp_bind_with_zone_connect_unzoned<N: Netstack>(name: &str) {
     })
     .await
 }
+
+#[derive(PartialEq)]
+enum ProtocolWithZirconSocket {
+    Tcp,
+    FastUdp,
+}
+
+#[netstack_test]
+#[test_case(ProtocolWithZirconSocket::Tcp)]
+#[test_case(ProtocolWithZirconSocket::FastUdp)]
+async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconSocket) {
+    // TODO(https://fxbug.dev/99905): Remove this test when Fast UDP is
+    // supported by Netstack3.
+    if N::VERSION == NetstackVersion::Netstack3 && protocol == ProtocolWithZirconSocket::FastUdp {
+        return;
+    }
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let netstack = match N::VERSION {
+        NetstackVersion::Netstack2 => sandbox
+            .create_netstack_realm::<Netstack2WithFastUdp, _>(format!("{}", name))
+            .expect("create realm"),
+        NetstackVersion::Netstack3 => {
+            sandbox.create_netstack_realm::<N, _>(format!("{}", name)).expect("create realm")
+        }
+        NetstackVersion::ProdNetstack2 | NetstackVersion::Netstack2WithFastUdp => {
+            panic!("unexpected netstack variant")
+        }
+    };
+
+    let provider = netstack
+        .connect_to_protocol::<fposix_socket::ProviderMarker>()
+        .expect("connect to socket provider");
+    let socket = match protocol {
+        ProtocolWithZirconSocket::Tcp => {
+            let socket = provider
+                .stream_socket(
+                    fposix_socket::Domain::Ipv4,
+                    fposix_socket::StreamSocketProtocol::Tcp,
+                )
+                .await
+                .expect("call stream socket")
+                .expect("request stream socket");
+            let fposix_socket::StreamSocketDescribeResponse { socket, .. } = socket
+                .into_proxy()
+                .expect("client end into proxy")
+                .describe()
+                .await
+                .expect("call describe");
+            socket
+        }
+        ProtocolWithZirconSocket::FastUdp => {
+            let response = provider
+                .datagram_socket(
+                    fposix_socket::Domain::Ipv4,
+                    fposix_socket::DatagramSocketProtocol::Udp,
+                )
+                .await
+                .expect("call datagram socket")
+                .expect("request datagram socket");
+            let socket = match response {
+                fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(_) => {
+                    panic!("expected fast udp socket, got sync udp")
+                }
+                fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(socket) => socket,
+            };
+            let fposix_socket::DatagramSocketDescribeResponse { socket, .. } = socket
+                .into_proxy()
+                .expect("client end into proxy")
+                .describe()
+                .await
+                .expect("call describe");
+            socket
+        }
+    };
+
+    let zx::HandleBasicInfo { rights, .. } = socket
+        .expect("zircon socket returned by describe")
+        .basic_info()
+        .expect("get socket basic info");
+    assert_eq!(
+        rights.bits(),
+        zx::sys::ZX_RIGHT_TRANSFER
+            | zx::sys::ZX_RIGHT_WAIT
+            | zx::sys::ZX_RIGHT_INSPECT
+            | zx::sys::ZX_RIGHT_WRITE
+            | zx::sys::ZX_RIGHT_READ
+    );
+}
