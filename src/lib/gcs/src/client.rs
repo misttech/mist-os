@@ -109,6 +109,14 @@ impl Client {
         Ok(Self { https: new_https_client(), token_store: Arc::new(TokenStore::new()?) })
     }
 
+    /// Allow access to public and private (auth-required) GCS data.
+    pub fn initial_with_urls(api_base: &str, storage_base: &str) -> Result<Self> {
+        Ok(Self {
+            https: new_https_client(),
+            token_store: Arc::new(TokenStore::new_with_urls(api_base, storage_base)?),
+        })
+    }
+
     /// Set the access token for all clients cloned from this client.
     pub async fn set_access_token(&self, access: String) {
         self.token_store.set_access_token(access).await;

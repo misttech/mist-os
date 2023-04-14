@@ -67,6 +67,15 @@ impl TokenStore {
         })
     }
 
+    /// Allow access to public and private (auth-required) GCS data.
+    pub fn new_with_urls(api_base: &str, storage_base: &str) -> Result<Self, GcsError> {
+        Ok(Self {
+            api_base: Url::parse(api_base).expect("parse api_base"),
+            storage_base: Url::parse(storage_base).expect("parse storage_base"),
+            access_token: Mutex::new("".to_string()),
+        })
+    }
+
     /// Create localhost base URLs and fake credentials for testing.
     #[cfg(test)]
     fn local_fake() -> Self {

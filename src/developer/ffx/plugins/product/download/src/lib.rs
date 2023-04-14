@@ -19,16 +19,18 @@ use structured_ui;
 /// `ffx product download` sub-command.
 #[ffx_plugin("product.experimental")]
 pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
+    let client = Client::initial()?;
     let mut input = stdin();
     let mut output = stdout();
     let mut err_out = stderr();
-    let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_download_impl(&cmd, &mut ui).await
+    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+    pb_download_impl(&cmd, &client, &ui).await
 }
 
 async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     cmd: &DownloadCommand,
-    ui: &mut I,
+    client: &Client,
+    ui: &I,
 ) -> Result<()> {
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Begin ----------------------------");
@@ -45,7 +47,6 @@ async fn pb_download_impl<I: structured_ui::Interface + Sync>(
 
     let parent_dir = local_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
     let temp_dir = tempfile::TempDir::new_in(&parent_dir)?;
-    let client = Client::initial()?;
     tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
         &transfer_manifest_url,
@@ -98,23 +99,45 @@ mod test {
             handler::{ForPath, StaticResponse},
             TestServer,
         },
-        //std::{io::Write, fs::{create_dir_all, File},},
         tempfile,
     };
 
-    #[ignore]
-    #[should_panic(expected = "downloading via transfer manifest")]
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_pb_download_impl() {
+    async fn test_gcs_download() {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
+        let server = TestServer::builder()
+            .handler(ForPath::new(
+                "/example/fake/transfer.json",
+                StaticResponse::ok_body(
+                    r#"
+            {
+                "version": "1",
+                "entries": [{
+                    "type": "files",
+                    "local": "foo",
+                    "remote": "data",
+                    "entries": [{ "name": "payload.txt"}]
+                }]
+            }"#,
+                ),
+            ))
+            .handler(ForPath::new("/api/b/example/o", StaticResponse::ok_body(r#"{}"#)))
+            .start()
+            .await;
+        let download_dir = test_dir.path().join("download");
         let cmd = DownloadCommand {
             auth: pbms::AuthFlowChoice::Default,
             force: false,
-            out_dir: test_dir.path().to_path_buf(),
+            out_dir: download_dir.to_path_buf(),
             manifest_url: "gs://example/fake/transfer.json".to_string(),
         };
-        let mut ui = structured_ui::MockUi::new();
-        pb_download_impl(&cmd, &mut ui).await.expect("testing download");
+        let client = Client::initial_with_urls(
+            &server.local_url_for_path("api"),
+            &server.local_url_for_path("storage"),
+        )
+        .expect("creating client");
+        let ui = structured_ui::MockUi::new();
+        pb_download_impl(&cmd, &client, &ui).await.expect("testing download");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -149,8 +172,9 @@ mod test {
             out_dir: download_dir.to_path_buf(),
             manifest_url: server.local_url_for_path("example/fake/transfer.json"),
         };
-        let mut ui = structured_ui::MockUi::new();
-        pb_download_impl(&cmd, &mut ui).await.expect("testing download");
+        let client = Client::initial().expect("creating client");
+        let ui = structured_ui::MockUi::new();
+        pb_download_impl(&cmd, &client, &ui).await.expect("testing download");
         assert!(download_dir.join("foo").join("payload.txt").exists());
     }
 }
