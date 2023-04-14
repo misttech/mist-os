@@ -13,9 +13,11 @@ import 'helpers.dart';
 // https://github.com/google/gvisor/tree/master/test/perf/linux
 
 void main() {
+  const starnix_gvisor_benchmarks = 'starnix_gvisor_benchmarks';
+
   enableLoggingOutput();
 
-  var benchmarks = {
+  const benchmarks = {
     'clock_getres_benchmark.cm':
         'fuchsia.starnix.gvisor_benchmarks.clock_getres.txt',
     'clock_gettime_benchmark.cm':
@@ -23,7 +25,7 @@ void main() {
     // 'death_benchmark' - not passing
     'dup_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.dup.txt',
     'epoll_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.epoll.txt',
-    // 'fork_benchmark' - not passing
+    'fork_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.fork.txt',
     // 'futex_benchmark' - not passing
     'getdents_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.getdents.txt',
     'getpid_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.getpid.txt',
@@ -45,12 +47,28 @@ void main() {
     'write_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.write.txt',
   };
 
+  const filters = {
+    // TODO(b/275745984): Remove when BM_ThreadSwitch passes.
+    'fork_benchmark.cm': '--benchmark_filter_internal="'
+        'BM_CPUBoundSymmetric'
+        '|BM_CPUBoundUniprocess'
+        '|BM_CPUBoundAsymmetric'
+        '|BM_ProcessSwitch'
+        '|BM_ThreadStart'
+        '|BM_ProcessLifecycle"',
+  };
+
   benchmarks.forEach((String componentName, String expectedMetricNamesFile) {
-    test('starnix_gvisor_benchmarks', () async {
+    var commandArgs = '';
+    if (filters.containsKey(componentName)) {
+      commandArgs = filters[componentName];
+    }
+
+    test(starnix_gvisor_benchmarks, () async {
       await runTestComponent(
-          packageName: 'starnix_gvisor_benchmarks',
+          packageName: starnix_gvisor_benchmarks,
           componentName: componentName,
-          commandArgs: '',
+          commandArgs: commandArgs,
           expectedMetricNamesFile: expectedMetricNamesFile);
     }, timeout: Timeout.none);
   });

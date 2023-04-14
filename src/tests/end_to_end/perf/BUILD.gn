@@ -209,6 +209,7 @@ if (is_host) {
     "fuchsia.starnix.gvisor_benchmarks.clock_gettime.txt",
     "fuchsia.starnix.gvisor_benchmarks.dup.txt",
     "fuchsia.starnix.gvisor_benchmarks.epoll.txt",
+    "fuchsia.starnix.gvisor_benchmarks.fork.txt",
     "fuchsia.starnix.gvisor_benchmarks.getdents.txt",
     "fuchsia.starnix.gvisor_benchmarks.getpid.txt",
     "fuchsia.starnix.gvisor_benchmarks.mapping.txt",
