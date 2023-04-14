@@ -209,10 +209,11 @@ Driver::~Driver() {
   }
 }
 
-zx::result<> Driver::Start() {
+void Driver::Start(fdf::StartCompleter completer) {
   // Serve the diagnostics directory.
   if (zx_status_t status = ServeDiagnosticsDir(); status != ZX_OK) {
-    return zx::error(status);
+    completer(zx::error(status));
+    return;
   }
 
   auto compat_connect =
@@ -246,6 +247,18 @@ zx::result<> Driver::Start() {
     }
   }
 
+  auto StopDriver = [this](const zx_status_t& status) -> result<> {
+    FDF_LOG(ERROR, "Failed to start driver '%s': %s", url().value().data(),
+            zx_status_get_string(status));
+    CompleteStart(zx::error(status));
+    device_.Unbind();
+    return ok();
+  };
+
+  // Store start completer to be replied to later. It will either be done in StopDriver or after the
+  // init hook is replied to and the node has been created and a devfs node has been exported.
+  start_completer_.emplace(std::move(completer));
+
   auto loader_vmo = fdf::Open(*context().incoming(), dispatcher(), kLibDriverPath, kOpenFlags)
                         .and_then(fit::bind_member<&Driver::GetBuffer>(this));
   auto driver_vmo = fdf::Open(*context().incoming(), dispatcher(), driver_path_.c_str(), kOpenFlags)
@@ -256,11 +269,9 @@ zx::result<> Driver::Start() {
           .and_then(fit::bind_member<&Driver::LoadDriver>(this))
           .and_then(std::move(compat_connect))
           .and_then(fit::bind_member<&Driver::StartDriver>(this))
-          .or_else(fit::bind_member<&Driver::StopDriver>(this))
+          .or_else(StopDriver)
           .wrap_with(scope_);
   executor_.schedule_task(std::move(start_driver));
-
-  return zx::ok();
 }
 
 bool Driver::IsComposite() { return !parent_clients_.empty(); }
@@ -520,13 +531,6 @@ result<void, zx_status_t> Driver::StartDriver() {
     FDF_LOG(ERROR, "Driver '%s' did not add a child device", url_str.data());
     return error(ZX_ERR_BAD_STATE);
   }
-  return ok();
-}
-
-result<> Driver::StopDriver(const zx_status_t& status) {
-  FDF_LOG(ERROR, "Failed to start driver '%s': %s", url().value().data(),
-          zx_status_get_string(status));
-  device_.Unbind();
   return ok();
 }
 

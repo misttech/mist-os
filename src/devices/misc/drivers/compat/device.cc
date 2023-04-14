@@ -775,10 +775,20 @@ void Device::InitReply(zx_status_t status) {
         // We can only do this if we have a parent, if we don't have a parent we've already been
         // exported.
         if (init_status == ZX_OK && parent_.has_value() && driver()) {
+          // We need to complete start after the first device the driver added completes it's init
+          // hook.
+          constexpr uint32_t kFirstDeviceId = 1;
           if (zx_status_t status = ExportAfterInit(); status != ZX_OK) {
             FDF_LOG(ERROR, "Device %s failed to create node: %s", topological_path_.c_str(),
                     zx_status_get_string(status));
+            if (device_id_ == kFirstDeviceId) {
+              driver()->CompleteStart(zx::error(status));
+            }
             Remove();
+          } else {
+            if (device_id_ == kFirstDeviceId) {
+              driver()->CompleteStart(zx::ok());
+            }
           }
         }
 

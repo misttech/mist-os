@@ -35,8 +35,7 @@ class Driver : public fdf::DriverBase {
          device_t device, const zx_protocol_device_t* ops, std::string_view driver_path);
   ~Driver() override;
 
-  zx::result<> Start() override;
-  using Base::Start;
+  void Start(fdf::StartCompleter completer) override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // Returns the context that DFv1 driver provided.
@@ -56,6 +55,8 @@ class Driver : public fdf::DriverBase {
   zx_status_t GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out);
 
   Device& GetDevice() { return device_; }
+
+  void CompleteStart(zx::result<> result) { start_completer_.value()(result); }
 
   // These accessors are used by other classes in the compat driver so we want to expose
   // them publicly since they are protected in DriverBase.
@@ -101,8 +102,6 @@ class Driver : public fdf::DriverBase {
   fpromise::result<void, zx_status_t> LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos);
   // Starts the DFv1 driver.
   fpromise::result<void, zx_status_t> StartDriver();
-  // Stops the DFv1 driver if there was a failure.
-  fpromise::result<> StopDriver(const zx_status_t& status);
 
   fpromise::promise<void, zx_status_t> ConnectToParentDevices();
   fpromise::promise<void, zx_status_t> GetDeviceInfo();
@@ -138,6 +137,8 @@ class Driver : public fdf::DriverBase {
   void* library_ = nullptr;
   zx_driver_rec_t* record_ = nullptr;
   void* context_ = nullptr;
+
+  std::optional<fdf::StartCompleter> start_completer_;
 
   // API resources.
   zx::resource root_resource_;

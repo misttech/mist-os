@@ -20,14 +20,7 @@ StartCompleter::~StartCompleter() {
 
 void StartCompleter::operator()(zx::result<> result) {
   ZX_ASSERT_MSG(complete_ != nullptr, "Cannot call StartCompleter more than once.");
-  if (result.is_error()) {
-    complete_(cookie_, result.status_value(), nullptr);
-    if (driver_) {
-      driver_.reset();
-    }
-  } else {
-    complete_(cookie_, result.status_value(), driver_.release());
-  }
+  complete_(cookie_, result.status_value(), driver_.release());
   complete_ = nullptr;
   cookie_ = nullptr;
 }

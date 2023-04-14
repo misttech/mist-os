@@ -293,7 +293,8 @@ class DriverTest : public testing::Test {
 
   std::unique_ptr<compat::Driver> StartDriver(std::string_view v1_driver_path,
                                               const zx_protocol_device_t* ops,
-                                              std::unordered_map<std::string, TestDevice> devices) {
+                                              std::unordered_map<std::string, TestDevice> devices,
+                                              zx_status_t expected_status = ZX_OK) {
     auto outgoing_dir_endpoints = fidl::CreateEndpoints<fio::Directory>();
     EXPECT_TRUE(outgoing_dir_endpoints.is_ok());
     auto pkg_endpoints = fidl::CreateEndpoints<fio::Directory>();
@@ -422,7 +423,6 @@ class DriverTest : public testing::Test {
          .node_name = "node"});
 
     // Start driver.
-    // We know that start completes synchronously.
     struct Context {
       zx_status_t* status;
       void** driver;
@@ -444,8 +444,14 @@ class DriverTest : public testing::Test {
     compat::DriverFactory::CreateDriver(std::move(start_args),
                                         driver_dispatcher_.driver_dispatcher().borrow(),
                                         std::move(start_completer));
-    EXPECT_EQ(ZX_OK, status);
-    EXPECT_NE(driver, nullptr);
+
+    while (driver == nullptr) {
+      fdf_testing_run_until_idle();
+    };
+    EXPECT_EQ(status, expected_status);
+    if (status != ZX_OK) {
+      EXPECT_NE(driver, nullptr);
+    }
 
     return std::unique_ptr<compat::Driver>(static_cast<compat::Driver*>(driver));
   }
@@ -571,7 +577,8 @@ TEST_F(DriverTest, Start_WithCreate) {
 
 TEST_F(DriverTest, Start_MissingBindAndCreate) {
   zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_missing_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver("/pkg/driver/v1_missing_test.so", &ops, {{"default", TestDevice()}},
+                            ZX_ERR_BAD_STATE);
 
   // We will know the driver has finished starting when it closes its node in error.
   while (node().HasNode()) {
@@ -647,7 +654,8 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
   compat_file().SetStatus(ZX_ERR_UNAVAILABLE);
 
   zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}});
+  auto driver =
+      StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}}, ZX_ERR_UNAVAILABLE);
 
   // Verify that v1_test.so has not added a child device.
   EXPECT_TRUE(node().children().empty());
@@ -660,7 +668,8 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
 
 TEST_F(DriverTest, Start_BindFailed) {
   zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}},
+                            ZX_ERR_NOT_SUPPORTED);
 
   // Verify that v1_test.so has set a context.
   while (!driver->Context()) {
