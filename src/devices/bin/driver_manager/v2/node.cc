@@ -467,6 +467,13 @@ Node* Node::GetPrimaryParent() const {
   return parents_.empty() ? nullptr : parents_[primary_index_];
 }
 
+void Node::CompleteBind(zx::result<> result) {
+  auto completer = std::move(request_bind_completer_);
+  if (completer) {
+    completer->Reply(result);
+  }
+}
+
 void Node::AddToParents() {
   auto this_node = shared_from_this();
   for (auto parent : parents_) {
@@ -842,6 +849,12 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
   }
   if (driver_component_.has_value() && !force_rebind) {
     completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+
+  if (request_bind_completer_) {
+    completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
+    return;
   }
 
   std::string driver_url_suffix;
@@ -850,15 +863,28 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
     properties_.push_back(fdf::MakeProperty(arena_, kCompatKey, driver_url_suffix));
   }
 
+  request_bind_completer_ = completer.ToAsync();
+
   if (driver_component_.has_value()) {
     restart_driver_url_suffix_ = driver_url_suffix;
     RestartNode();
-    completer.ReplySuccess();
     return;
   }
 
-  node_manager_.value()->Bind(*this, nullptr);
-  completer.ReplySuccess();
+  auto tracker = std::make_shared<BindResultTracker>(
+      1, [this](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> info) {
+        // We expect a single successful "bind". If we don't get it, we can assume the bind
+        // request failed. If we do get it, we will continue to wait for the driver's start hook
+        // to complete, which will only occur after the successful bind. The remaining flow will be
+        // similar to the RestartNode flow.
+        if (info.count() < 1) {
+          CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
+        } else if (info.count() > 1) {
+          LOGF(ERROR, "Unexpectedly bound multiple drivers to a single node");
+          CompleteBind(zx::error(ZX_ERR_BAD_STATE));
+        }
+      });
+  node_manager_.value()->Bind(*this, std::move(tracker));
 }
 
 void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
@@ -932,6 +958,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
         }
 
         driver_component_.emplace(*this, url, std::move(controller), std::move(result.value()));
+
         cb(zx::ok());
       });
 }

@@ -186,6 +186,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     parent.add_child(name_, std::nullopt, Devnode::NoRemote(), devfs_device_);
   }
 
+  // Invoked when a bind sequence has been completed. It allows us to reply to outstanding bind
+  // requests that may have originated from the node.
+  void CompleteBind(zx::result<> result);
+
   const std::string& name() const { return name_; }
   const DriverHost* driver_host() const { return *driver_host_; }
   const std::string& driver_url() const;
@@ -282,6 +286,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<NodeId> removal_id_;
   NodeRemovalTracker* removal_tracker_ = nullptr;
   bool node_restarting_ = false;
+  // An outstanding rebind request.
+  std::optional<RequestBindCompleter::Async> request_bind_completer_;
+
   std::optional<std::string> restart_driver_url_suffix_;
 
   // Invoked when the node has been fully removed.

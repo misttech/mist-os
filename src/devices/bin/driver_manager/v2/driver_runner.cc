@@ -349,11 +349,13 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
   if (status != ZX_OK) {
+    node.CompleteBind(zx::error(status));
     return zx::error(status);
   }
   zx_info_handle_basic_t info{};
   status = token.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK) {
+    node.CompleteBind(zx::error(status));
     return zx::error(status);
   }
 
@@ -366,6 +368,7 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
   auto create = CreateComponent(node.MakeComponentMoniker(), collection, std::string(url),
                                 {.node = &node, .token = std::move(token)});
   if (create.is_error()) {
+    node.CompleteBind(zx::error(create.error_value()));
     return create.take_error();
   }
   driver_args_.emplace(info.koid, node);
@@ -418,13 +421,17 @@ void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& complet
     completer.Close(ZX_ERR_UNAVAILABLE);
     return;
   }
-  auto& [_, node] = *it;
+  Node& node = it->second;
   driver_args_.erase(it);
 
   node.StartDriver(request->start_info, std::move(request->controller),
-                   [completer = completer.ToAsync()](auto result) mutable {
+                   [node_weak = std::weak_ptr(node.shared_from_this()),
+                    completer = completer.ToAsync()](zx::result<> result) mutable {
                      if (result.is_error()) {
                        completer.Close(result.error_value());
+                     }
+                     if (auto node = node_weak.lock(); node) {
+                       node->CompleteBind(result);
                      }
                    });
 }
