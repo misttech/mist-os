@@ -65,6 +65,19 @@ void validate_user_accessible_range(vaddr_t* vaddr, size_t* len) {
   *vaddr = fbl::conditional_select_nospec_eq(user_bit_end, 0, *vaddr, 0);
   *len = fbl::conditional_select_nospec_eq(user_bit_end, 0, *len, 0);
 
+#elif defined(__riscv)
+
+  // On RISC-V, we must check that no address in the range of [vaddr, vaddr+len) has a bit set above
+  // the lower half of the canonical address ranges.
+
+  // Note that we only really need to check the upper bound. Even if we overflowed above, `vaddr`
+  // and `len` will still be zero here.
+  vaddr_t user_bit_end = (*vaddr + *len - 1) & kRiscv64CanonicalAddressMask;
+  *vaddr = fbl::conditional_select_nospec_eq(user_bit_end, 0, *vaddr, 0);
+  *len = fbl::conditional_select_nospec_eq(user_bit_end, 0, *len, 0);
+
+#else
+#error implement for this architecture
 #endif
 }
 
