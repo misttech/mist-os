@@ -5,7 +5,7 @@
 #[macro_use]
 extern crate quote;
 
-use net_types::ip::SubnetError;
+use net_types::ip::{IpAddress, SubnetError};
 use proc_macro2::TokenStream;
 use std::fmt::Formatter;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -582,6 +582,47 @@ declare_macro!(net_ip_v6, NetGen, Ipv6Addr);
 declare_macro!(net_mac, NetGen, MacAddress);
 declare_macro!(net_subnet_v4, NetGen, StrictSubnet<Ipv4Addr>);
 declare_macro!(net_subnet_v6, NetGen, StrictSubnet<Ipv6Addr>);
+
+fn net_prefix_length_impl<I: net_types::ip::Ip>(
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let input = proc_macro2::TokenStream::from(input);
+    let n = match syn::parse2::<syn::LitInt>(input.clone()).and_then(|n| n.base10_parse::<u8>()) {
+        Ok(n) => n,
+        Err(e) => return e.to_compile_error().into(),
+    };
+    if n > I::Addr::BYTES * 8 {
+        return syn::Error::new_spanned(
+            input,
+            format!("{n} is too long to be the prefix length for an {} address", I::NAME),
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    let ip_version = match I::VERSION {
+        net_types::ip::IpVersion::V4 => quote! { net_types::ip::Ipv4 },
+        net_types::ip::IpVersion::V6 => quote! { net_types::ip::Ipv6 },
+    };
+
+    quote! {
+        // SAFETY: already checked that #n <= I::Addr::BYTES * 8.
+        unsafe {
+            net_types::ip::PrefixLength::<#ip_version>::new_unchecked(#n)
+        }
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn net_prefix_length_v4(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    net_prefix_length_impl::<net_types::ip::Ipv4>(input)
+}
+
+#[proc_macro]
+pub fn net_prefix_length_v6(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    net_prefix_length_impl::<net_types::ip::Ipv6>(input)
+}
 
 #[cfg(test)]
 mod tests {

@@ -91,6 +91,12 @@ pub use net_declare_macros::net_subnet_v4;
 /// address string.
 pub use net_declare_macros::net_subnet_v6;
 
+/// Declares a [`net_types::ip::PrefixLength<Ipv4>`] from an integer literal.
+pub use net_declare_macros::net_prefix_length_v4;
+
+/// Declares a [`net_types::ip::PrefixLength<Ipv6>`] from an integer literal.
+pub use net_declare_macros::net_prefix_length_v6;
+
 /// Redeclaration of macros to generate `std` types.
 pub mod std {
     pub use super::std_ip as ip;
@@ -119,6 +125,8 @@ pub mod net {
     pub use super::net_ip_v4 as ip_v4;
     pub use super::net_ip_v6 as ip_v6;
     pub use super::net_mac as mac;
+    pub use super::net_prefix_length_v4 as prefix_length_v4;
+    pub use super::net_prefix_length_v6 as prefix_length_v6;
     pub use super::net_subnet_v4 as subnet_v4;
     pub use super::net_subnet_v6 as subnet_v6;
 }
@@ -128,6 +136,7 @@ mod tests {
     use super::*;
     use ::std;
     use fidl_fuchsia_net as fidl;
+    use net_declare_macros::net_prefix_length_v4;
 
     #[test]
     fn test_std_ip() {
@@ -388,6 +397,22 @@ mod tests {
             )
             .unwrap(),
             net_subnet_v6!("ff80::/12")
+        )
+    }
+
+    #[test]
+    fn test_net_prefix_length_v4() {
+        assert_eq!(
+            net_types::ip::PrefixLength::<net_types::ip::Ipv4>::new(23).unwrap(),
+            net_prefix_length_v4!(23)
+        )
+    }
+
+    #[test]
+    fn test_net_prefix_length_v6() {
+        assert_eq!(
+            net_types::ip::PrefixLength::<net_types::ip::Ipv6>::new(125).unwrap(),
+            net_prefix_length_v6!(125)
         )
     }
 }

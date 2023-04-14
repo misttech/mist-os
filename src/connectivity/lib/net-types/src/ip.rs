@@ -93,9 +93,17 @@ pub enum IpVersion {
 /// `IpVersionMarker` behaves similarly to [`PhantomData`].
 ///
 /// [`PhantomData`]: core::marker::PhantomData
-#[derive(Copy, Clone, PartialEq, Eq, Hash, GenericOverIp)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, GenericOverIp)]
 pub struct IpVersionMarker<I: Ip> {
     _marker: core::marker::PhantomData<I>,
+}
+
+impl<I: Ip> IpVersionMarker<I> {
+    // TODO(https://github.com/rust-lang/rust/issues/67792): Remove once
+    // `const_trait_impl` is stabilized.
+    const fn new() -> Self {
+        Self { _marker: core::marker::PhantomData }
+    }
 }
 
 impl<I: Ip> Default for IpVersionMarker<I> {
@@ -268,6 +276,9 @@ pub trait Ip:
     /// `V4` for IPv4 and `V6` for IPv6.
     const VERSION: IpVersion;
 
+    /// The zero-sized-type IP version marker.
+    const VERSION_MARKER: IpVersionMarker<Self>;
+
     /// The unspecified address.
     ///
     /// This is 0.0.0.0 for IPv4 and :: for IPv6.
@@ -379,6 +390,8 @@ impl sealed::Sealed for Ipv4 {}
 
 impl Ip for Ipv4 {
     const VERSION: IpVersion = IpVersion::V4;
+    const VERSION_MARKER: IpVersionMarker<Self> = IpVersionMarker::new();
+
     // TODO(https://fxbug.dev/83331): Document the standard in which this
     // constant is defined.
     const UNSPECIFIED_ADDRESS: Ipv4Addr = Ipv4Addr::new([0, 0, 0, 0]);
@@ -496,6 +509,7 @@ impl sealed::Sealed for Ipv6 {}
 
 impl Ip for Ipv6 {
     const VERSION: IpVersion = IpVersion::V6;
+    const VERSION_MARKER: IpVersionMarker<Self> = IpVersionMarker::new();
     /// The unspecified IPv6 address, defined in [RFC 4291 Section 2.5.2].
     ///
     /// Per RFC 4291:
@@ -2510,6 +2524,94 @@ impl<A: Witness<Ipv6Addr> + Copy> AddrSubnet<Ipv6Addr, A> {
     }
 }
 
+/// An IP prefix length.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, GenericOverIp)]
+pub struct PrefixLength<I: Ip> {
+    /// `inner` is guaranteed to be a valid prefix length for `I::Addr`.
+    inner: u8,
+    _ip: IpVersionMarker<I>,
+}
+
+impl<I: Ip> PrefixLength<I> {
+    /// Returns the prefix length.
+    ///
+    /// The returned length is guaranteed to be a valid prefix length for
+    /// `I::Addr`.
+    pub const fn get(self) -> u8 {
+        let Self { inner, _ip } = self;
+        inner
+    }
+
+    /// Gets the subnet-mask representation of this prefix length.
+    pub fn get_mask(self) -> I::Addr {
+        I::map_ip(
+            self,
+            |prefix_len| Ipv4::LIMITED_BROADCAST_ADDRESS.mask(prefix_len.get()),
+            |prefix_len| Ipv6Addr([u8::MAX; 16]).mask(prefix_len.get()),
+        )
+    }
+
+    /// Constructs a `PrefixLength` from a given prefix length without checking
+    /// whether it is too long for the address type.
+    ///
+    /// # Safety
+    /// `prefix_length` must be less than or equal to the number of bits in
+    /// `I::Addr`. In other words, `prefix_length <= I::Addr::BYTES * 8`.
+    pub const unsafe fn new_unchecked(prefix_length: u8) -> Self {
+        Self { inner: prefix_length, _ip: I::VERSION_MARKER }
+    }
+
+    /// Constructs a `PrefixLength` from a given unverified prefix length.
+    ///
+    /// Returns `Err(PrefixTooLongError)` if `prefix_length` is too long for the
+    /// address type.
+    pub const fn new(prefix_length: u8) -> Result<Self, PrefixTooLongError> {
+        if prefix_length > I::Addr::BYTES * 8 {
+            return Err(PrefixTooLongError);
+        }
+        Ok(Self { inner: prefix_length, _ip: I::VERSION_MARKER })
+    }
+
+    /// Constructs a `PrefixLength` from an IP address representing a subnet mask.
+    ///
+    /// Returns `Err(NotSubnetMaskError)` if `subnet_mask` is not a valid subnet
+    /// mask.
+    pub fn try_from_subnet_mask(subnet_mask: I::Addr) -> Result<Self, NotSubnetMaskError> {
+        let IpInvariant((count_ones, leading_ones)) = I::map_ip(
+            subnet_mask,
+            |subnet_mask| {
+                let number = u32::from_be_bytes(subnet_mask.ipv4_bytes());
+                IpInvariant((number.count_ones(), number.leading_ones()))
+            },
+            |subnet_mask| {
+                let number = u128::from_be_bytes(subnet_mask.ipv6_bytes());
+                IpInvariant((number.count_ones(), number.leading_ones()))
+            },
+        );
+
+        if leading_ones != count_ones {
+            return Err(NotSubnetMaskError);
+        }
+
+        Ok(Self {
+            inner: u8::try_from(leading_ones)
+                .expect("the number of bits in an IP address fits in u8"),
+            _ip: IpVersionMarker::default(),
+        })
+    }
+}
+
+impl<I: Ip> From<PrefixLength<I>> for u8 {
+    fn from(value: PrefixLength<I>) -> Self {
+        value.get()
+    }
+}
+
+/// An IP address was provided which is not a valid subnet mask (the address
+/// has set bits after the first unset bit).
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct NotSubnetMaskError;
+
 /// A type which is witness to some property about an [`IpAddress`], `A`.
 ///
 /// `IpAddressWitness<A>` extends [`Witness`] of the `IpAddress` type `A` by
@@ -2792,6 +2894,7 @@ mod tests {
     use core::convert::TryInto;
 
     use super::*;
+    use test_case::test_case;
 
     #[test]
     fn test_map_ip_associated_constant() {
@@ -3152,6 +3255,76 @@ mod tests {
             0   => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
         }
     );
+
+    #[test_case([255, 255, 255, 0] => Ok(24))]
+    #[test_case([255, 255, 254, 0] => Ok(23))]
+    #[test_case([255, 255, 253, 0] => Err(NotSubnetMaskError))]
+    #[test_case([255, 255, 0, 255] => Err(NotSubnetMaskError))]
+    #[test_case([255, 255, 255, 255] => Ok(32))]
+    #[test_case([0, 0, 0, 0] => Ok(0))]
+    #[test_case([0, 0, 0, 255] => Err(NotSubnetMaskError))]
+    fn test_ipv4_prefix_len_try_from_subnet_mask(
+        subnet_mask: [u8; 4],
+    ) -> Result<u8, NotSubnetMaskError> {
+        let subnet_mask = Ipv4Addr::from(subnet_mask);
+        PrefixLength::<Ipv4>::try_from_subnet_mask(subnet_mask).map(|prefix_len| prefix_len.get())
+    }
+
+    #[test_case([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0] => Ok(64))]
+    #[test_case([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0, 0, 0, 0, 0, 0, 0, 0] => Ok(63))]
+    #[test_case([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xEF, 0, 0, 0, 0, 0, 0, 0, 0] => Err(NotSubnetMaskError))]
+    #[test_case([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0, 0, 0, 0, 0, 0, 0, 1] => Err(NotSubnetMaskError))]
+    #[test_case([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] => Ok(0))]
+    #[test_case([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF] => Ok(128))]
+    #[test_case([0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0] => Err(NotSubnetMaskError))]
+    fn test_ipv6_prefix_len_try_from_subnet_mask(
+        subnet_mask: [u8; 16],
+    ) -> Result<u8, NotSubnetMaskError> {
+        let subnet_mask = Ipv6Addr::from(subnet_mask);
+        PrefixLength::<Ipv6>::try_from_subnet_mask(subnet_mask).map(|prefix_len| prefix_len.get())
+    }
+
+    #[test_case(0 => true)]
+    #[test_case(1 => true)]
+    #[test_case(32 => true)]
+    #[test_case(33 => false)]
+    #[test_case(128 => false)]
+    #[test_case(129 => false)]
+    #[test_case(255 => false)]
+    fn test_ipv4_prefix_len_new(prefix_len: u8) -> bool {
+        PrefixLength::<Ipv4>::new(prefix_len).is_ok()
+    }
+
+    #[test_case(0 => true)]
+    #[test_case(1 => true)]
+    #[test_case(32 => true)]
+    #[test_case(33 => true)]
+    #[test_case(128 => true)]
+    #[test_case(129 => false)]
+    #[test_case(255 => false)]
+    fn test_ipv6_prefix_len_new(prefix_len: u8) -> bool {
+        PrefixLength::<Ipv6>::new(prefix_len).is_ok()
+    }
+
+    #[test_case(0 => [0, 0, 0, 0])]
+    #[test_case(6 => [252, 0, 0, 0])]
+    #[test_case(16 => [255, 255, 0, 0])]
+    #[test_case(25 => [255, 255, 255, 128])]
+    #[test_case(32 => [255, 255, 255, 255])]
+    fn test_ipv4_prefix_len_get_mask(prefix_len: u8) -> [u8; 4] {
+        let Ipv4Addr(inner) = PrefixLength::<Ipv4>::new(prefix_len).unwrap().get_mask();
+        inner
+    }
+
+    #[test_case(0 => [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])]
+    #[test_case(6 => [0xFC, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])]
+    #[test_case(64 => [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0])]
+    #[test_case(65 => [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x80, 0, 0, 0, 0, 0, 0, 0])]
+    #[test_case(128 => [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])]
+    fn test_ipv6_prefix_len_get_mask(prefix_len: u8) -> [u8; 16] {
+        let Ipv6Addr(inner) = PrefixLength::<Ipv6>::new(prefix_len).unwrap().get_mask();
+        inner
+    }
 
     #[test]
     fn test_ipv6_solicited_node() {

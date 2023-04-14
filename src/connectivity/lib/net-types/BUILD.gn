@@ -15,6 +15,7 @@ common_sources = [
   "src/ip.rs",
   "src/lib.rs",
 ]
+common_test_deps = [ "//third_party/rust_crates:test-case" ]
 
 rustc_library("net-types") {
   name = "net-types"
@@ -24,6 +25,7 @@ rustc_library("net-types") {
 
   deps = common_deps
   sources = common_sources
+  test_deps = common_test_deps
 
   features = [ "std" ]
 
@@ -38,6 +40,7 @@ rustc_library("net-types-nostd") {
 
   deps = common_deps
   sources = common_sources
+  test_deps = common_test_deps
 
   features = []
 
