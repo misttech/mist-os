@@ -264,7 +264,9 @@ BindResultTracker::BindResultTracker(size_t expected_result_count,
                                      NodeBindingInfoResultCallback result_callback)
     : expected_result_count_(expected_result_count),
       currently_reported_(0),
-      result_callback_(std::move(result_callback)) {}
+      result_callback_(std::move(result_callback)) {
+  ZX_ASSERT(expected_result_count > 0);
+}
 
 void BindResultTracker::ReportNoBind() {
   size_t current;

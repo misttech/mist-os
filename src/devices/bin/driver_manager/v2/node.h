@@ -39,6 +39,8 @@ using AddNodeResultCallback = fit::callback<void(
 using DestroyDriverComponentCallback =
     fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>;
 
+// Used to track binding results. Once the tracker reaches the expected result count, it invokes the
+// callback. The expected result count must be greater than 0.
 class BindResultTracker {
  public:
   explicit BindResultTracker(size_t expected_result_count,
