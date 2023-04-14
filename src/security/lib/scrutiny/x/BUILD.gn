@@ -29,14 +29,17 @@ if (is_host) {
       "src/scrutiny.rs",
       "src/system.rs",
       "src/todo.rs",
+      "src/update_package.rs",
     ]
 
     deps = [
       "//build/sdk/meta:rust",
+      "//src/lib/fuchsia-url",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/lib/fuchsia-pkg",
+      "//src/sys/pkg/lib/update-package",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:camino",
       "//third_party/rust_crates:rayon",
@@ -49,9 +52,14 @@ if (is_host) {
       "//src/security/lib/scrutiny/utils",
     ]
     test_deps = [
+      "//src/lib/assembly/assembly_manifest",
       "//src/lib/assembly/partitions_config",
+      "//src/lib/assembly/tool",
+      "//src/lib/assembly/update_package",
       "//src/lib/fuchsia",
+      "//src/sys/pkg/lib/epoch",
       "//third_party/rust_crates:maplit",
+      "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tempfile",
     ]

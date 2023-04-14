@@ -102,6 +102,8 @@ pub enum ProductBundleBuilderError {
         "attempted to build product bundle from unsupported product bundle format version: {version}"
     )]
     InvalidVerison { version: String },
+    #[error("attempted to build product bundle with no update package")]
+    MissingUpdatePackage,
 }
 
 /// Builder pattern for constructing instances of [`ProductBundle`].
@@ -131,10 +133,15 @@ impl ProductBundleBuilder {
             }
             SdkProductBundle::V2(product_bundle) => product_bundle,
         };
+        let update_package_hash = product_bundle
+            .update_package_hash
+            .ok_or_else(|| ProductBundleBuilderError::MissingUpdatePackage)?
+            .into();
         Ok(ProductBundle::new(ProductBundleData {
             directory: utf8_directory.into(),
             product_bundle,
             system_slot: self.system_slot,
+            update_package_hash,
         }))
     }
 }
@@ -158,6 +165,11 @@ impl ProductBundle {
         ProductBundleBuilder::new(directory, system_slot)
     }
 
+    /// Returns the Fuchsia merkle root hash of the update package in this product bundle.
+    pub fn update_package_hash(&self) -> &Hash {
+        &self.0.update_package_hash
+    }
+
     /// Constructs a data source that refers to this product bundle's repository.
     pub fn repositories(&self) -> impl Iterator<Item = ProductBundleRepository> {
         let product_bundle = self.clone();
@@ -166,6 +178,7 @@ impl ProductBundle {
         })
     }
 
+    /// Constructs a blob set that includes all blobs in this product bundle.
     pub fn blob_set(
         &self,
     ) -> Result<
@@ -216,6 +229,8 @@ struct ProductBundleData {
     product_bundle: SdkProductBundleV2,
     /// The system slot that this instance refers to.
     system_slot: SystemSlot,
+    /// The Fuchsia merkle root hash of the update package in this product bundle.
+    update_package_hash: Hash,
 }
 
 impl api::DataSource for ProductBundle {
@@ -403,6 +418,7 @@ type AbstractProductBundleRepositoryBlobSet = dyn blob::BlobSet<
     Error = BlobDirectoryError,
 >;
 
+#[derive(Clone)]
 pub struct ProductBundleRepositoryBlob {
     data_source: ProductBundleRepositoryBlobs,
     blob: FileBlob,
@@ -466,6 +482,7 @@ pub mod test {
 
     pub(crate) fn v2_sdk_a_product_bundle<P: AsRef<Path>>(
         product_bundle_path: P,
+        update_package_hash: Option<fuchsia_hash::Hash>,
     ) -> SdkProductBundle {
         let metadata_path = utf8_path_buf(
             product_bundle_path.as_ref().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_METADATA_PATH),
@@ -490,13 +507,14 @@ pub mod test {
                 snapshot_private_key_path: None,
                 timestamp_private_key_path: None,
             }],
-            update_package_hash: None,
+            update_package_hash,
             virtual_devices_path: None,
         })
     }
 
     pub(crate) fn v2_sdk_abr_product_bundle<P: AsRef<Path>>(
         product_bundle_path: P,
+        update_package_hash: Option<fuchsia_hash::Hash>,
     ) -> SdkProductBundle {
         let a_metadata_path = utf8_path_buf(
             product_bundle_path.as_ref().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_METADATA_PATH),
@@ -553,7 +571,7 @@ pub mod test {
                     timestamp_private_key_path: None,
                 },
             ],
-            update_package_hash: None,
+            update_package_hash,
             virtual_devices_path: None,
         })
     }
@@ -578,11 +596,20 @@ mod tests {
     use crate::product_bundle::test::utf8_path;
     use crate::product_bundle::test::v2_sdk_a_product_bundle;
     use crate::product_bundle::test::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH;
+    use sdk_metadata::ProductBundle as SdkProductBundle;
     use std::fs;
     use std::fs::File;
     use std::io::Write;
+    use std::path::Path;
     use std::path::PathBuf;
     use tempfile::TempDir;
+
+    fn v2_sdk_product_bundle<P: AsRef<Path>>(product_bundle_path: P) -> SdkProductBundle {
+        v2_sdk_a_product_bundle(
+            product_bundle_path,
+            Some(fuchsia_hash::Hash::from([0; fuchsia_hash::HASH_SIZE])), // update_package_hash
+        )
+    }
 
     #[fuchsia::test]
     fn test_builder_simple_failures() {
@@ -665,7 +692,7 @@ mod tests {
         fs::create_dir_all(&blobs_path_buf).unwrap();
 
         // Write product bundle manifest.
-        v2_sdk_a_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
+        v2_sdk_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
 
         // Instantiate product bundle under test.
         let product_bundle =
@@ -741,7 +768,7 @@ mod tests {
         fs::create_dir_all(&extra_dir_path_buf).unwrap();
 
         // Write product bundle manifest.
-        v2_sdk_a_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
+        v2_sdk_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
 
         // Instantiate product bundle under test.
         let product_bundle =

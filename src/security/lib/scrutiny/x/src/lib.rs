@@ -18,6 +18,7 @@ pub mod product_bundle;
 pub mod scrutiny;
 pub mod system;
 pub mod todo;
+pub mod update_package;
 
 // Directly expose all API types from top-level crate.
 pub use api::*;

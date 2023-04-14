@@ -367,6 +367,9 @@ pub enum DataSourceKind {
     /// A Zircon Boot Image (ZBI) file.
     Zbi,
 
+    /// Multiple kinds are associated with underlying data source(s).
+    Multiple(Vec<DataSourceKind>),
+
     // TODO(fxbug.dev/112121): Are there other data sources to consume?
     /// An artifact that was passed to a [`Scrutiny`] instance, but either its kind was not
     /// recognized, or the artifact was not a well-formed instance of the kind passed in.

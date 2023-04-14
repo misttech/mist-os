@@ -7,10 +7,12 @@
 #![allow(dead_code)]
 
 use crate::api;
+use crate::blob::BlobDirectoryError;
 use crate::blob::BlobSet;
+use crate::blob::CompositeBlobSet;
+use crate::data_source::BlobSource;
 use crate::hash::Hash;
-use crate::product_bundle::ProductBundleRepositoryBlobSet;
-use crate::product_bundle::ProductBundleRepositoryBlobs;
+use crate::product_bundle::ProductBundleRepositoryBlob;
 use fuchsia_archive::Error as FarError;
 use fuchsia_archive::Utf8Reader as FarReader;
 use fuchsia_merkle::Hash as FuchsiaMerkleHash;
@@ -71,7 +73,7 @@ impl api::MetaContents for MetaContents {
 
 /// Errors that can occur initializing a [`Package`] via `Package::new`.
 #[derive(Debug, Error)]
-enum PackageInitializationError {
+pub enum PackageInitializationError {
     #[error("error parsing meta/contents in meta.far: {0}")]
     MetaContentsError(#[from] FuchsiaMetaContentsError),
     #[error("error parsing meta/package in meta.far: {0}")]
@@ -93,8 +95,11 @@ pub struct Package<
 
 /// Unboxed production `crate::package::Package` implementation used by production
 /// `crate::api::Scrutiny` implementation.
-pub type ScrutinyPackage =
-    Package<ProductBundleRepositoryBlobs, ProductBundleRepositoryBlobSet, Box<dyn ReadSeek>>;
+pub type ScrutinyPackage = Package<
+    BlobSource,
+    CompositeBlobSet<ProductBundleRepositoryBlob, BlobDirectoryError>,
+    Box<dyn ReadSeek>,
+>;
 
 impl<
         PackageDataSource: Clone + api::DataSource,
@@ -115,7 +120,7 @@ impl<
 where
     <PackageBlobs as BlobSet>::Hash: From<FuchsiaMerkleHash>,
 {
-    fn new(
+    pub(crate) fn new(
         data_source: PackageDataSource,
         mut far_reader_seeker: FarReaderSeeker,
         blobs_source: PackageBlobs,

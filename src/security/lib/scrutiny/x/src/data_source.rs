@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use crate::api;
+use crate::blob::BlobSet as _;
+use crate::blob::CompositeBlobSet;
 use crate::product_bundle::DataSource as ProductBundleSource;
 use crate::product_bundle::ProductBundleRepositoryBlobs;
 use std::fmt::Debug;
@@ -70,13 +72,14 @@ impl api::DataSource for DataSource {
 }
 
 /// Unified `crate::api::DataSource` implementation over production blob types.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum BlobSource {
     #[cfg(test)]
     BlobFsArchive(blobfs::BlobFsArchive),
 
     BlobDirectory(BlobDirectory),
     ProductBundleRepositoryBlobs(ProductBundleRepositoryBlobs),
+    MultipleBlobSources(Vec<BlobSource>),
 }
 
 #[cfg(test)]
@@ -98,6 +101,17 @@ impl From<ProductBundleRepositoryBlobs> for BlobSource {
     }
 }
 
+impl<B: api::Blob, E: api::Error> From<CompositeBlobSet<B, E>> for BlobSource
+where
+    Self: From<B::DataSource>,
+{
+    fn from(composite_blob_set: CompositeBlobSet<B, E>) -> Self {
+        Self::MultipleBlobSources(
+            composite_blob_set.data_sources().map(Self::from).collect::<Vec<_>>(),
+        )
+    }
+}
+
 impl api::DataSource for BlobSource {
     type SourcePath = PathBuf;
 
@@ -109,6 +123,23 @@ impl api::DataSource for BlobSource {
             Self::BlobDirectory(blob_directory) => blob_directory.kind(),
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.kind()
+            }
+            Self::MultipleBlobSources(blob_sources) => {
+                let mut kinds = vec![];
+                for blob_source in blob_sources.into_iter() {
+                    let kind = blob_source.kind();
+                    match kind {
+                        api::DataSourceKind::Multiple(ks) => {
+                            kinds.extend(ks.into_iter());
+                        }
+                        kind => {
+                            if !kinds.contains(&kind) {
+                                kinds.push(kind);
+                            }
+                        }
+                    }
+                }
+                api::DataSourceKind::Multiple(kinds)
             }
         }
     }
@@ -122,6 +153,7 @@ impl api::DataSource for BlobSource {
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.parent()
             }
+            Self::MultipleBlobSources(_) => None,
         }
     }
 
@@ -136,6 +168,13 @@ impl api::DataSource for BlobSource {
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.children()
             }
+            Self::MultipleBlobSources(blob_sources) => {
+                let mut children = vec![];
+                for blob_source in blob_sources.into_iter() {
+                    children.extend(blob_source.children());
+                }
+                Box::new(children.into_iter())
+            }
         }
     }
 
@@ -148,6 +187,7 @@ impl api::DataSource for BlobSource {
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.path()
             }
+            Self::MultipleBlobSources(_) => None,
         }
     }
 
@@ -160,6 +200,7 @@ impl api::DataSource for BlobSource {
             Self::ProductBundleRepositoryBlobs(product_bundle_repository_blobs) => {
                 product_bundle_repository_blobs.version()
             }
+            Self::MultipleBlobSources(_) => api::DataSourceVersion::Unknown,
         }
     }
 }
@@ -170,7 +211,7 @@ pub mod blobfs {
     use std::iter;
     use std::path::PathBuf;
 
-    #[derive(Debug, Eq, Hash, PartialEq)]
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     pub struct BlobFsArchive {
         path: PathBuf,
     }
@@ -211,7 +252,7 @@ pub mod blobfs {
     }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BlobDirectory {
     directory: PathBuf,
 }

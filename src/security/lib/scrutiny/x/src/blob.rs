@@ -48,6 +48,7 @@ pub trait BlobSet {
     fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>>;
 }
 
+#[derive(Clone)]
 pub struct CompositeBlobSet<B: api::Blob + 'static, E: api::Error> {
     delegates:
         Vec<Rc<dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>>>,
@@ -518,12 +519,12 @@ impl BlobDirectoryBlobSetData {
 }
 
 /// Errors that can be encountered accessing blobs via a [`BlobDirectoryBlobSet`].
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum BlobDirectoryError {
     #[error("blob not found: {hash}, in blob directory: {directory}")]
     BlobNotFound { directory: PathBuf, hash: Hash },
-    #[error("error reading from blob directory: {directory}: {error}")]
-    IoError { directory: PathBuf, error: io::Error },
+    #[error("error reading from blob directory: {directory}: {io_error_string}")]
+    IoError { directory: PathBuf, io_error_string: String },
 }
 
 /// [`Iterator`] implementation for for blobs backed by a [`BlobDirectoryBlobSet`].
@@ -581,6 +582,7 @@ impl BlobSet for BlobDirectoryBlobSet {
 }
 
 /// [`Blob`] implementation for a blobs backed by a [`BlobDirectoryBlobSet`].
+#[derive(Clone)]
 pub struct FileBlob {
     hash: Hash,
     blob_set: BlobDirectoryBlobSet,
@@ -607,7 +609,7 @@ impl api::Blob for FileBlob {
         let path = self.blob_set.directory().join(&hash);
         Ok(Box::new(fs::File::open(&path).map_err(|error| BlobDirectoryError::IoError {
             directory: self.blob_set.directory().clone(),
-            error,
+            io_error_string: format!("{}", error),
         })?))
     }
 
