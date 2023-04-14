@@ -30,7 +30,7 @@ def parse_args():
 
 
 def write_file(file_path, package_list):
-    base = file_path
+    base = os.path.dirname(file_path)
     package_manifests = [
         os.path.relpath(path, base) + "\n" for path in package_list
     ]
