@@ -4,11 +4,13 @@
 
 use {
     anyhow::{format_err, Result},
-    display_utils::Controller,
+    display_utils::{Controller, PixelFormat},
 };
 
 mod double_buffered_fence_loop;
 mod static_config_vsync_loop;
+
+use crate::rgb::Rgb888;
 
 pub fn show_display_info(controller: &Controller, id: Option<u64>, fidl: bool) -> Result<()> {
     let displays = controller.displays();
@@ -23,7 +25,12 @@ pub fn show_display_info(controller: &Controller, id: Option<u64>, fidl: bool) -
     Ok(())
 }
 
-pub async fn vsync(controller: &Controller, id: Option<u64>) -> Result<()> {
+pub async fn vsync(
+    controller: &Controller,
+    id: Option<u64>,
+    color: Rgb888,
+    pixel_format: PixelFormat,
+) -> Result<()> {
     let displays = controller.displays();
     if displays.is_empty() {
         return Err(format_err!("no displays found"));
@@ -38,7 +45,11 @@ pub async fn vsync(controller: &Controller, id: Option<u64>) -> Result<()> {
             .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
     };
 
-    static_config_vsync_loop::run(controller, display).await
+    static_config_vsync_loop::run(
+        controller,
+        static_config_vsync_loop::Args { display, color, pixel_format },
+    )
+    .await
 }
 
 pub async fn squares(controller: &Controller, id: Option<u64>) -> Result<()> {

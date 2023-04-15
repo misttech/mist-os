@@ -14,17 +14,37 @@ use {
     std::io::Write,
 };
 
-use crate::{draw::MappedImage, fps::Counter};
+use crate::{draw::MappedImage, fps::Counter, rgb::Rgb888};
 
 const CLEAR: &str = "\x1B[2K\r";
 
-pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
+pub struct Args<'a> {
+    pub display: &'a DisplayInfo,
+    pub color: Rgb888,
+    pub pixel_format: PixelFormat,
+}
+
+pub fn get_bytes_for_rgb_color(rgb: Rgb888, pixel_format: PixelFormat) -> Result<Vec<u8>> {
+    match pixel_format {
+        PixelFormat::Argb8888 | PixelFormat::RgbX888 => {
+            Ok(vec![rgb.b, rgb.g, rgb.r, /*alpha=*/ 255])
+        }
+        PixelFormat::Abgr8888 | PixelFormat::Bgr888X => {
+            Ok(vec![rgb.r, rgb.g, rgb.b, /*alpha=*/ 255])
+        }
+        _ => Err(anyhow::format_err!("unsupported pixel format {}", pixel_format)),
+    }
+}
+
+pub async fn run<'a>(controller: &Controller, args: Args<'a>) -> Result<()> {
     // The display driver does not send vsync events to a client unless it successfully applies a
     // display configuration. Build a single full screen layer with a solid color to generate
     // hardware vsync events.
     // NOTE: An empty config results in artificial vsync events to be generated (notably in the
     // Intel driver). The config must contain at least one primary layer to obtain an accurate
     // hardware sample.
+
+    let Args { display, color, pixel_format } = args;
 
     // Obtain the display resolution based on the display's preferred mode.
     let (width, height) = {
@@ -34,13 +54,13 @@ pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
     let params = display_utils::ImageParameters {
         width,
         height,
-        pixel_format: PixelFormat::Argb8888,
+        pixel_format,
         color_space: fidl_fuchsia_sysmem::ColorSpaceType::Srgb,
         name: Some("display-tool vsync layer".to_string()),
     };
     let image = MappedImage::create(Image::create(controller.clone(), ImageId(1), &params).await?)?;
-    // Fill with Fuchsia as the color ([blue, green, red, alpha])
-    image.fill(&[255, 0, 255, 255]).context("failed to draw fill color")?;
+    let bytes_to_fill = get_bytes_for_rgb_color(color, pixel_format)?;
+    image.fill(&bytes_to_fill).context("failed to draw fill color")?;
 
     // Ensure that vsync events are enabled before we issue the first call to ApplyConfig.
     let mut vsync = controller.add_vsync_listener(Some(display.id()))?;

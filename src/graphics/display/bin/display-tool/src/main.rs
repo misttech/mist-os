@@ -5,17 +5,19 @@
 use {
     anyhow::Error,
     argh::FromArgs,
-    display_utils::Controller,
+    display_utils::{Controller, PixelFormat},
     fuchsia_async as fasync, fuchsia_trace_provider,
     futures::{
         future::{FutureExt, TryFutureExt},
         select,
     },
+    rgb::Rgb888,
 };
 
 mod commands;
 mod draw;
 mod fps;
+mod rgb;
 
 /// Top-level list of this tool's command-line arguments
 #[derive(FromArgs)]
@@ -44,6 +46,15 @@ struct VsyncArgs {
     /// ID of the display to show
     #[argh(positional)]
     id: Option<u64>,
+
+    /// screen fill color, using CSS hex syntax (rrggbb) without a leading #.
+    /// Default to 0000ff.
+    #[argh(option, default = "Rgb888{r: 0x00, g: 0x00, b: 0xff}")]
+    color: Rgb888,
+
+    /// pixel format. Default to ARGB8888.
+    #[argh(option, default = "PixelFormat::Argb8888")]
+    pixel_format: PixelFormat,
 }
 
 /// Play a double buffered animation using fence synchronization.
@@ -74,7 +85,9 @@ async fn main() -> Result<(), Error> {
     let cmd_future = async {
         match args.cmd {
             SubCommands::Info(args) => commands::show_display_info(&controller, args.id, args.fidl),
-            SubCommands::Vsync(args) => commands::vsync(&controller, args.id).await,
+            SubCommands::Vsync(args) => {
+                commands::vsync(&controller, args.id, args.color, args.pixel_format).await
+            }
             SubCommands::Squares(args) => commands::squares(&controller, args.id).await,
         }
     };

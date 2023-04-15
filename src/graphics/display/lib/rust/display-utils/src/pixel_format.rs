@@ -4,7 +4,7 @@
 
 #![allow(non_upper_case_globals)]
 
-use {fidl_fuchsia_sysmem as sysmem, std::fmt};
+use {fidl_fuchsia_sysmem as sysmem, std::fmt, std::str};
 
 // TODO(fxbug.dev/85320): This module is intended to provide some amount of compatibility between
 // the sysmem pixel format (the canonical Fuchsia image format) and zx_pixel_format_t (which is
@@ -156,5 +156,100 @@ impl fmt::Display for PixelFormat {
             PixelFormat::Nv12 => "NV12",
         };
         write!(f, "{}", string)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ParsePixelFormatError {
+    UnsupportedFormat(String),
+}
+
+impl fmt::Display for ParsePixelFormatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParsePixelFormatError::UnsupportedFormat(s) => write!(f, "Unsupported format {}", s),
+        }
+    }
+}
+
+impl str::FromStr for PixelFormat {
+    type Err = ParsePixelFormatError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "unknown" => Ok(PixelFormat::Unknown),
+            "mono8" => Ok(PixelFormat::Mono8),
+            "gray8" => Ok(PixelFormat::Gray8),
+            "rgb332" => Ok(PixelFormat::Rgb332),
+            "rgb2220" => Ok(PixelFormat::Rgb2220),
+            "rgb565" => Ok(PixelFormat::Rgb565),
+            "rgb888" => Ok(PixelFormat::Rgb888),
+            "bgr888x" => Ok(PixelFormat::Bgr888X),
+            "rgbx888" => Ok(PixelFormat::RgbX888),
+            "abgr8888" => Ok(PixelFormat::Abgr8888),
+            "argb8888" => Ok(PixelFormat::Argb8888),
+            "nv12" => Ok(PixelFormat::Nv12),
+            _ => Err(ParsePixelFormatError::UnsupportedFormat(s.to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[fuchsia::test]
+    fn pixel_format_from_str_invalid() {
+        assert_eq!(
+            PixelFormat::from_str("bad"),
+            Err(ParsePixelFormatError::UnsupportedFormat("bad".to_string()))
+        );
+        assert_eq!(
+            PixelFormat::from_str("rgba8888"),
+            Err(ParsePixelFormatError::UnsupportedFormat("rgba8888".to_string()))
+        );
+    }
+
+    #[fuchsia::test]
+    fn pixel_format_from_str_valid() {
+        assert_eq!(PixelFormat::from_str("unknown"), Ok(PixelFormat::Unknown));
+        assert_eq!(PixelFormat::from_str("mono8"), Ok(PixelFormat::Mono8));
+        assert_eq!(PixelFormat::from_str("gray8"), Ok(PixelFormat::Gray8));
+        assert_eq!(PixelFormat::from_str("rgb332"), Ok(PixelFormat::Rgb332));
+        assert_eq!(PixelFormat::from_str("rgb2220"), Ok(PixelFormat::Rgb2220));
+        assert_eq!(PixelFormat::from_str("rgb565"), Ok(PixelFormat::Rgb565));
+        assert_eq!(PixelFormat::from_str("rgb888"), Ok(PixelFormat::Rgb888));
+        assert_eq!(PixelFormat::from_str("bgr888x"), Ok(PixelFormat::Bgr888X));
+        assert_eq!(PixelFormat::from_str("rgbx888"), Ok(PixelFormat::RgbX888));
+        assert_eq!(PixelFormat::from_str("abgr8888"), Ok(PixelFormat::Abgr8888));
+        assert_eq!(PixelFormat::from_str("argb8888"), Ok(PixelFormat::Argb8888));
+        assert_eq!(PixelFormat::from_str("nv12"), Ok(PixelFormat::Nv12));
+
+        assert_eq!(PixelFormat::from_str("Unknown"), Ok(PixelFormat::Unknown));
+        assert_eq!(PixelFormat::from_str("Mono8"), Ok(PixelFormat::Mono8));
+        assert_eq!(PixelFormat::from_str("Gray8"), Ok(PixelFormat::Gray8));
+        assert_eq!(PixelFormat::from_str("Rgb332"), Ok(PixelFormat::Rgb332));
+        assert_eq!(PixelFormat::from_str("Rgb2220"), Ok(PixelFormat::Rgb2220));
+        assert_eq!(PixelFormat::from_str("Rgb565"), Ok(PixelFormat::Rgb565));
+        assert_eq!(PixelFormat::from_str("Rgb888"), Ok(PixelFormat::Rgb888));
+        assert_eq!(PixelFormat::from_str("Bgr888x"), Ok(PixelFormat::Bgr888X));
+        assert_eq!(PixelFormat::from_str("Rgbx888"), Ok(PixelFormat::RgbX888));
+        assert_eq!(PixelFormat::from_str("Abgr8888"), Ok(PixelFormat::Abgr8888));
+        assert_eq!(PixelFormat::from_str("Argb8888"), Ok(PixelFormat::Argb8888));
+        assert_eq!(PixelFormat::from_str("Nv12"), Ok(PixelFormat::Nv12));
+
+        assert_eq!(PixelFormat::from_str("UNKNOWN"), Ok(PixelFormat::Unknown));
+        assert_eq!(PixelFormat::from_str("MONO8"), Ok(PixelFormat::Mono8));
+        assert_eq!(PixelFormat::from_str("GRAY8"), Ok(PixelFormat::Gray8));
+        assert_eq!(PixelFormat::from_str("RGB332"), Ok(PixelFormat::Rgb332));
+        assert_eq!(PixelFormat::from_str("RGB2220"), Ok(PixelFormat::Rgb2220));
+        assert_eq!(PixelFormat::from_str("RGB565"), Ok(PixelFormat::Rgb565));
+        assert_eq!(PixelFormat::from_str("RGB888"), Ok(PixelFormat::Rgb888));
+        assert_eq!(PixelFormat::from_str("BGR888X"), Ok(PixelFormat::Bgr888X));
+        assert_eq!(PixelFormat::from_str("RGBX888"), Ok(PixelFormat::RgbX888));
+        assert_eq!(PixelFormat::from_str("ABGR8888"), Ok(PixelFormat::Abgr8888));
+        assert_eq!(PixelFormat::from_str("ARGB8888"), Ok(PixelFormat::Argb8888));
+        assert_eq!(PixelFormat::from_str("NV12"), Ok(PixelFormat::Nv12));
     }
 }
