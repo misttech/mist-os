@@ -1131,29 +1131,35 @@ zx_status_t AmlogicDisplay::Bind() {
   return ZX_OK;
 }
 
-// main bind function called from dev manager
-zx_status_t amlogic_display_bind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<AmlogicDisplay>(&ac, parent);
-  if (!ac.check()) {
+AmlogicDisplay::AmlogicDisplay(zx_device_t* parent) : DeviceType(parent) {}
+AmlogicDisplay::~AmlogicDisplay() = default;
+
+// static
+zx_status_t AmlogicDisplay::Create(zx_device_t* parent) {
+  fbl::AllocChecker alloc_checker;
+  auto dev = fbl::make_unique_checked<AmlogicDisplay>(&alloc_checker, parent);
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  auto status = dev->Bind();
+
+  const zx_status_t status = dev->Bind();
   if (status == ZX_OK) {
-    // devmgr is now in charge of the memory for dev
+    // devmgr now owns the memory for `dev`
     [[maybe_unused]] auto ptr = dev.release();
   }
   return status;
 }
 
-static constexpr zx_driver_ops_t amlogic_display_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = amlogic_display_bind;
-  return ops;
-}();
+namespace {
+
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = [](void* ctx, zx_device_t* parent) { return AmlogicDisplay::Create(parent); },
+};
+
+}  // namespace
 
 }  // namespace amlogic_display
 
 // clang-format off
-ZIRCON_DRIVER(amlogic_display, amlogic_display::amlogic_display_ops, "zircon", "0.1");
+ZIRCON_DRIVER(amlogic_display, amlogic_display::kDriverOps, "zircon", "0.1");

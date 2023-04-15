@@ -12,6 +12,7 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -68,7 +69,17 @@ class AmlogicDisplay
       public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol>,
       public ddk::DisplayClampRgbImplProtocol<AmlogicDisplay> {
  public:
-  AmlogicDisplay(zx_device_t* parent) : DeviceType(parent) {}
+  // Factory method used by the device manager glue code.
+  static zx_status_t Create(zx_device_t* parent);
+
+  explicit AmlogicDisplay(zx_device_t* parent);
+
+  AmlogicDisplay(const AmlogicDisplay&) = delete;
+  AmlogicDisplay(AmlogicDisplay&&) = delete;
+  AmlogicDisplay& operator=(const AmlogicDisplay&) = delete;
+  AmlogicDisplay& operator=(AmlogicDisplay&&) = delete;
+
+  ~AmlogicDisplay();
 
   // This function is called from the c-bind function upon driver matching
   zx_status_t Bind();
