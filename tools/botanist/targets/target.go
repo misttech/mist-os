@@ -613,6 +613,9 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 	// so we can use the ffx associated with the first target to set config values.
 	if len(targets) > 0 && targets[0].UseFFXExperimental(1) {
 		ffx := targets[0].GetFFX()
+		if err := ffx.ConfigSet(ctx, "fastboot.flash.timeout_rate", "4"); err != nil {
+			return err
+		}
 		if err := ffx.ConfigSet(ctx, "ffx.fastboot.inline_target", "true"); err != nil {
 			return err
 		}
