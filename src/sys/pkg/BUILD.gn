@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+
 group("pkg") {
   testonly = true
   deps = [
@@ -102,4 +104,13 @@ group("omaha-client-delayed-start") {
 group("pkgfs-disable-executability-restrictions") {
   public_deps = [ "bin/pkg-cache:disable-executability-restrictions" ]
   deps = [ "//build/validate:non_production_tag" ]
+}
+
+fuchsia_component("system-update-realm-component") {
+  manifest = "meta/system-update-realm.cml"
+  component_name = "system-update-realm"
+}
+
+fuchsia_package("system-update-realm") {
+  deps = [ ":system-update-realm-component" ]
 }

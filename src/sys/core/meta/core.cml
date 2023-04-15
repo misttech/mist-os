@@ -31,6 +31,13 @@
             startup: "eager",
             on_terminate: "reboot",
         },
+        // TODO(https://fxbug.dev/123798) Remove comment when this transformation is complete.
+        // This is the future home of system update-related components.
+        {
+            name: "system-update",
+            url: "fuchsia-pkg://fuchsia.com/system-update-realm#meta/system-update-realm.cm",
+            startup: "eager",
+        },
         {
             name: "mdns",
             url: "fuchsia-pkg://fuchsia.com/mdns#meta/mdns.cm",

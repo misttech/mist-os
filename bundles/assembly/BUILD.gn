@@ -204,6 +204,9 @@ assembly_input_bundle("core_realm") {
     # This is a required dependency of pkg-cache
     "//src/sys/pkg/bin/system-update-committer",
 
+    # This is the update realm which will contain system-update-committer
+    "//src/sys/pkg:system-update-realm",
+
     # Build-Information
     "//src/developer/build_info:build-info-service",
 
