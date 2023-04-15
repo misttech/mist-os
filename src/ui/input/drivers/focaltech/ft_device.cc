@@ -117,6 +117,11 @@ zx_status_t FtDevice::Init() {
     descriptor_len_ = get_ft6336_report_desc(&descriptor_);
   } else if (device_info.device_id == FOCALTECH_DEVICE_FT5726) {
     descriptor_len_ = get_ft5726_report_desc(&descriptor_);
+  } else if (device_info.device_id == FOCALTECH_DEVICE_FT5336) {
+    // Currently we assume the panel to be always Khadas TS050. If this changes,
+    // we may need extra information from the metadata to determine which HID
+    // report descriptor to use.
+    descriptor_len_ = get_ft5336_khadas_ts050_report_desc(&descriptor_);
   } else {
     zxlogf(ERROR, "focaltouch: unknown device ID %u", device_info.device_id);
     return ZX_ERR_INTERNAL;

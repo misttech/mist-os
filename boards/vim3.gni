@@ -39,6 +39,7 @@ _common_bootfs_deps = [
   "//src/graphics/display/drivers/dsi-dw",
   "//src/graphics/drivers/aml-gpu",
   "//src/ui/backlight/drivers/vim3-pwm-backlight",
+  "//src/ui/input/drivers/focaltech",
 ]
 
 board_bootfs_labels += _common_bootfs_deps

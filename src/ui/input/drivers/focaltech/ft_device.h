@@ -23,6 +23,7 @@
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <hid/ft3x27.h>
+#include <hid/ft5336_khadas_ts050.h>
 #include <hid/ft5726.h>
 #include <hid/ft6336.h>
 
