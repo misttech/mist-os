@@ -8,9 +8,11 @@
 
 mod insert_unique;
 
+mod named_map;
 mod paths;
 
 pub use insert_unique::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry};
+pub use named_map::NamedMap;
 pub use paths::{PathTypeMarker, TypedPathBuf};
 
 use anyhow::{Context as _, Result};

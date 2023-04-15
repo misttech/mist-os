@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
+use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry, NamedMap};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeMap;
@@ -12,14 +12,10 @@ use std::collections::BTreeMap;
 /// to it's source path on the filesystem.
 type FileEntryMap = BTreeMap<Utf8PathBuf, Utf8PathBuf>;
 
-/// A typename to clarify intent around what Strings are package names.
-type PackageName = String;
-
 // The config_data entries for each package, by package name
-type ConfigDataMap = BTreeMap<PackageName, FileEntryMap>;
+type ConfigDataMap = NamedMap<FileEntryMap>;
 
 /// A builder for the config_data package.
-#[derive(Default)]
 pub struct ConfigDataBuilder {
     /// A map of the files to put into config_data, by the name of the package
     /// that they are config_data for.
@@ -27,15 +23,20 @@ pub struct ConfigDataBuilder {
 }
 
 impl ConfigDataBuilder {
+    /// Construct a default ConfigDataBuilder.
+    pub fn default() -> Self {
+        ConfigDataBuilder { for_packages: ConfigDataMap::new("config data") }
+    }
+
     /// Add a file from the filesystem to config_data for a given package, at a
     /// particular path in the package's namespace.
     pub fn add_entry(
         &mut self,
-        package_name: &PackageName,
+        package_name: &str,
         destination: Utf8PathBuf,
         source: Utf8PathBuf,
     ) -> Result<()> {
-        let package_entries = self.for_packages.entry(package_name.clone()).or_default();
+        let package_entries = self.for_packages.entry(package_name.into()).or_default();
         package_entries.try_insert_unique(MapEntry(destination, source)).map_err(|error|
             anyhow!(
                 "Found a duplicate config_data entry for package '{}' at path: '{}': '{}' and was already '{}'",
@@ -51,7 +52,7 @@ impl ConfigDataBuilder {
         let outdir = outdir.as_ref().join("config_data");
         let mut package_builder = PackageBuilder::new("config-data");
 
-        for (package_name, entries) in self.for_packages {
+        for (package_name, entries) in self.for_packages.entries {
             for (destination_path, source_file) in entries {
                 let config_data_package_path =
                     Utf8PathBuf::from("meta/data").join(&package_name).join(destination_path);

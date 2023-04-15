@@ -20,6 +20,7 @@ rustc_library("util") {
   sources = [
     "src/insert_unique.rs",
     "src/lib.rs",
+    "src/named_map.rs",
     "src/paths.rs",
   ]
 }

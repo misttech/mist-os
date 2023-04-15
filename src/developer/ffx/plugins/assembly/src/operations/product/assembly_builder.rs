@@ -18,7 +18,7 @@ use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
 use assembly_util as util;
-use assembly_util::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry};
+use assembly_util::{InsertAllUniqueExt, InsertUniqueExt, NamedMap};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
@@ -638,71 +638,22 @@ impl PackageEntry {
     }
 }
 
-/// A named set of things, which are mapped by a String key.
-#[derive(Debug, Serialize)]
-struct NamedMap<T> {
-    /// The name of the Map.
-    name: String,
-
-    /// The entries in the map.
-    entries: BTreeMap<String, T>,
-}
-
-impl<T> NamedMap<T>
-where
-    T: std::fmt::Debug,
-{
-    /// Create a new, named, map.
-    fn new(name: &str) -> Self {
-        Self { name: name.to_owned(), entries: BTreeMap::new() }
-    }
-
-    fn try_insert_unique(&mut self, name: String, value: T) -> Result<()> {
-        let result = self.entries.try_insert_unique(MapEntry(name, value)).map_err(|e| {
-            format!(
-                "key: '{}'\n  existing value: {:#?}\n  new value: {:#?}",
-                e.key(),
-                e.previous_value(),
-                e.new_value()
-            )
-        });
-        // The error is mapped a second time to separate the borrow of entries
-        // from the borrow of name.
-        result.map_err(|e| anyhow!("duplicate entry in {}:\n  {}", self.name, e))
-    }
-}
-
-impl<T> std::ops::Deref for NamedMap<T> {
-    type Target = BTreeMap<String, T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.entries
-    }
-}
-
-impl<T> std::ops::DerefMut for NamedMap<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.entries
-    }
-}
-
-impl<T> IntoIterator for NamedMap<T> {
-    type Item = T;
-
-    type IntoIter = std::collections::btree_map::IntoValues<String, Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.entries.into_values()
-    }
-}
-
 /// A named set of packages with their manifests parsed into memory, keyed by package name.
-type PackageSet = NamedMap<PackageEntry>;
+#[derive(Debug, Serialize)]
+struct PackageSet {
+    map: NamedMap<PackageEntry>,
+}
+
 impl PackageSet {
+    /// Construct a PackageSet.
+    fn new(name: &str) -> Self {
+        PackageSet { map: NamedMap::new(name) }
+    }
+
     /// Add the package described by the ProductPackageSetEntry to the
     /// PackageSet
     fn add_package(&mut self, entry: PackageEntry) -> Result<()> {
-        self.try_insert_unique(entry.name().to_owned(), entry)
+        self.map.try_insert_unique(entry.name().to_owned(), entry)
     }
 
     /// Parse the given path as a PackageManifest, and add it to the PackageSet.
@@ -711,22 +662,47 @@ impl PackageSet {
             let entry = PackageEntry::parse_from(path)?;
             self.add_package(entry)
         }
-        .with_context(|| format!("Adding package to set: {}", self.name))
+        .with_context(|| format!("Adding package to set: {}", self.map.name))
     }
 
     /// Convert the PackageSet into an iterable collection of Paths.
     fn into_paths(self) -> impl Iterator<Item = Utf8PathBuf> {
-        self.entries.into_values().map(|e| e.path)
+        self.map.entries.into_values().map(|e| e.path)
     }
 }
 
-type FileEntryMap = NamedMap<Utf8PathBuf>;
+impl std::ops::Deref for PackageSet {
+    type Target = NamedMap<PackageEntry>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.map
+    }
+}
+
+impl std::ops::DerefMut for PackageSet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.map
+    }
+}
+
+/// A named set of file entries, keyed by file destination.
+#[derive(Debug, Serialize)]
+struct FileEntryMap {
+    map: NamedMap<Utf8PathBuf>,
+}
+
 impl FileEntryMap {
+    /// Construct a FileEntryMap.
+    fn new(name: &str) -> Self {
+        FileEntryMap { map: NamedMap::new(name) }
+    }
+
     /// Add a single FileEntry to the map, if the 'destination' path is a
     /// duplicate, return an error, otherwise add the entry.
     fn add_entry(&mut self, entry: FileEntry) -> Result<()> {
-        self.try_insert_unique(entry.destination, entry.source)
-            .with_context(|| format!("Adding entry to set: {}", self.name))
+        self.map
+            .try_insert_unique(entry.destination, entry.source)
+            .with_context(|| format!("Adding entry to set: {}", self.map.name))
     }
 
     /// Add FileEntries to the map, ensuring that the destination paths are all
@@ -740,10 +716,25 @@ impl FileEntryMap {
 
     /// Return the contents of the FileMap as a Vec<FileEntry>.
     fn into_file_entries(self) -> Vec<FileEntry> {
-        self.entries
+        self.map
+            .entries
             .into_iter()
             .map(|(destination, source)| FileEntry { destination, source })
             .collect()
+    }
+}
+
+impl std::ops::Deref for FileEntryMap {
+    type Target = NamedMap<Utf8PathBuf>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.map
+    }
+}
+
+impl std::ops::DerefMut for FileEntryMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.map
     }
 }
 
