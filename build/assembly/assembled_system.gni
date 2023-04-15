@@ -628,7 +628,7 @@ template("assembled_system") {
       cache_packages = _cache_packages
     }
 
-    config_data_packages = _base_packages + _universe_packages + _cache_packages
+    config_data_packages = _base_packages + _cache_packages
 
     boot_args = devmgr_config
 
