@@ -55,12 +55,18 @@ using DeviceType = ddk::Device<AmlHdmiDevice, ddk::Messageable<fuchsia_hardware_
 
 class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCounted<AmlHdmiDevice> {
  public:
-  explicit AmlHdmiDevice(zx_device_t* parent)
-      : DeviceType(parent),
-        HdmiIpBase(),
-        pdev_(parent),
-        hdmi_dw_(std::make_unique<hdmi_dw::HdmiDw>(this)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+  // Factory function called by the device manager binding code.
+  static zx_status_t Create(zx_device_t* parent);
+
+  explicit AmlHdmiDevice(zx_device_t* parent);
+
+  AmlHdmiDevice(const AmlHdmiDevice&) = delete;
+  AmlHdmiDevice(AmlHdmiDevice&&) = delete;
+  AmlHdmiDevice& operator=(const AmlHdmiDevice&) = delete;
+  AmlHdmiDevice& operator=(AmlHdmiDevice&&) = delete;
+
+  ~AmlHdmiDevice() override;
+
   zx_status_t Bind();
 
   void DdkUnbind(ddk::UnbindTxn txn) {
@@ -111,12 +117,8 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   //
   // `mmio` is the region documented as HDMITX in Section 8.1 "Memory Map" of
   // the AMLogic A311D datasheet.
-  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer mmio, std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw)
-      : DeviceType(parent),
-        pdev_(parent),
-        hdmi_dw_(std::move(hdmi_dw)),
-        hdmitx_mmio_(std::move(mmio)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
+                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw);
 
   void WriteIpReg(uint32_t addr, uint32_t data) override {
     fbl::AutoLock lock(&register_lock_);

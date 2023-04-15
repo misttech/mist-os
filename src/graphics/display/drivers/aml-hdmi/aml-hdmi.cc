@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-hdmi.h"
+#include "src/graphics/display/drivers/aml-hdmi/aml-hdmi.h"
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
+#include <zircon/assert.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 
 #include "src/graphics/display/drivers/aml-hdmi/aml-hdmi-bind.h"
-#include "top-regs.h"
+#include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
 
 #define HDMI_ASPECT_RATIO_NONE 0
 #define HDMI_ASPECT_RATIO_4x3 1
@@ -314,28 +315,48 @@ void AmlHdmiDevice::PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& comple
 }
 #undef PRINT_REG
 
-// main bind function called from dev manager
-zx_status_t AmlHdmiBind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<aml_hdmi::AmlHdmiDevice>(&ac, parent);
-  if (!ac.check()) {
+// static
+zx_status_t AmlHdmiDevice::Create(zx_device_t* parent) {
+  fbl::AllocChecker alloc_checker;
+  auto dev = fbl::make_unique_checked<aml_hdmi::AmlHdmiDevice>(&alloc_checker, parent);
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   auto status = dev->Bind();
   if (status == ZX_OK) {
-    // devmgr is now in charge of the memory for dev
+    // devmgr now owns the memory for `dev`.
     [[maybe_unused]] auto ptr = dev.release();
   }
   return status;
 }
 
-constexpr zx_driver_ops_t aml_hdmi_ops = [] {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = AmlHdmiBind;
-  return ops;
-}();
+AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
+    : DeviceType(parent),
+      pdev_(parent),
+      hdmi_dw_(std::make_unique<hdmi_dw::HdmiDw>(this)),
+      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+
+AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
+                             std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw)
+    : DeviceType(parent),
+      pdev_(parent),
+      hdmi_dw_(std::move(hdmi_dw)),
+      hdmitx_mmio_(std::move(hdmitx_mmio)),
+      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+  ZX_DEBUG_ASSERT(hdmi_dw_);
+}
+
+AmlHdmiDevice::~AmlHdmiDevice() = default;
+
+namespace {
+
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = [](void* ctx, zx_device_t* parent) { return AmlHdmiDevice::Create(parent); },
+};
+
+}  // namespace
 
 }  // namespace aml_hdmi
 
-ZIRCON_DRIVER(aml_hdmi, aml_hdmi::aml_hdmi_ops, "zircon", "0.1");
+ZIRCON_DRIVER(aml_hdmi, aml_hdmi::kDriverOps, "zircon", "0.1");
