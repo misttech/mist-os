@@ -22,8 +22,11 @@ def get_relative_path(relative_path: str, relative_to_file: str) -> str:
 
 
 def add_inputs_from_packages(
-        package_paths: Set[FilePath], all_manifest_paths: Set[FilePath],
-        inputs: List[FilePath], include_blobs: bool):
+        package_paths: Set[FilePath],
+        all_manifest_paths: Set[FilePath],
+        inputs: List[FilePath],
+        include_blobs: bool,
+        in_subpackage: bool = False):
     anonymous_subpackages: Set[FilePath] = set()
     for manifest_path in package_paths:
         inputs.append(manifest_path)
@@ -31,7 +34,10 @@ def add_inputs_from_packages(
         with open(manifest_path, 'r') as f:
             package_manifest = json_load(PackageManifest, f)
 
-        if include_blobs:
+        # Loading file-relative subpackages ends up statting blobs in the
+        # subpackages, so we need to also mark that they get accessed.
+        if include_blobs or (in_subpackage and
+                             package_manifest.blob_sources_relative == 'file'):
             for blob in package_manifest.blobs:
                 blob_source = blob.source_path
 
@@ -53,7 +59,11 @@ def add_inputs_from_packages(
 
     if anonymous_subpackages:
         add_inputs_from_packages(
-            anonymous_subpackages, all_manifest_paths, inputs, include_blobs)
+            anonymous_subpackages,
+            all_manifest_paths,
+            inputs,
+            include_blobs,
+            in_subpackage=True)
 
 
 def main():

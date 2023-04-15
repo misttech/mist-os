@@ -130,6 +130,13 @@ pub struct CreateUpdateArgs {
     #[argh(option)]
     pub rewrite_default_repo: Option<String>,
 
+    /// name to give the Subpackage Blobs Package.
+    /// This is currently only used by OTA tests to allow publishing multiple
+    /// subpackage blob packages to the same amber repository without naming
+    /// collisions.
+    #[argh(option, default = "default_subpackage_blobs_package_name()")]
+    pub subpackage_blobs_package_name: String,
+
     /// name to give the Update Package.
     /// This is currently only used by OTA tests to allow publishing multiple
     /// update packages to the same amber repository without naming collisions.
@@ -143,6 +150,10 @@ pub struct CreateUpdateArgs {
     /// directory to write intermediate files.
     #[argh(option)]
     pub gendir: Option<Utf8PathBuf>,
+}
+
+fn default_subpackage_blobs_package_name() -> String {
+    "subpackage_blobs".into()
 }
 
 /// Perform size checks (on packages or product based on the sub-command).

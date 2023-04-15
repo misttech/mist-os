@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::subpackage_blobs_package::construct_subpackage_blobs_package;
 use anyhow::{Context, Result};
 use assembly_manifest::{AssemblyManifest, Image, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
@@ -28,6 +29,17 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     let system_a_manifest =
         args.system_a.as_ref().map(AssemblyManifest::try_load_from).transpose()?;
 
+    let subpackage_blobs_package = if let Some(manifest) = &system_a_manifest {
+        Some(construct_subpackage_blobs_package(
+            manifest,
+            &args.outdir,
+            if let Some(gendir) = &args.gendir { gendir } else { &args.outdir },
+            &args.subpackage_blobs_package_name,
+        )?)
+    } else {
+        None
+    };
+
     let mut builder = UpdatePackageBuilder::new(
         Box::new(sdk_tools),
         partitions,
@@ -48,6 +60,11 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     if let Some(manifest) = &system_a_manifest {
         let mut packages = create_update_packages_manifest(manifest)?;
 
+        // Inject the subpackage blobs package into the update package.
+        if let Some(subpackage_blobs_package) = &subpackage_blobs_package {
+            packages.add_by_manifest(&subpackage_blobs_package.manifest)?;
+        };
+
         // Rewrite all the package URLs to use this repo as the repository.
         if let Some(default_repo) = args.rewrite_default_repo {
             let default_repo = RepositoryUrl::parse_host(default_repo)?;
@@ -63,9 +80,7 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     }
 
     // Set the images to update in the primary slot.
-    if let Some(manifest) =
-        args.system_a.as_ref().map(AssemblyManifest::try_load_from).transpose()?
-    {
+    if let Some(manifest) = system_a_manifest {
         builder.add_slot_images(Slot::Primary(manifest));
     }
 

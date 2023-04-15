@@ -22,6 +22,9 @@ template("update_package") {
         "${target_out_dir}/${target_name}_hermetic_inputs.d"
     outdir = "$target_out_dir/$target_name"
     gendir = "$outdir/gen"
+    subpackage_blobs_package = "$outdir/subpackage_blobs/meta.far"
+    subpackage_blobs_package_manifest =
+        "$outdir/subpackage_blobs/package_manifest.json"
     update_package = "$outdir/update.far"
     update_package_manifest = "$outdir/update_package_manifest.json"
     update_images_fuchsia_package = "$outdir/update_images_fuchsia.far"
@@ -33,6 +36,9 @@ template("update_package") {
     update_images_firmware_package = "$outdir/update_images_firmware.far"
     update_images_firmware_package_manifest =
         "$outdir/update_images_firmware_package_manifest.json"
+    subpackage_blobs_meta_package = "$gendir/subpackage_blobs/meta/package"
+    subpackage_blobs_abi_revision =
+        "$gendir/subpackage_blobs/meta/fuchsia.abi/abi-revision"
     update_meta_package = "$gendir/update/meta/package"
     update_abi_revision = "$gendir/update/meta/fuchsia.abi/abi-revision"
     update_images_fuchsia_meta_package =
@@ -142,6 +148,10 @@ template("update_package") {
     }
 
     outputs = [
+      files.subpackage_blobs_package,
+      files.subpackage_blobs_package_manifest,
+      files.subpackage_blobs_meta_package,
+      files.subpackage_blobs_abi_revision,
       files.update_package,
       files.update_package_manifest,
       files.update_images_fuchsia_package,
@@ -196,10 +206,17 @@ template("update_package") {
       inputs += [ invoker.system_r ]
     }
 
-    if (defined(invoker.name)) {
+    if (defined(invoker.update_package_name)) {
       args += [
         "--update-package-name",
-        invoker.name,
+        invoker.update_package_name,
+      ]
+    }
+
+    if (defined(invoker.subpackage_blobs_package_name)) {
+      args += [
+        "--subpackage-blobs-package-name",
+        invoker.subpackage_blobs_package_name,
       ]
     }
 
@@ -207,6 +224,7 @@ template("update_package") {
       # We generated some PackageManifests. We need to declare them, so that
       # these packages are published into TUF.
       package_output_manifests = [
+        files.subpackage_blobs_package_manifest,
         files.update_package_manifest,
         files.update_images_fuchsia_package_manifest,
         files.update_images_recovery_package_manifest,

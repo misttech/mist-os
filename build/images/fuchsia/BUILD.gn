@@ -567,7 +567,8 @@ if (is_fuchsia) {
       partitions_config_label,
       recovery_label,
     ]
-    name = "update_prime"
+    update_package_name = "update_prime"
+    subpackage_blobs_package_name = "subpackage_blobs_prime"
     partitions = _partitions_config_file
     system_a = files.images_prime_json
     system_r = files.recovery_images_json

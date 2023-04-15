@@ -18,6 +18,7 @@ mod extra_hash_descriptor;
 mod fvm;
 mod fxfs;
 mod operations;
+mod subpackage_blobs_package;
 mod zbi;
 use assembly_components as _;
 
