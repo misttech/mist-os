@@ -341,7 +341,6 @@ if (is_fuchsia) {
       recovery_label,
     ]
     partitions = _partitions_config_file
-    packages = files.packages_json
     system_a = files.images_json
     system_r = files.recovery_images_json
     board_name = board_name
@@ -570,7 +569,6 @@ if (is_fuchsia) {
     ]
     name = "update_prime"
     partitions = _partitions_config_file
-    packages = files.packages_prime_json
     system_a = files.images_prime_json
     system_r = files.recovery_images_json
     board_name = board_name

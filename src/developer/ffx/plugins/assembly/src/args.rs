@@ -99,10 +99,6 @@ fn default_package_mode() -> PackageMode {
 #[derive(Debug, FromArgs, PartialEq)]
 #[argh(subcommand, name = "create-update")]
 pub struct CreateUpdateArgs {
-    /// path to a packages manifest, which specifies what packages to update.
-    #[argh(option)]
-    pub packages: Option<Utf8PathBuf>,
-
     /// path to a partitions config, which specifies where in the partition
     /// table the images are put.
     #[argh(option)]

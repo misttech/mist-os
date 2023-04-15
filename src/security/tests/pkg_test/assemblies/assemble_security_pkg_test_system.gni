@@ -256,11 +256,9 @@ template("assemble_security_pkg_test_system") {
 
     if (defined(invoker.update_domain)) {
       deps += [ ":${labels.assembly}" ]
-      packages = files.assembly_out_packages_json
       rewrite_default_repo = invoker.update_domain
     } else {
       deps += [ ":${labels.packages_json}" ]
-      packages = files.packages_json
     }
   }
 

@@ -109,7 +109,6 @@ if (is_fuchsia) {
       "//build/info:latest-commit-date",
     ]
     partitions = files.partitions_config
-    packages = files.packages_json
     system_a = files.images_json
     version_file = build_info_files.version
     board_name = "fake_board"

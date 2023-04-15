@@ -18,6 +18,8 @@ template("update_package") {
 
   files = {
     hermetic_inputs = "${target_out_dir}/${target_name}_hermetic_inputs"
+    hermetic_inputs_depfile =
+        "${target_out_dir}/${target_name}_hermetic_inputs.d"
     outdir = "$target_out_dir/$target_name"
     gendir = "$outdir/gen"
     update_package = "$outdir/update.far"
@@ -66,12 +68,15 @@ template("update_package") {
 
     inputs = [ invoker.partitions ]
     outputs = [ files.hermetic_inputs ]
+    depfile = files.hermetic_inputs_depfile
 
     args = [
       "--partitions",
       rebase_path(invoker.partitions, root_build_dir),
       "--output",
       rebase_path(files.hermetic_inputs, root_build_dir),
+      "--depfile",
+      rebase_path(files.hermetic_inputs_depfile, root_build_dir),
     ]
 
     if (defined(invoker.system_a) || defined(invoker.system_b) ||
@@ -166,14 +171,6 @@ template("update_package") {
       invoker.partitions,
       invoker.version_file,
     ]
-
-    if (defined(invoker.packages)) {
-      args += [
-        "--packages",
-        rebase_path(invoker.packages, root_build_dir),
-      ]
-      inputs += [ invoker.packages ]
-    }
 
     if (defined(invoker.system_a)) {
       args += [

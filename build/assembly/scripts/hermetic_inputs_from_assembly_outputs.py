@@ -17,35 +17,43 @@ from typing import List, Set
 def get_relative_path(relative_path: str, relative_to_file: str) -> str:
     file_parent = os.path.dirname(relative_to_file)
     path = os.path.join(file_parent, relative_path)
-    path = os.path.realpath(path)
     path = os.path.relpath(path, os.getcwd())
     return path
 
 
 def add_inputs_from_packages(
         package_paths: Set[FilePath], all_manifest_paths: Set[FilePath],
-        inputs: List[FilePath]):
+        inputs: List[FilePath], include_blobs: bool):
     anonymous_subpackages: Set[FilePath] = set()
     for manifest_path in package_paths:
         inputs.append(manifest_path)
+
         with open(manifest_path, 'r') as f:
             package_manifest = json_load(PackageManifest, f)
+
+        if include_blobs:
             for blob in package_manifest.blobs:
                 blob_source = blob.source_path
-                if package_manifest.blob_sources_relative:
+
+                if package_manifest.blob_sources_relative == 'file':
                     blob_source = get_relative_path(blob_source, manifest_path)
+
                 inputs.append(blob_source)
-            for subpackage in package_manifest.subpackages:
-                subpackage_path = subpackage.manifest_path
-                if package_manifest.blob_sources_relative:
-                    subpackage_path = get_relative_path(
-                        subpackage_path, manifest_path)
-                if not subpackage_path in all_manifest_paths:
-                    anonymous_subpackages.add(subpackage_path)
-                    all_manifest_paths.add(subpackage_path)
+
+        for subpackage in package_manifest.subpackages:
+            subpackage_path = subpackage.manifest_path
+
+            if package_manifest.blob_sources_relative == 'file':
+                subpackage_path = get_relative_path(
+                    subpackage_path, manifest_path)
+
+            if not subpackage_path in all_manifest_paths:
+                anonymous_subpackages.add(subpackage_path)
+                all_manifest_paths.add(subpackage_path)
+
     if anonymous_subpackages:
         add_inputs_from_packages(
-            anonymous_subpackages, all_manifest_paths, inputs)
+            anonymous_subpackages, all_manifest_paths, inputs, include_blobs)
 
 
 def main():
@@ -101,11 +109,8 @@ def main():
         manifest_path = os.path.dirname(image_manifest_file.name)
         for image in image_manifest:
             inputs.append(os.path.join(manifest_path, image['path']))
-            if not args.include_blobs:
-                continue
 
-            # If we must include blobs, then collect the package manifests from
-            # the blobfs image.
+            # Collect the package manifests from the blobfs image.
             if image['type'] == 'blk' and image['name'] == 'blob':
                 packages = []
                 packages.extend(image['contents']['packages'].get('base', []))
@@ -119,7 +124,11 @@ def main():
     # If we collected any package manifests, include all the blobs referenced
     # by them.
     all_manifest_paths: Set[FilePath] = set(package_manifest_paths)
-    add_inputs_from_packages(package_manifest_paths, all_manifest_paths, inputs)
+    add_inputs_from_packages(
+        package_manifest_paths,
+        all_manifest_paths,
+        inputs,
+        include_blobs=args.include_blobs)
 
     # Write the hermetic inputs file.
     args.output.writelines(f"{input}\n" for input in sorted(inputs))

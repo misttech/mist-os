@@ -3,15 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_manifest::AssemblyManifest;
+use assembly_manifest::{AssemblyManifest, Image, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
 use assembly_tool::SdkToolProvider;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
-use assembly_util::from_reader;
 use epoch::EpochFile;
 use ffx_assembly_args::CreateUpdateArgs;
+use fuchsia_pkg::PackageManifest;
 use fuchsia_url::RepositoryUrl;
+use std::collections::BTreeSet;
 use std::fs::File;
 
 pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
@@ -23,6 +24,10 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     let partitions = PartitionsConfig::from_reader(&mut file)
         .context("Failed to parse the partitions config")?;
     let epoch: EpochFile = EpochFile::Version1 { epoch: args.epoch };
+
+    let system_a_manifest =
+        args.system_a.as_ref().map(AssemblyManifest::try_load_from).transpose()?;
+
     let mut builder = UpdatePackageBuilder::new(
         Box::new(sdk_tools),
         partitions,
@@ -40,12 +45,8 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     }
 
     // Add the packages to update.
-    if let Some(packages_path) = &args.packages {
-        let mut file = File::open(packages_path)
-            .with_context(|| format!("Failed to open: {packages_path}"))?;
-
-        let mut packages: UpdatePackagesManifest =
-            from_reader(&mut file).context("Failed to parse the packages manifest")?;
+    if let Some(manifest) = &system_a_manifest {
+        let mut packages = create_update_packages_manifest(manifest)?;
 
         // Rewrite all the package URLs to use this repo as the repository.
         if let Some(default_repo) = args.rewrite_default_repo {
@@ -77,4 +78,22 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
 
     builder.build()?;
     Ok(())
+}
+
+fn create_update_packages_manifest(
+    assembly_manifest: &AssemblyManifest,
+) -> Result<UpdatePackagesManifest> {
+    let mut packages_manifest = UpdatePackagesManifest::V1(BTreeSet::new());
+    for image in &assembly_manifest.images {
+        if let Image::BlobFS { contents, .. } = image {
+            let PackagesMetadata { base, cache } = &contents.packages;
+
+            for package in base.0.iter().chain(cache.0.iter()) {
+                let manifest = PackageManifest::try_load_from(&package.manifest)?;
+                packages_manifest.add_by_manifest(&manifest)?;
+            }
+        }
+    }
+
+    Ok(packages_manifest)
 }
