@@ -30,9 +30,9 @@ class AmlCanvas;
 using DeviceType = ddk::Device<AmlCanvas>;
 
 struct CanvasEntry {
-  CanvasEntry(CanvasEntry&&) = default;
   CanvasEntry() = default;
 
+  CanvasEntry(CanvasEntry&&) = default;
   CanvasEntry& operator=(CanvasEntry&& right) {
     if (this == &right)
       return *this;
@@ -59,13 +59,19 @@ struct CanvasEntry {
 class AmlCanvas : public DeviceType,
                   public ddk::AmlogicCanvasProtocol<AmlCanvas, ddk::base_protocol> {
  public:
+  // Factory method called by the device manager binding code.
+  static zx_status_t Create(zx_device_t* parent);
+
   // `mmio` is the region documented as DMC in Section 8.1 "Memory Map" of the
   // AMLogic A311D datasheet.
-  AmlCanvas(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti)
-      : DeviceType(parent), dmc_regs_(std::move(mmio)), bti_(std::move(bti)) {}
+  AmlCanvas(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti);
 
-  // This function is called from the c-bind function upon driver matching
-  static zx_status_t Setup(zx_device_t* parent);
+  AmlCanvas(const AmlCanvas&) = delete;
+  AmlCanvas(AmlCanvas&&) = delete;
+  AmlCanvas& operator=(const AmlCanvas&) = delete;
+  AmlCanvas& operator=(AmlCanvas&&) = delete;
+
+  ~AmlCanvas();
 
   // Required by ddk::AmlogicCanvasProtocol
   zx_status_t AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const canvas_info_t* info,

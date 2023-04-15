@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-canvas.h"
+#include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
-#include <assert.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <zircon/pixelformat.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <string>
 
@@ -21,8 +23,8 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "dmc-regs.h"
 #include "src/graphics/display/drivers/aml-canvas/aml_canvas-bind.h"
+#include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
 
 namespace aml_canvas {
 
@@ -142,22 +144,25 @@ zx_status_t AmlCanvas::AmlogicCanvasFree(uint8_t canvas_idx) {
 }
 
 void AmlCanvas::DdkRelease() {
-  lock_.Acquire();
-  for (uint32_t index = 0; index < kNumCanvasEntries; index++) {
-    entries_[index] = CanvasEntry();
+  {
+    fbl::AutoLock lock(&lock_);
+    for (uint32_t index = 0; index < kNumCanvasEntries; index++) {
+      entries_[index] = CanvasEntry();
+    }
   }
-  lock_.Release();
   delete this;
 }
 
-// static funtion to create the canvas object and initialize its members
-zx_status_t AmlCanvas::Setup(zx_device_t* parent) {
+// static
+zx_status_t AmlCanvas::Create(zx_device_t* parent) {
   // Get device protocol
-  ddk::PDevFidl pdev(parent);
-  if (!pdev.is_valid()) {
-    CANVAS_ERROR("Could not get parent protocol\n");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent);
+  if (pdev_result.is_error()) {
+    CANVAS_ERROR("Could not get parent protocol: %s", pdev_result.status_string());
+    return pdev_result.error_value();
   }
+
+  ddk::PDevFidl pdev = std::move(pdev_result).value();
 
   // Get BTI handle
   zx::bti bti;
@@ -171,14 +176,14 @@ zx_status_t AmlCanvas::Setup(zx_device_t* parent) {
   std::optional<fdf::MmioBuffer> mmio;
   status = pdev.MapMmio(0, &mmio);
   if (status != ZX_OK) {
-    CANVAS_ERROR("Could not map DMC registers %d\n", status);
+    CANVAS_ERROR("Could not map DMC registers: %s\n", zx_status_get_string(status));
     return status;
   }
 
-  fbl::AllocChecker ac;
-  auto canvas = fbl::make_unique_checked<aml_canvas::AmlCanvas>(&ac, parent, *std::move(mmio),
-                                                                std::move(bti));
-  if (!ac.check()) {
+  fbl::AllocChecker alloc_checker;
+  auto canvas = fbl::make_unique_checked<aml_canvas::AmlCanvas>(
+      &alloc_checker, parent, std::move(mmio).value(), std::move(bti));
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -192,33 +197,25 @@ zx_status_t AmlCanvas::Setup(zx_device_t* parent) {
     return status;
   }
 
-  // devmgr is now in charge of the memory for canvas
+  // devmgr now owns the memory for `canvas`.
   [[maybe_unused]] auto ptr = canvas.release();
-
-  return status;
+  return ZX_OK;
 }
 
-}  // namespace aml_canvas
+AmlCanvas::AmlCanvas(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti)
+    : DeviceType(parent), dmc_regs_(std::move(mmio)), bti_(std::move(bti)) {}
+
+AmlCanvas::~AmlCanvas() = default;
 
 namespace {
 
-static zx_status_t aml_canvas_bind(void* ctx, zx_device_t* parent) {
-  zx_status_t status = aml_canvas::AmlCanvas::Setup(parent);
-  if (status != ZX_OK) {
-    CANVAS_ERROR("Could not set up aml canvas device: %d\n", status);
-  }
-
-  return status;
-}
-
-static constexpr zx_driver_ops_t aml_canvas_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = aml_canvas_bind;
-  return ops;
-}();
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = [](void* ctx, zx_device_t* parent) { return AmlCanvas::Create(parent); }};
 
 }  // namespace
 
+}  // namespace aml_canvas
+
 // clang-format off
-ZIRCON_DRIVER(aml_canvas, aml_canvas_driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(aml_canvas, aml_canvas::kDriverOps, "zircon", "0.1");
