@@ -32,8 +32,19 @@ fuchsia_test_component("getifaddrs-test") {
   ]
 }
 
+fuchsia_test_component("getifaddrs-test-ns3") {
+  manifest = "meta/getifaddrs-test.cml"
+  deps = [
+    ":test-driver",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-netstack3",
+  ]
+}
+
 fuchsia_test_package("getifaddrs-tests") {
-  test_components = [ ":getifaddrs-test" ]
+  test_components = [
+    ":getifaddrs-test",
+    ":getifaddrs-test-ns3",
+  ]
 }
 
 group("tests") {

@@ -16,7 +16,6 @@
                 "NetDatagramTest.DatagramSendtoV*RecvfromV*",
                 "NetDatagramTest.ConnectUnspecV*",
                 "NetDatagramTest.PingIpv4LoopbackAddresses",
-                "IoctlTest.IoctlGetInterfaceFlags",
                 "IOSendingMethodTests/IOSendingMethodTest*",
 
                 // Observing errors.

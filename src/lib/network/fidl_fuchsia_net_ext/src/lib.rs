@@ -10,7 +10,7 @@ use std::fmt::Display;
 use fidl_fuchsia_net as fidl;
 
 use anyhow;
-use net_types::ip;
+use net_types::{ip, Witness as _};
 
 /// Extension trait to provides access to FIDL types.
 pub trait NetTypesIpAddressExt: ip::IpAddress {
@@ -87,6 +87,22 @@ impl<A: ip::IpAddress> FromExt<ip::Subnet<A>> for fidl::Subnet {
     fn from_ext(subnet: ip::Subnet<A>) -> fidl::Subnet {
         let addr: ip::IpAddr = subnet.network().into();
         fidl::Subnet { addr: addr.into_ext(), prefix_len: subnet.prefix() }
+    }
+}
+
+impl<A: ip::IpAddress> FromExt<ip::AddrSubnet<A>> for fidl::Subnet {
+    fn from_ext(subnet: ip::AddrSubnet<A>) -> fidl::Subnet {
+        let addr: ip::IpAddr = subnet.addr().get().into();
+        fidl::Subnet { addr: addr.into_ext(), prefix_len: subnet.subnet().prefix() }
+    }
+}
+
+impl FromExt<ip::AddrSubnetEither> for fidl::Subnet {
+    fn from_ext(addr_subnet: ip::AddrSubnetEither) -> fidl::Subnet {
+        match addr_subnet {
+            ip::AddrSubnetEither::V4(addr_subnet) => addr_subnet.into_ext(),
+            ip::AddrSubnetEither::V6(addr_subnet) => addr_subnet.into_ext(),
+        }
     }
 }
 
@@ -503,7 +519,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use net_declare::{
-        fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix, fidl_subnet, net_subnet_v4, net_subnet_v6,
+        fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix, fidl_subnet, net_addr_subnet,
+        net_addr_subnet_v4, net_addr_subnet_v6, net_subnet_v4, net_subnet_v6,
     };
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -615,6 +632,31 @@ mod tests {
         assert_matches!(
             ip::Subnet::<ip::Ipv6Addr>::try_from_ext(fidl_ip_v6_with_prefix!("fe80::1/64")),
             Err(ip::SubnetError::HostBitsSet)
+        );
+    }
+
+    #[test]
+    fn test_addr_subnet_fidl_subnet() {
+        assert_eq!(
+            fidl::Subnet::from_ext(net_addr_subnet_v4!("192.168.0.8/24")),
+            fidl_subnet!("192.168.0.8/24")
+        );
+
+        assert_eq!(
+            fidl::Subnet::from_ext(net_addr_subnet_v6!("fe80::1234/54")),
+            fidl_subnet!("fe80::1234/54")
+        );
+    }
+
+    #[test]
+    fn test_addr_subnet_either_fidl_subnet() {
+        assert_eq!(
+            fidl::Subnet::from_ext(net_addr_subnet!("192.168.0.8/24")),
+            fidl_subnet!("192.168.0.8/24")
+        );
+        assert_eq!(
+            fidl::Subnet::from_ext(net_addr_subnet!("fe80::1234/54")),
+            fidl_subnet!("fe80::1234/54")
         );
     }
 

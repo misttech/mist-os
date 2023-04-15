@@ -32,7 +32,10 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices::{BindingId, Devices},
+    devices::{
+        BindingId, DeviceSpecificInfo, Devices, DynamicCommonInfo, DynamicNetdeviceInfo,
+        LoopbackInfo, NetdeviceInfo, StaticCommonInfo,
+    },
     util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
     Ctx, DeviceIdExt as _,
 };
@@ -82,9 +85,8 @@ pub(crate) async fn serve(
                     };
                     responder_send!(responder, &mut response);
                 }
-                psocket::ProviderRequest::InterfaceNameToFlags { name: _, responder } => {
-                    // TODO(https://fxbug.dev/48969): implement this method.
-                    responder_send!(responder, &mut Err(zx::Status::NOT_FOUND.into_raw()));
+                psocket::ProviderRequest::InterfaceNameToFlags { name, responder } => {
+                    responder_send!(responder, &mut get_interface_flags(&ctx, &name));
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
                     let (client, request_stream) = create_request_stream();
@@ -122,8 +124,7 @@ pub(crate) async fn serve(
                     responder_send!(responder, &mut response);
                 }
                 psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
-                    // TODO(https://fxbug.dev/54162): implement this method.
-                    responder_send!(responder, &mut std::iter::empty());
+                    responder_send!(responder, &mut get_interface_addresses(&ctx));
                 }
             }
             Ok(ctx)
@@ -135,6 +136,121 @@ pub(crate) async fn serve(
 pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
 ) -> (fidl::endpoints::ClientEnd<T>, T::RequestStream) {
     fidl::endpoints::create_request_stream().expect("can't create stream")
+}
+
+fn get_interface_addresses(
+    ctx: &Ctx,
+) -> impl ExactSizeIterator<Item = psocket::InterfaceAddresses> {
+    let Ctx { sync_ctx, non_sync_ctx } = ctx;
+    non_sync_ctx
+        .devices
+        .with_devices(|devices| {
+            devices
+                .map(|d| {
+                    // Generally, calling into `netstack3_core` while operating
+                    // on the non-sync context is a recipe for deadlocks. That's
+                    // not an issue here since the non-sync context isn't being
+                    // passed into `get_all_ip_addr_subnets`.
+                    let addresses = netstack3_core::get_all_ip_addr_subnets(&*sync_ctx, d)
+                        .into_iter()
+                        .map(fidl_fuchsia_net_ext::FromExt::from_ext)
+                        .collect();
+
+                    let info = d.external_state();
+                    let flags = flags_for_device(&info);
+                    let StaticCommonInfo { binding_id, name } = info.static_common_info();
+
+                    psocket::InterfaceAddresses {
+                        id: Some(binding_id.get()),
+                        name: Some(name.clone()),
+                        addresses: Some(addresses),
+                        interface_flags: Some(flags),
+                        ..psocket::InterfaceAddresses::EMPTY
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .into_iter()
+}
+
+fn get_interface_flags(
+    ctx: &Ctx,
+    name: &str,
+) -> Result<psocket::InterfaceFlags, zx::sys::zx_status_t> {
+    let Ctx { sync_ctx: _, non_sync_ctx } = ctx;
+    let device =
+        non_sync_ctx.devices.get_device_by_name(name).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+    Ok(flags_for_device(&device.external_state()))
+}
+
+fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
+    let physical_up: bool;
+    let loopback: bool;
+
+    struct FromDynamicInfo {
+        admin_enabled: bool,
+    }
+
+    impl<'a> From<&'a DynamicCommonInfo> for FromDynamicInfo {
+        fn from(value: &'a DynamicCommonInfo) -> Self {
+            let DynamicCommonInfo {
+                mtu: _,
+                admin_enabled,
+                events: _,
+                control_hook: _,
+                addresses: _,
+            } = value;
+            FromDynamicInfo { admin_enabled: *admin_enabled }
+        }
+    }
+
+    let FromDynamicInfo { admin_enabled } = match info {
+        DeviceSpecificInfo::Netdevice(NetdeviceInfo {
+            handler: _,
+            mac: _,
+            static_common_info: _,
+            dynamic,
+        }) => {
+            let guard = dynamic.read().unwrap();
+            let DynamicNetdeviceInfo { common_info, phy_up } = &*guard;
+            physical_up = *phy_up;
+            loopback = false;
+            common_info.into()
+        }
+        DeviceSpecificInfo::Loopback(LoopbackInfo {
+            static_common_info: _,
+            dynamic_common_info,
+            rx_notifier: _,
+        }) => {
+            physical_up = true;
+            loopback = true;
+            (&*dynamic_common_info.read().unwrap()).into()
+        }
+    };
+
+    // Approximate that all interfaces support multicasting.
+    // TODO(https://fxbug.dev/125492): Set this more precisely.
+    let multicast = true;
+
+    // Note that the interface flags are not all intuitively named. Quotes below
+    // are from https://www.xml.com/ldd/chapter/book/ch14.html#INDEX-3,507.
+    [
+        // IFF_UP is "on when the interface is active and ready to transfer
+        // packets".
+        (physical_up, psocket::InterfaceFlags::UP),
+        // IFF_LOOPBACK is "set only in the loopback interface".
+        (loopback, psocket::InterfaceFlags::LOOPBACK),
+        // IFF_RUNNING "indicates that the interface is up and running".
+        (admin_enabled && physical_up, psocket::InterfaceFlags::RUNNING),
+        // IFF_MULTICAST is set for "interfaces that are capable of multicast
+        // transmission".
+        (multicast, psocket::InterfaceFlags::MULTICAST),
+    ]
+    .into_iter()
+    .fold(psocket::InterfaceFlags::empty(), |mut flags, (b, flag)| {
+        flags.set(flag, b);
+        flags
+    })
 }
 
 /// A trait generalizing the data structures passed as arguments to POSIX socket

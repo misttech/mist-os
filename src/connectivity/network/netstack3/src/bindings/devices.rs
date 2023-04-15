@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::{
-    collections::hash_map::HashMap,
+    collections::hash_map::{self, HashMap},
     num::NonZeroU64,
     ops::{Deref as _, DerefMut as _},
 };
@@ -39,10 +39,9 @@ pub type BindingId = NonZeroU64;
 /// `Devices` keeps a list of devices that are installed in the netstack with
 /// an associated netstack core ID `C` used to reference the device.
 ///
-/// The type parameters `C` and `I` are for the core ID type and the extra
-/// information associated with the device, respectively, and default to the
-/// types used by `EventLoop` for brevity in the main use case. The type
-/// parameters are there to allow testing without dependencies on `core`.
+/// The type parameter `C` is for the extra information associated with the
+/// device. The type parameters are there to allow testing without dependencies
+/// on `core`.
 pub struct Devices<C> {
     id_map: CoreRwLock<HashMap<BindingId, C>>,
     last_id: CoreMutex<BindingId>,
@@ -91,6 +90,12 @@ where
     /// Retrieve associated `core_id` for [`BindingId`].
     pub fn get_core_id(&self, id: BindingId) -> Option<C> {
         self.id_map.read().get(&id).cloned()
+    }
+
+    /// Call the provided callback with an iterator over the devices.
+    pub fn with_devices<R>(&self, f: impl FnOnce(hash_map::Values<'_, BindingId, C>) -> R) -> R {
+        let Self { id_map, last_id: _ } = self;
+        f(id_map.read().values())
     }
 }
 
