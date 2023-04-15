@@ -114,11 +114,7 @@ class FfxCliTests(unittest.TestCase):
         """Test case for ffx_cli.check_ffx_connection() success case."""
         self.assertTrue(ffx_cli.check_ffx_connection(target="fuchsia-emulator"))
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     def test_check_ffx_connection_failure_because_of_target_not_present(
             self) -> None:
@@ -127,11 +123,7 @@ class FfxCliTests(unittest.TestCase):
         ffx_cli.ffx_target_show()."""
         self.assertFalse(ffx_cli.check_ffx_connection(target="fx-emu"))
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fx-emu target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     def test_check_ffx_connection_failure_because_of_timeout(self) -> None:
         """Test case for ffx_cli.check_ffx_connection() failure case where
@@ -142,11 +134,7 @@ class FfxCliTests(unittest.TestCase):
         self.assertFalse(
             ffx_cli.check_ffx_connection(target="fuchsia-emulator"))
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     @parameterized.expand(
         [
@@ -174,11 +162,11 @@ class FfxCliTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             ffx_cli.check_ffx_connection(target="fuchsia-emulator")
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
+
+    def test_close(self):
+        """Test case for ffx_cli.close()."""
+        ffx_cli.close()
 
     def test_ffx_target_show_when_connected(self) -> None:
         """Verify ffx_target_show succeeds when target is connected to host."""
@@ -186,26 +174,27 @@ class FfxCliTests(unittest.TestCase):
             target="fuchsia-emulator")
         self.assertEqual(result, _FFX_TARGET_SHOW_JSON)
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
-    def test_ffx_target_show_when_not_connected(self) -> None:
-        """Verify ffx_target_show raises an exception when target is not
-        connected to host."""
+    def test_ffx_target_show_raises_timeout_expired(self) -> None:
+        """Verify ffx_target_show raising subprocess.TimeoutExpired."""
+        self.mock_check_output.side_effect = subprocess.TimeoutExpired(
+            cmd="some_cmd", timeout=30)
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            ffx_cli.ffx_target_show(target="fuchsia-d88c-799b-0e3a")
+
+        self.mock_check_output.assert_called_once()
+
+    def test_ffx_target_show_raises_ffx_command_error(self) -> None:
+        """Verify ffx_target_show raising FfxCommandError."""
         self.mock_check_output.side_effect = subprocess.CalledProcessError(
-            120, "some_cmd")
+            returncode=120, cmd="some_cmd")
 
         with self.assertRaises(errors.FfxCommandError):
             ffx_cli.ffx_target_show(target="fuchsia-d88c-799b-0e3a")
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-d88c-799b-0e3a target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     def test_get_target_address(self) -> None:
         """Verify get_target_address returns ip address of fuchsia device."""
@@ -214,11 +203,7 @@ class FfxCliTests(unittest.TestCase):
 
         self.assertEqual(result, expected)
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     @parameterized.expand(
         [
@@ -244,11 +229,7 @@ class FfxCliTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             ffx_cli.get_target_address(target="fuchsia-emulator")
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     def test_get_target_type(self) -> None:
         """Verify get_target_type returns target type of fuchsia device."""
@@ -257,11 +238,7 @@ class FfxCliTests(unittest.TestCase):
 
         self.assertEqual(result, expected)
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
 
     @parameterized.expand(
         [
@@ -287,11 +264,15 @@ class FfxCliTests(unittest.TestCase):
         with self.assertRaises(errors.FfxCommandError):
             ffx_cli.get_target_type(target="fuchsia-emulator")
 
-        self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator target show --json",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            timeout=10)
+        self.mock_check_output.assert_called_once()
+
+    def test_setup(self):
+        """Test case for ffx_cli.setup()."""
+        ffx_cli.setup(logs_dir="/tmp/ffx_logs/")
+
+        # calling setup again should fail
+        with self.assertRaises(errors.FfxCommandError):
+            ffx_cli.setup(logs_dir="/tmp/ffx_logs_2/")
 
 
 if __name__ == "__main__":

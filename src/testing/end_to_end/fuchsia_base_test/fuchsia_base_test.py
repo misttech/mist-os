@@ -12,6 +12,7 @@ from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.transports import sl4f
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
+from honeydew.utils import ffx_cli
 from mobly import base_test, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -46,6 +47,11 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             * Instantiates all fuchsia devices into self.fuchsia_devices
         """
         self._process_user_params()
+
+        # Call `ffx_cli.setup` before calling `register_controller` as
+        # `register_controller` results in calling an FFX command and we
+        # wouldn't want to miss those FFX logs
+        ffx_cli.setup(logs_dir=f"{self.log_path}/ffx/")
 
         self.fuchsia_devices: List[
             fuchsia_device.FuchsiaDevice] = self.register_controller(
@@ -83,6 +89,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         self._teardown_class_artifacts: str = f"{self.log_path}/teardown_class"
         if self.snapshot_on == SnapshotOn.TEARDOWN_CLASS:
             self._collect_snapshot(directory=self._teardown_class_artifacts)
+        ffx_cli.close()
 
     def on_fail(self, _) -> None:
         """on_fail is called once when a test case fails.
