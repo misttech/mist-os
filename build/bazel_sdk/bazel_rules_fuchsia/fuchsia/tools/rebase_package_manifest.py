@@ -13,13 +13,11 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--package-manifest',
-        type=argparse.FileType('r'),
         help='original package manifest file',
         required=True,
     )
     parser.add_argument(
         '--updated-package-manifest',
-        type=argparse.FileType('w'),
         help='output package manifest file',
         required=True,
     )
@@ -34,12 +32,48 @@ def parse_args():
 def main():
     args = parse_args()
     base_path = args.relative_base
-    package_manifest_json = json.load(args.package_manifest)
+
+    with open(args.package_manifest) as f:
+        package_manifest_json = json.load(f)
+
+    # Package manifests have an optional field `'blob_sources_relative'`, which
+    # states whether or not the files referenced in the manifest are relative to
+    # some working directory (with the value `working_dir`), or to the directory
+    # that contains the package manifest (which is the value `file`). When we're
+    # `file`, we will need to first make the paths relative to the manifest
+    # directory, before we make it relative to the `relative_base` path.
+    blob_sources_relative = package_manifest_json.get(
+        'blob_sources_relative', 'working_dir')
+
+    # The output manifest will always be relative to a working directory.
+    package_manifest_json['blob_sources_relative'] = 'working_dir'
+    package_manifest_dir = os.path.dirname(args.package_manifest)
 
     for blob in package_manifest_json['blobs']:
-        blob['source_path'] = os.path.relpath(blob['source_path'], base_path)
+        source_path = blob['source_path']
 
-    json.dump(package_manifest_json, args.updated_package_manifest, indent=2)
+        if blob_sources_relative == 'file':
+            source_path = os.path.join(package_manifest_dir, source_path)
+
+        blob['source_path'] = os.path.relpath(source_path, base_path)
+
+    try:
+        subpackages = package_manifest_json['subpackages']
+    except KeyError:
+        pass
+    else:
+        for subpackage in subpackages:
+            manifest_path = subpackage['manifest_path']
+
+            if blob_sources_relative == 'file':
+                manifest_path = os.path.join(
+                    package_manifest_dir, manifest_path)
+
+            subpackage['manifest_path'] = os.path.relpath(
+                manifest_path, base_path)
+
+    with open(args.updated_package_manifest, 'w') as f:
+        json.dump(package_manifest_json, f, indent=2)
 
 
 if __name__ == '__main__':
