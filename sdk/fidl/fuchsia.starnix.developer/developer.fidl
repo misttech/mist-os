@@ -30,15 +30,6 @@ protocol Manager {
         bridge_socket zx.handle:SOCKET;
     });
 
-    /// Starts a given component in the `Manager`'s component collection.
-    ///
-    /// This is useful in configurations where `fuchsia.element.Manager` is not available. However,
-    /// if the component is graphical, this will not cause the component to be displayed.
-    Start(struct {
-        /// The URL of the component to start.
-        url fuchsia.url.Url;
-    }) -> ();
-
     /// Starts a shell component.
     ///
     /// The shell component to launch is optionally specified by `params.url`. The container in which

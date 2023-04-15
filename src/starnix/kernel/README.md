@@ -61,22 +61,7 @@ Increasing by a facfor of 10 seems to work well.
 
 ### Run a Linux binary
 
-To run a Linux binary, ask starnix to start a component that wraps the binary:
-
-```sh
-ffx starnix start fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm
-```
-
-If this is the first time you've used the `ffx starnix` command, you might need
-to configure `ffx` to enable the `starnix` commands. Attempting to run the
-`start` command should provide instructions for enabling the `starnix` commands.
-
-If everything is working, you should see some log messages like the following:
-
-```text
-[00064.846853][33707][33709][starnix, starnix] INFO: main
-[00064.847640][33707][33709][starnix, starnix] INFO: start_component: fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm
-```
+See [`hello_starnix`](../examples/hello_starnix/README.md).
 
 ### Run a Linux test binary
 

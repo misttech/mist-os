@@ -77,16 +77,6 @@ pub async fn serve_starnix_manager(
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
-            fstardev::ManagerRequest::Start { url, responder } => {
-                let args = fcomponent::CreateChildArgs {
-                    numbered_handles: None,
-                    ..fcomponent::CreateChildArgs::EMPTY
-                };
-                if let Err(e) = create_child_component(url, args).await {
-                    tracing::error!("failed to create child component: {}", e);
-                }
-                responder.send()?;
-            }
             fstardev::ManagerRequest::StartShell { params, controller, .. } => {
                 start_shell(params, controller).await?;
             }

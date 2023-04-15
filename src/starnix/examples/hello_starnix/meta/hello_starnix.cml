@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     program: {
-        runner: "starnix_empty",
+        runner: "starnix_container",
         binary: "bin/hello_starnix",
     },
 }

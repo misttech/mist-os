@@ -1,0 +1,57 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    collections: [
+        {
+            name: "daemons",
+            environment: "#daemon-env",
+            durability: "single_run",
+        },
+    ],
+    capabilities: [
+        {
+            runner: "starnix_container",
+            path: "/svc/fuchsia.component.runner.ComponentRunner",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.binder.DevBinder",
+                "fuchsia.starnix.container.Controller",
+            ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: "#daemons",
+        },
+    ],
+    expose: [
+        {
+            runner: "starnix_container",
+            from: "self",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.container.Controller",
+            ],
+            from: "self",
+        },
+    ],
+    environments: [
+        {
+            name: "daemon-env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "starnix_container",
+                    from: "self",
+                },
+            ],
+        },
+    ],
+}
