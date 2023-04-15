@@ -1271,7 +1271,10 @@ static bool bug_84827_regression_test() {
   BEGIN_TEST;
 
   cpu_mask_t online_cpus = mp_get_online_mask();
-  ASSERT_GE(ktl::popcount(online_cpus), 2, "Must have at least 2 CPUs online");
+  if (ktl::popcount(online_cpus) < 2) {
+    printf("Skipping test, must have at least 2 CPUs online\n");
+    return true;
+  }
 
   // See above for an outline of the overall test.  The comments here are meant
   // to describe the deadlock hazard, and how we avoid it.
