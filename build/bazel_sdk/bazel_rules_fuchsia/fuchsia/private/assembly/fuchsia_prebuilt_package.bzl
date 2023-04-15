@@ -54,14 +54,20 @@ def _fuchsia_prebuilt_package_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     far_archive = ctx.files.archive[0]
 
-    # Technical note: `pm expand` below will populate its output directory
-    # with multiple files whose name are content hashes and cannot be known in
-    # advance, so use ctx.actions.declare_directory() to declare an output
-    # directory for the expansion. This tells Bazel that all files present
-    # in the directory after the command execution are outputs, and should
-    # be copied from the sandbox to the corresponding final output location
-    # in the output_base directory (otherwise, they would disappear once the
-    # sandbox is destroyed).
+    # where we will collect all of the temporary files
+    pkg_dir = ctx.label.name + "_pkg/"
+
+    # An environment variable that creates an isolated FFX instance.
+    ffx_isolate_dir = ctx.actions.declare_directory(pkg_dir + "_package.ffx")
+
+    # Technical note: `ffx package archive extract` below will populate its
+    # output directory with multiple files whose name are content hashes and
+    # cannot be known in advance, so use ctx.actions.declare_directory() to
+    # declare an output directory for the expansion. This tells Bazel that all
+    # files present in the directory after the command execution are outputs,
+    # and should be copied from the sandbox to the corresponding final output
+    # location in the output_base directory (otherwise, they would disappear
+    # once the sandbox is destroyed).
     #
     # The top-level directory for this target will be computed from
     # `${label}_expanded/`, which, for a label like `//package/foo:bar`
@@ -109,21 +115,26 @@ def _fuchsia_prebuilt_package_impl(ctx):
 
     # extract the package
     ctx.actions.run(
-        executable = sdk.pm,
+        executable = sdk.ffx,
         arguments = [
+            "--isolate-dir",
+            ffx_isolate_dir.path,
+            "package",
+            "archive",
+            "extract",
+            far_archive.path,
             "-o",
             output_dir.path,
-            "-r",
+            "--repository",
             "fuchsia.com",
-            "expand",
-            far_archive.path,
         ],
         inputs = [far_archive],
         outputs = [
             output_dir,
+            ffx_isolate_dir,
         ],
-        mnemonic = "FuchsiaPmExpand",
-        progress_message = "expanding package for %{label}",
+        mnemonic = "FuchsiaFfxPackageArchiveExtract",
+        progress_message = "extracting the package for %{label}",
     )
 
     # rebase paths in package manifest
