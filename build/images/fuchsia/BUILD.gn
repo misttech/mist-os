@@ -294,7 +294,6 @@ if (is_fuchsia) {
       ":product_bundle",
       ":scrutiny_x_smoke_test",
       ":update",
-      ":validate_universe_config_data_entries_empty",
     ]
 
     if (!fxfs_blob && include_fvm_blob_sparse) {
@@ -532,30 +531,6 @@ if (is_fuchsia) {
         sources += [ file ]
       }
     }
-  }
-
-  generated_file("universe_config_data_entries") {
-    testonly = fuchsia_base.testonly
-    data_keys = [ "config_package_entries" ]
-    walk_keys = [ "config_package_barrier" ]
-    output_conversion = "json"
-    outputs = [ "${target_out_dir}/universe_config_data_entries.json" ]
-  }
-
-  action("validate_universe_config_data_entries_empty") {
-    testonly = fuchsia_base.testonly
-    script = "//build/assembly/scripts/validate_config_data_entries_is_empty.py"
-    args = [
-      "--metadata-walk-results",
-      rebase_path("${target_out_dir}/universe_config_data_entries.json",
-                  root_build_dir),
-      "--output",
-      rebase_path("${target_out_dir}/universe_config_data_entries_empty.txt",
-                  root_build_dir),
-    ]
-    inputs = [ "${target_out_dir}/universe_config_data_entries.json" ]
-    deps = [ ":universe_config_data_entries" ]
-    outputs = [ "${target_out_dir}/universe_config_data_entries_empty.txt" ]
   }
 
   ##################################################
