@@ -49,9 +49,11 @@ tamird@google.com
 thatguy@google.com
 tmandry@google.com
 
+# Build system files in the source root
+per-file .gn,BUILD.gn = file:/build/OWNERS
+
 # Go-language support files
-per-file go.mod = file:/build/go/OWNERS
-per-file go.sum = file:/build/go/OWNERS
+per-file go.mod,go.sum = file:/build/go/OWNERS
 
 # Rust-language support files
 per-file rustfmt.toml = file:/build/rust/OWNERS
@@ -63,7 +65,6 @@ per-file pyrightconfig.json = file:/build/python/OWNERS
 per-file .gitmodules = file:/third_party/OWNERS
 
 # Add owners to source related files
-per-file .gitignore = file:/infra/OWNERS
-per-file .gitmodules = file:/infra/OWNERS
+per-file .gitignore,.gitmodules = file:/infra/OWNERS
 
 per-file .ignore = *
