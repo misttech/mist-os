@@ -23,12 +23,6 @@
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
-            as: "fuchsia.pkg.PackageResolver-full",
-            to: "#process_resolver",
-        },
-        {
-            protocol: "fuchsia.pkg.PackageResolver-base",
-            from: "parent",
             to: "#process_resolver",
         },
     ],

@@ -224,21 +224,7 @@ assembly_input_bundle("core_realm") {
         # TODO:  These shards should be folded into the `core.cml` file itself
         # as they are never omitted from that file.
         core = rebase_path(
-                [
-                  "//src/developer/build_info/meta/build_info.core_shard.cml",
-
-                  # The process_resolver core shard should only be present in
-                  # the `core_realm_development_access` AIB, but it's required
-                  # here until optional exposes are available, as the
-                  # `fuchsia.process.Resolver` capability is routed to the
-                  # `/bootstrap/console-launcher` component which is currently
-                  # present on all build-types (but is not needed on user, as
-                  # there is no reachable console there).
-                  # Note that the `process-resolver` component itself is not
-                  # present except when the `core_realm_development_access` is
-                  # added to the system.
-                  "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
-                ],
+                [ "//src/developer/build_info/meta/build_info.core_shard.cml" ],
                 root_build_dir)
       }
     },
@@ -307,6 +293,22 @@ assembly_input_bundle("core_realm_eng") {
         # config.
         core = rebase_path(
                 [
+                  # The process_resolver core shard (either the base-resolver or
+                  # pkg-resolver variant) should only be present in
+                  # the `core_realm_development_access` AIB, but it's required
+                  # here until optional exposes are available, as the
+                  # `fuchsia.process.Resolver` capability is routed to the
+                  # `/bootstrap/console-launcher` component which is currently
+                  # present on all build-types (but is not needed on user, as
+                  # there is no reachable console there).
+                  # Note that the `process-resolver` component itself is not
+                  # present except when the `core_realm_development_access` is
+                  # added to the system.
+                  #
+                  # eng uses the pkg-resolver, as opposed to the base-resolver,
+                  # to support ephemeral resolution of shell packages.
+                  "//src/sys/process-resolver/meta/process_resolver.pkg-resolver.core_shard.cml",
+
                   "//src/sys/core/meta/core-env-full-resolver.core_shard.cml",
                   "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
                   "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
@@ -337,6 +339,22 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
                   # resolver.
                   "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
 
+                  # The process_resolver core shard (either the base-resolver or
+                  # pkg-resolver variant) should only be present in
+                  # the `core_realm_development_access` AIB, but it's required
+                  # here until optional exposes are available, as the
+                  # `fuchsia.process.Resolver` capability is routed to the
+                  # `/bootstrap/console-launcher` component which is currently
+                  # present on all build-types (but is not needed on user, as
+                  # there is no reachable console there).
+                  # Note that the `process-resolver` component itself is not
+                  # present except when the `core_realm_development_access` is
+                  # added to the system.
+                  #
+                  # user and userdebug only have the base-resolver, not the
+                  # pkg-resolver.
+                  "//src/sys/process-resolver/meta/process_resolver.base-resolver.core_shard.cml",
+
                   # user and userdebug restrict access to the Storage capability
                   # to registered component ids.
                   "//src/sys/core/meta/restricted-storage.core_shard.cml",
@@ -358,8 +376,6 @@ assembly_input_bundle("core_realm_development_access") {
     "//src/developer/sshd-host",
 
     # Process resolver enables cli commands to be resolved to components.
-    # TODO(http://fxbug.dev/125120):  This component is compiled differently
-    # based on the `auto_update_packages` GN build argument.
     "//src/sys/process-resolver",
 
     # ffx's remote-control (remote access) components:

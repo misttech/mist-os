@@ -35,11 +35,6 @@ rustc_binary("bin") {
     "src/resolve/mod.rs",
     "src/resolve/serve.rs",
   ]
-
-  if (auto_update_packages) {
-    # Allow resolving packages from the universe
-    features = [ "auto_update_packages" ]
-  }
 }
 
 fuchsia_component("component") {
