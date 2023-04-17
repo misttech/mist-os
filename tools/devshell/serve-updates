@@ -315,8 +315,10 @@ fi
 device_name="$(get-device-name 2>/dev/null)"
 if [[ -z "${device_name}" ]]; then
   fx-warn ""
-  fx-warn "No default device set. fx serve-updates will get stuck on \"Discovery...\""
-  fx-warn "Run 'fx list-devices' and then 'fx set-device'"
+  fx-warn "No default device set. If 'fx serve-updates' gets stuck on"
+  fx-warn "\"Discovery...\" you can set a default device by running"
+  fx-warn "'fx list-devices' to get a list of devices, and then running"
+  fx-warn "'fx set-device'."
   fx-warn "\n"
 else
   fx-info ""
