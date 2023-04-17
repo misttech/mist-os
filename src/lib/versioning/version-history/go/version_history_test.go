@@ -29,9 +29,9 @@ func TestParseHistoryWorks(t *testing.T) {
 		Data: versionHistoryData{
 			Name: versionHistoryName,
 			Type: versionHistoryType,
-			Versions: []versionHistoryVersion{
-				{APILevel: "1", ABIRevision: "1"},
-				{APILevel: "2", ABIRevision: "0x2"},
+			Versions: map[string]ABIRevision{
+				"1": {ABIRevision: "1"},
+				"2": {ABIRevision: "0x2"},
 			},
 		},
 	})
@@ -60,7 +60,7 @@ func TestParseHistoryRejectsInvalidSchema(t *testing.T) {
 		Data: versionHistoryData{
 			Name:     versionHistoryName,
 			Type:     versionHistoryType,
-			Versions: []versionHistoryVersion{},
+			Versions: map[string]ABIRevision{},
 		},
 	})
 	if err != nil {
@@ -79,7 +79,7 @@ func TestParseHistoryRejectsInvalidName(t *testing.T) {
 		Data: versionHistoryData{
 			Name:     "some-name",
 			Type:     versionHistoryType,
-			Versions: []versionHistoryVersion{},
+			Versions: map[string]ABIRevision{},
 		},
 	})
 	if err != nil {
@@ -98,7 +98,7 @@ func TestParseHistoryRejectsInvalidType(t *testing.T) {
 		Data: versionHistoryData{
 			Name:     versionHistoryName,
 			Type:     "some-type",
-			Versions: []versionHistoryVersion{},
+			Versions: map[string]ABIRevision{},
 		},
 	})
 	if err != nil {
@@ -112,18 +112,18 @@ func TestParseHistoryRejectsInvalidType(t *testing.T) {
 }
 
 func TestParseHistoryRejectsInvalidVersions(t *testing.T) {
-	for _, testVersion := range []versionHistoryVersion{
-		{APILevel: "some-version", ABIRevision: "1"},
-		{APILevel: "-1", ABIRevision: "1"},
-		{APILevel: "1", ABIRevision: "some-revision"},
-		{APILevel: "1", ABIRevision: "-1"},
+	for k, v := range map[string]ABIRevision{
+		"some-version": {ABIRevision: "1"},
+		"-1":           {ABIRevision: "1"},
+		"1":            {ABIRevision: "some-revision"},
+		"2":            {ABIRevision: "-1"},
 	} {
 		b, err := json.Marshal(&versionHistory{
 			SchemaId: versionHistorySchemaId,
 			Data: versionHistoryData{
 				Name:     versionHistoryName,
 				Type:     versionHistoryType,
-				Versions: []versionHistoryVersion{testVersion},
+				Versions: map[string]ABIRevision{k: v},
 			},
 		})
 		if err != nil {
@@ -135,5 +135,4 @@ func TestParseHistoryRejectsInvalidVersions(t *testing.T) {
 			t.Fatalf("expected error, got: %+v", vs)
 		}
 	}
-
 }
