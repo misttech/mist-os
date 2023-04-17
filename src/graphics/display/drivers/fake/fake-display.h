@@ -32,14 +32,7 @@
 
 namespace fake_display {
 
-struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> {
-  char pixel_format;
-  bool ram_domain;
-  zx::vmo vmo;
-};
-
 class FakeDisplay;
-
 using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable, ddk::ChildPreReleaseable>;
 
 class FakeDisplay : public DeviceType,
@@ -123,6 +116,12 @@ class FakeDisplay : public DeviceType,
   }
 
  private:
+  struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> {
+    char pixel_format;
+    bool ram_domain;
+    zx::vmo vmo;
+  };
+
   enum class BufferCollectionUsage : int32_t;
 
   zx_status_t SetupDisplayInterface();
