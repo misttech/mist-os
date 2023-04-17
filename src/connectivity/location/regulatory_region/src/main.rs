@@ -11,9 +11,7 @@ use {
         RegulatoryRegionWatcherRequest as WatchRequest,
         RegulatoryRegionWatcherRequestStream as WatchRequestStream,
     },
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    fuchsia_syslog::{self as syslog, fx_log_info},
     futures::{StreamExt, TryFutureExt, TryStreamExt},
     regulatory_region_lib::pub_sub_hub::PubSubHub,
     std::path::Path,
@@ -27,9 +25,8 @@ enum IncomingService {
     WatchRequest(WatchRequestStream),
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    syslog::init().context("Failed to initialize logging")?;
     let mut fs = ServiceFs::new_local();
     let storage_path = Path::new(REGION_CODE_PATH);
     let region_tracker = PubSubHub::new(storage_path.into());
@@ -38,7 +35,7 @@ async fn main() -> Result<(), Error> {
     fs.take_and_serve_directory_handle().context("Failed to start serving")?;
     fs.for_each_concurrent(CONCURRENCY_LIMIT, |client| {
         handle_incoming_service(&region_tracker, client)
-            .unwrap_or_else(|e| fx_log_info!("Connection terminated: {:?}", e))
+            .unwrap_or_else(|e| tracing::info!("Connection terminated: {:?}", e))
     })
     .await;
     Ok(())

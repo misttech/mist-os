@@ -37,7 +37,6 @@ use {
     fuchsia_async as fasync,
     fuchsia_cobalt_builders::MetricEventExt,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_syslog::{self as syslog},
     futures::{lock::Mutex, prelude::*},
     log::info,
     std::{
@@ -99,10 +98,8 @@ impl ConnectedProtocol for CobaltConnectedService {
     }
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main]
 async fn main() -> Result<(), anyhow::Error> {
-    syslog::init().context("failed to initialize logging")?;
-
     let (cobalt_api, cobalt_fut) =
         ProtocolConnector::new(CobaltConnectedService).serve_and_log_errors();
     let _cobalt_task = fasync::Task::spawn(cobalt_fut);

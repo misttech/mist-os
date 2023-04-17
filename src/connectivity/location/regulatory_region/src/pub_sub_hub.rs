@@ -5,7 +5,6 @@
 //! A simple publish-and-subscribe facility.
 
 use {
-    fuchsia_syslog::fx_log_info,
     serde::{Deserialize, Serialize},
     std::{
         cell::RefCell,
@@ -106,7 +105,7 @@ fn load_region_code(path: impl AsRef<Path>) -> Option<String> {
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => return None,
             _ => {
-                fx_log_info!(
+                tracing::info!(
                     "Failed to read cached regulatory region, will initialize with none: {}",
                     e
                 );
@@ -118,7 +117,7 @@ fn load_region_code(path: impl AsRef<Path>) -> Option<String> {
     match serde_json::from_reader::<_, RegulatoryRegion>(io::BufReader::new(file)) {
         Ok(region) => Some(region.region_code),
         Err(e) => {
-            fx_log_info!("Error parsing stored regulatory region code: {}", e);
+            tracing::info!("Error parsing stored regulatory region code: {}", e);
             try_delete_file(path);
             None
         }
@@ -134,20 +133,20 @@ fn write_region_code(region_code: String, storage_path: impl AsRef<Path>) {
     let file = match File::create(storage_path.as_ref()) {
         Ok(file) => file,
         Err(e) => {
-            fx_log_info!("Failed to open file to write regulatory region: {}", e);
+            tracing::info!("Failed to open file to write regulatory region: {}", e);
             try_delete_file(storage_path);
             return;
         }
     };
     if let Err(e) = serde_json::to_writer(io::BufWriter::new(file), &write_val) {
-        fx_log_info!("Failed to write regulatory region: {}", e);
+        tracing::info!("Failed to write regulatory region: {}", e);
         try_delete_file(storage_path);
     }
 }
 
 fn try_delete_file(storage_path: impl AsRef<Path>) {
     if let Err(e) = fs::remove_file(&storage_path) {
-        fx_log_info!("Failed to delete previously cached regulatory region: {}", e);
+        tracing::info!("Failed to delete previously cached regulatory region: {}", e);
     }
 }
 

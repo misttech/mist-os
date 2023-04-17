@@ -12,14 +12,15 @@ rustc_binary("bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.location.namedplace:fuchsia.location.namedplace_rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/syslog/rust:syslog",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:tempfile",
@@ -33,9 +34,9 @@ rustc_library("lib") {
   name = "regulatory_region_lib"
   edition = "2021"
   deps = [
-    "//src/lib/syslog/rust:syslog",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/lib/fuchsia-async",
