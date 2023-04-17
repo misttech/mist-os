@@ -29,8 +29,7 @@ static constexpr int16_t kAccumulatorNegSaturation = -32768;  // y_min = -2^15
 
 static constexpr char kCvsdMimeType[] = "audio/cvsd";
 static constexpr uint64_t kInputBufferConstraintsVersionOrdinal = 1;
-static constexpr uint32_t kInputMinBufferCountForCamping = 1;
-static constexpr uint32_t kOutputMinBufferCountForCamping = 1;
+static constexpr uint32_t kMinBufferCountForCamping = 1;
 
 // This is an arbitrary cap for now.
 constexpr uint32_t kInputPerPacketBufferBytesMax = 4 * 1024 * 1024;
@@ -47,7 +46,7 @@ static_assert(kAccumulatorNegSaturation >= std::numeric_limits<int16_t>::min());
 static_assert(kAccumDecayNumerator < kAccumDecayDenominator);
 
 // See Bluetooth Core v5.3 section 9.2 CVSD CODEC.
-struct CodecParams {
+struct CvsdParams {
   const uint32_t k;
   const uint32_t j;
   const uint32_t equal_bit_mask;
@@ -70,26 +69,19 @@ struct OutputItem {
   std::optional<uint64_t> timestamp;
 };
 
-enum InputLoopStatus {
-  kOk = 0,               // Indicates the loop should continue.
-  kShouldTerminate = 1,  // Indicates the loop should break/terminate.
-};
-
-bool AreJbitsEqual(CodecParams* params);
+bool AreJbitsEqual(CvsdParams* params);
 
 static inline int16_t Round(const double value) {
   return static_cast<int16_t>(std::floor(value + 0.5));
 }
 
-double GetNewStepSize(const CodecParams& params);
+double GetNewStepSize(const CvsdParams& params);
 
-double GetNewAccumulator(const CodecParams& params, const uint8_t& bit);
+double GetNewAccumulator(const CvsdParams& params, const uint8_t& bit);
 
-void UpdateCVSDParams(CodecParams* params, uint8_t bit);
+void UpdateCvsdParams(CvsdParams* params, uint8_t bit);
 
-void PostSerial(async_dispatcher_t* dispatcher, fit::closure to_run);
-
-void InitCodecParams(std::optional<CodecParams>& codec_params);
+void InitCvsdParams(std::optional<CvsdParams>& codec_params);
 
 void SetOutputItem(std::optional<OutputItem>& output_item, CodecPacket* packet,
                    const CodecBuffer* buffer);

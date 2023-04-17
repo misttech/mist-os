@@ -27,7 +27,7 @@ executable("codec_runner_sw_cvsd") {
 
   deps = [
     "//src/media/codec/codecs:chunk_input_stream",
-    "//src/media/codec/codecs/sw:codec_adapter_sw",
+    "//src/media/codec/codecs/sw:codec_adapter_sw_impl",
     "//src/media/codec/codecs/sw:codec_runner_sw",
   ]
 }

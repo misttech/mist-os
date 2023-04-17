@@ -5,57 +5,44 @@
 #ifndef SRC_MEDIA_CODEC_CODECS_SW_CVSD_CODEC_ADAPTER_CVSD_ENCODER_H_
 #define SRC_MEDIA_CODEC_CODECS_SW_CVSD_CODEC_ADAPTER_CVSD_ENCODER_H_
 
-#include <lib/media/codec_impl/codec_adapter.h>
-
-#include "chunk_input_stream.h"
 #include "codec_adapter_cvsd.h"
-#include "codec_adapter_sw.h"
+#include "codec_adapter_sw_impl.h"
 
-class CodecAdapterCvsdEncoder : public CodecAdapterSW<fit::deferred_action<fit::closure>> {
+class CodecAdapterCvsdEncoder : public CodecAdapterSWImpl<CvsdParams> {
  public:
   explicit CodecAdapterCvsdEncoder(std::mutex& lock, CodecAdapterEvents* codec_adapter_events);
   ~CodecAdapterCvsdEncoder() = default;
 
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
-      CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
-      const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
-
-  void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
-
-  void CoreCodecStopStream() override;
-
  protected:
-  void ProcessInputLoop() override;
-  void CleanUpAfterStream() override;
-
-  // Returns the format details of the output and the bytes needed to store each
-  // output packet.
   std::pair<fuchsia::media::FormatDetails, size_t> OutputFormatDetails() override;
+  CodecAdapterCvsdEncoder::InputLoopStatus ProcessFormatDetails(
+      const fuchsia::media::FormatDetails& format_details) override;
+  int ProcessInputChunkData(const uint8_t* input_data, size_t input_data_size,
+                            uint8_t* output_buffer, size_t output_buffer_size) override;
+
+  // The minimum frame size (number of input data bytes that can be processed) is 16 bytes.
+  // For convenience and intuition, we make the `ChunkInputStream::InputBlock` size the same.
+  size_t InputChunkSize() override { return kInputFrameSize; }
+
+  size_t MinOutputBufferSize() override { return kOutputFrameSize; }
+  fuchsia::sysmem::BufferCollectionConstraints BufferCollectionConstraints(
+      const CodecPort port) override;
+
+  TimestampExtrapolator CreateTimestampExtrapolator(
+      const fuchsia::media::FormatDetails& format_details) override;
 
  private:
-  InputLoopStatus ProcessFormatDetails(const fuchsia::media::FormatDetails& format_details);
-  InputLoopStatus ProcessEndOfStream(CodecInputItem* item);
-  InputLoopStatus ProcessInputPacket(CodecPacket* packet);
-  InputLoopStatus ProcessCodecPacket(CodecPacket* packet);
-  // Outputs and resets current output buffer.
-  void SendAndResetOutputPacket();
-  void InitChunkInputStream(const fuchsia::media::FormatDetails& format_details);
+  // Each audio sample is signed 16 bits (2 byte).
+  static constexpr uint32_t kInputBytesPerSample = 2;
 
-  // Encodes a single output byte.
-  static void Encode(CodecParams* params, const uint8_t* input_data, uint8_t* output);
+  // CVSD encoder performs 16-1 compression of data where 2 bytes (16 bits) input
+  // produces 1 bit of output. To produce 1 whole output byte, we need
+  // 2 byte * 8 = 16 bytes of input.
+  static constexpr uint32_t kInputFrameSize = kInputBytesPerSample * 8;
 
-  std::optional<CodecParams> codec_params_;
-
-  // Current input buffer where we buffer data from the input packet
-  // before sending it over to be encoded as output. CVSD encoder processes
-  // 2 bytes of data to produce 1 bit of output data. Hence, the buffer should
-  // be initialized to 16 bytes size.
-  std::optional<ChunkInputStream> chunk_input_stream_;
-
-  // Current output item that we are currently encoding into.
-  std::optional<OutputItem> output_item_;
+  // Number of output bytes from processing kInputFrameSize of input data.
+  // 16-1 compression means output frame size is 16 / 1 = 1 byte.
+  static constexpr uint32_t kOutputFrameSize = 1;
 };
 
 #endif  // SRC_MEDIA_CODEC_CODECS_SW_CVSD_CODEC_ADAPTER_CVSD_ENCODER_H_

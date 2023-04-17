@@ -6,7 +6,7 @@
 
 #include <lib/async/cpp/task.h>
 
-bool AreJbitsEqual(const CodecParams& params) {
+bool AreJbitsEqual(const CvsdParams& params) {
   uint32_t lastKBits = params.historic_bits;
   for (uint32_t i = 0; i < params.k - params.j + 1; i++) {
     auto tmp = lastKBits & params.equal_bit_mask;
@@ -20,7 +20,7 @@ bool AreJbitsEqual(const CodecParams& params) {
 
 // Calculates the new step size based on Bluetooth Core v5.3 section
 // 9.2 CVSD CODEC, equations 16 and 17.
-double GetNewStepSize(const CodecParams& params) {
+double GetNewStepSize(const CvsdParams& params) {
   // EQ 16 and EQ 17.
   // If J bits in the last K output bits are equal, step size is incremented
   // otherwise, it's decremented.
@@ -42,7 +42,7 @@ double GetNewStepSize(const CodecParams& params) {
 
 // Calculates the new accumulator value based on Bluetooth Core v5.3 section
 // 9.2 CVSD CODEC equations.
-double GetNewAccumulator(const CodecParams& params, const uint8_t& bit) {
+double GetNewAccumulator(const CvsdParams& params, const uint8_t& bit) {
   double new_accum = params.accumulator;
   new_accum += (bit) ? -params.step_size : params.step_size;
 
@@ -61,7 +61,7 @@ double GetNewAccumulator(const CodecParams& params, const uint8_t& bit) {
   return new_accum;
 }
 
-void UpdateCVSDParams(CodecParams* params, uint8_t bit) {
+void UpdateCvsdParams(CvsdParams* params, uint8_t bit) {
   // Shift last value into historic bits buffer.
   params->historic_bits = ((params->historic_bits << 1) | bit) & params->historic_bit_mask;
 
@@ -72,15 +72,10 @@ void UpdateCVSDParams(CodecParams* params, uint8_t bit) {
   params->accumulator = GetNewAccumulator(*params, bit);
 }
 
-void PostSerial(async_dispatcher_t* dispatcher, fit::closure to_run) {
-  zx_status_t post_result = async::PostTask(dispatcher, std::move(to_run));
-  ZX_ASSERT_MSG(post_result == ZX_OK, "async::PostTask() failed - result: %d", post_result);
-}
-
-void InitCodecParams(std::optional<CodecParams>& codec_params) {
+void InitCvsdParams(std::optional<CvsdParams>& codec_params) {
   // Number of equal bits (run of 1's or 0's), J, should be less than or equal to
   // the number of historic output bits we keep track of.
-  codec_params.emplace(CodecParams{
+  codec_params.emplace(CvsdParams{
       .k = kK,
       .j = kJ,
       .equal_bit_mask = static_cast<uint32_t>(pow(2, kJ) - 1),
@@ -88,15 +83,5 @@ void InitCodecParams(std::optional<CodecParams>& codec_params) {
       .historic_bits = 0,
       .accumulator = 0,
       .step_size = 0,
-  });
-}
-
-void SetOutputItem(std::optional<OutputItem>& output_item, CodecPacket* packet,
-                   const CodecBuffer* buffer) {
-  output_item.emplace(OutputItem{
-      packet,
-      buffer,
-      0,
-      std::nullopt,
   });
 }

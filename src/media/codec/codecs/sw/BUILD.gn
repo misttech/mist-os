@@ -59,3 +59,18 @@ source_set("codec_adapter_sw") {
     "//zircon/system/ulib/trace",
   ]
 }
+
+source_set("codec_adapter_sw_impl") {
+  public = [ "codec_adapter_sw_impl.h" ]
+
+  public_deps = [
+    ":codec_adapter_sw",
+    "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
+    "//src/lib/fxl",
+    "//src/media/codec/codecs:chunk_input_stream",
+    "//src/media/lib/codec_impl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/trace",
+  ]
+}
