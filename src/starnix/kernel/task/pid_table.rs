@@ -103,4 +103,8 @@ impl PidTable {
     pub fn process_ids(&self) -> Vec<pid_t> {
         self.table.iter().flat_map(|(pid, entry)| entry.group.as_ref().and(Some(*pid))).collect()
     }
+
+    pub fn len(&self) -> usize {
+        self.table.len()
+    }
 }

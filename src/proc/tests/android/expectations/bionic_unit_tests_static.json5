@@ -37,8 +37,6 @@
                 "sys_stat.statx",
                 "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_symlink",
                 "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_dangling_symlink",
-                "sys_sysinfo.smoke",
-                "sys_sysinfo.sysinfo",
                 "sys_timex.adjtimex_smoke",
                 "sys_timex.adjtimex_EFAULT",
                 "sys_timex.clock_adjtime_smoke",

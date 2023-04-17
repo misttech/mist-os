@@ -1002,16 +1002,6 @@
                 "SyncFileRangeTest.BadArgs",
                 "SyncFileRangeTest.CannotSyncFileRangeOnUnopenedFd",
 
-                // sysinfo_test
-                "SysinfoTest.SysinfoIsCallable",
-                "SysinfoTest.TotalRamSaneValue",
-                "SysinfoTest.EfaultProducedOnBadAddress",
-                "SysinfoTest.FreeRamSaneValue",
-                "SysinfoTest.MemunitSet",
-                "SysinfoTest.UptimeSaneValue",
-                "SysinfoTest.NumProcsSaneValue",
-                "SysinfoTest.UptimeIncreasingValue",
-
                 // syslog_test
                 "Syslog.Size",
                 "Syslog.ReadAll",

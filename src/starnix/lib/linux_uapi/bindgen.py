@@ -51,16 +51,27 @@ GENERAL_REPLACEMENTS = [
     # Use CStr to represent constant C strings. The inputs look like:
     #   pub const FS_KEY_DESC_PREFIX: &[u8; 9usize] = b"fscrypt:\0";
     (
-        re.compile(': &\[u8; [0-9]+usize\] = (b".*)\\\\0";$'),
-        """: &'static std::ffi::CStr = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\1\\\\0") };"""
+        re.compile(': &\[u8; [0-9]+(usize)?\] = (b".*)\\\\0";\n'),
+        """: &'static std::ffi::CStr = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2\\\\0") };\n"""
     ),
+
+   # Remove redundant `_f` field from `struct sysinfo`. Derive Copy and Clone.
+   (
+        re.compile("#\[derive\(Debug, Default\)\]\n"
+                   "pub struct sysinfo {((\n"
+                   " +pub [_a-z0-9]+: [_a-z0-9 ;\[\]]+,)+)\n"
+                   " +pub _f: __IncompleteArrayField<crate::[a-z0-9_]+_types::c_char>,"),
+        "#[derive(Debug, Default, Copy, Clone)]\n"
+        "pub struct sysinfo {\\1"
+   ),
 
     # Add AsBytes/FromBytes to every copyable struct regardless of name.
     # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
     # Remove in favor of bindgen support for custom derives.
     (
-        re.compile("^#\[derive\(Debug, Default, Copy, Clone\)\]$"),
-        "#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]"),
+        re.compile("\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n"),
+        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"
+    )
 ]
 
 
@@ -188,13 +199,14 @@ def post_process_rust_file(rust_file_name):
                 else:
                     # No derive line, insert a new one.
                     output_lines += ["#[derive(FromBytes)]\n"]
-            else:
-                for (regexp, replacement) in GENERAL_REPLACEMENTS:
-                    line = regexp.sub(replacement, line)
             output_lines += [line]
 
+        text = "".join(output_lines)
+        for (regexp, replacement) in GENERAL_REPLACEMENTS:
+            text = regexp.sub(replacement, text)
+
         source_file.seek(0)
-        source_file.write("".join(output_lines))
+        source_file.write(text)
 
 
 def generate_platform_uapi(arch_info):

@@ -37,6 +37,31 @@ pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result
     Ok(())
 }
 
+pub fn sys_sysinfo(current_task: &CurrentTask, info: UserRef<uapi::sysinfo>) -> Result<(), Errno> {
+    let page_size = zx::system_get_page_size();
+    let total_ram_pages = zx::system_get_physmem() / (page_size as u64);
+    let num_procs = current_task.thread_group.kernel.pids.read().len();
+    let result = uapi::sysinfo {
+        uptime: (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds(),
+
+        // TODO(fxbug.dev/125626): Report system load.
+        loads: [0; 3],
+
+        totalram: total_ram_pages,
+
+        // TODO(fxbug.dev/125625): Return actual memory usage.
+        freeram: total_ram_pages / 8,
+
+        procs: num_procs.try_into().map_err(|_| errno!(EINVAL))?,
+        mem_unit: page_size,
+
+        ..Default::default()
+    };
+
+    current_task.mm.write_object(info, &result)?;
+    Ok(())
+}
+
 // Used to read a hostname or domainname from task memory
 fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<Vec<u8>, Errno> {
     let len = len as usize;

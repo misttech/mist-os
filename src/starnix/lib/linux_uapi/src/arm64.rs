@@ -3651,6 +3651,7 @@ pub const STATX_ATTR_AUTOMOUNT: u32 = 4096;
 pub const STATX_ATTR_MOUNT_ROOT: u32 = 8192;
 pub const STATX_ATTR_VERITY: u32 = 1048576;
 pub const STATX_ATTR_DAX: u32 = 2097152;
+pub const SI_LOAD_SHIFT: u32 = 16;
 pub const IGNBRK: u32 = 1;
 pub const BRKINT: u32 = 2;
 pub const IGNPAR: u32 = 4;
@@ -9693,6 +9694,25 @@ pub struct statx {
     pub stx_mnt_id: __u64,
     pub __spare2: __u64,
     pub __spare3: [__u64; 12usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct sysinfo {
+    pub uptime: __kernel_long_t,
+    pub loads: [__kernel_ulong_t; 3usize],
+    pub totalram: __kernel_ulong_t,
+    pub freeram: __kernel_ulong_t,
+    pub sharedram: __kernel_ulong_t,
+    pub bufferram: __kernel_ulong_t,
+    pub totalswap: __kernel_ulong_t,
+    pub freeswap: __kernel_ulong_t,
+    pub procs: __u16,
+    pub pad: __u16,
+    pub __bindgen_padding_0: [u8; 4usize],
+    pub totalhigh: __kernel_ulong_t,
+    pub freehigh: __kernel_ulong_t,
+    pub mem_unit: __u32,
+    pub __bindgen_padding_1: [u8; 4usize],
 }
 pub type cc_t = crate::arm64_types::c_uchar;
 pub type speed_t = crate::arm64_types::c_uint;
