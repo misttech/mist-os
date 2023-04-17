@@ -22,7 +22,6 @@
 
 #include "magma_util/platform/zircon/zircon_platform_status.h"
 #include "magma_util/short_macros.h"
-#include "platform_handle.h"
 #include "platform_logger.h"
 #include "platform_trace_provider.h"
 #include "platform_trace_provider_with_fdio.h"

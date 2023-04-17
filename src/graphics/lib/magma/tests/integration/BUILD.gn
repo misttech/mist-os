@@ -52,6 +52,7 @@ executable("magma_conformance_tests") {
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp_wire",
       "//sdk/lib/fdio",
       "//src/graphics/lib/magma/src/magma_util/platform:logger",
+      "//src/graphics/lib/magma/src/magma_util/platform:logger_provider_header",
       "//src/graphics/lib/magma/src/magma_util/platform:trace_provider",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]
@@ -89,6 +90,7 @@ executable("magma_conformance_tests_hermetic") {
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp_wire",
       "//sdk/lib/fdio",
       "//src/graphics/lib/magma/src/magma_util/platform:logger",
+      "//src/graphics/lib/magma/src/magma_util/platform:logger_provider_header",
       "//src/graphics/lib/magma/src/magma_util/platform:trace_provider",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]

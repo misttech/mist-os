@@ -26,6 +26,7 @@
 #include "fidl/fuchsia.tracing.provider/cpp/wire.h"
 #include "fuchsia/sysmem/cpp/fidl.h"
 #include "platform_logger.h"
+#include "platform_logger_provider.h"
 #include "platform_trace_provider.h"
 #endif
 
@@ -962,7 +963,7 @@ class TestConnection {
 #if defined(__Fuchsia__) && !defined(MAGMA_HERMETIC)
     // Logging should be set up by the test fixture, so just add more logs here to help manually
     // verify that the fixture is working correctly.
-    EXPECT_TRUE(magma::PlatformLogger::IsInitialized());
+    EXPECT_TRUE(magma::PlatformLoggerProvider::IsInitialized());
     MAGMA_LOG(INFO, "LoggingInit test complete");
 #endif
   }

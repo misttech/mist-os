@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 #include <platform_logger.h>
+#include <platform_logger_provider.h>
 #include <string.h>
 
 #include <gtest/gtest.h>
 
 TEST(PlatformLogger, LogMacro) {
   // Assumes the logger has already been initialized.
-  ASSERT_TRUE(magma::PlatformLogger::IsInitialized());
+  ASSERT_TRUE(magma::PlatformLoggerProvider::IsInitialized());
   MAGMA_LOG(INFO, "%s %s", "Hello", "world!");
 }

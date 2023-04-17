@@ -136,6 +136,7 @@ source_set("magma_platform_tests") {
     "$magma_build_root/src/magma_util/platform:event",
     "$magma_build_root/src/magma_util/platform:handle",
     "$magma_build_root/src/magma_util/platform:logger",
+    "$magma_build_root/src/magma_util/platform:logger_provider_header",
     "$magma_build_root/src/magma_util/platform:port",
     "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/src/magma_util/platform:sysmem_connection",

@@ -6,12 +6,13 @@
 #include <stdio.h>
 
 #include "platform_logger.h"
+#include "platform_logger_provider.h"
 
 namespace magma {
 
-bool PlatformLogger::IsInitialized() { return true; }
+bool PlatformLoggerProvider::IsInitialized() { return true; }
 
-bool PlatformLogger::Initialize(std::unique_ptr<PlatformHandle> handle) { return true; }
+bool PlatformLoggerProvider::Initialize(std::unique_ptr<PlatformHandle> handle) { return true; }
 
 static void print_level(PlatformLogger::LogLevel level) {
   switch (level) {

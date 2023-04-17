@@ -84,7 +84,9 @@ source_set("logger_init_helper") {
   testonly = true
   sources = [ "logger_init_helper.cc" ]
   deps = [
+    "$magma_build_root/src/magma_util/platform:handle",
     "$magma_build_root/src/magma_util/platform:logger_impl",
+    "$magma_build_root/src/magma_util/platform:logger_provider_header",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/zx",
   ]

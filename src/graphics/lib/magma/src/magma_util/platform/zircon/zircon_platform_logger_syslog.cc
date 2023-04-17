@@ -11,6 +11,7 @@
 #include <stdio.h>
 
 #include "platform_logger.h"
+#include "platform_logger_provider.h"
 #include "platform_thread.h"
 #include "zircon_platform_handle.h"
 
@@ -24,9 +25,9 @@ zx_handle_t log_socket;
 
 }  // namespace
 
-bool PlatformLogger::IsInitialized() { return g_is_logging_initialized; }
+bool PlatformLoggerProvider::IsInitialized() { return g_is_logging_initialized; }
 
-bool PlatformLogger::Initialize(std::unique_ptr<PlatformHandle> channel) {
+bool PlatformLoggerProvider::Initialize(std::unique_ptr<PlatformHandle> channel) {
   zx::socket local_socket, remote_socket;
   zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &local_socket, &remote_socket);
   if (status != ZX_OK)

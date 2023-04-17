@@ -10,10 +10,6 @@
 
 namespace magma {
 
-bool PlatformLogger::IsInitialized() { return true; }
-
-bool PlatformLogger::Initialize(std::unique_ptr<PlatformHandle> handle) { return true; }
-
 void PlatformLogger::LogVa(LogLevel level, const char* file, int line, const char* fmt,
                            va_list args) {
   // TODO: Propogate file and line via caller.

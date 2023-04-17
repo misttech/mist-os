@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 source_set("logger") {
-  public_deps = [ "..:logger_header" ]
+  public_deps = [
+    "..:logger_header",
+    "..:logger_provider_header",
+  ]
   sources = [ "linux_platform_logger.cc" ]
 }

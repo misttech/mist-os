@@ -274,10 +274,16 @@ source_set("event") {
   }
 }
 
-source_set("logger_header") {
+source_set("logger_provider_header") {
   public_configs = [ ":platform_include_config" ]
 
   public_deps = [ ":handle_header" ]
+
+  sources = [ "platform_logger_provider.h" ]
+}
+
+source_set("logger_header") {
+  public_configs = [ ":platform_include_config" ]
 
   sources = [ "platform_logger.h" ]
 }
@@ -289,7 +295,10 @@ group("logger") {
 }
 
 group("logger_impl") {
-  public_deps = [ ":logger_header" ]
+  public_deps = [
+    ":logger_header",
+    ":logger_provider_header",
+  ]
   if (is_fuchsia) {
     deps = [ "zircon:logger" ]
   }

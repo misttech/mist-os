@@ -9,6 +9,7 @@
 #include <limits.h>  // PAGE_SIZE
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 

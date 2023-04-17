@@ -9,8 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "platform_handle.h"
-
 #define MAGMA_LOG(level, ...) \
   magma::PlatformLogger::Log(magma::PlatformLogger::LOG_##level, __FILE__, __LINE__, __VA_ARGS__)
 
@@ -19,9 +17,6 @@ namespace magma {
 class PlatformLogger {
  public:
   enum LogLevel { LOG_ERROR, LOG_WARNING, LOG_INFO };
-
-  static bool Initialize(std::unique_ptr<PlatformHandle> channel);
-  static bool IsInitialized();
 
   __attribute__((format(printf, 4, 5))) static void Log(PlatformLogger::LogLevel level,
                                                         const char* file, int line, const char* msg,

@@ -7,6 +7,7 @@
 #include <lib/zx/channel.h>
 #include <platform_handle.h>
 #include <platform_logger.h>
+#include <platform_logger_provider.h>
 
 class LoggerInitHelper {
  public:
@@ -18,8 +19,8 @@ class LoggerInitHelper {
     status = fdio_service_connect("/svc/fuchsia.logger.LogSink", server_channel.release());
     assert(status == ZX_OK);
 
-    bool result =
-        magma::PlatformLogger::Initialize(magma::PlatformHandle::Create(client_channel.release()));
+    bool result = magma::PlatformLoggerProvider::Initialize(
+        magma::PlatformHandle::Create(client_channel.release()));
     assert(result);
     (void)result;
   }

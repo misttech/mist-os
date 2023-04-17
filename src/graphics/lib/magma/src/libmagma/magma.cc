@@ -15,6 +15,7 @@
 #include "platform_device_client.h"
 #include "platform_handle.h"
 #include "platform_logger.h"
+#include "platform_logger_provider.h"
 #include "platform_object.h"
 #include "platform_port.h"
 #include "platform_semaphore.h"
@@ -480,10 +481,10 @@ magma_status_t magma_initialize_logging(magma_handle_t channel) {
     return MAGMA_STATUS_INVALID_ARGS;
 
   auto handle = magma::PlatformHandle::Create(channel);
-  if (magma::PlatformLogger::IsInitialized())
+  if (magma::PlatformLoggerProvider::IsInitialized())
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Shouldn't initialize logging twice");
 
-  if (!magma::PlatformLogger::Initialize(std::move(handle)))
+  if (!magma::PlatformLoggerProvider::Initialize(std::move(handle)))
     return MAGMA_STATUS_INTERNAL_ERROR;
 
   return MAGMA_STATUS_OK;
