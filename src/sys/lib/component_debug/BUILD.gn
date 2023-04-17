@@ -78,6 +78,7 @@ rustc_library("component_debug") {
     "src/cli/storage.rs",
     "src/cmx.rs",
     "src/copy.rs",
+    "src/dirs.rs",
     "src/doctor.rs",
     "src/explore.rs",
     "src/io.rs",

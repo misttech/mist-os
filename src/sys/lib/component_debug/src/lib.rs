@@ -8,6 +8,7 @@ pub mod capability;
 pub mod cli;
 pub mod cmx;
 pub mod copy;
+pub mod dirs;
 pub mod doctor;
 pub mod explore;
 pub mod io;
