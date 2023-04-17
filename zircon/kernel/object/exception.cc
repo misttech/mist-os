@@ -84,32 +84,32 @@ class ExceptionHandlerIterator final {
       // handling to be sure of the proper sequencing.
       bool second_chance = exception_->IsSecondChance();
 
-      switch (next_type_) {
-        case ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER:
+      switch (next_method_) {
+        case ExceptionDeliveryMethod::kDebugChannel:
           *result =
               thread_->HandleException(thread_->process()->debug_exceptionate(), exception_, &sent);
           if (second_chance) {
-            next_type_ = ZX_EXCEPTION_CHANNEL_TYPE_JOB;
+            next_method_ = ExceptionDeliveryMethod::kJobChannel;
             next_job_ = thread_->process()->job();
           } else {
-            next_type_ = ZX_EXCEPTION_CHANNEL_TYPE_THREAD;
+            next_method_ = ExceptionDeliveryMethod::kThreadChannel;
           }
           break;
-        case ZX_EXCEPTION_CHANNEL_TYPE_THREAD:
+        case ExceptionDeliveryMethod::kThreadChannel:
           *result = thread_->HandleException(thread_->exceptionate(), exception_, &sent);
-          next_type_ = ZX_EXCEPTION_CHANNEL_TYPE_PROCESS;
+          next_method_ = ExceptionDeliveryMethod::kProcessChannel;
           break;
-        case ZX_EXCEPTION_CHANNEL_TYPE_PROCESS:
+        case ExceptionDeliveryMethod::kProcessChannel:
           *result = thread_->HandleException(thread_->process()->exceptionate(), exception_, &sent);
 
           if (second_chance) {
-            next_type_ = ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER;
+            next_method_ = ExceptionDeliveryMethod::kDebugChannel;
           } else {
-            next_type_ = ZX_EXCEPTION_CHANNEL_TYPE_JOB;
+            next_method_ = ExceptionDeliveryMethod::kJobChannel;
             next_job_ = thread_->process()->job();
           }
           break;
-        case ZX_EXCEPTION_CHANNEL_TYPE_JOB:
+        case ExceptionDeliveryMethod::kJobChannel:
           if (next_job_ == nullptr) {
             // Reached the root job and there was no handler.
             return false;
@@ -117,9 +117,6 @@ class ExceptionHandlerIterator final {
           *result = thread_->HandleException(next_job_->exceptionate(), exception_, &sent);
           next_job_ = next_job_->parent();
           break;
-        default:
-          ASSERT_MSG(0, "unexpected exception type %u", next_type_);
-          __UNREACHABLE;
       }
 
       // Return to the caller once a handler was activated.
@@ -131,9 +128,16 @@ class ExceptionHandlerIterator final {
   }
 
  private:
+  enum class ExceptionDeliveryMethod {
+    kDebugChannel,
+    kThreadChannel,
+    kProcessChannel,
+    kJobChannel,
+  };
+
   ThreadDispatcher* thread_;
   fbl::RefPtr<ExceptionDispatcher> exception_;
-  uint32_t next_type_ = ZX_EXCEPTION_CHANNEL_TYPE_DEBUGGER;
+  ExceptionDeliveryMethod next_method_ = ExceptionDeliveryMethod::kDebugChannel;
   fbl::RefPtr<JobDispatcher> next_job_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(ExceptionHandlerIterator);
