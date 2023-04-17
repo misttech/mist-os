@@ -11,6 +11,7 @@ import filecmp
 import os
 import shutil
 import json
+import subprocess
 import sys
 import difflib
 
@@ -48,12 +49,22 @@ def print_file_difference(source_file, dest_file, relpath):
     # assert relpath in WHITELIST_DIFF_LISTS
 
 
+def format_dir(buildifier_path: str, dir: str) -> None:
+    cmd = [buildifier_path, "-r", dir]
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-dir")
     parser.add_argument("--dest-dir")
+    parser.add_argument("--buildifier-path", default=None)
     args = parser.parse_args()
     manifest_json = None
+
+    if args.buildifier_path:
+        for dir in [args.source_dir, args.dest_dir]:
+            format_dir(args.buildifier_path, dir)
 
     for directory in os.listdir(args.source_dir):
         directory = os.path.join(args.source_dir, directory)
@@ -77,6 +88,7 @@ def main():
                     # Coherence check: Ensure that files with the same path have equal content.
                     if not filecmp.cmp(source_file, dest_file):
                         print_file_difference(source_file, dest_file, relpath)
+
                     continue
                 if not os.path.exists(os.path.dirname(dest_file)):
                     os.makedirs(os.path.dirname(dest_file))
