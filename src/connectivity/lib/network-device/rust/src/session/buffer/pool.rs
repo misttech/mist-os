@@ -18,6 +18,7 @@ use std::{
     iter::FromIterator,
 };
 
+use explicit::ResultExt as _;
 use fidl_fuchsia_hardware_network as netdev;
 use fuchsia_runtime::vmar_root_self;
 use fuchsia_zircon as zx;
@@ -166,23 +167,22 @@ impl Pool {
 
     /// Allocates a tx [`Buffer`].
     ///
-    /// The returned buffer will have at least `num_bytes` as size, the method
-    /// will block if there are not enough buffers.
+    /// The returned buffer will have `num_bytes` as its capacity, the method
+    /// will block if there are not enough buffers. An error will be returned if
+    /// the requested size cannot meet the device requirement, for example, if
+    /// the size of the head or tail region will become unrepresentable in u16.
     pub(in crate::session) async fn alloc_tx_buffer(
         self: &Arc<Self>,
         num_bytes: usize,
     ) -> Result<Buffer<Tx>> {
         let BufferLayout { min_tx_data, min_tx_head, min_tx_tail, length: buffer_length } =
             self.buffer_layout;
-        if num_bytes < min_tx_data {
-            return Err(Error::TxLength(num_bytes, min_tx_data));
-        }
         let tx_head = usize::from(min_tx_head);
         let tx_tail = usize::from(min_tx_tail);
-        let total_bytes = num_bytes + tx_head + tx_tail;
+        let total_bytes = num_bytes.max(min_tx_data) + tx_head + tx_tail;
         let num_parts = (total_bytes + buffer_length - 1) / buffer_length;
         let mut alloc = self.alloc_tx(ChainLength::try_from(num_parts)?).await;
-        alloc.init();
+        alloc.init(num_bytes)?;
         alloc.try_into()
     }
 
@@ -413,8 +413,9 @@ impl<K: AllocKind> Buffer<K> {
     /// Pads the [`Buffer`] to minimum tx buffer length requirements.
     pub(in crate::session) fn pad(&mut self) -> Result<()> {
         let num_parts = self.parts.len();
-        let BufferLayout { min_tx_tail, min_tx_data: mut target, min_tx_head: _, length: _ } =
+        let BufferLayout { min_tx_tail, min_tx_data, min_tx_head: _, length: _ } =
             self.alloc.pool.buffer_layout;
+        let mut target = min_tx_data;
         for (i, part) in self.parts.iter_mut().enumerate() {
             let grow_cap = if i == num_parts - 1 {
                 let descriptor =
@@ -423,17 +424,17 @@ impl<K: AllocKind> Buffer<K> {
                 let tail_length = descriptor.tail_length();
                 // data_length + tail_length <= buffer_length <= usize::MAX.
                 let rest = usize::try_from(data_length).unwrap() + usize::from(tail_length);
-                Some(
-                    rest.checked_sub(usize::from(min_tx_tail))
-                        .ok_or_else(|| Error::TxLength(rest, min_tx_tail.into()))?,
-                )
+                match rest.checked_sub(usize::from(min_tx_tail)) {
+                    Some(grow_cap) => Some(grow_cap),
+                    None => break,
+                }
             } else {
                 None
             };
             target -= part.pad(target, grow_cap)?;
         }
         if target != 0 {
-            return Err(Error::Pad(target, self.cap()));
+            return Err(Error::Pad(min_tx_data, self.cap()));
         }
         Ok(())
     }
@@ -694,22 +695,48 @@ impl<K: AllocKind> AllocGuard<K> {
 
 impl AllocGuard<Tx> {
     /// Initializes descriptors of a tx allocation.
-    fn init(&mut self) {
+    fn init(&mut self, mut requested_bytes: usize) -> Result<()> {
         let len = self.len();
         let BufferLayout { min_tx_head, min_tx_tail, length: buffer_length, min_tx_data: _ } =
             self.pool.buffer_layout;
         for (mut descriptor, clen) in self.descriptors_mut().zip((0..len).rev()) {
             let chain_length = ChainLength::try_from(clen).unwrap();
             let head_length = if clen + 1 == len { min_tx_head } else { 0 };
-            let tail_length = if clen == 0 { min_tx_tail } else { 0 };
-            // buffer_length is guaranteed to be larger than the sum of
+            let mut tail_length = if clen == 0 { min_tx_tail } else { 0 };
+
             // head_length and tail_length. The check was done when the config
             // for pool was created, so the subtraction won't overflow.
-            let data_length =
+            let available_bytes =
                 u32::try_from(buffer_length - usize::from(head_length) - usize::from(tail_length))
                     .unwrap();
+
+            let data_length = match u32::try_from(requested_bytes) {
+                Ok(requested) => {
+                    if requested < available_bytes {
+                        // The requested bytes are less than what is available,
+                        // we need to put the excess in the tail so that the
+                        // user cannot write more than they requested.
+                        tail_length = u16::try_from(available_bytes - requested)
+                            .ok_checked::<TryFromIntError>()
+                            .and_then(|tail_adjustment| tail_length.checked_add(tail_adjustment))
+                            .ok_or(Error::TxLength)?;
+                    }
+                    requested.min(available_bytes)
+                }
+                Err(TryFromIntError { .. }) => available_bytes,
+            };
+
+            requested_bytes -=
+                usize::try_from(data_length).unwrap_or_else(|TryFromIntError { .. }| {
+                    panic!(
+                        "data_length: {} must be smaller than requested_bytes: {}, which is a usize",
+                        data_length, requested_bytes
+                    )
+                });
             descriptor.initialize(chain_length, head_length, data_length, tail_length);
         }
+        assert_eq!(requested_bytes, 0);
+        Ok(())
     }
 }
 
@@ -1016,21 +1043,25 @@ mod tests {
     const WRITE_BYTE: u8 = 1;
     const PAD_BYTE: u8 = 0;
 
+    const DEFAULT_CONFIG: Config = Config {
+        buffer_stride: const_unwrap::const_unwrap_option(NonZeroU64::new(
+            DEFAULT_BUFFER_LENGTH.get() as u64,
+        )),
+        num_rx_buffers: DEFAULT_RX_BUFFERS,
+        num_tx_buffers: DEFAULT_TX_BUFFERS,
+        options: netdev::SessionFlags::empty(),
+        buffer_layout: BufferLayout {
+            length: DEFAULT_BUFFER_LENGTH.get(),
+            min_tx_head: DEFAULT_MIN_TX_BUFFER_HEAD,
+            min_tx_tail: DEFAULT_MIN_TX_BUFFER_TAIL,
+            min_tx_data: 0,
+        },
+    };
+
     impl Pool {
         fn new_test_default() -> Arc<Self> {
-            let (pool, _descriptors, _data) = Pool::new(Config {
-                buffer_stride: NonZeroU64::try_from(DEFAULT_BUFFER_LENGTH).unwrap(),
-                num_rx_buffers: DEFAULT_RX_BUFFERS,
-                num_tx_buffers: DEFAULT_TX_BUFFERS,
-                options: netdev::SessionFlags::empty(),
-                buffer_layout: BufferLayout {
-                    length: DEFAULT_BUFFER_LENGTH.get(),
-                    min_tx_head: DEFAULT_MIN_TX_BUFFER_HEAD,
-                    min_tx_tail: DEFAULT_MIN_TX_BUFFER_TAIL,
-                    min_tx_data: 0,
-                },
-            })
-            .expect("failed to create default pool");
+            let (pool, _descriptors, _data) =
+                Pool::new(DEFAULT_CONFIG).expect("failed to create default pool");
             pool
         }
 
@@ -1438,12 +1469,7 @@ mod tests {
         // Because we have to accommodate the space for head and tail, there
         // would be 2 parts instead of 1.
         assert_eq!(buffer.parts.len(), 2);
-        assert_eq!(
-            buffer.cap(),
-            alloc_bytes * 2
-                - usize::from(DEFAULT_MIN_TX_BUFFER_HEAD)
-                - usize::from(DEFAULT_MIN_TX_BUFFER_TAIL)
-        );
+        assert_eq!(buffer.cap(), alloc_bytes);
         let write_buf = (0..u8::try_from(DEFAULT_BUFFER_LENGTH.get()).unwrap()).collect::<Vec<_>>();
         assert_eq!(
             buffer.write_at(0, &write_buf[..]).expect("failed to write into buffer"),
@@ -1468,12 +1494,7 @@ mod tests {
         // Because we have to accommodate the space for head and tail, there
         // would be 2 parts instead of 1.
         assert_eq!(buffer.parts.len(), 2);
-        assert_eq!(
-            buffer.cap(),
-            alloc_bytes * 2
-                - usize::from(DEFAULT_MIN_TX_BUFFER_HEAD)
-                - usize::from(DEFAULT_MIN_TX_BUFFER_TAIL)
-        );
+        assert_eq!(buffer.cap(), alloc_bytes);
         let write_buf = (0..u8::try_from(DEFAULT_BUFFER_LENGTH.get()).unwrap()).collect::<Vec<_>>();
         assert_eq!(
             buffer.write(&write_buf[..]).expect("failed to write into buffer"),
@@ -1490,9 +1511,7 @@ mod tests {
             buffer.read(&mut read_buf[..]).expect("failed to read from buffer"),
             read_buf.len()
         );
-        for (idx, byte) in read_buf.iter().enumerate() {
-            assert_eq!(*byte, write_buf[idx + SEEK_FROM_END - READ_LEN]);
-        }
+        assert_eq!(&write_buf[..READ_LEN], &read_buf[..]);
     }
 
     #[test_case(32; "single buffer part")]
@@ -1525,7 +1544,13 @@ mod tests {
                 .fill_sentinel_bytes();
             let mut alloc =
                 pool.alloc_tx_now_or_never(BUFFER_PARTS).expect("failed to alloc descriptors");
-            alloc.init();
+            alloc
+                .init(
+                    DEFAULT_BUFFER_LENGTH.get() * usize::from(BUFFER_PARTS)
+                        - usize::from(DEFAULT_MIN_TX_BUFFER_HEAD)
+                        - usize::from(DEFAULT_MIN_TX_BUFFER_TAIL),
+                )
+                .expect("head/body/tail sizes are representable with u16/u32/u16");
             let mut buffer = Buffer::try_from(alloc).unwrap();
             buffer.check_write_and_pad(offset.try_into().unwrap(), pad_size.try_into().unwrap());
         }
@@ -1611,5 +1636,43 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn allocate_under_device_minimum() {
+        const MIN_TX_DATA: usize = 32;
+        const ALLOC_SIZE: usize = 16;
+        const WRITE_BYTE: u8 = 0xff;
+        const WRITE_SENTINAL_BYTE: u8 = 0xee;
+        const READ_SENTINAL_BYTE: u8 = 0xdd;
+        let mut config = DEFAULT_CONFIG;
+        config.buffer_layout.min_tx_data = MIN_TX_DATA;
+        let (pool, _descriptors, _vmo) = Pool::new(config).expect("failed to create a new pool");
+        for mut buffer in Vec::from_iter(std::iter::from_fn({
+            let pool = pool.clone();
+            move || pool.alloc_tx_buffer_now_or_never(MIN_TX_DATA)
+        })) {
+            assert_matches!(buffer.write(&[WRITE_SENTINAL_BYTE; MIN_TX_DATA]), Ok(MIN_TX_DATA));
+        }
+        let mut allocated =
+            pool.alloc_tx_buffer_now_or_never(16).expect("failed to allocate buffer");
+        assert_eq!(allocated.cap(), ALLOC_SIZE);
+        assert_matches!(allocated.write(&[WRITE_BYTE; ALLOC_SIZE + 1]), Ok(ALLOC_SIZE));
+        assert_matches!(allocated.pad(), Ok(()));
+        assert_eq!(allocated.cap(), MIN_TX_DATA);
+        assert_eq!(allocated.len(), MIN_TX_DATA);
+        let mut read_buf = [READ_SENTINAL_BYTE; MIN_TX_DATA];
+        assert_matches!(allocated.read_at(0, &mut read_buf), Ok(MIN_TX_DATA));
+        assert_eq!(&read_buf[..ALLOC_SIZE], &[WRITE_BYTE; ALLOC_SIZE][..]);
+        assert_eq!(&read_buf[ALLOC_SIZE..], &[0x0; ALLOC_SIZE][..]);
+    }
+
+    #[test]
+    fn invalid_tx_length() {
+        let mut config = DEFAULT_CONFIG;
+        config.buffer_layout.length = usize::from(u16::MAX) + 2;
+        config.buffer_layout.min_tx_head = 0;
+        let (pool, _descriptors, _vmo) = Pool::new(config).expect("failed to create pool");
+        assert_matches!(pool.alloc_tx_buffer(1).now_or_never(), Some(Err(Error::TxLength)));
     }
 }

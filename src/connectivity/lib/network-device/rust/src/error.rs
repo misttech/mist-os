@@ -26,8 +26,8 @@ pub enum Error {
     Index(usize, usize),
     #[error("failed to pad buffer to {0}, capacity {1}")]
     Pad(usize, usize),
-    #[error("buffer size {0} is smaller than the device required length {1}")]
-    TxLength(usize, usize),
+    #[error("cannot allocate a buffer to meet the device requirement")]
+    TxLength,
     #[error("failed to open session {0}: {1}")]
     Open(String, zx::Status),
     #[error("failed to create VMO {0}: {1}")]

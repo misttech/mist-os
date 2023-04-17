@@ -266,7 +266,7 @@ async fn create_interface(
                     | netdevice_client::Error::LargeChain(_)
                     | netdevice_client::Error::Index(_, _)
                     | netdevice_client::Error::Pad(_, _)
-                    | netdevice_client::Error::TxLength(_, _)
+                    | netdevice_client::Error::TxLength
                     | netdevice_client::Error::Open(_, _)
                     | netdevice_client::Error::Vmo(_, _)
                     | netdevice_client::Error::Fifo(_, _, _)
