@@ -31,7 +31,9 @@ declare_args() {
   # For scenarios where CastRunner is used,
   # [`use_cast_runner_canary`](#use_cast_runner_canary) must be set to the same
   # value.
-  use_chromium_canary = false
+  # TODO(crbug.com/1065707): Uncomment this once the .gni file is no longer
+  # using it.
+  # use_chromium_canary = false
 }
 
 # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.

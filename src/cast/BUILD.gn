@@ -4,6 +4,11 @@
 
 import("generate_cast_targets.gni")
 
+# Ensure chromium_latest builds are not using this directory.
+# use_chromium_canary and use_cast_runner_canary should always match. Use the latter
+# here because the former is inaccessible from here.
+assert(!use_cast_runner_canary)
+
 generate_cast_targets("cast") {
   archive_path_suffix = ""
 }
