@@ -962,7 +962,7 @@ impl<'a> NetCfg<'a> {
                         Ok(s) => s,
                         Err(e) => {
                             // TODO(fxbug.dev/57484): Restart the DNS server watcher.
-                            error!(
+                            warn!(
                                 "non-fatal error getting next event from DNS server watcher stream
                                 with source = {:?}: {:?}",
                                 source, e
