@@ -1,0 +1,7 @@
+fuchsia.starnix.gvisor_benchmarks: FutexRoundtripDelayed/0/MinTime/5.000
+fuchsia.starnix.gvisor_benchmarks: FutexRoundtripDelayed/10/MinTime/5.000
+fuchsia.starnix.gvisor_benchmarks: FutexWaitMonotonicDeadline/MinTime/5.000
+fuchsia.starnix.gvisor_benchmarks: FutexWaitMonotonicTimeout/1/MinTime/5.000
+fuchsia.starnix.gvisor_benchmarks: FutexWaitNop/MinTime/5.000
+fuchsia.starnix.gvisor_benchmarks: FutexWaitRealtimeDeadline/MinTime/5.000
+fuchsia.starnix.gvisor_benchmarks: FutexWakeNop/MinTime/5.000

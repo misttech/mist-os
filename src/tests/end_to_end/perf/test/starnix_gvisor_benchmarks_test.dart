@@ -12,7 +12,9 @@ import 'helpers.dart';
 // The benchmarks come from here:
 // https://github.com/google/gvisor/tree/master/test/perf/linux
 
-void main() {
+List<void Function()> _tests = [];
+
+void main(List<String> args) {
   const starnix_gvisor_benchmarks = 'starnix_gvisor_benchmarks';
 
   enableLoggingOutput();
@@ -26,7 +28,7 @@ void main() {
     'dup_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.dup.txt',
     'epoll_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.epoll.txt',
     'fork_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.fork.txt',
-    // 'futex_benchmark' - not passing
+    'futex_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.futex.txt',
     'getdents_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.getdents.txt',
     'getpid_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.getpid.txt',
     // 'gettid_benchmark' - long running
@@ -56,6 +58,16 @@ void main() {
         '|BM_ProcessSwitch'
         '|BM_ThreadStart'
         '|BM_ProcessLifecycle"',
+    // The following benchmarks run with large ranges of arguments.
+    // Run a subset of them.
+    'futex_benchmark.cm': '--benchmark_filter_internal="'
+        'BM_FutexRoundtripDelayed/0/min_time'
+        '|BM_FutexRoundtripDelayed/10/min_time'
+        '|BM_FutexWaitMonotonicDeadline'
+        '|BM_FutexWaitMonotonicTimeout/1/min_time'
+        '|BM_FutexWakeNop'
+        '|BM_FutexWaitNop'
+        '|BM_FutexWaitRealtimeDeadline"',
   };
 
   benchmarks.forEach((String componentName, String expectedMetricNamesFile) {
@@ -64,12 +76,16 @@ void main() {
       commandArgs = filters[componentName];
     }
 
-    test(starnix_gvisor_benchmarks, () async {
-      await runTestComponent(
-          packageName: starnix_gvisor_benchmarks,
-          componentName: componentName,
-          commandArgs: commandArgs,
-          expectedMetricNamesFile: expectedMetricNamesFile);
-    }, timeout: Timeout.none);
+    _tests.add(() {
+      test(starnix_gvisor_benchmarks, () async {
+        await runTestComponent(
+            packageName: starnix_gvisor_benchmarks,
+            componentName: componentName,
+            commandArgs: commandArgs,
+            expectedMetricNamesFile: expectedMetricNamesFile);
+      }, timeout: Timeout.none);
+    });
   });
+
+  runShardTests(args, _tests);
 }
