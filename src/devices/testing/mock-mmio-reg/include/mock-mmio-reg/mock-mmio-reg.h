@@ -15,12 +15,11 @@
 
 namespace ddk_mock {
 
+namespace {
+
 // Mocks a single MMIO register. This class is intended to be used with a fdf::MmioBuffer;
 // operations on an instance of that class will be directed to the mock if the mock-mmio-reg library
 // is a dependency of the test.
-//
-// This class will soon be moved to private namespace (or otherwise be made private). Please do not
-// directly instantiate instances of this type.
 class MockMmioReg {
  public:
   // Reads from the mocked register. Returns the value set by the next expectation, or the default
@@ -130,7 +129,9 @@ class MockMmioReg {
   fbl::Vector<MmioExpectation> write_expectations_;
 };
 
-// Mocks a region of MMIO registers. Each register is backed a MockMmioReg instance.
+}  // namespace
+
+// Mocks a region of MMIO registers. Each register is backed by a MockMmioReg instance.
 //
 // Example:
 // ddk_mock::MockMmioRegRegion mock_registers(register_size, number_of_registers);
@@ -162,12 +163,6 @@ class MockMmioRegRegion {
     ASSERT_GT(reg_size_, 0);
     regs_.resize(reg_count_);
   }
-
-  // Because the repos across //integration edges cannot be updated atomically, this overload serves
-  // as a compatible layer. Once all downstream repos have been updated to use the new interface,
-  // this will be removed. Do not use in new code.
-  MockMmioRegRegion(MockMmioReg* unused, size_t reg_size, size_t reg_count, size_t reg_offset = 0)
-      : MockMmioRegRegion(reg_size, reg_count, reg_offset) {}
 
   // Accesses the MockMmioReg at the given offset. Note that this is the _offset_, not the
   // _index_.
