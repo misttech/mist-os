@@ -17,11 +17,6 @@
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 
-#define IS_ALIGNED(a, b) (!(((uintptr_t)(a)) & (((uintptr_t)(b)) - 1)))
-
-#define CANVAS_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define CANVAS_INFO(fmt, ...) zxlogf(INFO, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-
 namespace aml_canvas {
 
 constexpr size_t kNumCanvasEntries = 256;

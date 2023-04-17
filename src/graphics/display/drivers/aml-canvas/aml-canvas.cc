@@ -8,16 +8,17 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include <lib/stdcompat/bit.h>
+#include <zircon/assert.h>
 #include <zircon/pixelformat.h>
 #include <zircon/status.h>
+#include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -28,17 +29,24 @@
 
 namespace aml_canvas {
 
+template <typename T, typename _ = std::enable_if<std::is_unsigned_v<T>>>
+constexpr bool IsAligned(T address_or_size, T alignment) {
+  ZX_DEBUG_ASSERT(cpp20::has_single_bit(alignment));
+
+  const T alignment_mask = alignment - 1;
+  return (address_or_size & alignment_mask) == 0;
+}
+
 zx_status_t AmlCanvas::AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const canvas_info_t* info,
                                            uint8_t* canvas_idx) {
   if (!info || !canvas_idx) {
     return ZX_ERR_INVALID_ARGS;
   }
 
+  uint32_t page_size = zx_system_get_page_size();
   uint32_t size = fbl::round_up<uint32_t, uint32_t>(
-      (info->stride_bytes * info->height) + static_cast<uint32_t>(offset % PAGE_SIZE), PAGE_SIZE);
+      (info->stride_bytes * info->height) + static_cast<uint32_t>(offset % page_size), page_size);
   uint32_t index;
-  zx_paddr_t paddr;
-  fbl::AutoLock al(&lock_);
 
   uint32_t height = info->height;
   uint32_t width = info->stride_bytes;
@@ -47,23 +55,23 @@ zx_status_t AmlCanvas::AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const can
     // The precise height of the canvas doesn't matter if wrapping isn't in
     // use (as long as the user doesn't try to read or write outside of
     // the defined area).
-    height = fbl::round_up<uint32_t, uint32_t>(height, 8);
+    height = fbl::round_up(height, uint32_t{8});
   }
 
-  if (!IS_ALIGNED(height, 8) || !IS_ALIGNED(width, 8)) {
-    CANVAS_ERROR("Height or width is not aligned\n");
+  if (!IsAligned(height, uint32_t{8}) || !IsAligned(width, uint32_t{8})) {
+    zxlogf(ERROR, "Height or width not a multiple of 8");
     return ZX_ERR_INVALID_ARGS;
   }
 
   // find an unused canvas index
+  fbl::AutoLock al(&lock_);
   for (index = 0; index < kNumCanvasEntries; index++) {
     if (!entries_[index].pmt.is_valid()) {
       break;
     }
   }
-
   if (index == kNumCanvasEntries) {
-    CANVAS_ERROR("All canvas indices are currently in use\n");
+    zxlogf(ERROR, "All canvas indices are currently in use");
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -76,15 +84,16 @@ zx_status_t AmlCanvas::AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const can
   }
 
   zx::pmt pmt;
+  zx_paddr_t paddr;
   zx_status_t status = bti_.pin(pin_flags, vmo, fbl::round_down<size_t, size_t>(offset, PAGE_SIZE),
                                 size, &paddr, 1, &pmt);
   if (status != ZX_OK) {
-    CANVAS_ERROR("zx_bti_pin failed %d \n", status);
+    zxlogf(ERROR, "zx_bti_pin() failed: %s", zx_status_get_string(status));
     return status;
   }
 
-  if (!IS_ALIGNED(paddr, 8)) {
-    CANVAS_ERROR("Physical address is not aligned\n");
+  if (!IsAligned(paddr, zx_paddr_t{8})) {
+    zxlogf(ERROR, "Physical address is not aligned\n");
     status = ZX_ERR_INVALID_ARGS;
     pmt.unpin();
     return ZX_ERR_INVALID_ARGS;
@@ -134,12 +143,11 @@ zx_status_t AmlCanvas::AmlogicCanvasFree(uint8_t canvas_idx) {
   auto& entry = entries_[canvas_idx];
 
   if (!entry.pmt.is_valid()) {
-    CANVAS_ERROR("Freeing invalid canvas index: %d\n", canvas_idx);
+    zxlogf(ERROR, "Refusing to free invalid canvas index: %d", int{canvas_idx});
     return ZX_ERR_INVALID_ARGS;
-  } else {
-    entry = CanvasEntry();
   }
 
+  entry = CanvasEntry();
   return ZX_OK;
 }
 
@@ -155,30 +163,28 @@ void AmlCanvas::DdkRelease() {
 
 // static
 zx_status_t AmlCanvas::Create(zx_device_t* parent) {
-  // Get device protocol
   zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent);
   if (pdev_result.is_error()) {
-    CANVAS_ERROR("Could not get parent protocol: %s", pdev_result.status_string());
+    zxlogf(ERROR, "Failed to get parent protocol: %s", pdev_result.status_string());
     return pdev_result.error_value();
   }
 
   ddk::PDevFidl pdev = std::move(pdev_result).value();
 
-  // Get BTI handle
   zx::bti bti;
-  zx_status_t status = pdev.GetBti(0, &bti);
+  zx_status_t status = pdev.GetBti(/*index=*/0, &bti);
   if (status != ZX_OK) {
-    CANVAS_ERROR("Could not get BTI handle\n");
+    zxlogf(ERROR, "Failed to get BTI handle: %s", zx_status_get_string(status));
     return status;
   }
 
-  // Map all MMIOs
   std::optional<fdf::MmioBuffer> mmio;
   status = pdev.MapMmio(0, &mmio);
   if (status != ZX_OK) {
-    CANVAS_ERROR("Could not map DMC registers: %s\n", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to map DMC registers: %s", zx_status_get_string(status));
     return status;
   }
+  ZX_ASSERT_MSG(mmio.has_value(), "PDevFidl::MapMmio() succeeded but didn't populate out-param");
 
   fbl::AllocChecker alloc_checker;
   auto canvas = fbl::make_unique_checked<aml_canvas::AmlCanvas>(
@@ -193,7 +199,7 @@ zx_status_t AmlCanvas::Create(zx_device_t* parent) {
                               .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
                               .set_inspect_vmo(canvas->inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
-    CANVAS_ERROR("Could not add aml canvas device: %d\n", status);
+    zxlogf(ERROR, "Failed to add aml-canvas device: %s", zx_status_get_string(status));
     return status;
   }
 
