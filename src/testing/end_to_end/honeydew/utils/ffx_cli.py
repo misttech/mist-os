@@ -83,11 +83,17 @@ def close() -> None:
     It does the following:
     * Deletes the isolation directory created during `setup()`
     """
+    global _ISOLATE_DIR
+    global _LOGS_DIR
+
     try:
         _LOGGER.debug("Deleting ffx isolation dir: '%s'", _ISOLATE_DIR)
         rmtree(str(_ISOLATE_DIR))
     except FileNotFoundError:
         pass
+
+    _ISOLATE_DIR = None
+    _LOGS_DIR = None
 
 
 def ffx_target_show(
