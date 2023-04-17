@@ -288,8 +288,9 @@ if (is_host) {
     not_needed([ "target_name" ])
     visibility = [ ":*" ]
 
-    # Prebuilt FAR tests
-    test_env = [
+    # Configure groups of prebuilt tests from Chromium.
+
+    default_test_environments = [
       atlas_env,
       nuc_env,
     ]
@@ -300,7 +301,7 @@ if (is_host) {
     # https://source.chromium.org/chromium/chromium/src/+/main:fuchsia/cipd/BUILD.gn.
     prebuilt_test_manifest("chromium_common_tests") {
       manifest_name = "common_tests_manifest.json"
-      environments = test_env
+      environments = default_test_environments
       log_settings = {
         max_severity = "ERROR"
       }
@@ -314,7 +315,7 @@ if (is_host) {
 
     prebuilt_test_manifest("chromium_web_engine_tests") {
       manifest_name = "web_engine_tests_manifest.json"
-      environments = test_env
+      environments = default_test_environments
       log_settings = {
         max_severity = "ERROR"
       }
