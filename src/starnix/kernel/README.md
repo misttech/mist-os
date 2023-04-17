@@ -26,7 +26,7 @@ Run Fuchsia as normal, for example using `fx serve` and `ffx emu start --headles
 To monitor starnix, look for log messages with the `starnix` tag:
 
 ```sh
-ffx log --filter starnix --severity TRACE --select "core/*/starnix*#TRACE"
+ffx log --filter starnix --severity TRACE --select "core/starnix_runner/kernels*#TRACE"
 ```
 
 When running tests, you will need to pass the log selection parameters to fx test instead:
