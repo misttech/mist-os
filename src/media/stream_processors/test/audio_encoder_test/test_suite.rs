@@ -20,6 +20,8 @@ pub struct AudioEncoderTestCase {
     pub settings: EncoderSettings,
     /// The number of PCM input frames per encoded frame.
     pub input_framelength: usize,
+    /// The frames per second of the input frames.
+    pub frames_per_second: u32,
     pub channel_count: usize,
     pub hash_tests: Vec<AudioEncoderHashTest>,
 }
@@ -38,6 +40,7 @@ pub struct AudioEncoderHashTest {
 impl AudioEncoderHashTest {
     pub fn saw_wave_test(
         output_packet_count: usize,
+        frames_per_second: u32,
         expected_digests: Vec<ExpectedDigest>,
     ) -> Self {
         Self {
@@ -46,7 +49,7 @@ impl AudioEncoderHashTest {
                 PcmFormat {
                     pcm_mode: AudioPcmMode::Linear,
                     bits_per_sample: 16,
-                    frames_per_second: 44100,
+                    frames_per_second,
                     channel_map: vec![AudioChannelId::Cf],
                 },
                 TEST_PCM_FRAME_COUNT,
@@ -59,10 +62,11 @@ impl AudioEncoderHashTest {
 
 impl AudioEncoderTestCase {
     pub async fn run(self) -> Result<()> {
-        self.test_termination().await?;
-        self.test_early_termination().await?;
-        self.test_timestamps().await?;
-        self.test_hashes().await
+        self.test_termination().await.expect("termination test");
+        self.test_early_termination().await.expect("early termination test");
+        self.test_timestamps().await.expect("timestamps test");
+        self.test_hashes().await.expect("hashes test");
+        Ok(())
     }
 
     async fn test_hashes(self) -> Result<()> {
@@ -236,7 +240,7 @@ impl AudioEncoderTestCase {
         let pcm_format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
             bits_per_sample: 16,
-            frames_per_second: 44100,
+            frames_per_second: self.frames_per_second,
             channel_map: match self.channel_count {
                 1 => vec![AudioChannelId::Cf],
                 2 => vec![AudioChannelId::Lf, AudioChannelId::Rf],

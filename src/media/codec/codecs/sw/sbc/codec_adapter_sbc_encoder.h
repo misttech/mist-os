@@ -43,13 +43,14 @@ class CodecAdapterSbcEncoder : public CodecAdapterSW<fit::deferred_action<fit::c
 
  private:
   struct Context {
-    fuchsia::media::SbcEncoderSettings settings;
+    fuchsia::media::SbcChannelMode channel_mode;
     fuchsia::media::PcmFormat input_format;
+    bool is_msbc;
     SBC_ENC_PARAMS params;
 
     size_t sbc_frame_length() const {
       const size_t part = 4 + params.s16NumOfSubBands * channel_count() / 2;
-      switch (settings.channel_mode) {
+      switch (channel_mode) {
         case fuchsia::media::SbcChannelMode::MONO:
         case fuchsia::media::SbcChannelMode::DUAL:
           return part + static_cast<size_t>(ceil(static_cast<double>(params.s16NumOfBlocks) *
@@ -65,7 +66,7 @@ class CodecAdapterSbcEncoder : public CodecAdapterSW<fit::deferred_action<fit::c
                                                  static_cast<double>(params.s16BitPool) / 8.0));
         default:
           FX_LOGS(FATAL) << "Channel mode enum became invalid value: "
-                         << static_cast<int>(settings.channel_mode);
+                         << static_cast<int>(channel_mode);
       }
     }
 
@@ -77,7 +78,7 @@ class CodecAdapterSbcEncoder : public CodecAdapterSW<fit::deferred_action<fit::c
 
     size_t pcm_batch_size() const { return pcm_frame_size() * pcm_frames_per_sbc_frame(); }
 
-    size_t channel_count() const { return input_format.channel_map.size(); }
+    size_t channel_count() const { return params.s16ChannelMode == SBC_MONO ? 1 : 2; }
   };
 
   enum InputLoopStatus {
@@ -91,6 +92,9 @@ class CodecAdapterSbcEncoder : public CodecAdapterSW<fit::deferred_action<fit::c
 
   // Attempts to encode input packet. Reports failures through `events_`.
   InputLoopStatus EncodeInput(CodecPacket* input_packet);
+
+  // Sends the output packet if it has any data in it.
+  void SendPendingOutputPacket();
 
   void SendOutputPacket(CodecPacket* output_packet);
 

@@ -1020,11 +1020,11 @@ mod tests {
         // Match the decoded data to the known hash.
         let expected_digest = ExpectedDigest::new(
             "Pcm: 44.1kHz/16bit/Mono",
-            "03b47b3ec7f7dcb41456c321377c61984966ea308b853d385194683e13f9836b",
+            "ff2e7afea51217886d3df15b9a623b4e49c9bd9bd79c58ac01bc94c5511e08d6",
         );
         let hash_validator = BytesValidator { output_file: None, expected_digest };
 
-        assert_eq!(512 * INPUT_FRAMES, decoded.len(), "Decoded size should be equal");
+        assert_eq!(256 * INPUT_FRAMES, decoded.len(), "Decoded size should be equal");
 
         let validated = hash_validator.validate(decoded.as_slice());
         assert!(validated.is_ok(), "Failed hash: {:?}", validated);

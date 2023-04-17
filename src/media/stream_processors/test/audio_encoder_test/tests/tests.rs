@@ -48,8 +48,10 @@ fn sbc_test_suite() -> Result<()> {
                 bit_pool: 59,
             }),
             channel_count: 1,
+            frames_per_second: 44100,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
                 94,
+                44100,
                 vec![ExpectedDigest::new(
                     "Sbc: 44.1kHz/Loudness/Mono/bitpool 56/blocks 8/subbands 4",
                     "5c65a88bda3f132538966d87df34aa8675f85c9892b7f9f5571f76f3c7813562",
@@ -58,6 +60,31 @@ fn sbc_test_suite() -> Result<()> {
         };
 
         fasync::TestExecutor::new().run_singlethreaded(sbc_tests.run())
+    })
+}
+
+#[fuchsia::test]
+fn msbc_test_suite() -> Result<()> {
+    with_large_stack(|| {
+        let sub_bands = 8;
+        let block_count = 15;
+
+        let msbc_tests = AudioEncoderTestCase {
+            input_framelength: (sub_bands * block_count) as usize,
+            settings: EncoderSettings::Msbc(MSbcEncoderSettings::EMPTY),
+            channel_count: 1,
+            frames_per_second: 16000,
+            hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
+                25,
+                16000,
+                vec![ExpectedDigest::new(
+                    "Sbc: 16kHz/Loudness/Mono/bitpool 26/blocks 15/subbands 8",
+                    "bf96bd3b827a1317d8e707d3791d1a7d4b7f6a0d7f63f89831c5de1f1828b5ab",
+                )],
+            )],
+        };
+
+        fasync::TestExecutor::new().run_singlethreaded(msbc_tests.run())
     })
 }
 
@@ -73,8 +100,10 @@ fn aac_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
+            frames_per_second: 44100,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
                 5,
+                44100,
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Raw Arm",
@@ -101,8 +130,10 @@ fn aac_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg4AacLc,
             }),
             channel_count: 1,
+            frames_per_second: 44100,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
                 5,
+                44100,
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Raw Arm",
@@ -132,8 +163,10 @@ fn aac_adts_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
+            frames_per_second: 44100,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
                 5,
+                44100,
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Adts Arm",
@@ -163,8 +196,10 @@ fn aac_latm_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
+            frames_per_second: 44100,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
                 5,
+                44100,
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Latm/MuxConfig Arm",
@@ -189,8 +224,10 @@ fn aac_latm_test_suite() -> Result<()> {
                 aot: AacAudioObjectType::Mpeg2AacLc,
             }),
             channel_count: 1,
+            frames_per_second: 44100,
             hash_tests: vec![AudioEncoderHashTest::saw_wave_test(
                 5,
+                44100,
                 vec![
                     ExpectedDigest::new(
                         "Aac: 44.1kHz/Mono/V5/Mpeg2 LC/Latm/NoMuxConfig Arm",
@@ -215,6 +252,7 @@ fn cvsd_simple_test_suite() -> Result<()> {
             input_framelength: 8,
             settings: EncoderSettings::Cvsd(CvsdEncoderSettings { ..CvsdEncoderSettings::EMPTY }),
             channel_count: 1,
+            frames_per_second: 64000,
             hash_tests: vec![AudioEncoderHashTest {
                 output_file: None,
                 input_audio: PcmAudio::create_from_data(

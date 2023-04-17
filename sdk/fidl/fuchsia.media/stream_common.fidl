@@ -670,6 +670,10 @@ type Lc3EncoderSettings = table {
     2: frame_duration Lc3FrameDuration;
 };
 
+/// Settings for the mSBC encoder. There are no settings as the mSBC encoder uses the values
+/// required by HFP Spec v1.8.
+@available(added=HEAD)
+type MSbcEncoderSettings = table {};
 
 /// Settings for encoders that tell them how to encode raw
 /// formats.
@@ -682,6 +686,8 @@ type EncoderSettings = flexible union {
     5: cvsd CvsdEncoderSettings;
     @available(added=HEAD)
     6: lc3 Lc3EncoderSettings;
+    @available(added=HEAD)
+    7: msbc MSbcEncoderSettings;
 };
 
 /// A list of permitted codec profiles. This list should be flexible since codecs can and will be added

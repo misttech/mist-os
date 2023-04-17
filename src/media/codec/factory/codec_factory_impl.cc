@@ -52,7 +52,9 @@ const EncoderSupportSpec kSbcEncoderSupportSpec = {
     .isolate_url = kIsolateRelativeUrlSbc,
     .mime_types = {"audio/pcm"},
     .supports_settings =
-        [](const fuchsia::media::EncoderSettings& settings) { return settings.is_sbc(); },
+        [](const fuchsia::media::EncoderSettings& settings) {
+          return settings.is_sbc() || settings.is_msbc();
+        },
 };
 
 const EncoderSupportSpec kAacEncoderSupportSpec = {
@@ -87,7 +89,7 @@ const DecoderSupportSpec kFfmpegSupportSpec = {
 
 const DecoderSupportSpec kSbcDecoderSuportSpec = {
     .isolate_url = kIsolateRelativeUrlSbc,
-    .mime_types = {"audio/sbc"},
+    .mime_types = {"audio/sbc", "audio/msbc"},
 };
 
 const DecoderSupportSpec kCvsdDecoderSuportSpec = {

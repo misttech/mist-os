@@ -10,7 +10,9 @@
 #include <limits>
 
 #include "codec_adapter_sw.h"
+#include "fuchsia/media/cpp/fidl.h"
 #include "lib/media/codec_impl/codec_port.h"
+#include "sbc_encoder.h"
 
 namespace {
 
@@ -21,6 +23,19 @@ constexpr uint32_t kInputPerPacketBufferBytesMin = SBC_MAX_PCM_BUFFER_SIZE;
 constexpr uint32_t kInputPerPacketBufferBytesMax = 4 * 1024 * 1024;
 
 constexpr char kSbcMimeType[] = "audio/sbc";
+constexpr char kMsbcMimeType[] = "audio/msbc";
+
+// Parameters used for MSBC (WBS HFP) encoding.
+constexpr SBC_ENC_PARAMS kMsbcEncodingParams = {
+    .s16SamplingFreq = SBC_sf16000,
+    .s16ChannelMode = SBC_MONO,
+    .s16NumOfSubBands = 8,
+    .s16NumOfChannels = 1,
+    .s16NumOfBlocks = 15,
+    .s16AllocationMethod = SBC_LOUDNESS,
+    .s16BitPool = 26,
+    .Format = SBC_FORMAT_MSBC,
+};
 
 }  // namespace
 
@@ -71,13 +86,17 @@ std::pair<fuchsia::media::FormatDetails, size_t> CodecAdapterSbcEncoder::OutputF
   FX_DCHECK(context_);
   fuchsia::media::AudioCompressedFormatSbc sbc;
   fuchsia::media::AudioCompressedFormat compressed_format;
-  compressed_format.set_sbc(std::move(sbc));
+  compressed_format.set_sbc(sbc);
 
   fuchsia::media::AudioFormat audio_format;
   audio_format.set_compressed(std::move(compressed_format));
 
   fuchsia::media::FormatDetails format_details;
-  format_details.set_mime_type(kSbcMimeType);
+  if (context_->is_msbc) {
+    format_details.set_mime_type(kMsbcMimeType);
+  } else {
+    format_details.set_mime_type(kSbcMimeType);
+  }
   format_details.mutable_domain()->set_audio(std::move(audio_format));
 
   return {std::move(format_details), context_->sbc_frame_length()};
@@ -200,13 +219,39 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::CreateContext(
       return kShouldTerminate;
   }
 
-  if (!format_details.has_encoder_settings() || !format_details.encoder_settings().is_sbc()) {
+  if (!format_details.has_encoder_settings() || (!format_details.encoder_settings().is_sbc() &&
+                                                 !format_details.encoder_settings().is_msbc())) {
     events_->onCoreCodecFailCodec("SBC Encoder received input without encoder settings.");
     return kShouldTerminate;
   }
-  auto& settings = format_details.encoder_settings().sbc();
 
-  if (settings.channel_mode == fuchsia::media::SbcChannelMode::MONO &&
+  fuchsia::media::SbcChannelMode channel_mode;
+  SBC_ENC_PARAMS params = {};
+  bool is_msbc = false;
+
+  if (format_details.encoder_settings().is_msbc()) {
+    is_msbc = true;
+    params = kMsbcEncodingParams;
+    // Only channel_mode is used, to determine the frame length.
+    channel_mode = fuchsia::media::SbcChannelMode::MONO;
+  } else {
+    fuchsia::media::SbcEncoderSettings settings = format_details.encoder_settings().sbc();
+    channel_mode = settings.channel_mode;
+
+    params.s16SamplingFreq = sampling_freq;
+    params.s16ChannelMode = static_cast<int16_t>(settings.channel_mode);
+    params.s16NumOfSubBands = static_cast<int16_t>(settings.sub_bands);
+    params.s16NumOfBlocks = static_cast<int16_t>(settings.block_count);
+    params.s16AllocationMethod = static_cast<int16_t>(settings.allocation);
+    SBC_Encoder_Init(&params);
+
+    // The encoder will suggest a value for the bitpool, but since the client
+    // provides that we ignore the suggestion and set it after
+    // SBC_Encoder_Init.
+    params.s16BitPool = static_cast<int16_t>(settings.bit_pool);
+  }
+
+  if (channel_mode == fuchsia::media::SbcChannelMode::MONO &&
       input_format.channel_map.size() != 1) {
     events_->onCoreCodecFailCodec(
         "SBC Encoder received request for MONO encoding, but input does "
@@ -214,7 +259,7 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::CreateContext(
     return kShouldTerminate;
   }
 
-  if (settings.channel_mode != fuchsia::media::SbcChannelMode::MONO &&
+  if (channel_mode != fuchsia::media::SbcChannelMode::MONO &&
       input_format.channel_map.size() != 2) {
     events_->onCoreCodecFailCodec(
         "SBC Encoder received request for DUAL, STEREO, or JOINT_STEREO "
@@ -222,23 +267,12 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::CreateContext(
     return kShouldTerminate;
   }
 
-  SBC_ENC_PARAMS params = {};
-  params.s16SamplingFreq = sampling_freq;
-  params.s16ChannelMode = static_cast<int16_t>(settings.channel_mode);
-  params.s16NumOfSubBands = static_cast<int16_t>(settings.sub_bands);
-  params.s16NumOfBlocks = static_cast<int16_t>(settings.block_count);
-  params.s16AllocationMethod = static_cast<int16_t>(settings.allocation);
-  SBC_Encoder_Init(&params);
-
-  // The encoder will suggest a value for the bitpool, but since the client
-  // provides that we ignore the suggestion and set it after
-  // SBC_Encoder_Init.
-  params.s16BitPool = static_cast<int16_t>(settings.bit_pool);
-
   const uint64_t bytes_per_second =
       input_format.frames_per_second * sizeof(uint16_t) * input_format.channel_map.size();
-  context_ = {
-      {.settings = std::move(settings), .input_format = std::move(input_format), .params = params}};
+  context_ = {{.channel_mode = channel_mode,
+               .input_format = input_format,
+               .is_msbc = is_msbc,
+               .params = params}};
   chunk_input_stream_.emplace(
       context_->pcm_batch_size(),
       format_details.has_timebase()
@@ -246,13 +280,16 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::CreateContext(
           : TimestampExtrapolator(),
       [this](const ChunkInputStream::InputBlock input_block) {
         if (input_block.non_padding_len == 0) {
+          if (input_block.is_end_of_stream) {
+            SendPendingOutputPacket();
+          }
           return ChunkInputStream::kContinue;
         }
 
         if (output_packet_ == nullptr) {
           std::optional<CodecPacket*> maybe_output_packet = free_output_packets_.WaitForElement();
           if (!maybe_output_packet) {
-            // The stream is ending.
+            // Can't allocate an output packet, end the stream.
             return ChunkInputStream::kTerminate;
           }
           FX_DCHECK(*maybe_output_packet != nullptr);
@@ -265,7 +302,7 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::CreateContext(
 
         uint8_t* output = NextOutputBlock();
         if (output == nullptr) {
-          // The stream is ending.
+          // Can't allocate an output block, end the stream.
           return ChunkInputStream::kTerminate;
         }
         FX_DCHECK(output_buffer_);
@@ -275,16 +312,7 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::CreateContext(
 
         if (output_offset_ + context_->sbc_frame_length() > output_buffer_->size() ||
             input_block.is_end_of_stream) {
-          FX_DCHECK(output_packet_ != nullptr);
-
-          output_packet_->SetBuffer(output_buffer_);
-          output_packet_->SetValidLengthBytes(static_cast<uint32_t>(output_offset_));
-          output_packet_->SetStartOffset(0);
-
-          SendOutputPacket(output_packet_);
-          output_packet_ = nullptr;
-          output_buffer_ = nullptr;
-          output_offset_ = 0;
+          SendPendingOutputPacket();
         }
 
         return ChunkInputStream::kContinue;
@@ -324,6 +352,22 @@ CodecAdapterSbcEncoder::InputLoopStatus CodecAdapterSbcEncoder::EncodeInput(
     default:
       return kOk;
   };
+}
+
+void CodecAdapterSbcEncoder::SendPendingOutputPacket() {
+  if (output_offset_ == 0) {
+    return;
+  }
+  FX_DCHECK(output_packet_ != nullptr);
+
+  output_packet_->SetBuffer(output_buffer_);
+  output_packet_->SetValidLengthBytes(static_cast<uint32_t>(output_offset_));
+  output_packet_->SetStartOffset(0);
+
+  SendOutputPacket(output_packet_);
+  output_packet_ = nullptr;
+  output_buffer_ = nullptr;
+  output_offset_ = 0;
 }
 
 void CodecAdapterSbcEncoder::SendOutputPacket(CodecPacket* output_packet) {

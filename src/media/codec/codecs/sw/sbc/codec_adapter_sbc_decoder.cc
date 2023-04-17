@@ -17,6 +17,7 @@
 namespace {
 
 constexpr char kSbcMimeType[] = "audio/sbc";
+constexpr char kMsbcMimeType[] = "audio/msbc";
 constexpr char kPcmMimeType[] = "audio/pcm";
 constexpr uint8_t kPcmBitsPerSample = 16;
 constexpr size_t kMaxInputFrames = 64;
@@ -205,24 +206,36 @@ fuchsia::media::PcmFormat CodecAdapterSbcDecoder::DecodeCodecInfo(
 
 CodecAdapterSbcDecoder::InputLoopStatus CodecAdapterSbcDecoder::CreateContext(
     const fuchsia::media::FormatDetails& format_details) {
-  if (!format_details.has_mime_type() || format_details.mime_type() != kSbcMimeType ||
-      !format_details.has_oob_bytes() ||
+  if (!format_details.has_mime_type() ||
+      (format_details.mime_type() != kSbcMimeType && format_details.mime_type() != kMsbcMimeType)) {
+    events_->onCoreCodecFailCodec("SBC Decoder received mime type that was not sbc or msbc audio.");
+    return kShouldTerminate;
+  }
+  if (!format_details.has_oob_bytes() ||
       format_details.oob_bytes().size() != sizeof(SbcCodecInfo)) {
-    events_->onCoreCodecFailCodec("SBC Decoder received input that was not compressed sbc audio.");
+    events_->onCoreCodecFailCodec(
+        "SBC Decoder received oob info input that was not for sbc audio.");
     return kShouldTerminate;
   }
 
   auto output_pcm_format = DecodeCodecInfo(format_details.oob_bytes());
 
+  uint8_t channels = static_cast<uint8_t>(output_pcm_format.channel_map.size());
   context_ = {.output_format = output_pcm_format};
-  OI_STATUS status = OI_CODEC_SBC_DecoderReset(
-      &context_->context, context_->context_data, sizeof(context_->context_data), SBC_MAX_CHANNELS,
-      /*pcmStride=*/kPcmBitsPerSample / 8, /*enhanced=*/false);
+  OI_STATUS status = OI_CODEC_SBC_DecoderReset(&context_->context, context_->context_data,
+                                               sizeof(context_->context_data), channels,
+                                               /*pcmStride=*/channels, /*enhanced=*/false);
   if (!OI_SUCCESS(status)) {
     events_->onCoreCodecFailCodec("Failed to reset SBC decoder");
     return kShouldTerminate;
   }
-
+  if (format_details.mime_type() == kMsbcMimeType) {
+    status = OI_CODEC_SBC_DecoderConfigureMSbc(&context_->context);
+    if (!OI_SUCCESS(status)) {
+      events_->onCoreCodecFailCodec("Failed to set mSBC on decoder");
+      return kShouldTerminate;
+    }
+  }
   return kOk;
 }
 

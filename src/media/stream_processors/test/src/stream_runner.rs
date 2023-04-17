@@ -67,12 +67,9 @@ impl StreamRunner {
             stream.start().await?;
 
             let channel_closed = loop {
-                let event = if let Some(event) = events.try_next().await? {
-                    event
-                } else {
+                let Some(event) = events.try_next().await? else {
                     break true;
                 };
-
                 let control_flow = stream.handle_event(event).await?;
                 match control_flow {
                     StreamControlFlow::Continue => {}
