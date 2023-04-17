@@ -22,6 +22,7 @@ use packet_formats::ethernet::{
 };
 
 use crate::{
+    context::SendFrameContext,
     device::{
         queue::{
             rx::{
@@ -36,7 +37,7 @@ use crate::{
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
-        socket::DeviceSockets,
+        socket::{DatagramHeader, DeviceSocketMetadata, DeviceSockets},
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, FrameDestination,
@@ -46,6 +47,9 @@ use crate::{
     sync::{RwLock, StrongRc, WeakRc},
     Instant, NonSyncContext, SyncCtx,
 };
+
+/// The MAC address corresponding to the loopback interface.
+const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
 
 /// A weak device ID identifying a loopback device.
 ///
@@ -279,6 +283,29 @@ impl<I: Instant, S> RwLockFor<crate::lock_ordering::DeviceSockets>
     }
 }
 
+impl<C: NonSyncContext, B: BufferMut, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
+    SendFrameContext<
+        C,
+        B,
+        DeviceSocketMetadata<LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>>,
+    > for Locked<&SyncCtx<C>, L>
+{
+    fn send_frame<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        metadata: DeviceSocketMetadata<LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>>,
+        body: S,
+    ) -> Result<(), S> {
+        let DeviceSocketMetadata { device_id, header } = metadata;
+        match header {
+            Some(DatagramHeader { dest_addr, protocol }) => {
+                send_as_ethernet_frame_to_dst(self, ctx, &device_id, body, protocol, dest_addr)
+            }
+            None => send_ethernet_frame(self, ctx, &device_id, body),
+        }
+    }
+}
+
 pub(super) fn send_ip_frame<
     B: BufferMut,
     NonSyncCtx: NonSyncContext,
@@ -295,15 +322,50 @@ pub(super) fn send_ip_frame<
 where
     A::Version: EthernetIpExt,
 {
-    const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
+    send_as_ethernet_frame_to_dst(
+        sync_ctx,
+        ctx,
+        device_id,
+        packet,
+        <A::Version as EthernetIpExt>::ETHER_TYPE,
+        LOOPBACK_MAC,
+    )
+}
 
+fn send_as_ethernet_frame_to_dst<
+    B: BufferMut,
+    NonSyncCtx: NonSyncContext,
+    S: Serializer<Buffer = B>,
+    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
+>(
+    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    ctx: &mut NonSyncCtx,
+    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
+    packet: S,
+    protocol: EtherType,
+    dst_mac: Mac,
+) -> Result<(), S> {
     let frame = packet.encapsulate(EthernetFrameBuilder::new(
         LOOPBACK_MAC,
-        LOOPBACK_MAC,
-        <A::Version as EthernetIpExt>::ETHER_TYPE,
+        dst_mac,
+        protocol,
         ETHERNET_MIN_BODY_LEN_NO_TAG,
     ));
 
+    send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|s| s.into_inner())
+}
+
+fn send_ethernet_frame<
+    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
+    S: Serializer<Buffer = B>,
+    B: BufferMut,
+    NonSyncCtx: NonSyncContext,
+>(
+    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    ctx: &mut NonSyncCtx,
+    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
+    frame: S,
+) -> Result<(), S> {
     match BufferTransmitQueueHandler::<LoopbackDevice, _, _>::queue_tx_frame(
         sync_ctx,
         ctx,
@@ -316,7 +378,7 @@ where
             unreachable!("loopback never fails to send a frame")
         }
         Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {
-            Err(s.into_inner())
+            Err(s)
         }
     }
 }

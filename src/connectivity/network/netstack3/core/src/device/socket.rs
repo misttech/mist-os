@@ -7,12 +7,14 @@
 use alloc::vec::Vec;
 use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
 use net_types::ethernet::Mac;
+use packet::{BufferMut, Serializer};
 
 use derivative::Derivative;
 use lock_order::{lock::RwLockFor, relation::LockBefore, Locked};
-use packet_formats::ethernet::EthernetFrame;
+use packet_formats::ethernet::{EtherType, EthernetFrame};
 
 use crate::{
+    context::SendFrameContext,
     data_structures::id_map::{EntryKey, IdMap},
     device::{
         with_ethernet_state, with_loopback_state, AnyDevice, Device, DeviceId, DeviceIdContext,
@@ -183,6 +185,66 @@ trait SocketHandler<C: NonSyncContext<Self::DeviceId>>: DeviceIdContext<AnyDevic
     fn remove(&mut self, id: SocketId);
 }
 
+/// An error encountered when sending a frame.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum SendFrameError {
+    /// The socket is not bound to a device and no egress device was specified.
+    NoDevice,
+    /// The device failed to send the frame.
+    SendFailed,
+}
+
+/// An error encountered when sending a datagram.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum SendDatagramError {
+    /// There was a problem sending the constructed frame.
+    Frame(SendFrameError),
+    /// No protocol number was provided.
+    NoProtocol,
+}
+
+/// The destination to use when sending a datagram.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SendDatagramParams<D> {
+    /// The frame-level sending parameters.
+    pub frame: SendFrameParams<D>,
+    /// The protocol to use, or `None` to use the socket's bound protocol.
+    pub protocol: Option<NonZeroU16>,
+    /// The destination address.
+    pub dest_addr: Mac,
+}
+
+/// The destination to use when sending a frame.
+#[derive(Debug, Clone, Derivative, Eq, PartialEq)]
+#[derivative(Default(bound = ""))]
+pub struct SendFrameParams<D> {
+    /// The egress device, or `None` to use the socket's bound device.
+    pub device: Option<D>,
+}
+
+trait BufferSocketSendHandler<B: BufferMut, C: NonSyncContext<Self::DeviceId>>:
+    SocketHandler<C>
+{
+    /// Sends a frame exactly as provided, or returns an error.
+    fn send_frame<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        socket: &SocketId,
+        params: SendFrameParams<Self::DeviceId>,
+        body: S,
+    ) -> Result<(), (S, SendFrameError)>;
+
+    /// Sends a datagram with a constructed link-layer header or returns an
+    /// error.
+    fn send_datagram<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        socket: &SocketId,
+        params: SendDatagramParams<Self::DeviceId>,
+        body: S,
+    ) -> Result<(), (S, SendDatagramError)>;
+}
+
 enum MaybeUpdate<T> {
     NoChange,
     NewValue(T),
@@ -302,6 +364,102 @@ impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>> SocketHandler<C> for S
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct DeviceSocketMetadata<D> {
+    pub(crate) device_id: D,
+    pub(crate) header: Option<DatagramHeader>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) struct DatagramHeader {
+    pub(crate) dest_addr: Mac,
+    pub(crate) protocol: EtherType,
+}
+
+impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>, B: BufferMut>
+    BufferSocketSendHandler<B, C> for SC
+where
+    for<'a> SC::DeviceSocketAccessor<'a>:
+        SendFrameContext<C, B, DeviceSocketMetadata<SC::DeviceId>>,
+{
+    fn send_frame<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId,
+        params: SendFrameParams<SC::DeviceId>,
+        body: S,
+    ) -> Result<(), (S, SendFrameError)> {
+        let SocketId(index) = id;
+        self.with_sockets(|Sockets(sockets), sync_ctx| {
+            let state = sockets.get(*index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
+            send_socket_frame(state, params, sync_ctx, ctx, body, None)
+        })
+    }
+
+    fn send_datagram<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId,
+        params: SendDatagramParams<Self::DeviceId>,
+        body: S,
+    ) -> Result<(), (S, SendDatagramError)> {
+        let SocketId(index) = id;
+        self.with_sockets(|Sockets(sockets), sync_ctx| {
+            let state = sockets.get(*index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
+            let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
+
+            let SocketState { protocol, device: _ } = &state;
+            let protocol = match target_protocol.or_else(|| {
+                protocol.and_then(|p| match p {
+                    Protocol::Specific(p) => Some(p),
+                    Protocol::All => None,
+                })
+            }) {
+                None => return Err((body, SendDatagramError::NoProtocol)),
+                Some(p) => p,
+            };
+
+            send_socket_frame(
+                state,
+                frame,
+                sync_ctx,
+                ctx,
+                body,
+                Some(DatagramHeader { dest_addr, protocol: EtherType::from(protocol.get()) }),
+            )
+            .map_err(|(s, e)| (s, SendDatagramError::Frame(e)))
+        })
+    }
+}
+
+fn send_socket_frame<
+    SC: DeviceIdContext<AnyDevice> + SendFrameContext<C, B, DeviceSocketMetadata<SC::DeviceId>>,
+    B: BufferMut,
+    C: NonSyncContext<SC::DeviceId>,
+    S: Serializer<Buffer = B>,
+>(
+    state: &SocketState<SC::WeakDeviceId>,
+    params: SendFrameParams<<SC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    body: S,
+    header: Option<DatagramHeader>,
+) -> Result<(), (S, SendFrameError)> {
+    let SocketState { protocol: _, device } = state;
+    let SendFrameParams { device: target_device } = params;
+
+    let device_id = match target_device.or_else(|| match device {
+        TargetDevice::AnyDevice => None,
+        TargetDevice::SpecificDevice(d) => sync_ctx.upgrade_weak_device_id(d),
+    }) {
+        Some(d) => d,
+        None => return Err((body, SendFrameError::NoDevice)),
+    };
+
+    let metadata = DeviceSocketMetadata { device_id, header };
+    sync_ctx.send_frame(ctx, metadata, body).map_err(|s| (s, SendFrameError::SendFailed))
+}
+
 /// Creates an packet socket with no protocol set configured for all devices.
 pub fn create<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId {
     let mut sync_ctx = Locked::new(sync_ctx);
@@ -342,6 +500,30 @@ pub fn get_info<C: crate::NonSyncContext>(
 pub fn remove<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>, id: SocketId) {
     let mut sync_ctx = Locked::new(sync_ctx);
     SocketHandler::remove(&mut sync_ctx, id)
+}
+
+/// Sends a frame for the specified socket without any additional framing.
+pub fn send_frame<C: crate::NonSyncContext, B: BufferMut>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &mut SocketId,
+    params: SendFrameParams<DeviceId<C>>,
+    body: B,
+) -> Result<(), (B, SendFrameError)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    BufferSocketSendHandler::send_frame(&mut sync_ctx, ctx, id, params, body)
+}
+
+/// Sends a datagram with system-determined framing.
+pub fn send_datagram<C: crate::NonSyncContext, B: BufferMut>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &mut SocketId,
+    params: SendDatagramParams<DeviceId<C>>,
+    body: B,
+) -> Result<(), (B, SendDatagramError)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    BufferSocketSendHandler::send_datagram(&mut sync_ctx, ctx, id, params, body)
 }
 
 /// Allows the rest of the stack to dispatch packets to listening sockets.
@@ -537,14 +719,14 @@ mod tests {
     use derivative::Derivative;
     use net_types::ethernet::Mac;
     use nonzero_ext::nonzero;
-    use packet::ParsablePacket;
+    use packet::{Buf, ParsablePacket};
     use packet_formats::ethernet::EthernetFrameLengthCheck;
     use test_case::test_case;
 
     use crate::{
         context::testutil::FakeSyncCtx,
         device::{
-            testutil::{FakeWeakDeviceId, MultipleDevicesId},
+            testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             StrongId,
         },
     };
@@ -562,6 +744,7 @@ mod tests {
     #[derivative(Default(bound = ""))]
     struct FakeNonSyncCtx<D> {
         received: HashMap<SocketId, Vec<ReceivedFrame<D>>>,
+        sent: Vec<(DeviceSocketMetadata<D>, Vec<u8>)>,
     }
 
     impl<D: Clone> NonSyncContext<D> for FakeNonSyncCtx<D> {
@@ -572,7 +755,7 @@ mod tests {
             frame: Frame<&[u8]>,
             raw_frame: &[u8],
         ) {
-            let Self { received } = self;
+            let Self { received, sent: _ } = self;
             received.entry(socket).or_default().push(ReceivedFrame {
                 device: device.clone(),
                 frame: frame.cloned(),
@@ -650,9 +833,7 @@ mod tests {
         }
     }
 
-    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> DeviceSocketAccessor
-        for FakeSyncCtx<FakeSockets<D>, (), D>
-    {
+    impl<D: FakeStrongDeviceId + 'static> DeviceSocketAccessor for FakeSyncCtx<FakeSockets<D>, (), D> {
         fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
             &mut self,
             device: &Self::DeviceId,
@@ -677,7 +858,7 @@ mod tests {
         }
     }
 
-    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> DeviceIdContext<AnyDevice>
+    impl<D: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
         for FakeSyncCtx<FakeSockets<D>, (), D>
     {
         type DeviceId = D;
@@ -693,7 +874,7 @@ mod tests {
         }
     }
 
-    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> SyncContext<FakeNonSyncCtx<D>>
+    impl<D: FakeStrongDeviceId + 'static> SyncContext<FakeNonSyncCtx<D>>
         for FakeSyncCtx<FakeSockets<D>, (), D>
     {
         type DeviceSocketAccessor<'a> = HashMap<D, DeviceSockets>;
@@ -717,6 +898,23 @@ mod tests {
         ) -> R {
             let FakeSockets { shared_sockets, device_sockets } = self.get_mut();
             cb(shared_sockets, device_sockets)
+        }
+    }
+
+    impl<D: FakeStrongDeviceId, B: BufferMut>
+        SendFrameContext<FakeNonSyncCtx<D>, B, DeviceSocketMetadata<D>>
+        for HashMap<D, DeviceSockets>
+    {
+        fn send_frame<S: Serializer<Buffer = B>>(
+            &mut self,
+            ctx: &mut FakeNonSyncCtx<D>,
+            metadata: DeviceSocketMetadata<D>,
+            frame: S,
+        ) -> Result<(), S> {
+            let body = frame.serialize_vec_outer().map_err(|(_, s)| s)?;
+            let body = body.map_a(|b| b.to_flattened_vec()).map_b(Buf::into_inner).into_inner();
+            ctx.sent.push((metadata, body));
+            Ok(())
         }
     }
 
@@ -873,22 +1071,23 @@ mod tests {
         assert_eq!(indexes, &[index]);
     }
 
-    const SRC_MAC: Mac = Mac::new([0, 1, 2, 3, 4, 5]);
-    const DST_MAC: Mac = Mac::new([6, 7, 8, 9, 10, 11]);
-    /// Arbitrary protocol number.
-    const PROTO: NonZeroU16 = nonzero!(0x08ABu16);
-    const BODY: &'static [u8] = b"some pig";
-
-    /// Creates an EthernetFrame with the values specified above.
-    fn test_frame() -> (EthernetFrame<&'static [u8]>, &'static [u8]) {
+    struct TestData;
+    impl TestData {
+        const SRC_MAC: Mac = Mac::new([0, 1, 2, 3, 4, 5]);
+        const DST_MAC: Mac = Mac::new([6, 7, 8, 9, 10, 11]);
+        /// Arbitrary protocol number.
+        const PROTO: NonZeroU16 = nonzero!(0x08ABu16);
+        const BODY: &'static [u8] = b"some pig";
         const BUFFER: &'static [u8] = &[
             6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 0x08, 0xAB, b's', b'o', b'm', b'e', b' ', b'p',
             b'i', b'g',
         ];
-        let mut buffer_view = BUFFER;
-        let frame =
-            EthernetFrame::parse(&mut buffer_view, EthernetFrameLengthCheck::NoCheck).unwrap();
-        (frame, &BUFFER)
+
+        /// Creates an EthernetFrame with the values specified above.
+        fn frame() -> EthernetFrame<&'static [u8]> {
+            let mut buffer_view = Self::BUFFER;
+            EthernetFrame::parse(&mut buffer_view, EthernetFrameLengthCheck::NoCheck).unwrap()
+        }
     }
 
     const WRONG_PROTO: NonZeroU16 = nonzero!(0x08ffu16);
@@ -923,30 +1122,29 @@ mod tests {
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
         let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
         let bound_a_right_protocol =
-            make_bound(SpecificDevice(MultipleDevicesId::A), Some(Specific(PROTO)));
+            make_bound(SpecificDevice(MultipleDevicesId::A), Some(Specific(TestData::PROTO)));
         let bound_a_wrong_protocol =
             make_bound(SpecificDevice(MultipleDevicesId::A), Some(Specific(WRONG_PROTO)));
         let bound_b_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::B), None);
         let bound_b_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::B), Some(All));
         let bound_b_right_protocol =
-            make_bound(SpecificDevice(MultipleDevicesId::B), Some(Specific(PROTO)));
+            make_bound(SpecificDevice(MultipleDevicesId::B), Some(Specific(TestData::PROTO)));
         let bound_b_wrong_protocol =
             make_bound(SpecificDevice(MultipleDevicesId::B), Some(Specific(WRONG_PROTO)));
         let bound_any_no_protocol = make_bound(AnyDevice, None);
         let bound_any_all_protocols = make_bound(AnyDevice, Some(All));
-        let bound_any_right_protocol = make_bound(AnyDevice, Some(Specific(PROTO)));
+        let bound_any_right_protocol = make_bound(AnyDevice, Some(Specific(TestData::PROTO)));
         let bound_any_wrong_protocol = make_bound(AnyDevice, Some(Specific(WRONG_PROTO)));
 
-        let (frame, raw) = test_frame();
         BufferSocketHandler::handle_received_frame(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &MultipleDevicesId::A,
-            Frame::from_ethernet(&frame, FrameDestination::Individual { local: true }),
-            raw,
+            Frame::from_ethernet(&TestData::frame(), FrameDestination::Individual { local: true }),
+            TestData::BUFFER,
         );
 
-        let FakeNonSyncCtx { received } = non_sync_ctx;
+        let FakeNonSyncCtx { received, sent: _ } = non_sync_ctx;
         let received: HashSet<_> = received
             .iter()
             .filter_map(|(id, frames)| {
@@ -957,12 +1155,12 @@ mod tests {
                             device: MultipleDevicesId::A,
                             frame: Frame::Ethernet {
                                 frame_dst: FrameDestination::Individual { local: true },
-                                src_mac: SRC_MAC,
-                                dst_mac: DST_MAC,
-                                protocol: Some(PROTO.into()),
-                                body: Vec::from(BODY),
+                                src_mac: TestData::SRC_MAC,
+                                dst_mac: TestData::DST_MAC,
+                                protocol: Some(TestData::PROTO.into()),
+                                body: Vec::from(TestData::BODY),
                             },
-                            raw: raw.into(),
+                            raw: TestData::BUFFER.into(),
                         }]
                     );
                     Some(id.clone())
@@ -1000,20 +1198,21 @@ mod tests {
         let mut non_sync_ctx = FakeNonSyncCtx::default();
         let socket = make_bound(&mut sync_ctx, TargetDevice::AnyDevice, Some(Protocol::All));
 
-        let (frame, raw) = test_frame();
-
         const RECEIVE_COUNT: usize = 10;
         for _ in 0..RECEIVE_COUNT {
             BufferSocketHandler::handle_received_frame(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &MultipleDevicesId::A,
-                Frame::from_ethernet(&frame, FrameDestination::Individual { local: true }),
-                raw,
+                Frame::from_ethernet(
+                    &TestData::frame(),
+                    FrameDestination::Individual { local: true },
+                ),
+                TestData::BUFFER,
             );
         }
 
-        let FakeNonSyncCtx { received } = non_sync_ctx;
+        let FakeNonSyncCtx { received, sent: _ } = non_sync_ctx;
         assert_eq!(
             received,
             HashMap::from([(
@@ -1023,16 +1222,166 @@ mod tests {
                         device: MultipleDevicesId::A,
                         frame: Frame::Ethernet {
                             frame_dst: FrameDestination::Individual { local: true },
-                            src_mac: SRC_MAC,
-                            dst_mac: DST_MAC,
-                            protocol: Some(PROTO.into()),
-                            body: Vec::from(BODY),
+                            src_mac: TestData::SRC_MAC,
+                            dst_mac: TestData::DST_MAC,
+                            protocol: Some(TestData::PROTO.into()),
+                            body: Vec::from(TestData::BODY),
                         },
-                        raw: raw.into(),
+                        raw: TestData::BUFFER.into()
                     };
                     RECEIVE_COUNT
                 ]
             )])
         );
+    }
+
+    #[test_case(None, None, Err(SendFrameError::NoDevice); "no bound or override device")]
+    #[test_case(Some(MultipleDevicesId::A), None, Ok(MultipleDevicesId::A); "bound device set")]
+    #[test_case(None, Some(MultipleDevicesId::A), Ok(MultipleDevicesId::A); "send device set")]
+    #[test_case(Some(MultipleDevicesId::A), Some(MultipleDevicesId::A), Ok(MultipleDevicesId::A);
+        "both set same")]
+    #[test_case(Some(MultipleDevicesId::A), Some(MultipleDevicesId::B), Ok(MultipleDevicesId::B);
+        "send overides")]
+    fn send_frame_on_socket(
+        bind_device: Option<MultipleDevicesId>,
+        send_device: Option<MultipleDevicesId>,
+        expected_device: Result<MultipleDevicesId, SendFrameError>,
+    ) {
+        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut non_sync_ctx = FakeNonSyncCtx::default();
+
+        let mut id = SocketHandler::create(&mut sync_ctx);
+        if let Some(bind_device) = bind_device {
+            SocketHandler::set_device(
+                &mut sync_ctx,
+                &mut id,
+                TargetDevice::SpecificDevice(&bind_device),
+            );
+        }
+
+        let destination = SendFrameParams { device: send_device };
+        let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
+        assert_eq!(
+            BufferSocketSendHandler::send_frame(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &id,
+                destination,
+                Buf::new(Vec::from(TestData::BODY), ..),
+            )
+            .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
+            expected_status
+        );
+
+        if let Ok(expected_device) = expected_device {
+            let FakeNonSyncCtx { sent, received: _ } = non_sync_ctx;
+            assert_eq!(
+                sent,
+                [(
+                    DeviceSocketMetadata { device_id: expected_device, header: None },
+                    Vec::from(TestData::BODY)
+                )]
+            )
+        }
+    }
+
+    #[test_case(
+        None, None,
+        SendDatagramParams {
+            frame: SendFrameParams {device: None},
+            dest_addr: TestData::DST_MAC,
+            protocol: None
+        },
+        Err(SendDatagramError::NoProtocol); "no protocol or device")]
+    #[test_case(
+        None, Some(MultipleDevicesId::A),
+        SendDatagramParams {
+            frame: SendFrameParams {device: None},
+            dest_addr: TestData::DST_MAC,
+            protocol: None
+        },
+        Err(SendDatagramError::NoProtocol); "bound no protocol")]
+    #[test_case(
+        Some(Protocol::All), Some(MultipleDevicesId::A),
+        SendDatagramParams {
+            frame: SendFrameParams {device: None},
+            dest_addr: TestData::DST_MAC,
+            protocol: None
+        },
+        Err(SendDatagramError::NoProtocol); "bound all protocols")]
+    #[test_case(
+        Some(Protocol::Specific(TestData::PROTO)), None,
+        SendDatagramParams {
+            frame: SendFrameParams {device: None},
+            dest_addr: TestData::DST_MAC,
+            protocol: None,
+        },
+        Err(SendDatagramError::Frame(SendFrameError::NoDevice)); "no device")]
+    #[test_case(
+        Some(Protocol::Specific(TestData::PROTO)), Some(MultipleDevicesId::A),
+        SendDatagramParams {
+            frame: SendFrameParams {device: None},
+            dest_addr: TestData::DST_MAC,
+            protocol: None,
+        },
+        Ok(MultipleDevicesId::A); "device and proto from bound")]
+    #[test_case(
+        None, None,
+        SendDatagramParams {
+            frame: SendFrameParams { device: Some(MultipleDevicesId::C), },
+            dest_addr: TestData::DST_MAC,
+            protocol: Some(TestData::PROTO),
+        },
+        Ok(MultipleDevicesId::C); "device and proto from destination")]
+    #[test_case(
+        Some(Protocol::Specific(WRONG_PROTO)), Some(MultipleDevicesId::A),
+        SendDatagramParams {
+            frame: SendFrameParams {device: Some(MultipleDevicesId::C),},
+            dest_addr: TestData::DST_MAC,
+            protocol: Some(TestData::PROTO),
+        },
+        Ok(MultipleDevicesId::C); "destination overrides")]
+    fn send_datagram_on_socket(
+        bind_protocol: Option<Protocol>,
+        bind_device: Option<MultipleDevicesId>,
+        destination: SendDatagramParams<MultipleDevicesId>,
+        expected_device: Result<MultipleDevicesId, SendDatagramError>,
+    ) {
+        let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut non_sync_ctx = FakeNonSyncCtx::default();
+
+        let id = make_bound(
+            &mut sync_ctx,
+            bind_device.map_or(TargetDevice::AnyDevice, TargetDevice::SpecificDevice),
+            bind_protocol,
+        );
+
+        let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
+        assert_eq!(
+            BufferSocketSendHandler::send_datagram(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &id,
+                destination,
+                Buf::new(Vec::from(TestData::BODY), ..),
+            )
+            .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
+            expected_status
+        );
+
+        if let Ok(expected_device) = expected_device {
+            let FakeNonSyncCtx { sent, received: _ } = non_sync_ctx;
+            let expected_sent = (
+                DeviceSocketMetadata {
+                    device_id: expected_device,
+                    header: Some(DatagramHeader {
+                        dest_addr: TestData::DST_MAC,
+                        protocol: TestData::PROTO.get().into(),
+                    }),
+                },
+                Vec::from(TestData::BODY),
+            );
+            assert_eq!(sent, [expected_sent])
+        }
     }
 }

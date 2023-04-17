@@ -191,13 +191,11 @@ impl_lock_after!(IpState<Ipv6> => IpStateFragmentCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => EthernetIpv4Arp);
 impl_lock_after!(IpState<Ipv6> => EthernetIpv6Nud);
 
-// The loopback data path operates at L3 so we can enqueue packets without going
-// through the device layer lock.
-impl_lock_after!(IpState<Ipv6> => LoopbackTxQueue);
-impl_lock_after!(IpState<Ipv6> => EthernetTxQueue);
+impl_lock_after!(IpState<Ipv6> => AnyDeviceSockets);
+impl_lock_after!(AnyDeviceSockets => LoopbackTxQueue);
+impl_lock_after!(AnyDeviceSockets => EthernetTxQueue);
 impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
 
-impl_lock_after!(IpState<Ipv6> => AnyDeviceSockets);
 impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 

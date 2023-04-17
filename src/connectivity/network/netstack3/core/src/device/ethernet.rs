@@ -52,7 +52,7 @@ use crate::{
             },
             DequeueState, TransmitQueueFrameError,
         },
-        socket::{BufferSocketHandler, DeviceSockets},
+        socket::{BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, DeviceSockets},
         state::IpLinkDeviceState,
         with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
@@ -259,7 +259,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
-fn send_ip_frame_to_dst<
+fn send_as_ethernet_frame_to_dst<
     B: BufferMut,
     S: Serializer<Buffer = B>,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
@@ -274,17 +274,33 @@ fn send_ip_frame_to_dst<
     ether_type: EtherType,
 ) -> Result<(), S> {
     let local_mac = get_mac(sync_ctx, device_id);
+    let frame = body.encapsulate(EthernetFrameBuilder::new(
+        local_mac.get(),
+        dst_mac,
+        ether_type,
+        ETHERNET_MIN_BODY_LEN_NO_TAG,
+    ));
+    send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|frame| frame.into_inner())
+}
+
+fn send_ethernet_frame<
+    B: BufferMut,
+    S: Serializer<Buffer = B>,
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+    frame: S,
+) -> Result<(), S> {
     match BufferTransmitQueueHandler::<EthernetLinkDevice, _, _>::queue_tx_frame(
         sync_ctx,
         ctx,
         device_id,
         (),
-        body.encapsulate(EthernetFrameBuilder::new(
-            local_mac.get(),
-            dst_mac,
-            ether_type,
-            ETHERNET_MIN_BODY_LEN_NO_TAG,
-        )),
+        frame,
     ) {
         Ok(()) => Ok(()),
         Err(TransmitQueueFrameError::NoQueue(e)) => {
@@ -292,7 +308,7 @@ fn send_ip_frame_to_dst<
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {
-            Err(s.into_inner())
+            Err(s)
         }
     }
 }
@@ -311,7 +327,7 @@ impl<
         dst_mac: Mac,
         body: S,
     ) -> Result<(), S> {
-        send_ip_frame_to_dst(self, ctx, device_id, dst_mac, body, EtherType::Ipv6)
+        send_as_ethernet_frame_to_dst(self, ctx, device_id, dst_mac, body, EtherType::Ipv6)
     }
 }
 
@@ -721,7 +737,7 @@ where
     let body = body.with_size_limit(get_mtu(sync_ctx, device_id).get() as usize);
 
     if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
-        send_ip_frame_to_dst(
+        send_as_ethernet_frame_to_dst(
             sync_ctx,
             ctx,
             device_id,
@@ -1021,7 +1037,7 @@ impl<
         >,
         body: S,
     ) -> Result<(), S> {
-        send_ip_frame_to_dst(self, ctx, &device_id, dst_addr, body, EtherType::Arp)
+        send_as_ethernet_frame_to_dst(self, ctx, &device_id, dst_addr, body, EtherType::Arp)
     }
 }
 
@@ -1074,7 +1090,30 @@ impl<
         dst_mac: Mac,
         body: S,
     ) -> Result<(), S> {
-        send_ip_frame_to_dst(self, ctx, device_id, dst_mac, body, EtherType::Ipv4)
+        send_as_ethernet_frame_to_dst(self, ctx, device_id, dst_mac, body, EtherType::Ipv4)
+    }
+}
+
+impl<
+        C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+        B: BufferMut,
+        SC: EthernetIpLinkDeviceDynamicStateContext<C>
+            + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
+    > SendFrameContext<C, B, DeviceSocketMetadata<SC::DeviceId>> for SC
+{
+    fn send_frame<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        metadata: DeviceSocketMetadata<SC::DeviceId>,
+        body: S,
+    ) -> Result<(), S> {
+        let DeviceSocketMetadata { device_id, header } = metadata;
+        match header {
+            Some(DatagramHeader { dest_addr, protocol }) => {
+                send_as_ethernet_frame_to_dst(self, ctx, &device_id, dest_addr, body, protocol)
+            }
+            None => send_ethernet_frame(self, ctx, &device_id, body),
+        }
     }
 }
 
@@ -1301,7 +1340,14 @@ mod tests {
             body: S,
         ) -> Result<(), S> {
             if let Some(link_addr) = self.get_ref().static_arp_entries.get(&lookup_addr).cloned() {
-                send_ip_frame_to_dst(self, ctx, device_id, link_addr, body, EtherType::Ipv4)
+                send_as_ethernet_frame_to_dst(
+                    self,
+                    ctx,
+                    device_id,
+                    link_addr,
+                    body,
+                    EtherType::Ipv4,
+                )
             } else {
                 Ok(())
             }

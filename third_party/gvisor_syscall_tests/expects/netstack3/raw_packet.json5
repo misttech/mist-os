@@ -14,10 +14,8 @@
             matchers: [
                 // TODO(https://fxbug.dev/106735): Support packet sockets.
                 "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
-                "AllInetTests/CookedPacketTest.Send/*",
                 "AllInetTests/RawPacketTest.SetSocketSendBuf*",
                 "AllInetTests/RawPacketTest.GetSocketError*",
-                "AllInetTests/RawPacketTest.Send/*",
                 "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
                 "AllInetTests/RawPacketTest.SetAndGetSocketLinger/*",
                 "AllInetTests/RawPacketTest.GetSocketAcceptConn/*",

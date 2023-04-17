@@ -39,7 +39,7 @@ use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
 
 use crate::{
-    context::{InstantContext, RecvFrameContext},
+    context::{InstantContext, RecvFrameContext, SendFrameContext},
     data_structures::{
         id_map::{self, IdMap},
         id_map_collection::IdMapCollectionKey,
@@ -658,7 +658,7 @@ where
             self::ethernet::send_ip_frame::<_, _, _, A, _>(sync_ctx, ctx, &id, local_addr, body)
         }
         DeviceId::Loopback(id) => {
-            self::loopback::send_ip_frame(sync_ctx, ctx, id, local_addr, body)
+            self::loopback::send_ip_frame::<_, _, A, _, _>(sync_ctx, ctx, id, local_addr, body)
         }
     }
 }
@@ -1230,6 +1230,43 @@ impl<C: socket::NonSyncContext<DeviceId<C>> + DeviceLayerEventDispatcher>
         whole_frame: &[u8],
     ) {
         self.receive_frame(socket, &device.clone().into(), frame, whole_frame)
+    }
+}
+
+impl<C: NonSyncContext, B: BufferMut, L>
+    SendFrameContext<C, B, socket::DeviceSocketMetadata<DeviceId<C>>> for Locked<&SyncCtx<C>, L>
+where
+    Self: SendFrameContext<
+            C,
+            B,
+            socket::DeviceSocketMetadata<EthernetDeviceId<C::Instant, C::EthernetDeviceState>>,
+        > + SendFrameContext<
+            C,
+            B,
+            socket::DeviceSocketMetadata<LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>>,
+        >,
+{
+    fn send_frame<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        metadata: socket::DeviceSocketMetadata<DeviceId<C>>,
+        frame: S,
+    ) -> Result<(), S> {
+        let socket::DeviceSocketMetadata { device_id, header } = metadata;
+        match device_id {
+            DeviceId::Ethernet(device_id) => SendFrameContext::send_frame(
+                self,
+                ctx,
+                socket::DeviceSocketMetadata { device_id, header },
+                frame,
+            ),
+            DeviceId::Loopback(device_id) => SendFrameContext::send_frame(
+                self,
+                ctx,
+                socket::DeviceSocketMetadata { device_id, header },
+                frame,
+            ),
+        }
     }
 }
 

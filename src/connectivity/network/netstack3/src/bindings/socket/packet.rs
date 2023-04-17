@@ -10,6 +10,7 @@ use std::{
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_posix as fposix;
+use fidl_fuchsia_posix_socket as fpsocket;
 use fidl_fuchsia_posix_socket_packet as fppacket;
 
 use fidl::{endpoints::RequestStream as _, Peered as _};
@@ -21,12 +22,16 @@ use net_types::ethernet::Mac;
 use netstack3_core::{
     data_structures::id_map::{EntryKey as _, IdMap},
     device::{
-        socket::{Frame, NonSyncContext, Protocol, SocketId, SocketInfo, TargetDevice},
+        socket::{
+            Frame, NonSyncContext, Protocol, SendDatagramError, SendDatagramParams, SendFrameError,
+            SendFrameParams, SocketId, SocketInfo, TargetDevice,
+        },
         DeviceId, FrameDestination, WeakDeviceId,
     },
     sync::Mutex,
     SyncCtx,
 };
+use packet::Buf;
 
 use crate::bindings::{
     devices::BindingId,
@@ -36,8 +41,8 @@ use crate::bindings::{
         IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
     },
     util::{
-        ConversionContext as _, DeviceNotFoundError, IntoFidl, TryIntoCoreWithContext as _,
-        TryIntoFidlWithContext,
+        ConversionContext as _, DeviceNotFoundError, IntoCore as _, IntoFidl as _,
+        TryFromFidlWithContext, TryIntoCoreWithContext as _, TryIntoFidlWithContext,
     },
     BindingsNonSyncCtxImpl, Ctx,
 };
@@ -367,6 +372,41 @@ impl<'a> RequestHandler<'a> {
         queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
     }
 
+    fn send_msg(
+        self,
+        packet_info: Option<Box<fppacket::PacketInfo>>,
+        data: Vec<u8>,
+    ) -> Result<(), fposix::Errno> {
+        let Self {
+            ctx,
+            data: BindingData { peer_event: _, message_queue: _, state: State { ref mut id, kind } },
+        } = self;
+        let mut ctx = ctx.clone();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+
+        let data = Buf::new(data, ..);
+        match kind {
+            fppacket::Kind::Network => {
+                let params = packet_info.try_into_core_with_ctx(non_sync_ctx)?;
+                netstack3_core::device::socket::send_datagram(
+                    sync_ctx,
+                    non_sync_ctx,
+                    id,
+                    params,
+                    data,
+                )
+                .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
+            }
+            fppacket::Kind::Link => {
+                let params = packet_info
+                    .try_into_core_with_ctx(non_sync_ctx)
+                    .map_err(IntoErrno::into_errno)?;
+                netstack3_core::device::socket::send_frame(sync_ctx, non_sync_ctx, id, params, data)
+                    .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
+            }
+        }
+    }
+
     fn handle_request(
         self,
         request: fppacket::SocketRequest,
@@ -476,14 +516,24 @@ impl<'a> RequestHandler<'a> {
                 let response = self.receive();
                 responder_send!(responder, &mut response.map(|r| params.apply_to(r)))
             }
-            fppacket::SocketRequest::SendMsg {
-                packet_info: _,
-                data: _,
-                control: _,
-                flags: _,
-                responder,
-            } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+            fppacket::SocketRequest::SendMsg { packet_info, data, control, flags, responder } => {
+                if ![
+                    fppacket::SendControlData::EMPTY,
+                    fppacket::SendControlData {
+                        socket: Some(fpsocket::SocketSendControlData::EMPTY),
+                        ..fppacket::SendControlData::EMPTY
+                    },
+                ]
+                .contains(&control)
+                {
+                    tracing::warn!("unsupported control data: {:?}", control);
+                    responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                } else if flags != fpsocket::SendMsgFlags::empty() {
+                    tracing::warn!("unsupported control flags: {:?}", flags);
+                    responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                } else {
+                    responder_send!(responder, &mut self.send_msg(packet_info, data));
+                }
             }
         }
         ControlFlow::Continue(None)
@@ -519,6 +569,57 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties>
         };
         let id = ctx.get_binding_id(device).get();
         Ok(fppacket::InterfaceProperties { addr, id, type_: iface_type })
+    }
+}
+
+impl<D> TryFromFidlWithContext<Option<Box<fppacket::PacketInfo>>> for SendDatagramParams<D>
+where
+    D: TryFromFidlWithContext<BindingId, Error = DeviceNotFoundError>,
+{
+    type Error = fposix::Errno;
+
+    fn try_from_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
+        ctx: &C,
+        packet_info: Option<Box<fppacket::PacketInfo>>,
+    ) -> Result<Self, Self::Error> {
+        packet_info.ok_or(fposix::Errno::Einval).and_then(|info| {
+            let fppacket::PacketInfo { protocol, interface_id, addr } = *info;
+            let device = BindingId::new(interface_id)
+                .map(|id| id.try_into_core_with_ctx(ctx))
+                .transpose()
+                .map_err(IntoErrno::into_errno)?;
+            let protocol = NonZeroU16::new(protocol);
+            let dest_addr = match addr {
+                fppacket::HardwareAddress::Eui48(mac) => Some(mac.into_core()),
+                fppacket::HardwareAddress::None(fppacket::Empty) => None,
+                fppacket::HardwareAddressUnknown!() => None,
+            }
+            .ok_or(fposix::Errno::Einval)?;
+            Ok(Self { frame: SendFrameParams { device }, protocol, dest_addr })
+        })
+    }
+}
+
+impl<D> TryFromFidlWithContext<Option<Box<fppacket::PacketInfo>>> for SendFrameParams<D>
+where
+    D: TryFromFidlWithContext<BindingId, Error = DeviceNotFoundError>,
+{
+    type Error = DeviceNotFoundError;
+
+    fn try_from_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
+        ctx: &C,
+        packet_info: Option<Box<fppacket::PacketInfo>>,
+    ) -> Result<Self, Self::Error> {
+        packet_info.map_or(Ok(SendFrameParams::default()), |info| {
+            let fppacket::PacketInfo { protocol, interface_id, addr } = *info;
+            // Ignore protocol and addr since the frame to send already includes
+            // any link-layer headers.
+            let _ = (protocol, addr);
+            let device = BindingId::new(interface_id)
+                .map(|id| id.try_into_core_with_ctx(ctx))
+                .transpose()?;
+            Ok(SendFrameParams { device })
+        })
     }
 }
 
@@ -564,5 +665,23 @@ impl RecvMsgParams {
         let control = fppacket::RecvControlData::EMPTY;
 
         (packet_info, body, control, truncated.try_into().unwrap_or(u32::MAX))
+    }
+}
+
+impl IntoErrno for SendDatagramError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            Self::Frame(f) => f.into_errno(),
+            Self::NoProtocol => fposix::Errno::Einval,
+        }
+    }
+}
+
+impl IntoErrno for SendFrameError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            SendFrameError::NoDevice => fposix::Errno::Einval,
+            SendFrameError::SendFailed => fposix::Errno::Enobufs,
+        }
     }
 }
