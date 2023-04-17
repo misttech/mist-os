@@ -2,14 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::pin::Pin;
+
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fuchsia_zircon as zx;
 
+use crate::errors;
 use anyhow::Context as _;
+use async_utils::{
+    hanging_get::client::HangingGetStream,
+    stream::{StreamMap, Tagged, WithTag as _},
+};
 use futures::stream::TryStreamExt as _;
 use tracing::{info, warn};
-
-use crate::errors;
 
 #[derive(Debug)]
 pub(super) struct ClientState {
@@ -26,10 +31,16 @@ pub(super) const NEW_CLIENT_PARAMS: fnet_dhcp::NewClientParams = fnet_dhcp::NewC
     ..fnet_dhcp::NewClientParams::EMPTY
 };
 
+pub(super) type ConfigurationStreamMap = StreamMap<u64, InterfaceIdTaggedConfigurationStream>;
+pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<u64, ConfigurationStream>;
+pub(super) type ConfigurationStream =
+    HangingGetStream<fnet_dhcp::ClientProxy, fnet_dhcp::ClientWatchConfigurationResponse>;
+
 pub(super) fn start_client(
     interface_id: u64,
     interface_name: &str,
     client_provider: &fnet_dhcp::ClientProviderProxy,
+    configuration_streams: &mut ConfigurationStreamMap,
 ) -> ClientState {
     info!("starting DHCPv4 client for {} (id={})", interface_name, interface_id);
 
@@ -40,6 +51,18 @@ pub(super) fn start_client(
         .new_client(interface_id, NEW_CLIENT_PARAMS, server)
         .expect("create new DHCPv4 client");
 
+    if let Some(stream) = configuration_streams.insert(
+        interface_id,
+        ConfigurationStream::new_eager_with_fn_ptr(
+            client.clone(),
+            fnet_dhcp::ClientProxy::watch_configuration,
+        )
+        .tagged(interface_id),
+    ) {
+        let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> = stream;
+        unreachable!("only one DHCPv4 client may exist on {} (id={})", interface_name, interface_id)
+    }
+
     ClientState { client }
 }
 
@@ -47,13 +70,22 @@ pub(super) async fn stop_client(
     interface_id: u64,
     interface_name: &str,
     ClientState { client }: ClientState,
+    configuration_streams: &mut ConfigurationStreamMap,
 ) {
     info!("stopping DHCPv4 client for {} (id={})", interface_name, interface_id);
+
+    let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> =
+        configuration_streams.remove(&interface_id).unwrap_or_else(|| {
+            unreachable!(
+                "DHCPv4 client must exist when stopping on {} (id={})",
+                interface_name, interface_id,
+            )
+        });
 
     client.shutdown().unwrap_or_else(|e| {
         warn!(
             "error shutting down DHCPv4 client for {} (id={}): {:?}",
-            interface_name, interface_id, e
+            interface_name, interface_id, e,
         )
     });
 

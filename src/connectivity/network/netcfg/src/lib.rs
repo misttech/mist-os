@@ -425,6 +425,7 @@ impl InterfaceState {
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         dhcpv6_client_provider: Option<&fnet_dhcpv6::ClientProviderProxy>,
         watchers: &mut DnsServerWatchers<'_>,
+        dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
     ) -> Result<(), errors::Error> {
         let Self { config, control: _, device_class: _ } = self;
@@ -444,6 +445,7 @@ impl InterfaceState {
                     &properties.name,
                     dhcpv4_client,
                     dhcpv4_client_provider,
+                    dhcpv4_configuration_streams,
                 );
 
                 if let Some(dhcpv6_client_provider) = dhcpv6_client_provider {
@@ -490,6 +492,8 @@ pub struct NetCfg<'a> {
     forwarded_device_classes: ForwardedDeviceClasses,
 
     allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
+
+    dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap,
 
     dhcpv6_prefix_provider_handler: Option<dhcpv6::PrefixProviderHandler>,
     dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap,
@@ -693,6 +697,7 @@ impl<'a> NetCfg<'a> {
             interface_metrics,
             dns_servers: Default::default(),
             forwarded_device_classes,
+            dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
             dhcpv6_prefix_provider_handler: None,
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
@@ -1115,8 +1120,11 @@ impl<'a> NetCfg<'a> {
         id: u64,
         name: &str,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
+        configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
     ) {
-        if let Some(fut) = dhcpv4_client.take().map(|c| dhcpv4::stop_client(id, name, c)) {
+        if let Some(fut) =
+            dhcpv4_client.take().map(|c| dhcpv4::stop_client(id, name, c, configuration_streams))
+        {
             fut.await
         }
     }
@@ -1126,8 +1134,10 @@ impl<'a> NetCfg<'a> {
         name: &str,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
+        configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
     ) {
-        *dhcpv4_client = dhcpv4_client_provider.map(|p| dhcpv4::start_client(id, name, p));
+        *dhcpv4_client = dhcpv4_client_provider
+            .map(|p| dhcpv4::start_client(id, name, p, configuration_streams));
     }
 
     async fn handle_dhcpv4_client_update(
@@ -1136,11 +1146,18 @@ impl<'a> NetCfg<'a> {
         online: bool,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
+        configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
     ) {
         if online {
-            Self::handle_dhcpv4_client_start(id, name, dhcpv4_client, dhcpv4_client_provider)
+            Self::handle_dhcpv4_client_start(
+                id,
+                name,
+                dhcpv4_client,
+                dhcpv4_client_provider,
+                configuration_streams,
+            )
         } else {
-            Self::handle_dhcpv4_client_stop(id, name, dhcpv4_client).await
+            Self::handle_dhcpv4_client_stop(id, name, dhcpv4_client, configuration_streams).await
         }
     }
 
@@ -1159,6 +1176,7 @@ impl<'a> NetCfg<'a> {
             dhcp_server,
             dhcpv4_client_provider,
             dhcpv6_client_provider,
+            dhcpv4_configuration_streams,
             dhcpv6_prefixes_streams,
             allowed_upstream_device_classes,
             dhcpv6_prefix_provider_handler,
@@ -1172,6 +1190,7 @@ impl<'a> NetCfg<'a> {
             watchers,
             dns_servers,
             interface_states,
+            dhcpv4_configuration_streams,
             dhcpv6_prefixes_streams,
             lookup_admin,
             dhcp_server,
@@ -1206,6 +1225,7 @@ impl<'a> NetCfg<'a> {
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         interface_states: &mut HashMap<u64, InterfaceState>,
+        dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
         lookup_admin: &fnet_name::LookupAdminProxy,
         dhcp_server: &Option<fnet_dhcp::Server_Proxy>,
@@ -1221,6 +1241,7 @@ impl<'a> NetCfg<'a> {
                             dhcpv4_client_provider.as_ref(),
                             dhcpv6_client_provider.as_ref(),
                             watchers,
+                            dhcpv4_configuration_streams,
                             dhcpv6_prefixes_streams,
                         )
                         .await
@@ -1237,6 +1258,7 @@ impl<'a> NetCfg<'a> {
                             dhcpv4_client_provider.as_ref(),
                             dhcpv6_client_provider.as_ref(),
                             watchers,
+                            dhcpv4_configuration_streams,
                             dhcpv6_prefixes_streams,
                         )
                         .await
@@ -1271,6 +1293,7 @@ impl<'a> NetCfg<'a> {
                             *online,
                             dhcpv4_client,
                             dhcpv4_client_provider.as_ref(),
+                            dhcpv4_configuration_streams,
                         )
                         .await;
 
@@ -1430,6 +1453,7 @@ impl<'a> NetCfg<'a> {
                                     *id,
                                     name,
                                     &mut dhcpv4_client,
+                                    dhcpv4_configuration_streams,
                                 )
                                     .await;
 
@@ -2692,6 +2716,7 @@ mod tests {
                 forwarded_device_classes: Default::default(),
                 dhcpv6_prefix_provider_handler: Default::default(),
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,
+                dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             },
             ServerEnds {
@@ -3000,7 +3025,7 @@ mod tests {
                 handle_update(&mut netcfg, true /* online */, &mut dns_watchers).await;
             }
 
-            match dhcpv4_client_provider
+            let mut client_req_stream = match dhcpv4_client_provider
                 .try_next()
                 .await
                 .expect("get next dhcpv4 client provider event")
@@ -3016,7 +3041,17 @@ mod tests {
                     assert_eq!(params, dhcpv4::NEW_CLIENT_PARAMS,);
                     request.into_stream().expect("error converting client server end to stream")
                 }
-            }
+            };
+
+            assert_matches::assert_matches!(
+                client_req_stream.try_next().now_or_never(),
+                Some(Ok(Some(fnet_dhcp::ClientRequest::WatchConfiguration { responder }))) => {
+                    responder.drop_without_shutdown();
+                },
+                "expect a watch_configuration call immediately"
+            );
+
+            client_req_stream
         };
 
         // Make sure the DHCPv4 client is shutdown on interface disable/removal.
