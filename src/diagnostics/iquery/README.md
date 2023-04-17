@@ -7,7 +7,7 @@ data exposed by components. More can be read about iquery [here][iquery].
 
 ## Building
 
-To add this project to your build, append `--with //src/diagnostics/iquery`
+To add this project to your build, append `--args='dev_bootfs_labels=["//src/diagnostics/iquery"]'`
 to the `fx set` invocation.
 
 ## Running
