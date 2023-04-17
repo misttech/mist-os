@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/element/cpp/fidl.h>
+#include <fuchsia/testing/harness/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
@@ -19,9 +20,20 @@ class ElementManagerTest : public zxtest::Test {};
 TEST_F(ElementManagerTest, ProposeElement) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  fuchsia::element::ManagerPtr manager;
   auto context = sys::ComponentContext::Create();
-  EXPECT_EQ(ZX_OK, context->svc()->Connect(manager.NewRequest()));
+
+  fuchsia::testing::harness::RealmProxySyncPtr realm;
+  EXPECT_EQ(ZX_OK, context->svc()->Connect(realm.NewRequest()));
+
+  // TODO(kjharland): Create a helper macro to shorten this to one line.
+  zx::channel local;
+  zx::channel remote;
+  ASSERT_OK(zx::channel::create(0, &local, &remote));
+  fuchsia::testing::harness::RealmProxy_ConnectToNamedProtocol_Result connection_result;
+  realm->ConnectToNamedProtocol("fuchsia.element.Manager", std::move(remote), &connection_result);
+  ASSERT_FALSE(connection_result.is_err());
+  fuchsia::element::ManagerPtr manager;
+  manager.Bind(std::move(local));
 
   manager.set_error_handler([&](zx_status_t status) {
     EXPECT_EQ(ZX_OK, status);

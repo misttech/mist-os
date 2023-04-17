@@ -35,6 +35,18 @@ import("//build/config/fuchsia/platform_version.gni")
 import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
 import("//sdk/ctf/build/internal/generate_ctf_packages.gni")
 
+template("generate_fuchsia-element-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "test-root.cm"
+    subpackages = [
+      test_info.target_label,
+      "//sdk/ctf/tests/fidl/fuchsia.element:test-realm-proxy",
+    ]
+    deps = [ "//sdk/ctf/tests/fidl/fuchsia.element:test-root" ]
+  }
+}
+
 template("generate_fuchsia-hwinfo-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {

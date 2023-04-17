@@ -1,0 +1,36 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "test_suite",
+            url: "fuchsia-element-tests#meta/default.cm",
+        },
+        {
+            name: "test_realm_proxy",
+            url: "test-realm-proxy#meta/default.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.testing.harness.RealmProxy",
+            from: "#test_realm_proxy",
+            to: "#test_suite",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [
+                "#test_realm_proxy",
+                "#test_suite",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
+        },
+    ],
+}

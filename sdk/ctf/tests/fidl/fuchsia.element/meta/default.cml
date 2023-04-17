@@ -11,7 +11,7 @@
     },
     use: [
         {
-            protocol: [ "fuchsia.element.Manager" ],
+            protocol: [ "fuchsia.testing.harness.RealmProxy" ],
         },
     ],
 }

@@ -1,5 +1,10 @@
 [
   {
+    "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.element:fuchsia-element-tests_archive_copy",
+    "archive_name": "fuchsia-element-tests",
+    "package_name": "fuchsia-element-tests"
+  },
+  {
     "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.hwinfo:fuchsia-hwinfo-tests_archive_copy",
     "archive_name": "fuchsia-hwinfo-tests",
     "package_name": "fuchsia-hwinfo-tests"

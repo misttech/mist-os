@@ -3,16 +3,16 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/fuchsia_test_realm_proxy.gni")
 import("//sdk/ctf/build/ctf.gni")
 
 ctf_executable("element-manager-test-bin") {
   output_name = "element-manager-test"
   testonly = true
-
   sources = [ "element_manager_test.cc" ]
-
   deps = [
     "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -21,113 +21,40 @@ ctf_executable("element-manager-test-bin") {
   ]
 }
 
-ctf_fuchsia_component("fuchsia-element-test") {
-  manifest = "meta/fuchsia-element-test.cml"
+ctf_fuchsia_component("default") {
+  manifest = "meta/default.cml"
   testonly = true
-}
-
-ctf_fuchsia_component("element-manager-test") {
-  manifest = "meta/element-manager-test.cml"
-  testonly = true
-
   deps = [ ":element-manager-test-bin" ]
 }
 
-ctf_fuchsia_test_package("fuchsia-element-tests") {
-  plasa_element = "fidl/fuchsia.element/Manager"
+ctf_fuchsia_package("fuchsia-element-tests") {
   package_name = "fuchsia-element-tests"
-  test_components = [ ":fuchsia-element-test" ]
-  deps = [
-    ":element-manager-test",
-    ":reference-element",
-    ":reference-graphical-presenter",
-    ":reference-scenic",
-    ":reference-session",
-    "//src/session/bin/element_manager:element_manager_comp",
-    "//src/session/bin/element_manager:sc_values",
+  testonly = true
+  deps = [ ":default" ]
+}
+
+fuchsia_component("test-root") {
+  manifest = "meta/test-root.cml"
+}
+
+fuchsia_test_realm_proxy("test-realm-proxy") {
+  proxied_component = "session:reference-session"
+  proxied_component_name = "reference-session"
+  proxied_protocols = [ "fuchsia.element.Manager" ]
+}
+
+fuchsia_test_package("fuchsia-element-tests-latest") {
+  test_components = [ ":test-root" ]
+  subpackages = [
+    ":test-realm-proxy",
+    ":fuchsia-element-tests",
   ]
-}
-
-ctf_executable("reference-element-bin") {
-  output_name = "reference-element"
-  testonly = true
-
-  sources = [ "reference_element.cc" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-ctf_fuchsia_component("reference-element") {
-  manifest = "meta/reference-element.cml"
-  testonly = true
-  deps = [ ":reference-element-bin" ]
-}
-
-ctf_executable("reference-graphical-presenter-bin") {
-  output_name = "reference-graphical-presenter"
-  testonly = true
-
-  sources = [ "reference_graphical_presenter.cc" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-ctf_fuchsia_component("reference-graphical-presenter") {
-  manifest = "meta/reference-graphical-presenter.cml"
-  testonly = true
-  deps = [ ":reference-graphical-presenter-bin" ]
-}
-
-ctf_executable("reference-scenic-bin") {
-  output_name = "reference-scenic"
-  testonly = true
-
-  sources = [ "reference_scenic.cc" ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-ctf_fuchsia_component("reference-scenic") {
-  manifest = "meta/reference-scenic.cml"
-  testonly = true
-  deps = [ ":reference-scenic-bin" ]
-}
-
-ctf_executable("reference-session-bin") {
-  output_name = "reference-session"
-  testonly = true
-
-  sources = [ "reference_session.cc" ]
-
-  deps = [
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
-}
-
-ctf_fuchsia_component("reference-session") {
-  manifest = "meta/reference-session.cml"
-  testonly = true
-  deps = [ ":reference-session-bin" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia-element-tests" ]
+  deps = [
+    ":fuchsia-element-tests-latest",
+    ":fuchsia-element-tests_archive",
+  ]
 }
