@@ -452,7 +452,10 @@ else
   if [[ "$ARCH" == "x64" ]] && [[ $VIRTIO == 0 ]]; then
     ARGS+=" -device e1000,netdev=net0,mac=$MAC"
   else
-    ARGS+=" -device virtio-net-pci,netdev=net0,vectors=8,mac=$MAC"
+    # Disable iPXE romfile. OVMF (UEFI implementation) defaults to using iPXE to
+    # talk to the network device, but iPXE's driver is more than 2x slower than
+    # OVMF's own virtio-net driver.
+    ARGS+=" -device virtio-net-pci,romfile=,netdev=net0,vectors=8,mac=$MAC"
   fi
 fi
 
