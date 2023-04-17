@@ -6,7 +6,6 @@ use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
     pin::Pin,
-    task::{Context, Poll},
 };
 
 use fidl_fuchsia_net as fnet;
@@ -15,7 +14,10 @@ use fidl_fuchsia_net_name as fnet_name;
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
-use async_utils::stream::{StreamMap, Tagged};
+use async_utils::{
+    hanging_get::client::HangingGetStream,
+    stream::{StreamMap, Tagged},
+};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use futures::{
     future::TryFutureExt as _,
@@ -64,54 +66,8 @@ impl Into<fnet_dhcpv6::Lifetimes> for Lifetimes {
     }
 }
 
-enum HangingGetStreamState {
-    Init,
-    ErrorYielded,
-    Terminated,
-}
-
-pub(super) struct PrefixesStream {
-    client_proxy: fnet_dhcpv6::ClientProxy,
-    fut: fidl::client::QueryResponseFut<Vec<fnet_dhcpv6::Prefix>>,
-    state: HangingGetStreamState,
-}
-
-impl PrefixesStream {
-    fn new(client_proxy: fnet_dhcpv6::ClientProxy) -> Self {
-        let fut = client_proxy.watch_prefixes();
-        Self { client_proxy, fut, state: HangingGetStreamState::Init }
-    }
-}
-
-impl Stream for PrefixesStream {
-    type Item = Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let Self { client_proxy, fut, state } = &mut *self;
-        match state {
-            HangingGetStreamState::Init => {}
-            HangingGetStreamState::ErrorYielded => {
-                *state = HangingGetStreamState::Terminated;
-                return Poll::Ready(None);
-            }
-            HangingGetStreamState::Terminated => {
-                panic!("should poll PrefixesStream after termination");
-            }
-        }
-
-        let res = futures::ready!(futures::future::FutureExt::poll_unpin(fut, cx));
-        match res {
-            Err(_) => {
-                *state = HangingGetStreamState::ErrorYielded;
-            }
-            Ok(_) => {
-                // Rehydrate the server with a pending watch.
-                *fut = client_proxy.watch_prefixes();
-            }
-        }
-        Poll::Ready(Some(res))
-    }
-}
+pub(super) type PrefixesStream =
+    HangingGetStream<fnet_dhcpv6::ClientProxy, Vec<fnet_dhcpv6::Prefix>>;
 
 pub(super) fn from_fidl_prefixes(
     fidl_prefixes: &[fnet_dhcpv6::Prefix],
@@ -197,7 +153,8 @@ pub(super) fn start_client(
     let dns_servers_stream = futures::stream::try_unfold(client.clone(), move |proxy| {
         proxy.watch_servers().map_ok(move |s| Some((s, proxy)))
     });
-    let prefixes_stream = PrefixesStream::new(client);
+    let prefixes_stream =
+        PrefixesStream::new_eager_with_fn_ptr(client, fnet_dhcpv6::ClientProxy::watch_prefixes);
 
     Ok((dns_servers_stream, prefixes_stream))
 }
