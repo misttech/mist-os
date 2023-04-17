@@ -44,6 +44,5 @@ group("tests") {
   public_deps = [
     ":fidl_api_mapper_test($host_toolchain)",
     ":verify_deps_in_sdk_test($host_toolchain)",
-    "verify_release:tests",
   ]
 }

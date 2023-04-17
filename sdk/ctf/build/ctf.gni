@@ -9,8 +9,6 @@
 # verification helpers like verify_deps_in_sdk.gni.
 #
 # Please keep the list sorted alphabetically.
-import("//sdk/ctf/build/ctf_dart_library.gni")
-import("//sdk/ctf/build/ctf_dart_test.gni")
 import("//sdk/ctf/build/ctf_executable.gni")
 import("//sdk/ctf/build/ctf_fidl.gni")
 import("//sdk/ctf/build/ctf_fuchsia_component.gni")
