@@ -200,7 +200,7 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #
 # Board: FVM/Fxfs parameters
 #
-#   generate_fvm (optional; default: true)
+#   generate_fvm (optional; default: false)
 #     [bool] Whether to generate a FVM image.
 #
 #   generate_fxfs (optional; default: false)
@@ -244,7 +244,7 @@ template("assembled_system") {
   assert(defined(invoker.product_assembly_config_label),
          "Need to define product_assembly_config_label")
 
-  generate_fvm = true
+  generate_fvm = false
   if (defined(invoker.generate_fvm)) {
     generate_fvm = invoker.generate_fvm
   }
@@ -255,8 +255,10 @@ template("assembled_system") {
   assert(!generate_fvm || !generate_fxfs,
          "Only one of Fxfs and FVM can host blobs")
   _supports_blobs = generate_fvm || generate_fxfs
-  _has_fastboot_fvm = generate_fvm && (fvm_emmc_partition_size != false ||
-                                       fvm_ftl_nand_block_count != false)
+  if (generate_fvm) {
+    _has_fastboot_fvm =
+        fvm_emmc_partition_size != false || fvm_ftl_nand_block_count != false
+  }
 
   generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
@@ -1269,7 +1271,7 @@ template("assembled_system") {
         }
 
         # Optionally include the fastboot FVM.
-        if (_has_fastboot_fvm) {
+        if (generate_fvm && _has_fastboot_fvm) {
           images += [
             {
               name = "${image_name}.fvm_fastboot"

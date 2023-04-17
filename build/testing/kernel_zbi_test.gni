@@ -61,7 +61,6 @@ template("cuckoo_kernel_zbi_test") {
 
   assembly_input = {
     testonly = true
-    generate_fvm = true
     include_component_id_index = true
     kernel_zbi = assembly_kernel_zbi
     kernel_image_name = assembly_kernel_image_name

@@ -15,6 +15,7 @@ import("//build/dist/zip_resource.gni")
 import("//build/packages/publish-archive.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/security/tests/pkg_test/assemblies/build_info.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 # Construct a system assembly for use in product security tests.
 #
@@ -229,6 +230,8 @@ template("assemble_security_pkg_test_system") {
   # Main system assembly.
   assembled_system(labels.assembly) {
     forward_variables_from(invoker, [ "fvm_truncate_to_length" ])
+    generate_fvm = !fxfs_blob
+    generate_fxfs = fxfs_blob
     testonly = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     board_name = invoker.board_name

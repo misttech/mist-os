@@ -10,6 +10,7 @@ import("//build/images/vboot/vboot.gni")
 import("//build/images/zedboot/zedboot_args.gni")
 import("//build/info/info.gni")
 import("//build/testing/host_test_data.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/appmgr/core_shards.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -36,7 +37,8 @@ if (is_fuchsia) {
   # Parameters shared between recovery-eng and recovery-installer
   recovery_base = {
     testonly = true
-    generate_fvm = !bootfs_only
+    generate_fvm = !bootfs_only && !fxfs_blob
+    generate_fxfs = !bootfs_only && fxfs_blob
     ramdisk_fvm_in_zbi = true
 
     include_component_id_index = true
@@ -360,7 +362,8 @@ if (is_fuchsia) {
   assembled_system("recovery-fdr") {
     base_packages = recovery_fdr_packages
     core_realm_definition = ":core"
-    generate_fvm = !bootfs_only
+    generate_fvm = !bootfs_only && !fxfs_blob
+    generate_fxfs = !bootfs_only && fxfs_blob
     ramdisk_fvm_in_zbi = true
 
     include_component_id_index = true

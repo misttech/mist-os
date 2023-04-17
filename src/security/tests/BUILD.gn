@@ -2,10 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/storage/fshost/generated_fshost_config.gni")
+
 group("tests") {
   testonly = true
-  deps = [
-    "pkg_test/tests",
-    "scrutiny_ffx_integration:tests",
-  ]
+  deps = [ "pkg_test/tests" ]
+
+  # TODO(fxbug.dev/122056): Support Fxblob in scrutiny
+  if (!fxfs_blob) {
+    deps += [ "scrutiny_ffx_integration:tests" ]
+  }
 }

@@ -5,6 +5,7 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/images/zedboot/zedboot_args.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 
 # Wraps assembled_system to allow adding internal network-conformance test stubs.
@@ -56,7 +57,8 @@ template("assemble_network_conformance_system") {
 
     core_realm_definition = ":core"
 
-    generate_fvm = !bootfs_only
+    generate_fvm = !bootfs_only && !fxfs_blob
+    generate_fxfs = !bootfs_only && fxfs_blob
     ramdisk_fvm_in_zbi = true
 
     include_component_id_index = true

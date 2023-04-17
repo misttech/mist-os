@@ -5,6 +5,7 @@
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/images/paths.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 
 #########
@@ -77,8 +78,9 @@ if (labels.images == "//build/images/bringup") {
   assembled_system("guest") {
     testonly = true
 
-    # The guest image always needs to have an fvm, because it has base packages.
-    generate_fvm = true
+    # The guest image always needs to have either an FVM or Fxfs, because it has base packages.
+    generate_fvm = !fxfs_blob
+    generate_fxfs = fxfs_blob
 
     product_assembly_config_label = ":product_assembly_config"
 

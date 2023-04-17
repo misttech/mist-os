@@ -96,6 +96,7 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
+    generate_fvm = true
 
     product_assembly_config_label = ":product_assembly_config"
     allow_eng_platform_bundle_use = true
