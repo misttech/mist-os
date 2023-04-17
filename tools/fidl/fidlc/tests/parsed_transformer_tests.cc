@@ -34,11 +34,11 @@ void GoodTransform(const std::string& before, const std::string& after) {
   }
   for (const auto& error : library.reporter()->errors()) {
     ADD_FAILURE("reported error: %s\n",
-                error->Print(library.reporter()->program_invocation()).c_str());
+                error->Format(library.reporter()->program_invocation()).c_str());
   }
   for (const auto& warning : library.reporter()->warnings()) {
     ADD_FAILURE("reported warning: %s\n",
-                warning->Print(library.reporter()->program_invocation()).c_str());
+                warning->Format(library.reporter()->program_invocation()).c_str());
   }
   ASSERT_TRUE(prepared);
 
@@ -48,11 +48,11 @@ void GoodTransform(const std::string& before, const std::string& after) {
   }
   for (const auto& error : library.reporter()->errors()) {
     ADD_FAILURE("reported error: %s\n",
-                error->Print(library.reporter()->program_invocation()).c_str());
+                error->Format(library.reporter()->program_invocation()).c_str());
   }
   for (const auto& warning : library.reporter()->warnings()) {
     ADD_FAILURE("reported warning: %s\n",
-                warning->Print(library.reporter()->program_invocation()).c_str());
+                warning->Format(library.reporter()->program_invocation()).c_str());
   }
   ASSERT_TRUE(transformed);
 

@@ -54,13 +54,6 @@ class Reporter {
     return false;
   }
 
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  bool Fail(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
-            const identity_t<Args>&... args) {
-    Report(Diagnostic::MakeError(def, span, args...));
-    return false;
-  }
-
   template <ErrorId Id, typename... Args>
   void Warn(const WarningDef<Id, Args...>& def, SourceSpan span, const identity_t<Args>&... args) {
     Report(Diagnostic::MakeWarning(def, span, args...));
@@ -68,28 +61,6 @@ class Reporter {
 
   // Reports an error or warning.
   void Report(std::unique_ptr<Diagnostic> diag);
-
-  // Reports a fixable error. This differs slightly from |Fail| in that it should never stop
-  // compilation, but rather may optionally be reported when it completes. In essence, except for
-  // how it is surfaced when reporting diagnostics, a |FixableError()| call should be thought of as
-  // a |Warn()|, with the compiler able to proceed past it.
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void FixableError(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
-                    const identity_t<Args>&... args) {
-    if (!ignore_fixables_) {
-      Report(Diagnostic::MakeError(def, span, args...));
-    }
-  }
-
-  // Reports a fixable warning. This differs slightly from |Fail| in that it should never stop
-  // compilation, but rather may optionally be reported when it completes.
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void FixableWarn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
-                   const identity_t<Args>&... args) {
-    if (!ignore_fixables_) {
-      Report(Diagnostic::MakeWarning(def, span, args...));
-    }
-  }
 
   // Combines errors and warnings and sorts by (file, span).
   std::vector<Diagnostic*> Diagnostics() const;
@@ -161,22 +132,10 @@ class ReporterMixin {
     return reporter_->Fail(def, span, args...);
   }
 
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void FixableError(const FixableErrorDef<Id, FixableKind, Args...>& def, SourceSpan span,
-                    const identity_t<Args>&... args) {
-    return reporter_->FixableError(def, span, args...);
-  }
-
   template <ErrorId Id, typename... Args>
   void Warn(const WarningDef<Id, Args...>& def, SourceSpan span,
             const identity_t<Args>&... args) const {
     reporter_->Warn(def, span, args...);
-  }
-
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  void FixableWarn(const FixableWarningDef<Id, FixableKind, Args...>& def, SourceSpan span,
-                   const identity_t<Args>&... args) {
-    reporter_->FixableWarn(def, span, args...);
   }
 
  private:

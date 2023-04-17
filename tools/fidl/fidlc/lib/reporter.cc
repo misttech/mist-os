@@ -90,7 +90,10 @@ void Reporter::AddWarning(std::unique_ptr<Diagnostic> warning) {
 //        ^~~~
 void Reporter::Report(std::unique_ptr<Diagnostic> diag) {
   ZX_ASSERT_MSG(diag, "should not report nullptr diagnostic");
-  switch (diag->get_severity()) {
+  if (diag->def.opts.fixable && ignore_fixables_) {
+    return;
+  }
+  switch (diag->def.kind) {
     case DiagnosticKind::kError:
       AddError(std::move(diag));
       break;
@@ -125,13 +128,11 @@ std::vector<Diagnostic*> Reporter::Diagnostics() const {
 
     // If neither diagnostic had a span, or if their spans were ==, sort
     // by kind (errors first) and then message.
-    if (a->get_severity() == DiagnosticKind::kError &&
-        b->get_severity() == DiagnosticKind::kWarning)
+    if (a->def.kind == DiagnosticKind::kError && b->def.kind == DiagnosticKind::kWarning)
       return true;
-    if (a->get_severity() == DiagnosticKind::kWarning &&
-        b->get_severity() == DiagnosticKind::kError)
+    if (a->def.kind == DiagnosticKind::kWarning && b->def.kind == DiagnosticKind::kError)
       return false;
-    return a->get_id() < b->get_id();
+    return a->def.id < b->def.id;
   });
 
   return diagnostics;
@@ -143,7 +144,7 @@ void Reporter::PrintReports(bool enable_color) const {
   size_t warnings_reported = 0;
   for (const auto& diag : diags) {
     std::string qualifier;
-    if (diag->get_severity() == DiagnosticKind::kError) {
+    if (diag->def.kind == DiagnosticKind::kError) {
       errors_reported++;
       qualifier = "error";
     } else {
@@ -151,7 +152,7 @@ void Reporter::PrintReports(bool enable_color) const {
       qualifier = "warning";
     }
 
-    auto msg = Format(qualifier, diag->span, diag->Print(program_invocation()), enable_color);
+    auto msg = Format(qualifier, diag->span, diag->Format(program_invocation()), enable_color);
     fprintf(stderr, "%s\n", msg.c_str());
     // There should never be errors in virtual files. These contain code
     // synthesized by the compiler, and the user has no control over them.

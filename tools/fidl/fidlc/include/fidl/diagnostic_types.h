@@ -127,33 +127,35 @@ enum class DiagnosticKind {
   kRetired,
 };
 
-// A tag that indicates whether or not a diagnostic definition has an associated
-// markdown file providing further documentation.
-enum class DiagnosticDocumented {
-  kDocumented,
-  kNotDocumented,
+// Extra fields set on some diagnostic definitions.
+struct DiagnosticOptions {
+  // If true, the error message will link to the diagnostic on fuchsia.dev.
+  bool documented = true;
+  // If set, the error message will instruct the user to run fidl-fix.
+  std::optional<Fixable::Kind> fixable;
 };
 
 struct DiagnosticDef {
-  constexpr explicit DiagnosticDef(ErrorId id, DiagnosticKind kind, DiagnosticDocumented documented,
-                                   std::optional<Fixable::Kind> fixable, std::string_view msg)
-      : id(id), kind(kind), documented(documented), fixable(fixable), msg(msg) {}
+  constexpr explicit DiagnosticDef(ErrorId id, DiagnosticKind kind, std::string_view msg,
+                                   DiagnosticOptions opts)
+      : id(id), kind(kind), msg(msg), opts(opts) {}
   DiagnosticDef(const DiagnosticDef&) = delete;
+
+  // Returns a string of the form "fi-NNNN".
+  std::string FormatId() const;
 
   ErrorId id;
   DiagnosticKind kind;
-  DiagnosticDocumented documented;
-  std::optional<Fixable::Kind> fixable = std::nullopt;
   std::string_view msg;
+  DiagnosticOptions opts;
 };
 
 // The definition of an error. All instances of ErrorDef are in diagnostics.h.
 // Template args define format parameters in the error message.
 template <ErrorId Id, typename... Args>
 struct ErrorDef final : DiagnosticDef {
-  constexpr explicit ErrorDef(std::string_view msg)
-      : DiagnosticDef(Id, DiagnosticKind::kError, DiagnosticDocumented::kDocumented, std::nullopt,
-                      msg) {
+  constexpr explicit ErrorDef(std::string_view msg, DiagnosticOptions opts = {})
+      : DiagnosticDef(Id, DiagnosticKind::kError, msg, opts) {
     internal::CheckFormatArgs<Args...>(msg);
   }
 };
@@ -162,69 +164,18 @@ struct ErrorDef final : DiagnosticDef {
 // diagnostics.h. Template args define format parameters in the warning message.
 template <ErrorId Id, typename... Args>
 struct WarningDef final : DiagnosticDef {
-  constexpr explicit WarningDef(std::string_view msg)
-      : DiagnosticDef(Id, DiagnosticKind::kWarning, DiagnosticDocumented::kDocumented, std::nullopt,
-                      msg) {
+  constexpr explicit WarningDef(std::string_view msg, DiagnosticOptions opts = {})
+      : DiagnosticDef(Id, DiagnosticKind::kWarning, msg, opts) {
     internal::CheckFormatArgs<Args...>(msg);
   }
 };
 
 // The definition of an obsolete error. These are never displayed to the user -
 // they are merely used to retire error numerals from circulation.
-template <ErrorId Id, typename... Args>
+template <ErrorId Id>
 struct RetiredDef final : DiagnosticDef {
-  constexpr explicit RetiredDef(std::string_view msg)
-      : DiagnosticDef(Id, DiagnosticKind::kRetired, DiagnosticDocumented::kDocumented, std::nullopt,
-                      msg) {
-    internal::CheckFormatArgs<Args...>(msg);
-  }
-};
-
-// The definition of a fixable diagnostic. See |FixableErrorDef| and |FixableWarningDef| for more
-// information on how these should be used.
-template <ErrorId Id, Fixable::Kind FixableKind>
-struct FixableDiagnosticDef : DiagnosticDef {
-  constexpr explicit FixableDiagnosticDef(DiagnosticKind kind, std::string_view msg)
-      : DiagnosticDef(Id, kind, DiagnosticDocumented::kDocumented, FixableKind, msg),
-        fix_kind_(FixableKind) {}
-
- private:
-  const Fixable::Kind fix_kind_;
-};
-
-// The definition of a fixable error. This diagnostic will only be surfaced to the user in the
-// following circumstances:
-//
-//   1. There are no non-fixable errors to report.
-//   2. The |Reporter| class holding it is not |set_silence_fixables(true)|.
-//
-// This ensures that users only see fixable error notifications for inputs that would otherwise
-// compile if the fix were performed, and that the fixable error notifications can be turned off
-// when fidlc is used to apply the fix itself.
-template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-struct FixableErrorDef final : FixableDiagnosticDef<Id, FixableKind> {
-  constexpr explicit FixableErrorDef(std::string_view msg)
-      : FixableDiagnosticDef<Id, FixableKind>(DiagnosticKind::kError, msg) {
-    internal::CheckFormatArgs<Args...>(msg);
-  }
-};
-
-// The definition of a fixable warning. This diagnostic will only be surfaced to the user in the
-// following circumstances:
-//
-//   1. There are no non-fixable errors or warnings to report.
-//   2. The |Reporter| class holding it is not |set_silence_fixables(true)|.
-//
-// This ensures that users only see fixable warning notifications for inputs that would otherwise
-// compile if the fix were performed, and that the fixable warning notifications can be turned off
-// when fidlc is used to apply the fix itself.
-template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-struct FixableWarningDef final : DiagnosticDef {
-  constexpr explicit FixableWarningDef(std::string_view msg)
-      : DiagnosticDef(Id, DiagnosticKind::kWarning, DiagnosticDocumented::kDocumented, FixableKind,
-                      msg) {
-    internal::CheckFormatArgs<Args...>(msg);
-  }
+  constexpr explicit RetiredDef()
+      : DiagnosticDef(Id, DiagnosticKind::kRetired, "retired diagnostic", {}) {}
 };
 
 // A Diagnostic is the result of instantiating a DiagnosticDef with arguments.
@@ -247,13 +198,6 @@ struct Diagnostic {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  static std::unique_ptr<Diagnostic> MakeError(const FixableErrorDef<Id, FixableKind, Args...>& def,
-
-                                               SourceSpan span, const identity_t<Args>&... args) {
-    return std::make_unique<Diagnostic>(def, span, args...);
-  }
-
   template <ErrorId Id, typename... Args>
   static std::unique_ptr<Diagnostic> MakeWarning(const WarningDef<Id, Args...>& def,
 
@@ -261,28 +205,8 @@ struct Diagnostic {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 
-  template <ErrorId Id, Fixable::Kind FixableKind, typename... Args>
-  static std::unique_ptr<Diagnostic> MakeWarning(
-      const FixableWarningDef<Id, FixableKind, Args...>& def,
-
-      SourceSpan span, const identity_t<Args>&... args) {
-    return std::make_unique<Diagnostic>(def, span, args...);
-  }
-
-  // Print the full error ID ("fi-NNNN") in string form.
-  std::string PrintId() const;
-
-  // Print the permalink ("https://fuchsia.dev/error/fi-NNNN") in string form.
-  std::string PrintLink() const;
-
-  // Print the full error message.
-  std::string Print(const ProgramInvocation& program_invocation) const;
-
-  ErrorId get_id() const { return def.id; }
-
-  DiagnosticKind get_severity() const { return def.kind; }
-
-  bool is_diagnostic_fixable() const { return def.fixable.has_value(); }
+  // Formats the error message to a string.
+  std::string Format(const ProgramInvocation& program_invocation) const;
 
   const DiagnosticDef& def;
   SourceSpan span;

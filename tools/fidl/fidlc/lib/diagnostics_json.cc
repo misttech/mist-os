@@ -10,11 +10,10 @@ namespace fidl {
 
 void DiagnosticsJson::Generate(const Diagnostic* diagnostic) {
   GenerateObject([&]() {
-    std::string category =
-        diagnostic->get_severity() == DiagnosticKind::kError ? "error" : "warning";
+    std::string category = diagnostic->def.kind == DiagnosticKind::kError ? "error" : "warning";
     GenerateObjectMember("category", "fidlc/" + category, Position::kFirst);
 
-    GenerateObjectMember("error_id", diagnostic->PrintId());
+    GenerateObjectMember("error_id", diagnostic->def.FormatId());
     GenerateObjectMember("message", diagnostic->msg);
     Generate(diagnostic->span);
   });

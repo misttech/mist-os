@@ -47,7 +47,7 @@ namespace {
 fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag,
                                   const fidl::ProgramInvocation& program_invocation) {
   const char* check_id = nullptr;
-  switch (diag.get_severity()) {
+  switch (diag.def.kind) {
     case fidl::DiagnosticKind::kError:
       check_id = "parse-error";
       break;
@@ -59,7 +59,7 @@ fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag,
              "this diagnostic kind must never be shown - it only reserves retired error numerals");
       break;
   }
-  return fidl::Finding(diag.span, check_id, diag.Print(program_invocation));
+  return fidl::Finding(diag.span, check_id, diag.Format(program_invocation));
 }
 
 void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,

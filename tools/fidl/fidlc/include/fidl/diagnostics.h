@@ -16,12 +16,12 @@
 
 namespace fidl {
 
-constexpr RetiredDef<0> ErrAlwaysRetired("error id fi-0000 was always retired");
+constexpr RetiredDef<0> ErrAlwaysRetired;
 constexpr ErrorDef<1, std::string_view> ErrInvalidCharacter("invalid character '{}'");
 constexpr ErrorDef<2> ErrUnexpectedLineBreak("unexpected line-break in string literal");
 constexpr ErrorDef<3, std::string_view> ErrInvalidEscapeSequence("invalid escape sequence '{}'");
 constexpr ErrorDef<4, char> ErrInvalidHexDigit("invalid hex digit '{}'");
-constexpr RetiredDef<5, char> ErrInvalidOctDigit("invalid oct digit '{}'");
+constexpr RetiredDef<5> ErrInvalidOctDigit;
 constexpr ErrorDef<6, std::string_view> ErrExpectedDeclaration("invalid declaration type {}");
 constexpr ErrorDef<7> ErrUnexpectedToken("found unexpected token");
 constexpr ErrorDef<8, Token::KindAndSubkind, Token::KindAndSubkind> ErrUnexpectedTokenOfKind(
@@ -43,9 +43,7 @@ constexpr ErrorDef<17> ErrOrdinalOutOfBound("ordinal out-of-bound");
 constexpr ErrorDef<18> ErrOrdinalsMustStartAtOne("ordinals must start at 1");
 constexpr ErrorDef<19> ErrMustHaveOneMember("must have at least one member");
 constexpr ErrorDef<20> ErrInvalidProtocolMember("invalid protocol member");
-constexpr RetiredDef<21> ErrExpectedProtocolMember(
-    "merged ErrUnrecognizedProtocolMember (fi-0020) and ErrExpectedProtocolMember (fi-0021) into "
-    "fi-0020 as ErrInvalidProtocolMember");
+constexpr RetiredDef<21> ErrExpectedProtocolMember;
 constexpr ErrorDef<22> ErrCannotAttachAttributeToIdentifier(
     "cannot attach attributes to identifiers");
 constexpr ErrorDef<23> ErrRedundantAttributePlacement(
@@ -175,8 +173,7 @@ constexpr ErrorDef<74, flat::Decl::Kind> ErrInvalidMethodPayloadLayoutClass(
     "cannot use {} as a request/response; must use a struct, table, or union");
 constexpr ErrorDef<75, const flat::Type *> ErrInvalidMethodPayloadType(
     "invalid request/response type '{}'; must use a struct, table, or union");
-constexpr RetiredDef<76, std::string_view> ErrResponsesWithErrorsMustNotBeEmpty(
-    "must define success type of method '{}'");
+constexpr RetiredDef<76> ErrResponsesWithErrorsMustNotBeEmpty;
 constexpr ErrorDef<77, std::string_view> ErrEmptyPayloadStructs(
     "method '{}' cannot have an empty struct as a payload, prefer omitting the payload altogether");
 constexpr ErrorDef<78, std::string_view, SourceSpan> ErrDuplicateMethodName(
@@ -323,19 +320,12 @@ constexpr ErrorDef<132, const flat::Attribute *> ErrAttributeDisallowsArgs(
 constexpr ErrorDef<133, std::string_view, const flat::Attribute *> ErrAttributeArgRequiresLiteral(
     "argument '{}' of attribute '{}' does not support referencing constants; "
     "please use a literal instead");
-constexpr RetiredDef<134, const flat::Attribute *> ErrAttributeConstraintNotSatisfied(
-    "declaration did not satisfy constraint of attribute '{}'");
+constexpr RetiredDef<134> ErrAttributeConstraintNotSatisfied;
 constexpr ErrorDef<135, std::string_view> ErrInvalidDiscoverableName(
     "invalid @discoverable name '{}'; must follow the format 'the.library.name.TheProtocolName'");
-constexpr RetiredDef<136, flat::Name> ErrTableCannotBeSimple(
-    "union '{}' is not a simple type, so it cannot be used in "
-    "@for_deprecated_c_bindings");
-constexpr RetiredDef<137, flat::Name> ErrUnionCannotBeSimple(
-    "table '{}' is not a simple type, so it cannot be used in "
-    "@for_deprecated_c_bindings");
-constexpr RetiredDef<138, std::string_view> ErrElementMustBeSimple(
-    "element '{}' does not have a simple type, so it cannot be used in "
-    "@for_deprecated_c_bindings");
+constexpr RetiredDef<136> ErrTableCannotBeSimple;
+constexpr RetiredDef<137> ErrUnionCannotBeSimple;
+constexpr RetiredDef<138> ErrElementMustBeSimple;
 constexpr ErrorDef<139, uint32_t, uint32_t> ErrTooManyBytes(
     "too large: only {} bytes allowed, but {} bytes found");
 constexpr ErrorDef<140, uint32_t, uint32_t> ErrTooManyHandles(
@@ -406,12 +396,10 @@ constexpr ErrorDef<171, flat::Name> ErrCannotBeBoxedShouldBeOptional(
 constexpr ErrorDef<172, flat::Name> ErrResourceMustBeUint32Derived("resource {} must be uint32");
 constexpr ErrorDef<173, flat::Name> ErrResourceMissingSubtypeProperty(
     "resource {} expected to have the subtype property, but it was missing");
-constexpr RetiredDef<174, flat::Name> ErrResourceMissingRightsProperty(
-    "resource {} expected to have the rights property, but it was missing");
+constexpr RetiredDef<174> ErrResourceMissingRightsProperty;
 constexpr ErrorDef<175, flat::Name> ErrResourceSubtypePropertyMustReferToEnum(
     "the subtype property must be an enum, but wasn't in resource {}");
-constexpr RetiredDef<176> ErrHandleSubtypeMustReferToResourceSubtype(
-    "the subtype must be a constant referring to the resource's subtype enum");
+constexpr RetiredDef<176> ErrHandleSubtypeMustReferToResourceSubtype;
 constexpr ErrorDef<177, flat::Name> ErrResourceRightsPropertyMustReferToBits(
     "the rights property must be a uint32 or a uint32-based bits, "
     "but wasn't defined as such in resource {}");
@@ -441,32 +429,34 @@ constexpr ErrorDef<187> ErrUnicodeEscapeEmpty("Unicode escape must have at least
 constexpr ErrorDef<188> ErrUnicodeEscapeTooLong("Unicode escape must have at most 6 hex digits");
 constexpr ErrorDef<189, std::string_view> ErrUnicodeEscapeTooLarge(
     "invalid Unicode code point '{}'; maximum is 10FFFF");
-constexpr RetiredDef<190, flat::Name> ErrSimpleProtocolMustBeClosed(
-    "@for_deprecated_c_bindings annotated protocol {} must be closed");
-constexpr FixableErrorDef<191, Fixable::Kind::kProtocolModifier, std::string_view>
-    ErrMethodMustDefineStrictness(
-        "Method {} must explicitly specify strict or flexible. (The default is changing "
-        "from strict to flexible, and explicit modifiers are mandatory during the migration.)");
-constexpr FixableErrorDef<192, Fixable::Kind::kProtocolModifier, std::string_view>
-    ErrProtocolMustDefineOpenness(
-        "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
-        "from closed to open, and explicit modifiers are mandatory during the migration.)");
+constexpr RetiredDef<190> ErrSimpleProtocolMustBeClosed;
+constexpr ErrorDef<191, std::string_view> ErrMethodMustDefineStrictness(
+    "Method {} must explicitly specify strict or flexible. (The default is changing "
+    "from strict to flexible, and explicit modifiers are mandatory during the migration.)",
+    {.fixable = Fixable::Kind::kProtocolModifier});
+constexpr ErrorDef<192, std::string_view> ErrProtocolMustDefineOpenness(
+    "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
+    "from closed to open, and explicit modifiers are mandatory during the migration.)",
+    {.fixable = Fixable::Kind::kProtocolModifier});
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
-constexpr FixableErrorDef<194, Fixable::Kind::kEmptyStructResponse, std::string_view>
-    ErrEmptyPayloadStructsWhenResultUnion(
-        "method '{}' cannot have an empty struct as a payload, prefer omitting the payload"
-        "altogether");
+constexpr ErrorDef<194, std::string_view> ErrEmptyPayloadStructsWhenResultUnion(
+    "method '{}' cannot have an empty struct as a payload, prefer omitting the payload"
+    "altogether",
+    {.fixable = Fixable::Kind::kEmptyStructResponse});
 constexpr ErrorDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag(
     "the @experimental_overflowing attribute can only be used if the"
     "`--experiment allow_overflowing` flag has been enabled for fidlc");
 constexpr ErrorDef<196> ErrExperimentalOverflowingIncorrectUsage(
     "the @experimental_overflowing attribute must have at least one of the `request` or `response`"
     "arguments set to true");
-constexpr ErrorDef<197> ErrOverlayMustBeStrict("overlays must be strict");
-constexpr ErrorDef<198> ErrOverlayMustBeValue("overlays must be value (not resource) types");
-constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain resource members");
+constexpr ErrorDef<197> ErrOverlayMustBeStrict("overlays must be strict", {.documented = false});
+constexpr ErrorDef<198> ErrOverlayMustBeValue("overlays must be value (not resource) types",
+                                              {.documented = false});
+constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain resource members",
+                                                    {.documented = false});
 constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
-    "overlays may not contain reserved members");
+    "overlays may not contain reserved members", {.documented = false});
+
 }  // namespace fidl
 
 // LINT.ThenChange(/tools/fidl/fidlc/tests/errcat_good_tests.cc)

@@ -305,34 +305,27 @@ std::string Display(const VersionSet& s) {
 
 }  // namespace internal
 
-std::string Diagnostic::PrintId() const {
+std::string DiagnosticDef::FormatId() const {
   char id_str[8];
-  std::snprintf(id_str, 8, "fi-%04d", def.id);
+  std::snprintf(id_str, 8, "fi-%04d", id);
   return id_str;
 }
 
-std::string Diagnostic::PrintLink() const {
-  char shortlink_str[34];
-  std::snprintf(shortlink_str, 34, "https://fuchsia.dev/error/%s", PrintId().c_str());
-  return shortlink_str;
-}
-
-std::string Diagnostic::Print(const ProgramInvocation& program_invocation) const {
+std::string Diagnostic::Format(const ProgramInvocation& program_invocation) const {
   std::ostringstream out;
-  if (def.documented == DiagnosticDocumented::kNotDocumented) {
-    out << std::string(msg);
-  } else {
-    out << std::string(msg) + " [" + PrintLink() + "]";
+  out << msg;
+  if (def.opts.documented) {
+    out << " [https://fuchsia.dev/error/" << def.FormatId() << "]";
   }
 
-  if (def.fixable.has_value()) {
+  if (auto fixable = def.opts.fixable) {
     ZX_ASSERT(program_invocation.is_populated());
     std::ostringstream fixme;
     fixme << "\n\n  This is a fixable error.\n"
           << "  Please run the following command to update your FIDL files and fix the issue:\n\n"
           << "    [[[ FIXME ]]]\n\n"
           << "    >>> " << program_invocation.binary_path().c_str()
-          << "/fidl-fix --fix=" << Fixable::Get(def.fixable.value()).name
+          << "/fidl-fix --fix=" << Fixable::Get(fixable.value()).name
           << program_invocation.ExperimentsAsString(" --experiment=", " ").c_str()
           << program_invocation.DependenciesAsString(" --dep=", ",").c_str() << " "
           << program_invocation.LibraryFilesAsString(" ").value().c_str() << "\n\n"

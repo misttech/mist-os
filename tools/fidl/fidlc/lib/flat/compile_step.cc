@@ -1067,7 +1067,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
         if (permission == EmptyPayload::kBanned && struct_decl->members.empty()) {
           Fail(ErrEmptyPayloadStructs, method_name, method_name.data());
         } else if (permission == EmptyPayload::kFixable && struct_decl->members.empty()) {
-          FixableError(ErrEmptyPayloadStructsWhenResultUnion, method_name, method_name.data());
+          Fail(ErrEmptyPayloadStructsWhenResultUnion, method_name, method_name.data());
         }
         break;
       }

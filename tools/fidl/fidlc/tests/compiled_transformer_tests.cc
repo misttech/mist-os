@@ -46,10 +46,10 @@ void GoodTransform(const std::string& library, std::vector<std::string> deps,
     ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
   }
   for (const auto& error : reporter.errors()) {
-    ADD_FAILURE("reported error: %s\n", error->Print(reporter.program_invocation()).c_str());
+    ADD_FAILURE("reported error: %s\n", error->Format(reporter.program_invocation()).c_str());
   }
   for (const auto& warning : reporter.warnings()) {
-    ADD_FAILURE("reported warning: %s\n", warning->Print(reporter.program_invocation()).c_str());
+    ADD_FAILURE("reported warning: %s\n", warning->Format(reporter.program_invocation()).c_str());
   }
   ASSERT_TRUE(prepared);
 
@@ -58,10 +58,10 @@ void GoodTransform(const std::string& library, std::vector<std::string> deps,
     ADD_FAILURE("transformer failure: %s\n", error.msg.c_str());
   }
   for (const auto& error : reporter.errors()) {
-    ADD_FAILURE("reported error: %s\n", error->Print(reporter.program_invocation()).c_str());
+    ADD_FAILURE("reported error: %s\n", error->Format(reporter.program_invocation()).c_str());
   }
   for (const auto& warning : reporter.warnings()) {
-    ADD_FAILURE("reported warning: %s\n", warning->Print(reporter.program_invocation()).c_str());
+    ADD_FAILURE("reported warning: %s\n", warning->Format(reporter.program_invocation()).c_str());
   }
   ASSERT_TRUE(transformed);
 

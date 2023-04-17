@@ -229,7 +229,7 @@ class TestLibrary final : public SharedInterface {
         fidl::SourceSpan span(beginning, *source_file);
         const auto& error = errors().at(0);
         auto error_msg = fidl::Reporter::Format(
-            "error", error->span, error->Print(reporter()->program_invocation()), /*color=*/false);
+            "error", error->span, error->Format(reporter()->program_invocation()), /*color=*/false);
         findings_.emplace_back(span, "parser-error", error_msg + "\n");
         return false;
       }
