@@ -2889,69 +2889,74 @@ impl BinderDriver {
             buffers: buffers.clone(),
         };
 
-        let caller_thread = match match binder_thread.lock().transactions.last() {
-            Some(TransactionRole::Receiver(rx)) => rx.upgrade(),
-            _ => None,
-        } {
-            Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
-            _ => None,
-        };
+        let (target_thread, command) =
+            if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
+                // The caller is not expecting a reply.
+                binder_thread.lock().enqueue_command(Command::OnewayTransactionComplete);
 
-        let command = if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
-            // The caller is not expecting a reply.
-            binder_thread.lock().enqueue_command(Command::OnewayTransactionComplete);
+                // Register the transaction buffer.
+                target_proc.lock().active_transactions.insert(
+                    buffers.data.address,
+                    ActiveTransaction {
+                        request_type: RequestType::Oneway { object: Arc::downgrade(&object) },
+                        _state: transaction_state.into(),
+                    },
+                );
 
-            // Register the transaction buffer.
-            target_proc.lock().active_transactions.insert(
-                buffers.data.address,
-                ActiveTransaction {
-                    request_type: RequestType::Oneway { object: Arc::downgrade(&object) },
-                    _state: transaction_state.into(),
-                },
-            );
+                // Oneway transactions are enqueued on the binder object and processed one at a time.
+                // This guarantees that oneway transactions are processed in the order they are
+                // submitted, and one at a time.
+                let mut object_state = object.lock();
+                if object_state.handling_oneway_transaction {
+                    // Currently, a oneway transaction is being handled. Queue this one so that it is
+                    // scheduled when the buffer from the in-progress transaction is freed.
+                    object_state.oneway_transactions.push_back(transaction);
+                    return Ok(());
+                }
 
-            // Oneway transactions are enqueued on the binder object and processed one at a time.
-            // This guarantees that oneway transactions are processed in the order they are
-            // submitted, and one at a time.
-            let mut object_state = object.lock();
-            if object_state.handling_oneway_transaction {
-                // Currently, a oneway transaction is being handled. Queue this one so that it is
-                // scheduled when the buffer from the in-progress transaction is freed.
-                object_state.oneway_transactions.push_back(transaction);
-                return Ok(());
-            }
+                // No oneway transactions are being handled, which means that no buffer will be
+                // freed, kicking off scheduling from the oneway queue. Instead, we must schedule
+                // the transaction regularly, but mark the object as handling a oneway transaction.
+                object_state.handling_oneway_transaction = true;
 
-            // No oneway transactions are being handled, which means that no buffer will be
-            // freed, kicking off scheduling from the oneway queue. Instead, we must schedule
-            // the transaction regularly, but mark the object as handling a oneway transaction.
-            object_state.handling_oneway_transaction = true;
+                (None, Command::OnewayTransaction(transaction))
+            } else {
+                let target_thread = match match binder_thread.lock().transactions.last() {
+                    Some(TransactionRole::Receiver(rx)) => rx.upgrade(),
+                    _ => None,
+                } {
+                    Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
+                    _ => None,
+                };
 
-            Command::OnewayTransaction(transaction)
-        } else {
-            // Make the sender thread part of the transaction so it doesn't get scheduled to handle
-            // any other transactions.
-            binder_thread
-                .lock()
-                .transactions
-                .push(TransactionRole::Sender(WeakBinderPeer::new(binder_proc, binder_thread)));
+                // Make the sender thread part of the transaction so it doesn't get scheduled to handle
+                // any other transactions.
+                binder_thread
+                    .lock()
+                    .transactions
+                    .push(TransactionRole::Sender(WeakBinderPeer::new(binder_proc, binder_thread)));
 
-            // Register the transaction buffer.
-            target_proc.lock().active_transactions.insert(
-                buffers.data.address,
-                ActiveTransaction {
-                    request_type: RequestType::RequestResponse,
-                    _state: transaction_state.into(),
-                },
-            );
+                // Register the transaction buffer.
+                target_proc.lock().active_transactions.insert(
+                    buffers.data.address,
+                    ActiveTransaction {
+                        request_type: RequestType::RequestResponse,
+                        _state: transaction_state.into(),
+                    },
+                );
 
-            Command::Transaction {
-                sender: WeakBinderPeer::new(binder_proc, binder_thread),
-                data: transaction,
-            }
-        };
+                (
+                    target_thread,
+                    Command::Transaction {
+                        sender: WeakBinderPeer::new(binder_proc, binder_thread),
+                        data: transaction,
+                    },
+                )
+            };
 
-        // Find a thread to handle the transaction, or use the process' command queue.
-        if let Some(target_thread) = caller_thread {
+        // Schedule the transaction on the target_thread if it is specified, otherwise use the
+        // process' command queue.
+        if let Some(target_thread) = target_thread {
             target_thread.lock().enqueue_command(command);
         } else {
             target_proc.enqueue_command(command);
