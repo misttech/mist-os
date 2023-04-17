@@ -154,12 +154,14 @@ zx_status_t Vim3::DisplayInit() {
                         bind_fuchsia_gpio::FUNCTION_HDMI_HOTPLUG_DETECT),
   };
 
-  std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
   };
 
-  std::vector<fuchsia_driver_framework::NodeProperty> sysmem_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
+  std::vector<fuchsia_driver_framework::NodeProperty> sysmem_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
   };
 
   std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{

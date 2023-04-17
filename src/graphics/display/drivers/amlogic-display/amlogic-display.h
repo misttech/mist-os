@@ -5,12 +5,12 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -179,7 +179,7 @@ class AmlogicDisplay
   // Protocol handles used in by this driver
   ddk::PDevFidl pdev_;
   ddk::AmlogicCanvasProtocolClient canvas_;
-  ddk::SysmemProtocolClient sysmem_;
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
 
   // Board Info
   pdev_board_info_t board_info_;

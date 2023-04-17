@@ -532,10 +532,11 @@ zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  zx_status_t status = sysmem_.Connect(std::move(connection));
-  if (status != ZX_OK) {
-    DISP_ERROR("Could not connect to sysmem\n");
-    return status;
+  auto status =
+      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));
+  if (!status.ok()) {
+    DISP_ERROR("Failed to connect to sysmem: %s\n", status.status_string());
+    return status.status();
   }
 
   return ZX_OK;
@@ -1027,11 +1028,14 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  if (zx_status_t status = ddk::SysmemProtocolClient::CreateFromDevice(parent_, "sysmem", &sysmem_);
-      status != ZX_OK) {
-    DISP_ERROR("Could not get Display SYSMEM protocol %d\n", status);
-    return status;
+  zx::result sysmem_client =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
+          parent_, "sysmem-fidl");
+  if (sysmem_client.is_error()) {
+    zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client.status_string());
+    return sysmem_client.status_value();
   }
+  sysmem_.Bind(std::move(*sysmem_client));
 
   if (zx_status_t status =
           ddk::AmlogicCanvasProtocolClient::CreateFromDevice(parent_, "canvas", &canvas_);
@@ -1098,11 +1102,10 @@ zx_status_t AmlogicDisplay::Bind() {
       return endpoints.status_value();
     }
     auto& [client, server] = endpoints.value();
-    auto status = sysmem_.Connect(server.TakeChannel());
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
-             zx_status_get_string(status));
-      return status;
+    auto status = sysmem_->ConnectServer(std::move(endpoints->server));
+    if (!status.ok()) {
+      zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s", status.status_string());
+      return status.status();
     }
     sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
 
