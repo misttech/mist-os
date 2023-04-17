@@ -38,6 +38,10 @@
 
 namespace aml_canvas {
 
+// AMLogic documentation uses "DMC" to refer to the DDR memory controller. The
+// canvas driver controls a special subset of that controller, used to translate
+// image data accesses from (x, y) coordinates to memory addresses.
+
 constexpr uint32_t kDmcCavLutDataL = (0x12 << 2);
 constexpr uint32_t kDmcCavLutDataH = (0x13 << 2);
 constexpr uint32_t kDmcCavLutAddr = (0x14 << 2);
@@ -48,7 +52,9 @@ constexpr uint32_t kDmcCavMaxRegAddr = kDmcCavLutAddr;
 // This register is typo-ed as DC_CAV_LUT_DATAL in the A311D datasheet
 class CanvasLutDataLow : public hwreg::RegisterBase<CanvasLutDataLow, uint32_t> {
  public:
+  // Bottom 3 bits of width in 8-byte units, 32-byte aligned.
   DEF_FIELD(31, 29, dmc_cav_width);
+  // Starting physical address of data in 8-byte units, 32-byte aligned.
   DEF_FIELD(28, 0, dmc_cav_addr);
 
   static auto Get() { return hwreg::RegisterAddr<CanvasLutDataLow>(kDmcCavLutDataL); }
@@ -64,11 +70,18 @@ class CanvasLutDataLow : public hwreg::RegisterBase<CanvasLutDataLow, uint32_t> 
 // DMC_CAV_LUT_DATAH, typo-ed as DC_CAV_LUT_DATAH
 class CanvasLutDataHigh : public hwreg::RegisterBase<CanvasLutDataHigh, uint32_t> {
  public:
+  // Swap words in image data. 1<<3 = 64-bit, 1<<2 = 32-bit, 1<<1 = 16-bit, 1 =
+  // 8-bit, 0 = none.
   DEF_FIELD(29, 26, dmc_cav_endianness);
+  // 0 = linear, 1 = 32x32, 2 = 64x32
   DEF_FIELD(25, 24, dmc_cav_blkmode);
+  // If 1, y coordinates are computed modulo height
   DEF_BIT(23, dmc_cav_ywrap);
+  // If 1, x coordinates are computed modulo width
   DEF_BIT(22, dmc_cav_xwrap);
+  // Height in rows.
   DEF_FIELD(21, 9, dmc_cav_height);
+  // Width in 8-byte units, 32-byte aligned.
   DEF_FIELD(8, 0, dmc_cav_width);
 
   static auto Get() { return hwreg::RegisterAddr<CanvasLutDataHigh>(kDmcCavLutDataH); }
@@ -84,6 +97,10 @@ class CanvasLutDataHigh : public hwreg::RegisterBase<CanvasLutDataHigh, uint32_t
 };
 
 // DMC_CAV_LUT_ADDR, typo-ed as DC_CAV_LUT_ADDR
+//
+// An index register used to read or write canvas entries in the LUT.
+// Writes must be followed by at least one read to ensure that they have been
+// committed, e.g. CanvasLutDataHigh::Get().ReadFrom(mmio_space)
 class CanvasLutAddr : public hwreg::RegisterBase<CanvasLutAddr, uint32_t> {
  public:
   DEF_BIT(9, dmc_cav_addr_wr);
