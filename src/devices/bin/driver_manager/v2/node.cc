@@ -469,6 +469,7 @@ Node* Node::GetPrimaryParent() const {
 
 void Node::CompleteBind(zx::result<> result) {
   auto completer = std::move(request_bind_completer_);
+  request_bind_completer_.reset();
   if (completer) {
     completer->Reply(result);
   }
