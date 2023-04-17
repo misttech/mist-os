@@ -169,6 +169,7 @@ build_api_module("api") {
     ":tests",
     ":tool_paths",
     ":triage_sources",
+    ":vnames_config",
     "//build/images/archive",
   ]
 }
@@ -1369,6 +1370,36 @@ build_api_module("licenses") {
   # No need to save license artifacts for SDK-only builds.
   if (has_board) {
     deps = [ "//build/images:default-images" ]
+  }
+}
+
+# Describes the path to the Fuchsia `vnames.json` file.
+# in file: "$root_build_dir/vnames_config.json"
+#
+# Paths are relative to $root_build_dir.
+#
+# Type: list(scope)
+#
+#   * path
+#     - Required: Path to where the file is found, relative to $root_build_dir.
+#     - Type: path relative to $root_build_dir
+#
+build_api_module("vnames_config") {
+  testonly = true
+  data_keys = [ "vnames_config" ]
+  rebase = root_build_dir
+  deps = [ ":vnames_config.metadata" ]
+}
+
+group("vnames_config.metadata") {
+  testonly = true
+  visibility = [ ":vnames_config" ]
+  metadata = {
+    vnames_config = [
+      {
+        path = "//infra/vnames.json"
+      },
+    ]
   }
 }
 
