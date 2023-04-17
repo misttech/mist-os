@@ -284,9 +284,10 @@ impl AudioDaemon {
                 >()
                 .context("Failed to connect to fuchsia.media.Audio")?;
                 audio_component.create_audio_capturer(server_end, true)?;
-                client_end
-                    .into_proxy()
-                    .map_err(|e| anyhow::anyhow!("Error getting AudioCapturerProxy: {e}"))
+
+                let capturer_proxy = client_end.into_proxy()?;
+                capturer_proxy.set_pcm_stream_type(&mut stream_type)?;
+                Ok(capturer_proxy)
             }
             _ => Err(anyhow::anyhow!("Unsupported RecordLocation")),
         }
@@ -569,6 +570,7 @@ impl AudioDaemon {
             let (stdout_remote, stdout_local) = zx::Socket::create_stream();
             let (stderr_remote, stderr_local) = zx::Socket::create_stream();
 
+            let request_name = request.method_name();
             let request_result = match request {
                 AudioDaemonRequest::Play { payload, responder } => {
                     let response = AudioDaemonPlayResponse {
@@ -673,7 +675,7 @@ impl AudioDaemon {
             };
             match request_result {
                 Ok(_) => println!("Request succeeded."),
-                Err(e) => println!("Request failed with error {e}"),
+                Err(e) => println!("Request {request_name} failed with error {e}"),
             }
         }
         Ok(())
