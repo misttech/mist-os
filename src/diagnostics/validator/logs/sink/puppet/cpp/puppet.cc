@@ -34,7 +34,6 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           syslog_backend::LogBuffer buffer;
           syslog_backend::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
                                       nullptr);
-          syslog_backend::EndRecord(&buffer);
           syslog_backend::FlushRecord(&buffer);
         },
         nullptr);
@@ -139,7 +138,6 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           break;
       }
     }
-    syslog_backend::EndRecord(&buffer);
     syslog_backend::FlushRecord(&buffer);
   }
 

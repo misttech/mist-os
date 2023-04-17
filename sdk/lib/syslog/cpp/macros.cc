@@ -65,7 +65,6 @@ LogMessage::~LogMessage() {
   if (tag_) {
     syslog_backend::WriteKeyValue(buffer.get(), "tag", tag_);
   }
-  syslog_backend::EndRecord(buffer.get());
   syslog_backend::FlushRecord(buffer.get());
   if (severity_ >= LOG_FATAL)
     __builtin_debugtrap();

@@ -199,7 +199,6 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
         syslog_backend::WriteKeyValue(&buffer, "tag", tag.data());
       }
     }
-    syslog_backend::EndRecord(&buffer);
     if (!syslog_backend::FlushRecord(&buffer)) {
       return ZX_ERR_IO;
     }

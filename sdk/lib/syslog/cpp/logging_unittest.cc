@@ -355,13 +355,11 @@ TEST_F(LoggingFixture, BackendDirect) {
   syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
                               "condition");
   syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
-  syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
   syslog_backend::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
                               "condition");
   syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
   syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
 
   std::string log = ReadLogs(state);

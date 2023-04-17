@@ -46,8 +46,6 @@ WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, double value);
 
 WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, bool value);
 
-WEAK void EndRecord(LogBuffer* buffer);
-
 WEAK bool FlushRecord(LogBuffer* buffer);
 
 WEAK bool HasStructuredBackend();
@@ -87,10 +85,12 @@ constexpr bool Not() {
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
 struct LogBuffer {
-  // Max size of log buffer
+  // Max size of log buffer. This number may change as additional fields
+  // are added to the internal encoding state. It is based on trial-and-error
+  // and is adjusted when compilation fails due to it not being large enough.
   static constexpr auto kBufferSize = (1 << 15) / 8;
   // Additional storage for internal log state.
-  static constexpr auto kStateSize = 13;
+  static constexpr auto kStateSize = 18;
   // Record state (for keeping track of backend-specific details)
   uint64_t record_state[kStateSize];
   // Log data (used by the backend to encode the log into). The format
@@ -231,7 +231,6 @@ struct LogValue {
     // https://bugs.llvm.org/show_bug.cgi?id=41093 -- Clang loses constexpr
     // even though this should be constexpr here.
     buffer.Encode<0, sizeof...(KeyValuePairs)>(kvps);
-    syslog_backend::EndRecord(&buffer);
     syslog_backend::FlushRecord(&buffer);
   }
 

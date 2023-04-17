@@ -4,7 +4,6 @@
 
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/logging_backend.h>
-#include <lib/syslog/cpp/logging_backend_fuchsia_private.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
 #include <lib/syslog/logger.h>

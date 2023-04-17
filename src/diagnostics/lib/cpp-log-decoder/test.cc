@@ -26,7 +26,6 @@ TEST(LogDecoder, DecodesCorrectly) {
   syslog_backend::WriteKeyValue(&buffer, "tag", "some tag");
   syslog_backend::WriteKeyValue(&buffer, "tag", "some other tag");
   syslog_backend::WriteKeyValue(&buffer, "user property", 5.2);
-  syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
   uint8_t data[2048];
   size_t processed = 0;

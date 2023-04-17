@@ -4,7 +4,6 @@
 
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/logging_backend.h>
-#include <lib/syslog/cpp/logging_backend_fuchsia_private.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -74,7 +73,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       } break;
     }
   }
-  syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
   return 0;
 }
