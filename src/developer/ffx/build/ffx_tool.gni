@@ -64,11 +64,16 @@ template("ffx_tool") {
     output_name = invoker.output_name
   }
 
+  # targets that are part of the 'public interface' of ffx_tool
   target_versioned = "${target_name}_versioned"
   target_unversioned = target_name
   target_metadata = "${target_name}_metadata"
   target_host_tool = "${target_name}_host_tool"
   target_test_data = "${target_name}_test_data"
+
+  # targets that are part of the private interface of ffx_tool
+  # (prefixed with _ to differentiate).
+  target_versioned_bin = "_${target_name}_versioned_bin"
 
   output_versioned = output_name
   output_unversioned = "${output_name}_unversioned"
@@ -88,7 +93,7 @@ template("ffx_tool") {
   }
 
   # Replace the special linker sections containing the version information with the real values
-  ffx_apply_version(target_versioned) {
+  ffx_apply_version(target_versioned_bin) {
     output_name = output_versioned
 
     deps = [ ":$target_unversioned" ]
@@ -96,8 +101,8 @@ template("ffx_tool") {
 
   # Create the metadata file for in-tree discovery
   ffx_action(target_metadata) {
-    ffx_tool = ":$target_versioned"
-    ffx_tool_output_name = output_versioned
+    ffx_tool = ":$target_unversioned"
+    ffx_tool_output_name = output_unversioned
     needs_sdk = false
     inputs = []
     outputs = [ "$root_out_dir/$output_metadata" ]
@@ -107,12 +112,18 @@ template("ffx_tool") {
     ]
   }
 
+  # Combine those into a target that represents both the versioned binary
+  # and the metadata.
+  group(target_versioned) {
+    public_deps = [
+      ":$target_metadata",
+      ":$target_versioned_bin",
+    ]
+  }
+
   # Install host tool
   install_host_tools(target_host_tool) {
-    deps = [
-      ":$target_metadata",
-      ":$target_versioned",
-    ]
+    deps = [ ":$target_versioned" ]
     outputs = [
       output_name,
       output_metadata,

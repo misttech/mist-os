@@ -41,10 +41,14 @@ ffx_tool("ffx_echo") {
 }
 
 group("echo") {
-  deps = [
+  public_deps = [
     ":ffx_echo",
     ":ffx_echo_host_tool",
   ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_echo_versioned" ]
 }
 
 group("tests") {

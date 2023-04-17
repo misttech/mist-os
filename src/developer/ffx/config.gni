@@ -102,11 +102,13 @@ dual_mode_defaults = [
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to
 # subtools.
 dual_mode_subtools = []
+dual_mode_subtool_bins = []
 dual_mode_subtool_tests = []
 dual_mode_subtool_test_data = []
 
 foreach(plugin, dual_mode_plugins) {
   dual_mode_subtools += [ plugin + "_tool_host_tool" ]
+  dual_mode_subtool_bins += [ plugin + "_tool_versioned" ]
   dual_mode_subtool_tests += [ plugin + "_tests" ]
-  dual_mode_subtool_test_data += [ plugin + "_test_data" ]
+  dual_mode_subtool_test_data += [ plugin + "_tool_test_data" ]
 }
