@@ -124,7 +124,12 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   size_t pt_pages() const { return pt_->pages(); }
   uint16_t pcid() const { return pcid_; }
 
+  // Note: these load/fetch_or calls use the seq_cst memory ordering. Although some of the call
+  // sites of these methods *may* be able to tolerate more relaxed orderings, most of them require
+  // strong orderings and this should not be changed.
   cpu_mask_t active_cpus() const { return active_cpus_.load(); }
+  cpu_mask_t pcid_dirty_cpus() const { return pcid_dirty_cpus_.load(); }
+  cpu_mask_t MarkPcidDirtyCpus(cpu_mask_t mask) { return pcid_dirty_cpus_.fetch_or(mask); }
 
   IoBitmap& io_bitmap() { return io_bitmap_; }
 
@@ -185,6 +190,10 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
 
   // Whether not this has been active since |ActiveSinceLastCheck| was called.
   ktl::atomic<bool> active_since_last_check_ = false;
+
+  // A bitmap of cpus where the current PCID that was assigned is now dirty and should
+  // be flushed on the next context switch.
+  ktl::atomic<cpu_mask_t> pcid_dirty_cpus_{0};
 };
 
 class X86VmICacheConsistencyManager final : public ArchVmICacheConsistencyManagerInterface {

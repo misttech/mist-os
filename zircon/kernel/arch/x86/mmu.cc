@@ -362,19 +362,44 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
     pending->contains_global = true;
   }
 
-  /* Target only CPUs this aspace is active on.  It may be the case that some
-   * other CPU will become active in it after this load, or will have left it
-   * just before this load.  In the former case, it is becoming active after
-   * the write to the page table, so it will see the change.  In the latter
-   * case, it will get a spurious request to flush. */
   mp_ipi_target_t target;
   cpu_mask_t target_mask = 0;
-  // TODO(31418): Avoid always shooting down a PCID on all cores.
-  if (pending->contains_global || pcid != MMU_X86_UNUSED_PCID) {
+  if (pending->contains_global) {
     target = MP_IPI_TARGET_ALL;
   } else {
     target = MP_IPI_TARGET_MASK;
+    // Target only CPUs this aspace is active on. It may be the case that some other CPU will
+    // become active in it after this load, or will have left it  just before this load.
+    // In the absence of PCIDs there are two cases:
+    //  1. It is becoming active after the write to the page table, so it will see the change.
+    //  2. It will get a potentially spurious request to flush.
+    // With PCIDs we need additional handling for case (1), since an inactive CPU might have old
+    // entries cached and so may not see the change, and case (2) is no longer spurious. See
+    // additional comments in next if block.
     target_mask = aspace->active_cpus();
+
+    if (g_x86_feature_pcid_enabled) {
+      // Only the kernel aspace uses the 0 pcid, and all its mappings are global and so would have
+      // forced an IPI_TARGET_ALL above.
+      DEBUG_ASSERT(pcid != MMU_X86_UNUSED_PCID);
+      // Mark all cpus as being dirty that aren't in this mask. This will force a TLB flush on the
+      // next context switch on that cpu.
+      aspace->MarkPcidDirtyCpus(~target_mask);
+
+      // At this point we have CPUs in our target_mask that we're going to IPI, and any CPUS not in
+      // target_mask that will at some point in the future become active and see the dirty bit.
+      //
+      // This is, however, not all CPUs, as there might be CPUs that are not in target_mask, but
+      // became active before we could set the dirty bit. To account for these CPUs we read
+      // active_cpus again and OR with the previous target_mask. It is possible that we might now
+      // both IPI a core and have it flush on load due to the dirty bit, however this is a very
+      // unlikely race condition and so will not be expensive in practice.
+      //
+      // Note that any CPU that manages to become active after we read target_mask and stop being
+      // active before we read it again below does not matter, since the dirty bit is still set and
+      // so when it eventually runs again it will still clear the PCID.
+      target_mask |= aspace->active_cpus();
+    }
   }
 
   /* Task used for invalidating a TLB entry on each CPU */
@@ -671,14 +696,9 @@ zx_status_t X86ArchVmAspace::Init() {
       pcid_ = result.value();
       DEBUG_ASSERT(pcid_ != MMU_X86_UNUSED_PCID && pcid_ < 4096);
 
-      // Assigning this PCID across from where it was last used is effectively changing all the non
-      // kernel mappings, so make sure to invalidate everywhere.
-      DEBUG_ASSERT(g_x86_feature_invpcid);
-      auto pcid_invalidate = [](void* raw_context) -> void {
-        const uint16_t pcid = *reinterpret_cast<uint16_t*>(raw_context);
-        invpcid_pcid_all(pcid);
-      };
-      mp_sync_exec(MP_IPI_TARGET_ALL, 0, pcid_invalidate, &pcid_);
+      // Start off with all cpus marked as dirty so the first context switch on any cpu
+      // invalidates the entire PCID when it's loaded.
+      MarkPcidDirtyCpus(CPU_MASK_ALL);
     }
 
     zx_status_t status = mmu->Init(this, test_page_alloc_func_);
@@ -774,27 +794,42 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
     paddr_t phys = aspace->pt_phys();
     LTRACEF_LEVEL(3, "switching to aspace %p, pt %#" PRIXPTR "\n", aspace, phys);
 
+    if (old_aspace != nullptr) {
+      [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
+      // Make sure we were actually previously running on this CPU.
+      DEBUG_ASSERT(prev & cpu_bit);
+    }
+    // Set ourselves as active on this CPU prior to clearing the dirty bit. This ensures that TLB
+    // invalidation code will either see us as active, and know to IPI us, or we will see the dirty
+    // bit and clear the tlb here. See comment in X86PageTableMmu::TlbInvalidate for more details.
+    [[maybe_unused]] uint32_t prev = aspace->active_cpus_.fetch_or(cpu_bit);
+    // Should not already be running on this CPU.
+    DEBUG_ASSERT(!(prev & cpu_bit));
+
     // Load the new cr3, add in the pcid if it's supported
     if (aspace->pcid_ != MMU_X86_UNUSED_PCID) {
       DEBUG_ASSERT(g_x86_feature_pcid_enabled);
       DEBUG_ASSERT(aspace->pcid_ < 4096);
-      context_switches_pcid.Add(1);
       arch::X86Cr3PCID cr3;
-      cr3.set_noflush(1);
+
+      // If the new aspace is marked as dirty for this cpu, force a TLB invalidate
+      // when loading the new cr3. Clear the dirty flag while we're at it. If
+      // another cpu sets the dirty flag after this point but before we load the cr3
+      // and invalidate it, we'll at most end up with an extraneous dirty flag set.
+      const cpu_mask_t dirty_mask = aspace->pcid_dirty_cpus_.fetch_and(~cpu_bit);
+      if (dirty_mask & cpu_bit) {
+        // This is a double negative, and noflush=0 -> flush.
+        cr3.set_noflush(0);
+      } else {
+        cr3.set_noflush(1);
+        context_switches_pcid.Add(1);
+      }
       cr3.set_base(phys);
       cr3.set_pcid(aspace->pcid_ & 0xfff);
       cr3.Write();
     } else {
       arch::X86Cr3::Write(phys);
     }
-    if (old_aspace != nullptr) {
-      [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
-      // Make sure we were actually previously running on this CPU
-      DEBUG_ASSERT(prev & cpu_bit);
-    }
-    [[maybe_unused]] uint32_t prev = aspace->active_cpus_.fetch_or(cpu_bit);
-    // Should not already be running on this CPU.
-    DEBUG_ASSERT(!(prev & cpu_bit));
 
     aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
   } else {
