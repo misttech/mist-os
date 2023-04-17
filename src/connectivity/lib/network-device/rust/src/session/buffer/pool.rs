@@ -347,7 +347,7 @@ impl<K: AllocKind> Debug for Buffer<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self { alloc, parts, pos } = self;
         f.debug_struct("Buffer")
-            .field("len", &self.cap())
+            .field("cap", &self.cap())
             .field("alloc", alloc)
             .field("parts", parts)
             .field("pos", pos)
