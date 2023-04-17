@@ -12,7 +12,6 @@ use {
             PROTOCOL_IPV4_CONTROL, PROTOCOL_IPV6_CONTROL, PROTOCOL_LINK_CONTROL,
         },
     },
-    fuchsia_async as fasync,
     futures::future::BoxFuture,
     packet::{Buf, ParseBuffer},
     ppp_packet::{
@@ -20,7 +19,7 @@ use {
         link::ControlOption as LinkControlOption, PppPacket,
     },
     std::{
-        sync::{Arc, Mutex, Once},
+        sync::{Arc, Mutex},
         time::{Duration, Instant},
     },
 };
@@ -70,14 +69,8 @@ macro_rules! assert_opened {
     };
 }
 
-static START: Once = Once::new();
-
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_link_open_ack_received() -> Result<(), anyhow::Error> {
-    START.call_once(|| {
-        fuchsia_syslog::init().unwrap();
-    });
-
     let now = Instant::now();
 
     let tx_req = vec![0xc0, 0x21, 0x01, 0x00, 0x00, 0x0a, 0x05, 0x06, 0xe0, 0x1e, 0x87, 0x64];
@@ -117,12 +110,8 @@ async fn test_link_open_ack_received() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_link_open_ack_sent() -> Result<(), anyhow::Error> {
-    START.call_once(|| {
-        fuchsia_syslog::init().unwrap();
-    });
-
     let now = Instant::now();
 
     let tx_req = vec![0xc0, 0x21, 0x01, 0x00, 0x00, 0x0a, 0x05, 0x06, 0xe0, 0x1e, 0x87, 0x64];
@@ -162,12 +151,8 @@ async fn test_link_open_ack_sent() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_restart() -> Result<(), anyhow::Error> {
-    START.call_once(|| {
-        fuchsia_syslog::init().unwrap();
-    });
-
     let now = Instant::now();
     let expired_once = now + Duration::from_secs(3);
     let expired_twice = expired_once + Duration::from_secs(3);
@@ -201,12 +186,8 @@ async fn test_restart() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn test_full_ipv4_ipv6() -> Result<(), anyhow::Error> {
-    START.call_once(|| {
-        fuchsia_syslog::init().unwrap();
-    });
-
     let now = Instant::now();
 
     let tx_req = vec![0xc0, 0x21, 0x01, 0x00, 0x00, 0x0a, 0x05, 0x06, 0xf6, 0x24, 0xab, 0x38];
