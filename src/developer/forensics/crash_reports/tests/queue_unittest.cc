@@ -127,7 +127,7 @@ class QueueTest : public UnitTestFixture {
     report_id_ = 1;
     crash_server_ =
         std::make_unique<StubCrashServer>(dispatcher(), services(), &annotation_manager_,
-                                          upload_attempt_results, kUploadResponseDelay);
+                                          upload_attempt_results, &clock_, kUploadResponseDelay);
 
     InitQueue();
   }

@@ -17,6 +17,7 @@
 #include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/lib/fxl/macros.h"
+#include "src/lib/timekeeper/clock.h"
 
 namespace forensics {
 namespace crash_reports {
@@ -30,7 +31,7 @@ class CrashServer {
 
   CrashServer(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
               const std::string& url, LogTags* tags,
-              feedback::AnnotationManager* annotation_manager);
+              feedback::AnnotationManager* annotation_manager, timekeeper::Clock* clock);
 
   virtual ~CrashServer() {}
 
@@ -54,7 +55,7 @@ class CrashServer {
   //   immediately available).
   static std::map<std::string, std::string> PrepareAnnotations(
       const Report& report, const Snapshot& snapshot,
-      const feedback::AnnotationManager* annotation_manager);
+      const feedback::AnnotationManager* annotation_manager, zx::time uptime);
 
  private:
   async_dispatcher_t* dispatcher_;
@@ -62,6 +63,7 @@ class CrashServer {
   const std::string url_;
   LogTags* tags_;
   feedback::AnnotationManager* annotation_manager_;
+  timekeeper::Clock* clock_;
 
   bool pending_request_{false};
   fuchsia::net::http::LoaderPtr loader_;

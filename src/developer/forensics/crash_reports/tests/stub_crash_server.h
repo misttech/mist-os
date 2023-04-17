@@ -12,6 +12,7 @@
 #include "src/developer/forensics/crash_reports/annotation_map.h"
 #include "src/developer/forensics/crash_reports/crash_server.h"
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
+#include "src/lib/timekeeper/clock.h"
 
 namespace forensics {
 namespace crash_reports {
@@ -23,9 +24,9 @@ class StubCrashServer : public CrashServer {
   StubCrashServer(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
                   feedback::AnnotationManager* annotation_manager,
                   std::vector<CrashServer::UploadStatus> request_return_values,
-                  const zx::duration response_delay = zx::sec(0))
+                  timekeeper::Clock* clock, const zx::duration response_delay = zx::sec(0))
       : CrashServer(dispatcher, std::move(services), kStubCrashServerUrl, nullptr,
-                    annotation_manager),
+                    annotation_manager, clock),
         dispatcher_(dispatcher),
         response_delay_(response_delay),
         request_return_values_(std::move(request_return_values)) {

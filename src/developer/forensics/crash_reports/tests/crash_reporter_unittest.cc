@@ -187,7 +187,7 @@ class CrashReporterTest : public UnitTestFixture {
         /*max_reports_tmp_size=*/StorageSize::Megabytes(1), max_reports_cache_size);
 
     crash_server_ = std::make_unique<StubCrashServer>(
-        dispatcher(), services(), annotation_manager_.get(), upload_attempt_results);
+        dispatcher(), services(), annotation_manager_.get(), upload_attempt_results, &clock_);
 
     const feedback::BuildTypeConfig build_type_config{
         .crash_report_upload_policy = crash_report_upload_policy,

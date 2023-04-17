@@ -22,6 +22,7 @@
 #include "src/developer/forensics/testing/stubs/data_provider.h"
 #include "src/developer/forensics/testing/stubs/loader.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
+#include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics {
 namespace crash_reports {
@@ -42,6 +43,7 @@ const Report kReport{/*report_id=*/0,
                      /*attachments=*/{},
                      /*snapshot_uuid=*/kSnapshotUuid,
                      /*minidump=*/std::nullopt};
+constexpr zx::time kUptime(zx::sec(86).get());
 
 class CrashServerTest : public UnitTestFixture {
  protected:
@@ -58,7 +60,7 @@ class CrashServerTest : public UnitTestFixture {
     loader_server_ = std::make_unique<stubs::Loader>(dispatcher(), std::move(responses));
     InjectServiceProvider(loader_server_.get());
     crash_server_ = std::make_unique<CrashServer>(dispatcher(), services(), kUrl, &tags_,
-                                                  annotation_manager_.get());
+                                                  annotation_manager_.get(), &clock_);
     RunLoopUntilIdle();
   }
 
@@ -83,6 +85,7 @@ class CrashServerTest : public UnitTestFixture {
 
   std::unique_ptr<stubs::DataProviderBase> data_provider_server_;
   LogTags tags_;
+  timekeeper::TestClock clock_;
   std::unique_ptr<CrashServer> crash_server_;
 };
 
@@ -281,13 +284,14 @@ TEST_F(CrashServerTest, PreparesAnnotationsErrorSnapshot) {
 
   EXPECT_THAT(CrashServer::PrepareAnnotations(
                   report, MissingSnapshot(feedback::Annotations(), presence_annotations),
-                  annotation_manager_.get()),
+                  annotation_manager_.get(), kUptime),
               UnorderedElementsAreArray({
                   Pair("key1", "value1"),
                   Pair("key2", "value2"),
                   Pair("key3", "value3.1"),
                   Pair("key4", "value4"),
                   Pair(feedback::kDebugReportUploadBootId, "some-value"),
+                  Pair(feedback::kDebugUploadUptime, "000d00h01m26s"),
               }));
 }
 
@@ -314,12 +318,13 @@ TEST_F(CrashServerTest, PreparesAnnotationsNoCurrentBootId) {
 
   EXPECT_THAT(CrashServer::PrepareAnnotations(
                   report, MissingSnapshot(feedback::Annotations(), presence_annotations),
-                  annotation_manager_.get()),
+                  annotation_manager_.get(), kUptime),
               UnorderedElementsAreArray({
                   Pair("key1", "value1"),
                   Pair("key2", "value2"),
                   Pair("key3", "value3.1"),
                   Pair("key4", "value4"),
+                  Pair(feedback::kDebugUploadUptime, "000d00h01m26s"),
               }));
 }
 
