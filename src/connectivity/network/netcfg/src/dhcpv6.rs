@@ -24,7 +24,7 @@ use futures::{
     stream::{BoxStream, Stream, TryStreamExt as _},
 };
 
-use crate::errors::{self, ContextExt as _};
+use crate::errors;
 use crate::{dns, DnsServerWatchers};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -311,7 +311,7 @@ pub(super) async fn stop_client(
     interface_id: u64,
     watchers: &mut DnsServerWatchers<'_>,
     prefixes_streams: &mut PrefixesStreamMap,
-) -> Result<(), errors::Error> {
+) {
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id };
 
     // Dropping all fuchsia.net.dhcpv6/Client proxies will stop the DHCPv6 client.
@@ -329,9 +329,7 @@ pub(super) async fn stop_client(
             )
         });
 
-    dns::update_servers(lookup_admin, dns_servers, source, vec![])
-        .await
-        .context("error clearing DNS servers")
+    dns::update_servers(lookup_admin, dns_servers, source, vec![]).await
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

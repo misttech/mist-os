@@ -747,7 +747,7 @@ impl<'a> NetCfg<'a> {
         &mut self,
         source: DnsServersUpdateSource,
         servers: Vec<fnet_name::DnsServer_>,
-    ) -> Result<(), errors::Error> {
+    ) {
         dns::update_servers(&self.lookup_admin, &mut self.dns_servers, source, servers).await
     }
 
@@ -796,8 +796,7 @@ impl<'a> NetCfg<'a> {
                             dns_watchers,
                             &mut self.dhcpv6_prefixes_streams,
                         )
-                        .await
-                        .or_else(errors::Error::accept_non_fatal)?;
+                        .await;
 
                         dhcpv6::maybe_send_watch_prefix_response(
                             &self.interface_states,
@@ -1003,12 +1002,7 @@ impl<'a> NetCfg<'a> {
                         }
                     };
 
-                    self.update_dns_servers(source, servers)
-                        .await
-                        .with_context(|| {
-                            format!("error handling DNS servers update from {:?}", source)
-                        })
-                        .or_else(errors::Error::accept_non_fatal)?
+                    self.update_dns_servers(source, servers).await
                 }
                 Event::RequestStream(req_stream) => {
                     match req_stream.context("ServiceFs ended unexpectedly")? {
@@ -1320,20 +1314,14 @@ impl<'a> NetCfg<'a> {
                                 sockaddr.display_ext(),
                             );
 
-                            return dhcpv6::stop_client(
+                            return Ok(dhcpv6::stop_client(
                                 &lookup_admin,
                                 dns_servers,
                                 *id,
                                 watchers,
                                 dhcpv6_prefixes_streams,
                             )
-                            .await
-                            .with_context(|| {
-                                format!(
-                                    "error stopping DHCPv6 client on down interface {} (id={})",
-                                    name, id
-                                )
-                            });
+                            .await);
                         }
 
                         // Stop the DHCPv6 client if its address can no longer be found on the
@@ -1362,22 +1350,14 @@ impl<'a> NetCfg<'a> {
                                     sockaddr.display_ext(),
                                 );
 
-                                let () =
-                                    dhcpv6::stop_client(
-                                        &lookup_admin,
-                                        dns_servers,
-                                        *id,
-                                        watchers,
-                                        dhcpv6_prefixes_streams,
-                                    )
-                                    .await
-                                    .with_context(|| {
-                                        format!(
-                                            "error stopping DHCPv6 client on  interface {} (id={}) \
-                                            since sockaddr {} was removed",
-                                            name, id, sockaddr.display_ext()
-                                        )
-                                    })?;
+                                let () = dhcpv6::stop_client(
+                                    &lookup_admin,
+                                    dns_servers,
+                                    *id,
+                                    watchers,
+                                    dhcpv6_prefixes_streams,
+                                )
+                                .await;
                             }
                         }
 
@@ -1474,20 +1454,14 @@ impl<'a> NetCfg<'a> {
                                     sockaddr.display_ext()
                                 );
 
-                                dhcpv6::stop_client(
+                                Ok(dhcpv6::stop_client(
                                     &lookup_admin,
                                     dns_servers,
                                     *id,
                                     watchers,
                                     dhcpv6_prefixes_streams,
                                 )
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "error stopping DHCPv6 client on removed interface {} (id={})",
-                                        name, id
-                                    )
-                                })
+                                .await)
                             }
                             InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
                                 if let Some(dhcp_server) = dhcp_server {
@@ -2228,10 +2202,7 @@ impl<'a> NetCfg<'a> {
                     dns_watchers,
                     &mut self.dhcpv6_prefixes_streams,
                 )
-                .await
-                .context("stopping DHCPv6 client in order to restart with PD")
-                .or_else(errors::Error::accept_non_fatal)
-                .expect("stopping DHCPv6 client to restart with PD configured");
+                .await;
             }
 
             // Restart DHCPv6 client and configure it to perform PD.
@@ -2345,10 +2316,7 @@ impl<'a> NetCfg<'a> {
                 dns_watchers,
                 &mut self.dhcpv6_prefixes_streams,
             )
-            .await
-            .context("stopping DHCPv6 client in order to restart with PD")
-            .or_else(errors::Error::accept_non_fatal)
-            .expect("stopping DHCPv6 client before restarting without PD");
+            .await;
 
             let properties = self.interface_properties.get(id).unwrap_or_else(|| {
                 panic!("interface {} has DHCPv6 client but properties unknown", id)
@@ -2399,8 +2367,7 @@ impl<'a> NetCfg<'a> {
                     dns_watchers,
                     &mut self.dhcpv6_prefixes_streams,
                 )
-                .await
-                .or_else(errors::Error::accept_non_fatal)?;
+                .await;
                 HashMap::new()
             }
             Ok(prefixes_map) => prefixes_map,
@@ -2478,11 +2445,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
 
     let servers = servers.into_iter().map(static_source_from_ip).collect();
     debug!("updating default servers to {:?}", servers);
-    let () = netcfg
-        .update_dns_servers(DnsServersUpdateSource::Default, servers)
-        .await
-        .context("error updating default DNS servers")
-        .or_else(errors::Error::accept_non_fatal)?;
+    let () = netcfg.update_dns_servers(DnsServersUpdateSource::Default, servers).await;
 
     M::run(netcfg, allowed_bridge_upstream_device_classes)
         .map_err(|e| {
@@ -3133,7 +3096,7 @@ mod tests {
                         ..fnet_name::DnsServer_::EMPTY
                     }],
                 )
-                .map(|r| r.context("error updating netstack DNS servers").map_err(Into::into)),
+                .map(Ok),
             run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
                 .map(|r| r.context("error running lookup admin")),
         )
@@ -3198,7 +3161,7 @@ mod tests {
                         ..fnet_name::DnsServer_::EMPTY
                     }],
                 )
-                .map(|r| r.context("error updating netstack DNS servers").map_err(Into::into)),
+                .map(Ok),
             run_lookup_admin_once(&mut servers.lookup_admin, &vec![DNS_SERVER2, DNS_SERVER1])
                 .map(|r| r.context("error running lookup admin")),
         )

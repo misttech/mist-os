@@ -5,11 +5,8 @@
 use fidl_fuchsia_net_name as fnet_name;
 use fuchsia_zircon as zx;
 
-use anyhow::Context as _;
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
-use tracing::trace;
-
-use crate::errors;
+use tracing::{trace, warn};
 
 /// Updates the DNS servers used by the DNS resolver.
 pub(super) async fn update_servers(
@@ -17,19 +14,16 @@ pub(super) async fn update_servers(
     dns_servers: &mut DnsServers,
     source: DnsServersUpdateSource,
     servers: Vec<fnet_name::DnsServer_>,
-) -> Result<(), errors::Error> {
+) {
     trace!("updating DNS servers obtained from {:?} to {:?}", source, servers);
 
     let () = dns_servers.set_servers_from_source(source, servers);
     let mut servers = dns_servers.consolidated();
     trace!("updating LookupAdmin with DNS servers = {:?}", servers);
 
-    lookup_admin
-        .set_dns_servers(&mut servers.iter_mut())
-        .await
-        .context("error sending set DNS servers request")
-        .map_err(errors::Error::NonFatal)?
-        .map_err(zx::Status::from_raw)
-        .context("error setting DNS servers")
-        .map_err(errors::Error::NonFatal)
+    match lookup_admin.set_dns_servers(&mut servers.iter_mut()).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => warn!("error setting DNS servers: {:?}", zx::Status::from_raw(e)),
+        Err(e) => warn!("error sending set DNS servers request: {:?}", e),
+    }
 }
