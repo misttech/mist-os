@@ -7,6 +7,7 @@ use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
     cm_rust::CapabilityName,
+    fidl::endpoints::{ControlHandle as _, Responder as _},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
     fuchsia_fs::{file, file::ReadError, node::OpenError, OpenFlags},
     fuchsia_zbi::{ZbiParser, ZbiResult, ZbiType},
@@ -267,7 +268,16 @@ impl BuiltinCapability for Arguments {
                         .filter(|(k, _)| k.starts_with(&prefix))
                         .map(|(k, v)| k.to_owned() + "=" + &v)
                         .collect();
-                    responder.send(&mut vec.iter().map(|x| x.as_str()))?
+                    if vec.len() > fboot::MAX_ARGS_VECTOR_LENGTH.into() {
+                        tracing::warn!(
+                            "[Arguments] Collect results count {} exceeded maximum of {}",
+                            vec.len(),
+                            fboot::MAX_ARGS_VECTOR_LENGTH
+                        );
+                        responder.control_handle().shutdown_with_epitaph(Status::INTERNAL);
+                    } else {
+                        responder.send(&mut vec.iter().map(|x| x.as_str()))?
+                    }
                 }
             }
         }
