@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Error};
+use anyhow::Error;
+use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
@@ -14,7 +15,7 @@ use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async as fasync;
-use fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path};
+use fuchsia_component::client::connect_to_protocol_at_path;
 use log::{Level, Log, Metadata, Record, SetLoggerError};
 /// Logger which prints levels at or below info to stdout and levels at or
 /// above warn to stderr.
@@ -59,14 +60,14 @@ impl Connector {
         &self,
         moniker: &str,
     ) -> Result<P::Proxy, Error> {
-        let resolved_dirs = self
-            .realm_query
-            .get_instance_directories(moniker)
-            .await?
-            .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
-            .ok_or(format_err!("{} is not resolved", moniker))?;
-        let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-        connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+        let moniker = moniker.try_into()?;
+        let proxy = connect_to_instance_protocol_at_dir_root::<P>(
+            &moniker,
+            OpenDirType::Exposed,
+            &self.realm_query,
+        )
+        .await?;
+        Ok(proxy)
     }
 }
 
