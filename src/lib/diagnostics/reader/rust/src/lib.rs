@@ -133,31 +133,6 @@ pub struct ArchiveReader {
 // Before unsealing this, consider whether your code belongs in this file.
 pub trait SerializableValue: private::Sealed {
     const FORMAT_OF_VALUE: Format;
-    fn flatten(datas: Vec<Self>) -> Self
-    where
-        Self: Sized;
-}
-
-macro_rules! define_fn_flatten_for_format {
-    ($($format:ident),*) => {
-        $(
-            paste::paste! {
-                fn flatten(datas: Vec<Self>) -> Self {
-                    let mut final_result = vec![];
-                    // Flatten the result.
-                    for data in datas {
-                        match data {
-                            [<serde_ $format>]::Value::Array(mut values) => {
-                                final_result.append(&mut values)
-                            }
-                            data => final_result.push(data),
-                        }
-                    }
-                    Self::Array(final_result)
-                }
-            }
-        )*
-    }
 }
 
 // The "sealed trait" pattern.
@@ -171,12 +146,10 @@ impl private::Sealed for serde_cbor::Value {}
 
 impl SerializableValue for serde_json::Value {
     const FORMAT_OF_VALUE: Format = Format::Json;
-    define_fn_flatten_for_format!(json);
 }
 
 impl SerializableValue for serde_cbor::Value {
     const FORMAT_OF_VALUE: Format = Format::Cbor;
-    define_fn_flatten_for_format!(cbor);
 }
 
 impl ArchiveReader {
@@ -281,18 +254,17 @@ impl ArchiveReader {
 
     /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
     /// Returns the raw json for each hierarchy fetched.
-    pub async fn snapshot_raw<D, T: SerializableValue>(&self) -> Result<T, Error>
+    pub async fn snapshot_raw<D, T>(&self) -> Result<T, Error>
     where
         D: DiagnosticsData,
-        T: for<'a> Deserialize<'a>,
+        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>>,
     {
         let data_future = self.snapshot_inner::<D, T>(T::FORMAT_OF_VALUE);
-        let datas = match self.timeout {
+        let data = match self.timeout {
             Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
             None => data_future.await?,
         };
-        let final_result = T::flatten(datas);
-        Ok(final_result)
+        Ok(T::from(data))
     }
 
     async fn snapshot_inner<D, T>(&self, format: Format) -> Result<Vec<T>, Error>
@@ -371,8 +343,8 @@ impl ArchiveReader {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum OneOrMany<T> {
-    One(T),
     Many(Vec<T>),
+    One(T),
 }
 
 async fn drain_batch_iterator<T, Fut>(
