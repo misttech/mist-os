@@ -27,6 +27,7 @@
 #include <fbl/auto_lock.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
+#include <phys/arch/arch-handoff.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -51,12 +52,7 @@
 // Static relocated base to prepare for KASLR. Used at early boot and by gdb
 // script to know the target relocated address.
 // TODO(fxbug.dev/24762): Choose it randomly.
-// TODO-rvbringup: undo needing to jam this on
-#if 1 || DISABLE_KASLR
-uint64_t kernel_relocated_base = KERNEL_BASE;
-#else
-uint64_t kernel_relocated_base = 0xffffffff10000000;
-#endif
+uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 
 // The main translation table for the kernel. Globally declared because it's reached
 // from assembly.
