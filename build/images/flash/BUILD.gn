@@ -37,13 +37,11 @@ bazel_input_resource("esp.bazel_input") {
 if (use_gigaboot) {
   flash_image_deps += [ ":esp" ]
 
-  esp_outputs = [ "${root_build_dir}/kernel.efi_${target_cpu}/fuchsia.esp.blk" ]
-
   firmware_info += [
     {
       name = "esp"
       partition = "fuchsia-esp"
-      out_path = rebase_path(esp_outputs[0], root_build_dir)
+      out_path = rebase_path(files.esp, root_build_dir)
     },
   ]
 }
