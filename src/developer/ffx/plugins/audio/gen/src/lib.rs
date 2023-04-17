@@ -4,12 +4,13 @@
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     errors::ffx_bail,
     ffx_audio_gen_args::{
         GenCommand, PinkNoiseCommand, SawtoothCommand, SineCommand, SquareCommand, SubCommand,
         TriangleCommand, WhiteNoiseCommand,
     },
-    ffx_core::ffx_plugin,
+    fho::{FfxMain, FfxTool, SimpleWriter},
     rand::{rngs::ThreadRng, thread_rng, Rng},
     std::{f64::consts::PI, io, io::Write, time::Duration},
 };
@@ -167,18 +168,27 @@ enum SignalType {
     PinkNoise,
 }
 
-#[ffx_plugin("audio")]
-pub async fn gen_cmd(cmd: GenCommand) -> Result<()> {
-    match cmd.subcommand {
-        SubCommand::Sine(cmd) => generate_signal(GenericSignal::from(cmd)).await?,
-        SubCommand::Square(cmd) => generate_signal(GenericSignal::from(cmd)).await?,
-        SubCommand::Sawtooth(cmd) => generate_signal(GenericSignal::from(cmd)).await?,
-        SubCommand::Triangle(cmd) => generate_signal(GenericSignal::from(cmd)).await?,
-        SubCommand::WhiteNoise(cmd) => generate_signal(GenericSignal::from(cmd)).await?,
-        SubCommand::PinkNoise(cmd) => generate_signal(GenericSignal::from(cmd)).await?,
-    }
+#[derive(FfxTool)]
+pub struct GenTool {
+    #[command]
+    cmd: GenCommand,
+}
+fho::embedded_plugin!(GenTool);
+#[async_trait(?Send)]
+impl FfxMain for GenTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let res = match self.cmd.subcommand {
+            SubCommand::Sine(cmd) => generate_signal(GenericSignal::from(cmd)).await,
+            SubCommand::Square(cmd) => generate_signal(GenericSignal::from(cmd)).await,
+            SubCommand::Sawtooth(cmd) => generate_signal(GenericSignal::from(cmd)).await,
+            SubCommand::Triangle(cmd) => generate_signal(GenericSignal::from(cmd)).await,
+            SubCommand::WhiteNoise(cmd) => generate_signal(GenericSignal::from(cmd)).await,
+            SubCommand::PinkNoise(cmd) => generate_signal(GenericSignal::from(cmd)).await,
+        };
 
-    Ok(())
+        res.map_err(Into::into)
+    }
 }
 
 async fn generate_signal(cmd: GenericSignal) -> Result<()> {

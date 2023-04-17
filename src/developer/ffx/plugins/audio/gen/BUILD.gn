@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_audio_gen") {
   version = "0.1.0"
@@ -18,8 +19,10 @@ ffx_plugin("ffx_audio_gen") {
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:hound",
     "//third_party/rust_crates:rand",
   ]
