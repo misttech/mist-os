@@ -29,6 +29,7 @@ type config struct {
 	afterTestScript      string
 	useFlash             bool
 	downgradeOTAAttempts uint
+	bootfsCompression    string
 }
 
 func newConfig(fs *flag.FlagSet) (*config, error) {
@@ -59,7 +60,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.StringVar(&c.afterTestScript, "after-test-script", "", "Run this script after a test step")
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
 	fs.UintVar(&c.downgradeOTAAttempts, "downgrade-ota-attempts", 1, "Number of times to try to OTA from the downgrade build to the upgrade build before failing.")
-
+	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd", "compress storage images, default is zstd")
 	return c, nil
 }
 

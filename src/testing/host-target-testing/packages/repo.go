@@ -350,6 +350,7 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 	systemImageMerkle string,
 	srcUpdatePackagePath string,
 	dstUpdatePackagePath string,
+	bootfsCompression string,
 	editFunc func(path string) error) (Package, error) {
 	return r.EditUpdatePackage(ctx,
 		avbTool, zbiTool,
@@ -357,7 +358,7 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 		dstUpdatePackagePath,
 		"testrepository",
 		func(tempDir string) error {
-			if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(ctx, systemImageMerkle, tempDir); err != nil {
+			if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(ctx, systemImageMerkle, tempDir, bootfsCompression); err != nil {
 				return err
 			}
 			return editFunc(tempDir)

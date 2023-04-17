@@ -40,11 +40,6 @@ func NewZBIToolWithStdout(zbiToolPath string, stdout io.Writer) (*ZBITool, error
 }
 
 func (z *ZBITool) MakeImageArgsZbi(ctx context.Context, destPath string, imageArgs map[string]string) error {
-	path, err := exec.LookPath(z.zbiToolPath)
-	if err != nil {
-		return err
-	}
-
 	imageArgsFile, err := os.CreateTemp("", "")
 	if err != nil {
 		return err
@@ -65,15 +60,7 @@ func (z *ZBITool) MakeImageArgsZbi(ctx context.Context, destPath string, imageAr
 		imageArgsFile.Name(),
 	}
 
-	logger.Infof(ctx, "running: %s %q", path, args)
-	cmd := exec.CommandContext(ctx, path, args...)
-	if z.stdout != nil {
-		cmd.Stdout = z.stdout
-	} else {
-		cmd.Stdout = os.Stdout
-	}
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return z.RunZbiCommand(ctx, args)
 }
 
 // Create new ZBI with the system image merkle provided:
@@ -83,7 +70,10 @@ func (z *ZBITool) MakeImageArgsZbi(ctx context.Context, destPath string, imageAr
 // * create zbi manifest to generate new bootfs and zbi
 // * generate new bootfs
 // * generate new zbi under tempDir
-func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context, systemImageMerkle string, pkgDir string) error {
+func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context,
+	systemImageMerkle string,
+	pkgDir string,
+	bootfsCompression string) error {
 
 	// Create zbitemp directory to store the overwritten zbi
 	tempDirForNewZbi, err := os.MkdirTemp("", "")
@@ -108,7 +98,7 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context, systemI
 	// Extract bootfs from the zbi extractted from step above
 	zbiFiles, err := ioutil.ReadDir(pathToZbiDir)
 	if err != nil {
-		return fmt.Errorf("failed to read zbi directory from %s: %q", pathToZbiDir, err)
+		return fmt.Errorf("fialed to read zbi directory from %s: %q", pathToZbiDir, err)
 	}
 
 	pathToZbiBootfs := ""
@@ -185,6 +175,7 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context, systemI
 	args = []string{
 		"--output",
 		pathToSrcZbi,
+		"--compressed=" + bootfsCompression,
 	}
 	for _, file := range zbiFiles {
 		if !strings.HasSuffix(file.Name(), ".bootfs.zbi") {
@@ -194,7 +185,11 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context, systemI
 		}
 	}
 
-	return z.RunZbiCommand(ctx, args)
+	if err := z.RunZbiCommand(ctx, args); err != nil {
+		return fmt.Errorf("failed to extract zbi %q", err)
+	}
+
+	return nil
 }
 
 func (z *ZBITool) RunZbiCommand(ctx context.Context, args []string) error {
