@@ -522,6 +522,10 @@ bool MsdArmConnection::UpdateCommittedMemory(GpuMapping* mapping) __TA_NO_THREAD
 }
 
 bool MsdArmConnection::PageInMemory(uint64_t address) {
+  // The last buffer reference can't be dropped while holding `address_lock_`, since that will call
+  // `RemoveMapping`, which grabs `address_lock_`. Declare `buffer` before the lock guard to prevent
+  // that from happening.
+  std::shared_ptr<MsdArmBuffer> buffer;
   std::lock_guard<std::mutex> lock(address_lock_);
   if (gpu_mappings_.empty())
     return false;
@@ -532,7 +536,7 @@ bool MsdArmConnection::PageInMemory(uint64_t address) {
   --it;
   GpuMapping& mapping = *it->second.get();
   DASSERT(address >= mapping.gpu_va());
-  auto buffer = mapping.buffer().lock();
+  buffer = mapping.buffer().lock();
   DASSERT(buffer);
 
   if (address >= mapping.gpu_va() + mapping.size()) {
