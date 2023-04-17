@@ -11,6 +11,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
+#include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fidl/cpp/wire/async_binding.h>
@@ -34,7 +35,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-#include "dw-mipi-dsi-reg.h"
+#include "src/graphics/display/drivers/dsi-dw/dw-mipi-dsi-reg.h"
 
 #define DSI_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define DSI_INFO(fmt, ...) zxlogf(INFO, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
@@ -52,8 +53,14 @@ using DeviceTypeBase =
     ddk::Device<DsiDwBase, ddk::Messageable<fuchsia_hardware_dsi::DsiBase>::Mixin>;
 class DsiDwBase : public DeviceTypeBase, public ddk::EmptyProtocol<ZX_PROTOCOL_DSI_BASE> {
  public:
-  DsiDwBase(zx_device_t* parent, DsiDw* dsidw) : DeviceTypeBase(parent), dsidw_(dsidw) {}
-  zx_status_t Bind();
+  DsiDwBase(zx_device_t* parent, DsiDw* dsidw);
+
+  DsiDwBase(const DsiDwBase&) = delete;
+  DsiDwBase(DsiDwBase&&) = delete;
+  DsiDwBase& operator=(const DsiDwBase&) = delete;
+  DsiDwBase& operator=(DsiDwBase&&) = delete;
+
+  ~DsiDwBase() override;
 
   // FIDL
   void SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& _completer) override;
@@ -68,12 +75,19 @@ using DeviceType = ddk::Device<DsiDw>;
 
 class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_protocol> {
  public:
-  DsiDw(zx_device_t* parent) : DeviceType(parent) {}
+  // Factory method called by the device manager binding code.
+  static zx_status_t Create(zx_device_t* parent);
 
-  // This function is called from the c-bind function upon driver matching
-  zx_status_t Bind();
+  explicit DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio);
 
-  // Part of ZX_DSIIMPL_PROTOCOL
+  DsiDw(const DsiDw&) = delete;
+  DsiDw(DsiDw&&) = delete;
+  DsiDw& operator=(const DsiDw&) = delete;
+  DsiDw& operator=(DsiDw&&) = delete;
+
+  ~DsiDw();
+
+  // DsiImplProtocol implementation:
   zx_status_t DsiImplConfig(const dsi_config_t* dsi_config);
   void DsiImplPowerUp();
   void DsiImplPowerDown();
@@ -91,6 +105,7 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
   zx_status_t DsiImplReadReg(uint32_t reg, uint32_t* val);
   zx_status_t DsiImplEnableBist(uint32_t pattern);
 
+  // ddk::Device implementation:
   void DdkRelease();
 
  private:

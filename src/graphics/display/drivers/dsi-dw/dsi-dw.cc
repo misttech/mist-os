@@ -2,13 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "dsi-dw.h"
+#include "src/graphics/display/drivers/dsi-dw/dsi-dw.h"
 
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
+#include <lib/mmio/mmio.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <memory>
+#include <optional>
 
 #include <ddk/metadata/display.h>
 #include <ddktl/fidl.h>
@@ -49,24 +56,17 @@ constexpr uint32_t kBitCmdEmpty = 0;
 
 }  // namespace
 
-// DsiDwBase Functions
-zx_status_t DsiDwBase::Bind() {
-  auto status = DdkAdd("dw-dsi-base", DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
-  if (status != ZX_OK) {
-    DSI_ERROR("Could not add device (%d)", status);
-    return status;
-  }
-  return status;
-}
+DsiDwBase::DsiDwBase(zx_device_t* parent, DsiDw* dsidw) : DeviceTypeBase(parent), dsidw_(dsidw) {}
+
+DsiDwBase::~DsiDwBase() = default;
 
 void DsiDwBase::SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& _completer) {
-  zx_status_t status = ZX_OK;
   // TODO(payamm): We don't support READ at the moment. READ is complicated because it consumes
   // additional cycles required to get info from the LCD. This may cause issues if the command is
   // issued during the last line of a frame. If we want to support READ, we would want to properly
   // stop VIDEO, switch to COMMAND mode and perform the read. For now, we will not support it.
   fidl::VectorView<uint8_t> rsp_data(nullptr, 0);
-  status = dsidw_->SendCommand(request->cmd, request->txdata, rsp_data);
+  zx_status_t status = dsidw_->SendCommand(request->cmd, request->txdata, rsp_data);
   if (status != ZX_OK) {
     _completer.ReplyError(status);
   }
@@ -74,6 +74,14 @@ void DsiDwBase::SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& _com
 }
 
 void DsiDwBase::DdkRelease() { delete this; }
+
+DsiDw::DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio)
+    : DeviceType(parent), dsi_mmio_(std::move(mmio)) {
+  last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value();
+  DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
+}
+
+DsiDw::~DsiDw() = default;
 
 zx_status_t DsiDw::DsiImplWriteReg(uint32_t reg, uint32_t val) {
   // TODO(payamm): Verify register offset is valid
@@ -877,64 +885,66 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
 
 void DsiDw::DdkRelease() { delete this; }
 
-zx_status_t DsiDw::Bind() {
-  ddk::PDevFidl pdev{parent_};
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "aml-thermal: failed to get platform device");
+// static
+zx_status_t DsiDw::Create(zx_device_t* parent) {
+  zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "Failed to get platform device: %s", pdev_result.status_string());
     return ZX_ERR_INTERNAL;
   }
 
-  // Map DSI registers
-  if (zx_status_t status = pdev.MapMmio(0, &dsi_mmio_); status != ZX_OK) {
-    DSI_ERROR("Could not map DSI mmio (%d)\n", status);
+  ddk::PDevFidl pdev = std::move(pdev_result).value();
+
+  std::optional<fdf::MmioBuffer> dsi_mmio;
+  if (zx_status_t status = pdev.MapMmio(0, &dsi_mmio); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map MMIO registers: %s", zx_status_get_string(status));
     return status;
   }
+  ZX_ASSERT_MSG(dsi_mmio.has_value(),
+                "PDevFidl::MapMmio() succeeded but didn't populate out-param");
 
-  last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value();
-  DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
-
-  if (zx_status_t status = DdkAdd("dw-dsi"); status != ZX_OK) {
-    DSI_ERROR("could not add device %d\n", status);
-  }
-
-  fbl::AllocChecker ac;
-  std::unique_ptr<DsiDwBase> dw_base = fbl::make_unique_checked<DsiDwBase>(&ac, zxdev_, this);
-  if (!ac.check()) {
-    DSI_ERROR("Could not create DsiDwBase");
+  fbl::AllocChecker alloc_checker;
+  auto dsi_dw =
+      fbl::make_unique_checked<DsiDw>(&alloc_checker, parent, std::move(dsi_mmio).value());
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (zx_status_t status = dw_base->Bind(); status != ZX_OK) {
-    DSI_ERROR("Dsi Base Initialization failed (%d)", status);
+  zx_status_t status = dsi_dw->DdkAdd("dw-dsi");
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add dw-dsi device: %s", zx_status_get_string(status));
     return status;
   }
-  [[maybe_unused]] auto ptr = dw_base.release();
+  // devmgr now owns the memory for `dsi_dw`
+  DsiDw* const dsi_dw_ptr = dsi_dw.release();
+
+  auto dsi_dw_base =
+      fbl::make_unique_checked<DsiDwBase>(&alloc_checker, dsi_dw_ptr->zxdev(), dsi_dw_ptr);
+  if (!alloc_checker.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  status = dsi_dw_base->DdkAdd("dw-dsi-base", DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
+  if (status != ZX_OK) {
+    DSI_ERROR("Failed to add dw-dsi-base device: %s", zx_status_get_string(status));
+    return status;
+  }
+  // devmgr now owns the memory for `dsi_dw_base`
+  [[maybe_unused]] DsiDwBase* dw_base_ptr = dsi_dw_base.release();
+
   return ZX_OK;
 }
 
-// main bind function called from dev manager
-zx_status_t dsi_dw_bind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<dsi_dw::DsiDw>(&ac, parent);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  auto status = dev->Bind();
-  if (status == ZX_OK) {
-    // devmgr is now in charge of the memory for dev
-    [[maybe_unused]] auto ptr = dev.release();
-  }
-  return status;
-}
+namespace {
 
-static constexpr zx_driver_ops_t dsi_dw_ops = [] {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = dsi_dw_bind;
-  return ops;
-}();
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = [](void* ctx, zx_device_t* parent) { return DsiDw::Create(parent); },
+};
+
+}  // namespace
 
 }  // namespace dsi_dw
 
 // clang-format off
-ZIRCON_DRIVER(dsi_dw, dsi_dw::dsi_dw_ops, "zircon", "0.1");
+ZIRCON_DRIVER(dsi_dw, dsi_dw::kDriverOps, "zircon", "0.1");
