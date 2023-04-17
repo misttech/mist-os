@@ -283,15 +283,21 @@ fpromise::promise<void> Device::SuspendOp(fdm::SystemPowerState state) {
 }
 
 void Device::CompleteUnbind() {
-  // Remove ourself from devfs.
-  devfs_connector_.reset();
+  auto task = fpromise::make_ok_promise()
+                  .and_then([this]() mutable {
+                    // Remove ourself from devfs.
+                    devfs_connector_.reset();
 
-  // Our unbind is finished, so close all outstanding connections to devfs clients.
-  devfs_server_.CloseAllConnections([this]() {
-    // Now call our unbind completer.
-    ZX_ASSERT(unbind_completer_);
-    unbind_completer_.complete_ok();
-  });
+                    // Our unbind is finished, so close all outstanding connections to devfs
+                    // clients.
+                    devfs_server_.CloseAllConnections([this]() {
+                      // Now call our unbind completer.
+                      ZX_ASSERT(unbind_completer_);
+                      unbind_completer_.complete_ok();
+                    });
+                  })
+                  .wrap_with(scope_);
+  executor_.schedule_task(std::move(task));
 }
 
 void Device::CompleteSuspend() {
