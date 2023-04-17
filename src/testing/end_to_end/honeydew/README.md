@@ -124,6 +124,93 @@ True
 >>> del emu
 ```
 
+## HoneyDew code guidelines
+### Python Style Guide
+HoneyDew code follows [Google Python Style Guide] and it is important to ensure
+any new code written continue to follow these guidelines.
+
+At this point, we do not have an automated way (in CQ) for identifying this and
+alerting the CL author prior to submitting the CL. Until then CL author need to
+follow the below instructions every time HoneyDew code is changed:
+
+#### linting
+* Ensure code is [pylint] compliant
+* `pylint` module is not yet available under [Fuchsia third-party]. So for the
+  time being you need to [pip] install `pylint` inside a
+  [python virtual environment] (activate virtual environment and run
+  `pip install pylint`) or at system level (`pip install --user pylint`)
+* Verify `pylint` is properly installed by running `pylint --help`
+* Run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+
+#### type-checking
+* Ensure code is [mypy] and [pytype] compliant
+* For `mypy`,
+  * `mypy` module is not yet available under [Fuchsia third-party]. So for the
+    time being you need to [pip] install `mypy` inside a
+    [python virtual environment] (activate virtual environment and run
+    `pip install mypy`) or at system level (`pip install --user mypy`)
+  * Verify `mypy` is properly installed by running `mypy --help`
+  * Run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+* For `pytype`,
+  * `pytype` module is not yet available under [Fuchsia third-party]. So for the
+    time being you need to [pip] install `pytype` inside a
+    [python virtual environment] (activate virtual environment and run
+    `pip install pytype`) or at system level (`pip install --user pytype`)
+  * Verify `pytype` is properly installed by running `pytype --help`
+  * Run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+
+### Code Coverage
+It is a hard requirement that HoneyDew code is well tested using a combination
+of unit and functional tests.
+
+Broadly this is how we can define the scope of each tests:
+* Unit test cases
+  * Tests individual code units (such as functions) in isolation from the rest
+    of the system by mocking all of the dependencies.
+  * Makes it easy to test different error conditions, corner cases etc
+  * Minimum of 80% of HoneyDew code is tested using these unit tests
+* Functional test cases
+  * Aims to ensure that a given API works as intended and indeed does what it is
+    supposed to do (that is, `<device>.reboot()` actually reboots Fuchsia
+    device) which can’t be ensured using unit test cases
+  * Every single HoneyDew’s Host-(Fuchsia)Target interaction API should have at
+    least one functional test case
+
+We use [coverage] tool for measuring 80% code coverage requirement of HoneyDew.
+
+At this point, we do not have an automated way (in CQ) for identifying this and
+alerting the CL author prior to submitting the CL. Until then CL author need to
+follow the below instructions every time HoneyDew code is changed:
+
+* `coverage` module is not yet available under [Fuchsia third-party]. So for the
+  time being you need to [pip] install `coverage` inside a
+  [python virtual environment] (activate virtual environment and run
+  `pip install coverage`) or at system level
+  (`pip install --user coverage`)
+* Verify `coverage` is properly installed by running `coverage --help`
+* Install all the dependencies of HoneyDew unit test code which you can find out
+  from [unit tests BUILD.gn] file
+  * At this point, it is just `parameterized` module.
+  * So [pip] install `parameterized` inside a [python virtual environment]
+    (activate virtual environment and run `pip install parameterized`) or at
+    system level (`pip install --user parameterized`)
+  * Verify `parameterized` is properly installed by running
+    `pip3 show parameterized`
+* Run the below commands sequence
+```sh
+# For coverage to identify `honeydew` code as it is not pip installer
+$ export PYTHONPATH="${PYTHONPATH}:${FUCHSIA_DIR}/src/testing/end_to_end"
+
+# CD to HoneyDew tests directory
+$ cd ${FUCHSIA_DIR}/src/testing/end_to_end/honeydew/tests
+
+# Run unit tests using coverage tool which will run the tests
+$ coverage run -m unittest discover --top-level-directory ~/fuchsia/src/testing/end_to_end/honeydew --start-directory ~/fuchsia/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"
+
+# Run below command to generate code coverage stats
+$ coverage report -m
+```
+
 ## Contributing
 One of the primary goal while designing HoneyDew was to make it easy to
 contribute for anyone working on Host-(Fuchsia)Target interactions.
@@ -154,17 +241,16 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
   * ensure [functional tests README] has the instructions to run this new test
   * ensure this new test is included in `group("tests")` section in the
     [top level HoneyDew functional tests BUILD] file
-* Ensure code is [pylint], [mypy] and [pytype] compatible
-  * Install `pylint`, `mypy` and `pytype` inside virtual environment or at system level
-  * For `pylint`, you can either enable it in your IDE or
-    run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
-  * For `mypy`, you can either enable it in your IDE or
-    run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
-  * For `pytype`, you can run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+* Ensure code is meeting all the
+  [HoneyDew code guidelines](#honeydew-code-guidelines) by sharing a proof
+  (output) with CL reviewers (until CQ/Pre-Submit is updated to automatically
+  check this)
+* Please run any impacted functional tests locally and share the test output
+with the CL reviewers
 * At least one of the [HoneyDew OWNERS] should be added as a reviewer
-  * Please run any impacted functional tests locally and share the test output
-    with the CL reviewers
-  * Please share `pylint`, `mypy` and `pytype` output with the CL reviewers
+* CL reviewers to make sure CL author has shared all the necessary output (as
+  mentioned above) that was run using the latest patchset before approving the
+  CL
 
 [HoneyDew OWNERS]: ../OWNERS
 
@@ -173,6 +259,8 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 [unit tests]: tests/unit_tests/
 
 [unit tests README]: tests/unit_tests/README.md
+
+[unit tests BUILD.gn]: tests/unit_tests/BUILD.gn#10
 
 [top level HoneyDew unit tests BUILD]: tests/unit_tests/BUILD.gn
 
@@ -199,3 +287,13 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 [vscode extensions]: vscode/extensions.json
 
 [vscode settings]: vscode/settings.json
+
+[Google Python Style Guide]: https://google.github.io/styleguide/pyguide.html
+
+[Fuchsia third-party]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/
+
+[python virtual environment]: https://realpython.com/python-virtual-environments-a-primer/
+
+[coverage]: https://coverage.readthedocs.io/
+
+[pip]: https://pip.pypa.io/en/stable/
