@@ -175,6 +175,7 @@ fn get_suitable_dhcpv6_prefix(
             });
         match config {
             crate::InterfaceConfigState::Host(crate::HostInterfaceState {
+                dhcpv4_client: _,
                 dhcpv6_client_state,
                 dhcpv6_pd_config: _,
             }) => {
@@ -204,6 +205,7 @@ fn get_suitable_dhcpv6_prefix(
         .filter_map(|(interface_id, crate::InterfaceState { config, device_class, control: _ })| {
             let prefixes = match config {
                 crate::InterfaceConfigState::Host(crate::HostInterfaceState {
+                    dhcpv4_client: _,
                     dhcpv6_client_state,
                     dhcpv6_pd_config: _,
                 }) => {
@@ -387,6 +389,7 @@ mod tests {
             Self {
                 control,
                 config: InterfaceConfigState::Host(HostInterfaceState {
+                    dhcpv4_client: None,
                     dhcpv6_client_state,
                     dhcpv6_pd_config,
                 }),
