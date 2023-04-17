@@ -428,7 +428,7 @@ void MdnsImpl::PublishInstance(const std::string& instance_name, const std::stri
     title = instance_full_name;
     auto iter =
         service_instance_publication_responders_by_instance_full_name_.find(instance_full_name);
-    if (iter == service_instance_publication_responders_by_instance_full_name_.end()) {
+    if (iter != service_instance_publication_responders_by_instance_full_name_.end()) {
       std::cout << Command::kPublish << " " << title << " failed: already published\n";
       return;
     }

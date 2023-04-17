@@ -773,6 +773,8 @@ bool CommandParser::MatchDigit(uint8_t& value_out) {
   }
 
   value_out = *remaining_chars() - '0';
+  ConsumeChars(1);
+
   return true;
 }
 
@@ -820,7 +822,7 @@ void Command::ShowHelp(CommandVerb command_verb) {
       std::cout << "\n";
       std::cout << "resolve <instance name>\n";
       std::cout << "    resolves a service instance\n";
-      std::cout << "    <instance name>: instance.service including `.tcp_.` or `.udp_.` suffix\n";
+      std::cout << "    <instance name>: instance.service including `._tcp.` or `._udp.` suffix\n";
       std::cout << "    --timeout=<seconds>                   default: '3'\n";
       std::cout << "    --media=<media>                       default: `wired,wireless`\n";
       std::cout << "    --ip-versions=<versions>              default: `4,6`\n";
@@ -839,7 +841,7 @@ void Command::ShowHelp(CommandVerb command_verb) {
       std::cout << "\n";
       std::cout << "subscribe <service name>\n";
       std::cout << "    subscribes to a service\n";
-      std::cout << "    <service name>: name of service including `.tcp_.` or `.udp_.` suffix\n";
+      std::cout << "    <service name>: name of service including `._tcp.` or `._udp.` suffix\n";
       std::cout << "    --media=<media>                       default: `wired,wireless`\n";
       std::cout << "    --ip-versions=<versions>              default: `4,6`\n";
       std::cout << "    --exclude-local=<true|false>          default: `false`\n";
@@ -864,7 +866,7 @@ void Command::ShowHelp(CommandVerb command_verb) {
       std::cout << "\n";
       std::cout << "publish <instance name> <port> <text>*\n";
       std::cout << "    publishes to a service instance\n";
-      std::cout << "    <instance name>: instance.service including `.tcp_.` or `.udp_.` suffix\n";
+      std::cout << "    <instance name>: instance.service including `._tcp.` or `._udp.` suffix\n";
       std::cout << "    <port>: port number (decimal)\n";
       std::cout << "    <text>: text string (in single or double quotes)\n";
       std::cout << "    --probe=<true|false>                  default: `true`\n";
@@ -885,7 +887,7 @@ void Command::ShowHelp(CommandVerb command_verb) {
       std::cout << "\n";
       std::cout << "unsubscribe <service name>\n";
       std::cout << "    cancels 'subscribe <service name>'\n";
-      std::cout << "    <service name>: name of service including `.tcp_.` or `.udp_.` suffix\n";
+      std::cout << "    <service name>: name of service including `._tcp.` or `._udp.` suffix\n";
       std::cout << "\n";
       std::cout << "unsubscribe all\n";
       std::cout << "    cancels 'subscribe all'\n";
@@ -898,7 +900,7 @@ void Command::ShowHelp(CommandVerb command_verb) {
       std::cout << "\n";
       std::cout << "unpublish <instance name>\n";
       std::cout << "    cancels `publish <instance name> ...`\n";
-      std::cout << "    <instance name>: instance.service including `.tcp_.` or `.udp_.` suffix\n";
+      std::cout << "    <instance name>: instance.service including `._tcp.` or `._udp.` suffix\n";
       std::cout << "    --proxy-host=<host name>              default: none (local)\n";
       break;
     case CommandVerb::kHelp:
