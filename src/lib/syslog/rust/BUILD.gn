@@ -45,9 +45,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/sys/pkg/bin/system-updater:*",
 ]
 
-# At this time we are not enforcing restrictions on the below.
-rust_fuchsia_syslog_visibility_allowlist += [ "//third_party/*" ]
-
 group("rust") {
   deps = [ ":syslog" ]
   visibility =
