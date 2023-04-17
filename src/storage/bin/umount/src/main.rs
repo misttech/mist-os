@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, format_err, Context, Error},
+    anyhow::{anyhow, Context, Error},
     argh::FromArgs,
+    component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType},
     fidl_fuchsia_fs_realm::ControllerMarker,
     fidl_fuchsia_sys2::RealmQueryMarker,
-    fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path},
+    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon as zx,
     std::path::Path,
 };
@@ -42,20 +43,16 @@ async fn main() -> Result<(), Error> {
 
     // Connect to fs_realm
     const REALM_QUERY_SERVICE_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";
-    const FS_REALM_MONIKER: &str = "./core/fs_realm";
-
     let realm_query_proxy =
         connect_to_protocol_at_path::<RealmQueryMarker>(REALM_QUERY_SERVICE_PATH)?;
+    let moniker = "./core/fs_realm".try_into().unwrap();
+    let fs_realm_proxy = connect_to_instance_protocol_at_dir_root::<ControllerMarker>(
+        &moniker,
+        OpenDirType::Exposed,
+        &realm_query_proxy,
+    )
+    .await?;
 
-    let resolved_dirs = realm_query_proxy
-        .get_instance_directories(FS_REALM_MONIKER)
-        .await?
-        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
-        .ok_or(format_err!("{} is not resolved", FS_REALM_MONIKER))?;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-
-    let fs_realm_proxy = connect_to_protocol_at_dir_root::<ControllerMarker>(&exposed_dir)
-        .context("Failed to connect to fuchsia.fs.realm.Controller")?;
     fs_realm_proxy
         .unmount(filename_str)
         .await
