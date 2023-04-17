@@ -136,8 +136,9 @@ high-quality RFC by prompting you to think through the problem you are trying to
 solve in a semi-structured way.
 
 Do not worry about assigning a number to your RFC at this stage. Instead, use
-`NNNN` as a placeholder. For example, the file name should be something like
-`NNNN_my_idea.md`. The RFC will get a number shortly before landing.
+`0000` as a placeholder. For example, the file name should be something like
+`0000_my_idea.md`. The RFC will get a number once it is approved or rejected,
+before landing.
 
 > *Suggestion.* Consider marking the CL containing your RFC as a
 > "work-in-progress" until you are ready for feedback.
@@ -303,4 +304,3 @@ existing processes:
    similar process [to make decisions about the FIDL
    language](/docs/contribute/governance/deprecated-ftp-process.md). This
    proposal exists because of the success of that decision-making process.
-
