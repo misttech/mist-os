@@ -14,6 +14,7 @@ use futures::{future::TryFutureExt as _, stream::Stream};
 pub enum DnsServersUpdateSource {
     Default,
     Netstack,
+    Dhcpv4 { interface_id: u64 },
     Dhcpv6 { interface_id: u64 },
 }
 

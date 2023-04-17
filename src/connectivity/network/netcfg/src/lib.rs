@@ -763,6 +763,13 @@ impl<'a> NetCfg<'a> {
             DnsServersUpdateSource::Default => {
                 panic!("should not have a DNS server watcher for the default source");
             }
+            DnsServersUpdateSource::Dhcpv4 { interface_id } => {
+                unreachable!(
+                    "DHCPv4 configurations are not obtained through DNS server watcher; \
+                     interface_id={}",
+                    interface_id,
+                )
+            }
             DnsServersUpdateSource::Netstack => Ok(()),
             DnsServersUpdateSource::Dhcpv6 { interface_id } => {
                 let InterfaceState { config, control: _, device_class: _ } = self
