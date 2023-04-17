@@ -144,6 +144,11 @@ pub struct RunArgs {
     #[argh(switch, short = 'r')]
     /// destroy and recreate the component instance if it already exists
     pub recreate: bool,
+
+    #[argh(switch)]
+    /// connect stdin, stdout, and stderr to the component (requires component
+    /// to be in a collection with single_run durability)
+    pub connect_stdio: bool,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]

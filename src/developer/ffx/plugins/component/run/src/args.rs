@@ -40,4 +40,9 @@ pub struct RunComponentCommand {
     #[argh(switch, short = 'f')]
     /// start printing logs from the started component after it has started
     pub follow_logs: bool,
+
+    #[argh(switch)]
+    /// connect stdin, stdout, and stderr to the component (requires component
+    /// to be in a collection with single_run durability)
+    pub connect_stdio: bool,
 }

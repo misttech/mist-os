@@ -22,9 +22,16 @@ pub async fn cmd(
     let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
 
     // All errors from component_debug library are user-visible.
-    run_cmd(args.moniker.clone(), args.url, args.recreate, lifecycle_controller, std::io::stdout())
-        .await
-        .map_err(|e| FfxError::Error(e, 1))?;
+    run_cmd(
+        args.moniker.clone(),
+        args.url,
+        args.recreate,
+        args.connect_stdio,
+        lifecycle_controller,
+        std::io::stdout(),
+    )
+    .await
+    .map_err(|e| FfxError::Error(e, 1))?;
 
     if args.follow_logs {
         let log_filter = args.moniker.strip_prefix("/").unwrap().to_string();

@@ -74,6 +74,7 @@ pub async fn create_instance_in_collection(
     collection: &str,
     child_name: &str,
     url: &AbsoluteComponentUrl,
+    child_args: Option<fcomponent::CreateChildArgs>,
 ) -> Result<(), CreateError> {
     let mut collection_ref = fdecl::CollectionRef { name: collection.to_string() };
     let decl = fdecl::Child {
@@ -89,7 +90,7 @@ pub async fn create_instance_in_collection(
             &parent.to_string(),
             &mut collection_ref,
             decl,
-            fcomponent::CreateChildArgs::EMPTY,
+            child_args.unwrap_or(fcomponent::CreateChildArgs::EMPTY),
         )
         .await
         .map_err(|e| ActionError::Fidl(e))?
@@ -231,7 +232,8 @@ pub async fn unresolve_instance(
 mod test {
     use {
         super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
-        futures::TryStreamExt, moniker::RelativeMonikerBase,
+        fidl::HandleBased, fidl_fuchsia_process as fprocess, futures::TryStreamExt,
+        moniker::RelativeMonikerBase,
     };
 
     fn lifecycle_create_instance(
@@ -239,6 +241,7 @@ mod test {
         expected_collection: &'static str,
         expected_name: &'static str,
         expected_url: &'static str,
+        expected_numbered_handle_count: usize,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
             create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
@@ -249,6 +252,7 @@ mod test {
                     parent_moniker,
                     collection,
                     decl,
+                    args,
                     responder,
                     ..
                 } => {
@@ -256,6 +260,10 @@ mod test {
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
+                    assert_eq!(
+                        expected_numbered_handle_count,
+                        args.numbered_handles.unwrap_or(vec![]).len()
+                    );
                     responder.send(&mut Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -407,8 +415,34 @@ mod test {
             "foo",
             "bar",
             "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
+            0,
         );
-        create_instance_in_collection(&lc, &parent, "foo", "bar", &url).await.unwrap();
+        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, None).await.unwrap();
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_child_with_numbered_handles() {
+        let parent = RelativeMoniker::parse_str("./core").unwrap();
+        let url =
+            AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
+        let lc = lifecycle_create_instance(
+            "./core",
+            "foo",
+            "bar",
+            "fuchsia-pkg://fuchsia.com/test#meta/test.cm",
+            2,
+        );
+        let (left, right) = fidl::Socket::create_stream();
+        let child_args = fcomponent::CreateChildArgs {
+            numbered_handles: Some(vec![
+                fprocess::HandleInfo { handle: left.into_handle(), id: 0x10 },
+                fprocess::HandleInfo { handle: right.into_handle(), id: 0x11 },
+            ]),
+            ..fcomponent::CreateChildArgs::EMPTY
+        };
+        create_instance_in_collection(&lc, &parent, "foo", "bar", &url, Some(child_args))
+            .await
+            .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -417,8 +451,9 @@ mod test {
         let url =
             AbsoluteComponentUrl::parse("fuchsia-pkg://fuchsia.com/test#meta/test.cm").unwrap();
         let lc = lifecycle_create_fail(fsys::CreateError::InstanceAlreadyExists);
-        let err =
-            create_instance_in_collection(&lc, &parent, "foo", "bar", &url).await.unwrap_err();
+        let err = create_instance_in_collection(&lc, &parent, "foo", "bar", &url, None)
+            .await
+            .unwrap_err();
         assert_matches!(err, CreateError::InstanceAlreadyExists);
     }
 

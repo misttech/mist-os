@@ -57,7 +57,15 @@ pub async fn exec() -> Result<()> {
             graph_cmd(args.filter, args.orientation, realm_query, writer).await
         }
         ComponentSubcommand::Run(args) => {
-            run_cmd(args.moniker, args.url, args.recreate, lifecycle_controller, writer).await
+            run_cmd(
+                args.moniker,
+                args.url,
+                args.recreate,
+                args.connect_stdio,
+                lifecycle_controller,
+                writer,
+            )
+            .await
         }
         ComponentSubcommand::Copy(args) => copy_cmd(&realm_query, args.paths, args.verbose).await,
         ComponentSubcommand::Storage(args) => match args.subcommand {
