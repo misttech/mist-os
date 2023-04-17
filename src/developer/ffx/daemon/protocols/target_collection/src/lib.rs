@@ -88,6 +88,7 @@ async fn add_manual_target(
     addr: SocketAddr,
     lifetime: Option<Duration>,
 ) -> Rc<Target> {
+    tracing::debug!("Adding manual targets, addr: {addr:?}");
     // Expiry is the SystemTime (represented as seconds after the UNIX_EPOCH) at which a manual
     // target is allowed to expire and enter the Disconnected state. If no lifetime is given,
     // the target is allowed to persist indefinitely. This is persisted in FFX config.
@@ -522,9 +523,9 @@ impl FidlProtocol for TargetCollectionProtocol {
 #[tracing::instrument(skip(tc))]
 fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget) {
     if let Some(ref serial) = target.serial {
-        tracing::trace!("Found new target via fastboot: {}", serial);
+        tracing::debug!("Found new target via fastboot: {}", serial);
     } else {
-        tracing::trace!("Fastboot target has no serial number. Not able to merge.");
+        tracing::debug!("Fastboot target has no serial number. Not able to merge.");
         return;
     }
     let t = TargetInfo { serial: target.serial, ..Default::default() };
@@ -539,6 +540,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
 
 #[tracing::instrument(skip(tc))]
 fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Option<Rc<Target>> {
+    tracing::debug!("Discovered target {t:?}");
     let ssh_address = t.ssh_address;
     let mut t = TargetInfo {
         nodename: t.nodename,
