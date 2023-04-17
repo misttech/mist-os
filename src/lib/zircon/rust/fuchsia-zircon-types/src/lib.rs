@@ -1600,6 +1600,7 @@ struct_decl_macro! {
         pub mmu_overhead_bytes: u64,
         pub ipc_bytes: u64,
         pub other_bytes: u64,
+        pub vmo_reclaim_disable_bytes: u64,
     }
 }
 

@@ -945,6 +945,10 @@ typedef struct zx_info_kmem_stats_extended {
 
     // Non-free memory that isn't accounted for in any other field.
     uint64_t other_bytes;
+
+    // The amount of memory in VMOs that would otherwise be tracked for
+    // reclamation, but has had reclamation disabled.
+    uint64_t vmo_reclaim_disabled_bytes;
 } zx_info_kmem_stats_extended_t;
 ```
 

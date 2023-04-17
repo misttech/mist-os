@@ -67,6 +67,7 @@ impl From<sys::zx_info_kmem_stats_extended_t> for MemStatsExtended {
             mmu_overhead_bytes,
             ipc_bytes,
             other_bytes,
+            vmo_reclaim_disable_bytes,
         } = info;
         MemStatsExtended {
             total_bytes,
@@ -83,6 +84,7 @@ impl From<sys::zx_info_kmem_stats_extended_t> for MemStatsExtended {
             mmu_overhead_bytes,
             ipc_bytes,
             other_bytes,
+            vmo_reclaim_disable_bytes,
         }
     }
 }

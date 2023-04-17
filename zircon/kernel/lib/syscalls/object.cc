@@ -773,6 +773,9 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       stats_ext.vmo_discardable_locked_bytes = discardable_counts.locked * PAGE_SIZE;
       stats_ext.vmo_discardable_unlocked_bytes = discardable_counts.unlocked * PAGE_SIZE;
 
+      PageQueues::Counts queue_counts = pmm_page_queues()->QueueCounts();
+      stats_ext.vmo_reclaim_disabled_bytes = queue_counts.high_priority;
+
       return single_record_result(_buffer, buffer_size, _actual, _avail, stats_ext);
     }
     case ZX_INFO_RESOURCE: {
