@@ -11,7 +11,6 @@ import("//build/sdk/sdk_atom.gni")
 _generating_sdk = false
 
 # The SDK prefix for the current toolchain.
-_sdk_prefix = ""
 if (current_toolchain == default_toolchain) {
   _generating_sdk = true
   _sdk_prefix = ""
@@ -35,6 +34,7 @@ if (_generating_sdk) {
     }
   }
 }
+
 rust_library("sdk_metadata-v1_0_0") {
   crate_name = "sdk_metadata"
   crate_root = "//sdk_metadata/src/lib.rs"

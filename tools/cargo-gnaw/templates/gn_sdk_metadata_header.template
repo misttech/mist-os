@@ -5,7 +5,6 @@ import("//build/sdk/sdk_atom.gni")
 _generating_sdk = false
 
 # The SDK prefix for the current toolchain.
-_sdk_prefix = ""
 if (current_toolchain == default_toolchain) {{
   _generating_sdk = true
   _sdk_prefix = ""

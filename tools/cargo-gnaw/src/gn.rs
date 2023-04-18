@@ -57,7 +57,7 @@ pub fn write_import<W: io::Write>(output: &mut W, file_name: &str) -> Result<(),
 ///     appropriate group and rule names. See [RuleRenaming] for details.
 pub fn write_top_level_rule<W: io::Write>(
     output: &mut W,
-    platform: Option<String>,
+    platform: Option<&str>,
     pkg: &Package,
     group_visibility: Option<&GroupVisibility>,
     rule_renaming: Option<&RuleRenaming>,
@@ -111,6 +111,7 @@ pub fn write_top_level_rule<W: io::Write>(
 /// Writes Fuchsia SDK metadata for a top-level rule.
 pub fn write_fuchsia_sdk_metadata<W: io::Write>(
     output: &mut W,
+    platform: Option<&str>,
     pkg: &Package,
     abs_dir: &Path,
     rel_dir: &Path,
@@ -138,9 +139,15 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
         version = pkg.version,
     )?;
 
+    let platform_constraint = if let Some(p) = platform {
+        format!(" && {}", target_to_gn_conditional(p)?)
+    } else {
+        "".to_owned()
+    };
+
     writeln!(
         output,
-        r#" if (_generating_sdk) {{
+        r#" if (_generating_sdk{constraint}) {{
             sdk_atom("{group_name}_sdk") {{
                 id = "sdk://${{_sdk_prefix}}third_party/rust_crates/{group_name}"
                 category = "internal"
@@ -150,7 +157,9 @@ pub fn write_fuchsia_sdk_metadata<W: io::Write>(
                     schema = "3p_rust_library"
                 }}
             }}
-        }}"#,
+        }}
+        "#,
+        constraint = platform_constraint,
         source = rel_path.display(),
         group_name = pkg.name,
     )?;

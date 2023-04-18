@@ -387,7 +387,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
 
                             gn::write_top_level_rule(
                                 &mut output,
-                                platform,
+                                platform.as_deref(),
                                 package,
                                 visibility,
                                 target_renaming,
@@ -401,6 +401,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                             if let Some((abs_path, rel_path)) = &fuchsia_sdk_metadata_paths {
                                 gn::write_fuchsia_sdk_metadata(
                                     &mut output,
+                                    platform.as_deref(),
                                     package,
                                     abs_path,
                                     rel_path,
@@ -444,7 +445,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 .with_context(|| "writing top level rule")?;
 
                 if let Some((abs_path, rel_path)) = &fuchsia_sdk_metadata_paths {
-                    gn::write_fuchsia_sdk_metadata(&mut output, package, abs_path, rel_path)
+                    gn::write_fuchsia_sdk_metadata(&mut output, None, package, abs_path, rel_path)
                         .with_context(|| "writing Fuchsia SDK metadata for top level rule")?;
                 }
             }
