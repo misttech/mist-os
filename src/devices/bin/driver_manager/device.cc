@@ -14,6 +14,7 @@
 #include <lib/zx/clock.h>
 #include <zircon/status.h>
 
+#include <deque>
 #include <memory>
 #include <string_view>
 
@@ -22,6 +23,7 @@
 #include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/lib/log/log.h"
+#include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/utf_codecs.h"
 
 // TODO(fxbug.dev/43370): remove this once init tasks can be enabled for all devices.
@@ -355,7 +357,7 @@ void Device::InitializeInspectValues() {
   inspect().set_flags(flags);
   inspect().set_properties(props());
 
-  inspect().set_topological_path(GetTopologicalPath().value().c_str());
+  inspect().set_topological_path(MakeTopologicalPath());
 
   std::string type("Device");
   if (flags & DEV_CTX_PROXY) {
@@ -427,43 +429,18 @@ std::list<const Device*> Device::children() const {
 
 std::list<Device*> Device::children() { return Device::GetChildren<Device>(this); }
 
-zx::result<std::string> Device::GetTopologicalPath() const {
-  char tmp[fuchsia_device::wire::kMaxDevicePathLen];
-  char* path = tmp + sizeof(tmp) - 1;
-  *path = 0;
-  size_t chars_written = 1;
-
-  // Build the topological path by walking backwards up the tree.
-  fbl::RefPtr<const Device> itr = fbl::RefPtr<const Device>(this);
-  while (itr != nullptr) {
-    if (itr->flags & DEV_CTX_PROXY) {
-      itr = itr->parent();
+std::string Device::MakeTopologicalPath() const {
+  std::deque<std::string_view> names;
+  const Device* dev = this;
+  while (dev != nullptr) {
+    names.push_front(dev->name());
+    dev = dev->parent().get();
+    if (dev && dev->flags & DEV_CTX_PROXY) {
+      dev = dev->parent().get();
     }
-
-    const char* name = itr->name().data();
-
-    size_t len = itr->name().size() + 1;
-    if ((len + chars_written) > sizeof(tmp)) {
-      return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
-    }
-
-    memcpy(path - len + 1, name, len - 1);
-    path -= len;
-    *path = '/';
-    chars_written += len;
-    itr = itr->parent();
   }
-
-  // Add the "/dev" prefix to the front of the path.
-  constexpr std::string_view devfs_prefix = "/dev";
-  if ((devfs_prefix.size() + chars_written) > sizeof(tmp)) {
-    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
-  }
-  memcpy(path - devfs_prefix.size(), devfs_prefix.data(), devfs_prefix.size());
-  path -= devfs_prefix.size();
-  chars_written += devfs_prefix.size();
-
-  return zx::ok(std::string(path));
+  names.push_front("/dev");
+  return fxl::JoinStrings(names, "/");
 }
 
 zx_status_t Device::InitializeToDevfs() {
@@ -940,11 +917,8 @@ void Device::BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync
 }
 
 void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  zx::result path = GetTopologicalPath();
-  if (path.is_error()) {
-    completer.ReplyError(path.error_value());
-  }
-  completer.ReplySuccess(fidl::StringView::FromExternal(path.value()));
+  std::string path = MakeTopologicalPath();
+  completer.ReplySuccess(fidl::StringView::FromExternal(path));
 }
 
 void Device::LoadFirmware(LoadFirmwareRequestView request, LoadFirmwareCompleter::Sync& completer) {
@@ -965,9 +939,8 @@ void Device::LoadFirmware(LoadFirmwareRequestView request, LoadFirmwareCompleter
     walk_dev = walk_dev->parent();
   }
   if (!driver) {
-    zx::result topo_path = GetTopologicalPath();
     LOGF(ERROR, "Wasn't able to find driver %s for device %s", driver_path.c_str(),
-         topo_path.is_ok() ? topo_path.value().c_str() : "<bad_topo>");
+         MakeTopologicalPath().c_str());
     completer.ReplyError(ZX_ERR_INTERNAL);
     return;
   }
@@ -1081,12 +1054,9 @@ zx::result<std::shared_ptr<dfv2::Node>> Device::CreateDFv2Device() {
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
-  zx::result full_path = GetTopologicalPath();
-  if (full_path.is_error()) {
-    return full_path.take_error();
-  }
+  std::string full_path = MakeTopologicalPath();
   // The topo_path needs to remove the leading "/dev/".
-  auto topo_path = full_path.value().substr(std::string_view("/dev/").size());
+  auto topo_path = full_path.substr(std::string_view("/dev/").size());
 
   std::string name = std::to_string(coordinator->GetNextDfv2DeviceId());
 

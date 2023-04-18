@@ -789,17 +789,13 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
       device_list.emplace_back(&device);
     } else {
       for (const fidl::StringView& device_filter : request->device_filter) {
-        zx::result path = device.GetTopologicalPath();
-        if (path.is_error()) {
-          request->iterator.Close(path.status_value());
-          return;
-        }
+        std::string path = device.MakeTopologicalPath();
         bool matches = false;
         // TODO(fxbug.dev/115717): Matches should also check the /dev/class/ path.
         if (request->exact_match) {
-          matches = path.value() == device_filter.get();
+          matches = path == device_filter.get();
         } else {
-          matches = path.value().find(device_filter.get()) != std::string_view::npos;
+          matches = path.find(device_filter.get()) != std::string_view::npos;
         }
         if (matches) {
           device_list.emplace_back(&device);

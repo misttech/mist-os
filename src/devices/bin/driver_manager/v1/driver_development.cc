@@ -67,12 +67,7 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
       device_info.driver_host_koid(device->host()->koid());
     }
 
-    zx::result path = device->GetTopologicalPath();
-    if (path.is_error()) {
-      return path.take_error();
-    }
-
-    device_info.topological_path(fidl::StringView(allocator, path.value()));
+    device_info.topological_path(device->MakeTopologicalPath());
 
     device_info.bound_driver_libname(fidl::StringView(allocator, device->parent_driver_url()));
 

@@ -998,7 +998,7 @@ TEST_F(CompositeTestCase, DevfsNotifications) {
   }
 }
 
-// Make sure the path returned by GetTopologicalPath is accurate
+// Make sure the path returned by MakeTopologicalPath is accurate
 TEST_F(CompositeTestCase, Topology) {
   const uint32_t protocol_id[] = {
       ZX_PROTOCOL_GPIO,
@@ -1029,10 +1029,8 @@ TEST_F(CompositeTestCase, Topology) {
   for (size_t i = 0; i < devices_.size(); ++i) {
     const auto& device = devices_[i];
 
-    auto path = device.device->GetTopologicalPath();
-    ASSERT_OK(path.status_value());
-
-    const std::string_view parent_topological_path{path.value().c_str() + kDev.size()};
+    std::string path = device.device->MakeTopologicalPath();
+    const std::string_view parent_topological_path{path.c_str() + kDev.size()};
     zx::result parent = resolve_path(&root, parent_topological_path);
     ASSERT_OK(parent);
     zx::result child = resolve_path(parent.value(), kCompositeDevName);

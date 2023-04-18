@@ -131,7 +131,7 @@ class Device final
   std::list<const Device*> children() const;
   std::list<Device*> children();
 
-  zx::result<std::string> GetTopologicalPath() const;
+  std::string MakeTopologicalPath() const;
 
   zx_status_t InitializeToDevfs();
 

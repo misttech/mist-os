@@ -27,12 +27,7 @@ fdd::wire::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFrag
       fidl::StringView(arena, name_.c_str()));
 
   if (bound_device_) {
-    auto topological_path = bound_device_->GetTopologicalPath();
-    if (topological_path.is_ok()) {
-      fragment_info.device(fidl::StringView(arena, topological_path->c_str()));
-    } else {
-      LOGF(WARNING, "Unable to retrieve topological path for %s", bound_device_->name().c_str());
-    }
+    fragment_info.device(bound_device_->MakeTopologicalPath());
   }
 
   fidl::VectorView<fdm::wire::BindInstruction> bind_rules(arena, bind_rules_.size());

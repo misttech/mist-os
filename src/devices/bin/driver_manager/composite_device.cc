@@ -496,12 +496,7 @@ fdd::wire::CompositeInfo CompositeDevice::GetCompositeInfo(fidl::AnyArena& arena
   }
 
   if (device_) {
-    auto topological_path = device_->GetTopologicalPath();
-    if (topological_path.is_ok()) {
-      composite_info.topological_path(fidl::StringView(arena, *topological_path));
-    } else {
-      LOGF(WARNING, "Unable to retrieve topological path for device %s", device_->name().c_str());
-    }
+    composite_info.topological_path(device_->MakeTopologicalPath());
   }
 
   return composite_info.Build();
@@ -531,13 +526,7 @@ fidl::VectorView<fdd::wire::CompositeParentNodeInfo> CompositeDevice::GetParentI
         fidl::StringView(arena, std::string(fragment.name())));
 
     if (fragment.bound_device()) {
-      auto topological_path = fragment.bound_device()->GetTopologicalPath();
-      if (topological_path.is_ok()) {
-        parent.device(fidl::StringView(arena, topological_path->c_str()));
-      } else {
-        LOGF(WARNING, "Unable to retrieve topological path for %s",
-             fragment.bound_device()->name().c_str());
-      }
+      parent.device(arena, fragment.bound_device()->MakeTopologicalPath());
     }
 
     parents[index] = parent.Build();
