@@ -112,7 +112,7 @@ zx_status_t EventRing::Init(size_t page_size, const zx::bti& bti, fdf::MmioBuffe
 
   // Attempt to grow our event ring to the desired size.
   do {
-    status = AddSegment();
+    status = AddSegment(true);
     if (status != ZX_OK) {
       zxlogf(WARNING,
              "Event ring failed to add a segment during initialization. "
@@ -146,7 +146,7 @@ zx_status_t EventRing::AddSegmentIfNone() {
   return ZX_OK;
 }
 
-zx_status_t EventRing::AddSegment() {
+zx_status_t EventRing::AddSegment(bool initialization) {
   if (segments_.Pressure() < segments_.SegmentCount()) {
     segments_.AddPressure();
     return ZX_OK;
@@ -176,7 +176,9 @@ zx_status_t EventRing::AddSegment() {
     erdp_virt_ = static_cast<TRB*>(buffer->virt());
     needs_iterator = true;
   }
-  buffers_.push_back(std::make_unique<SegmentBuf>(std::move(buffer), true));
+  // Segments added to event ring on initialization (before event ring is used) are not considered
+  // "new segments"
+  buffers_.push_back(std::make_unique<SegmentBuf>(std::move(buffer), !initialization));
   if (needs_iterator) {
     buffers_it_ = buffers_.begin();
   }

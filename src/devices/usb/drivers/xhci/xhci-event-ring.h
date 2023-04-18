@@ -155,7 +155,7 @@ class EventRing {
   // USB 2.0 device attach
   void Usb2DeviceAttach(uint16_t port_id);
   zx_status_t AddSegmentIfNone() __TA_REQUIRES(segment_mutex_);
-  zx_status_t AddSegment() __TA_REQUIRES(segment_mutex_);
+  zx_status_t AddSegment(bool initialization = false) __TA_REQUIRES(segment_mutex_);
 
   bool StallWorkaroundForDefectiveHubs(std::unique_ptr<TRBContext>& context);
 
