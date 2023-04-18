@@ -51,7 +51,6 @@ fuchsia_assemble_package(
     package = ":prebuilt_ams_light",
 )
 
-
 # buildifier: leave-alone
 fuchsia_product_configuration(
     name = "testing_product_config",
@@ -95,14 +94,21 @@ fuchsia_product_configuration(
             }},
         },
         "product": {
-            "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+            "session_url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm",
         },
     },
 )
 
 fuchsia_product_configuration_test(
     name = "product_config_golden_test",
-    golden_file = ":test_data/product_config_golden_file.json",
+    # Unfortunately, the golden file contains paths that depend on the target
+    # build configuration (e.g. x86_64-fastbuild/... for x64 builds, and
+    # aarch64-fastbuild/... for arm64 ones), so different golden files need
+    # to be provided.
+    golden_file = select({
+        "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/product_config_golden_file_arm64.json",
+        "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/product_config_golden_file_x64.json",
+    }),
     product_config = ":testing_product_config",
 )
 
