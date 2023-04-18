@@ -14,7 +14,3 @@ trackers: {
     component: "Security"
   }
 }
-
-presubmits: {
-  review_notify: "fuchsia-security@google.com"
-}

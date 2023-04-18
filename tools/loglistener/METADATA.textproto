@@ -11,10 +11,6 @@ last_reviewed_date: {
 trackers: {
   monorail: {
     project: "fuchsia"
-    component: "Security"
+    component: "Zircon>FW-services"
   }
-}
-
-presubmits: {
-  review_notify: "fuchsia-security@google.com"
 }
