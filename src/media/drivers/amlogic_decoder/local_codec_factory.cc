@@ -42,10 +42,23 @@ const DecoderDescription kDecoderDescriptions[] = {
     {.mime_type = "video/h264",
      .is_hw = true,
      .profiles = {{
+         .profile = fuchsia::media::CodecProfile::H264PROFILE_MAIN,
+         .min_coded_size = {.width = 16u, .height = 16u},
+         .max_coded_size = {.width = 4096u, .height = 4096u},
+         // The decoder itself does not yet support decryption. Rather the decoder supports
+         // receiving input in protected memory.
+         .allow_encryption = false,
+         .require_encryption = false,
+         .allow_input_protection = true,
+         .require_input_protection = false,
+     }}},
+    {.mime_type = "video/h264",
+     .is_hw = true,
+     .profiles = {{
          .profile = fuchsia::media::CodecProfile::H264PROFILE_HIGH,
          .min_coded_size = {.width = 16u, .height = 16u},
          .max_coded_size = {.width = 4096u, .height = 4096u},
-         // The decoder itself does not yet support decryption.  Rather the decoder supports
+         // The decoder itself does not yet support decryption. Rather the decoder supports
          // receiving input in protected memory.
          .allow_encryption = false,
          .require_encryption = false,
@@ -58,7 +71,7 @@ const DecoderDescription kDecoderDescriptions[] = {
          .profile = fuchsia::media::CodecProfile::VP9PROFILE_PROFILE0,
          .min_coded_size = {.width = 2u, .height = 2u},
          .max_coded_size = {.width = 4096u, .height = 4096u},
-         // The decoder itself does not yet support decryption.  Rather the decoder supports
+         // The decoder itself does not yet support decryption. Rather the decoder supports
          // receiving input in protected memory.
          .allow_encryption = false,
          .require_encryption = false,
