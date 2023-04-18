@@ -149,6 +149,8 @@ func (c *cachedPkgRepo) fetchFromGCS(w http.ResponseWriter, r *http.Request, loc
 
 	// Retrieve a GCS reader from the bucket.
 	resourcePath := strings.TrimLeft(r.URL.Path, "/")
+	c.logf("Downloading gs://%s/%s", bucket, resourcePath)
+
 	gcsRdr, size, err := getGCSReader(r.Context(), c.gcsClient, bucket, resourcePath)
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotExist) {
@@ -282,7 +284,17 @@ func NewPackageServer(ctx context.Context, repoPath, remoteRepoURL, remoteBlobUR
 	mux.Handle("/config.json", cs)
 	mux.Handle("/", cPkgRepo)
 	pkgSrv := &http.Server{
-		Handler: mux,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			lw := &loggingWriter{w, 0, 0}
+			mux.ServeHTTP(lw, r)
+			logger.Debugf(ctx, "Served %s \"%s %s %s\" %d %d",
+				r.RemoteAddr,
+				r.Method,
+				r.RequestURI,
+				r.Proto,
+				lw.Status,
+				lw.ResponseSize)
+		}),
 	}
 
 	// Start the server and spin off a handler to stop it when the context
@@ -312,4 +324,21 @@ func NewPackageServer(ctx context.Context, repoPath, remoteRepoURL, remoteBlobUR
 		RepoURL:              fmt.Sprintf("http://%s:%d/repository", localhostPlaceholder, port),
 		BlobURL:              fmt.Sprintf("http://%s:%d/blobs", localhostPlaceholder, port),
 	}, nil
+}
+
+type loggingWriter struct {
+	http.ResponseWriter
+	Status       int
+	ResponseSize int64
+}
+
+func (lw *loggingWriter) WriteHeader(status int) {
+	lw.Status = status
+	lw.ResponseWriter.WriteHeader(status)
+}
+
+func (lw *loggingWriter) Write(b []byte) (int, error) {
+	n, err := lw.ResponseWriter.Write(b)
+	lw.ResponseSize += int64(n)
+	return n, err
 }
