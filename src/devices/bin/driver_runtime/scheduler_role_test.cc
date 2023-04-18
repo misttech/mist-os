@@ -180,9 +180,15 @@ MultipleDispatchersThreadPoolTest::CreateTestDispatcher(
     std::string_view scheduler_role, fdf::SynchronizedDispatcher::Options options) {
   auto fake_driver = CreateFakeDriver();
   auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) {
-    fbl::AutoLock lock(&lock_);
-    num_dispatchers_shutdown_++;
-    if (num_dispatchers_shutdown_ == dispatchers_.size()) {
+    bool signal = false;
+    {
+      fbl::AutoLock lock(&lock_);
+      num_dispatchers_shutdown_++;
+      if (num_dispatchers_shutdown_ == dispatchers_.size()) {
+        signal = true;
+      }
+    }
+    if (signal) {
       shutdown_completion_.Signal();
     }
   };
