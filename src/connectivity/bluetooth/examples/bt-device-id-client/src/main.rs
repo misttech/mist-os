@@ -41,10 +41,8 @@ fn set_device_identification(
     Ok((fut, client))
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["bt-device-id-client"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["bt-device-id-client"]).expect("Unable to initialize logger");
-
     let di_svc = fuchsia_component::client::connect_to_protocol::<di::DeviceIdentificationMarker>()
         .context("Couldn't connect to DI capability")?;
 
