@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{Context as _, Error};
 use ffx_core::ffx_plugin;
 use ffx_update_args as args;
 use fidl_fuchsia_update::{
@@ -10,6 +10,9 @@ use fidl_fuchsia_update::{
 };
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use fidl_fuchsia_update_ext::State;
+use fidl_fuchsia_update_installer::{self as finstaller, InstallerProxy};
+use fidl_fuchsia_update_installer_ext as installer;
+use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
 
 /// Main entry point for the `update` subcommand.
@@ -17,15 +20,18 @@ use futures::prelude::*;
     "target_update",
     ManagerProxy = "core/system-update-checker:expose:fuchsia.update.Manager",
     ChannelControlProxy = "core/system-update-checker:expose:fuchsia.update.channelcontrol.ChannelControl"
+    InstallerProxy = "core/system-updater:expose:fuchsia.update.installer.Installer",
 )]
 pub async fn update_cmd(
     update_manager_proxy: ManagerProxy,
     channel_control_proxy: ChannelControlProxy,
+    installer_proxy: InstallerProxy,
     update_args: args::Update,
 ) -> Result<(), Error> {
     update_cmd_impl(
         update_manager_proxy,
         channel_control_proxy,
+        installer_proxy,
         update_args,
         &mut std::io::stdout(),
     )
@@ -35,6 +41,7 @@ pub async fn update_cmd(
 pub async fn update_cmd_impl<W: std::io::Write>(
     update_manager_proxy: ManagerProxy,
     channel_control_proxy: ChannelControlProxy,
+    installer_proxy: InstallerProxy,
     update_args: args::Update,
     writer: &mut W,
 ) -> Result<(), Error> {
@@ -46,7 +53,7 @@ pub async fn update_cmd_impl<W: std::io::Write>(
             handle_check_now_cmd(check_now, update_manager_proxy, writer).await?;
         }
         args::Command::ForceInstall(args) => {
-            force_install(args.update_pkg_url, args.reboot).await?;
+            force_install(installer_proxy, args.update_pkg_url, args.reboot, writer).await?;
         }
     }
     Ok(())
@@ -141,10 +148,51 @@ async fn handle_check_now_cmd<W: std::io::Write>(
 
 /// Change to a specific version, regardless of whether it's newer or older than
 /// the current system software.
-// TODO(fxbug.dev/60019): implement force install.
-async fn force_install(_update_pkg_url: String, _reboot: bool) -> Result<(), Error> {
-    eprintln!("The force install is not yet implemented in this tool.");
-    eprintln!("In the meantime, please use preexisting tools for a force install.");
+async fn force_install<W: std::io::Write>(
+    installer_proxy: InstallerProxy,
+    update_pkg_url: String,
+    reboot: bool,
+    writer: &mut W,
+) -> Result<(), Error> {
+    let pkg_url =
+        AbsolutePackageUrl::parse(&update_pkg_url).context("parsing update package url")?;
+
+    let options = installer::Options {
+        initiator: installer::Initiator::User,
+        should_write_recovery: true,
+        allow_attach_to_existing_attempt: true,
+    };
+
+    let (reboot_controller, reboot_controller_server_end) =
+        fidl::endpoints::create_proxy::<finstaller::RebootControllerMarker>()
+            .context("creating reboot controller")?;
+
+    let mut update_attempt = installer::start_update(
+        &pkg_url,
+        options,
+        &installer_proxy,
+        Some(reboot_controller_server_end),
+    )
+    .await
+    .context("starting update")?;
+
+    writeln!(writer, "Installing an update.")?;
+    if !reboot {
+        reboot_controller.detach().context("notify installer do not reboot")?;
+    }
+    while let Some(state) = update_attempt.try_next().await.context("getting next state")? {
+        writeln!(writer, "State: {state:?}")?;
+        if state.id() == installer::StateId::WaitToReboot {
+            if reboot {
+                return Ok(());
+            }
+        } else if state.is_success() {
+            return Ok(());
+        } else if state.is_failure() {
+            anyhow::bail!("Encountered failure state");
+        }
+    }
+
     Ok(())
 }
 
@@ -154,6 +202,8 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_update_channelcontrol::ChannelControlRequest;
+    use mock_installer::MockUpdateInstallerService;
+    use std::sync::Arc;
 
     async fn perform_channel_control_test<V, O>(
         argument: args::channel::Command,
@@ -256,5 +306,39 @@ mod tests {
             |output| assert_eq!(output, "known channels:\nsome-channel\nother-channel\n"),
         )
         .await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_force_install() {
+        let update_info = installer::UpdateInfo::builder().download_size(1000).build();
+        let mock_installer = Arc::new(MockUpdateInstallerService::with_states(vec![
+            installer::State::Prepare,
+            installer::State::Fetch(
+                installer::UpdateInfoAndProgress::new(update_info, installer::Progress::none())
+                    .unwrap(),
+            ),
+            installer::State::Stage(
+                installer::UpdateInfoAndProgress::new(
+                    update_info,
+                    installer::Progress::builder()
+                        .fraction_completed(0.5)
+                        .bytes_downloaded(500)
+                        .build(),
+                )
+                .unwrap(),
+            ),
+            installer::State::WaitToReboot(installer::UpdateInfoAndProgress::done(update_info)),
+        ]));
+        let proxy = mock_installer.spawn_installer_service();
+        let mut buf = Vec::new();
+        force_install(proxy, "fuchsia-pkg://fuchsia.test/update".into(), true, &mut buf)
+            .await
+            .unwrap();
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), "Installing an update.
+State: Prepare
+State: Fetch(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.0, bytes_downloaded: 0 } })
+State: Stage(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.5, bytes_downloaded: 500 } })
+State: WaitToReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })
+");
     }
 }
