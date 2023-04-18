@@ -1176,8 +1176,7 @@ def inherit_main_arg_parser_flags(
         help="Path to reclient tools like rewrapper, reproxy.",
     )
     main_group.add_argument(
-        "--disable",
-        dest='disable',
+        "--local",
         action="store_true",
         default=False,
         help="Disable remote execution, run the original command locally.",
@@ -1293,7 +1292,7 @@ def remote_action_from_args(
         inputs=inputs,
         output_files=output_files,
         output_dirs=output_dirs,
-        disable=main_args.disable,
+        disable=main_args.local,
         save_temps=main_args.save_temps,
         auto_reproxy=main_args.auto_reproxy,
         remote_log=main_args.remote_log,
@@ -1304,11 +1303,13 @@ def remote_action_from_args(
 
 
 _FORWARDED_REMOTE_FLAGS = cl_utils.FlagForwarder(
+    # Mapped options can be wrapper script options (from
+    # inherit_main_arg_parser_flags) or rewrapper options.
     [
         cl_utils.ForwardedFlag(
             name="--remote-disable",
             has_optarg=False,
-            mapped_name="--disable",
+            mapped_name="--local",
         ),
         cl_utils.ForwardedFlag(
             name="--remote-inputs",

@@ -866,7 +866,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
 
     def test_defaults(self):
         remote_args, unknown, other = self._forward_and_parse([])
-        self.assertFalse(remote_args.disable)
+        self.assertFalse(remote_args.local)
         self.assertEqual(remote_args.inputs, [])
         self.assertEqual(remote_args.output_files, [])
         self.assertEqual(remote_args.output_directories, [])
@@ -880,7 +880,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
             '-o', 'hello.o'
         ]
         remote_args, unknown, other = self._forward_and_parse(command)
-        self.assertFalse(remote_args.disable)
+        self.assertFalse(remote_args.local)
         self.assertEqual(remote_args.inputs, [])
         self.assertEqual(remote_args.output_files, [])
         self.assertEqual(remote_args.output_directories, [])
@@ -890,7 +890,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
     def test_disable(self):
         remote_args, unknown, other = self._forward_and_parse(
             ['cat', 'foo.txt', '--remote-disable'])
-        self.assertTrue(remote_args.disable)
+        self.assertTrue(remote_args.local)
         self.assertEqual(unknown, [])
         self.assertEqual(other, ['cat', 'foo.txt'])
 
@@ -1448,15 +1448,15 @@ class MainTests(unittest.TestCase):
         main_args = args[0]
         self.assertEqual(main_args.inputs, ['src/in.txt', 'another.s'])
 
-    def test_main_args_remote_disable(self):
-        command = ['--disable', '--', 'echo', 'hello']
+    def test_main_args_local(self):
+        command = ['--local', '--', 'echo', 'hello']
         with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
                                return_value=0) as mock_run:
             self.assertEqual(remote_action.main(command), 0)
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
-        self.assertTrue(main_args.disable)
+        self.assertTrue(main_args.local)
 
     def test_flag_forwarding_remote_disable(self):
         command = ['--', 'echo', '--remote-disable', 'hello']
@@ -1466,7 +1466,7 @@ class MainTests(unittest.TestCase):
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
-        self.assertTrue(main_args.disable)
+        self.assertTrue(main_args.local)
 
 
 if __name__ == '__main__':
