@@ -7,10 +7,8 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
-use std::collections::BTreeMap;
-
 const VERSION_HISTORY_BYTES: &[u8] = include_bytes!(env!("SDK_VERSION_HISTORY"));
-const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-3349aec7.json";
+const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-ef02ef45.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";
 const VERSION_HISTORY_TYPE: &str = "version_history";
 
@@ -52,13 +50,9 @@ impl<'de> Deserialize<'de> for AbiRevision {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
 pub struct Version {
-    pub abi_revision: AbiRevision,
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Serialize, Deserialize)]
-pub struct VersionData {
-    pub abi_revision: AbiRevision,
+    #[serde(with = "serde_u64")]
     pub api_level: u64,
+    pub abi_revision: AbiRevision,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -66,7 +60,7 @@ struct VersionHistoryData {
     name: String,
     #[serde(rename = "type")]
     element_type: String,
-    api_levels: BTreeMap<String, Version>,
+    versions: Vec<Version>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -75,11 +69,11 @@ struct VersionHistory {
     data: VersionHistoryData,
 }
 
-pub fn version_history() -> Result<Vec<VersionData>, serde_json::Error> {
+pub fn version_history() -> Result<Vec<Version>, serde_json::Error> {
     parse_version_history(VERSION_HISTORY_BYTES)
 }
 
-fn parse_version_history(bytes: &[u8]) -> Result<Vec<VersionData>, serde_json::Error> {
+fn parse_version_history(bytes: &[u8]) -> Result<Vec<Version>, serde_json::Error> {
     let v: VersionHistory = serde_json::from_slice(bytes)?;
     if v.schema_id != VERSION_HISTORY_SCHEMA_ID {
         return Err(serde_json::Error::invalid_value(
@@ -100,19 +94,34 @@ fn parse_version_history(bytes: &[u8]) -> Result<Vec<VersionData>, serde_json::E
         ));
     }
 
-    let mut versions = Vec::new();
+    Ok(v.data.versions)
+}
 
-    for (key, value) in v.data.api_levels {
-        let api_level = key
-            .parse()
-            .map_err(|_| serde::de::Error::invalid_value(Unexpected::Str(&key), &"an integer"))?;
+// Helpers to serialize and deserialize integer strings into u64s.
+mod serde_u64 {
+    use {
+        serde::{
+            de::{Error, Unexpected},
+            Deserialize, Deserializer, Serialize, Serializer,
+        },
+        std::str::FromStr,
+    };
 
-        versions.push(VersionData { api_level, abi_revision: value.abi_revision });
+    pub fn serialize<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        format!("{}", value).serialize(serializer)
     }
 
-    versions.sort_by_key(|s| s.api_level);
-
-    Ok(versions)
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        u64::from_str(&s)
+            .map_err(|_| D::Error::invalid_value(Unexpected::Str(&s), &"an unsigned integer"))
+    }
 }
 
 #[cfg(test)]
@@ -124,7 +133,7 @@ mod tests {
         let versions = version_history().unwrap();
         assert_eq!(
             versions[0],
-            VersionData { api_level: 4, abi_revision: AbiRevision::new(0x601665C5B1A89C7F) }
+            Version { api_level: 4, abi_revision: AbiRevision::new(0x601665C5B1A89C7F) }
         )
     }
 
@@ -134,23 +143,25 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "version_history",
-                "api_levels": {
-                    "1":{
-                        "abi_revision":"10"
+                "versions": [
+                    {
+                        "api_level": "1",
+                        "abi_revision": "10"
                     },
-                    "2":{
-                        "abi_revision":"0x20"
+                    {
+                        "api_level": "2",
+                        "abi_revision": "0x20"
                     }
-                }
+                ]
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
         }"#;
 
         assert_eq!(
             parse_version_history(&expected_bytes[..]).unwrap(),
             vec![
-                VersionData { api_level: 1, abi_revision: AbiRevision::new(10) },
-                VersionData { api_level: 2, abi_revision: AbiRevision::new(0x20) },
+                Version { api_level: 1, abi_revision: AbiRevision::new(10) },
+                Version { api_level: 2, abi_revision: AbiRevision::new(0x20) },
             ],
         );
     }
@@ -161,14 +172,14 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "version_history",
-                "api_levels": {}
+                "versions": []
             },
             "schema_id": "some-schema"
         }"#;
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-ef02ef45.json"
         );
     }
 
@@ -178,9 +189,9 @@ mod tests {
             "data": {
                 "name": "some-name",
                 "type": "version_history",
-                "api_levels": {}
+                "versions": []
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
         }"#;
 
         assert_eq!(
@@ -195,9 +206,9 @@ mod tests {
             "data": {
                 "name": "Platform version map",
                 "type": "some-type",
-                "api_levels": {}
+                "versions": []
             },
-            "schema_id": "https://fuchsia.dev/schema/version_history-3349aec7.json"
+            "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
         }"#;
 
         assert_eq!(
@@ -212,33 +223,34 @@ mod tests {
             (
                 "some-version",
                 "1",
-                "invalid value: string \"some-version\", expected an integer",
+                "invalid value: string \"some-version\", expected an unsigned integer at line 1 column 123",
             ),
             (
                 "-1",
                 "1",
-                 "invalid value: string \"-1\", expected an integer",
+                 "invalid value: string \"-1\", expected an unsigned integer at line 1 column 113",
             ),
             (
                 "1",
                 "some-revision",
-                "invalid value: string \"some-revision\", expected an unsigned integer at line 1 column 59",
+                "invalid value: string \"some-revision\", expected an unsigned integer at line 1 column 107",
             ),
             (
                 "1",
                 "-1",
-                "invalid value: string \"-1\", expected an unsigned integer at line 1 column 48",
+                "invalid value: string \"-1\", expected an unsigned integer at line 1 column 96",
             ),
         ] {
             let expected_bytes = serde_json::to_vec(&serde_json::json!({
                 "data": {
                     "name": VERSION_HISTORY_NAME,
                     "type": VERSION_HISTORY_TYPE,
-                    "api_levels": {
-                        api_level:{
-                            "abi_revision": abi_revision
-                        }
-                    },
+                    "versions": [
+                        {
+                            "api_level": api_level,
+                            "abi_revision": abi_revision,
+                        },
+                    ],
                 },
                 "schema_id": VERSION_HISTORY_SCHEMA_ID,
             }))

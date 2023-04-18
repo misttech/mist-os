@@ -11,7 +11,6 @@ use {
     futures::stream::TryStreamExt as _,
     std::collections::HashMap,
     tracing::error,
-    version_history::AbiRevision,
 };
 
 pub(crate) async fn serve_request_stream(
@@ -149,10 +148,12 @@ async fn resolve_from_package(
     } else {
         None
     };
-    let abi_revision =
-        fidl_fuchsia_component_abi_ext::read_abi_revision_optional(&package, AbiRevision::PATH)
-            .await
-            .map_err(crate::ResolverError::AbiRevision)?;
+    let abi_revision = fidl_fuchsia_component_abi_ext::read_abi_revision_optional(
+        &package,
+        version_history::AbiRevision::PATH,
+    )
+    .await
+    .map_err(crate::ResolverError::AbiRevision)?;
     Ok(fcomponent_resolution::Component {
         url: Some(url.to_string()),
         resolution_context: Some(outgoing_context),
