@@ -223,8 +223,9 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
                         ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
                         buffer_collection_info_.settings.buffer_settings.size_bytes, nullptr, 0));
 
+  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info_.settings));
   const uint32_t pixels_per_row =
-      utils::GetPixelsPerRow(buffer_collection_info_.settings, kBytesPerPixel, display_size_.width);
+      utils::GetPixelsPerRow(buffer_collection_info_.settings, display_size_.width);
   uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
   uint32_t valid_bytes_per_row = display_size_.width * kBytesPerPixel;
 

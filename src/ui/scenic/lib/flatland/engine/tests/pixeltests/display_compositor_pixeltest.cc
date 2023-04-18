@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/fit/defer.h>
+#include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/types.h>
 
@@ -502,6 +503,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   if (!texture_collection) {
     GTEST_SKIP();
   }
+
+  const uint32_t texture_bytes_per_row =
+      utils::GetBytesPerRow(texture_collection_info.settings, kTextureWidth);
+
   auto release_texture_collection =
       fit::defer([display_compositor = display_compositor.get(), kTextureCollectionId] {
         ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
@@ -510,16 +515,25 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   // Get a raw pointer for the texture's vmo and make it green.
   const uint32_t num_pixels = kTextureWidth * kTextureHeight;
   uint32_t col = (255U << 24) | (255U << 8);
-  std::vector<uint32_t> write_values;
-  write_values.assign(num_pixels, col);
+
+  // Get a raw pointer for the texture's vmo and make it green.
+  const size_t num_bytes = texture_bytes_per_row * kTextureHeight;
+  std::vector<uint8_t> write_bytes(num_bytes, 0);
+  for (int64_t row = 0; row < kTextureHeight; row++) {
+    cpp20::span<uint32_t> row_pixels(
+        reinterpret_cast<uint32_t*>(write_bytes.data() + texture_bytes_per_row * row),
+        kTextureWidth);
+    int64_t offset = reinterpret_cast<uint8_t*>(row_pixels.data()) - write_bytes.data();
+    std::fill(row_pixels.begin(), row_pixels.end(), col);
+  }
+
   switch (GetParam()) {
     case fuchsia::sysmem::PixelFormatType::BGRA32:
     case fuchsia::sysmem::PixelFormatType::R8G8B8A8: {
       MapHostPointer(texture_collection_info, /*vmo_index*/ 0, HostPointerAccessMode::kWriteOnly,
-                     [&write_values](uint8_t* vmo_host, uint32_t num_bytes) {
-                       EXPECT_GE(num_bytes, sizeof(uint32_t) * write_values.size());
-                       memcpy(vmo_host, write_values.data(),
-                              sizeof(uint32_t) * write_values.size());
+                     [&write_bytes](uint8_t* vmo_host, uint32_t num_bytes) {
+                       EXPECT_GE(num_bytes, write_bytes.size());
+                       memcpy(vmo_host, write_bytes.data(), write_bytes.size());
                      });
       break;
     }
@@ -576,12 +590,16 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   // Compare the capture vmo data to the texture data above. Since we're doing a full screen
   // render, the two should be identical. The comparison is a bit complicated though since
   // the images are of two different formats.
-  bool images_are_same = CaptureCompare(read_values.data(), write_values.data(), read_values.size(),
+  bool images_are_same = CaptureCompare(read_values.data(), write_bytes.data(), read_values.size(),
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
 
 // Test color conversion on the display hardware.
+//
+// TODO(fxbug.dev/125530): Currently this test is skipped on all of the
+// display platforms Fuchsia supports, because none of the display drivers
+// fully supports the features required by the test.
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(
@@ -751,19 +769,30 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
         ReleaseClientTextureBufferCollection(display_compositor, kCompareCollectionId);
       });
 
+  const uint32_t texture_bytes_per_row =
+      utils::GetBytesPerRow(compare_collection_info.settings, kTextureWidth);
+
   // Setup the values we will compare the display capture against.
   const uint32_t num_pixels = kTextureWidth * kTextureHeight;
   uint32_t col = /*A*/ (255U << 24) | /*G*/ (51U << 8);
-  std::vector<uint32_t> write_values;
-  write_values.assign(num_pixels, col);
+
+  const size_t num_bytes = texture_bytes_per_row * kTextureHeight;
+  std::vector<uint8_t> write_bytes(num_bytes, 0);
+  for (int64_t row = 0; row < kTextureHeight; row++) {
+    cpp20::span<uint32_t> row_pixels(
+        reinterpret_cast<uint32_t*>(write_bytes.data() + texture_bytes_per_row * row),
+        kTextureWidth);
+    int64_t offset = reinterpret_cast<uint8_t*>(row_pixels.data()) - write_bytes.data();
+    std::fill(row_pixels.begin(), row_pixels.end(), col);
+  }
+
   switch (GetParam()) {
     case fuchsia::sysmem::PixelFormatType::BGRA32:
     case fuchsia::sysmem::PixelFormatType::R8G8B8A8: {
       MapHostPointer(compare_collection_info, /*vmo_index*/ 0, HostPointerAccessMode::kWriteOnly,
-                     [&write_values](uint8_t* vmo_host, uint32_t num_bytes) {
-                       EXPECT_GE(num_bytes, sizeof(uint32_t) * write_values.size());
-                       memcpy(vmo_host, write_values.data(),
-                              sizeof(uint32_t) * write_values.size());
+                     [&write_bytes](uint8_t* vmo_host, uint32_t num_bytes) {
+                       EXPECT_GE(num_bytes, write_bytes.size());
+                       memcpy(vmo_host, write_bytes.data(), write_bytes.size());
                      });
       break;
     }
@@ -816,11 +845,14 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   // Compare the capture vmo data to the texture data above. Since we're doing a full screen
   // render, the two should be identical. The comparison is a bit complicated though since
   // the images are of two different formats.
-  bool images_are_same = CaptureCompare(read_values.data(), write_values.data(), read_values.size(),
+  bool images_are_same = CaptureCompare(read_values.data(), write_bytes.data(), read_values.size(),
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
 
+// TODO(fxbug.dev/125530): Currently this test is skipped on all of the
+// display platforms Fuchsia supports, because none of the display drivers
+// fully supports the features required by the test.
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   auto renderer = NewNullRenderer();
   auto display_compositor = std::make_shared<flatland::DisplayCompositor>(

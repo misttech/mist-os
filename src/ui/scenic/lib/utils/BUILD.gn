@@ -43,6 +43,7 @@ source_set("utils") {
     "//third_party/glm",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/image-format",
   ]
 
   deps = [

@@ -77,17 +77,6 @@ glm::ivec4 GetPixel(const uint8_t* vmo_host, uint32_t width, uint32_t x, uint32_
   return glm::ivec4(r, g, b, a);
 }
 
-inline uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
-                                uint32_t bytes_per_pixel, uint32_t image_width) {
-  uint32_t bytes_per_row_divisor = settings.image_format_constraints.bytes_per_row_divisor;
-  uint32_t min_bytes_per_row = settings.image_format_constraints.min_bytes_per_row;
-  uint32_t bytes_per_row = fbl::round_up(std::max(image_width * bytes_per_pixel, min_bytes_per_row),
-                                         bytes_per_row_divisor);
-  uint32_t pixels_per_row = bytes_per_row / bytes_per_pixel;
-
-  return pixels_per_row;
-}
-
 // When checking the output of a render target, we want to make sure that non only
 // are the renderables renderered correctly, but that the rest of the image is
 // black, without any errantly colored pixels.
@@ -802,8 +791,9 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
         const uint32_t pixels_per_row =
-            GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kTextureWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings, kTextureWidth);
 
         // The texture only has 8 pixels, so it needs 32 write values for 4 channels. We
         // set the left half of pixels to red and the right half to green.
@@ -935,8 +925,9 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
         const uint32_t pixels_per_row =
-            GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings, kWidth);
 
         const uint8_t kWriteRed[] = {/*red*/ 255U, 0, 0, 255U};
         const uint8_t kWriteGreen[] = {/*green*/ 0, 255U, 0, 255U};
@@ -959,34 +950,34 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
-                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   const uint32_t pixels_per_row =
-                       GetPixelsPerRow(client_target_info.settings, kBytesPerRGBAPixel, kWidth);
+  MapHostPointer(
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_target_info.settings));
+        const uint32_t pixels_per_row = utils::GetPixelsPerRow(client_target_info.settings, kWidth);
 
-                   // Flush the cache before reading back target image.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, pixels_per_row * kHeight * kBytesPerRGBAPixel,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+        // Flush the cache before reading back target image.
+        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, pixels_per_row * kHeight * kBytesPerRGBAPixel,
+                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
 
-                   const auto kReadRed = glm::ivec4(255, 0, 0, 255);
-                   const auto kReadGreen = glm::ivec4(0, 255, 0, 255);
-                   int num_other_pixels = 0;
-                   // Make sure the pixels are in the right order.
-                   for (uint32_t y = 0; y < kHeight; ++y) {
-                     for (uint32_t x = 0; x < kWidth; ++x) {
-                       const auto pixel = GetPixel(vmo_host, pixels_per_row, x, y);
-                       if (pixel != (x < kWidth / 2 ? kReadRed : kReadGreen)) {
-                         if (!num_other_pixels) {
-                           FX_LOGS(ERROR) << "Unexpected pixel: " << pixel.r << "," << pixel.g
-                                          << "," << pixel.b << "," << pixel.a;
-                         }
-                         ++num_other_pixels;
-                       }
-                     }
-                   }
-                   EXPECT_EQ(num_other_pixels, 0);
-                 });
+        const auto kReadRed = glm::ivec4(255, 0, 0, 255);
+        const auto kReadGreen = glm::ivec4(0, 255, 0, 255);
+        int num_other_pixels = 0;
+        // Make sure the pixels are in the right order.
+        for (uint32_t y = 0; y < kHeight; ++y) {
+          for (uint32_t x = 0; x < kWidth; ++x) {
+            const auto pixel = GetPixel(vmo_host, pixels_per_row, x, y);
+            if (pixel != (x < kWidth / 2 ? kReadRed : kReadGreen)) {
+              if (!num_other_pixels) {
+                FX_LOGS(ERROR) << "Unexpected pixel: " << pixel.r << "," << pixel.g << ","
+                               << pixel.b << "," << pixel.a;
+              }
+              ++num_other_pixels;
+            }
+          }
+        }
+        EXPECT_EQ(num_other_pixels, 0);
+      });
 }
 
 // This test actually renders a rectangle using the VKRenderer. We create a single rectangle,
@@ -1101,8 +1092,9 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
         const uint32_t pixels_per_row =
-            GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kTextureWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings, kTextureWidth);
 
         // The texture only has 8 pixels, so it needs 32 write values for 4 channels. We
         // set the left half of pixels to red and the right half to green.
@@ -1364,8 +1356,9 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        EXPECT_EQ(kBytesPerRGBAPixel, utils::GetBytesPerPixel(client_collection_info.settings));
         const uint32_t pixels_per_row =
-            GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kTextureWidth);
+            utils::GetPixelsPerRow(client_collection_info.settings, kTextureWidth);
 
         // The texture only has 8 pixels, so it needs 32 write values for 4 channels. We
         // set the left half of pixels to red and the right half to green.
@@ -1541,7 +1534,8 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
   MapHostPointer(
       client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        uint32_t pixels_per_row = GetPixelsPerRow(client_collection_info.settings, 4U, 1U);
+        EXPECT_EQ(4u, utils::GetBytesPerPixel(client_collection_info.settings));
+        uint32_t pixels_per_row = utils::GetPixelsPerRow(client_collection_info.settings, 1U);
 
         const uint8_t kNumWrites = static_cast<uint8_t>((pixels_per_row * 4) + 4);
 

@@ -6,10 +6,11 @@
 
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 
+#include <fbl/algorithm.h>
 #include <gmock/gmock.h>
 
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
-#include "zircon/system/ulib/fbl/include/fbl/algorithm.h"
+#include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace integration_tests {
 using flatland::MapHostPointer;
@@ -59,8 +60,8 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
                          fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info,
                          uint32_t buffer_collection_idx, uint32_t kBytesPerPixel,
                          uint32_t image_width, uint32_t image_height) {
-  uint32_t pixels_per_row =
-      utils::GetPixelsPerRow(buffer_collection_info.settings, kBytesPerPixel, image_width);
+  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings));
+  uint32_t pixels_per_row = utils::GetPixelsPerRow(buffer_collection_info.settings, image_width);
 
   MapHostPointer(buffer_collection_info, buffer_collection_idx,
                  flatland::HostPointerAccessMode::kReadWrite,
@@ -146,8 +147,9 @@ std::vector<uint8_t> ExtractScreenCapture(
                        ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
                        buffer_collection_info.settings.buffer_settings.size_bytes, nullptr, 0));
 
+  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings));
   uint32_t pixels_per_row =
-      utils::GetPixelsPerRow(buffer_collection_info.settings, kBytesPerPixel, render_target_width);
+      utils::GetPixelsPerRow(buffer_collection_info.settings, render_target_width);
   std::vector<uint8_t> read_values;
   read_values.resize(static_cast<size_t>(render_target_width) * render_target_height *
                      kBytesPerPixel);
