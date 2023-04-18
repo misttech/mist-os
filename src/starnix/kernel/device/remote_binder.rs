@@ -495,10 +495,14 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                             // 1. Unregister the task from `binder_tasks`
                             // 2. If the tasks ends up in error, disconnecting the binder protocol.
                             let mut task = fasync::Task::local({
-                                let binder_tasks = binder_tasks.clone();
+                                // Keep a weak references to the tasks to unregister. Do not keep a
+                                // strong reference as otherwise it creates a reference count loop.
+                                let binder_tasks = Rc::downgrade(&binder_tasks);
                                 async move {
                                     let result = task.await;
-                                    binder_tasks.lock().remove(&koid);
+                                    if let Some(binder_tasks) = binder_tasks.upgrade() {
+                                        binder_tasks.lock().remove(&koid);
+                                    }
                                     if let Err(err) = result {
                                         log_warn!("DevBinder::Open failed: {err:?}");
                                         control_handle.shutdown();
