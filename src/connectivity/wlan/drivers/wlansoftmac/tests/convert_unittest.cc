@@ -114,9 +114,9 @@ TEST_F(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
     auto& band_cap = band_caps_buffer[i];
 
     band_cap.band = kFakeFidlBand;
-    band_cap.basic_rate_count = wlan_internal::kMaxSupportedBasicRates;
+    band_cap.basic_rate_count = wlan_ieee80211::kMaxSupportedBasicRates;
 
-    for (size_t j = 0; j < wlan_internal::kMaxSupportedBasicRates; j++) {
+    for (size_t j = 0; j < wlan_ieee80211::kMaxSupportedBasicRates; j++) {
       band_cap.basic_rate_list.data()[j] = kFakeRate;
     }
 
@@ -155,8 +155,8 @@ TEST_F(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
   for (size_t i = 0; i < wlan_common::kMaxBands; i++) {
     auto band_cap = out.band_caps_list[i];
     EXPECT_EQ(kFakeBanjoBand, band_cap.band);
-    EXPECT_EQ(wlan_internal::kMaxSupportedBasicRates, band_cap.basic_rate_count);
-    for (size_t j = 0; j < wlan_internal::kMaxSupportedBasicRates; j++) {
+    EXPECT_EQ(wlan_ieee80211::kMaxSupportedBasicRates, band_cap.basic_rate_count);
+    for (size_t j = 0; j < wlan_ieee80211::kMaxSupportedBasicRates; j++) {
       EXPECT_EQ(kFakeRate, band_cap.basic_rate_list[j]);
     }
     EXPECT_EQ(kPopulaterBool, band_cap.ht_supported);

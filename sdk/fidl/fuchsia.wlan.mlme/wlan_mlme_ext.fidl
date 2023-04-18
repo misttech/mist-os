@@ -32,7 +32,7 @@ type BandCapability = struct {
     /// IEEE Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps.
     /// The value returned by this type indicates all the non-HT rates
     /// the device supports transmitting and receiving.
-    basic_rates vector<uint8>:internal.MAX_SUPPORTED_BASIC_RATES;
+    basic_rates vector<uint8>:ieee80211.MAX_SUPPORTED_BASIC_RATES;
 
     ht_cap box<ieee80211.HtCapabilities>;
     vht_cap box<ieee80211.VhtCapabilities>;

@@ -628,7 +628,6 @@ pub mod test_utils {
         },
         banjo_fuchsia_wlan_common as banjo_common,
         banjo_fuchsia_wlan_ieee80211::*,
-        banjo_fuchsia_wlan_internal as banjo_wlan_internal,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync,
         fuchsia_zircon::AsHandleRef,
@@ -1171,7 +1170,7 @@ pub mod test_utils {
         let mut band_caps_list = [default_band_capability(); banjo_common::MAX_BANDS as usize];
         let basic_rate_list = arr!(
             [0x02, 0x04, 0x0b, 0x16, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c],
-            banjo_wlan_internal::MAX_SUPPORTED_BASIC_RATES as usize
+            banjo_ieee80211::MAX_SUPPORTED_BASIC_RATES as usize
         );
         let basic_rate_count = basic_rate_list.len() as u8;
         band_caps_list[0] = banjo_wlan_softmac::WlanSoftmacBandCapability {
@@ -1192,7 +1191,7 @@ pub mod test_utils {
             band: banjo_common::WlanBand::FIVE_GHZ,
             basic_rate_list: arr!(
                 [0x02, 0x04, 0x0b, 0x16, 0x30, 0x60, 0x7e, 0x7f],
-                banjo_wlan_internal::MAX_SUPPORTED_BASIC_RATES as usize
+                banjo_ieee80211::MAX_SUPPORTED_BASIC_RATES as usize
             ),
             basic_rate_count: 8,
             operating_channel_list: arr!(
@@ -1306,7 +1305,7 @@ pub mod test_utils {
             ht_caps: HtCapabilities { bytes: [0; banjo_ieee80211::HT_CAP_LEN as usize] },
             vht_supported: false,
             vht_caps: VhtCapabilities { bytes: [0; banjo_ieee80211::VHT_CAP_LEN as usize] },
-            basic_rate_list: [0; banjo_wlan_internal::MAX_SUPPORTED_BASIC_RATES as usize],
+            basic_rate_list: [0; banjo_ieee80211::MAX_SUPPORTED_BASIC_RATES as usize],
             basic_rate_count: 0,
             operating_channel_list: [0; banjo_ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS as usize],
             operating_channel_count: 0,

@@ -212,8 +212,8 @@ void WlanInterface::WlanFullmacImplQuery(wlan_fullmac_query_info_t* info) {
                                   WLAN_RATE_24M, WLAN_RATE_36M, WLAN_RATE_48M, WLAN_RATE_54M};
   constexpr uint8_t kRates5g[] = {WLAN_RATE_6M,  WLAN_RATE_9M,  WLAN_RATE_12M, WLAN_RATE_18M,
                                   WLAN_RATE_24M, WLAN_RATE_36M, WLAN_RATE_48M, WLAN_RATE_54M};
-  static_assert(std::size(kRates2g) <= fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES);
-  static_assert(std::size(kRates5g) <= fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES);
+  static_assert(std::size(kRates2g) <= fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES);
+  static_assert(std::size(kRates5g) <= fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES);
 
   // Retrieve the list of supported channels. This does not call into firmware, it's just mlan
   // computing all the channels and it shouldn't fail as long as the request is properly formatted.

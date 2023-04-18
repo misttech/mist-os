@@ -100,3 +100,12 @@ const OUI_LEN uint8 = 3;
 @available(added=HEAD)
 @namespaced
 const MAX_KEY_LEN uint8 = 32;
+
+// IEEE Std 802.11-2016 defines 12 values in dot11SupportedDataRatesRxTable.
+// It is never necessary to report more than 12 basic rates.
+//
+// This constant bounds the number of supported basic rates communicated between
+// WLAN components.
+@available(added=13)
+@namespaced
+const MAX_SUPPORTED_BASIC_RATES uint8 = 12;

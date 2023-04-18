@@ -4159,13 +4159,13 @@ static void brcmf_dump_if_band_cap(wlan_fullmac_band_capability_t* band_cap) {
   }
   BRCMF_DBG_UNFILTERED("   band: %s", band_str);
 
-  if (band_cap->basic_rate_count > fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES) {
+  if (band_cap->basic_rate_count > fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES) {
     BRCMF_DBG_UNFILTERED("Number of rates reported (%u) exceeds limit (%du), truncating",
                          band_cap->basic_rate_count,
-                         fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES);
-    band_cap->basic_rate_count = fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES;
+                         fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES);
+    band_cap->basic_rate_count = fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES;
   }
-  char rates_str[fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES * 6 + 1];
+  char rates_str[fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES * 6 + 1];
   char* str = rates_str;
   for (unsigned i = 0; i < band_cap->basic_rate_count; i++) {
     str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->basic_rate_list[i]);
@@ -4258,14 +4258,14 @@ void brcmf_if_query(net_device* ndev, wlan_fullmac_query_info_t* info) {
     if (bandlist[i] == WLC_BAND_2G) {
       band_cap->band = WLAN_BAND_TWO_GHZ;
       band_cap->basic_rate_count =
-          std::min<size_t>(fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
+          std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
       memcpy(band_cap->basic_rate_list, wl_g_rates,
              band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list));
       band_cap_2ghz = band_cap;
     } else if (bandlist[i] == WLC_BAND_5G) {
       band_cap->band = WLAN_BAND_FIVE_GHZ;
       band_cap->basic_rate_count =
-          std::min<size_t>(fuchsia_wlan_internal_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
+          std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
       memcpy(band_cap->basic_rate_list, wl_a_rates,
              band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list));
       band_cap_5ghz = band_cap;

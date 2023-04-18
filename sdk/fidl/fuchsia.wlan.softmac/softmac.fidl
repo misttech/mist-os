@@ -18,7 +18,7 @@ type WlanSoftmacBandCapability = struct {
     /// The value returned by this type indicates all the non-HT rates
     /// the device supports transmitting and receiving.
     basic_rate_count uint8;
-    basic_rate_list array<uint8, fuchsia.wlan.internal.MAX_SUPPORTED_BASIC_RATES>;
+    basic_rate_list array<uint8, ieee80211.MAX_SUPPORTED_BASIC_RATES>;
 
     /// If the device supports the HT PHY mode in this band, then ht_supported is
     /// set to true, and the value in ht_caps indicates the capabilities. Otherwise,

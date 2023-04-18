@@ -53,7 +53,7 @@ void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
 
     band_cap_list[i].basic_rate_count =
         std::min<size_t>((tap_phy_config.bands)[i].rates.count(),
-                         fuchsia_wlan_internal::wire::kMaxSupportedBasicRates);
+                         fuchsia_wlan_ieee80211::wire::kMaxSupportedBasicRates);
     std::copy_n((tap_phy_config.bands)[i].rates.data(), band_cap_list[i].basic_rate_count,
                 band_cap_list[i].basic_rate_list.begin());
 
