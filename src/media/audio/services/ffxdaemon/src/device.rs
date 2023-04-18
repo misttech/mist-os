@@ -43,18 +43,21 @@ impl Device {
     }
 
     pub async fn get_info(&self) -> Result<DeviceInfo, Error> {
-        let stream_properties = self.stream_config_client.get_properties().await?;
-        let supported_formats = self.stream_config_client.get_supported_formats().await?;
-        let gain_state = self.stream_config_client.watch_gain_state().await?;
-        let plug_state = self.stream_config_client.watch_plug_state().await?;
+        let stream_properties = self.stream_config_client.get_properties().await;
+        let supported_formats = self.stream_config_client.get_supported_formats().await.ok();
+        let gain_state = self.stream_config_client.watch_gain_state().await.ok();
+        let plug_state = self.stream_config_client.watch_plug_state().await.ok();
 
-        Ok(DeviceInfo {
-            stream_properties: Some(stream_properties),
-            supported_formats: Some(supported_formats),
-            gain_state: Some(gain_state),
-            plug_state: Some(plug_state),
-            ..DeviceInfo::EMPTY
-        })
+        match stream_properties {
+            Ok(stream_properties) => Ok(DeviceInfo {
+                stream_properties: Some(stream_properties),
+                supported_formats,
+                gain_state,
+                plug_state,
+                ..DeviceInfo::EMPTY
+            }),
+            Err(e) => Err(e.into()),
+        }
     }
 
     pub fn set_gain(&self, gain_state: GainState) -> Result<(), Error> {

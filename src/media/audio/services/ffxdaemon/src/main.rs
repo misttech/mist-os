@@ -645,17 +645,37 @@ impl AudioDaemon {
                         payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
 
                     let device =
-                        device::Device::connect(format_utils::path_for_selector(device_selector)?)?;
+                        device::Device::connect(format_utils::path_for_selector(device_selector)?);
 
-                    let info = device.get_info().await?;
-                    let response = AudioDaemonDeviceInfoResponse {
-                        device_info: Some(info),
-                        ..AudioDaemonDeviceInfoResponse::EMPTY
-                    };
+                    match device {
+                        Err(e) => {
+                            println!("Could not connect to device. {e}");
+                            responder
+                                .send(&mut Err(zx::Status::INTERNAL.into_raw()))
+                                .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                        }
 
-                    responder
-                        .send(&mut Ok(response))
-                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                        Ok(device) => {
+                            let info = device.get_info().await;
+                            match info {
+                                Ok(info) => {
+                                    let response = AudioDaemonDeviceInfoResponse {
+                                        device_info: Some(info),
+                                        ..AudioDaemonDeviceInfoResponse::EMPTY
+                                    };
+                                    responder
+                                        .send(&mut Ok(response))
+                                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                                }
+                                Err(e) => {
+                                    println!("Could not connect to device. {e}");
+                                    responder
+                                        .send(&mut Err(zx::Status::INTERNAL.into_raw()))
+                                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                                }
+                            }
+                        }
+                    }
                 }
 
                 AudioDaemonRequest::DeviceSetGainState { payload, responder } => {
