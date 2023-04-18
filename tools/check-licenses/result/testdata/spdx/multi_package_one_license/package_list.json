@@ -3,11 +3,12 @@
     "root": "fake/path",
     "licenseFile": [
       {
+        "contentLoaded": true,
         "data": [
           {
             "SPDXName": "Example License File for ProjectA",
             "SPDXID": "testing123",
-            "data": "RXhhbXBsZSBsaWNlbnNlIHRleHQ=",
+            "data": "Example license text",
             "url": "www.google.com"
           }
         ]

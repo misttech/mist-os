@@ -66,7 +66,7 @@ func NewSpecialProject(projectRootPath string) (*Project, error) {
 		Name:                            projectName,
 		Root:                            projectRootPath,
 		LicenseFileType:                 file.SingleLicense,
-		RegularFileType:                 file.Any,
+		RegularFileType:                 file.RegularFile,
 		ShouldBeDisplayed:               true,
 		SourceCodeIncluded:              false,
 		Children:                        make(map[string]*Project, 0),
@@ -100,7 +100,7 @@ func NewSpecialProject(projectRootPath string) (*Project, error) {
 		l = filepath.Join(p.Root, l)
 		l = filepath.Clean(l)
 
-		licenseFile, err := file.NewFile(l, p.LicenseFileType, p.Name)
+		licenseFile, err := file.LoadFile(l, p.LicenseFileType, p.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -108,21 +108,21 @@ func NewSpecialProject(projectRootPath string) (*Project, error) {
 
 		switch {
 		case strings.Contains(l, "dart-pkg"):
-			licenseFile.URL = fmt.Sprintf("%v/license", p.URL)
+			licenseFile.SetURL(fmt.Sprintf("%v/license", p.URL))
 
 		case strings.Contains(l, "golibs"):
-			relPath, err := filepath.Rel(p.Root, licenseFile.RelPath)
+			relPath, err := filepath.Rel(p.Root, licenseFile.RelPath())
 			if err != nil {
 				return nil, err
 			}
-			licenseFile.URL = fmt.Sprintf("%s/%s", p.URL, relPath)
+			licenseFile.SetURL(fmt.Sprintf("%s/%s", p.URL, relPath))
 
 		case strings.Contains(l, "rust_crates"):
 			rel := l
 			if strings.Contains(l, Config.FuchsiaDir) {
 				rel, _ = filepath.Rel(Config.FuchsiaDir, l)
 			}
-			licenseFile.URL = fmt.Sprintf("https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/%v", rel)
+			licenseFile.SetURL(fmt.Sprintf("https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/%v", rel))
 		}
 	}
 

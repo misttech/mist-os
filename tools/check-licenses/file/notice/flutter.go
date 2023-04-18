@@ -83,5 +83,5 @@ func ParseFlutter(path string, content []byte) ([]*Data, error) {
 		return nil, err
 	}
 
-	return licenses, nil
+	return mergeDuplicates(licenses), nil
 }

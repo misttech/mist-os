@@ -28,8 +28,8 @@ func TestNameLicenseProvided(t *testing.T) {
 	if p.Name != name {
 		t.Errorf("%v: expected Name == \"%v\", got %v.", t.Name(), name, p.Name)
 	}
-	if len(p.LicenseFile) != 1 || p.LicenseFile[0].Name != licenseFile {
-		t.Errorf("%v: expected License file == \"%v\", got %v.", t.Name(), licenseFile, p.LicenseFile[0].Name)
+	if len(p.LicenseFile) != 1 || p.LicenseFile[0].Name() != licenseFile {
+		t.Errorf("%v: expected License file == \"%v\", got %v.", t.Name(), licenseFile, p.LicenseFile[0].Name())
 	}
 }
 
@@ -59,8 +59,8 @@ func TestMultiLineFields(t *testing.T) {
 	if p.Name != name {
 		t.Errorf("%v: expected Name == \"%v\", got %v.", t.Name(), name, p.Name)
 	}
-	if len(p.LicenseFile) != 1 || p.LicenseFile[0].Name != licenseFile {
-		t.Errorf("%v: expected License file == \"%v\", got %v.", t.Name(), licenseFile, p.LicenseFile[0].Name)
+	if len(p.LicenseFile) != 1 || p.LicenseFile[0].Name() != licenseFile {
+		t.Errorf("%v: expected License file == \"%v\", got %v.", t.Name(), licenseFile, p.LicenseFile[0].Name())
 	}
 	if strings.TrimSpace(p.Description) != strings.TrimSpace(description) {
 		t.Errorf("%v: expected Description == \"%v\", got %v.", t.Name(), description, p.Description)

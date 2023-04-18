@@ -81,5 +81,5 @@ func ParseAndroid(path string, content []byte) ([]*Data, error) {
 		builder.Reset()
 	}
 
-	return licenses, nil
+	return mergeDuplicates(licenses), nil
 }

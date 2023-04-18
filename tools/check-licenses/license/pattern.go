@@ -161,7 +161,7 @@ func NewPattern(path string) (*Pattern, error) {
 // Search the given data slice for text that matches this Pattern regex.
 func (p *Pattern) Search(d *file.FileData) bool {
 	// If the data is empty, and this pattern is "_empty", return true.
-	if len(d.Data) == 0 && p.Name == "_empty" {
+	if len(d.Data()) == 0 && p.Name == "_empty" {
 		return true
 	}
 
@@ -169,20 +169,20 @@ func (p *Pattern) Search(d *file.FileData) bool {
 	// This should be faster than running the regex search.
 	if _, ok := p.PreviousMatches[d.Hash()]; ok && !p.isHeader {
 		p.Matches = append(p.Matches, d)
-		d.LicenseType = p.Type
+		d.SetLicenseType(p.Type)
 		return true
 	} else if _, ok := p.PreviousMismatches[d.Hash()]; ok {
 		return false
 	}
 
-	if m := p.Re.Find(d.Data); m != nil {
+	if m := p.Re.Find(d.Data()); m != nil {
 		// If this is a source file with the copyright header info at the top,
 		// modify the filedata object to hold the copyright info instead of the
 		// full file contents.
 		if p.isHeader {
 			d.SetData(m)
 		}
-		d.LicenseType = p.Type
+		d.SetLicenseType(p.Type)
 
 		p.Matches = append(p.Matches, d)
 		p.PreviousMatches[d.Hash()] = true
@@ -193,9 +193,9 @@ func (p *Pattern) Search(d *file.FileData) bool {
 	// For some reason, this specific pattern file isn't matching
 	// the license text that it is based on.
 	// TODO(fxbug.dev/115364): Analyze why this isn't matching properly.
-	if d.RelPath == "third_party/golibs/vendor/github.com/spdx/tools-golang/LICENSE.docs" &&
+	if d.File().RelPath() == "third_party/golibs/vendor/github.com/spdx/tools-golang/LICENSE.docs" &&
 		p.RelPath == "tools/check-licenses/license/patterns/exception/cc-by-4.0/spdx-tools-golang.txt" {
-		d.LicenseType = p.Type
+		d.SetLicenseType(p.Type)
 		p.Matches = append(p.Matches, d)
 		p.PreviousMatches[d.Hash()] = true
 		return true

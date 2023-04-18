@@ -9,6 +9,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file/notice"
@@ -21,24 +22,23 @@ import (
 // that points to the location of this license text in the original NOTICE file,
 // making it easier to find this license text again later.
 type FileData struct {
-	FilePath    string
-	RelPath     string
-	LibraryName string
-	LineNumber  int
-	Data        []byte `json:"data"`
+	file        *File
+	libraryName string
+	lineNumber  int
+	data        []byte
 
 	// ---------------
-	LicenseType string
-	PatternPath string
-	URL         string `json:"url"`
+	licenseType string
+	patternPath string
+	url         string
 
-	BeingSurfaced      string
-	SourceCodeIncluded string
+	beingSurfaced      string
+	sourceCodeIncluded string
 
 	// SPDX fields for referencing this file content
 	// in the SPDX output file.
-	SPDXName string `json:"SPDXName"`
-	SPDXID   string `json:"SPDXID"`
+	spdxName string
+	spdxID   string
 
 	hash string
 }
@@ -49,128 +49,140 @@ type OrderFileData []*FileData
 func (a OrderFileData) Len() int      { return len(a) }
 func (a OrderFileData) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a OrderFileData) Less(i, j int) bool {
-	if a[i].FilePath < a[j].FilePath {
+	if a[i].file.absPath < a[j].file.absPath {
 		return true
 	}
-	if a[i].FilePath > a[j].FilePath {
+	if a[i].file.absPath > a[j].file.absPath {
 		return false
 	}
-	return a[i].LineNumber < a[j].LineNumber
+	return a[i].lineNumber < a[j].lineNumber
 }
 
-func NewFileData(path string, relPath string, content []byte, filetype FileType, project string) ([]*FileData, error) {
+func LoadFileData(f *File, content []byte) ([]*FileData, error) {
 	data := make([]*FileData, 0)
 
 	// The "LicenseFormat" field of each file is set at the project level
 	// (in README.fuchsia files) and it affects how they are analyzed here.
-	switch filetype {
+	switch f.fileType {
 
-	// Default: File.LicenseFormat == Any
-	// This is most likely a regular source file in the repository.
-	// May or may not have copyright information.
-	case Any:
-		fallthrough
-
-	// File.LicenseFormat == CopyrightHeader
+	// File.LicenseFormat == RegularFile
 	// All source files belonging to "The Fuchsia Authors" (fuchsia.git)
 	// must contain Copyright header information.
-	case CopyrightHeader:
+	// Source files in other projects must not have restrictive license types.
+	case RegularFile:
 		fallthrough
 
 	// File.LicenseFormat == SingleLicense
 	// Regular LICENSE files that contain text for a single license.
 	case SingleLicense:
 		data = append(data, &FileData{
-			FilePath:    path,
-			RelPath:     relPath,
-			LineNumber:  0,
-			LibraryName: project,
-			Data:        bytes.TrimSpace(content),
+			file:        f,
+			lineNumber:  0,
+			libraryName: f.projectName,
+			data:        bytes.TrimSpace(content),
 		})
 
 	// File.LicenseFormat == MultiLicense*
 	// NOTICE files that contain text for multiple licenses.
 	// See the files in the /notice subdirectory for more info.
 	case MultiLicenseChromium:
-		ndata, err := notice.ParseChromium(path, content)
+		ndata, err := notice.ParseChromium(f.absPath, content)
 		if err != nil {
 			return nil, err
 		}
 		for _, d := range ndata {
 			data = append(data, &FileData{
-				FilePath:    path,
-				RelPath:     relPath,
-				LineNumber:  d.LineNumber,
-				LibraryName: d.LibraryName,
-				Data:        bytes.TrimSpace(d.LicenseText),
+				file:        f,
+				lineNumber:  d.LineNumber,
+				libraryName: d.LibraryName,
+				data:        bytes.TrimSpace(d.LicenseText),
 			})
 		}
 	case MultiLicenseFlutter:
-		ndata, err := notice.ParseFlutter(path, content)
+		ndata, err := notice.ParseFlutter(f.absPath, content)
 		if err != nil {
 			return nil, err
 		}
 		for _, d := range ndata {
 			data = append(data, &FileData{
-				FilePath:    path,
-				RelPath:     relPath,
-				LineNumber:  d.LineNumber,
-				LibraryName: d.LibraryName,
-				Data:        bytes.TrimSpace(d.LicenseText),
+				file:        f,
+				lineNumber:  d.LineNumber,
+				libraryName: d.LibraryName,
+				data:        bytes.TrimSpace(d.LicenseText),
 			})
 		}
 	case MultiLicenseAndroid:
-		ndata, err := notice.ParseAndroid(path, content)
+		ndata, err := notice.ParseAndroid(f.absPath, content)
 		if err != nil {
 			return nil, err
 		}
 		for _, d := range ndata {
 			data = append(data, &FileData{
-				FilePath:    path,
-				RelPath:     relPath,
-				LineNumber:  d.LineNumber,
-				LibraryName: d.LibraryName,
-				Data:        bytes.TrimSpace(d.LicenseText),
+				file:        f,
+				lineNumber:  d.LineNumber,
+				libraryName: d.LibraryName,
+				data:        bytes.TrimSpace(d.LicenseText),
 			})
 		}
 	case MultiLicenseGoogle:
-		ndata, err := notice.ParseGoogle(path, content)
+		ndata, err := notice.ParseGoogle(f.absPath, content)
 		if err != nil {
 			return nil, err
 		}
 		for _, d := range ndata {
 			data = append(data, &FileData{
-				FilePath:    path,
-				RelPath:     relPath,
-				LineNumber:  d.LineNumber,
-				LibraryName: d.LibraryName,
-				Data:        bytes.TrimSpace(d.LicenseText),
+				file:        f,
+				lineNumber:  d.LineNumber,
+				libraryName: d.LibraryName,
+				data:        bytes.TrimSpace(d.LicenseText),
 			})
 		}
 	}
 
 	for _, d := range data {
+		// Some characters in license texts are not interpreted properly
+		// (mismatched encodings?) and end up as garbled characters in output files.
+		// We replace those characters with properly encoded ones here.
 		for _, r := range Config.Replacements {
-			d.Data = bytes.ReplaceAll(d.Data, []byte(r.Replace), []byte(r.With))
+			d.data = bytes.ReplaceAll(d.data, []byte(r.Replace), []byte(r.With))
 		}
 
-		if d.LibraryName == "" {
-			d.LibraryName = project
+		if d.libraryName == "" {
+			d.libraryName = f.projectName
 		}
 
-		d.SPDXName = fmt.Sprintf("%s", d.LibraryName)
-		d.SPDXID = fmt.Sprintf("LicenseRef-filedata-%06d", spdxIndex)
-		spdxIndex = spdxIndex + 1
+		d.spdxName = fmt.Sprintf("%s", d.libraryName)
+
+		h := fnv.New128a()
+		h.Write([]byte(fmt.Sprintf("%s %s %s", d.libraryName, d.file.relPath, string(d.data))))
+		d.spdxID = fmt.Sprintf("LicenseRef-filedata-%x", h.Sum([]byte{}))
 	}
 	return data, nil
 }
+
+// Setters
+// TODO(fxbug.dev/125736): Remove all setters.
+func (fd *FileData) SetLicenseType(lt string) { fd.licenseType = lt }
+
+// Getters
+func (fd *FileData) File() *File                { return fd.file }
+func (fd *FileData) LibraryName() string        { return fd.libraryName }
+func (fd *FileData) LineNumber() int            { return fd.lineNumber }
+func (fd *FileData) Data() []byte               { return fd.data }
+func (fd *FileData) LicenseType() string        { return fd.licenseType }
+func (fd *FileData) PatternPath() string        { return fd.patternPath }
+func (fd *FileData) URL() string                { return fd.url }
+func (fd *FileData) BeingSurfaced() string      { return fd.beingSurfaced }
+func (fd *FileData) SourceCodeIncluded() string { return fd.sourceCodeIncluded }
+func (fd *FileData) SPDXName() string           { return fd.spdxName }
+func (fd *FileData) SPDXID() string             { return fd.spdxID }
 
 // For copyright data, we want "filedata" to only contain the copyright
 // text. Not the rest of the source code in the given file.
 // This method lets us set the filedata data after detecting the copyright
 // header info.
 func (fd *FileData) SetData(data []byte) {
-	fd.Data = data
+	fd.data = data
 	fd.hash = ""
 	fd.Hash()
 }
@@ -178,16 +190,16 @@ func (fd *FileData) SetData(data []byte) {
 // Use the config replacement / filedataurls information, along with
 // the project name and URL (if it exists) to define the actual location
 // of the license file on the internet.
-func (fd *FileData) UpdateURLs(project string, projectURL string) {
-	if strings.Contains(fd.RelPath, "prebuilt") {
+func (fd *FileData) UpdateURLs(projectName string, projectURL string) {
+	if strings.Contains(fd.file.relPath, "prebuilt") {
 		for _, ur := range Config.FileDataURLs {
-			if _, ok := ur.Projects[project]; !ok {
+			if _, ok := ur.Projects[projectName]; !ok {
 				continue
 			}
 
 			prefix := ur.Prefix
-			if url, ok := ur.Replacements[fd.LibraryName]; ok {
-				fd.URL = fmt.Sprintf("%v%v", prefix, url)
+			if url, ok := ur.Replacements[fd.libraryName]; ok {
+				fd.url = fmt.Sprintf("%v%v", prefix, url)
 				return
 			}
 		}
@@ -202,7 +214,7 @@ func (fd *FileData) Hash() string {
 	}
 
 	hasher := sha1.New()
-	hasher.Write(bytes.TrimSpace(fd.Data))
+	hasher.Write(bytes.TrimSpace(fd.data))
 	fd.hash = base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 	return fd.hash
 }

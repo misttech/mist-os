@@ -48,7 +48,11 @@ func search(projectRoot string, f *file.File, patterns []*Pattern) ([]*SearchRes
 
 	// Run the license patterns on the parsed license texts.
 	// Save the match results to a result object.
-	for _, d := range f.Data {
+	data, err := f.Data()
+	if err != nil {
+		return searchResults, err
+	}
+	for _, d := range data {
 		for _, p := range patterns {
 			if p.Search(d) {
 				result := &SearchResult{
@@ -63,7 +67,7 @@ func search(projectRoot string, f *file.File, patterns []*Pattern) ([]*SearchRes
 				// If it is the only license that matched the text, that's bad.
 				// Record these instances in the metrics, so we can investigate later.
 				if p.Name == Unrecognized.Name {
-					plusVal(UnrecognizedLicenses, fmt.Sprintf("%v - %v", f.RelPath, d.LibraryName))
+					plusVal(UnrecognizedLicenses, fmt.Sprintf("%v - %v", f.RelPath(), d.LibraryName()))
 				}
 
 				break
@@ -71,22 +75,23 @@ func search(projectRoot string, f *file.File, patterns []*Pattern) ([]*SearchRes
 		}
 	}
 	if len(searchResults) > 0 {
-		base := filepath.Base(f.RelPath)
-		path := filepath.Join("matches", f.RelPath, base)
+		base := filepath.Base(f.RelPath())
+		path := filepath.Join("matches", f.RelPath(), base)
 		allHeaders := true
 		for iter, r := range searchResults {
 			allHeaders = allHeaders && r.Pattern.isHeader
-			data := append([]byte(r.LicenseData.RelPath), []byte("\n\n")...)
-			data = append(data, r.LicenseData.Data...)
+			data := append([]byte(r.LicenseData.File().RelPath()), []byte("\n\n")...)
+			data = append(data, r.LicenseData.Data()...)
 			plusFile(filepath.Join("patterns", r.Pattern.RelPath, "example"), data)
 			if !r.Pattern.isHeader {
 				dir := filepath.Dir(path)
 				segPath := filepath.Join(dir, "segments", strconv.Itoa(iter))
-				plusFile(segPath, r.LicenseData.Data)
+				plusFile(segPath, r.LicenseData.Data())
 			}
 		}
 		if !allHeaders {
-			plusFile(path, f.Text)
+			text, _ := f.Text()
+			plusFile(path, text)
 		}
 
 	}
@@ -113,7 +118,7 @@ func Finalize() {
 
 		var m strings.Builder
 		for _, match := range p.Matches {
-			m.WriteString(match.FilePath)
+			m.WriteString(match.File().RelPath())
 			m.WriteString("\n")
 		}
 		plusFile(filepath.Join("patterns", p.RelPath, "matches"), []byte(m.String()))

@@ -74,5 +74,5 @@ func ParseChromium(path string, content []byte) ([]*Data, error) {
 		}
 	}
 
-	return licenses, nil
+	return mergeDuplicates(licenses), nil
 }

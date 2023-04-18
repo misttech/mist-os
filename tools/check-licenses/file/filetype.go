@@ -16,21 +16,28 @@ package file
 type FileType string
 
 const (
-	Any                  FileType = "any"
-	CopyrightHeader               = "copyright_header"
-	SingleLicense                 = "single_license"
-	MultiLicenseChromium          = "multi_license_chromium"
-	MultiLicenseFlutter           = "multi_license_flutter"
-	MultiLicenseAndroid           = "multi_license_android"
-	MultiLicenseGoogle            = "multi_license_google"
+	RegularFile          FileType = "Regular File"
+	SingleLicense                 = "Single License"
+	MultiLicenseChromium          = "Multi License Chromium"
+	MultiLicenseFlutter           = "Multi License Flutter"
+	MultiLicenseAndroid           = "Multi License Android"
+	MultiLicenseGoogle            = "Multi License Google"
 )
 
 var FileTypes map[string]FileType
 
 func init() {
 	FileTypes = map[string]FileType{
-		"any":                    Any,
-		"copyright_header":       CopyrightHeader,
+		"Regular File":           RegularFile,
+		"Single License":         SingleLicense,
+		"Multi License Chromium": MultiLicenseChromium,
+		"Multi License Flutter":  MultiLicenseFlutter,
+		"Multi License Android":  MultiLicenseAndroid,
+		"Multi License Google":   MultiLicenseGoogle,
+
+		// DEPRECATED: soft transition
+		"regular":                RegularFile,
+		"copyright_header":       RegularFile,
 		"single_license":         SingleLicense,
 		"multi_license_chromium": MultiLicenseChromium,
 		"multi_license_flutter":  MultiLicenseFlutter,

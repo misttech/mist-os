@@ -68,17 +68,18 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 	}
 	count := 0
 	for _, f := range fuchsia.SearchableFiles {
-		if len(f.Data) == 0 {
-			return fmt.Errorf("Found a file that hasn't been parsed yet?? %v\n", f.AbsPath)
+		fdList, err := f.Data()
+		if err != nil {
+			return fmt.Errorf("Found a file that hasn't been parsed yet?? %v | %v\n", f.AbsPath(), err)
 		}
 	OUTER:
-		for _, fd := range f.Data {
+		for _, fd := range fdList {
 			for _, p := range license.AllCopyrightPatterns {
 				if _, ok := p.PreviousMatches[fd.Hash()]; ok {
 					continue OUTER
 				}
 			}
-			b.WriteString(fmt.Sprintf("-> %v\n", fd.FilePath))
+			b.WriteString(fmt.Sprintf("-> %v\n", fd.File().RelPath()))
 			count = count + 1
 		}
 	}
@@ -94,8 +95,8 @@ func AllLicenseTextsMustBeRecognized() error {
 		var b strings.Builder
 		b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/license/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
 		for _, m := range license.Unrecognized.Matches {
-			b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber, m.FilePath))
-			b.WriteString(fmt.Sprintf("\n%v\n\n", string(m.Data)))
+			b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber(), m.File().RelPath()))
+			b.WriteString(fmt.Sprintf("\n%v\n\n", string(m.Data())))
 		}
 		return fmt.Errorf(b.String())
 	}
@@ -118,7 +119,7 @@ OUTER:
 			}
 		}
 
-		filepath := sr.LicenseData.FilePath
+		filepath := sr.LicenseData.File().RelPath()
 		for _, allowlist := range sr.Pattern.Allowlist {
 			for _, entry := range allowlist.Entries {
 				for _, project := range entry.Projects {
@@ -151,7 +152,7 @@ func AllComplianceWorksheetLinksAreGood() error {
 			fmt.Printf("Not checking URL for pattern %s\n", sr.Pattern.Name)
 			continue
 		}
-		url := sr.LicenseData.URL
+		url := sr.LicenseData.URL()
 		if checkedURLs[url] {
 			continue
 		}

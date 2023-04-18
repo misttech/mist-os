@@ -33,7 +33,7 @@ func AnalyzeLicenses() error {
 			} else {
 				p.LicenseFileSearchResults = append(p.LicenseFileSearchResults, results...)
 				for _, r := range results {
-					key := string(r.LicenseData.Data)
+					key := string(r.LicenseData.Data())
 					if _, ok := p.LicenseFileSearchResultsDeduped[key]; !ok {
 						p.LicenseFileSearchResultsDeduped[key] = r
 					}
@@ -43,10 +43,19 @@ func AnalyzeLicenses() error {
 			l.UpdateURLs(p.Name, p.URL)
 		}
 
+		// Currently, searching copyright header info for all source files
+		// in all projects is too much work. Runtimes on my local machine exceed 30mins.
+		//
+		// TODO(fxbug.dev/125491): Enable checks on all source files.
+		if p.Root != "." {
+			continue
+		}
+
 		// Analyze the copyright headers in the files in each project.
 		sort.Sort(file.Order(p.SearchableFiles))
 		for _, f := range p.SearchableFiles {
-			if len(f.Text) == 0 {
+			text, _ := f.Text()
+			if len(text) == 0 {
 				continue
 			}
 			if results, err := license.SearchHeaders(p.Root, f); err != nil {

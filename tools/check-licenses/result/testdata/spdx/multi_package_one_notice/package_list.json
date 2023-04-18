@@ -3,23 +3,24 @@
     "root": "fake/path",
     "licenseFile": [
       {
+        "contentLoaded": true,
         "data": [
           {
-            "SPDXName": "Example License File for ProjectA",
-            "SPDXID": "testing123 1",
-            "data": "RXhhbXBsZSBsaWNlbnNlIHRleHQ=",
+            "spdxName": "Example License File for ProjectA",
+            "spdxID": "testing123 1",
+            "data": "Example license text",
             "url": "www.google.com"
           },
           {
-            "SPDXName": "2nd Example License File for ProjectA",
-            "SPDXID": "testing123 2",
-            "data": "RXhhbXBsZSBsaWNlbnNlIHRleHQ=",
+            "spdxName": "2nd Example License File for ProjectA",
+            "spdxID": "testing123 2",
+            "data": "Example license text",
             "url": "www.google.com"
           },
           {
-            "SPDXName": "3rd Example License File for ProjectA",
-            "SPDXID": "testing123 3",
-            "data": "RXhhbXBsZSBsaWNlbnNlIHRleHQ=",
+            "spdxName": "3rd Example License File for ProjectA",
+            "spdxID": "testing123 3",
+            "data": "Example license text",
             "url": "www.google.com"
           }
         ]
@@ -51,11 +52,13 @@
     "root": "fake/path2",
     "licenseFile": [
       {
+        "text": "RXhhbXBsZSBsaWNlbnNlIHRleHQ=",
+        "contentLoaded": true,
         "data": [
           {
             "SPDXName": "Example License File for ProjectB",
             "SPDXID": "testing123 4",
-            "data": "RXhhbXBsZSBsaWNlbnNlIHRleHQ=",
+            "data": "Example license text",
             "url": "www.google.com"
           }
         ]

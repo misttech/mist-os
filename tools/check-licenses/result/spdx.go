@@ -76,13 +76,21 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 			// Prebuilts often come with a NOTICE file with several license texts.
 			// For now, let's keep those license texts together in one single
 			// OtherLicense SPDX object.
+			text, err := l.Text()
+			if err != nil {
+				return "", fmt.Errorf("Failed to get text for file %s: %v", l.RelPath(), err)
+			}
+			data, err := l.Data()
+			if err != nil {
+				return "", fmt.Errorf("Failed to get data for file %s: %v", l.RelPath(), err)
+			}
 			if strings.Contains(p.Root, "prebuilt") {
 				ol := &spdx.OtherLicense{
-					LicenseName:       l.SPDXName,
-					LicenseIdentifier: l.SPDXID,
-					ExtractedText:     string(l.Text),
+					LicenseName:       l.SPDXName(),
+					LicenseIdentifier: l.SPDXID(),
+					ExtractedText:     string(text),
 					LicenseCrossReferences: []string{
-						l.URL,
+						l.URL(),
 					},
 				}
 				if _, ok := seenOtherLicenses[ol.LicenseIdentifier]; !ok {
@@ -92,13 +100,13 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 				continue
 			}
 
-			for _, d := range l.Data {
+			for _, d := range data {
 				ol := &spdx.OtherLicense{
-					LicenseName:       d.SPDXName,
-					LicenseIdentifier: d.SPDXID,
-					ExtractedText:     string(d.Data),
+					LicenseName:       d.SPDXName(),
+					LicenseIdentifier: d.SPDXID(),
+					ExtractedText:     string(d.Data()),
 					LicenseCrossReferences: []string{
-						d.URL,
+						d.URL(),
 					},
 				}
 				if _, ok := seenOtherLicenses[ol.LicenseIdentifier]; !ok {

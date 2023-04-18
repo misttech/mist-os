@@ -10,7 +10,6 @@ import (
 	"log"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/util"
@@ -65,8 +64,12 @@ func FilterProjects() error {
 	dedupedLicenseDataMap := make(map[string][]*file.FileData)
 	for _, p := range FilteredProjects {
 		for _, lf := range p.LicenseFile {
-			for _, ld := range lf.Data {
-				key := string(ld.Data)
+			data, err := lf.Data()
+			if err != nil {
+				return err
+			}
+			for _, ld := range data {
+				key := string(ld.Data())
 				if _, ok := dedupedLicenseDataMap[key]; !ok {
 					dedupedLicenseDataMap[key] = make([]*file.FileData, 0)
 				}
@@ -77,13 +80,13 @@ func FilterProjects() error {
 
 	for _, v := range dedupedLicenseDataMap {
 		sort.SliceStable(v, func(i, j int) bool {
-			return v[i].LibraryName > string(v[j].LibraryName)
+			return v[i].LibraryName() > string(v[j].LibraryName())
 		})
 		DedupedLicenseData = append(DedupedLicenseData, v)
 	}
 
 	sort.SliceStable(DedupedLicenseData, func(i, j int) bool {
-		return string(DedupedLicenseData[i][0].Data) > string(DedupedLicenseData[j][0].Data)
+		return string(DedupedLicenseData[i][0].Data()) > string(DedupedLicenseData[j][0].Data())
 	})
 
 	return nil
@@ -150,16 +153,8 @@ func getFileMap() (map[string]*Project, error) {
 		allFiles = append(allFiles, p.Files...)
 		allFiles = append(allFiles, p.LicenseFile...)
 		for _, f := range allFiles {
-			path := f.AbsPath
-			if strings.Contains(f.AbsPath, Config.FuchsiaDir) {
-				var err error
-				path, err = filepath.Rel(Config.FuchsiaDir, f.AbsPath)
-				if err != nil {
-					return nil, err
-				}
-			}
-			filePath := "//" + path
-			folderPath := "//" + filepath.Dir(path)
+			filePath := "//" + f.RelPath()
+			folderPath := "//" + filepath.Dir(f.RelPath())
 
 			// "gn gen" may reveal that the current workspace
 			// has a dependency on a LICENSE file.

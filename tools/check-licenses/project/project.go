@@ -55,6 +55,8 @@ type Project struct {
 
 	// SPDX fields
 	Package *spdx.Package "json:'package'"
+
+	SPDXID string
 }
 
 // Order implements sort.Interface for []*Project based on the Root field.
@@ -140,7 +142,7 @@ func NewProject(readmePath string, projectRootPath string) (*Project, error) {
 		ReadmePath:                      readmePath,
 		LicenseFileType:                 file.SingleLicense,
 		LicenseFileTypeMap:              make(map[string]file.FileType, 0),
-		RegularFileType:                 file.Any,
+		RegularFileType:                 file.RegularFile,
 		ShouldBeDisplayed:               true,
 		SourceCodeIncluded:              false,
 		Children:                        make(map[string]*Project, 0),
@@ -237,18 +239,18 @@ func NewProject(readmePath string, projectRootPath string) (*Project, error) {
 		l = filepath.Join(Config.FuchsiaDir, p.Root, l)
 		l = filepath.Clean(l)
 
-		licenseFile, err := file.NewFile(l, licenseFileType, p.Name)
+		licenseFile, err := file.LoadFile(l, licenseFileType, p.Name)
 		if err != nil {
 			return nil, err
 		}
 
 		licenseDir := filepath.Dir(l)
 		if url, hash, err := getGitInfo(licenseDir); err == nil {
-			licenseFile.URL = fmt.Sprintf("%s/+/%s/%s", url, hash, licenseFilePaths[i])
+			licenseFile.SetURL(fmt.Sprintf("%s/+/%s/%s", url, hash, licenseFilePaths[i]))
 		}
 
 		if licenseFileUrls[i] != "" {
-			licenseFile.URL = licenseFileUrls[i]
+			licenseFile.SetURL(licenseFileUrls[i])
 		}
 
 		p.LicenseFile = append(p.LicenseFile, licenseFile)
@@ -302,7 +304,7 @@ func (p *Project) processCustomFields() error {
 func (p *Project) AddFiles(filepaths []string) error {
 	licenseFileMap := make(map[string]bool, 0)
 	for _, lpath := range p.LicenseFile {
-		licenseFileMap[lpath.AbsPath] = true
+		licenseFileMap[lpath.AbsPath()] = true
 	}
 
 	for _, path := range filepaths {
@@ -310,7 +312,7 @@ func (p *Project) AddFiles(filepaths []string) error {
 			continue
 		}
 
-		f, err := file.NewFile(path, p.RegularFileType, p.Name)
+		f, err := file.LoadFile(path, p.RegularFileType, p.Name)
 		if err != nil {
 			return err
 		}

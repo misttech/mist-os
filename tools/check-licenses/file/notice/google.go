@@ -66,5 +66,5 @@ func ParseGoogle(path string, content []byte) ([]*Data, error) {
 		licenses = append(licenses, license)
 	}
 
-	return licenses, nil
+	return mergeDuplicates(licenses), nil
 }
