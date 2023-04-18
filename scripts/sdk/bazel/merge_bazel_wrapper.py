@@ -46,12 +46,32 @@ def print_file_difference(source_file, dest_file, relpath):
                 print(line)
         except UnicodeDecodeError:
             return
-    # assert relpath in WHITELIST_DIFF_LISTS
 
 
 def format_dir(buildifier_path: str, dir: str) -> None:
     cmd = [buildifier_path, "-r", dir]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def sorting(item):
+    if isinstance(item, dict):
+        return sorted((key, sorting(values)) for key, values in item.items())
+    if isinstance(item, list):
+        return sorted(sorting(x) for x in item)
+    return item
+
+
+def validate_same_json(source_file, dest_file):
+    if not os.path.basename(source_file).endswith(".json"):
+        return False
+
+    with open(source_file, "r+") as sf, open(dest_file, "r+") as df:
+        source = sorting(json.load(sf))
+        dest = sorting(json.load(df))
+        # Update the json to be sorted form, to better demonstrate the differences
+        json.dump(source, sf)
+        json.dump(dest, df)
+        return source == dest
 
 
 def main():
@@ -87,9 +107,11 @@ def main():
                 if os.path.exists(dest_file):
                     # Coherence check: Ensure that files with the same path have equal content.
                     if not filecmp.cmp(source_file, dest_file):
-                        print_file_difference(source_file, dest_file, relpath)
-
+                        if not validate_same_json(source_file, dest_file):
+                            print_file_difference(
+                                source_file, dest_file, relpath)
                     continue
+
                 if not os.path.exists(os.path.dirname(dest_file)):
                     os.makedirs(os.path.dirname(dest_file))
                 shutil.copy(source_file, dest_file)
