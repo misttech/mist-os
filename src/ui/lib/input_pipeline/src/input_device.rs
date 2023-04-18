@@ -55,7 +55,7 @@ pub struct InputDeviceStatus {
     _last_generated_timestamp_ns: fuchsia_inspect::UintProperty,
 
     // This node records the health status of the `InputDevice`.
-    _health_node: fuchsia_inspect::health::Node,
+    pub health_node: fuchsia_inspect::health::Node,
 }
 
 impl InputDeviceStatus {
@@ -76,7 +76,7 @@ impl InputDeviceStatus {
             _events_generated: events_generated,
             _last_received_timestamp_ns: last_received_timestamp_ns,
             _last_generated_timestamp_ns: last_generated_timestamp_ns,
-            _health_node: health_node,
+            health_node,
         }
     }
 }
@@ -303,50 +303,61 @@ pub async fn get_device_binding(
     device_node: fuchsia_inspect::Node,
 ) -> Result<Box<dyn InputDeviceBinding>, Error> {
     match device_type {
-        InputDeviceType::ConsumerControls => Ok(Box::new(
-            consumer_controls_binding::ConsumerControlsBinding::new(
-                device_proxy,
-                input_event_sender,
-                device_node,
-            )
-            .await?,
-        )),
-        InputDeviceType::Mouse => Ok(Box::new(
-            mouse_binding::MouseBinding::new(
+        InputDeviceType::ConsumerControls => {
+            let mut binding = consumer_controls_binding::ConsumerControlsBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
-            .await?,
-        )),
-        InputDeviceType::Touch => Ok(Box::new(
-            touch_binding::TouchBinding::new(
+            .await?;
+            binding.inspect_status.health_node.set_ok();
+            Ok(Box::new(binding))
+        }
+        InputDeviceType::Mouse => {
+            let mut binding = mouse_binding::MouseBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
-            .await?,
-        )),
-        InputDeviceType::Keyboard => Ok(Box::new(
-            keyboard_binding::KeyboardBinding::new(
+            .await?;
+            binding.inspect_status.health_node.set_ok();
+            Ok(Box::new(binding))
+        }
+        InputDeviceType::Touch => {
+            let mut binding = touch_binding::TouchBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
-            .await?,
-        )),
-        InputDeviceType::LightSensor => Ok(Box::new(
-            light_sensor_binding::LightSensorBinding::new(
+            .await?;
+            binding.inspect_status.health_node.set_ok();
+            Ok(Box::new(binding))
+        }
+        InputDeviceType::Keyboard => {
+            let mut binding = keyboard_binding::KeyboardBinding::new(
                 device_proxy,
                 device_id,
                 input_event_sender,
                 device_node,
             )
-            .await?,
-        )),
+            .await?;
+            binding.inspect_status.health_node.set_ok();
+            Ok(Box::new(binding))
+        }
+        InputDeviceType::LightSensor => {
+            let mut binding = light_sensor_binding::LightSensorBinding::new(
+                device_proxy,
+                device_id,
+                input_event_sender,
+                device_node,
+            )
+            .await?;
+            binding.inspect_status.health_node.set_ok();
+            Ok(Box::new(binding))
+        }
     }
 }
 

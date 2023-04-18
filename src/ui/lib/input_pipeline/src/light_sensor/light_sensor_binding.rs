@@ -10,6 +10,7 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor, SensorType};
 use fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest;
+use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc::Sender;
 
@@ -38,7 +39,7 @@ pub(crate) struct LightSensorBinding {
     device_descriptor: LightSensorDeviceDescriptor,
 
     /// The inventory of this binding's Inspect status.
-    _inspect_status: InputDeviceStatus,
+    pub inspect_status: InputDeviceStatus,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -131,9 +132,16 @@ impl LightSensorBinding {
         input_event_sender: Sender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let descriptor = device.get_descriptor().await?;
-        let input_device_status = InputDeviceStatus::new(device_node);
+        let mut input_device_status = InputDeviceStatus::new(device_node);
+        let descriptor = match device.get_descriptor().await {
+            Ok(descriptor) => descriptor,
+            Err(_) => {
+                input_device_status.health_node.set_unhealthy("Could not get device descriptor.");
+                return Err(format_err!("Could not get descriptor for device_id: {}", device_id));
+            }
+        };
         let device_info = descriptor.device_info.ok_or_else(|| {
+            input_device_status.health_node.set_unhealthy("Empty device_info in descriptor.");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
             tracing::error!("DRIVER BUG: empty device_info for device_id: {}", device_id);
@@ -208,7 +216,10 @@ impl LightSensorBinding {
                             })
                     })
                     .next()
-                    .ok_or_else(|| format_err!("missing sensor data in device"))?;
+                    .ok_or_else(|| {
+                        input_device_status.health_node.set_unhealthy("Missing light sensor data.");
+                        format_err!("missing sensor data in device")
+                    })?;
                 Ok(LightSensorBinding {
                     event_sender: input_event_sender,
                     device_descriptor: LightSensorDeviceDescriptor {
@@ -217,13 +228,18 @@ impl LightSensorBinding {
                         device_id,
                         sensor_layout,
                     },
-                    _inspect_status: input_device_status,
+                    inspect_status: input_device_status,
                 })
             }
-            device_descriptor => Err(format_err!(
-                "Light Sensor Device Descriptor failed to parse: \n {:?}",
-                device_descriptor
-            )),
+            device_descriptor => {
+                input_device_status
+                    .health_node
+                    .set_unhealthy("Light Sensor Device Descriptor failed to parse.");
+                Err(format_err!(
+                    "Light Sensor Device Descriptor failed to parse: \n {:?}",
+                    device_descriptor
+                ))
+            }
         }
     }
 

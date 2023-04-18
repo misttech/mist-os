@@ -12,7 +12,9 @@ use {
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_zircon as zx,
+    fidl_fuchsia_ui_pointerinjector as pointerinjector,
+    fuchsia_inspect::health::Reporter,
+    fuchsia_zircon as zx,
     futures::channel::mpsc::Sender,
     maplit::hashmap,
     std::collections::HashMap,
@@ -200,7 +202,7 @@ pub struct TouchBinding {
     device_proxy: InputDeviceProxy,
 
     /// The inventory of this binding's Inspect status.
-    _inspect_status: InputDeviceStatus,
+    pub inspect_status: InputDeviceStatus,
 }
 
 #[async_trait]
@@ -287,9 +289,17 @@ impl TouchBinding {
         input_event_sender: Sender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_descriptor: fidl_fuchsia_input_report::DeviceDescriptor =
-            device_proxy.get_descriptor().await?;
-        let input_device_status = InputDeviceStatus::new(device_node);
+        let mut input_device_status = InputDeviceStatus::new(device_node);
+        let device_descriptor: fidl_input_report::DeviceDescriptor = match device_proxy
+            .get_descriptor()
+            .await
+        {
+            Ok(descriptor) => descriptor,
+            Err(_) => {
+                input_device_status.health_node.set_unhealthy("Could not get device descriptor.");
+                return Err(format_err!("Could not get descriptor for device_id: {}", device_id));
+            }
+        };
 
         let touch_device_type = get_device_type(&device_proxy).await;
 
@@ -330,9 +340,14 @@ impl TouchBinding {
                 },
                 touch_device_type,
                 device_proxy,
-                _inspect_status: input_device_status,
+                inspect_status: input_device_status,
             }),
-            descriptor => Err(format_err!("Touch Descriptor failed to parse: \n {:?}", descriptor)),
+            descriptor => {
+                input_device_status
+                    .health_node
+                    .set_unhealthy("Touch Device Descriptor failed to parse.");
+                Err(format_err!("Touch Descriptor failed to parse: \n {:?}", descriptor))
+            }
         }
     }
 

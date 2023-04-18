@@ -12,7 +12,9 @@ use {
     fidl_fuchsia_ui_input3 as fidl_ui_input3,
     fidl_fuchsia_ui_input3::KeyEventType,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync,
+    fuchsia_inspect::health::Reporter,
+    fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, SinkExt},
 };
 
@@ -267,7 +269,7 @@ pub struct KeyboardBinding {
     device_descriptor: KeyboardDeviceDescriptor,
 
     /// The inventory of this binding's Inspect status.
-    _inspect_status: InputDeviceStatus,
+    pub inspect_status: InputDeviceStatus,
 }
 
 #[async_trait]
@@ -366,9 +368,17 @@ impl KeyboardBinding {
         device_id: u32,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let descriptor = device.get_descriptor().await?;
-        let input_device_status = InputDeviceStatus::new(device_node);
+        let mut input_device_status = InputDeviceStatus::new(device_node);
+        let descriptor = match device.get_descriptor().await {
+            Ok(descriptor) => descriptor,
+            Err(_) => {
+                input_device_status.health_node.set_unhealthy("Could not get device descriptor.");
+                return Err(format_err!("Could not get descriptor for device_id: {}", device_id));
+            }
+        };
+
         let device_info = descriptor.device_info.ok_or({
+            input_device_status.health_node.set_unhealthy("Empty device_info in descriptor");
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
             tracing::error!("DRIVER BUG: empty device_info for device_id: {}", device_id);
@@ -386,12 +396,17 @@ impl KeyboardBinding {
                     device_info,
                     device_id,
                 },
-                _inspect_status: input_device_status,
+                inspect_status: input_device_status,
             }),
-            device_descriptor => Err(format_err!(
-                "Keyboard Device Descriptor failed to parse: \n {:?}",
-                device_descriptor
-            )),
+            device_descriptor => {
+                input_device_status
+                    .health_node
+                    .set_unhealthy("Keyboard Device Descriptor failed to parse.");
+                Err(format_err!(
+                    "Keyboard Device Descriptor failed to parse: \n {:?}",
+                    device_descriptor
+                ))
+            }
         }
     }
 

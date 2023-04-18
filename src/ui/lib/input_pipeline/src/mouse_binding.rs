@@ -11,6 +11,7 @@ use {
     fidl_fuchsia_input_report as fidl_input_report,
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
+    fuchsia_inspect::health::Reporter,
     fuchsia_zircon as zx,
     futures::channel::mpsc::Sender,
     std::collections::HashSet,
@@ -161,7 +162,7 @@ pub struct MouseBinding {
     device_descriptor: MouseDeviceDescriptor,
 
     /// The inventory of this binding's Inspect status.
-    _inspect_status: InputDeviceStatus,
+    pub inspect_status: InputDeviceStatus,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -256,16 +257,31 @@ impl MouseBinding {
         input_event_sender: Sender<input_device::InputEvent>,
         device_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let device_descriptor: fidl_input_report::DeviceDescriptor =
-            device.get_descriptor().await?;
+        let mut input_device_status = InputDeviceStatus::new(device_node);
+        let device_descriptor: fidl_input_report::DeviceDescriptor = match device
+            .get_descriptor()
+            .await
+        {
+            Ok(descriptor) => descriptor,
+            Err(_) => {
+                input_device_status.health_node.set_unhealthy("Could not get device descriptor.");
+                return Err(format_err!("Could not get descriptor for device_id: {}", device_id));
+            }
+        };
 
-        let mouse_descriptor = device_descriptor
-            .mouse
-            .ok_or_else(|| format_err!("DeviceDescriptor does not have a MouseDescriptor"))?;
+        let mouse_descriptor = device_descriptor.mouse.ok_or_else(|| {
+            input_device_status
+                .health_node
+                .set_unhealthy("DeviceDescriptor does not have a MouseDescriptor.");
+            format_err!("DeviceDescriptor does not have a MouseDescriptor")
+        })?;
 
-        let mouse_input_descriptor = mouse_descriptor
-            .input
-            .ok_or_else(|| format_err!("MouseDescriptor does not have a MouseInputDescriptor"))?;
+        let mouse_input_descriptor = mouse_descriptor.input.ok_or_else(|| {
+            input_device_status
+                .health_node
+                .set_unhealthy("MouseDescriptor does not have a MouseInputDescriptor.");
+            format_err!("MouseDescriptor does not have a MouseInputDescriptor")
+        })?;
 
         let model = mouse_model_database::db::get_mouse_model(device_descriptor.device_info);
 
@@ -279,12 +295,10 @@ impl MouseBinding {
             counts_per_mm: model.counts_per_mm,
         };
 
-        let input_device_status = InputDeviceStatus::new(device_node);
-
         Ok(MouseBinding {
             event_sender: input_event_sender,
             device_descriptor,
-            _inspect_status: input_device_status,
+            inspect_status: input_device_status,
         })
     }
 

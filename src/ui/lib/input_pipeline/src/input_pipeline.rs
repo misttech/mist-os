@@ -1029,7 +1029,7 @@ mod tests {
                         last_received_timestamp_ns: 0u64,
                         last_generated_timestamp_ns: 0u64,
                         "fuchsia.inspect.Health": {
-                            status: "STARTING_UP",
+                            status: "OK",
                             // Timestamp value is unpredictable and not relevant in this context,
                             // so we only assert that the property is present.
                             start_timestamp_nanos: AnyProperty
