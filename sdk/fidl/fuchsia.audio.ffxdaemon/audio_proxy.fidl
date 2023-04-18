@@ -23,10 +23,14 @@ type PlayLocation = flexible union {
 /// Configuration for AudioRenderer.
 type RendererConfig = table {
     /// The usage of the audio stream.
+    ///
     /// Required.
     1: usage fuchsia.media.AudioRenderUsage;
 
-    /// How to set the reference clock.
+    /// The reference clock type used by the stream. If unspecified, use the default
+    /// reference clock provided by the renderer.
+    ///
+    /// Optional.
     2: clock ClockType;
 
     /// How many packets to use when sending data to an AudioRenderer.
@@ -65,11 +69,16 @@ type CustomClockInfo = table {
     /// Frequency rate adjustment to a clone of the system monotonic clock.
     /// Given in parts per million relative to the system monotonic rate.
     /// Must fall within [ZX_CLOCK_UPDATE_MIN_RATE_ADJUST, ZX_CLOCK_UPDATE_MAX_RATE_ADJUST].
-    /// For more info, see `zx_clock_update`.
+    /// For more info, see `zx_clock_update`. If not specified, use the reference clock's
+    /// default rate.
+    ///
+    /// Optional.
     1: rate_adjust int32;
 
     /// Starting delta between the reference clock passed to AudioRenderer or Capturer
-    /// and the system monotonic clock.
+    /// and the system monotonic clock. If not specified, do not adjust reference clock offset.
+    ///
+    /// Optional.
     2: offset int32;
 };
 
@@ -97,38 +106,50 @@ type CapturerType = flexible union {
 /// Configuration for AudioCapturer.
 type CapturerInfo = table {
     /// The usage of the audio stream.
+    ///
     /// Required.
     1: usage fuchsia.media.AudioCaptureUsage;
 
-    /// How to set the reference clock.
+    /// The reference clock type used by the stream. If unspecified, use the default
+    /// reference clock provided by the capturer.
+    ///
+    /// Optional.
     2: clock ClockType;
 };
 
 /// Gain settings.
 type GainSettings = table {
-    /// Whether to mute the audio stream.
+    /// Whether to mute the audio stream. If unspecified, do not adjust the existing mute value.
+    ///
+    /// Optional.
     1: mute bool;
 
-    /// Gain level in dB.
+    /// Gain level in dB. If unspecified, do not adjust stream or device gain.
+    ///
+    /// Optional.
     2: gain float32;
 };
 
 /// Device target info.
 type DeviceInfo = table {
     /// Top level static properties of the stream.
+    ///
     /// Required.
     1: stream_properties fuchsia.hardware.audio.StreamProperties;
 
     /// Supported formats.
+    ///
     /// Required.
     2: supported_formats
             vector<fuchsia.hardware.audio.SupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
 
     /// Gain state.
+    ///
     /// Required.
     3: gain_state fuchsia.hardware.audio.GainState;
 
     /// Plug state.
+    ///
     /// Required.
     4: plug_state fuchsia.hardware.audio.PlugState;
 };
@@ -136,10 +157,12 @@ type DeviceInfo = table {
 /// Identifies which device to retrieve information about.
 type DeviceSelector = table {
     /// Whether device is input or output.
+    ///
     /// Required.
     1: is_input bool;
 
     /// ID of device.
+    ///
     /// Required.
     2: id fuchsia.io.Path;
 };
@@ -157,22 +180,28 @@ protocol AudioDaemon {
     /// Returns sockets for transmitting info back to stdout and stderr on host.
     Play(resource table {
         /// Socket for audio data. Should transmit entire file in WAV format.
+        ///
         /// Required.
         1: socket zx.handle:SOCKET;
 
         /// Play on device ring buffer or AudioRenderer.
+        ///
         /// Required.
         2: location PlayLocation;
 
         /// Play settings.
+        ///
+        /// Required.
         3: gain_settings GainSettings;
     }) -> (resource table {
         /// Information from daemon component for ffx plugin to display.
-        /// Always present.
+        ///
+        /// Required.
         1: stdout zx.handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
-        /// Always present.
+        ///
+        /// Required.
         2: stderr zx.handle:SOCKET;
     }) error zx.status;
 
@@ -180,41 +209,52 @@ protocol AudioDaemon {
     /// Returns sockets containing audio data and errors back to host.
     Record(resource table {
         /// Record from AudioCapturer or ring buffer.
+        ///
         /// Required.
         1: location RecordLocation;
 
         /// Streamtype.
+        ///
         /// Required.
         2: stream_type fuchsia.media.AudioStreamType;
 
-        /// Duration in nanoseconds to record audio data.
+        /// Duration in nanoseconds to record audio data. If not specified, daemon will send
+        /// data back to ffx client until it receives a stop signal following a keypress.
+        /// If present, the record request is still cancelable via handle below.
+        ///
         /// Optional.
         3: duration zx.duration;
 
-        /// Handle to specify when to stop.
-        /// Can be set only if the `duration` is not specified.
+        /// Handle to signal when to stop sending data back to ffx client.
+        ///
+        /// Required.
         4: canceler server_end:AudioDaemonCanceler;
 
-        /// Record gain settings.
+        /// Record gain settings. If not specified, AudioCapturer's defaults will apply.
+        ///
         /// Optional.
         5: gain_settings GainSettings;
 
-        /// Buffer size.
+        /// Buffer size. If not specified, allocate enough to hold one second of audio data.
+        ///
         /// Optional.
         6: buffer_size uint64;
     }) -> (resource table {
         /// Contains audio data in the form of a complete WAV file.
-        /// Always present.
+        ///
+        /// Required.
         1: stdout zx.handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
-        /// Always present.
+        ///
+        /// Required.
         2: stderr zx.handle:SOCKET;
     }) error zx.status;
 
     /// Lists all available audio devices on target.
     ListDevices() -> (resource table {
         /// List of available devices, sorted by name.
+        ///
         /// Required.
         1: devices vector<fuchsia.io.Path>:MAX;
     }) error zx.status;
@@ -223,20 +263,25 @@ protocol AudioDaemon {
     DeviceInfo(resource table {
         /// Id of device to retrieve information about, and
         /// whether it is an input or output device.
+        ///
         /// Required.
         1: device DeviceSelector;
     }) -> (resource table {
-        /// Information about device.
+        /// Information about the device.
+        ///
+        /// Required.
         1: device_info DeviceInfo;
     }) error zx.status;
 
     /// Sets the gain of the stream in decibels.
     DeviceSetGainState(resource table {
         /// Id of the device to set the gain state.
+        ///
         /// Required.
         1: device DeviceSelector;
 
         /// Desired gain state.
+        ///
         /// Required.
         2: gain_state fuchsia.hardware.audio.GainState;
     }) -> () error zx.status;
