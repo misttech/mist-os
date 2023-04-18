@@ -78,6 +78,7 @@ def extract_toolchain(target):
         raise ValueError("target %s missing closing `)`")
     return substr[:-1]  # remove closing `)`
 
+
 def version_from_toolchain(toolchain):
     """ Return a version to use to allow host and target crates to coexist. """
     version = "0.0.1"
@@ -236,7 +237,8 @@ def write_toml_file(
             extra_configs.append(flag[len("--cfg="):])
 
     crate_type = "rlib"
-    package_name = lookup_gn_pkg_name(project, target, for_workspace=for_workspace)
+    package_name = lookup_gn_pkg_name(
+        project, target, for_workspace=for_workspace)
 
     default_target = ""
     if classify_toolchain(extract_toolchain(target)) == ToolchainType.TARGET:
@@ -261,8 +263,10 @@ def write_toml_file(
 
     env_vars = metadata.get("rustenv", [])
     if extra_configs or env_vars:
-        with open(os.path.join(gn_cargo_dir, str(lookup[target]), "build.rs"), "w") as buildfile:
-            template = textwrap.dedent("""\
+        with open(os.path.join(gn_cargo_dir, str(lookup[target]), "build.rs"),
+                  "w") as buildfile:
+            template = textwrap.dedent(
+                """\
                 //! build script for {target}
                 fn main() {{
                 // build script does not read any files
@@ -272,13 +276,13 @@ def write_toml_file(
                 {env_vars}
                 }}
             """)
-            body="\n".join(
-                f'println!(r#"cargo:rustc-cfg={cfg}"#);' for cfg in extra_configs
-            )
-            env_vars="\n".join(
-                f'println!("cargo:rustc-env={env}");' for env in env_vars
-            )
-            buildfile.write(template.format(target=target, body=body, env_vars=env_vars))
+            body = "\n".join(
+                f'println!(r#"cargo:rustc-cfg={cfg}"#);'
+                for cfg in extra_configs)
+            env_vars = "\n".join(
+                f'println!("cargo:rustc-env={env}");' for env in env_vars)
+            buildfile.write(
+                template.format(target=target, body=body, env_vars=env_vars))
 
     extra_test_deps = set()
     if target_type in {"[lib]", "[[bin]]"}:
@@ -369,7 +373,8 @@ def write_toml_file(
             elif "crate_name" in project.targets[dep]:
                 toolchain = extract_toolchain(dep)
                 version = version_from_toolchain(toolchain)
-                crate_name = lookup_gn_pkg_name(project, dep, for_workspace=for_workspace)
+                crate_name = lookup_gn_pkg_name(
+                    project, dep, for_workspace=for_workspace)
                 output_name = project.targets[dep]["crate_name"]
                 dep_dir = os.path.join(gn_cargo_dir, str(lookup[dep]))
                 fout.write(
@@ -394,6 +399,7 @@ def write_toml_file(
             # https://users.rust-lang.org/t/features-and-dependencies-cannot-have-the-same-name/47746/2
             if feature not in dep_crate_names:
                 fout.write("%s = []\n" % feature)
+
 
 def main():
     # TODO(tmandry): Remove all hardcoded paths and replace with args.
@@ -490,15 +496,14 @@ def main():
                 root_build_dir,
                 gn_cargo_dir,
                 for_workspace=False,
-                version = version)
+                version=version)
 
         if (not target.startswith("//third_party/rust_crates:")
            ) and target in project.reachable_targets:
             workspace_dirs_by_toolchain[toolchain].append(
                 (
                     target,
-                    os.path.relpath(
-                        for_workspace_cargo_toml_dir, root_path)))
+                    os.path.relpath(for_workspace_cargo_toml_dir, root_path)))
             with open(os.path.join(for_workspace_cargo_toml_dir, "Cargo.toml"),
                       "w") as fout:
                 write_toml_file(
@@ -511,7 +516,7 @@ def main():
                     root_build_dir,
                     os.path.join(gn_cargo_dir, "for_workspace"),
                     for_workspace=True,
-                    version = version)
+                    version=version)
 
     # TODO: refactor into separate function
     for toolchain, workspace_dirs in workspace_dirs_by_toolchain.items():
@@ -546,7 +551,8 @@ def main():
                 fout.write(
                     "%s = { path = %s" % (
                         patch,
-                        json.dumps(os.path.join("third_party/rust_crates", path))))
+                        json.dumps(
+                            os.path.join("third_party/rust_crates", path))))
                 if package := project.patches[patch].get("package"):
                     fout.write(", package = \"%s\"" % (package,))
                 fout.write(" }\n")
