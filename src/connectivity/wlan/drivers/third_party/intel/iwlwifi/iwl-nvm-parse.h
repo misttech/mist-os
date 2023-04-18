@@ -58,6 +58,7 @@ enum iwl_nvm_sbands_flags {
  * later with iwl_free_nvm_data().
  */
 struct iwl_nvm_data* iwl_parse_nvm_data(struct iwl_trans* trans, const struct iwl_cfg* cfg,
+                                        const struct iwl_fw *fw,
                                         const __be16* nvm_hw, const __le16* nvm_sw,
                                         const __le16* nvm_calib, const __le16* regulatory,
                                         const __le16* mac_override, const __le16* phy_sku,
@@ -98,7 +99,8 @@ void iwl_nvm_fixups(uint32_t hw_id, unsigned int section, uint8_t* data, unsigne
  * Allocates a new iwl_nvm_data structure, fills it with
  * NVM data, and returns it to caller.
  */
-struct iwl_nvm_data* iwl_get_nvm(struct iwl_trans* trans, const struct iwl_fw* fw);
+zx_status_t iwl_get_nvm(struct iwl_trans* trans, const struct iwl_fw* fw,
+                        struct iwl_nvm_data** ret_nvm);
 
 //
 // cfg_rates_to_80211 - convert iwl_cfg80211_rates to 802.11 rate.

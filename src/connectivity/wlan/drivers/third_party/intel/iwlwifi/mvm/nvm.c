@@ -296,7 +296,7 @@ static struct iwl_nvm_data* iwl_parse_nvm_sections(struct iwl_mvm* mvm) {
   lar_enabled = !iwlwifi_mod_params.lar_disable &&
                 fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_LAR_SUPPORT);
 
-  return iwl_parse_nvm_data(mvm->trans, mvm->cfg, hw, sw, calib, regulatory, mac_override, phy_sku,
+  return iwl_parse_nvm_data(mvm->trans, mvm->cfg, mvm->fw, hw, sw, calib, regulatory, mac_override, phy_sku,
                             mvm->fw->valid_tx_ant, mvm->fw->valid_rx_ant, lar_enabled);
 }
 

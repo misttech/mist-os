@@ -257,7 +257,7 @@ static uint32_t iwl_get_channel_flags(uint8_t ch_num, int ch_idx, bool is_5ghz, 
 //
 static size_t iwl_init_channel_map(struct device* dev, const struct iwl_cfg* cfg,
                                    struct iwl_nvm_data* data, const __le16* const nvm_ch_flags,
-                                   uint32_t sbands_flags) {
+                                   u32 sbands_flags, bool v4) {
   size_t ch_idx;
   size_t n_channels = 0;
   struct ieee80211_channel* channel;
@@ -278,7 +278,10 @@ static size_t iwl_init_channel_map(struct device* dev, const struct iwl_cfg* cfg
   for (ch_idx = 0; ch_idx < num_of_ch; ch_idx++) {
     bool is_5ghz = (ch_idx >= num_2ghz_channels);
 
-    ch_flags = le16_to_cpup(nvm_ch_flags + ch_idx);
+    if (v4)
+      ch_flags = le32_to_cpup((const __le32 *)nvm_ch_flags + ch_idx);
+    else
+      ch_flags = le16_to_cpup(nvm_ch_flags + ch_idx);
 
     if (is_5ghz && !data->sku_cap_band_52ghz_enable) {
       continue;
@@ -732,15 +735,18 @@ static void iwl_init_he_hw_capab(struct iwl_trans *trans,
 
 #endif  // NEEDS_PORTING
 
-static void iwl_init_sbands(struct iwl_trans* trans, struct iwl_nvm_data* data,
-                            const __le16* nvm_ch_flags, uint8_t tx_chains, uint8_t rx_chains,
-                            uint32_t sbands_flags) {
+static void iwl_init_sbands(struct iwl_trans* trans,
+			    struct iwl_nvm_data* data,
+			    const __le16* nvm_ch_flags, u8 tx_chains,
+			    u8 rx_chains, u32 sbands_flags, bool v4,
+			    const struct iwl_fw *fw)
+{
   struct device* dev = trans->dev;
   const struct iwl_cfg* cfg = trans->cfg;
   size_t n_used = 0;
   struct ieee80211_supported_band* sband;
 
-  size_t n_channels = iwl_init_channel_map(dev, cfg, data, nvm_ch_flags, sbands_flags);
+  size_t n_channels = iwl_init_channel_map(dev, cfg, data, nvm_ch_flags, sbands_flags, v4);
   sband = &data->bands[WLAN_BAND_TWO_GHZ];
   sband->band = WLAN_BAND_TWO_GHZ;
   sband->bitrates = &iwl_cfg80211_rates[RATES_24_OFFS];
@@ -998,6 +1004,7 @@ static bool iwl_nvm_no_wide_in_5ghz(struct iwl_trans *trans, const struct iwl_cf
 }
 
 struct iwl_nvm_data* iwl_parse_nvm_data(struct iwl_trans* trans, const struct iwl_cfg* cfg,
+                                        const struct iwl_fw *fw,
                                         const __be16* nvm_hw, const __le16* nvm_sw,
                                         const __le16* nvm_calib, const __le16* regulatory,
                                         const __le16* mac_override, const __le16* phy_sku,
@@ -1091,7 +1098,7 @@ struct iwl_nvm_data* iwl_parse_nvm_data(struct iwl_trans* trans, const struct iw
     sbands_flags |= IWL_NVM_SBANDS_FLAGS_NO_WIDE_IN_5GHZ;
   }
 
-  iwl_init_sbands(trans, data, ch_section, tx_chains, rx_chains, sbands_flags);
+  iwl_init_sbands(trans, data, ch_section, tx_chains, rx_chains, sbands_flags, false, fw);
   data->calib_version = 255;
 
   return data;
@@ -1434,9 +1441,10 @@ out:
   return ret;
 }
 IWL_EXPORT_SYMBOL(iwl_read_external_nvm);
+#endif  // NEEDS_PORTING
 
-struct iwl_nvm_data *iwl_get_nvm(struct iwl_trans *trans,
-				 const struct iwl_fw *fw)
+zx_status_t iwl_get_nvm(struct iwl_trans *trans,
+				 const struct iwl_fw *fw, struct iwl_nvm_data** ret_nvm)
 {
 	struct iwl_nvm_get_info cmd = {};
 	struct iwl_nvm_data *nvm;
@@ -1446,7 +1454,7 @@ struct iwl_nvm_data *iwl_get_nvm(struct iwl_trans *trans,
 		.len = { sizeof(cmd) },
 		.id = WIDE_ID(REGULATORY_AND_NVM_GROUP, NVM_GET_INFO)
 	};
-	int  ret;
+	zx_status_t ret;
 	bool empty_otp;
 	u32 mac_flags;
 	u32 sbands_flags = 0;
@@ -1463,14 +1471,16 @@ struct iwl_nvm_data *iwl_get_nvm(struct iwl_trans *trans,
 	size_t rsp_size = v4 ? sizeof(*rsp) : sizeof(*rsp_v3);
 	void *channel_profile;
 
-	ret = iwl_trans_send_cmd(trans, &hcmd);
-	if (ret)
-		return ERR_PTR(ret);
+	ZX_ASSERT(ret_nvm);
 
-	if (WARN(iwl_rx_packet_payload_len(hcmd.resp_pkt) != rsp_size,
-		 "Invalid payload len in NVM response from FW %d",
-		 iwl_rx_packet_payload_len(hcmd.resp_pkt))) {
-		ret = -EINVAL;
+	ret = iwl_trans_send_cmd(trans, &hcmd);
+	if (ret != ZX_OK)
+		return ret;
+
+	if (iwl_rx_packet_payload_len(hcmd.resp_pkt) != rsp_size) {
+		IWL_WARN(trans, "Invalid payload len in NVM response from FW %d",
+		         iwl_rx_packet_payload_len(hcmd.resp_pkt));
+		ret = ZX_ERR_INVALID_ARGS;
 		goto out;
 	}
 
@@ -1480,9 +1490,9 @@ struct iwl_nvm_data *iwl_get_nvm(struct iwl_trans *trans,
 	if (empty_otp)
 		IWL_INFO(trans, "OTP is empty\n");
 
-	nvm = kzalloc(struct_size(nvm, channels, IWL_NUM_CHANNELS), GFP_KERNEL);
+	nvm = calloc(1, struct_size(nvm, channels, IWL_NUM_CHANNELS));
 	if (!nvm) {
-		ret = -ENOMEM;
+		ret = ZX_ERR_NO_MEMORY;
 		goto out;
 	}
 
@@ -1491,7 +1501,7 @@ struct iwl_nvm_data *iwl_get_nvm(struct iwl_trans *trans,
 
 	if (!is_valid_ether_addr(nvm->hw_addr)) {
 		IWL_ERR(trans, "no valid mac address was found\n");
-		ret = -EINVAL;
+		ret = ZX_ERR_INVALID_ARGS;
 		goto err_free;
 	}
 
@@ -1542,13 +1552,13 @@ struct iwl_nvm_data *iwl_get_nvm(struct iwl_trans *trans,
 			sbands_flags, v4, fw);
 
 	iwl_free_resp(&hcmd);
-	return nvm;
+
+	*ret_nvm = nvm;
+	return ZX_OK;
 
 err_free:
 	kfree(nvm);
 out:
 	iwl_free_resp(&hcmd);
-	return ERR_PTR(ret);
+	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_get_nvm);
-#endif  // NEEDS_PORTING
