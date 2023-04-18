@@ -29,6 +29,7 @@ ffx("ffx") {
   # make it so you won't have to re-link all of ffx to build a single plugin's
   # code.
   if (!ffx_build_dual_mode_plugins_as_subtools) {
+    large_ffx_binary_optimizations = true
     plugin_deps += dual_mode_plugins  # from config.gni
   }
 

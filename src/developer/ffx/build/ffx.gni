@@ -23,6 +23,11 @@ template("ffx") {
     ffx_name = invoker.name
   }
 
+  _large_binary_optimizations = false
+  if (defined(invoker.large_ffx_binary_optimizations)) {
+    _large_binary_optimizations = invoker.large_ffx_binary_optimizations
+  }
+
   suite_name = ffx_name + "_lib"
 
   _original_target_name = target_name
@@ -35,34 +40,36 @@ template("ffx") {
     output_name = ffx_name + "_unversioned"
     original_target_name = _original_target_name
 
-    # As ffx is a tool that's used by subsequent build actions, speeding up its
-    # compilation allows other tasks to be started more quickly, lowering
-    # overall drag on the graph.
+    if (_large_binary_optimizations) {
+      # As ffx is a tool that's used by subsequent build actions, speeding up its
+      # compilation allows other tasks to be started more quickly, lowering
+      # overall drag on the graph.
 
-    # FFX build on RBE disabled because of the impact on overall build performance.
-    disable_rbe = true
+      # FFX build on RBE disabled because of the impact on overall build performance.
+      disable_rbe = true
 
-    # Since RBE is disabled, this runs locally and is known to require
-    # massive memory.  Until RBE is re-enabled for this target,
-    # we must limit its concurrency with other memory-intensive jobs.
-    # See https://fxbug.dev/111094 for context.
-    if (disable_rbe) {
-      pool = "//build/config:highmem($default_toolchain)"
-    }
+      # Since RBE is disabled, this runs locally and is known to require
+      # massive memory.  Until RBE is re-enabled for this target,
+      # we must limit its concurrency with other memory-intensive jobs.
+      # See https://fxbug.dev/111094 for context.
+      if (disable_rbe) {
+        pool = "//build/config:highmem($default_toolchain)"
+      }
 
-    # Use up to 16 threads for codegen
-    configs += [ "//build/config/rust:codegen_units_16" ]
+      # Use up to 16 threads for codegen
+      configs += [ "//build/config/rust:codegen_units_16" ]
 
-    if (is_debug) {
-      # Disable lto for debug builds, as the additional codegen units imply the
-      # use of thin-local lto
-      configs += [ "//build/config/rust:lto_disabled" ]
-    } else {
-      # Use thin lto (instead of implied thin-local), to run (thin) lto across
-      # the entire set of dependency crates, to minimize final binary size
-      # without spending an undue amount of time (this is still faster than
-      # using codegen_units=1)
-      configs += [ "//build/config/rust:lto_thin" ]
+      if (is_debug) {
+        # Disable lto for debug builds, as the additional codegen units imply the
+        # use of thin-local lto
+        configs += [ "//build/config/rust:lto_disabled" ]
+      } else {
+        # Use thin lto (instead of implied thin-local), to run (thin) lto across
+        # the entire set of dependency crates, to minimize final binary size
+        # without spending an undue amount of time (this is still faster than
+        # using codegen_units=1)
+        configs += [ "//build/config/rust:lto_thin" ]
+      }
     }
 
     deps = ffx_deps
