@@ -80,6 +80,7 @@ pub use types::{EARLIEST_SUPPORTED_VERSION, JOURNAL_BLOCK_SIZE_CHANGE_VERSION, L
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlobMetadata {
     pub hashes: Vec<[u8; 32]>,
+    pub chunk_size: u64,
     pub compressed_offsets: Vec<u64>,
     pub uncompressed_size: u64,
 }

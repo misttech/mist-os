@@ -12,7 +12,7 @@ use {
         volume::info_to_filesystem_info,
         volume::FxVolume,
     },
-    anyhow::{anyhow, bail, ensure, Error},
+    anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io::{
@@ -76,8 +76,7 @@ use {
     },
 };
 
-// A blob is hashed in 8 KiB chunks.
-pub(crate) const BLOCK_SIZE: u64 = 8192;
+pub(crate) const BLOCK_SIZE: u64 = fuchsia_merkle::BLOCK_SIZE as u64;
 
 pub(crate) const READ_AHEAD_SIZE: u64 = 131_072;
 
@@ -193,33 +192,43 @@ impl BlobDirectory {
                     volume.store().crypt(),
                 )
                 .await?;
-                let (tree, compressed_offsets, uncompressed_size) = match object
-                    .read_attr(BLOB_MERKLE_ATTRIBUTE_ID)
-                    .await?
-                {
+                let (tree, metadata) = match object.read_attr(BLOB_MERKLE_ATTRIBUTE_ID).await? {
                     None => {
                         // TODO(fxbug.dev/122125): Should we abort if we fail to read metadata?
-                        (MerkleTree::from_levels(vec![vec![hash]]), Vec::new(), object.get_size())
+                        (
+                            MerkleTree::from_levels(vec![vec![hash]]),
+                            BlobMetadata {
+                                hashes: vec![],
+                                chunk_size: 0,
+                                compressed_offsets: vec![],
+                                uncompressed_size: object.get_size(),
+                            },
+                        )
                     }
                     Some(data) => {
-                        let metadata: BlobMetadata = bincode::deserialize_from(&*data)?;
+                        let mut metadata: BlobMetadata = bincode::deserialize_from(&*data)?;
                         let tree = if metadata.hashes.is_empty() {
                             MerkleTree::from_levels(vec![vec![hash]])
                         } else {
                             let mut builder = MerkleTreeBuilder::new();
-                            for hash in metadata.hashes {
+                            for hash in std::mem::take(&mut metadata.hashes) {
                                 builder.push_data_hash(hash.into());
                             }
                             let tree = builder.finish();
                             ensure!(tree.root() == hash, FxfsError::Inconsistent);
                             tree
                         };
-                        (tree, metadata.compressed_offsets, metadata.uncompressed_size)
+                        (tree, metadata)
                     }
                 };
 
-                let node = FxBlob::new(object, tree, compressed_offsets, uncompressed_size)
-                    as Arc<dyn FxNode>;
+                let node = FxBlob::new(
+                    object,
+                    tree,
+                    metadata.chunk_size,
+                    metadata.compressed_offsets,
+                    metadata.uncompressed_size,
+                ) as Arc<dyn FxNode>;
                 placeholder.commit(&node);
                 Ok(node)
             }
@@ -402,7 +411,6 @@ impl From<object_store::Directory<FxVolume>> for BlobDirectory {
 // drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
 // (assertions will fire).
 const PURGED: usize = 1 << (usize::BITS - 1);
-const COMPRESSION_CHUNK_SIZE: u64 = 32 * 1024;
 
 /// Represents an immutable blob stored on Fxfs with associated an merkle tree.
 pub struct FxBlob {
@@ -410,6 +418,7 @@ pub struct FxBlob {
     buffer: VmoDataBuffer,
     open_count: AtomicUsize,
     merkle_tree: MerkleTree,
+    compressed_chunk_size: u64,
     compressed_offsets: Vec<u64>,
     uncompressed_size: u64,
 }
@@ -418,6 +427,7 @@ impl FxBlob {
     pub fn new(
         handle: StoreObjectHandle<FxVolume>,
         merkle_tree: MerkleTree,
+        compressed_chunk_size: u64,
         compressed_offsets: Vec<u64>,
         uncompressed_size: u64,
     ) -> Arc<Self> {
@@ -427,6 +437,7 @@ impl FxBlob {
             buffer,
             open_count: AtomicUsize::new(0),
             merkle_tree,
+            compressed_chunk_size,
             compressed_offsets,
             uncompressed_size,
         });
@@ -518,12 +529,19 @@ impl FxBlob {
         let read = if self.compressed_offsets.is_empty() {
             self.handle.read(range.start, buffer.as_mut()).await?
         } else {
-            let indices = (range.start / COMPRESSION_CHUNK_SIZE) as usize
-                ..(range.end / COMPRESSION_CHUNK_SIZE) as usize;
-            let len = self.compressed_offsets.len();
-            ensure!(indices.start < len && indices.end <= len, FxfsError::OutOfRange);
+            ensure!(self.compressed_chunk_size > 0, FxfsError::Inconsistent);
+            let indices = (range.start / self.compressed_chunk_size) as usize
+                ..(range.end / self.compressed_chunk_size) as usize;
+            let seek_table_len = self.compressed_offsets.len();
+            ensure!(
+                indices.start < seek_table_len && indices.end <= seek_table_len,
+                anyhow!(FxfsError::OutOfRange).context(format!(
+                    "Out of bounds seek table access {:?}, len {}",
+                    indices, seek_table_len
+                ))
+            );
             let compressed_offsets = self.compressed_offsets[indices.start]
-                ..if indices.end == len {
+                ..if indices.end == seek_table_len {
                     self.handle.get_size()
                 } else {
                     self.compressed_offsets[indices.end]
@@ -533,7 +551,12 @@ impl FxBlob {
                 ..round_up(compressed_offsets.end, bs).unwrap();
             let mut compressed_buf =
                 self.handle.allocate_buffer((aligned.end - aligned.start) as usize);
-            let read = self.handle.read(aligned.start, compressed_buf.as_mut()).await?;
+            let read =
+                self.handle.read(aligned.start, compressed_buf.as_mut()).await.context(format!(
+                    "Failed to read compressed range {:?}, len {}",
+                    aligned,
+                    self.handle.get_size()
+                ))?;
             let compressed_buf_range = (compressed_offsets.start - aligned.start) as usize
                 ..(compressed_offsets.end - aligned.start) as usize;
             ensure!(
@@ -571,8 +594,8 @@ impl FxBlob {
         if self.compressed_offsets.is_empty() {
             round_down(range.start, BLOCK_SIZE)..round_up(range.end, BLOCK_SIZE).unwrap()
         } else {
-            round_down(range.start, COMPRESSION_CHUNK_SIZE)
-                ..round_up(range.end, COMPRESSION_CHUNK_SIZE).unwrap()
+            round_down(range.start, self.compressed_chunk_size)
+                ..round_up(range.end, self.compressed_chunk_size).unwrap()
         }
     }
 }
@@ -779,6 +802,7 @@ impl PagerBackedVmo for FxBlob {
                 error!(
                     ?range,
                     merkle_root = %self.merkle_tree.root(),
+                    ?self.uncompressed_size,
                     error = e.as_value(),
                     "Failed to load range"
                 );
@@ -887,8 +911,12 @@ impl FxUnsealedBlob {
                 hashes.push(**hash);
             }
             let mut serialized = Vec::new();
-            let metadata =
-                BlobMetadata { hashes, compressed_offsets: Vec::new(), uncompressed_size: size };
+            let metadata = BlobMetadata {
+                hashes,
+                chunk_size: 0,
+                compressed_offsets: Vec::new(),
+                uncompressed_size: size,
+            };
             bincode::serialize_into(&mut serialized, &metadata).unwrap();
             // TODO(fxbug.dev/122125): Is this the best place to store merkle tree data?
             // (Inline attribute, prepended to data, ..?)
@@ -1215,11 +1243,16 @@ mod tests {
         futures::StreamExt as _,
         fxfs::{
             filesystem::{FxFilesystem, OpenFxFilesystem},
-            object_handle::ObjectHandle as _,
+            object_handle::{ObjectHandle as _, WriteBytes as _},
             object_store::{
-                directory::Directory, volume::root_volume, HandleOptions, ObjectStore,
-                StoreObjectHandle,
+                directory::Directory,
+                transaction::{LockKey, TransactionHandler as _},
+                volume::root_volume,
+                DirectWriter, HandleOptions, ObjectStore, StoreObjectHandle,
+                BLOB_MERKLE_ATTRIBUTE_ID,
             },
+            round::round_up,
+            serialized_types::BlobMetadata,
         },
         std::{
             path::PathBuf,
@@ -1377,6 +1410,76 @@ mod tests {
         let hash = fixture.write_blob(&data).await;
 
         assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_large_compressed_blob() {
+        let fixture = Fixture::new().await;
+
+        let data = vec![3; 3_000_000];
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let tree = builder.finish();
+        {
+            // Manually insert the blob with our own metadata.
+            // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs and make-blob-image.
+            let root_object_id = fixture.vol.store().root_directory_object_id();
+            let root_dir =
+                Directory::open(&fixture.vol, root_object_id).await.expect("open failed");
+
+            let handle;
+            let keys = [LockKey::object(fixture.vol.store().store_object_id(), root_object_id)];
+            let mut transaction = fixture
+                .filesystem
+                .clone()
+                .new_transaction(&keys, Default::default())
+                .await
+                .unwrap();
+            handle = root_dir
+                .create_child_file(&mut transaction, &format!("{}", tree.root()))
+                .await
+                .unwrap();
+            transaction.commit().await.unwrap();
+
+            let mut writer = DirectWriter::new(&handle, Default::default());
+            let mut compressed_offsets = vec![];
+            let mut offset = 0;
+            let chunk_size = round_up(data.len() as u64 / 2, BLOCK_SIZE).unwrap();
+            for chunk in data.chunks(chunk_size as usize) {
+                let mut compressor = zstd::bulk::Compressor::new(1).ok().unwrap();
+                compressor
+                    .set_parameter(zstd::zstd_safe::CParameter::ChecksumFlag(true))
+                    .ok()
+                    .unwrap();
+                let contents = compressor.compress(&chunk).unwrap();
+                compressed_offsets.push(offset);
+                offset += contents.len() as u64;
+                writer.write_bytes(&contents[..]).await.unwrap();
+            }
+            writer.complete().await.unwrap();
+
+            let mut serialized = Vec::new();
+            let len = data.len() as u64;
+            bincode::serialize_into(
+                &mut serialized,
+                &BlobMetadata {
+                    hashes: tree.as_ref()[0]
+                        .clone()
+                        .into_iter()
+                        .map(|h| h.into())
+                        .collect::<Vec<[u8; 32]>>(),
+                    chunk_size,
+                    compressed_offsets,
+                    uncompressed_size: len,
+                },
+            )
+            .unwrap();
+            handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await.unwrap();
+        }
+
+        assert_eq!(fixture.read_blob(&format!("{}", tree.root())).await, data);
 
         fixture.close().await;
     }

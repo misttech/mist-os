@@ -121,11 +121,11 @@ async fn install_blobs(
         let tree = builder.finish();
         assert_eq!(&tree.root(), hash);
 
-        let compressed_offsets = if let Some((compressed, offsets)) =
-            maybe_compress(&contents, filesystem.block_size() as usize)
+        let offsets_and_chunk_size = if let Some((compressed, chunk_size, offsets)) =
+            maybe_compress(&contents, fuchsia_merkle::BLOCK_SIZE, filesystem.block_size() as usize)
         {
             contents = compressed;
-            Some(offsets)
+            Some((offsets, chunk_size))
         } else {
             None
         };
@@ -145,7 +145,7 @@ async fn install_blobs(
 
         let levels = tree.as_ref();
         // TODO(fxbug.dev/122056: Refactor to share implementation with blob.rs.
-        let metadata_len = if levels.len() > 1 || compressed_offsets.is_some() {
+        let metadata_len = if levels.len() > 1 || offsets_and_chunk_size.is_some() {
             let mut hashes: Vec<[u8; HASH_SIZE]> = Vec::new();
             if levels.len() > 1 {
                 // We only need to store the leaf hashes.
@@ -153,14 +153,11 @@ async fn install_blobs(
                     hashes.push(hash.clone().into());
                 }
             }
+            let (compressed_offsets, chunk_size) = offsets_and_chunk_size.unwrap_or((vec![], 0));
             let mut serialized = Vec::new();
             bincode::serialize_into(
                 &mut serialized,
-                &BlobMetadata {
-                    hashes,
-                    compressed_offsets: compressed_offsets.unwrap_or(Vec::new()),
-                    uncompressed_size,
-                },
+                &BlobMetadata { hashes, chunk_size, compressed_offsets, uncompressed_size },
             )
             .unwrap();
             let len = serialized.len();
@@ -187,18 +184,22 @@ async fn install_blobs(
 }
 
 // TODO(fxbug.dev/122125): Support the blob delivery format.
-fn maybe_compress(buf: &[u8], block_size: usize) -> Option<(Vec<u8>, Vec<u64>)> {
-    if buf.len() <= block_size {
+fn maybe_compress(
+    buf: &[u8],
+    block_size: usize,
+    filesystem_block_size: usize,
+) -> Option<(Vec<u8>, u64, Vec<u64>)> {
+    if buf.len() <= filesystem_block_size {
         // No savings.
         return None;
     }
 
-    const MAX_FRAMES: u64 = 1023;
-    const TARGET_CHUNK_SIZE: u64 = 32 * 1024;
-    let chunk_size = if buf.len() as u64 > MAX_FRAMES * TARGET_CHUNK_SIZE {
-        round_up(buf.len() / MAX_FRAMES as usize, block_size).unwrap()
+    const MAX_FRAMES: usize = 1023;
+    const TARGET_CHUNK_SIZE: usize = 32 * 1024;
+    let chunk_size = if buf.len() > MAX_FRAMES * TARGET_CHUNK_SIZE {
+        round_up(buf.len() / MAX_FRAMES, block_size).unwrap()
     } else {
-        TARGET_CHUNK_SIZE as usize
+        TARGET_CHUNK_SIZE
     };
 
     // Limit the size of the output buffer so that we fail if the data won't
@@ -232,11 +233,11 @@ fn maybe_compress(buf: &[u8], block_size: usize) -> Option<(Vec<u8>, Vec<u64>)> 
             return None;
         }
     }
-    if round_up(output.len(), block_size).unwrap() >= buf.len() {
+    if round_up(output.len(), filesystem_block_size).unwrap() >= buf.len() {
         // Compression expanded the file.
         return None;
     }
-    Some((output, compressed_offsets))
+    Some((output, chunk_size as u64, compressed_offsets))
 }
 
 #[cfg(test)]
@@ -319,7 +320,7 @@ mod tests {
                 // always compress down to a single block.
                 size: 8192,
                 file_size: 65537,
-                merkle_tree_size: 336,
+                merkle_tree_size: 344,
                 used_space_in_blobfs: 8192,
                 ..
             } if merkle == "1194c76d2d3b61f29df97a85ede7b2fd2b293b452f53072356e3c5c939c8131d"
