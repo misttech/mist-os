@@ -62,7 +62,6 @@ test("fdio-test") {
     "badfd.cc",
     "directory.cc",
     "eventfd.cc",
-    "fdio_inotify.cc",
     "fdio_lock.cc",
     "fdio_mmap.cc",
     "fdio_poll.cc",

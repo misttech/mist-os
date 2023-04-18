@@ -12,11 +12,6 @@ zx::result<fdio_ptr> fdio::open(std::string_view path, fuchsia_io::wire::OpenFla
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t fdio::add_inotify_filter(std::string_view path, uint32_t mask,
-                                     uint32_t watch_descriptor, zx::socket socket) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 zx_status_t fdio::clone(zx_handle_t* out_handle) { return ZX_ERR_NOT_SUPPORTED; }
 
 zx_status_t fdio::unwrap(zx_handle_t* out_handle) { return ZX_ERR_NOT_SUPPORTED; }

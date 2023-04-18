@@ -7,25 +7,6 @@ import("//build/dist/packaged_shared_library.gni")
 import("//build/test.gni")
 import("//src/storage/fs_test/suite.gni")
 
-test("memfs-inotify-test") {
-  sources = [ "memfs-inotify-tests.cc" ]
-  deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
-    "//src/lib/fxl",
-    "//src/lib/storage/vfs/cpp:inotify_test_base",
-    "//src/storage/memfs",
-    "//src/storage/memfs:lib",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
 test("memfs-test") {
   sources = [ "memfs-tests.cc" ]
   deps = [
@@ -40,11 +21,6 @@ test("memfs-test") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
   ]
-}
-
-fuchsia_unittest_package("memfs-inotify-test-pkg") {
-  package_name = "memfs-inotify-test"
-  deps = [ ":memfs-inotify-test" ]
 }
 
 fuchsia_unittest_package("memfs-tests") {
@@ -118,7 +94,6 @@ group("tests") {
   testonly = true
   deps = [
     ":memfs-fs-tests",
-    ":memfs-inotify-test-pkg",
     ":memfs-legacy-tests",
     ":memfs-slow-fs-tests",
     ":memfs-tests",

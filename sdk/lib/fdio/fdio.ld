@@ -102,10 +102,6 @@
 		getpeername;
 		getsockname;
 		getsockopt;
-		inotify_add_watch;
-		inotify_init;
-		inotify_init1;
-		inotify_rm_watch;
 		ioctl;
 		isatty;
 		lchown;

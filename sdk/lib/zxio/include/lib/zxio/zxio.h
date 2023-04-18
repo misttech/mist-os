@@ -417,16 +417,6 @@ ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, const char*
 ZXIO_EXPORT zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, const char* path,
                                         size_t path_len, zx_handle_t request);
 
-// Adds a inotify filter on a file/directory relative to the given |directory|.
-// The events on server side are communicated to the client via |socket|.
-// The |watch_descriptor| is the unique ID used to identify the watch filters
-// by the the client.
-//
-// See fuchsia.io/io for the available |mask|.
-ZXIO_EXPORT zx_status_t zxio_add_inotify_filter(zxio_t* io, const char* path, size_t path_len,
-                                                uint32_t mask, uint32_t watch_descriptor,
-                                                zx_handle_t socket);
-
 // Remove a file relative to the given directory. |flags| has the same values
 // and semantics as POSIX's unlinkat |flags| argument.
 ZXIO_EXPORT zx_status_t zxio_unlink(zxio_t* directory, const char* name, size_t name_len,

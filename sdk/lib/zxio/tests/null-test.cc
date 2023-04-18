@@ -47,8 +47,6 @@ TEST(NullTest, Default) {
   constexpr std::string_view name("hello");
   ASSERT_STATUS(zxio_open_async(&io, {}, name.data(), name.length(), ZX_HANDLE_INVALID),
                 ZX_ERR_NOT_SUPPORTED);
-  ASSERT_STATUS(zxio_add_inotify_filter(&io, name.data(), name.length(), 0u, 0, ZX_HANDLE_INVALID),
-                ZX_ERR_NOT_SUPPORTED);
   ASSERT_STATUS(zxio_unlink(&io, name.data(), name.length(), 0), ZX_ERR_NOT_SUPPORTED);
 
   constexpr std::string_view old_path("one");
@@ -111,8 +109,6 @@ TEST(NullTest, Null) {
 
   constexpr std::string_view name("hello");
   ASSERT_STATUS(zxio_open_async(&io, {}, name.data(), name.length(), ZX_HANDLE_INVALID),
-                ZX_ERR_NOT_SUPPORTED);
-  ASSERT_STATUS(zxio_add_inotify_filter(&io, name.data(), name.length(), 0u, 0, ZX_HANDLE_INVALID),
                 ZX_ERR_NOT_SUPPORTED);
   ASSERT_STATUS(zxio_unlink(&io, name.data(), name.length(), 0), ZX_ERR_NOT_SUPPORTED);
 

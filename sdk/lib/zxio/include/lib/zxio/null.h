@@ -53,9 +53,6 @@ zx_status_t zxio_default_open(zxio_t* io, uint32_t flags, const char* path, size
                               zxio_storage_t* storage);
 zx_status_t zxio_default_open_async(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
                                     zx_handle_t request);
-zx_status_t zxio_default_add_inotify_filter(zxio_t* io, const char* path, size_t path_len,
-                                            uint32_t mask, uint32_t watch_descriptor,
-                                            zx_handle_t socket);
 zx_status_t zxio_default_unlink(zxio_t* io, const char* name, size_t name_len, int flags);
 zx_status_t zxio_default_token_get(zxio_t* io, zx_handle_t* out_token);
 zx_status_t zxio_default_rename(zxio_t* io, const char* old_path, size_t old_path_len,
@@ -124,7 +121,6 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .shutdown = zxio_default_shutdown,
     .open = zxio_default_open,
     .open_async = zxio_default_open_async,
-    .add_inotify_filter = zxio_default_add_inotify_filter,
     .unlink = zxio_default_unlink,
     .token_get = zxio_default_token_get,
     .rename = zxio_default_rename,

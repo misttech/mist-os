@@ -64,8 +64,6 @@ typedef struct zxio_ops {
                       zxio_storage_t* storage);
   zx_status_t (*open_async)(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
                             zx_handle_t request);
-  zx_status_t (*add_inotify_filter)(zxio_t* io, const char* path, size_t path_len, uint32_t mask,
-                                    uint32_t watch_descriptor, zx_handle_t socket);
   zx_status_t (*unlink)(zxio_t* io, const char* name, size_t name_len, int flags);
   zx_status_t (*token_get)(zxio_t* io, zx_handle_t* out_token);
   zx_status_t (*rename)(zxio_t* io, const char* old_path, size_t old_path_len,

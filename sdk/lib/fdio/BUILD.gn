@@ -84,7 +84,6 @@ if (is_fuzzer) {
       "fdio_unistd.cc",
       "fdio_unistd.h",
       "get_client.h",
-      "inotify.cc",
       "internal.h",
       "io.cc",
       "iovec.cc",

@@ -123,8 +123,6 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
 
   virtual zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::wire::OpenFlags flags);
   virtual zx_status_t clone(zx_handle_t* out_handle) = 0;
-  virtual zx_status_t add_inotify_filter(std::string_view path, uint32_t mask,
-                                         uint32_t watch_descriptor, zx::socket socket);
 
   // |unwrap| releases the underlying handle if applicable.  The caller must ensure there are no
   // concurrent operations on |io|.

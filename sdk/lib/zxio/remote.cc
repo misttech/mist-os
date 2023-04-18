@@ -419,9 +419,6 @@ class Remote : public HasIo {
 
   zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request);
 
-  zx_status_t AddInotifyFilter(const char* path, size_t path_len, uint32_t mask,
-                               uint32_t watch_descriptor, zx_handle_t socket_handle);
-
   zx_status_t Unlink(const char* name, size_t name_len, int flags);
 
   zx_status_t TokenGet(zx_handle_t* out_token);
@@ -918,17 +915,6 @@ zx_status_t Remote<Protocol>::OpenAsync(uint32_t flags, const char* path, size_t
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::AddInotifyFilter(const char* path, size_t path_len, uint32_t mask,
-                                               uint32_t watch_descriptor,
-                                               zx_handle_t socket_handle) {
-  const auto inotify_mask = static_cast<fio::wire::InotifyWatchMask>(mask);
-  const fidl::WireResult result =
-      client()->AddInotifyFilter(fidl::StringView::FromExternal(path, path_len), inotify_mask,
-                                 watch_descriptor, zx::socket(socket_handle));
-  return result.status();
-}
-
-template <typename Protocol>
 zx_status_t Remote<Protocol>::Unlink(const char* name, size_t name_len, int flags) {
   fidl::Arena allocator;
   auto options = fio::wire::UnlinkOptions::Builder(allocator);
@@ -1225,7 +1211,6 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
 
   ops.open = Adaptor::From<&Directory::Open>;
   ops.open_async = Adaptor::From<&Directory::OpenAsync>;
-  ops.add_inotify_filter = Adaptor::From<&Directory::AddInotifyFilter>;
   ops.unlink = Adaptor::From<&Directory::Unlink>;
   ops.token_get = Adaptor::From<&Directory::TokenGet>;
   ops.rename = Adaptor::From<&Directory::Rename>;

@@ -354,16 +354,6 @@ zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, const char* path,
   return zio->ops->open_async(directory, flags, path, path_len, request);
 }
 
-zx_status_t zxio_add_inotify_filter(zxio_t* directory, const char* path, size_t path_len,
-                                    uint32_t mask, uint32_t watch_descriptor, zx_handle_t socket) {
-  if (!zxio_is_valid(directory)) {
-    zx_handle_close(socket);
-    return ZX_ERR_BAD_HANDLE;
-  }
-  zxio_internal_t* zio = to_internal(directory);
-  return zio->ops->add_inotify_filter(directory, path, path_len, mask, watch_descriptor, socket);
-}
-
 zx_status_t zxio_unlink(zxio_t* directory, const char* name, size_t name_len, int flags) {
   if (!zxio_is_valid(directory)) {
     return ZX_ERR_BAD_HANDLE;

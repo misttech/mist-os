@@ -61,12 +61,6 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   zx::result<fbl::RefPtr<fdio>> Open(fbl::RefPtr<LocalVnode> vn, std::string_view path,
                                      fuchsia_io::wire::OpenFlags flags) const;
 
-  // Walk local namespace and send inotify filter request to remote server.
-  //
-  // This object may represent either a local node, or a remote object.
-  zx_status_t AddInotifyFilter(fbl::RefPtr<LocalVnode> vn, std::string_view path, uint32_t mask,
-                               uint32_t watch_descriptor, zx::socket socket) const;
-
   // Connect to a remote object within the namespace.
   //
   // Returns an error if |path| does not exist.

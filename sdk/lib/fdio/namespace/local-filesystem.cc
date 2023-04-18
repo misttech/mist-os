@@ -175,40 +175,6 @@ zx::result<fdio_ptr> fdio_namespace::Open(fbl::RefPtr<LocalVnode> vn, std::strin
       vn->NodeType());
 }
 
-zx_status_t fdio_namespace::AddInotifyFilter(fbl::RefPtr<LocalVnode> vn, std::string_view path,
-                                             uint32_t mask, uint32_t watch_descriptor,
-                                             zx::socket socket) const {
-  fbl::AutoLock lock(&lock_);
-  zx_status_t status = WalkLocked(&vn, &path);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  return std::visit(fdio::overloaded{
-                        [](LocalVnode::Local& l) {
-                          // The Vnode exists, but it has no remote object.
-                          // we simply return a ZX_ERR_NOT_SUPPORTED
-                          // as we do not support inotify for local-namespace filesystem
-                          // at the time.
-                          return ZX_ERR_NOT_SUPPORTED;
-                        },
-                        [](LocalVnode::Intermediate& c) {
-                          // The Vnode exists, but it has no remote object.
-                          // we simply return a ZX_ERR_NOT_SUPPORTED
-                          // as we do not support inotify for local-namespace filesystem
-                          // at the time.
-                          return ZX_ERR_NOT_SUPPORTED;
-                        },
-                        [&](LocalVnode::Remote& s) {
-                          // Active remote connections are immutable, so referencing remote here
-                          // is safe. But we do not want to do a blocking call under the ns lock.
-                          return zxio_add_inotify_filter(s.Connection(), path.data(), path.length(),
-                                                         mask, watch_descriptor, socket.release());
-                        },
-                    },
-                    vn->NodeType());
-}
-
 zx_status_t fdio_namespace::Readdir(const LocalVnode& vn, DirentIteratorState* state,
                                     zxio_dirent_t* inout_entry) const {
   fbl::AutoLock lock(&lock_);
