@@ -71,6 +71,9 @@ class VirtualAudioUtil {
 
     SET_IN,
     SET_OUT,
+    SET_STREAM_CONFIG,
+    SET_DAI,
+    SET_CODEC,
     WAIT,
     HELP,
     INVALID,
@@ -112,6 +115,9 @@ class VirtualAudioUtil {
 
       {"in", Command::SET_IN},
       {"out", Command::SET_OUT},
+      {"stream", Command::SET_STREAM_CONFIG},
+      {"dai", Command::SET_DAI},
+      {"codec", Command::SET_CODEC},
       {"wait", Command::WAIT},
       {"help", Command::HELP},
       {"?", Command::HELP},
@@ -260,7 +266,7 @@ uint32_t VirtualAudioUtil::frame_size_[2];
 media::TimelineRate VirtualAudioUtil::ref_time_to_running_position_rate_[2];
 media::TimelineFunction VirtualAudioUtil::ref_time_to_running_position_[2];
 
-enum DeviceType { kOutput = 0u, kInput = 1u };
+enum DeviceDirection { kOutput = 0u, kInput = 1u };
 uint32_t VirtualAudioUtil::BytesPerSample(uint32_t format_bitfield) {
   if (format_bitfield & (AUDIO_SAMPLE_FORMAT_20BIT_IN32 | AUDIO_SAMPLE_FORMAT_24BIT_IN32 |
                          AUDIO_SAMPLE_FORMAT_32BIT | AUDIO_SAMPLE_FORMAT_32BIT_FLOAT)) {
@@ -545,6 +551,18 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
       configuring_output_ = true;
       success = true;
       break;
+    case Command::SET_STREAM_CONFIG:
+      config()->set_device_type(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG);
+      success = true;
+      break;
+    case Command::SET_DAI:
+      config()->set_device_type(fuchsia::virtualaudio::DeviceType::DAI);
+      success = true;
+      break;
+    case Command::SET_CODEC:
+      config()->set_device_type(fuchsia::virtualaudio::DeviceType::CODEC);
+      success = true;
+      break;
     case Command::WAIT:
       success = WaitForKey();
       break;
@@ -567,9 +585,14 @@ void VirtualAudioUtil::Usage() {
 
   printf("\nValid options:\n");
 
-  printf("\n  By default, the virtual output device configuration is assumed\n");
-  printf("  --in\t\t\t  Switch to the virtual input device configuration\n");
-  printf("  --out\t\t\t  Switch back to the virtual output device configuration\n");
+  printf("\n  By default, a virtual device of type StreamConfig and direction Output is used\n");
+
+  printf("  --codec\t\t\t  Switch to a Codec configuration with the same direction\n");
+  printf("  --dai\t\t\t  Switch to a Dai configuration with the same direction\n");
+  printf("  --stream\t\t\t  Switch to a StreamConfig configuration with the same direction\n");
+
+  printf("  --in\t\t\t  Switch to an Input configuration (same device type)\n");
+  printf("  --out\t\t\t  Switch to an Output configuration (same device type)\n");
 
   printf("\n  The following commands customize a device configuration, before it is added\n");
   printf("  --dev[=<DEVICE_NAME>]\t  Set the device name\n");
@@ -995,17 +1018,22 @@ bool VirtualAudioUtil::AddDevice() {
 
   if (configuring_output_) {
     fuchsia::virtualaudio::Control_AddOutput_Result result;
-    status = controller_->AddOutput(std::move(cfg), output_device_.NewRequest(), &result);
-    if (result.is_err()) {
-      status = result.err();
+    if ((status = controller_->AddOutput(std::move(cfg), output_device_.NewRequest(), &result)) ==
+        ZX_OK) {
+      if (result.is_err()) {
+        status = result.err();
+      }
     }
   } else {
     fuchsia::virtualaudio::Control_AddInput_Result result;
-    status = controller_->AddInput(std::move(cfg), input_device_.NewRequest(), &result);
-    if (result.is_err()) {
-      status = result.err();
+    if ((status = controller_->AddInput(std::move(cfg), input_device_.NewRequest(), &result)) ==
+        ZX_OK) {
+      if (result.is_err()) {
+        status = result.err();
+      }
     }
   }
+
   if (status != ZX_OK) {
     printf("ERROR: Failed to add %s device, status = %d\n",
            configuring_output_ ? "output" : "input", status);
@@ -1174,7 +1202,7 @@ void VirtualAudioUtil::FormatNotification(uint32_t fps, uint32_t fmt, uint32_t c
   printf("--Received Format (%u fps, %x fmt, %u chan, %zu delay) for %s\n", fps, fmt, chans, delay,
          (is_out ? "output" : "input"));
 
-  DeviceType dev_type = is_out ? kOutput : kInput;
+  DeviceDirection dev_type = is_out ? kOutput : kInput;
   frame_size_[dev_type] = chans * BytesPerSample(fmt);
   ref_time_to_running_position_rate_[dev_type] =
       media::TimelineRate(fps * frame_size_[dev_type], ZX_SEC(1));
@@ -1214,7 +1242,7 @@ void VirtualAudioUtil::BufferNotification(zx::vmo ring_buffer_vmo, uint32_t num_
   ring_buffer_vmo_ = std::move(ring_buffer_vmo);
   uint64_t vmo_size;
   ring_buffer_vmo_.get_size(&vmo_size);
-  DeviceType dev_type = is_out ? kOutput : kInput;
+  DeviceDirection dev_type = is_out ? kOutput : kInput;
   rb_size_[dev_type] = static_cast<uint32_t>(num_ring_buffer_frames * frame_size_[dev_type]);
 
   printf("--Received SetBuffer (vmo size: %zu, ring size: %zu, frames: %u, notifs: %u) for %s\n",
@@ -1248,7 +1276,7 @@ template <bool is_out>
 void VirtualAudioUtil::StartNotification(zx_time_t start_time) {
   printf("--Received Start    (time: %zu) for %s\n", start_time, (is_out ? "output" : "input"));
 
-  DeviceType dev_type = is_out ? kOutput : kInput;
+  DeviceDirection dev_type = is_out ? kOutput : kInput;
   ref_time_to_running_position_[dev_type] =
       media::TimelineFunction(0, start_time, ref_time_to_running_position_rate_[dev_type]);
 
@@ -1258,7 +1286,7 @@ void VirtualAudioUtil::StartNotification(zx_time_t start_time) {
 
 template <bool is_out>
 void VirtualAudioUtil::StopNotification(zx_time_t stop_time, uint32_t ring_position) {
-  DeviceType dev_type = is_out ? kOutput : kInput;
+  DeviceDirection dev_type = is_out ? kOutput : kInput;
   auto expected_running_position = ref_time_to_running_position_[dev_type].Apply(stop_time);
   UpdateRunningPosition(ring_position, is_out);
 
@@ -1277,7 +1305,7 @@ void VirtualAudioUtil::PositionNotification(zx_time_t monotonic_time_for_positio
   printf("--Received Position (time: %13zu, pos: %6u) for %s", monotonic_time_for_position,
          ring_position, (is_out ? "output" : "input "));
 
-  DeviceType dev_type = is_out ? kOutput : kInput;
+  DeviceDirection dev_type = is_out ? kOutput : kInput;
   if (monotonic_time_for_position > ref_time_to_running_position_[dev_type].reference_time()) {
     int64_t expected_running_position =
         ref_time_to_running_position_[dev_type].Apply(monotonic_time_for_position);
