@@ -5,6 +5,7 @@
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
+#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 #include "src/lib/fsl/handles/object_info.h"
@@ -91,6 +92,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
  protected:
+  // TODO(fxbug.dev/125447): This is unnecesarily hardcoded. We should consider
+  // making display pixel format a test parameter as well.
   const zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_ARGB_8888;
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
@@ -326,76 +329,126 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     EXPECT_TRUE(result_capture_result.is_response());
   }
 
+  // TODO(fxbug.dev/125394): This is taken from //src/graphics/display/bin/
+  // display-test and modified for Scenic testing purposes; instead of making a
+  // copy and make modifications, we should make this into a generic library.
 #ifdef FAKE_DISPLAY
-  bool CaptureCompare(const void* capture_buf, const void* actual_buf, size_t size, uint32_t height,
-                      uint32_t width) {
-    EXPECT_EQ(size, width * height * 4);
-    return memcmp(actual_buf, capture_buf, size) == 0;
+  bool CaptureCompare(cpp20::span<const uint8_t> captured_image,
+                      cpp20::span<const uint8_t> input_image,
+                      zx_pixel_format_t input_image_pixel_format, uint32_t height, uint32_t width) {
+    FX_CHECK(input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
+             input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
+             input_image_pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
+             input_image_pixel_format == ZX_PIXEL_FORMAT_BGR_888x);
+    const int input_image_formats_bytes_per_pixel = ZX_PIXEL_FORMAT_BYTES(input_image_pixel_format);
+    EXPECT_EQ(captured_image.size(),
+              static_cast<size_t>(width) * height * input_image_formats_bytes_per_pixel);
+    EXPECT_EQ(captured_image.size(), input_image.size());
+    return memcmp(captured_image.data(), input_image.data(), captured_image.size()) == 0;
   }
 #else
+  bool CaptureCompare(cpp20::span<const uint8_t> captured_image,
+                      cpp20::span<const uint8_t> input_image,
+                      zx_pixel_format_t input_image_pixel_format, int height, int width) {
+    FX_CHECK(input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
+             input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
+             input_image_pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
+             input_image_pixel_format == ZX_PIXEL_FORMAT_BGR_888x);
 
-  // This function is taken directly from the zircon display capture test and modified slightly
-  // to fit this test.
-  bool CaptureCompare(const void* capture_buf, const void* actual_buf, size_t size, uint32_t height,
-                      uint32_t width) {
-    auto image_buf = std::make_unique<uint8_t[]>(size);
-    std::memcpy(image_buf.get(), actual_buf, size);
+    auto expected_rgba_image = std::vector<uint8_t>(input_image.begin(), input_image.end());
 
-    uint8_t* imageptr = static_cast<uint8_t*>(image_buf.get());
-    const uint8_t* captureptr = static_cast<const uint8_t*>(capture_buf);
-
-    // first fix endianess
-    auto* tmpptr = reinterpret_cast<uint32_t*>(image_buf.get());
-    for (size_t i = 0; i < size / 4; i++) {
-      tmpptr[i] = be32toh(tmpptr[i]);
-    }
-
-    uint32_t capture_stride = ZX_ALIGN(width * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888), 64);
-    uint32_t buffer_stride = ZX_ALIGN(width * ZX_PIXEL_FORMAT_BYTES(kPixelFormat), 64);
-    uint32_t capture_width_bytes = width * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
-    uint32_t buffer_width_bytes = width * ZX_PIXEL_FORMAT_BYTES(kPixelFormat);
-    size_t buf_idx = 0;
-
-#ifdef PLATFORM_ASTRO
-    // For Astro only:
-    // Ignore last column. Has junk (hardware bug)
-    // Ignoring last column, means there is a shift by one pixel.
-    // Therefore, image_buffer should start from pixel 1 (i.e. 4th byte since x888) and
-    // capture_buffer should end at width - 3 (i.e. 888)
-    capture_width_bytes -= ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
-    buf_idx = ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_x888);
-#endif  // PLATFORM_ASTRO
-
-    size_t cap_idx = 0;
-    // Ignore first line. It <sometimes> contains junk (hardware bug).
-    // Track the number of differences between the display output and the input buffer.
-    uint32_t num_different = 0;
-    for (size_t h = 1; h < height; h++) {
-      for (; cap_idx < capture_width_bytes && buf_idx < buffer_width_bytes;) {
-        // skip the alpha channel
-        if (((buf_idx) % 4) == 0) {
-          buf_idx++;
-          continue;
+    // Amlogic captured images are always in packed R8G8B8 where R8 is the least
+    // significant byte. To avoid out-of-order data access, we convert B8G8R8A8
+    // images to R8G8B8A8 (where R8 is the least significant byte) for easier
+    // comparison.
+    for (size_t i = 0; i + 3 < expected_rgba_image.size(); i += 4) {
+      switch (input_image_pixel_format) {
+        case ZX_PIXEL_FORMAT_ARGB_8888:
+        case ZX_PIXEL_FORMAT_RGB_x888: {
+          uint8_t r, g, b, a;
+          std::tie(b, g, r, a) = std::tie(expected_rgba_image[i + 0], expected_rgba_image[i + 1],
+                                          expected_rgba_image[i + 2], expected_rgba_image[i + 3]);
+          std::tie(expected_rgba_image[i + 0], expected_rgba_image[i + 1],
+                   expected_rgba_image[i + 2], expected_rgba_image[i + 3]) = std::tie(r, g, b, a);
+          break;
         }
-        if (imageptr[h * buffer_stride + buf_idx] == captureptr[h * capture_stride + cap_idx]) {
-          buf_idx++;
-          cap_idx++;
-          continue;
-        }
-        if (imageptr[h * buffer_stride + buf_idx] != 0 &&
-            (imageptr[h * buffer_stride + buf_idx] ==
-                 captureptr[h * capture_stride + cap_idx] + 1 ||
-             imageptr[h * buffer_stride + buf_idx] ==
-                 captureptr[h * capture_stride + cap_idx] - 1)) {
-          buf_idx++;
-          cap_idx++;
-          continue;
-        }
-        num_different++;
+        case ZX_PIXEL_FORMAT_ABGR_8888:
+        case ZX_PIXEL_FORMAT_BGR_888x:
+          // No need to convert.
+          break;
       }
     }
-    EXPECT_EQ(num_different, 0U) << "Capture Compare number of values different: " << num_different;
-    return num_different == 0U;
+
+    // Actually the pixel format of captured image is not RGB888 but BGR888;
+    // though it is not defined as a zx_pixel_format_t. Since we only need the
+    // bytes-per-pixel here to calculate the stride, in this case it's okay to
+    // use ZX_PIXEL_FORMAT_RGB_888.
+    const int capture_stride =
+        ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888)), 64);
+    const int expected_stride =
+        ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(input_image_pixel_format)), 64);
+
+    // Ignore the first row. It sometimes contains junk (hardware bug).
+    const int start_row = 1;
+    const int end_row = height;
+
+    const int start_column = 0;
+    // Ignore the last column for Astro only. It contains junk bytes (hardware bug).
+    const int end_column = [&] {
+#ifdef PLATFORM_ASTRO
+      return width - 1;
+#else
+      return width;
+#endif  // PLATFORM_ASTRO
+    }();
+
+    const int expected_image_column_offset = [] {
+#ifdef PLATFORM_ASTRO
+      return 1;
+#else
+      return 0;
+#endif  // PLATFORM_ASTRO
+    }();
+
+    const int color_difference_threshold = [] {
+#ifdef PLATFORM_VIM3
+      // On VIM3 with HDMI output the onboard color conversion caused some color
+      // difference between captured image and original RGB image. Currently we
+      // see a maximum difference of 3 (0xff and 0xfc) so we set it as the
+      // maximum allowed color difference.
+      return 3;
+#else
+      // On non VIM3 Amlogic platforms, the color conversion matrix and
+      // calculated results are rounded to 0.5, so it's possible to see a
+      // maximum color error of 1 in the readback pixels.
+      return 1;
+#endif  // PLATFORM_VIM3
+    }();
+
+    int64_t num_pixels_different = 0;
+    for (int row = start_row; row < end_row; row++) {
+      for (int captured_column = start_column; captured_column < end_column; captured_column++) {
+        int expected_column = captured_column + expected_image_column_offset;
+        bool pixel_same = true;
+        for (int channel = 0; channel < 3; channel++) {
+          // On the expected image, the fourth byte per pixel is alpha channel, so we ignore it.
+          int expected_byte_index = row * expected_stride + expected_column * 4 + channel;
+          int captured_byte_index = row * capture_stride + captured_column * 3 + channel;
+          if (abs(static_cast<int>(expected_rgba_image[expected_byte_index]) -
+                  captured_image[captured_byte_index]) > color_difference_threshold) {
+            pixel_same = false;
+            break;
+          }
+        }
+        if (!pixel_same) {
+          ++num_pixels_different;
+        }
+      }
+    }
+
+    EXPECT_EQ(num_pixels_different, 0U)
+        << "Capture Compare number of pixels different: " << num_pixels_different;
+    return num_pixels_different == 0U;
   }
 #endif  // FAKE_DISPLAY
 };
@@ -590,7 +643,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   // Compare the capture vmo data to the texture data above. Since we're doing a full screen
   // render, the two should be identical. The comparison is a bit complicated though since
   // the images are of two different formats.
-  bool images_are_same = CaptureCompare(read_values.data(), write_bytes.data(), read_values.size(),
+  bool images_are_same = CaptureCompare(read_values, write_bytes, kPixelFormat,
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
@@ -716,8 +769,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
     // render, the two should be identical. The comparison is a bit complicated though since
     // the images are of two different formats.
     bool images_are_same =
-        CaptureCompare(read_values.data(), write_values.data(), read_values.size(),
-                       display->height_in_px(), display->width_in_px());
+        CaptureCompare(read_values,
+                       cpp20::span(reinterpret_cast<uint8_t*>(write_values.data()),
+                                   write_values.size() * sizeof(uint32_t)),
+                       kPixelFormat, display->height_in_px(), display->width_in_px());
     EXPECT_TRUE(images_are_same);
   }
 }
@@ -845,7 +900,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   // Compare the capture vmo data to the texture data above. Since we're doing a full screen
   // render, the two should be identical. The comparison is a bit complicated though since
   // the images are of two different formats.
-  bool images_are_same = CaptureCompare(read_values.data(), write_bytes.data(), read_values.size(),
+  bool images_are_same = CaptureCompare(read_values, write_bytes, kPixelFormat,
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
@@ -966,9 +1021,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   // Compare the capture vmo data to the expected data above. Since we're doing a full screen
   // render, the two should be identical. The comparison is a bit complicated though since
   // the images are of two different formats.
-  bool images_are_same =
-      CaptureCompare(readback_values.data(), expected_values.data(), readback_values.size(),
-                     display->height_in_px(), display->width_in_px());
+  bool images_are_same = CaptureCompare(readback_values, expected_values, kPixelFormat,
+                                        display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
 
@@ -1128,8 +1182,9 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                    CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
                    // Compare the capture vmo data to the values we are expecting.
+
                    bool images_are_same =
-                       CaptureCompare(read_values.data(), vmo_host, read_values.size(),
+                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
                                       display->height_in_px(), display->width_in_px());
                    EXPECT_TRUE(images_are_same);
 
@@ -1278,7 +1333,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
 
                    // Compare the capture vmo data to the values we are expecting.
                    bool images_are_same =
-                       CaptureCompare(read_values.data(), vmo_host, read_values.size(),
+                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
                                       display->height_in_px(), display->width_in_px());
                    EXPECT_TRUE(images_are_same);
 
@@ -1464,52 +1519,53 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
-  MapHostPointer(
-      render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
-      [&](const uint8_t* vmo_host, uint32_t num_bytes) {
-        // Grab the capture vmo data.
-        std::vector<uint8_t> read_values;
-        CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+  MapHostPointer(render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) {
+                   // Grab the capture vmo data.
+                   std::vector<uint8_t> read_values;
+                   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-        // Compare the capture vmo data to the values we are expecting.
-        bool images_are_same = CaptureCompare(read_values.data(), vmo_host, read_values.size(),
-                                              display->height_in_px(), display->width_in_px());
-        EXPECT_TRUE(images_are_same);
+                   // Compare the capture vmo data to the values we are expecting.
+                   bool images_are_same =
+                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
+                                      display->height_in_px(), display->width_in_px());
+                   EXPECT_TRUE(images_are_same);
 
-        auto get_pixel = [&display](const uint8_t* vmo_host, uint32_t x, uint32_t y) -> uint32_t {
-          uint32_t index = y * display->width_in_px() * 4 + x * 4;
-          auto a = vmo_host[index];
-          auto b = vmo_host[index + 1];
-          auto c = vmo_host[index + 2];
-          auto d = vmo_host[index + 3];
-          return (a << 24) | (b << 16) | (c << 8) | d;
-        };
+                   auto get_pixel = [&display](const uint8_t* vmo_host, uint32_t x,
+                                               uint32_t y) -> uint32_t {
+                     uint32_t index = y * display->width_in_px() * 4 + x * 4;
+                     auto a = vmo_host[index];
+                     auto b = vmo_host[index + 1];
+                     auto c = vmo_host[index + 2];
+                     auto d = vmo_host[index + 3];
+                     return (a << 24) | (b << 16) | (c << 8) | d;
+                   };
 
-        // There should be a total of 20 white pixels (4 for the normal white square and
-        // 16 for the magnified white square).
-        uint32_t num_white = 0, num_blue = 0;
-        uint32_t num_pixels = num_bytes / 4;
-        const uint32_t kWhiteColor = 0xFFFFFFFF;
-        const uint32_t kBlueColor = 0xFF0000FF;
-        for (uint32_t i = 0; i < num_pixels; i += 4) {
-          // |vmo_host| has BGRA sequence in pixel values.
-          auto a = vmo_host[i];
-          auto b = vmo_host[i + 1];
-          auto c = vmo_host[i + 2];
-          auto d = vmo_host[i + 3];
-          uint32_t val = (a << 24) | (b << 16) | (c << 8) | d;
-          if (val == kWhiteColor) {
-            num_white++;
-          } else if (val == kBlueColor) {
-            num_blue++;
-          }
-        }
-        EXPECT_EQ(num_white, 15U);
-        EXPECT_EQ(num_blue, 5U);
+                   // There should be a total of 20 white pixels (4 for the normal white square and
+                   // 16 for the magnified white square).
+                   uint32_t num_white = 0, num_blue = 0;
+                   uint32_t num_pixels = num_bytes / 4;
+                   const uint32_t kWhiteColor = 0xFFFFFFFF;
+                   const uint32_t kBlueColor = 0xFF0000FF;
+                   for (uint32_t i = 0; i < num_pixels; i += 4) {
+                     // |vmo_host| has BGRA sequence in pixel values.
+                     auto a = vmo_host[i];
+                     auto b = vmo_host[i + 1];
+                     auto c = vmo_host[i + 2];
+                     auto d = vmo_host[i + 3];
+                     uint32_t val = (a << 24) | (b << 16) | (c << 8) | d;
+                     if (val == kWhiteColor) {
+                       num_white++;
+                     } else if (val == kBlueColor) {
+                       num_blue++;
+                     }
+                   }
+                   EXPECT_EQ(num_white, 15U);
+                   EXPECT_EQ(num_blue, 5U);
 
-        // Expect the top-left corner of the mag rect to be blue.
-        EXPECT_EQ(get_pixel(vmo_host, 10, 0), kBlueColor);
-      });
+                   // Expect the top-left corner of the mag rect to be blue.
+                   EXPECT_EQ(get_pixel(vmo_host, 10, 0), kBlueColor);
+                 });
 }
 
 // Pixeltest for ensuring rotation and flipping are applied correctly.
@@ -1642,52 +1698,53 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
-  MapHostPointer(
-      render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
-      [&](const uint8_t* vmo_host, uint32_t num_bytes) {
-        // Grab the capture vmo data.
-        std::vector<uint8_t> read_values;
-        CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+  MapHostPointer(render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) {
+                   // Grab the capture vmo data.
+                   std::vector<uint8_t> read_values;
+                   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-        // Compare the capture vmo data to the values we are expecting.
-        bool images_are_same = CaptureCompare(read_values.data(), vmo_host, read_values.size(),
-                                              display->height_in_px(), display->width_in_px());
-        EXPECT_TRUE(images_are_same);
+                   // Compare the capture vmo data to the values we are expecting.
+                   bool images_are_same =
+                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
+                                      display->height_in_px(), display->width_in_px());
+                   EXPECT_TRUE(images_are_same);
 
-        // There should be a total of 3 white pixels and 1 blue pixel.
-        uint32_t num_white = 0, num_blue = 0;
-        uint32_t num_pixels = num_bytes / 4;
-        const uint32_t kWhiteColor = 0xFFFFFFFF;
-        const uint32_t kBlueColor = 0xFF0000FF;
-        for (uint32_t i = 0; i < num_pixels; i += 4) {
-          // |vmo_host| has BGRA sequence in pixel values.
-          auto a = vmo_host[i];
-          auto b = vmo_host[i + 1];
-          auto c = vmo_host[i + 2];
-          auto d = vmo_host[i + 3];
-          uint32_t val = (a << 24) | (b << 16) | (c << 8) | d;
-          if (val == kWhiteColor) {
-            num_white++;
-          } else if (val == kBlueColor) {
-            num_blue++;
-          }
-        }
-        EXPECT_EQ(num_white, 3U);
-        EXPECT_EQ(num_blue, 1U);
+                   // There should be a total of 3 white pixels and 1 blue pixel.
+                   uint32_t num_white = 0, num_blue = 0;
+                   uint32_t num_pixels = num_bytes / 4;
+                   const uint32_t kWhiteColor = 0xFFFFFFFF;
+                   const uint32_t kBlueColor = 0xFF0000FF;
+                   for (uint32_t i = 0; i < num_pixels; i += 4) {
+                     // |vmo_host| has BGRA sequence in pixel values.
+                     auto a = vmo_host[i];
+                     auto b = vmo_host[i + 1];
+                     auto c = vmo_host[i + 2];
+                     auto d = vmo_host[i + 3];
+                     uint32_t val = (a << 24) | (b << 16) | (c << 8) | d;
+                     if (val == kWhiteColor) {
+                       num_white++;
+                     } else if (val == kBlueColor) {
+                       num_blue++;
+                     }
+                   }
+                   EXPECT_EQ(num_white, 3U);
+                   EXPECT_EQ(num_blue, 1U);
 
-        auto get_pixel = [&display](const uint8_t* vmo_host, uint32_t x, uint32_t y) -> uint32_t {
-          uint32_t index = y * display->width_in_px() * 4 + x * 4;
-          auto a = vmo_host[index];
-          auto b = vmo_host[index + 1];
-          auto c = vmo_host[index + 2];
-          auto d = vmo_host[index + 3];
-          return (a << 24) | (b << 16) | (c << 8) | d;
-        };
+                   auto get_pixel = [&display](const uint8_t* vmo_host, uint32_t x,
+                                               uint32_t y) -> uint32_t {
+                     uint32_t index = y * display->width_in_px() * 4 + x * 4;
+                     auto a = vmo_host[index];
+                     auto b = vmo_host[index + 1];
+                     auto c = vmo_host[index + 2];
+                     auto d = vmo_host[index + 3];
+                     return (a << 24) | (b << 16) | (c << 8) | d;
+                   };
 
-        // Expect the top-right corner of the rect to be blue.
-        EXPECT_EQ(get_pixel(vmo_host, 0, 0), kWhiteColor);
-        EXPECT_EQ(get_pixel(vmo_host, 1, 0), kBlueColor);
-      });
+                   // Expect the top-right corner of the rect to be blue.
+                   EXPECT_EQ(get_pixel(vmo_host, 0, 0), kWhiteColor);
+                   EXPECT_EQ(get_pixel(vmo_host, 1, 0), kBlueColor);
+                 });
 }
 
 }  // namespace test
