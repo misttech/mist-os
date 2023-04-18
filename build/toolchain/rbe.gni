@@ -20,7 +20,7 @@ declare_args() {
   # as opposed to the older (slower) bash scripts.  This option will
   # eventually disappear upon completing the transition to the Python scripts.
   cxx_rbe_use_python_impl = true
-  rust_rbe_use_python_impl = false
+  rust_rbe_use_python_impl = true
 }
 
 rbe_common_configs = [
