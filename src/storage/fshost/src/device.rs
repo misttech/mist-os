@@ -284,7 +284,7 @@ impl Device for BlockDevice {
 
     async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
         let volume_proxy = self.volume_proxy()?;
-        crate::volume::resize_volume(&volume_proxy, target_size_bytes, false).await
+        crate::volume::resize_volume(&volume_proxy, target_size_bytes).await
     }
 
     async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {

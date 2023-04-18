@@ -284,13 +284,6 @@ impl Environment for FshostEnvironment {
             _ => DiskFormat::Minfs,
         };
 
-        // Set the max partition size for data
-        if !self.launcher.is_ramdisk_device(device) {
-            if let Err(e) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
-                tracing::warn!(?e, "Failed to set max partition size for data");
-            };
-        }
-
         // Potentially bind and unseal zxcrypt before serving data.
         let mut zxcrypt_device = None;
         let device = if self.launcher.requires_zxcrypt(format, device) {
@@ -310,6 +303,13 @@ impl Environment for FshostEnvironment {
         } else {
             device
         };
+
+        // Set the max partition size for data
+        if !self.launcher.is_ramdisk_device(device) {
+            if let Err(e) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
+                tracing::warn!(?e, "Failed to set max partition size for data");
+            };
+        }
 
         let filesystem = match format {
             DiskFormat::Fxfs => {
@@ -355,13 +355,6 @@ impl Environment for FshostEnvironment {
             _ => DiskFormat::Minfs,
         };
 
-        // Set the max partition size for data
-        if !self.launcher.is_ramdisk_device(device) {
-            if let Err(e) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
-                tracing::warn!(?e, "Failed to set max partition size for data");
-            };
-        }
-
         // Potentially bind and format zxcrypt first.
         let mut zxcrypt_device;
         let device = if self.launcher.requires_zxcrypt(format, device) {
@@ -378,6 +371,13 @@ impl Environment for FshostEnvironment {
         } else {
             device
         };
+
+        // Set the max partition size for data
+        if !self.launcher.is_ramdisk_device(device) {
+            if let Err(e) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
+                tracing::warn!(?e, "Failed to set max partition size for data");
+            };
+        }
 
         tracing::info!(path = device.path(), format = format.as_str(), "Formatting");
 

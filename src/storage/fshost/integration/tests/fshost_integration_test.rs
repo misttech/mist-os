@@ -351,13 +351,21 @@ async fn partition_max_size_set() {
     let (status, blobfs_slice_count) =
         fvm_proxy.get_partition_limit(blobfs_instance_guid.as_mut()).await.unwrap();
     zx::Status::ok(status).unwrap();
-    assert_eq!(blobfs_slice_count, BLOBFS_MAX_BYTES / FVM_SLICE_SIZE);
+    assert_eq!(blobfs_slice_count, (BLOBFS_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE);
 
     // data max size check
     let (status, data_slice_count) =
         fvm_proxy.get_partition_limit(data_instance_guid.as_mut()).await.unwrap();
     zx::Status::ok(status).unwrap();
-    assert_eq!(data_slice_count, DATA_MAX_BYTES / FVM_SLICE_SIZE);
+    // The expected size depends on whether we are using zxcrypt or not.
+    // When wrapping in zxcrypt the data partition size is the same, but the physical disk
+    // commitment is one slice bigger.
+    let mut expected_slices = (DATA_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE;
+    if data_fs_zxcrypt() && data_fs_type() != VFS_TYPE_FXFS {
+        tracing::info!("Adding an extra expected data slice for zxcrypt");
+        expected_slices += 1;
+    }
+    assert_eq!(data_slice_count, expected_slices);
 
     fixture.tear_down().await;
 }
@@ -696,6 +704,19 @@ async fn reset_fvm_partitions() {
         let volume_info = volume_info.expect("get_volume_info returned no volume info");
         let slice_size = manager_info.slice_size;
         let slice_count = volume_info.partition_slice_count;
-        assert_eq!(slice_size * slice_count, DEFAULT_DATA_VOLUME_SIZE);
+        // We expect the partition to be at least as big as we requested...
+        assert!(
+            slice_size * slice_count >= DEFAULT_DATA_VOLUME_SIZE,
+            "{} >= {}",
+            slice_size * slice_count,
+            DEFAULT_DATA_VOLUME_SIZE
+        );
+        // ..but also no bigger than one extra slice and some rounding up.
+        assert!(
+            slice_size * slice_count <= DEFAULT_DATA_VOLUME_SIZE + slice_size,
+            "{} <= {}",
+            slice_size * slice_count,
+            DEFAULT_DATA_VOLUME_SIZE + 2 * slice_size
+        );
     }
 }

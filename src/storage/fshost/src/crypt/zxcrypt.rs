@@ -150,12 +150,30 @@ impl Device for ZxcryptDevice {
     }
 
     async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
+        // Nb: The zxcrypt device proxies the BlockVolume protocol and
+        // changes the extend/shrink offset to account for the
+        // zxcrypt header (src/devices/block/drivers/zxcrypt/device.cc:193).
         let volume_proxy = self.volume_proxy()?;
-        crate::volume::resize_volume(&volume_proxy, target_size_bytes, true).await
+        crate::volume::resize_volume(&volume_proxy, target_size_bytes).await
     }
 
     async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {
-        self.inner_device.set_partition_max_bytes(max_bytes).await
+        // Because partition limits are set on the volume manager (not the volume proxy)
+        // we have to account fo the zxcrypt overheads ourselves.
+        let extra_bytes = if max_bytes > 0 {
+            let volume_proxy = self.volume_proxy()?;
+            let (status, volume_manager_info, _volume_info) = volume_proxy
+                .get_volume_info()
+                .await
+                .context("Transport error on get_volume_info")?;
+            zx::Status::ok(status).context("get_volume_info failed")?;
+            let manager = volume_manager_info.ok_or(anyhow!("Expected volume manager info"))?;
+            manager.slice_size
+        } else {
+            0
+        };
+        // Add an extra slice for zxcrypt metadata.
+        self.inner_device.set_partition_max_bytes(max_bytes + extra_bytes).await
     }
 
     fn controller(&self) -> &ControllerProxy {

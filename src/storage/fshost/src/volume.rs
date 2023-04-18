@@ -19,17 +19,16 @@ const MAX_VSLICES: u64 = 1 << (SLICE_ENTRY_VSLICE_BITS - 1);
 const DEFAULT_VOLUME_PERCENTAGE: u64 = 10;
 const DEFAULT_VOLUME_SIZE: u64 = 24 * 1024 * 1024;
 
-pub async fn resize_volume(
-    volume_proxy: &VolumeProxy,
-    target_bytes: u64,
-    inside_zxcrypt: bool,
-) -> Result<u64, Error> {
-    // Free all the existing slices.
+pub async fn resize_volume(volume_proxy: &VolumeProxy, target_bytes: u64) -> Result<u64, Error> {
+    // Free existing slices (except the first).
+    // Note while physical slices in FVM are 1-indexed, virtual slices (used here) are 0-indexed.
+    // The reason we start at slice 1 here is because FVM requires that the first slice always be
+    // allocated -- we can't shrink it away.
     let mut slice = 1;
-    // The -1 here is because of zxcrypt; zxcrypt will offset all slices by 1 to account for its
-    // header.  zxcrypt isn't present in all cases, but that won't matter since minfs shouldn't be
-    // using a slice so high.
     while slice < (MAX_VSLICES - 1) {
+        // Note also that query_slices responds with an extent that is either allocated or free,
+        // but not a mix of both. The last unallocated extent always has a slice count that runs
+        // the total to MAX_VSLICES - 1.
         let (status, vslices, response_count) =
             volume_proxy.query_slices(&[slice]).await.context("Transport error on query_slices")?;
         zx::Status::ok(status).context("query_slices failed")?;
@@ -53,11 +52,9 @@ pub async fn resize_volume(
     let manager = volume_manager_info.ok_or(anyhow!("Expected volume manager info"))?;
     let slice_size = manager.slice_size;
 
-    // Count the first slice (which is already allocated to the volume) as available.
-    let slices_available = 1 + manager.slice_count - manager.assigned_slice_count;
-    // TODO(fxbug.dev/123427): Shouldn't this round up?
-    let mut slice_count = target_bytes / slice_size;
-    if slice_count == 0 {
+    // Note we add one here to include the 0th slice that we cannot shrink away.
+    let slices_available = manager.slice_count - manager.assigned_slice_count + 1;
+    let mut slice_count = if target_bytes == 0 {
         // If a size is not specified, limit the size of the data partition so as not to use up all
         // FVM's space (thus limiting blobfs growth).  10% or 24MiB (whichever is larger) should be
         // enough.
@@ -66,8 +63,10 @@ pub async fn resize_volume(
             DEFAULT_VOLUME_SIZE / slice_size,
         );
         tracing::info!("Using default size of {:?}", default_slices * slice_size);
-        slice_count = cmp::min(slices_available, default_slices);
-    }
+        cmp::min(slices_available, default_slices)
+    } else {
+        (target_bytes + slice_size - 1) / slice_size
+    };
     if slices_available < slice_count {
         tracing::info!(
             "Only {:?} slices available. Some functionality
@@ -76,13 +75,7 @@ pub async fn resize_volume(
         );
         slice_count = slices_available;
     }
-    assert!(slice_count > 0);
-    if inside_zxcrypt {
-        // zxcrypt occupies an additional slice for its own metadata.
-        slice_count -= 1;
-    }
     if slice_count > 1 {
-        // -1 for slice_count because we get the first slice for free.
         let status = volume_proxy
             .extend(1, slice_count - 1)
             .await
@@ -112,7 +105,7 @@ pub async fn set_partition_max_bytes(
     zx::Status::ok(status).context("get_info call failed")?;
     let info = info.ok_or(anyhow!("Expected info"))?;
     let slice_size = info.slice_size;
-    let max_slice_count = max_byte_size / slice_size;
+    let max_slice_count = (max_byte_size + slice_size - 1) / slice_size;
     let mut instance_guid =
         Guid { value: *device.partition_instance().await.context("Expected partition instance")? };
     let status = fvm_proxy
@@ -143,7 +136,6 @@ mod tests {
 
     async fn check_resize_volume(
         target_bytes: u64,
-        inside_zxcrypt: bool,
         assigned_slice_count: u64,
         expected_extend_slice_count: u64,
     ) -> Result<u64, Error> {
@@ -196,25 +188,19 @@ mod tests {
 
         select! {
             _ = mock_device => unreachable!(),
-            matches = resize_volume(&proxy, target_bytes, inside_zxcrypt).fuse() => matches,
+            matches = resize_volume(&proxy, target_bytes).fuse() => matches,
         }
     }
 
     #[fuchsia::test]
     async fn test_target_bytes_zero_slice_count_equals_default_slices() {
         let target_bytes = 0;
-        let inside_zxcrypt = false;
         let assigned_slice_count = 3000;
         let expected_extend_slice_count = 1535;
         assert_eq!(
-            check_resize_volume(
-                target_bytes,
-                inside_zxcrypt,
-                assigned_slice_count,
-                expected_extend_slice_count
-            )
-            .await
-            .unwrap(),
+            check_resize_volume(target_bytes, assigned_slice_count, expected_extend_slice_count)
+                .await
+                .unwrap(),
             // Add one because extend ignores free allocated slice per volume
             (expected_extend_slice_count + 1) * SLICE_SIZE
         );
@@ -223,18 +209,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_target_bytes_zero_slice_count_equals_slices_available() {
         let target_bytes = 0;
-        let inside_zxcrypt = false;
         let assigned_slice_count = 4000;
         let expected_extend_slice_count = 1000;
         assert_eq!(
-            check_resize_volume(
-                target_bytes,
-                inside_zxcrypt,
-                assigned_slice_count,
-                expected_extend_slice_count
-            )
-            .await
-            .unwrap(),
+            check_resize_volume(target_bytes, assigned_slice_count, expected_extend_slice_count)
+                .await
+                .unwrap(),
             // Add one because extend ignores free allocated slice per volume
             (expected_extend_slice_count + 1) * SLICE_SIZE
         );
@@ -243,77 +223,14 @@ mod tests {
     #[fuchsia::test]
     async fn test_slice_count_less_than_slice_available() {
         let target_bytes = SLICE_SIZE * 2500;
-        let inside_zxcrypt = false;
         let assigned_slice_count = 3000;
         let expected_extend_slice_count = 2000;
         assert_eq!(
-            check_resize_volume(
-                target_bytes,
-                inside_zxcrypt,
-                assigned_slice_count,
-                expected_extend_slice_count
-            )
-            .await
-            .unwrap(),
+            check_resize_volume(target_bytes, assigned_slice_count, expected_extend_slice_count)
+                .await
+                .unwrap(),
             // Add one because extend ignores free allocated slice per volume
             (expected_extend_slice_count + 1) * SLICE_SIZE
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_inside_zxcrypt_no_extend_one_available_slice() {
-        let target_bytes = SLICE_SIZE * 2000;
-        let inside_zxcrypt = true;
-        let assigned_slice_count = SLICE_COUNT;
-        let expected_extend_slice_count = 0;
-        assert_eq!(
-            check_resize_volume(
-                target_bytes,
-                inside_zxcrypt,
-                assigned_slice_count,
-                expected_extend_slice_count
-            )
-            .await
-            .unwrap(),
-            0
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_inside_zxcrypt_no_extend_two_available_slices() {
-        let target_bytes = SLICE_SIZE * 2000;
-        let inside_zxcrypt = true;
-        let assigned_slice_count = SLICE_COUNT - 1;
-        let expected_extend_slice_count = 0;
-        assert_eq!(
-            check_resize_volume(
-                target_bytes,
-                inside_zxcrypt,
-                assigned_slice_count,
-                expected_extend_slice_count
-            )
-            .await
-            .unwrap(),
-            SLICE_SIZE
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_inside_zxcrypt_no_extend_one_slice_requested() {
-        let target_bytes = SLICE_SIZE;
-        let inside_zxcrypt = true;
-        let assigned_slice_count = 4000;
-        let expected_extend_slice_count = 0;
-        assert_eq!(
-            check_resize_volume(
-                target_bytes,
-                inside_zxcrypt,
-                assigned_slice_count,
-                expected_extend_slice_count
-            )
-            .await
-            .unwrap(),
-            0
         );
     }
 }
