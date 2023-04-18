@@ -9,15 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path"
+
+	"go.fuchsia.dev/fuchsia/tools/build"
 )
-
-type blob struct {
-	Merkle string `json:"merkle"`
-}
-
-type deliveryBlobConfig struct {
-	Type int `json:"type"`
-}
 
 // BlobsUploads parses the blob manifest in the build and returns a list of
 // Uploads for all blobs.
@@ -32,7 +26,7 @@ func BlobsUploads(blobManifestPath, deliveryBlobConfigPath, srcDir, dstDir strin
 		return nil, fmt.Errorf("failed to read blob manifest: %w", err)
 	}
 
-	var blobs []blob
+	var blobs []build.Blob
 	err = json.Unmarshal(data, &blobs)
 	if err != nil {
 		return nil, fmt.Errorf("unable to unmarshal blob manifest: %w", err)
@@ -48,27 +42,20 @@ func BlobsUploads(blobManifestPath, deliveryBlobConfigPath, srcDir, dstDir strin
 	}
 
 	// Also upload delivery blobs if the config exists.
-	data, err = os.ReadFile(deliveryBlobConfigPath)
+	blobType, err := build.GetDeliveryBlobType(deliveryBlobConfigPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return uploads, nil
+		return nil, fmt.Errorf("unable to get delivery blob type: %w", err)
+	}
+	if blobType != nil {
+		blobTypeString := fmt.Sprint(*blobType)
+		for _, blob := range blobs {
+			uploads = append(uploads,
+				Upload{
+					Source:      path.Join(srcDir, blobTypeString, blob.Merkle),
+					Destination: path.Join(dstDir, blobTypeString, blob.Merkle),
+					Deduplicate: true,
+				})
 		}
-		return nil, fmt.Errorf("failed to read delivery blob config: %w", err)
-	}
-
-	var config deliveryBlobConfig
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal delivery blob config: %w", err)
-	}
-	blobType := fmt.Sprint(config.Type)
-	for _, blob := range blobs {
-		uploads = append(uploads,
-			Upload{
-				Source:      path.Join(srcDir, blobType, blob.Merkle),
-				Destination: path.Join(dstDir, blobType, blob.Merkle),
-				Deduplicate: true,
-			})
 	}
 	return uploads, nil
 }

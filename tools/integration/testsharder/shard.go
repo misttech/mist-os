@@ -5,7 +5,6 @@
 package testsharder
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -22,8 +21,6 @@ import (
 const (
 	// The name of the metadata directory within a package repository.
 	metadataDirName = "repository"
-	// The name of the blobs directory within a package repository.
-	blobsDirName = "blobs"
 	// The delivery blob config.
 	deliveryBlobConfigName = "delivery_blob_config.json"
 )
@@ -97,20 +94,10 @@ func (s *Shard) CreatePackageRepo(buildDir string, globalRepoMetadata string, ca
 			pkgManifests = append(pkgManifests, t.PackageManifests...)
 		}
 
-		blobsDirRel := blobsDirName
 		// Use delivery blobs if the config exists.
-		data, err := os.ReadFile(filepath.Join(buildDir, deliveryBlobConfigName))
-		if err == nil {
-			var config struct {
-				Type int `json:"type"`
-			}
-			err = json.Unmarshal(data, &config)
-			if err != nil {
-				return fmt.Errorf("unable to unmarshal delivery blob config: %w", err)
-			}
-			blobsDirRel = filepath.Join(blobsDirRel, fmt.Sprint(config.Type))
-		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read delivery blob config: %w", err)
+		blobsDirRel, err := build.GetBlobsDir(filepath.Join(buildDir, deliveryBlobConfigName))
+		if err != nil {
+			return fmt.Errorf("failed to get blobs dir: %w", err)
 		}
 		blobsDir := filepath.Join(localRepo, blobsDirRel)
 		addedBlobs := make(map[string]struct{})

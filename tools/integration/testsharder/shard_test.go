@@ -17,6 +17,11 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
+const (
+	// The name of the blobs directory within a package repository.
+	blobsDirName = "blobs"
+)
+
 // Note that just printing a list of shard pointers will print a list of memory addresses,
 // which would make for an unhelpful error message.
 func assertEqual(t *testing.T, expected, actual []*Shard) {
@@ -352,9 +357,7 @@ func TestMakeShards(t *testing.T) {
 		assertEqual(t, expected, actual)
 
 		// Create delivery blobs.
-		deliveryBlobConfig := struct {
-			Type int `json:"type"`
-		}{
+		deliveryBlobConfig := build.DeliveryBlobConfig{
 			Type: 1,
 		}
 		if err := jsonutil.WriteToFile(filepath.Join(buildDir, deliveryBlobConfigName), deliveryBlobConfig); err != nil {

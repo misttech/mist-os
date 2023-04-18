@@ -103,11 +103,6 @@ func (b *ArtifactsBuild) GetFlashManifest(ctx context.Context) (string, error) {
 	return buildFlasher.FlashManifest, nil
 }
 
-type blob struct {
-	// Merkle is the merkle associated with a blob.
-	Merkle string `json:"merkle"`
-}
-
 // GetPackageRepository returns a Repository for this build. It tries to
 // download a package when all the artifacts are stored in individual files,
 // which is how modern builds publish their build artifacts.
@@ -143,18 +138,25 @@ func (b *ArtifactsBuild) GetPackageRepository(ctx context.Context, fetchMode Blo
 		return nil, fmt.Errorf("failed to read blobs manifest: %w", err)
 	}
 
-	var blobs []blob
+	var blobs []build.Blob
 	err = json.Unmarshal(blobsData, &blobs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal blobs JSON: %w", err)
 	}
+
+	deliveryBlobConfigPath := filepath.Join(packagesDir, "delivery_blob_config.json")
+	blobsDir, err := build.GetBlobsDir(deliveryBlobConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blobs dir: %w", err)
+	}
+
 	var blobsList []string
 	for _, blob := range blobs {
-		blobsList = append(blobsList, filepath.Join("blobs", blob.Merkle))
+		blobsList = append(blobsList, filepath.Join(blobsDir, blob.Merkle))
 	}
 	logger.Infof(ctx, "all_blobs contains %d blobs", len(blobs))
 
-	blobsDir := filepath.Join(b.dir, "blobs")
+	blobsDir = filepath.Join(b.dir, "blobs")
 
 	if fetchMode == PrefetchBlobs {
 		if err := b.archive.download(ctx, b.id, true, filepath.Dir(blobsDir), blobsList); err != nil {

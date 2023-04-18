@@ -33,6 +33,7 @@ go_library("build") {
     "assembly_manifest.go",
     "binaries.go",
     "binaries_test.go",
+    "blob.go",
     "boot_tests.go",
     "checkout_artifacts.go",
     "clippy.go",
