@@ -84,12 +84,6 @@ zx_status_t AmlogicDisplay::RestartDisplay() {
   return vout_->RestartDisplay();
 }
 
-bool AmlogicDisplay::SupportsCapture() const {
-  // TODO(fxbug.dev/124947): Capture on VIM3 is disabled due to unexpected
-  // graphics test failures.
-  return device_info_.pid != PDEV_PID_AMLOGIC_A311D;
-}
-
 zx_status_t AmlogicDisplay::DisplayInit() {
   ZX_ASSERT(!fully_initialized());
   zx_status_t status;
@@ -653,9 +647,6 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t displa
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
-  if (!SupportsCapture()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
   fbl::AutoLock lock(&capture_lock_);
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   capture_active_id_ = INVALID_ID;
@@ -1062,19 +1053,17 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  if (SupportsCapture()) {
-    // Map VD1_WR Interrupt (used for capture)
-    if (zx_status_t status = pdev_.GetInterrupt(IRQ_VD1_WR, 0, &vd1_wr_irq_); status != ZX_OK) {
-      DISP_ERROR("Could not map vd1 wr interrupt %d\n", status);
-      return status;
-    }
+  // Map VD1_WR Interrupt (used for capture)
+  if (zx_status_t status = pdev_.GetInterrupt(IRQ_VD1_WR, 0, &vd1_wr_irq_); status != ZX_OK) {
+    DISP_ERROR("Could not map vd1 wr interrupt %d\n", status);
+    return status;
+  }
 
-    auto vd_thread = [](void* arg) { return static_cast<AmlogicDisplay*>(arg)->CaptureThread(); };
-    if (int status = thrd_create_with_name(&capture_thread_, vd_thread, this, "capture_thread");
-        status != 0) {
-      DISP_ERROR("Could not create capture_thread %d\n", status);
-      return status;
-    }
+  auto vd_thread = [](void* arg) { return static_cast<AmlogicDisplay*>(arg)->CaptureThread(); };
+  if (int status = thrd_create_with_name(&capture_thread_, vd_thread, this, "capture_thread");
+      status != 0) {
+    DISP_ERROR("Could not create capture_thread %d\n", status);
+    return status;
   }
 
   if (vout_->supports_hpd()) {

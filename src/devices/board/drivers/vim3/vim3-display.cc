@@ -72,6 +72,10 @@ static const std::vector<fpbus::Irq> display_irqs{
         .irq = A311D_RDMA_DONE_IRQ,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
+    {{
+        .irq = A311D_VID1_WR_IRQ,
+        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+    }},
 };
 
 static const std::vector<fpbus::Bti> display_btis{
