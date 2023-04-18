@@ -84,7 +84,7 @@ this command line flag is set to false, turbo is disabled for all CPUs in the
 system.
 )""")
 
-DEFINE_OPTION("kernel.x86.enable_pcid", bool, x86_enable_pcid, {false}, R"""(
+DEFINE_OPTION("kernel.x86.enable_pcid", bool, x86_enable_pcid, {true}, R"""(
 This option controls whether PCIDs are used, if there is sufficient CPU support.
 If this option is enabled and there is not sufficient CPU support, then this
 option has no effect.

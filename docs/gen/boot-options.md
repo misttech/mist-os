@@ -1136,7 +1136,7 @@ system.
 
 ### kernel.x86.enable_pcid=\<bool>
 
-**Default:** `false`
+**Default:** `true`
 
 This option controls whether PCIDs are used, if there is sufficient CPU support.
 If this option is enabled and there is not sufficient CPU support, then this
