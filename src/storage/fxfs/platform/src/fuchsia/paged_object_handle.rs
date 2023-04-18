@@ -722,17 +722,28 @@ impl PagedObjectHandle {
     }
 
     pub async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        // We must extract informaton from `inner` *before* we try and retrieve the properties from
+        // the handle to avoid a window where we might see old properties.  When we flush, we update
+        // the handle and *then* remove the properties from `inner`.
+        let (dirty_page_count, data_size, ctime, mtime) = {
+            let mut inner = self.inner.lock().unwrap();
+            if self.was_file_modified_since_last_call()? {
+                inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
+            }
+            (
+                inner.dirty_page_count,
+                self.buffer.size(),
+                inner.dirty_crtime.timestamp(),
+                inner.dirty_mtime.timestamp(),
+            )
+        };
         let mut props = self.handle.get_properties().await?;
-        let mut inner = self.inner.lock().unwrap();
-        if self.was_file_modified_since_last_call()? {
-            inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
-        }
-        props.allocated_size += inner.dirty_page_count * zx::system_get_page_size() as u64;
-        props.data_attribute_size = self.buffer.size();
-        if let Some(t) = inner.dirty_crtime.timestamp() {
+        props.allocated_size += dirty_page_count * zx::system_get_page_size() as u64;
+        props.data_attribute_size = data_size;
+        if let Some(t) = ctime {
             props.creation_time = t;
         }
-        if let Some(t) = inner.dirty_mtime.timestamp() {
+        if let Some(t) = mtime {
             props.modification_time = t;
         }
         Ok(props)
