@@ -254,6 +254,9 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
     if (!fidl_driver_info.has_driver_url()) {
       matched_driver_info.is_dfv2 = true;
     }
+    if (fidl_driver_info.has_package_type()) {
+      matched_driver_info.package_type = fidl_driver_info.package_type();
+    }
 
     if (!matched_driver_info.is_fallback && config.only_return_base_and_fallback_drivers &&
         IsFuchsiaBootScheme(matched_driver_info.component_url)) {

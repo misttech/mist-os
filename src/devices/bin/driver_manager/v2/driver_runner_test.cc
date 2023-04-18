@@ -310,10 +310,14 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
             .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
                 .name = "test-group",
                 .node_index = 0,
-                .composite = fuchsia_driver_index::MatchedCompositeInfo(
-                    {.composite_name = "test-composite",
-                     .driver_info = fuchsia_driver_index::MatchedDriverInfo(
-                         {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})}),
+                .composite = fuchsia_driver_index::MatchedCompositeInfo({
+                    .composite_name = "test-composite",
+                    .driver_info = fuchsia_driver_index::MatchedDriverInfo({
+                        .url = "fuchsia-boot:///#meta/composite-driver.cm",
+                        .colocate = true,
+                        .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+                    }),
+                }),
                 .num_nodes = 2,
                 .node_names = {{"node-0", "node-1"}},
                 .primary_index = 1,
@@ -323,10 +327,14 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
             .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
                 .name = "test-group",
                 .node_index = 1,
-                .composite = fuchsia_driver_index::MatchedCompositeInfo(
-                    {.composite_name = "test-composite",
-                     .driver_info = fuchsia_driver_index::MatchedDriverInfo(
-                         {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})}),
+                .composite = fuchsia_driver_index::MatchedCompositeInfo({
+                    .composite_name = "test-composite",
+                    .driver_info = fuchsia_driver_index::MatchedDriverInfo({
+                        .url = "fuchsia-boot:///#meta/composite-driver.cm",
+                        .colocate = true,
+                        .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+                    }),
+                }),
                 .num_nodes = 2,
                 .node_names = {{"node-0", "node-1"}},
                 .primary_index = 1,
@@ -1797,10 +1805,14 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   // Add a match for the composite node spec that we are creating.
   std::string name("test-group");
   const fuchsia_driver_index::MatchedCompositeNodeSpecInfo match({
-      .composite = fuchsia_driver_index::MatchedCompositeInfo(
-          {.composite_name = "test-composite",
-           .driver_info = fuchsia_driver_index::MatchedDriverInfo(
-               {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})}),
+      .composite = fuchsia_driver_index::MatchedCompositeInfo({
+          .composite_name = "test-composite",
+          .driver_info = fuchsia_driver_index::MatchedDriverInfo({
+              .url = "fuchsia-boot:///#meta/composite-driver.cm",
+              .colocate = true,
+              .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+          }),
+      }),
       .node_names = {{"node-0", "node-1"}},
       .primary_index = 1,
   });

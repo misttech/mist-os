@@ -116,6 +116,7 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
         .url(fidl::ObjectView<fidl::StringView>(arena, arena, match.url))
         .is_fallback(match.is_fallback)
         .colocate(match.colocate)
+        .package_type(fuchsia_driver_index::DriverPackageType::kBoot)
         .Build();
   }
 

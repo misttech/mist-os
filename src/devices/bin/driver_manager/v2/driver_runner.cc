@@ -146,6 +146,20 @@ fidl::StringView CollectionName(Collection collection) {
       return "full-pkg-drivers";
   }
 }
+Collection ToCollection(fdi::DriverPackageType package) {
+  switch (package) {
+    case fdi::DriverPackageType::kBoot:
+      return Collection::kBoot;
+    case fdi::DriverPackageType::kBase:
+      return Collection::kPackage;
+    case fdi::DriverPackageType::kCached:
+      return Collection::kFullPackage;
+    case fdi::DriverPackageType::kUniverse:
+      return Collection::kFullPackage;
+    default:
+      return Collection::kNone;
+  }
+}
 
 // Perfrom a Breadth-First-Search (BFS) over the node topology, applying the visitor function on
 // the node being visited.
@@ -297,7 +311,10 @@ void DriverRunner::PublishCompositeNodeManager(component::OutgoingDirectory& out
 }
 
 zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
-  return StartDriver(*root_node_, url, fdi::DriverPackageType::kBase);
+  fdi::DriverPackageType package = cpp20::starts_with(url, kBootScheme)
+                                       ? fdi::DriverPackageType::kBoot
+                                       : fdi::DriverPackageType::kBase;
+  return StartDriver(*root_node_, url, package);
 }
 
 std::shared_ptr<Node> DriverRunner::root_node() { return root_node_; }
@@ -365,11 +382,7 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
     return zx::error(status);
   }
 
-  // TODO(fxb/98474) Stop doing the url prefix check and just rely on the package_type.
-  auto collection = cpp20::starts_with(url, kBootScheme) ? Collection::kBoot : Collection::kPackage;
-  if (package_type == fdi::DriverPackageType::kUniverse) {
-    collection = Collection::kFullPackage;
-  }
+  Collection collection = ToCollection(package_type);
   node.set_collection(collection);
   auto create = CreateComponent(node.MakeComponentMoniker(), collection, std::string(url),
                                 {.node = &node, .token = std::move(token)});
