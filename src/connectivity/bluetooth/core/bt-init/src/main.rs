@@ -68,8 +68,8 @@ async fn open_childs_service_directory<C: ComponentClientAdapter>(
     }
 }
 
+#[fuchsia::main(logging_tags = ["bt-init"])]
 fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["bt-init"]).expect("Can't init logger");
     info!("starting bt-init...");
 
     let mut executor = fasync::LocalExecutor::new();
