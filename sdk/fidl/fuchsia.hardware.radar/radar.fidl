@@ -147,6 +147,14 @@ protocol RadarBurstReader {
         burst Burst;
     }) error StatusCode;
 
+    // TODO(fxbug.dev/99924): Remove this after `OnBurst()` has the same
+    // signature and all users have been migrated.
+    @available(added=HEAD)
+    -> OnBurst2(flexible union {
+        1: burst Burst;
+        2: error StatusCode;
+    });
+
     /// Signals to the driver that the client is no longer reading the VMO. The
     /// client must not access the VMO after calling this.
     ///
