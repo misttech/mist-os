@@ -6,6 +6,8 @@ use std::{collections::HashSet, pin::Pin};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
+use fidl_fuchsia_net_ext::{FromExt as _, IntoExt as _};
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_name as fnet_name;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_zircon as zx;
@@ -19,7 +21,7 @@ use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use futures::stream::TryStreamExt as _;
 use net_declare::fidl_subnet;
 use net_types::{ip::Ipv4Addr, SpecifiedAddr, Witness as _};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::{dns, errors};
 
@@ -49,15 +51,63 @@ pub(super) async fn update_configuration(
     interface_id: u64,
     ClientState { client: _, routers: configured_routers }: &mut ClientState,
     fnet_dhcp::ClientWatchConfigurationResponse {
-        address: _,
+        address,
         dns_servers: new_dns_servers,
         routers: new_routers,
         ..
     }: fnet_dhcp::ClientWatchConfigurationResponse,
     dns_servers: &mut DnsServers,
+    control: &fnet_interfaces_ext::admin::Control,
     stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
+    if let Some(fnet_dhcp::Address {
+        address, address_parameters, address_state_provider, ..
+    }) = address
+    {
+        let Some(address) = address else {
+            error!(
+                "ignoring DHCPv4 configuration for interface {} without address set",
+                interface_id,
+            );
+            return;
+        };
+        let Some(address_parameters) = address_parameters else {
+            error!(
+                "ignoring DHCPv4 configuration for interface {} without address_parameters set",
+                interface_id,
+            );
+            return;
+        };
+        let Some(address_state_provider) = address_state_provider else {
+            error!(
+                "ignoring DHCPv4 configuration for interface {} without address_state_provider set",
+                interface_id,
+            );
+            return;
+        };
+
+        match control.add_address(
+            &mut address.into_ext(),
+            address_parameters,
+            address_state_provider,
+        ) {
+            Ok(()) => {}
+            Err(e) => {
+                let fnet::Ipv4AddressWithPrefix { addr, prefix_len } = address;
+                warn!(
+                    "error adding DHCPv4-acquired address {}/{} for interface {}: {}",
+                    // Make sure address is pretty-printed so that PII filtering
+                    // is properly applied on addresses.
+                    Ipv4Addr::from_ext(addr),
+                    prefix_len,
+                    interface_id,
+                    e,
+                )
+            }
+        }
+    }
+
     dns::update_servers(
         lookup_admin,
         dns_servers,
@@ -165,6 +215,7 @@ pub(super) async fn stop_client(
     mut state: ClientState,
     configuration_streams: &mut ConfigurationStreamMap,
     dns_servers: &mut DnsServers,
+    control: &fnet_interfaces_ext::admin::Control,
     stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
@@ -175,6 +226,7 @@ pub(super) async fn stop_client(
         &mut state,
         fnet_dhcp::ClientWatchConfigurationResponse::EMPTY,
         dns_servers,
+        control,
         stack,
         lookup_admin,
     )

@@ -1134,6 +1134,7 @@ impl<'a> NetCfg<'a> {
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
+        control: &fnet_interfaces_ext::admin::Control,
         stack: &fnet_stack::StackProxy,
         lookup_admin: &fnet_name::LookupAdminProxy,
     ) {
@@ -1144,6 +1145,7 @@ impl<'a> NetCfg<'a> {
                 c,
                 configuration_streams,
                 dns_servers,
+                control,
                 stack,
                 lookup_admin,
             )
@@ -1171,6 +1173,7 @@ impl<'a> NetCfg<'a> {
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
+        control: &fnet_interfaces_ext::admin::Control,
         stack: &fnet_stack::StackProxy,
         lookup_admin: &fnet_name::LookupAdminProxy,
     ) {
@@ -1189,6 +1192,7 @@ impl<'a> NetCfg<'a> {
                 dhcpv4_client,
                 configuration_streams,
                 dns_servers,
+                control,
                 stack,
                 lookup_admin,
             )
@@ -1322,7 +1326,7 @@ impl<'a> NetCfg<'a> {
                                 dhcpv6_client_state,
                                 dhcpv6_pd_config,
                             }),
-                        control: _,
+                        control,
                         device_class: _,
                     }) => {
                         Self::handle_dhcpv4_client_update(
@@ -1333,6 +1337,7 @@ impl<'a> NetCfg<'a> {
                             dhcpv4_client_provider.as_ref(),
                             dhcpv4_configuration_streams,
                             dns_servers,
+                            control,
                             stack,
                             lookup_admin,
                         )
@@ -1469,7 +1474,7 @@ impl<'a> NetCfg<'a> {
                     // An interface netcfg was not responsible for configuring was removed, do
                     // nothing.
                     None => Ok(()),
-                    Some(InterfaceState { config, control: _, device_class: _ }) => {
+                    Some(InterfaceState { config, control, device_class: _ }) => {
                         match config {
                             InterfaceConfigState::Host(HostInterfaceState {
                                 mut dhcpv4_client,
@@ -1482,6 +1487,7 @@ impl<'a> NetCfg<'a> {
                                     &mut dhcpv4_client,
                                     dhcpv4_configuration_streams,
                                     dns_servers,
+                                    &control,
                                     stack,
                                     lookup_admin,
                                 )
@@ -2412,8 +2418,8 @@ impl<'a> NetCfg<'a> {
             }
         };
 
-        let dhcpv4_client = {
-            let InterfaceState { config, control: _, device_class: _ } = self
+        let (dhcpv4_client, control) = {
+            let InterfaceState { config, control, device_class: _ } = self
                 .interface_states
                 .get_mut(&interface_id)
                 .unwrap_or_else(|| panic!("interface {} not found", interface_id));
@@ -2423,9 +2429,12 @@ impl<'a> NetCfg<'a> {
                     dhcpv4_client,
                     dhcpv6_client_state: _,
                     dhcpv6_pd_config: _,
-                }) => dhcpv4_client.as_mut().unwrap_or_else(|| {
-                    panic!("interface {} does not have a running DHCPv4 client", interface_id)
-                }),
+                }) => (
+                    dhcpv4_client.as_mut().unwrap_or_else(|| {
+                        panic!("interface {} does not have a running DHCPv4 client", interface_id)
+                    }),
+                    control,
+                ),
                 InterfaceConfigState::WlanAp(wlan_ap_state) => {
                     panic!(
                         "interface {} expected to be host but is WLAN AP with state {:?}",
@@ -2440,6 +2449,7 @@ impl<'a> NetCfg<'a> {
             dhcpv4_client,
             configuration,
             &mut self.dns_servers,
+            control,
             &self.stack,
             &self.lookup_admin,
         )
@@ -2683,10 +2693,12 @@ fn exit_with_fidl_error(cause: fidl::Error) -> ! {
 
 #[cfg(test)]
 mod tests {
+    use fidl_fuchsia_net_ext::FromExt as _;
+
     use assert_matches::assert_matches;
     use futures::future::{self, FutureExt as _};
     use futures::stream::{FusedStream as _, TryStreamExt as _};
-    use net_declare::{fidl_ip, fidl_ip_v6, fidl_ip_v6_with_prefix};
+    use net_declare::{fidl_ip, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
     use test_case::test_case;
 
     use super::*;
@@ -3055,7 +3067,7 @@ mod tests {
 
         // Mock a new interface being discovered by NetCfg (we only need to make NetCfg aware of a
         // NIC with ID `INTERFACE_ID` to test DHCPv4).
-        let (control, _control_server_end) =
+        let (control, control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
         let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
@@ -3065,6 +3077,7 @@ mod tests {
                 .insert(INTERFACE_ID, InterfaceState::new_host(control, device_class.into(), None)),
             None
         );
+        let mut control = control_server_end.into_stream().expect("control request stream");
 
         async fn handle_update(
             netcfg: &mut NetCfg<'_>,
@@ -3146,11 +3159,32 @@ mod tests {
                 assert!(routers.insert(*next_hop.expect("specified next hop")))
             };
 
+        const ADDRESS: fnet::Ipv4AddressWithPrefix = fidl_ip_v4_with_prefix!("192.0.2.254/24");
+        const ADDRESS_PARAMETERS: fnet_interfaces_admin::AddressParameters =
+            fnet_interfaces_admin::AddressParameters {
+                initial_properties: Some(fnet_interfaces_admin::AddressProperties {
+                    preferred_lifetime_info: None,
+                    valid_lifetime_end: Some(zx::Time::INFINITE.into_nanos()),
+                    ..fnet_interfaces_admin::AddressProperties::EMPTY
+                }),
+                temporary: Some(true),
+                add_subnet_route: Some(false),
+                ..fnet_interfaces_admin::AddressParameters::EMPTY
+            };
         let (expected_routers, stack) = {
             let dns_servers = vec![fidl_ip_v4!("192.0.2.1"), fidl_ip_v4!("192.0.2.2")];
             let routers = vec![fidl_ip_v4!("192.0.2.3"), fidl_ip_v4!("192.0.2.4")];
+
+            let (_asp_client, asp_server) = fidl::endpoints::create_proxy().expect("create proxy");
+
             responder
                 .send(fnet_dhcp::ClientWatchConfigurationResponse {
+                    address: Some(fnet_dhcp::Address {
+                        address: Some(ADDRESS),
+                        address_parameters: Some(ADDRESS_PARAMETERS),
+                        address_state_provider: Some(asp_server),
+                        ..fnet_dhcp::Address::EMPTY
+                    }),
                     dns_servers: Some(dns_servers.clone()),
                     routers: Some(routers.clone()),
                     ..fnet_dhcp::ClientWatchConfigurationResponse::EMPTY
@@ -3189,10 +3223,26 @@ mod tests {
                 },
             );
 
-            let ((), (), (added_routers, stack)) = future::join3(
+            let expect_add_address_called = async {
+                assert_matches!(
+                    control.next().await.expect("control request stream should not be exhausted"),
+                    Ok(fnet_interfaces_admin::ControlRequest::AddAddress {
+                        address,
+                        parameters,
+                        address_state_provider: _,
+                        control_handle: _,
+                    })  => {
+                        assert_eq!(address, fnet::Subnet::from_ext(ADDRESS));
+                        assert_eq!(parameters, ADDRESS_PARAMETERS);
+                    }
+                );
+            };
+
+            let ((), (), (added_routers, stack), ()) = future::join4(
                 netcfg.handle_dhcpv4_configuration(got_interface_id, got_response),
                 run_lookup_admin_once(&mut lookup_admin, &dns_servers),
                 expect_add_default_routers,
+                expect_add_address_called,
             )
             .await;
             assert_eq!(netcfg.dns_servers.consolidated(), dns_servers);
@@ -3262,6 +3312,12 @@ mod tests {
         // No more requests sent by NetCfg.
         assert_matches!(lookup_admin.next().now_or_never(), None);
         assert_matches!(stack.next().now_or_never(), None);
+        let control_next = control.next().now_or_never();
+        if remove_interface {
+            assert_matches!(control_next, Some(None));
+        } else {
+            assert_matches!(control_next, None);
+        }
     }
 
     /// Waits for a `SetDnsServers` request with the specified servers.
