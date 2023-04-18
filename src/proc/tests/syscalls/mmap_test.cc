@@ -791,4 +791,71 @@ TEST(Mprotect, GrowTempFilePermisisons) {
   ASSERT_EQ(0, unlink(path.c_str()));
 }
 
+TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
+  // Test that even if mprotect fails, we either see the new mapping or the old
+  // one, and the accesses are consistent with what is reported by the kernel.
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/test_mprotect_consistent_failure";
+  {
+    uint8_t buf[] = {1};
+    ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+    ASSERT_TRUE(fd);
+    ASSERT_EQ(write(fd.get(), &buf[0], sizeof(buf)), 1);
+  }
+  ScopedFD fd = ScopedFD(open(path.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd);
+
+  void* ptr = mmap(0, page_size * 3, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(ptr, MAP_FAILED);
+  uintptr_t ptr_addr = reinterpret_cast<uintptr_t>(ptr);
+
+  ASSERT_NE(mmap(reinterpret_cast<void*>(ptr_addr + page_size), page_size, PROT_READ,
+                 MAP_SHARED | MAP_FIXED, fd.get(), 0),
+            MAP_FAILED);
+
+  ASSERT_NE(mprotect(reinterpret_cast<void*>(ptr_addr), page_size * 3,
+                     PROT_READ | PROT_WRITE | PROT_EXEC),
+            0);
+
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
+
+  auto second_page = find_memory_mapping(ptr_addr + page_size, maps);
+  ASSERT_NE(second_page, std::nullopt);
+  EXPECT_EQ(second_page->perms, "r--s");
+  EXPECT_TRUE(TryRead(ptr_addr + page_size));
+  EXPECT_FALSE(TryWrite(ptr_addr + page_size));
+
+  auto test_consistency = [](const auto& mapping, uintptr_t addr) {
+    auto new_perms = "rwxp";
+    auto old_perms = "---p";
+    if (mapping->perms == new_perms) {
+      EXPECT_TRUE(TryRead(addr));
+      EXPECT_TRUE(TryWrite(addr));
+
+      volatile uint8_t* ptr = reinterpret_cast<volatile uint8_t*>(addr);
+      *ptr = 5;
+      EXPECT_EQ(*ptr, 5);
+    } else if (mapping->perms == old_perms) {
+      EXPECT_FALSE(TryRead(addr));
+      EXPECT_FALSE(TryWrite(addr));
+    } else {
+      ASSERT_FALSE(true) << "invalid perms for mapping: " << mapping->perms;
+    }
+  };
+
+  auto first_page = find_memory_mapping(ptr_addr, maps);
+  ASSERT_NE(first_page, std::nullopt);
+  test_consistency(first_page, ptr_addr);
+
+  auto third_page = find_memory_mapping(ptr_addr + page_size * 2, maps);
+  ASSERT_NE(third_page, std::nullopt);
+  test_consistency(third_page, ptr_addr + page_size * 2);
+
+  munmap(ptr, page_size * 3);
+  unlink(path.c_str());
+}
+
 }  // namespace
