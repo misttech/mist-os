@@ -529,6 +529,7 @@ impl Task {
         let clone_thread = flags & (CLONE_THREAD as u64) != 0;
         let clone_vm = flags & (CLONE_VM as u64) != 0;
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
+        let clone_vfork = flags & (CLONE_VFORK as u64) != 0;
 
         let new_uts = flags & (CLONE_NEWUTS as u64) != 0;
 
@@ -550,7 +551,12 @@ impl Task {
             // (libc and language runtimes) don't actually rely on the memory being shared between
             // the two processes. And the vfork() man page explicitly allows vfork() to be
             // implemented as fork() which is what we do here.
-            log_warn!("CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork).");
+            if !clone_vfork {
+                log_warn!(
+                    self,
+                    "CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork)."
+                );
+            }
         } else if clone_thread && !clone_vm {
             not_implemented!(self, "CLONE_THREAD without CLONE_VM is not implemented");
             return error!(ENOSYS);
