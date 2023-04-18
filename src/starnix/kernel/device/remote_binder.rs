@@ -25,10 +25,10 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{channel::oneshot, select, TryStreamExt};
+use futures::{channel::oneshot, future::FutureExt, pin_mut, select, TryStreamExt};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 trait RemoteControllerConnector: Send + Sync + 'static {
     fn connect_to_remote_controller(
@@ -64,14 +64,14 @@ impl DeviceOps for RemoteBinderDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(RemoteBinderFileOps::new(current_task.thread_group.clone()))
+        Ok(RemoteBinderFileOps::new(&current_task.thread_group))
     }
 }
 
 struct RemoteBinderFileOps(Arc<RemoteBinderHandle<DefaultRemoteControllerConnector>>);
 
 impl RemoteBinderFileOps {
-    fn new(thread_group: Arc<ThreadGroup>) -> Box<Self> {
+    fn new(thread_group: &Arc<ThreadGroup>) -> Box<Self> {
         Box::new(Self(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(thread_group)))
     }
 }
@@ -268,7 +268,7 @@ struct RemoteBinderHandle<F: RemoteControllerConnector> {
 struct RemoteBinderHandleState {
     /// The thread_group of the tasks that interact with this remote binder. This is used to
     /// ionterrupt a random thread in the task group is a taskless request needs to be handled.
-    thread_group: Arc<ThreadGroup>,
+    thread_group: Weak<ThreadGroup>,
 
     /// Mapping from the koid of the remote process to the local task.
     koid_to_task: HashMap<u64, pid_t>,
@@ -332,18 +332,20 @@ impl RemoteBinderHandleState {
         self.taskless_requests.push_back(request);
         // Interrupt at least one task in the thread group to ensure that the request will be
         // handled.
-        if let Ok(task) = self.thread_group.read().get_task() {
-            task.interrupt();
+        if let Some(thread_group) = self.thread_group.upgrade() {
+            if let Ok(task) = thread_group.read().get_task() {
+                task.interrupt();
+            }
         }
         self.waiters.notify_all();
     }
 }
 
 impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
-    fn new(thread_group: Arc<ThreadGroup>) -> Arc<Self> {
+    fn new(thread_group: &Arc<ThreadGroup>) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(RemoteBinderHandleState {
-                thread_group,
+                thread_group: Arc::downgrade(thread_group),
                 koid_to_task: Default::default(),
                 unassigned_tasks: Default::default(),
                 unassigned_requests: Default::default(),
@@ -632,8 +634,32 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         let handle = self.clone();
         current_task.kernel().thread_pool.dispatch(move || {
             let mut executor = fasync::LocalExecutor::new();
-            let result = executor
-                .run_singlethreaded(handle.clone().serve_dev_binder(dev_binder_server_end.into()));
+            let result = executor.run_singlethreaded({
+                let handle = handle.clone();
+                async {
+                    // Retrieve a `DropWaiter` for the thread_group, taking care not to keep a
+                    // strong reference to the thread_group itself.
+                    let drop_waiter = handle
+                        .state
+                        .lock()
+                        .thread_group
+                        .upgrade()
+                        .map(|tg| tg.drop_notifier.waiter());
+                    let Some(drop_waiter) = drop_waiter else { return Ok(()); };
+                    let dev_binder_server =
+                        handle.serve_dev_binder(dev_binder_server_end.into()).fuse();
+                    let on_task_end = drop_waiter
+                        .on_closed()
+                        .map(|r| r.map(|_| ()).map_err(anyhow::Error::from))
+                        .fuse();
+
+                    pin_mut!(dev_binder_server, on_task_end);
+                    select! {
+                        dev_binder_server = dev_binder_server => dev_binder_server,
+                        on_task_end = on_task_end => on_task_end,
+                    }
+                }
+            });
             if let Err(e) = &result {
                 log_error!("Error when servicing the DevBinder protocol: {e:#}");
             }
@@ -760,7 +786,7 @@ mod tests {
             .expect("Task");
 
             let remote_binder_handle =
-                RemoteBinderHandle::<TestRemoteControllerConnector>::new(task.thread_group.clone());
+                RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task.thread_group);
 
             let service_name_string = CString::new(service_name.as_bytes()).expect("CString::new");
             let service_name_bytes = service_name_string.as_bytes_with_nul();

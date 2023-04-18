@@ -180,6 +180,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/wayland/image_file.rs",
     "device/wayland/mod.rs",
     "device/wayland/vulkan.rs",
+    "drop_notifier.rs",
     "dynamic_thread_pool.rs",
     "execution/component_runner.rs",
     "execution/container.rs",

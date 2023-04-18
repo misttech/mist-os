@@ -10,6 +10,7 @@ use std::sync::{Arc, Weak};
 
 use crate::auth::Credentials;
 use crate::device::terminal::*;
+use crate::drop_notifier::DropNotifier;
 use crate::lock::RwLock;
 use crate::logging::log_error;
 use crate::mutable_state::*;
@@ -112,6 +113,8 @@ pub struct ThreadGroup {
     /// The signal actions that are registered for this process.
     pub signal_actions: Arc<SignalActions>,
 
+    pub drop_notifier: DropNotifier,
+
     /// The mutable state of the ThreadGroup.
     mutable_state: RwLock<ThreadGroupMutableState>,
 }
@@ -193,6 +196,7 @@ impl ThreadGroup {
             process,
             leader,
             signal_actions,
+            drop_notifier: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
                 tasks: BTreeMap::new(),
