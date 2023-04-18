@@ -4,7 +4,6 @@
 
 #include "src/ui/scenic/bin/app.h"
 
-#include <fuchsia/stash/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
@@ -42,86 +41,74 @@ static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 // escher/profiling/timestamp_profiler.cc.
 static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
-// Populates a ConfigValues struct by reading a config file and retrieving
-// overrides from the stash.
-scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
+enum TagType { INTEGER, BOOL };
+
+/// ConfigValue holds a value for a given key.
+struct ConfigValue {
+  TagType tag;
+  union {
+    int int_val;
+    bool bool_val;
+  };
+};
+
+// Populates a ConfigValues struct by reading a config file.
+scenic_impl::ConfigValues GetConfig() {
   scenic_impl::ConfigValues values;
 
-  using GetValueCallback = std::function<void(const std::string&, fuchsia::stash::Value&)>;
+  using GetValueCallback = std::function<void(const std::string&, ConfigValue&)>;
   std::unordered_map<std::string, GetValueCallback> config{
       {
           "frame_scheduler_min_predicted_frame_duration_in_us",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_intval()) << key << " must be an integer";
-            FX_CHECK(value.intval() >= 0) << key << " must be greater than 0";
-            values.min_predicted_frame_duration = zx::usec(value.intval());
+            FX_CHECK(value.tag == INTEGER) << key << " must be an integer";
+            FX_CHECK(value.int_val >= 0) << key << " must be greater than 0";
+            values.min_predicted_frame_duration = zx::usec(value.int_val);
           },
       },
       {
           "i_can_haz_flatland",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_boolval()) << key << " must be a boolean";
-            values.i_can_haz_flatland = value.boolval();
+            FX_CHECK(value.tag == BOOL) << key << " must be a boolean";
+            values.i_can_haz_flatland = value.bool_val;
           },
       },
       {
           "enable_allocator_for_flatland",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_boolval()) << key << " must be a boolean";
-            values.enable_allocator_for_flatland = value.boolval();
+            FX_CHECK(value.tag == BOOL) << key << " must be a boolean";
+            values.enable_allocator_for_flatland = value.bool_val;
           },
       },
       {
           "pointer_auto_focus",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_boolval()) << key << " must be a boolean";
-            values.pointer_auto_focus_on = value.boolval();
+            FX_CHECK(value.tag == BOOL) << key << " must be a boolean";
+            values.pointer_auto_focus_on = value.bool_val;
           },
       },
       {
           "flatland_enable_display_composition",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_boolval()) << key << " must be a boolean";
-            values.flatland_enable_display_composition = value.boolval();
+            FX_CHECK(value.tag == BOOL) << key << " must be a boolean";
+            values.flatland_enable_display_composition = value.bool_val;
           },
       },
       {
           "i_can_haz_display_id",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_intval()) << key << " must be an integer";
-            values.i_can_haz_display_id = value.intval();
+            FX_CHECK(value.tag == INTEGER) << key << " must be an integer";
+            values.i_can_haz_display_id = value.int_val;
           },
       },
       {
           "i_can_haz_display_mode",
           [&values](auto& key, auto& value) {
-            FX_CHECK(value.is_intval()) << key << " must be an integer";
-            values.i_can_haz_display_mode = value.intval();
+            FX_CHECK(value.tag == INTEGER) << key << " must be an integer";
+            values.i_can_haz_display_mode = value.int_val;
           },
       },
   };
-
-  async::Loop stash_loop(&kAsyncLoopConfigNeverAttachToThread);
-  fuchsia::stash::StorePtr store;
-  fuchsia::stash::StoreAccessorPtr accessor;
-  if (app_context->svc()->Connect(store.NewRequest(stash_loop.dispatcher())) == ZX_OK) {
-    store->Identify("stash_ctl");
-    store->CreateAccessor(true, accessor.NewRequest(stash_loop.dispatcher()));
-  } else {
-    FX_LOGS(INFO) << "Unable to access /svc/" << fuchsia::stash::Store::Name_
-                  << "; using only config file";
-  }
-
-  // Request all stash values asynchronously. We do this before reading the
-  // config file so we hide the cost of the asynchronous requests behind the
-  // synchronous filesystem server request.
-  for (auto& [key, callback] : config) {
-    accessor->GetValue(key, [&key = key, &callback = callback](auto value) {
-      if (value) {
-        callback(key, *value);
-      };
-    });
-  }
 
   std::string config_string;
   if (files::ReadFileToString("/config/data/scenic_config", &config_string)) {
@@ -132,13 +119,11 @@ scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
       if (document.HasMember(key)) {
         auto& json_value = document[key];
 
-        fuchsia::stash::Value value;
+        ConfigValue value;
         if (json_value.IsInt()) {
-          value = fuchsia::stash::Value::WithIntval(json_value.GetInt());
+          value = {INTEGER, {json_value.GetInt()}};
         } else if (json_value.IsBool()) {
-          value = fuchsia::stash::Value::WithBoolval(json_value.GetBool());
-        } else if (json_value.IsString()) {
-          value = fuchsia::stash::Value::WithStringval(json_value.GetString());
+          value = {BOOL, {json_value.GetBool()}};
         } else {
           FX_CHECK(false) << "Unsupported type for '" << key << "'";
         }
@@ -163,19 +148,6 @@ scenic_impl::ConfigValues GetConfig(sys::ComponentContext* app_context) {
   } else {
     FX_LOGS(INFO)
         << "No config file found at /config/data/display_rotation, using default rotation value 0";
-  }
-
-  // Wait for each stash value to be returned. These should have arrived while
-  // reading the config file.
-  //
-  // Note: The order of these operations means that the stash will override any
-  // values set by the config file.
-  for (auto& _ : config) {
-    // Only run the loop if the accessor is still bound.
-    if (!accessor) {
-      break;
-    }
-    stash_loop.Run(zx::time::infinite(), /*once*/ true);
   }
 
   FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
@@ -249,7 +221,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
          fit::closure quit_callback)
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
-      config_values_(GetConfig(app_context_.get())),
+      config_values_(GetConfig()),
       // TODO(fxbug.dev/40997): subsystems requiring graceful shutdown *on a loop* should register
       // themselves. It is preferable to cleanly shutdown using destructors only, if possible.
       shutdown_manager_(
