@@ -40,33 +40,34 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         description="Detects Rust compilation attributes",
-        argument_default=[],
+        argument_default=None,
+        add_help=False,
     )
     parser.add_argument(
         "-o",  # required
         type=Path,
         dest="output",
-        default="",
+        default=None,
         metavar="FILE",
         help="compiler output",
     )
     parser.add_argument(
         "--crate-type",
         type=str,
-        default="",
+        default=None,
         metavar="TYPE",
         help="Rust compiler output crate type",
     )
     parser.add_argument(
         "--sysroot",
         type=Path,
-        default="",
+        default=None,
         help="compiler sysroot",
     )
     parser.add_argument(
         "--target",
         type=str,
-        default="",
+        default=None,
         help="target platform",
     )
     parser.add_argument(
@@ -207,7 +208,7 @@ class RustAction(object):
         return self._command
 
     @property
-    def output_file(self) -> Path:
+    def output_file(self) -> Optional[Path]:
         return self._attributes.output  # usually this is the -o file
 
     @property
@@ -230,7 +231,7 @@ class RustAction(object):
         return self._want_sysroot_libgcc
 
     @property
-    def target(self) -> str:
+    def target(self) -> Optional[str]:
         return self._attributes.target
 
     @property
@@ -328,6 +329,8 @@ class RustAction(object):
         """Removes any .rlib or .exe suffix to get the stem name."""
         # Returning str instead of Path because caller most likely
         # wants to append something to the result to form a Path name.
+        if not self.output_file:
+            raise RuntimeError('Cannot infer stem name without a named -o output file')
         return str(self.output_file.parent / self.output_file.stem)
 
     @property

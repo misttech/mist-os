@@ -455,13 +455,13 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(prepare_status, 0)  # success
         self.assertEqual(r.remote_compiler, remote_compiler)
         a = r.remote_action
-        self.assertEqual(a.local_command, _strs([remote_compiler, source, '-o', rlib]))
+        self.assertEqual(
+            a.local_command, _strs([remote_compiler, source, '-o', rlib]))
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
             remote_inputs, set([remote_compiler, shlib_rel, source] + deps))
         self.assertEqual(remote_output_files, {rlib})
-
 
     def test_post_run_actions(self):
         exec_root = Path('/home/project')

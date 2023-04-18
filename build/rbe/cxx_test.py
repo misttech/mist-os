@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import unittest
+import sys
 from pathlib import Path
 from unittest import mock
 from typing import Any, Sequence
@@ -28,6 +29,21 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
 
 class CxxActionTests(unittest.TestCase):
+
+    def test_help_unwanted(self):
+        source = Path('hello.cc')
+        output = Path('hello.o')
+        for opt in (
+                '-h',
+                '--help',
+                '-hwasan-record-stack-history=libcall',
+                '-hello-world-is-ignored',
+        ):
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                c = cxx.CxxAction(
+                    _strs(['clang++', opt, '-c', source, '-o', output]))
+                preprocess, compile = c.split_preprocessing()
+            mock_exit.assert_not_called()
 
     def test_simple_clang_cxx(self):
         source = Path('hello.cc')
@@ -102,7 +118,8 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
         self.assertEqual(
-            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.ASM)])
+            c.sources,
+            [cxx.Source(file=source, dialect=cxx.SourceLanguage.ASM)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.crash_diagnostics_dir)
@@ -120,7 +137,8 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.compiler_is_gcc)
         self.assertEqual(c.target, '')
         self.assertEqual(
-            c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.ASM)])
+            c.sources,
+            [cxx.Source(file=source, dialect=cxx.SourceLanguage.ASM)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.crash_diagnostics_dir)

@@ -1078,6 +1078,7 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         "Understand some rewrapper flags, so they may be used as attributes.",
         argument_default=None,
+        add_help=False,  # do not intercept --help
     )
     parser.add_argument(
         "--exec_root",

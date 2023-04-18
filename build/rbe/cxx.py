@@ -26,6 +26,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Detects C++ compilation attributes",
         argument_default=[],
+        add_help=False,
     )
     parser.add_argument(
         "-o",
@@ -133,7 +134,8 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         description="Detects C-preprocessing attributes",
-        argument_default=[],
+        argument_default=[],  # many of the options are repeatable
+        add_help=False,
     )
     parser.add_argument(
         "-D",

@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import unittest
+import sys
 from unittest import mock
 from pathlib import Path
 
@@ -42,7 +43,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r._auxiliary_output_path, 'foo')
         self.assertEqual(r.direct_sources, [source])
         self.assertEqual(r.emit, {})
-        self.assertEqual(r.target, '')
+        self.assertIsNone(r.target)
         self.assertFalse(r.emit_llvm_ir)
         self.assertFalse(r.emit_llvm_bc)
         self.assertFalse(r.save_analysis)
@@ -71,6 +72,29 @@ class RustActionTests(unittest.TestCase):
             self.assertEqual(r._output_file_base, 'bin/foo')
             self.assertEqual(r._auxiliary_output_path, 'bin/foo')
             self.assertEqual(r.direct_sources, [source])
+
+    def test_no_source(self):
+        compiler = Path('../tools/bin/rustc')
+        output = Path('foo.rlib')
+        r = rustc.RustAction(_strs([compiler, '-o', output]))
+        self.assertEqual(r.direct_sources, [])
+
+    def test_no_output(self):
+        compiler = Path('../tools/bin/rustc')
+        source = Path('../foo/lib.rs')
+        r = rustc.RustAction(_strs([compiler, source]))
+        with self.assertRaises(RuntimeError):
+            base = r._output_file_base
+
+    def test_do_not_help(self):
+        compiler = Path('../tools/rustc')
+        source = Path('../foo/lib.rs')
+        output = Path('foo.rlib')
+        for opt in ('-h', '--help', '-halp-ignore=foo'):
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                r = rustc.RustAction(_strs([compiler, opt, source, '-o', output]))
+                self.assertEqual(r.compiler, compiler)
+            mock_exit.assert_not_called()
 
     def test_env(self):
         r = rustc.RustAction(

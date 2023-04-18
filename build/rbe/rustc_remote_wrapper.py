@@ -240,7 +240,7 @@ class RustRemoteAction(object):
         return self._rust_action.crate_type
 
     @property
-    def target(self) -> str:
+    def target(self) -> Optional[str]:
         return self._rust_action.target
 
     @property
@@ -265,7 +265,8 @@ class RustRemoteAction(object):
 
     def remote_compile_command(self) -> Iterable[str]:
         for tok in self._rust_action.command:
-            yield str(self.remote_compiler) if tok == str(self.host_compiler) else tok
+            yield str(self.remote_compiler) if tok == str(
+                self.host_compiler) else tok
 
     def _cleanup(self):
         for f in self._cleanup_files:
@@ -336,6 +337,8 @@ class RustRemoteAction(object):
         # needed by code emitted by rustc.  Listing this here works around a
         # missing upload issue, and adheres to the guidance of listing files
         # instead of whole directories.
+        if not self.target:
+            return
         libunwind_a = Path(
             self.exec_root_rel, fuchsia.rust_stdlib_dir(self.target),
             'libunwind.a')
@@ -496,6 +499,8 @@ class RustRemoteAction(object):
 
     def _sysroot_files(self) -> Iterable[Path]:
         # sysroot files
+        if not self.target:
+            return
         sysroot_dir = self.sysroot
         sysroot_triple = fuchsia.rustc_target_to_sysroot_triple(self.target)
         if sysroot_dir:
@@ -511,9 +516,11 @@ class RustRemoteAction(object):
         if self.linker:
             yield from self._remote_linker_executables()
 
-            clang_lib_triple = fuchsia.rustc_target_to_clang_target(self.target)
-            yield from self._remote_libcxx(clang_lib_triple)
-            yield from self._remote_clang_runtime_libs(clang_lib_triple)
+            if self.target:
+                clang_lib_triple = fuchsia.rustc_target_to_clang_target(
+                    self.target)
+                yield from self._remote_libcxx(clang_lib_triple)
+                yield from self._remote_clang_runtime_libs(clang_lib_triple)
 
         # --crate-type cdylib needs rust-lld (hard-coding this is a hack)
         # This will always be linux-x64, even when cross-compiling, because

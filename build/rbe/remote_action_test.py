@@ -313,6 +313,12 @@ class RewrapperArgParserTests(unittest.TestCase):
             ['--canonicalize_working_dir=false'])
         self.assertFalse(args.canonicalize_working_dir)
 
+    def test_help_unwanted(self):
+        for opt in ('-h', '--help'):
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                self._parser.parse_known_args([opt])
+            mock_exit.assert_not_called()
+
 
 class RemoteActionMainParserTests(unittest.TestCase):
 
