@@ -39,15 +39,15 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 
 static inline void iwl_scd_txq_set_chain(struct iwl_trans* trans, uint16_t txq_id) {
-  iwl_set_bits_prph(trans, SCD_QUEUECHAIN_SEL, BIT(txq_id));
+  iwl_set_bits_prph(trans, SCD_QUEUECHAIN_SEL, (uint32_t)BIT(txq_id));
 }
 
 static inline void iwl_scd_txq_enable_agg(struct iwl_trans* trans, uint16_t txq_id) {
-  iwl_set_bits_prph(trans, SCD_AGGR_SEL, BIT(txq_id));
+  iwl_set_bits_prph(trans, SCD_AGGR_SEL, (uint32_t)BIT(txq_id));
 }
 
 static inline void iwl_scd_txq_disable_agg(struct iwl_trans* trans, uint16_t txq_id) {
-  iwl_clear_bits_prph(trans, SCD_AGGR_SEL, BIT(txq_id));
+  iwl_clear_bits_prph(trans, SCD_AGGR_SEL, (uint32_t)BIT(txq_id));
 }
 
 static inline void iwl_scd_disable_agg(struct iwl_trans* trans) {

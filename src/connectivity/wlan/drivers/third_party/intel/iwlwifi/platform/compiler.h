@@ -117,6 +117,9 @@ static inline uint16_t be16_to_cpup(const uint16_t* x) {
   return be16toh(val);
 }
 
+#define get_unaligned_le32(x) (*(uint32_t*)(x))
+#define put_unaligned_le64(val, addr) ((*(uint64_t*)(addr)) = (val))
+
 #define lower_32_bits(x) ((x) & 0xffffffff)
 #define upper_32_bits(x) ((x) >> 32)
 
@@ -311,11 +314,15 @@ size_t find_next_bit(unsigned int* bitarr, size_t num_bits, size_t bit_offset);
        (bit) = find_next_bit((bitarr), (num_bits), (bit) + 1))
 
 // This function calculates the hamming weight of an 8-bit bitmap.
-static inline uint8_t hweight8(uint8_t bitmap) {
-  uint8_t hw = bitmap - ((bitmap >> 1) & 0x55);
+//
+// The input accepts uint64_t because it is convenient for the hweight64() macro.
+//
+static inline uint8_t hweight8(uint64_t bitmap) {
+  ZX_ASSERT(bitmap <= 255);
+  uint64_t hw = bitmap - ((bitmap >> 1) & 0x55);
   hw = (hw & 0x33) + ((hw >> 2) & 0x33);
   hw = (hw + (hw >> 4)) & 0x0F;
-  return hw;
+  return (uint8_t)hw;
 }
 
 #define hweight16(w) (hweight8(w) + hweight8((w) >> 8))
