@@ -4,7 +4,6 @@
 
 use anyhow::Error;
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::{channel::mpsc, future, pin_mut};
 use tracing::{error, info, warn};
@@ -19,10 +18,8 @@ mod fidl_service;
 /// The maximum number of simultaneous DI advertisements that this implementation supports.
 pub const DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS: usize = 10;
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["bt-device-id"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["bt-device-id"]).expect("Unable to initialize logger");
-
     let profile = fuchsia_component::client::connect_to_protocol::<ProfileMarker>()?;
     let (device_id_request_sender, device_id_request_receiver) = mpsc::channel(1);
     let device_id_server = DeviceIdServer::new(
