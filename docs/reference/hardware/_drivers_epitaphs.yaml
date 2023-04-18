@@ -332,3 +332,15 @@
   available_in_git: '07c54ed670c4dd5b25fbe509943bc660932e046a'
   areas: ['USB']
   path: '/src/devices/usb/drivers/usb-dfu'
+- short_description: 'Test driver connects to a DAI driver and provides StreamConfig'
+  deletion_reason: 'Test driver not in use anymore'
+  gerrit_change_id: '836439'
+  available_in_git: 'f144767476d742cc7fa7780927ad6c316ba4ec8f'
+  areas: ['Audio']
+  path: '/src/media/audio/drivers/dai-test'
+- short_description: 'Sherlock BT Diagnostic board driver'
+  deletion_reason: 'Test driver not in use anymore'
+  gerrit_change_id: '836439'
+  available_in_git: 'f144767476d742cc7fa7780927ad6c316ba4ec8f'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/sherlock'

@@ -185,28 +185,6 @@ driver_bind_rules("astro-xhci-bind") {
   ]
 }
 
-driver_bind_rules("astro-dai-test-in-bind") {
-  rules = "bind/astro-dai-test-in.bind"
-  header_output = "astro-dai-test-in-bind.h"
-  bind_output = "astro-dai-test-in-bind.bc"
-  tests = "bind-tests/astro-dai-test-in-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.dai",
-  ]
-}
-
-driver_bind_rules("astro-dai-test-out-bind") {
-  rules = "bind/astro-dai-test-out.bind"
-  header_output = "astro-dai-test-out-bind.h"
-  bind_output = "astro-dai-test-out-bind.bc"
-  tests = "bind-tests/astro-dai-test-out-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.dai",
-  ]
-}
-
 driver_bind_rules("astro-aml-sdio-bind") {
   rules = "bind/astro-aml-sdio.bind"
   header_output = "astro-aml-sdio-bind.h"
@@ -276,8 +254,6 @@ fuchsia_driver("astro-driver") {
     ":astro-bluetooth-bind_header",
     ":astro-buttons-bind_header",
     ":astro-cpu-bind_header",
-    ":astro-dai-test-in-bind_header",
-    ":astro-dai-test-out-bind_header",
     ":astro-dwc2-phy-bind_header",
     ":astro-mali-bind_header",
     ":astro-pwm-bind_header",
@@ -366,8 +342,6 @@ group("tests") {
     ":astro-bluetooth-bind_test",
     ":astro-buttons-bind_test",
     ":astro-cpu-bind_test",
-    ":astro-dai-test-in-bind_test",
-    ":astro-dai-test-out-bind_test",
     ":astro-dwc2-phy-bind_test",
     ":astro-mali-bind_test",
     ":astro-pwm-bind_test",

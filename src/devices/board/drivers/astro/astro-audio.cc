@@ -33,16 +33,9 @@
 #define ENABLE_BT
 // Enable DAI mode for BT PCM audio.
 #define ENABLE_DAI_MODE
-// Enable DAI test.
-// #define ENABLE_DAI_TEST
 
 #ifdef ENABLE_BT
-#ifdef ENABLE_DAI_MODE
-#ifdef ENABLE_DAI_TEST
-#include "src/devices/board/drivers/astro/astro-dai-test-in-bind.h"
-#include "src/devices/board/drivers/astro/astro-dai-test-out-bind.h"
-#endif
-#else
+#ifndef ENABLE_DAI_MODE
 static const device_fragment_t tdm_pcm_fragments[] = {};
 #endif
 #endif
@@ -289,34 +282,6 @@ zx_status_t Astro::AudioInit() {
     }
 #endif
 
-#ifdef ENABLE_DAI_MODE
-#ifdef ENABLE_DAI_TEST
-    // Add test driver.
-    bool is_input = false;
-    const device_metadata_t test_metadata[] = {
-        {
-            .type = DEVICE_METADATA_PRIVATE,
-            .data = &is_input,
-            .length = sizeof(is_input),
-        },
-    };
-    zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-                                {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_DAI_TEST}};
-    composite_device_desc_t comp_desc = {};
-    comp_desc.props = props;
-    comp_desc.props_count = std::size(props);
-    comp_desc.spawn_colocated = false;
-    comp_desc.fragments = astro_dai_test_out_fragments;
-    comp_desc.fragments_count = std::size(astro_dai_test_out_fragments);
-    comp_desc.primary_fragment = "dai-out", comp_desc.metadata_list = test_metadata;
-    comp_desc.metadata_count = std::size(test_metadata);
-    status = DdkAddComposite("astro-dai-test-out", &comp_desc);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: PCM CompositeDeviceAdd failed: %d", __FILE__, status);
-      return status;
-    }
-#endif
-#endif
   }
 #endif
   // Add TDM OUT to the codec.
@@ -493,34 +458,6 @@ zx_status_t Astro::AudioInit() {
     }
   }
 
-#ifdef ENABLE_DAI_MODE
-#ifdef ENABLE_DAI_TEST  // Add test driver.
-  bool is_input = true;
-  const device_metadata_t test_metadata[] = {
-      {
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = &is_input,
-          .length = sizeof(is_input),
-      },
-  };
-  zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-                              {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_DAI_TEST}};
-  composite_device_desc_t comp_desc = {};
-  comp_desc.props = props;
-  comp_desc.props_count = std::size(props);
-  comp_desc.spawn_colocated = false;
-  comp_desc.fragments = astro_dai_test_in_fragments;
-  comp_desc.fragments_count = std::size(astro_dai_test_in_fragments);
-  comp_desc.primary_fragment = "dai-in";
-  comp_desc.metadata_list = test_metadata;
-  comp_desc.metadata_count = std::size(test_metadata);
-  status = DdkAddComposite("astro-dai-test-in", &comp_desc);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: PCM CompositeDeviceAdd failed: %d", __FILE__, status);
-    return status;
-  }
-#endif
-#endif
 #endif
 
   // Input device.

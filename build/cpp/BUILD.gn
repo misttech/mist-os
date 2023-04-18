@@ -103,10 +103,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/devices/board/drivers/sherlock:sherlock-dai-test-driver",
-
-    #------------------
-    #------------------
     "//src/devices/board/drivers/sherlock:sherlock-driver",
 
     #------------------

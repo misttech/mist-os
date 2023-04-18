@@ -17,7 +17,6 @@ group("drivers") {
     "drivers/pinecrest",
     "drivers/qemu-arm64",
     "drivers/sherlock:sherlock",
-    "drivers/sherlock:sherlock-dai-test",
     "drivers/sherlock:sherlock-factory",
     "drivers/vim3",
   ]

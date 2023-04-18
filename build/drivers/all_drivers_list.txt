@@ -108,7 +108,6 @@
 //src/devices/board/drivers/nelson:nelson-module-driver
 //src/devices/board/drivers/pinecrest:pinecrest-driver
 //src/devices/board/drivers/qemu-arm64:qemu-arm64-driver
-//src/devices/board/drivers/sherlock:sherlock-dai-test-driver
 //src/devices/board/drivers/sherlock:sherlock-driver
 //src/devices/board/drivers/sherlock:sherlock-factory-driver
 //src/devices/board/drivers/vim3:vim3-driver
@@ -363,7 +362,6 @@
 //src/media/audio/drivers/codecs/tas5707:tas5707-driver
 //src/media/audio/drivers/codecs/tas5720:tas5720-driver
 //src/media/audio/drivers/codecs/tas58xx:tas58xx-driver
-//src/media/audio/drivers/dai-test:dai-test-driver
 //src/media/audio/drivers/intel-hda/codecs/hdmi:hdmi-audio-codec-driver
 //src/media/audio/drivers/intel-hda/codecs/qemu:qemu-audio-codec-driver
 //src/media/audio/drivers/intel-hda/codecs/realtek:realtek-audio-codec-driver

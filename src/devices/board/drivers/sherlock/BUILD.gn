@@ -9,30 +9,6 @@ config("factory") {
   defines = [ "FACTORY_BUILD" ]
 }
 
-config("dai-test") {
-  defines = [ "ENABLE_DAI_TEST" ]
-}
-
-driver_bind_rules("sherlock-dai-test-in-bind") {
-  rules = "bind/sherlock-dai-test-in.bind"
-  header_output = "sherlock-dai-test-in-bind.h"
-  bind_output = "sherlock-dai-test-in-bind.bc"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.dai",
-  ]
-}
-
-driver_bind_rules("sherlock-dai-test-out-bind") {
-  rules = "bind/sherlock-dai-test-out.bind"
-  header_output = "sherlock-dai-test-out-bind.h"
-  bind_output = "sherlock-dai-test-out-bind.bc"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.dai",
-  ]
-}
-
 driver_bind_rules("sherlock-bind") {
   rules = "sherlock.bind"
   header_output = "sherlock-bind.h"
@@ -324,9 +300,6 @@ template("sherlock_driver") {
     if (use_factory) {
       configs += [ ":factory" ]
     }
-    if (enable_dai_test) {
-      configs += [ ":dai-test" ]
-    }
 
     sources = [
       "sherlock-audio.cc",
@@ -370,8 +343,6 @@ template("sherlock_driver") {
       ":sherlock-aml-usb-phy-v2-bind_header",
       ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
-      ":sherlock-dai-test-in-bind_header",
-      ":sherlock-dai-test-out-bind_header",
       ":sherlock-dwc2-phy-bind_header",
       ":sherlock-emmc-bind_header",
       ":sherlock-hevc-enc-bind_header",
@@ -474,17 +445,10 @@ template("sherlock_driver") {
 
 sherlock_driver("sherlock") {
   use_factory = false
-  enable_dai_test = false
 }
 
 sherlock_driver("sherlock-factory") {
   use_factory = true
-  enable_dai_test = false
-}
-
-sherlock_driver("sherlock-dai-test") {
-  use_factory = false
-  enable_dai_test = true
 }
 
 group("tests") {
