@@ -96,7 +96,7 @@
         },
         {
             protocol: "fuchsia.update.CommitStatusProvider",
-            from: "#system-update-committer",
+            from: "#system-update",
         },
         {
             protocol: "fuchsia.developer.remotecontrol.RemoteControl",

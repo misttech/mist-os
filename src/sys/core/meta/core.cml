@@ -25,12 +25,7 @@
             startup: "eager",
             environment: "#session-env",
         },
-        {
-            name: "system-update-committer",
-            url: "fuchsia-pkg://fuchsia.com/system-update-committer#meta/system-update-committer.cm",
-            startup: "eager",
-            on_terminate: "reboot",
-        },
+
         // TODO(https://fxbug.dev/123798) Remove comment when this transformation is complete.
         // This is the future home of system update-related components.
         {
@@ -332,12 +327,12 @@
                 "fuchsia.update.verify.BlobfsVerifier",
             ],
             from: "parent",
-            to: "#system-update-committer",
+            to: "#system-update",
         },
         {
             protocol: [ "fuchsia.update.verify.NetstackVerifier" ],
             from: "#network",
-            to: "#system-update-committer",
+            to: "#system-update",
         },
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],
@@ -493,7 +488,8 @@
         {
             directory: "config-data",
             from: "parent",
-            to: "#system-update-committer",
+            as: "system-update-committer-config-data",
+            to: "#system-update",
             subdir: "system-update-committer",
         },
         {
@@ -722,7 +718,7 @@
         },
         {
             protocol: "fuchsia.update.CommitStatusProvider",
-            from: "#system-update-committer",
+            from: "#system-update",
         },
         {
             protocol: [

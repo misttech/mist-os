@@ -60,7 +60,7 @@
         },
         {
             protocol: "fuchsia.update.CommitStatusProvider",
-            from: "#system-update-committer",
+            from: "#system-update",
             to: "#system-update-checker",
         },
         {

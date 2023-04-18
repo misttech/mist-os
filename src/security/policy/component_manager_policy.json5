@@ -805,7 +805,9 @@
                 "/core/setui_service",
                 "/core/sysmem_connector",
                 "/core/system-update-checker",
+                // TODO(https://fxbug.dev/123798): Remove
                 "/core/system-update-committer",
+                "/core/system-update/system-update-committer",
                 "/core/wlancfg",
                 "/core/wlandevicemonitor",
                 "/core/wlanstack",

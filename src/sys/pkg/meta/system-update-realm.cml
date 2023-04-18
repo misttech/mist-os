@@ -3,4 +3,38 @@
 // found in the LICENSE file.
 
 // This manifest defines the contents of the system update realm.
-{}
+{
+    include: [ "syslog/offer.shard.cml" ],
+    children: [
+        {
+            name: "system-update-committer",
+            url: "fuchsia-pkg://fuchsia.com/system-update-committer#meta/system-update-committer.cm",
+            startup: "eager",
+            on_terminate: "reboot",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.paver.Paver",
+                "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.NetstackVerifier",
+            ],
+            from: "parent",
+            to: "#system-update-committer",
+        },
+        {
+            directory: "system-update-committer-config-data",
+            from: "parent",
+            as: "config-data",
+            to: "#system-update-committer",
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.update.CommitStatusProvider" ],
+            from: "#system-update-committer",
+        },
+    ],
+}
