@@ -261,7 +261,9 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   auto orphans = inspector.GetRoot().CreateChild("orphan_nodes");
   for (auto& [moniker, node] : orphaned_nodes_) {
     if (auto locked_node = node.lock()) {
-      orphans.RecordString("moniker", moniker);
+      auto orphan = orphans.CreateChild(orphans.UniqueName("orphan-"));
+      orphan.RecordString("moniker", moniker);
+      orphans.Record(std::move(orphan));
     }
   }
 
