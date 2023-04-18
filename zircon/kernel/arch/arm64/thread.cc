@@ -152,6 +152,10 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
     arm64_debug_restore_state(newthread);
   }
 
+  const bool in_restricted =
+      newthread->restricted_state() != nullptr && newthread->restricted_state()->in_restricted();
+  arch_set_restricted_flag(in_restricted);
+
   arm64_context_switch_spec_mitigations(oldthread, newthread);
 
   // Call into the inner assembly context switch routine to save integer registers on the old stack

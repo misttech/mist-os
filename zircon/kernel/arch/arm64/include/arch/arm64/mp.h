@@ -7,6 +7,10 @@
 #ifndef ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARM64_MP_H_
 #define ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARM64_MP_H_
 
+#define PERCPU_IN_RESTRICTED_MODE 32
+
+#ifndef __ASSEMBLER__
+
 #include <zircon/compiler.h>
 
 #include <arch/arm64.h>
@@ -57,7 +61,12 @@ struct arm64_percpu {
 
   // A pointer providing fast access to the high-level arch-agnostic per-cpu struct.
   percpu* high_level_percpu;
+
+  // Flag to track that we're in restricted mode.
+  uint32_t in_restricted_mode;
 } __CPU_ALIGN;
+static_assert(offsetof(struct arm64_percpu, in_restricted_mode) == PERCPU_IN_RESTRICTED_MODE,
+              "in_restricted mode is at the wrong offset");
 
 void arch_init_cpu_map(uint cluster_count, const uint* cluster_cpus);
 void arch_register_mpid(uint cpu_id, uint64_t mpid);
@@ -133,7 +142,10 @@ cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr);
 // Setup the high-level percpu struct pointer for |cpu_num|.
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu* percpu);
 
-// TODO: implement
-inline void arch_set_restricted_flag(bool restricted) {}
+inline void arch_set_restricted_flag(bool restricted) {
+  WRITE_PERCPU_FIELD32(in_restricted_mode, restricted ? 1 : 0);
+}
+
+#endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARM64_MP_H_

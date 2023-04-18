@@ -26,8 +26,8 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
   LTRACEF("options %#x vector %#" PRIx64 " context %#" PRIx64 "\n", options, vector_table_ptr,
           context);
 
-  // Only x86 is supported.
-#if !defined(__x86_64__)
+  // Only x86 and arm64 are supported.
+#if !defined(__x86_64__) && !defined(__aarch64__)
   return ZX_ERR_NOT_SUPPORTED;
 #endif
 
@@ -42,8 +42,8 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
 zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
   LTRACEF("options 0x%x\n", options);
 
-  // Only x86 is supported.
-#if !defined(__x86_64__)
+  // Only x86 and arm64 are supported.
+#if !defined(__x86_64__) && !defined(__aarch64__)
   return ZX_ERR_NOT_SUPPORTED;
 #endif
 
@@ -100,8 +100,8 @@ zx_status_t sys_restricted_bind_state(uint32_t options, user_out_handle* out) {
 zx_status_t sys_restricted_unbind_state(uint32_t options) {
   LTRACEF("options 0x%x\n", options);
 
-  // Only x86 is supported.
-#if !defined(__x86_64__)
+  // Only x86 and arm64 are supported.
+#if !defined(__x86_64__) && !defined(__aarch64__)
   return ZX_ERR_NOT_SUPPORTED;
 #endif
 

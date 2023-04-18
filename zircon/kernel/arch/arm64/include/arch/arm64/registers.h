@@ -10,6 +10,11 @@
 #include <zircon/hw/debug/arm64.h>
 #include <zircon/syscalls/debug.h>
 
+// CPSR
+// Current Program Status Register. It contains processor status and control
+// information. Only the top 4 bits (NCZV) are addressable from user mode.
+inline constexpr uint32_t kArmUserVisibleFlags = 0xf0000000;
+
 // MDSCR_EL1
 // Monitor Debug System Control Register. It's the main control register fot the debug
 // implementation.

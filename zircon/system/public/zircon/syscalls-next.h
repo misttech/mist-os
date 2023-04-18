@@ -89,6 +89,8 @@ typedef struct zx_restricted_state {
 #if __aarch64__
   uint64_t x[31];
   uint64_t sp;
+  uint64_t pc;
+  uint64_t tpidr_el0;
   // Contains only the user-controllable upper 4-bits (NZCV).
   uint32_t cpsr;
   uint8_t padding1[4];

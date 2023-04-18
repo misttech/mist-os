@@ -9,6 +9,7 @@
 #include <arch/regs.h>
 #include <arch/arm64.h>
 #include <arch/arm64/asm.h>
+#include <arch/arm64/mp.h>
 #include <arch/asm_macros.h>
 #include <lib/userabi/vdso-arm64.h>
 #include <lib/syscalls/zx-syscall-numbers.h>
@@ -481,6 +482,9 @@ LOCAL_FUNCTION_LABEL(arm64_syscall_dispatcher)
     //   execute with most register state clear.
     // TODO(fxbug.dev/12540): Add to synchronous exception path as well.
     speculation_clear_gprs
+    // Check if we're issuing a syscall from restricted mode.
+    ldr w12, [percpu_ptr, #PERCPU_IN_RESTRICTED_MODE]
+    cbnz w12, .Lrestricted_syscall
     // Verify syscall number and call the unknown handler if bad.
     cmp  x16, #ZX_SYS_COUNT
     bhs  .Lunknown_syscall
@@ -497,6 +501,12 @@ LOCAL_FUNCTION_LABEL(arm64_syscall_dispatcher)
     br   x12
     // Prevent speculation through BR
     SPECULATION_POSTFENCE
+
+.Lrestricted_syscall:
+    // Move the pointer to the iframe into the first argument.
+    mov x0, sp
+    bl syscall_from_restricted
+    // This does not return.
 
 .Lunknown_syscall:
     mov x0, x16 // move the syscall number into the 0 arg slot

@@ -33,10 +33,11 @@ protocol Restricted {
     ///
     /// Arguments to the function at *vector_table_ptr* are architecturally specific:
     ///
-    /// On x64, *context* is placed in *rdi* and an exception code is played in *rsi*.
+    /// On x64, *context* is placed in *rdi* and an exception code is placed in *rsi*.
     /// All other registers are currently undefined, including the stack pointer.
     ///
-    /// ARM64 support is currently unimplemented.
+    /// On arm64, *context* is placed in *x0* and an exception code is placed in *x1*.
+    /// All other registers are currently undefined, including the stack pointer.
     ///
     /// Currently, the *exception code* passed back to normal mode is always 0.
     ///

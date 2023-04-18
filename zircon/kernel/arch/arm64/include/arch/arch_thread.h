@@ -80,9 +80,9 @@ struct arch_thread {
 
   // User mode's TPIDR and TPIDRRO.
   //
-  // TODO(maniscalco): User mode registers state is stored in two places, on the stack (|iframe_t|)
-  // and here.  Consider consolidating and moving it all here so that it's in one place.  Motivation
-  // is to reduce code complexity.
+  // TODO(fxbug.dev/121508): User mode registers state is stored in two places, on the stack
+  // (|iframe_t|) and here.  Consider consolidating and moving it all here so that it's in one
+  // place.  Motivation is to reduce code complexity.
   uint64_t tpidr_el0;
   uint64_t tpidrro_el0;
 

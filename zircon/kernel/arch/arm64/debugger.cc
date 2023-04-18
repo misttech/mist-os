@@ -18,10 +18,6 @@
 #include <kernel/thread.h>
 #include <kernel/thread_lock.h>
 
-// Only the NZCV flags (bits 31 to 28 respectively) of the CPSR are
-// readable and writable by userland on ARM64.
-static uint32_t kUserVisibleFlags = 0xf0000000;
-
 // SS (="Single Step") is bit 0 in MDSCR_EL1.
 static constexpr uint64_t kMdscrSSMask = 1;
 
@@ -47,7 +43,7 @@ zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t
   out->lr = in->lr;
   out->sp = in->usp;
   out->pc = in->elr;
-  out->cpsr = in->spsr & kUserVisibleFlags;
+  out->cpsr = in->spsr & kArmUserVisibleFlags;
   out->tpidr = thread->arch().tpidr_el0;
 
   return ZX_OK;
@@ -72,7 +68,7 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
   out->lr = in->lr;
   out->usp = in->sp;
   out->elr = in->pc;
-  out->spsr = (out->spsr & ~kUserVisibleFlags) | (in->cpsr & kUserVisibleFlags);
+  out->spsr = (out->spsr & ~kArmUserVisibleFlags) | (in->cpsr & kArmUserVisibleFlags);
   thread->arch().tpidr_el0 = in->tpidr;
 
   return ZX_OK;

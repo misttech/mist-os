@@ -1226,6 +1226,8 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
 pub struct zx_restricted_state_t {
     pub r: [u64; 31], // Note: r[30] is `lr` which is separated out in the general regs.
     pub sp: u64,
+    pub pc: u64,
+    pub tpidr_el0: u64,
     // Contains only the user-controllable upper 4-bits (NZCV).
     pub cpsr: u32,
     pub padding1: [u8; 4],
@@ -1268,6 +1270,8 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
                 registers.r[29],
                 registers.lr,
             ],
+            pc: 0,
+            tpidr_el0: 0,
             sp: registers.sp,
             cpsr: registers.cpsr as u32,
             padding1: [0, 0, 0, 0],
