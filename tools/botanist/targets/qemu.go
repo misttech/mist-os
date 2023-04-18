@@ -285,9 +285,10 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		}
 	}()
 
-	storageFull := getImageByName(images, "blk_storage-full")
+	fvmImage := getImageByName(images, "blk_storage-full")
+	fxfsImage := getImageByName(images, "fxfs-blk_storage-full")
 
-	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, storageFull); err != nil {
+	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, fvmImage, fxfsImage); err != nil {
 		return err
 	}
 
@@ -359,15 +360,23 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		qemuCmd.SetUEFIVolumes(code, data, diskPath)
 	}
 
-	if storageFull != nil {
+	if fxfsImage != nil {
+		if err := extendImage(ctx, fxfsImage, storageFullMinSize); err != nil {
+			return fmt.Errorf("%s to %d bytes: %w", constants.FailedToExtendBlkMsg, storageFullMinSize, err)
+		}
+		qemuCmd.AddVirtioBlkPciDrive(qemu.Drive{
+			ID:   "maindisk",
+			File: fxfsImage.Path,
+		})
+	} else if fvmImage != nil {
 		if t.config.FVMTool != "" {
-			if err := extendStorageFull(ctx, storageFull, t.config.FVMTool, storageFullMinSize); err != nil {
+			if err := extendFvmImage(ctx, fvmImage, t.config.FVMTool, storageFullMinSize); err != nil {
 				return fmt.Errorf("%s to %d bytes: %w", constants.FailedToExtendFVMMsg, storageFullMinSize, err)
 			}
 		}
 		qemuCmd.AddVirtioBlkPciDrive(qemu.Drive{
 			ID:   "maindisk",
-			File: storageFull.Path,
+			File: fvmImage.Path,
 		})
 	}
 
@@ -632,8 +641,8 @@ func embedZBIWithKey(ctx context.Context, zbiImage *bootserver.Image, zbiTool st
 	return nil
 }
 
-func extendStorageFull(ctx context.Context, storageFull *bootserver.Image, fvmTool string, size int64) error {
-	if storageFull.Size >= size {
+func extendFvmImage(ctx context.Context, fvmImage *bootserver.Image, fvmTool string, size int64) error {
+	if fvmTool == "" {
 		return nil
 	}
 	absToolPath, err := filepath.Abs(fvmTool)
@@ -641,7 +650,7 @@ func extendStorageFull(ctx context.Context, storageFull *bootserver.Image, fvmTo
 		return err
 	}
 	logger.Debugf(ctx, "extending fvm.blk to %d bytes", size)
-	cmd := exec.CommandContext(ctx, absToolPath, storageFull.Path, "extend", "--length", strconv.Itoa(int(size)))
+	cmd := exec.CommandContext(ctx, absToolPath, fvmImage.Path, "extend", "--length", strconv.Itoa(int(size)))
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	cmd.Stdout = stdout
@@ -649,7 +658,18 @@ func extendStorageFull(ctx context.Context, storageFull *bootserver.Image, fvmTo
 	if err := cmd.Run(); err != nil {
 		return err
 	}
-	storageFull.Size = size
+	fvmImage.Size = size
+	return nil
+}
+
+func extendImage(ctx context.Context, image *bootserver.Image, size int64) error {
+	if image.Size >= size {
+		return nil
+	}
+	if err := os.Truncate(image.Path, size); err != nil {
+		return err
+	}
+	image.Size = size
 	return nil
 }
 
