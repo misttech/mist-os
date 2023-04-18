@@ -6,5 +6,3 @@ per-file third_party.md = file: /third_party/rust_crates/OWNERS
 per-file bloat.md = adamperry@google.com
 per-file cargo.md = computerdruid@google.com
 per-file editors.md = aaronwood@google.com,computerdruid@google.com,paulfaria@google.com
-
-# COMPONENT: Rust

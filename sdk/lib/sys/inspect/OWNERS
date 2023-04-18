@@ -1,4 +1,2 @@
 include /src/diagnostics/OWNERS
 claytonmccray@google.com
-
-# COMPONENT: Diagnostics>Inspect

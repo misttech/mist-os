@@ -1,4 +1,2 @@
 include /src/connectivity/network/OWNERS
 include /src/connectivity/network/mdns/OWNERS
-
-# COMPONENT: NetworkStack>mdnsservice

@@ -1,5 +1,3 @@
 include /build/OWNERS
 yifeit@google.com
 brunodalbo@google.com
-
-# COMPONENT: Build>GN

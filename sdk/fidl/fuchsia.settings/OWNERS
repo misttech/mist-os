@@ -1,4 +1,2 @@
 #  Owners of the Fuchsia Settings APIs.
 include /src/settings/OWNERS
-
-# COMPONENT: SettingsSetupUI

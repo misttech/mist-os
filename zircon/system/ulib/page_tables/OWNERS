@@ -1,4 +1,2 @@
 include /zircon/kernel/vm/OWNERS
 abdulla@google.com
-
-# COMPONENT: Zircon>Kernel

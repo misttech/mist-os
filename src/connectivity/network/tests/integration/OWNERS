@@ -1,3 +1,1 @@
 include /src/connectivity/network/tests/integration/common/OWNERS
-
-# COMPONENT: NetworkStack

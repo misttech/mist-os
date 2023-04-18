@@ -1,5 +1,3 @@
 include /src/connectivity/network/OWNERS  # Netstack team can +2
 
 include /src/connectivity/network/netstack/dhcp/OWNERS
-
-# COMPONENT: NetworkStack

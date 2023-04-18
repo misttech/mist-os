@@ -2,5 +2,3 @@ include /src/connectivity/network/OWNERS
 
 brunodalbo@google.com
 martinjeffrey@google.com
-
-# COMPONENT: NetworkStack

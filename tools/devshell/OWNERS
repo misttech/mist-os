@@ -56,5 +56,3 @@ per-file tests/subcommands/fx_setup_go_test =  olivernewman@google.com
 
 per-file doc-checker.fx,mdlint.fx       = file: /tools/doc_checker/OWNERS
 # per-file-COMPONENT  doc-checker.fx,mdlint.fx       = DeveloperExperience>DocTools
-
-# COMPONENT: Tools>fx

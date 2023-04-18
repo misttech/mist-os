@@ -1,5 +1,3 @@
 set noparent
 
 include /build/rust/OWNERS
-
-# COMPONENT: Build>Rust

@@ -7,5 +7,3 @@ peterjohnston@google.com
 
 # Driver Framework Team for refactoring.
 include /src/devices/OWNERS
-
-# COMPONENT: Zircon>drivers

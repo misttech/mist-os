@@ -66,5 +66,3 @@ per-file             update-3p-owners = file: /tools/auto_owners/OWNERS
 per-file             update-rustc-third-party = adamperry@google.com,tmandry@google.com
 # per-file-COMPONENT update-rustc-third-party = Rust>third_party
 per-file zedmon=claridge@google.com
-
-# COMPONENT: Tools>fx

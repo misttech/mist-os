@@ -2,5 +2,3 @@ include /src/fidl/OWNERS
 include /src/sys/testing/OWNERS
 
 kjharland@google.com
-
-# COMPONENT: TestArchitecture

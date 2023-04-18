@@ -1,3 +1,1 @@
 include /src/lib/syslog/OWNERS
-
-# COMPONENT: Diagnostics
