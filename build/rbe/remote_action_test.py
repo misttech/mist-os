@@ -607,6 +607,34 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(
             logged_command[third_ddash + 1:], ['touch', str(output)])
 
+    def test_local_only_no_compare(self):
+        # --compare does nothing with --local
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        base_command = ['touch', str(output)]
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--compare', '--local', '--'] + base_command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertTrue(action.remote_disable)
+
+        with mock.patch.object(remote_action.RemoteAction, 'run',
+                               return_value=0) as mock_run:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_compare_against_local') as mock_compare:
+                exit_code = action.run_with_main_args(main_args)
+
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called_once()
+        mock_compare.assert_not_called()
+
     def test_local_remote_compare_no_diffs_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
         exec_root = Path('/home/project')
@@ -770,6 +798,45 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertIn(local_trace, local_command)
         mock_trace_diff.assert_called_with(
             Path(local_trace + '.norm'), Path(remote_trace + '.norm'))
+
+    def test_local_check_determinism(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        exec_root_rel = cl_utils.relpath(exec_root, start=working_dir)
+        output = Path('hello.txt')
+        base_command = ['touch', str(output)]
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--check-determinism', '--local', '--'] + base_command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertTrue(action.remote_disable)
+
+        with mock.patch.object(
+                cl_utils, 'subprocess_call',
+                return_value=cl_utils.SubprocessResult(0)) as mock_run:
+            exit_code = action.run_with_main_args(main_args)
+
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        launch_command = args[0]
+        self.assertEqual(kwargs['cwd'], working_dir)
+        first_ddash = launch_command.index('--')
+        check_prefix = launch_command[:first_ddash]
+        self.assertEqual(check_prefix[0], sys.executable)
+        self.assertIn(
+            str(exec_root_rel / remote_action._CHECK_DETERMINISM_SCRIPT),
+            check_prefix)
+        self.assertIn('--check-repeatability', check_prefix)
+        outputs_index = check_prefix.index('--outputs')
+        self.assertEqual(check_prefix[outputs_index + 1:], [str(output)])
+        self.assertEqual(launch_command[first_ddash + 1:], base_command)
 
     def test_output_leak_scan_with_canonical_working_dir_mocked(self):
         exec_root = Path('/home/project')
@@ -1467,6 +1534,17 @@ class MainTests(unittest.TestCase):
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
         self.assertTrue(main_args.local)
+
+    def test_main_args_local_check_determinism(self):
+        command = ['--local', '--check-determinism', '--', 'echo', 'hello']
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=0) as mock_run:
+            self.assertEqual(remote_action.main(command), 0)
+        mock_run.assert_called_once()
+        args, kwargs = mock_run.call_args_list[0]
+        main_args = args[0]
+        self.assertTrue(main_args.local)
+        self.assertTrue(main_args.check_determinism)
 
 
 if __name__ == '__main__':

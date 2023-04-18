@@ -47,6 +47,8 @@ _DETAIL_DIFF_SCRIPT = Path('build', 'rbe', 'detail-diff.sh')
 
 _REMOTETOOL_SCRIPT = Path('build', 'rbe', 'remotetool.sh')
 
+_CHECK_DETERMINISM_SCRIPT = Path('build', 'tracer', 'output_cacher.py')
+
 _RECLIENT_ERROR_STATUS = 35
 _RBE_SERVER_ERROR_STATUS = 45
 _RBE_KILLED_STATUS = 137
@@ -507,6 +509,7 @@ class RemoteAction(object):
         remote_log: str = "",
         fsatrace_path: Optional[Path] = None,
         diagnose_nonzero: bool = False,
+        check_determinism: bool = False,
     ):
         """RemoteAction constructor.
 
@@ -526,6 +529,7 @@ class RemoteAction(object):
           output_dirs: directories to be fetched after remote execution, relative to the
             current working dir.
           disable: if true, execute locally.
+          check_determinism: if true, compare outputs of two local executions.
           save_temps: if true, keep around temporarily generated files after execution.
           auto_reproxy: if true, launch reproxy around the rewrapper invocation.
             This is not needed if reproxy is already running.
@@ -560,6 +564,7 @@ class RemoteAction(object):
         # Parse and strip out --remote-* flags from command.
         self._remote_command = command
         self._remote_disable = disable
+        self._check_determinism = check_determinism
         self._options = (options or [])
 
         # Detect some known rewrapper options
@@ -687,6 +692,10 @@ class RemoteAction(object):
     @property
     def remote_disable(self) -> bool:
         return self._remote_disable
+
+    @property
+    def check_determinism(self) -> bool:
+        return self._check_determinism
 
     @property
     def diagnose_nonzero(self) -> bool:
@@ -823,9 +832,32 @@ class RemoteAction(object):
 
         yield from self.local_command
 
+    def _generate_check_determinism_prefix(self) -> Iterable[str]:
+        yield from [
+            sys.executable,  # same Python interpreter
+            '-S',
+            str(self.exec_root_rel / _CHECK_DETERMINISM_SCRIPT),
+            '--check-repeatability',
+            '--outputs',
+        ]
+
+        # Don't bother mentioning the fsatrace file as an output,
+        # for checking determinism, as it may be sensitive to process id,
+        # and other temporary file accesses.
+        for f in self.output_files_relative_to_working_dir:
+            yield str(f)
+
+        # TODO: The comparison script does not support directories yet.
+        # When it does, yield from self.output_dirs_relative_to_working_dir.
+
+        yield '--'
+
     def _generate_local_launch_command(self) -> Iterable[str]:
         # When requesting fsatrace, log to a different file than the
         # remote log, so they can be compared.
+        if self.check_determinism:
+            yield from self._generate_check_determinism_prefix()
+
         if self._fsatrace_path:
             yield from self._fsatrace_command_prefix(self._fsatrace_local_log)
 
@@ -944,8 +976,9 @@ class RemoteAction(object):
 
         main_exit_code = self.run()
 
-        if main_args.compare:
-            # Also run locally, and compare outputs
+        if main_args.compare and not main_args.local:
+            # Also run locally, and compare outputs.
+            # If running only --local, there is nothing to compare.
             return self._compare_against_local()
 
         return main_exit_code
@@ -1200,6 +1233,12 @@ def inherit_main_arg_parser_flags(
         help="Build system identifier, for diagnostic messages",
     )
     main_group.add_argument(
+        "--check-determinism",
+        action="store_true",
+        default=False,
+        help="Run locally twice and compare outputs [requires: --local].",
+    )
+    main_group.add_argument(
         "--log",
         type=str,
         dest="remote_log",
@@ -1235,7 +1274,7 @@ Otherwise, BASE will default to the first output file named.""",
         action="store_true",
         default=False,
         help=
-        "In 'compare' mode, run both locally and remotely (sequentially) and compare outputs.  Exit non-zero (failure) if any of the outputs differs between the local and remote execution, even if those executions succeeded.  When used with --fsatrace-path, also compare file access traces.",
+        "In 'compare' mode, run both locally and remotely (sequentially) and compare outputs.  Exit non-zero (failure) if any of the outputs differs between the local and remote execution, even if those executions succeeded.  When used with --fsatrace-path, also compare file access traces.  No comparison is done with --local mode.",
     )
     main_group.add_argument(
         "--diagnose-nonzero",
@@ -1293,6 +1332,7 @@ def remote_action_from_args(
         output_files=output_files,
         output_dirs=output_dirs,
         disable=main_args.local,
+        check_determinism=main_args.check_determinism,
         save_temps=main_args.save_temps,
         auto_reproxy=main_args.auto_reproxy,
         remote_log=main_args.remote_log,
