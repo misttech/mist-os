@@ -161,6 +161,14 @@
             ],
         },
         {
+            protocol: "fuchsia.scheduler.ProfileProvider",
+            from: "parent",
+            to: [
+                "#fshost",
+                "#netstack",
+            ],
+        },
+        {
             directory: "pkgfs",
             from: "#fshost",
             as: "pkgfs-system",
@@ -197,7 +205,10 @@
         {
             storage: "data",
             from: "self",
-            to: "#pkg-resolver",
+            to: [
+                "#pkg-resolver",
+                "#system-updater",
+            ],
         },
         {
             protocol: "fuchsia.net.name.Lookup",
@@ -252,6 +263,15 @@
                 "#pkg-cache",
                 "#pkg-resolver",
                 "#pkg_server",
+                "#system-updater",
+            ],
+        },
+        {
+            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            from: "#cobalt",
+            to: [
+                "#pkg-cache",
+                "#pkg-resolver",
                 "#system-updater",
             ],
         },
