@@ -8,10 +8,7 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 ffx_plugin("ffx_starnix") {
   version = "0.0.1"
   edition = "2021"
-  plugin_deps = [
-    "adb:ffx_starnix_adb",
-    "shell:ffx_starnix_shell",
-  ]
+  plugin_deps = [ "adb:ffx_starnix_adb" ]
 
   args_sources = [ "src/args.rs" ]
 }

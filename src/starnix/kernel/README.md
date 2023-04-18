@@ -61,7 +61,55 @@ Increasing by a facfor of 10 seems to work well.
 
 ### Run a Linux binary
 
-See [`hello_starnix`](../examples/hello_starnix/README.md).
+Running a Linux binary manually involves two steps. First, you need to start the
+container in which the binary will run. This step is analogous to booting a
+virtual machine:
+
+```sh
+ffx component run /core/starnix_runner/playground:<container-name> <container-url>
+```
+
+In this command, you pick a `<container-name>` that you can use to refer to
+this container later. You can run as many instances of a container as you wish
+as long as you given them different names.
+
+The `<container-url>` is the component URL for the container you wish to run.
+For example, `fuchsia-pkg://fuchsia.com/starless#meta/empty_container.cm` is
+the component URL for the empty container, which does not have a `libc.so`
+and, therefore, cannot run dynamicly linked C binaries.
+
+Once the container is running, you can run Linux binaries inside that
+container using the component URL for that binary:
+
+```sh
+ffx component run --connect-stdio \
+    /core/starnix_runner/playground:<container-name>/daemons:<component-name> \
+    <component-url>
+```
+
+The `--connect-stdio` flag is optional, but specifying this flag will cause
+stdio, stdout, and stderr from your terminal to be connected to the binary.
+Notice that this command re-uses the `<container-name>` you picked for the
+previous command. This name indicates the contianer in which you the process
+will run.
+
+Similar to the previous command, you pick a `<component-name>` for the
+component that represents this process. When the process exits, this component
+will disappear from the component topology.
+
+The `<component-url>` is the component URL for the binary you wish to run. For
+example, `fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm` is the
+component URL for the `hello_starnix` binary. The component manifest specifies
+which binary to run. The binary can be inside the container (e.g., `/bin/sh`)
+or the binary can be in the package that contains the component.
+
+To terminate the container, use the `ffx component stop` command.
+
+See [`hello_starnix`](../examples/hello_starnix/README.md) for how to run a
+minimal binary in an empty container.
+
+See [`shell.sh`](../containers/chromiumos/shell.sh) for how to run a shell in
+a conatiner.
 
 ### Run a Linux test binary
 

@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, format_err, Context, Error};
+use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, Proxy, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fidl_fuchsia_starnix_developer as fstardev;
 use fuchsia_async as fasync;
 use fuchsia_component::client::{self as fclient, connect_to_protocol};
-use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon as zx;
-use fuchsia_zircon::HandleBased;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use kernel_config::generate_kernel_config;
-use rand::Rng;
 use std::sync::Arc;
 use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
 
@@ -77,9 +73,6 @@ pub async fn serve_starnix_manager(
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
-            fstardev::ManagerRequest::StartShell { params, controller, .. } => {
-                start_shell(params, controller).await?;
-            }
             fstardev::ManagerRequest::VsockConnect { container, port, bridge_socket, .. } => {
                 connect_to_vsock(port, bridge_socket, &container).unwrap_or_else(|e| {
                     tracing::error!("failed to connect to vsock {:?}", e);
@@ -104,29 +97,6 @@ pub async fn serve_component_runner(
     Ok(())
 }
 
-async fn start_shell(
-    params: fstardev::ShellParams,
-    controller: ServerEnd<fstardev::ShellControllerMarker>,
-) -> Result<(), Error> {
-    let controller_handle_info = fprocess::HandleInfo {
-        handle: controller.into_channel().into_handle(),
-        id: HandleInfo::new(HandleType::User0, 0).as_raw(),
-    };
-    let numbered_handles = vec![
-        handle_info_from_socket(params.standard_in, 0)?,
-        handle_info_from_socket(params.standard_out, 1)?,
-        handle_info_from_socket(params.standard_err, 2)?,
-        controller_handle_info,
-    ];
-    let args = fcomponent::CreateChildArgs {
-        numbered_handles: Some(numbered_handles),
-        ..fcomponent::CreateChildArgs::EMPTY
-    };
-
-    let url = params.url.ok_or(anyhow!("No shell URL specified"))?;
-    create_child_component(url, args).await
-}
-
 /// Connects `bridge_socket` to the vsocket at `port` in the specified container.
 ///
 /// Returns an error if the FIDL connection to the container failed.
@@ -138,58 +108,6 @@ fn connect_to_vsock(port: u32, bridge_socket: fidl::Socket, container: &str) -> 
     container
         .vsock_connect(port, bridge_socket)
         .context("Failed to call vsock connect on container")
-}
-
-/// Creates a `HandleInfo` from the provided socket and file descriptor.
-///
-/// The file descriptor is encoded as a `PA_HND(PA_FD, <file_descriptor>)` before being stored in
-/// the `HandleInfo`.
-///
-/// Returns an error if `socket` is `None`.
-pub fn handle_info_from_socket(
-    socket: Option<fidl::Socket>,
-    file_descriptor: u16,
-) -> Result<fprocess::HandleInfo, Error> {
-    if let Some(socket) = socket {
-        let info = HandleInfo::new(HandleType::FileDescriptor, file_descriptor);
-        Ok(fprocess::HandleInfo { handle: socket.into_handle(), id: info.as_raw() })
-    } else {
-        Err(anyhow!("Failed to create HandleInfo for {}", file_descriptor))
-    }
-}
-
-/// Creates a new child component in the `playground` collection.
-///
-/// # Parameters
-/// - `url`: The URL of the component to create.
-/// - `args`: The `CreateChildArgs` that are passed to the component manager.
-pub async fn create_child_component(
-    url: String,
-    args: fcomponent::CreateChildArgs,
-) -> Result<(), Error> {
-    // TODO(fxbug.dev/74511): The amount of setup required here is a bit lengthy. Ideally,
-    // fuchsia-component would provide language-specific bindings for the Realm API that could
-    // reduce this logic to a few lines.
-
-    const COLLECTION: &str = "playground";
-    let realm = fclient::realm().context("failed to connect to Realm service")?;
-    let mut collection_ref = fdecl::CollectionRef { name: COLLECTION.into() };
-    let id: u64 = rand::thread_rng().gen();
-    let child_name = format!("starnix-{}", id);
-    let child_decl = fdecl::Child {
-        name: Some(child_name.clone()),
-        url: Some(url),
-        startup: Some(fdecl::StartupMode::Lazy),
-        environment: None,
-        ..fdecl::Child::EMPTY
-    };
-    let () = realm
-        .create_child(&mut collection_ref, child_decl, args)
-        .await?
-        .map_err(|e| format_err!("failed to create child: {:?}", e))?;
-    // The component is run in a `SingleRun` collection instance, and will be automatically
-    // deleted when it exits.
-    Ok(())
 }
 
 /// Creates a new instance of `starnix_kernel`.

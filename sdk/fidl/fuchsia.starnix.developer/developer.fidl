@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.starnix.developer;
 
-using fuchsia.url;
 using zx;
 
 /// A protocol used to instantiate and interact with components run by Starnix.
@@ -28,39 +27,5 @@ protocol Manager {
 
         /// The socket handle that will be used by the container.
         bridge_socket zx.handle:SOCKET;
-    });
-
-    /// Starts a shell component.
-    ///
-    /// The shell component to launch is optionally specified by `params.url`. The container in which
-    /// the shell will run is determined by the `.cml` file of the shell component (i.e., by which
-    /// runner it uses). For example, a shell component with its `runner` set to `bionic` will
-    /// run in the `bionic` container.
-    ///
-    /// If no shell component is specified, the `Manager` will choose a default shell component to
-    /// launch and connect to.
-    StartShell(resource struct {
-        params ShellParams;
-        controller server_end:ShellController;
-    });
-};
-
-type ShellParams = resource table {
-    /// A socket handle that will be connected to the shell's standard input. Optional.
-    1: standard_in zx.handle:SOCKET;
-
-    /// A socket handle that will be connected to the shell's standard output. Optional.
-    2: standard_out zx.handle:SOCKET;
-
-    /// A socket handle that will be connected to the shell's standard error. Optional.
-    3: standard_err zx.handle:SOCKET;
-
-    /// The URL of the shell component to launch. Required.
-    4: url fuchsia.url.Url;
-};
-
-protocol ShellController {
-    -> OnTerminated(struct {
-        return_code int32;
     });
 };

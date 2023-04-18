@@ -144,9 +144,7 @@ pub async fn start_component(
         }
     }
 
-    let startup_handles =
-        parse_numbered_handles(&current_task, start_info.numbered_handles, &current_task.files)?;
-    let shell_controller = startup_handles.shell_controller;
+    parse_numbered_handles(&current_task, start_info.numbered_handles, &current_task.files)?;
 
     let mut argv = vec![binary_path];
     argv.extend(args.into_iter());
@@ -160,14 +158,6 @@ pub async fn start_component(
         });
 
     execute_task(current_task, |result| {
-        // TODO(fxb/74803): Using the component controller's epitaph may not be the best way to
-        // communicate the exit status. The component manager could interpret certain epitaphs as starnix
-        // being unstable, and chose to terminate starnix as a result.
-        // Errors when closing the controller with an epitaph are disregarded, since there are
-        // legitimate reasons for this to fail (like the client having closed the channel).
-        if let Some(shell_controller) = shell_controller {
-            let _ = shell_controller.close_with_epitaph(zx::Status::OK);
-        }
         let _ = match result {
             Ok(ExitStatus::Exit(0)) => controller.close_with_epitaph(zx::Status::OK),
             _ => controller.close_with_epitaph(zx::Status::from_raw(

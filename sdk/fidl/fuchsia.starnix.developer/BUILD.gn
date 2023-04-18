@@ -6,8 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.starnix.developer") {
   sources = [ "developer.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.url",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//zircon/vdso/zx" ]
 }

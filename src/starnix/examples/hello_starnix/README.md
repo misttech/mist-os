@@ -16,11 +16,11 @@ You can confirm that this container is running using `ffx component list`. If ev
 Next, run `hello_starnix` inside this container:
 
 ```sh
-ffx component run /core/starnix_runner/playground:starless/daemons:hello_starnix fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm
+ffx component run --connect-stdio /core/starnix_runner/playground:starless/daemons:hello_starnix fuchsia-pkg://fuchsia.com/hello-starnix#meta/hello_starnix.cm
 ```
 
-You should be able to see the output from this program using `ffx log`:
+This command should produce the following output:
 
 ```
-[2800.441][kernels:empty_container.cm_C0kyAI8][stdio,starnix][I] hello starnix
+hello starnix
 ```

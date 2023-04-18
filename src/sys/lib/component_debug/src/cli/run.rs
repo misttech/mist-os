@@ -105,7 +105,7 @@ impl Stdio {
             std::process::exit(0);
         });
 
-        // If we're following stdio, we just wait forever. When stdout or stderr is
+        // If we're following stdio, we just wait forever. When stdout is
         // closed, the whole process will exit.
         let () = futures::future::pending().await;
     }

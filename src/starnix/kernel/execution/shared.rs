@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error};
-use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
-use fidl_fuchsia_starnix_developer as fstardev;
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
@@ -282,10 +280,6 @@ pub fn copy_process_debug_addr(
     Ok(())
 }
 
-pub struct StartupHandles {
-    pub shell_controller: Option<ServerEnd<fstardev::ShellControllerMarker>>,
-}
-
 /// Creates a `StartupHandles` from the provided handles.
 ///
 /// The `numbered_handles` of type `HandleType::FileDescriptor` are used to
@@ -297,8 +291,7 @@ pub fn parse_numbered_handles(
     current_task: &CurrentTask,
     numbered_handles: Option<Vec<fprocess::HandleInfo>>,
     files: &FdTable,
-) -> Result<StartupHandles, Error> {
-    let mut shell_controller = None;
+) -> Result<(), Error> {
     if let Some(numbered_handles) = numbered_handles {
         for numbered_handle in numbered_handles {
             let info = HandleInfo::try_from(numbered_handle.id)?;
@@ -308,10 +301,6 @@ pub fn parse_numbered_handles(
                     FdNumber::from_raw(info.arg().into()),
                     create_file_from_handle(current_task, numbered_handle.handle)?,
                 )?;
-            } else if info.handle_type() == HandleType::User0 {
-                shell_controller = Some(ServerEnd::<fstardev::ShellControllerMarker>::from(
-                    numbered_handle.handle,
-                ));
             }
         }
     }
@@ -324,7 +313,7 @@ pub fn parse_numbered_handles(
         }
     }
 
-    Ok(StartupHandles { shell_controller })
+    Ok(())
 }
 
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
