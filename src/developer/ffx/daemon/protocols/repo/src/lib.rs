@@ -18,7 +18,7 @@ use {
     fidl_fuchsia_net_ext::SocketAddress,
     fidl_fuchsia_pkg::RepositoryManagerMarker,
     fidl_fuchsia_pkg_rewrite::EngineMarker as RewriteEngineMarker,
-    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule},
+    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule, RuleConfig},
     fuchsia_async as fasync,
     fuchsia_hyper::{new_https_client, HttpsClient},
     fuchsia_repo::{
@@ -412,7 +412,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         }
 
         if !aliases.is_empty() {
-            let () = create_aliases(cx, repo_name, &target_nodename, &aliases).await?;
+            let () = create_aliases_fidl(cx, repo_name, &target_nodename, &aliases).await?;
         }
 
         if should_make_tunnel {
@@ -497,7 +497,6 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         // ssh workflow does not touch tunneling logic
         let (_should_make_tunnel, repo_host) = create_repo_host(listen_addr, host_address);
         let repo_config_endpoint = format!("http://{}/{}/repo.config", repo_host, repo_name);
-        let args = vec!["pkgctl", "repo", "add", "url", &repo_config_endpoint];
 
         let device_addr = match target.ssh_address() {
             Some(ssh_address) => ssh_address,
@@ -508,7 +507,12 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         };
 
         // Adding repo via pkgctl
-        self.ssh_provider.run_ssh_command(device_addr, args).await?;
+        self.ssh_provider
+            .run_ssh_command(
+                device_addr,
+                vec!["pkgctl", "repo", "add", "url", &repo_config_endpoint],
+            )
+            .await?;
 
         let aliases = {
             let repo = repo.read().await;
@@ -524,7 +528,16 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         };
 
         if !aliases.is_empty() {
-            let () = create_aliases(cx, repo_name, &target_nodename, &aliases).await?;
+            let alias_rules = aliases_to_rules(repo_name, &aliases)?;
+            let rules_config_json_string =
+                rules_config_to_json_string(RuleConfig::Version1(alias_rules))?;
+
+            self.ssh_provider
+                .run_ssh_command(
+                    device_addr,
+                    vec!["pkgctl", "rule", "replace", "json", &rules_config_json_string],
+                )
+                .await?;
         }
 
         if save_config == SaveConfig::Save {
@@ -686,7 +699,17 @@ fn aliases_to_rules(
     Ok(rules)
 }
 
-async fn create_aliases(
+fn rules_config_to_json_string(rule_config: RuleConfig) -> Result<String, ffx::RepositoryError> {
+    let rule_config_string = serde_json::to_string(&rule_config).map_err(|err| {
+        tracing::error!("Failed to convert RulesConfig to json String: {:#?}", err);
+        ffx::RepositoryError::InternalError
+    })?;
+
+    // Must wrap json string as '{}'.
+    Ok(format!("'{}'", rule_config_string))
+}
+
+async fn create_aliases_fidl(
     cx: &Context,
     repo_name: &str,
     target_nodename: &str,
@@ -1692,6 +1715,12 @@ mod tests {
         };
     }
 
+    macro_rules! assert_vec_empty {
+        ($input_vector:expr) => {
+            assert_eq!($input_vector, vec![]);
+        };
+    }
+
     async fn test_repo_config_fidl<S: SshProvider + 'static>(
         repo: &Rc<RefCell<Repo<TestEventHandlerProvider, RealRegistrar<S>>>>,
     ) -> RepositoryConfig {
@@ -1738,7 +1767,7 @@ mod tests {
 
     async fn test_repo_config_ssh<S: SshProvider + 'static>(
         repo: &Rc<RefCell<Repo<TestEventHandlerProvider, RealRegistrar<S>>>>,
-    ) -> (SocketAddr, Vec<String>) {
+    ) -> Vec<String> {
         test_repo_config_ssh_with_repo_host(repo, None, REPO_NAME.into()).await
     }
 
@@ -1746,7 +1775,7 @@ mod tests {
         repo: &Rc<RefCell<Repo<TestEventHandlerProvider, RealRegistrar<S>>>>,
         repo_host: Option<String>,
         repo_name: String,
-    ) -> (SocketAddr, Vec<String>) {
+    ) -> Vec<String> {
         // The repository server started on a random address, so look it up.
         let inner = Arc::clone(&repo.borrow().inner);
         let addr = if let Some(addr) = inner.read().await.server.listen_addr() {
@@ -1761,13 +1790,40 @@ mod tests {
             addr.to_string()
         };
 
-        let device_addr = SocketAddr::from_str(DEVICE_ADDR).unwrap();
         let repo_config_endpoint = format!("http://{}/{}/repo.config", repo_host, repo_name);
 
         let args = vec!["pkgctl", "repo", "add", "url", repo_config_endpoint.as_str()];
-        let string_args = args.into_iter().map(|s| s.to_string()).collect();
+        args.into_iter().map(|s| s.to_string()).collect()
+    }
 
-        (device_addr, string_args)
+    async fn test_target_alias_ssh<S: SshProvider + 'static>(
+        repo: &Rc<RefCell<Repo<TestEventHandlerProvider, RealRegistrar<S>>>>,
+        repo_name: &str,
+        target: &ffx::RepositoryTarget,
+    ) -> Vec<String> {
+        let aliases = if let Some(aliases) = &target.aliases {
+            BTreeSet::<String>::from_iter(aliases.clone().into_iter())
+        } else {
+            // Fallback to repo aliases
+            repo.borrow()
+                .inner
+                .read()
+                .await
+                .manager
+                .get(repo_name)
+                .unwrap()
+                .read()
+                .await
+                .aliases()
+                .clone()
+        };
+
+        let alias_rules = aliases_to_rules(repo_name, &aliases).unwrap();
+        let rules_config_json_string =
+            rules_config_to_json_string(RuleConfig::Version1(alias_rules)).unwrap();
+
+        let repo_args = vec!["pkgctl", "rule", "replace", "json", &rules_config_json_string];
+        repo_args.into_iter().map(|s| s.to_string()).collect()
     }
 
     // Communication with device.
@@ -1814,10 +1870,14 @@ mod tests {
     }
 
     #[derive(Debug, PartialEq)]
-    enum PkgctlCommandEvent {
-        RepoAdd { device_addr: SocketAddr, args: Vec<String> },
-        _RuleDumpDynamic { device_addr: SocketAddr, args: Vec<String> },
-        _RuleReplace { device_addr: SocketAddr, args: Vec<String> },
+    struct PkgctlCommandEvent {
+        device_addr: SocketAddr,
+        args: Vec<String>,
+    }
+
+    enum PkgctlCommandType {
+        RepoAdd,
+        RuleReplace,
     }
 
     #[derive(Debug, PartialEq)]
@@ -2037,18 +2097,27 @@ mod tests {
 
     #[derive(Default)]
     struct TestSshProvider {
-        commands: Arc<Mutex<Vec<PkgctlCommandEvent>>>,
+        repo_register_commands: Arc<Mutex<Vec<PkgctlCommandEvent>>>,
+        rule_replace_commands: Arc<Mutex<Vec<PkgctlCommandEvent>>>,
     }
 
     impl TestSshProvider {
         fn new() -> Self {
-            let commands = Arc::new(Mutex::new(Vec::new()));
+            let repo_register_commands = Arc::new(Mutex::new(Vec::new()));
+            let rule_replace_commands = Arc::new(Mutex::new(Vec::new()));
 
-            Self { commands }
+            Self { repo_register_commands, rule_replace_commands }
         }
 
-        fn take_events(&self) -> Vec<PkgctlCommandEvent> {
-            self.commands.lock().unwrap().drain(..).collect()
+        fn take_events(&self, pkgctl_command_type: PkgctlCommandType) -> Vec<PkgctlCommandEvent> {
+            match pkgctl_command_type {
+                PkgctlCommandType::RepoAdd => {
+                    self.repo_register_commands.lock().unwrap().drain(..).collect()
+                }
+                PkgctlCommandType::RuleReplace => {
+                    self.rule_replace_commands.lock().unwrap().drain(..).collect()
+                }
+            }
         }
     }
 
@@ -2059,31 +2128,61 @@ mod tests {
             device_addr: SocketAddr,
             args: Vec<&str>,
         ) -> Result<(), ffx::RepositoryError> {
-            let string_args = args.into_iter().map(|s| s.to_string()).collect();
+            let string_args: Vec<String> = args.into_iter().map(|s| s.to_string()).collect();
+            assert!(string_args.len() == 5);
 
-            self.commands
-                .lock()
-                .unwrap()
-                .push(PkgctlCommandEvent::RepoAdd { device_addr, args: string_args });
+            match string_args[1].as_str() {
+                "repo" => {
+                    self.repo_register_commands
+                        .lock()
+                        .unwrap()
+                        .push(PkgctlCommandEvent { device_addr, args: string_args });
+                }
+                "rule" => {
+                    self.rule_replace_commands
+                        .lock()
+                        .unwrap()
+                        .push(PkgctlCommandEvent { device_addr, args: string_args });
+                }
+                _ => {
+                    tracing::error!("Unknown pkgctl event in test...");
+                    return Err(ffx::RepositoryError::InternalError);
+                }
+            }
 
             Ok(())
         }
     }
 
+    impl Repo<TestEventHandlerProvider, RealRegistrar<TestSshProvider>> {
+        fn take_events(&self, pkgctl_command_type: PkgctlCommandType) -> Vec<PkgctlCommandEvent> {
+            self.registrar.ssh_provider.take_events(pkgctl_command_type)
+        }
+    }
+
     #[derive(Default)]
     struct ErroringSshProvider {
-        commands: Arc<Mutex<Vec<PkgctlCommandEvent>>>,
+        repo_register_commands: Arc<Mutex<Vec<PkgctlCommandEvent>>>,
+        rule_replace_commands: Arc<Mutex<Vec<PkgctlCommandEvent>>>,
     }
 
     impl ErroringSshProvider {
         fn new() -> Self {
-            let commands = Arc::new(Mutex::new(Vec::new()));
+            let repo_register_commands = Arc::new(Mutex::new(Vec::new()));
+            let rule_replace_commands = Arc::new(Mutex::new(Vec::new()));
 
-            Self { commands }
+            Self { repo_register_commands, rule_replace_commands }
         }
 
-        fn take_events(&self) -> Vec<PkgctlCommandEvent> {
-            self.commands.lock().unwrap().drain(..).collect()
+        fn take_events(&self, pkgctl_command_type: PkgctlCommandType) -> Vec<PkgctlCommandEvent> {
+            match pkgctl_command_type {
+                PkgctlCommandType::RepoAdd => {
+                    self.repo_register_commands.lock().unwrap().drain(..).collect()
+                }
+                PkgctlCommandType::RuleReplace => {
+                    self.rule_replace_commands.lock().unwrap().drain(..).collect()
+                }
+            }
         }
     }
 
@@ -2094,14 +2193,34 @@ mod tests {
             device_addr: SocketAddr,
             args: Vec<&str>,
         ) -> Result<(), ffx::RepositoryError> {
-            let string_args = args.into_iter().map(|s| s.to_string()).collect();
+            let string_args: Vec<String> = args.into_iter().map(|s| s.to_string()).collect();
 
-            self.commands
-                .lock()
-                .unwrap()
-                .push(PkgctlCommandEvent::RepoAdd { device_addr, args: string_args });
+            match string_args[1].as_str() {
+                "repo" => {
+                    self.repo_register_commands
+                        .lock()
+                        .unwrap()
+                        .push(PkgctlCommandEvent { device_addr, args: string_args });
+                }
+                "rule" => {
+                    self.rule_replace_commands
+                        .lock()
+                        .unwrap()
+                        .push(PkgctlCommandEvent { device_addr, args: string_args });
+                }
+                _ => {
+                    tracing::error!("Unknown pkgctl event in test...");
+                    return Err(ffx::RepositoryError::InternalError);
+                }
+            }
 
             Err(ffx::RepositoryError::RepositoryManagerError)
+        }
+    }
+
+    impl Repo<TestEventHandlerProvider, RealRegistrar<ErroringSshProvider>> {
+        fn take_events(&self, pkgctl_command_type: PkgctlCommandType) -> Vec<PkgctlCommandEvent> {
+            self.registrar.ssh_provider.take_events(pkgctl_command_type)
         }
     }
 
@@ -2264,336 +2383,551 @@ mod tests {
                 .build();
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
-            assert_eq!(get_repositories(&proxy).await, vec![]);
-            assert_eq!(get_target_registrations(&proxy).await, vec![]);
+            assert_vec_empty!(get_repositories(&proxy).await);
+            assert_vec_empty!(get_target_registrations(&proxy).await);
         })
     }
 
-    #[test]
-    fn test_load_from_config_with_data() {
-        run_test(TestRunMode::Fidl, async {
-            // Initialize a simple repository.
-            let repo_path =
-                fs::canonicalize(EMPTY_REPO_PATH).unwrap().to_str().unwrap().to_string();
+    async fn check_load_from_config_with_data(test_run_mode: TestRunMode) {
+        // Initialize a simple repository.
+        let repo_path = fs::canonicalize(EMPTY_REPO_PATH).unwrap().to_str().unwrap().to_string();
 
-            ffx_config::query("repository")
-                .level(Some(ConfigLevel::User))
-                .set(serde_json::json!({
-                    "repositories": {
-                        "repo1": {
-                            "type": "pm",
-                            "path": repo_path,
-                        },
-                        "repo2": {
-                            "type": "pm",
-                            "path": repo_path,
-                            "aliases": ["corp2.com"],
-                        },
-                        "repo3": {
-                            "type": "pm",
-                            "path": repo_path,
-                            "aliases": ["corp3.com"],
+        ffx_config::query("repository")
+            .level(Some(ConfigLevel::User))
+            .set(serde_json::json!({
+                "repositories": {
+                    "repo1": {
+                        "type": "pm",
+                        "path": repo_path,
+                    },
+                    "repo2": {
+                        "type": "pm",
+                        "path": repo_path,
+                        "aliases": ["corp2.com"],
+                    },
+                    "repo3": {
+                        "type": "pm",
+                        "path": repo_path,
+                        "aliases": ["corp3.com"],
+                    },
+                },
+                "registrations": {
+                    "repo1": {
+                        TARGET_NODENAME: {
+                            "repo_name": "repo1",
+                            "target_identifier": TARGET_NODENAME,
+                            "aliases": [ "fuchsia.com", "example.com" ],
+                            "storage_type": "ephemeral",
                         },
                     },
-                    "registrations": {
-                        "repo1": {
-                            TARGET_NODENAME: {
-                                "repo_name": "repo1",
-                                "target_identifier": TARGET_NODENAME,
-                                "aliases": [ "fuchsia.com", "example.com" ],
-                                "storage_type": "ephemeral",
-                            },
-                        },
-                        "repo2": {
-                            TARGET_NODENAME: {
-                                "repo_name": "repo2",
-                                "target_identifier": TARGET_NODENAME,
-                                "aliases": (),
-                                "storage_type": "ephemeral",
-                            },
-                        },
-                        "repo3": {
-                            TARGET_NODENAME: {
-                                "repo_name": "repo3",
-                                "target_identifier": TARGET_NODENAME,
-                                "aliases": [ "anothercorp3.com" ],
-                                "storage_type": "ephemeral",
-                            },
+                    "repo2": {
+                        TARGET_NODENAME: {
+                            "repo_name": "repo2",
+                            "target_identifier": TARGET_NODENAME,
+                            "aliases": (),
+                            "storage_type": "ephemeral",
                         },
                     },
-                    "server": {
-                        "enabled": true,
-                        "mode": "ffx",
-                        "listen": SocketAddr::from((Ipv4Addr::LOCALHOST, 0)).to_string(),
+                    "repo3": {
+                        TARGET_NODENAME: {
+                            "repo_name": "repo3",
+                            "target_identifier": TARGET_NODENAME,
+                            "aliases": [ "anothercorp3.com" ],
+                            "storage_type": "ephemeral",
+                        },
                     },
-                }))
-                .await
-                .unwrap();
+                },
+                "server": {
+                    "enabled": true,
+                    "mode": "ffx",
+                    "listen": SocketAddr::from((Ipv4Addr::LOCALHOST, 0)).to_string(),
+                },
+            }))
+            .await
+            .unwrap();
 
-            let repo = Rc::new(RefCell::new(Repo {
-                inner: RepoInner::new(),
-                event_handler_provider: TestEventHandlerProvider,
-                registrar: Arc::new(RealRegistrar {
-                    ssh_provider: Arc::new(TestSshProvider::new()),
-                }),
-            }));
-            let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
-            let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
-
-            let daemon = FakeDaemonBuilder::new()
-                .rcs_handler(fake_rcs_closure)
-                .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
-                    fake_repo_manager_closure,
-                )
-                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
-                .inject_fidl_protocol(Rc::clone(&repo))
-                .target(ffx::TargetInfo {
-                    nodename: Some(TARGET_NODENAME.to_string()),
-                    ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
-                    ..ffx::TargetInfo::EMPTY
-                })
-                .build();
-
-            let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
-
-            // The server should have started.
-            {
-                let inner = Arc::clone(&repo.borrow().inner);
-                assert_matches!(inner.read().await.server, ServerState::Running(_));
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                ffx_config::query("repository.registration-mode")
+                    .level(Some(ConfigLevel::User))
+                    .set("fidl".to_string().into())
+                    .await
+                    .unwrap();
             }
+            TestRunMode::Ssh => {
+                ffx_config::query("repository.registration-mode")
+                    .level(Some(ConfigLevel::User))
+                    .set("ssh".to_string().into())
+                    .await
+                    .unwrap();
+            }
+        }
 
-            // Make sure we set up the repository and rewrite rules on the device.
-            assert_eq!(
-                fake_repo_manager.take_events(),
-                vec![
-                    RepositoryManagerEvent::Add {
-                        repo: test_repo_config_fidl_with_repo_host(&repo, None, "repo1".into())
-                            .await
-                    },
-                    RepositoryManagerEvent::Add {
-                        repo: test_repo_config_fidl_with_repo_host(&repo, None, "repo2".into())
-                            .await
-                    },
-                    RepositoryManagerEvent::Add {
-                        repo: test_repo_config_fidl_with_repo_host(&repo, None, "repo3".into())
-                            .await
-                    },
-                ],
-            );
-
-            assert_eq!(
-                fake_engine.take_events(),
-                vec![
-                    RewriteEngineEvent::ListDynamic,
-                    RewriteEngineEvent::IteratorNext,
-                    RewriteEngineEvent::ResetAll,
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => "repo1", "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => "repo1", "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionCommit,
-                    RewriteEngineEvent::ListDynamic,
-                    RewriteEngineEvent::IteratorNext,
-                    RewriteEngineEvent::ResetAll,
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("corp2.com" => "repo2", "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionCommit,
-                    RewriteEngineEvent::ListDynamic,
-                    RewriteEngineEvent::IteratorNext,
-                    RewriteEngineEvent::ResetAll,
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("anothercorp3.com" => "repo3", "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionCommit,
-                ],
-            );
-
-            // Make sure we can read back the repositories.
-            assert_eq!(
-                get_repositories(&proxy).await,
-                vec![
-                    ffx::RepositoryConfig {
-                        name: "repo1".to_string(),
-                        spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
-                            path: Some(repo_path.clone()),
-                            aliases: None,
-                            ..ffx::PmRepositorySpec::EMPTY
-                        }),
-                    },
-                    ffx::RepositoryConfig {
-                        name: "repo2".to_string(),
-                        spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
-                            path: Some(repo_path.clone()),
-                            aliases: Some(vec!["corp2.com".into()]),
-                            ..ffx::PmRepositorySpec::EMPTY
-                        }),
-                    },
-                    ffx::RepositoryConfig {
-                        name: "repo3".to_string(),
-                        spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
-                            path: Some(repo_path.clone()),
-                            aliases: Some(vec!["corp3.com".into()]),
-                            ..ffx::PmRepositorySpec::EMPTY
-                        }),
-                    },
-                ]
-            );
-
-            // Make sure we can read back the taret registrations.
-            assert_eq!(
-                get_target_registrations(&proxy).await,
-                vec![
-                    ffx::RepositoryTarget {
-                        repo_name: Some("repo1".to_string()),
-                        target_identifier: Some(TARGET_NODENAME.to_string()),
-                        aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                        ..ffx::RepositoryTarget::EMPTY
-                    },
-                    ffx::RepositoryTarget {
-                        repo_name: Some("repo2".to_string()),
-                        target_identifier: Some(TARGET_NODENAME.to_string()),
-                        aliases: None,
-                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                        ..ffx::RepositoryTarget::EMPTY
-                    },
-                    ffx::RepositoryTarget {
-                        repo_name: Some("repo3".to_string()),
-                        target_identifier: Some(TARGET_NODENAME.to_string()),
-                        aliases: Some(vec!["anothercorp3.com".to_string()]),
-                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                        ..ffx::RepositoryTarget::EMPTY
-                    },
-                ],
-            );
+        let repo = Rc::new(RefCell::new(Repo {
+            inner: RepoInner::new(),
+            event_handler_provider: TestEventHandlerProvider,
+            registrar: Arc::new(RealRegistrar { ssh_provider: Arc::new(TestSshProvider::new()) }),
+        }));
+        let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
+        let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
+        let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
+        let device_address = ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
+            scope_id: 0,
+            port: DEVICE_PORT,
         });
-    }
 
-    #[test]
-    fn test_load_from_config_with_disabled_server() {
-        run_test(TestRunMode::Fidl, async {
-            // Initialize a simple repository.
-            let repo_path =
-                fs::canonicalize(EMPTY_REPO_PATH).unwrap().to_str().unwrap().to_string();
+        let daemon = FakeDaemonBuilder::new()
+            .rcs_handler(fake_rcs_closure)
+            .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
+                fake_repo_manager_closure,
+            )
+            .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
+            .inject_fidl_protocol(Rc::clone(&repo))
+            .target(ffx::TargetInfo {
+                nodename: Some(TARGET_NODENAME.to_string()),
+                ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                addresses: Some(vec![device_address.clone()]),
+                ssh_address: Some(device_address.clone()),
+                ..ffx::TargetInfo::EMPTY
+            })
+            .build();
 
-            ffx_config::query("repository")
-                .level(Some(ConfigLevel::User))
-                .set(serde_json::json!({
-                    "repositories": {
-                        REPO_NAME: {
-                            "type": "pm",
-                            "path": repo_path
+        let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+        // The server should have started.
+        {
+            let inner = Arc::clone(&repo.borrow().inner);
+            assert_matches!(inner.read().await.server, ServerState::Running(_));
+        }
+
+        // Make sure we set up the repository and rewrite rules on the device.
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_repo_manager.take_events(),
+                    vec![
+                        RepositoryManagerEvent::Add {
+                            repo: test_repo_config_fidl_with_repo_host(&repo, None, "repo1".into())
+                                .await
                         },
-                    },
-                    "registrations": {
-                        REPO_NAME: {
-                            TARGET_NODENAME: {
-                                "repo_name": REPO_NAME,
-                                "target_identifier": TARGET_NODENAME,
-                                "aliases": [ "example.com", "fuchsia.com" ],
-                                "storage_type": "ephemeral",
-                            },
-                        }
-                    },
-                    "server": {
-                        "enabled": false,
-                        "mode": "ffx",
-                        "listen": SocketAddr::from((Ipv4Addr::LOCALHOST, 0)).to_string(),
-                    },
-                }))
-                .await
-                .unwrap();
+                        RepositoryManagerEvent::Add {
+                            repo: test_repo_config_fidl_with_repo_host(&repo, None, "repo2".into())
+                                .await
+                        },
+                        RepositoryManagerEvent::Add {
+                            repo: test_repo_config_fidl_with_repo_host(&repo, None, "repo3".into())
+                                .await
+                        },
+                    ],
+                );
 
-            let repo = Rc::new(RefCell::new(Repo {
-                inner: RepoInner::new(),
-                event_handler_provider: TestEventHandlerProvider,
-                registrar: Arc::new(RealRegistrar {
-                    ssh_provider: Arc::new(TestSshProvider::new()),
-                }),
-            }));
-            let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
-            let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
-
-            let daemon = FakeDaemonBuilder::new()
-                .rcs_handler(fake_rcs_closure)
-                .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
-                    fake_repo_manager_closure,
-                )
-                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
-                .inject_fidl_protocol(Rc::clone(&repo))
-                .target(ffx::TargetInfo {
-                    nodename: Some(TARGET_NODENAME.to_string()),
-                    ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
-                    ..ffx::TargetInfo::EMPTY
-                })
-                .build();
-
-            let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
-
-            // The server should be stopped.
-            {
-                let inner = Arc::clone(&repo.borrow().inner);
-                assert_matches!(inner.read().await.server, ServerState::Stopped);
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_repo_config_ssh_with_repo_host(&repo, None, "repo1".into())
+                                .await
+                        },
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_repo_config_ssh_with_repo_host(&repo, None, "repo2".into())
+                                .await
+                        },
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_repo_config_ssh_with_repo_host(&repo, None, "repo3".into())
+                                .await
+                        },
+                    ],
+                );
 
-            // Make sure we can read back the repositories.
-            assert_eq!(
-                get_repositories(&proxy).await,
-                vec![ffx::RepositoryConfig {
-                    name: REPO_NAME.to_string(),
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
+            }
+        }
+
+        // Make sure we set up the repository and rewrite rules on the device.
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("example.com" => "repo1", "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("fuchsia.com" => "repo1", "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("corp2.com" => "repo2", "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("anothercorp3.com" => "repo3", "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_target_alias_ssh(
+                                &repo,
+                                "repo1",
+                                &ffx::RepositoryTarget {
+                                    repo_name: Some("repo1".to_string()),
+                                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                                    aliases: Some(vec![
+                                        "fuchsia.com".to_string(),
+                                        "example.com".to_string()
+                                    ]),
+                                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                                    ..ffx::RepositoryTarget::EMPTY
+                                }
+                            )
+                            .await
+                        },
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_target_alias_ssh(
+                                &repo,
+                                "repo2",
+                                &ffx::RepositoryTarget {
+                                    repo_name: Some("repo2".to_string()),
+                                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                                    ..ffx::RepositoryTarget::EMPTY
+                                }
+                            )
+                            .await
+                        },
+                        PkgctlCommandEvent {
+                            device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                            args: test_target_alias_ssh(
+                                &repo,
+                                "repo3",
+                                &ffx::RepositoryTarget {
+                                    repo_name: Some("repo3".to_string()),
+                                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                                    aliases: Some(vec!["anothercorp3.com".to_string()]),
+                                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                                    ..ffx::RepositoryTarget::EMPTY
+                                }
+                            )
+                            .await
+                        }
+                    ]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
+            }
+        }
+
+        // Make sure we can read back the repositories.
+        assert_eq!(
+            get_repositories(&proxy).await,
+            vec![
+                ffx::RepositoryConfig {
+                    name: "repo1".to_string(),
                     spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
                         path: Some(repo_path.clone()),
+                        aliases: None,
                         ..ffx::PmRepositorySpec::EMPTY
                     }),
-                }]
-            );
+                },
+                ffx::RepositoryConfig {
+                    name: "repo2".to_string(),
+                    spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
+                        path: Some(repo_path.clone()),
+                        aliases: Some(vec!["corp2.com".into()]),
+                        ..ffx::PmRepositorySpec::EMPTY
+                    }),
+                },
+                ffx::RepositoryConfig {
+                    name: "repo3".to_string(),
+                    spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
+                        path: Some(repo_path.clone()),
+                        aliases: Some(vec!["corp3.com".into()]),
+                        ..ffx::PmRepositorySpec::EMPTY
+                    }),
+                },
+            ]
+        );
 
-            // Make sure we can read back the target registrations.
-            assert_eq!(
-                get_target_registrations(&proxy).await,
-                vec![ffx::RepositoryTarget {
-                    repo_name: Some(REPO_NAME.to_string()),
+        // Make sure we can read back the target registrations.
+        assert_eq!(
+            get_target_registrations(&proxy).await,
+            vec![
+                ffx::RepositoryTarget {
+                    repo_name: Some("repo1".to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     ..ffx::RepositoryTarget::EMPTY
-                }],
-            );
+                },
+                ffx::RepositoryTarget {
+                    repo_name: Some("repo2".to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    aliases: None,
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    ..ffx::RepositoryTarget::EMPTY
+                },
+                ffx::RepositoryTarget {
+                    repo_name: Some("repo3".to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    aliases: Some(vec!["anothercorp3.com".to_string()]),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    ..ffx::RepositoryTarget::EMPTY
+                },
+            ],
+        );
+    }
 
-            // We should not have tried to register any repositories on the device since the server
-            // has not been started.
-            assert_eq!(fake_repo_manager.take_events(), vec![]);
-            assert_eq!(fake_engine.take_events(), vec![]);
+    #[test]
+    fn test_load_from_config_with_data_with_fidl() {
+        run_test(TestRunMode::Fidl, async {
+            check_load_from_config_with_data(TestRunMode::Fidl).await;
+        });
+    }
 
-            // Start the server.
-            proxy.server_start(None).await.unwrap().unwrap();
+    #[test]
+    fn test_load_from_config_with_data_with_ssh() {
+        run_test(TestRunMode::Ssh, async {
+            check_load_from_config_with_data(TestRunMode::Ssh).await;
+        });
+    }
 
-            // Make sure we set up the repository and rewrite rules on the device.
-            assert_eq!(
-                fake_repo_manager.take_events(),
-                vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }],
-            );
+    async fn check_load_from_config_with_disabled_server(test_run_mode: TestRunMode) {
+        // Initialize a simple repository.
+        let repo_path = fs::canonicalize(EMPTY_REPO_PATH).unwrap().to_str().unwrap().to_string();
 
-            assert_eq!(
-                fake_engine.take_events(),
-                vec![
-                    RewriteEngineEvent::ListDynamic,
-                    RewriteEngineEvent::IteratorNext,
-                    RewriteEngineEvent::ResetAll,
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+        ffx_config::query("repository")
+            .level(Some(ConfigLevel::User))
+            .set(serde_json::json!({
+                "repositories": {
+                    REPO_NAME: {
+                        "type": "pm",
+                        "path": repo_path
                     },
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionCommit,
-                ],
-            );
+                },
+                "registrations": {
+                    REPO_NAME: {
+                        TARGET_NODENAME: {
+                            "repo_name": REPO_NAME,
+                            "target_identifier": TARGET_NODENAME,
+                            "aliases": [ "example.com", "fuchsia.com" ],
+                            "storage_type": "ephemeral",
+                        },
+                    }
+                },
+                "server": {
+                    "enabled": false,
+                    "mode": "ffx",
+                    "listen": SocketAddr::from((Ipv4Addr::LOCALHOST, 0)).to_string(),
+                },
+            }))
+            .await
+            .unwrap();
+
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                ffx_config::query("repository.registration-mode")
+                    .level(Some(ConfigLevel::User))
+                    .set("fidl".to_string().into())
+                    .await
+                    .unwrap();
+            }
+            TestRunMode::Ssh => {
+                ffx_config::query("repository.registration-mode")
+                    .level(Some(ConfigLevel::User))
+                    .set("ssh".to_string().into())
+                    .await
+                    .unwrap();
+            }
+        }
+
+        let repo = Rc::new(RefCell::new(Repo {
+            inner: RepoInner::new(),
+            event_handler_provider: TestEventHandlerProvider,
+            registrar: Arc::new(RealRegistrar { ssh_provider: Arc::new(TestSshProvider::new()) }),
+        }));
+        let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
+        let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
+        let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
+        let device_address = ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: [127, 0, 0, 1] }),
+            scope_id: 0,
+            port: DEVICE_PORT,
+        });
+
+        let daemon = FakeDaemonBuilder::new()
+            .rcs_handler(fake_rcs_closure)
+            .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
+                fake_repo_manager_closure,
+            )
+            .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
+            .inject_fidl_protocol(Rc::clone(&repo))
+            .target(ffx::TargetInfo {
+                nodename: Some(TARGET_NODENAME.to_string()),
+                ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                addresses: Some(vec![device_address.clone()]),
+                ssh_address: Some(device_address.clone()),
+                ..ffx::TargetInfo::EMPTY
+            })
+            .build();
+
+        let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+        // The server should be stopped.
+        {
+            let inner = Arc::clone(&repo.borrow().inner);
+            assert_matches!(inner.read().await.server, ServerState::Stopped);
+        }
+
+        // Make sure we can read back the repositories.
+        assert_eq!(
+            get_repositories(&proxy).await,
+            vec![ffx::RepositoryConfig {
+                name: REPO_NAME.to_string(),
+                spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
+                    path: Some(repo_path.clone()),
+                    ..ffx::PmRepositorySpec::EMPTY
+                }),
+            }]
+        );
+
+        // Make sure we can read back the target registrations.
+        assert_eq!(
+            get_target_registrations(&proxy).await,
+            vec![ffx::RepositoryTarget {
+                repo_name: Some(REPO_NAME.to_string()),
+                target_identifier: Some(TARGET_NODENAME.to_string()),
+                aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                ..ffx::RepositoryTarget::EMPTY
+            }],
+        );
+
+        // We should not have tried to register any repositories on the device since the server
+        // has not been started.
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+
+        // Start the server.
+        proxy.server_start(None).await.unwrap().unwrap();
+
+        // Make sure we set up the repository and rewrite rules on the device.
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_repo_manager.take_events(),
+                    vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    }],
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
+            }
+        }
+
+        // Check rewrite rules
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_target_alias_ssh(
+                            &repo,
+                            REPO_NAME,
+                            &&ffx::RepositoryTarget {
+                                repo_name: Some(REPO_NAME.to_string()),
+                                target_identifier: Some(TARGET_NODENAME.to_string()),
+                                aliases: Some(vec![
+                                    "example.com".to_string(),
+                                    "fuchsia.com".to_string()
+                                ]),
+                                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                                ..ffx::RepositoryTarget::EMPTY
+                            }
+                        )
+                        .await
+                    }],
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
+            }
+        }
+    }
+
+    #[test]
+    fn test_load_from_config_with_disabled_server_with_fidl() {
+        run_test(TestRunMode::Fidl, async {
+            check_load_from_config_with_disabled_server(TestRunMode::Fidl).await;
+        });
+    }
+
+    #[test]
+    fn test_load_from_config_with_disabled_server_with_ssh() {
+        run_test(TestRunMode::Ssh, async {
+            check_load_from_config_with_disabled_server(TestRunMode::Ssh).await;
         });
     }
 
@@ -2759,12 +3093,12 @@ mod tests {
 
             // Adding a repository should not create a tunnel, since we haven't registered the
             // repository on a device.
-            assert_eq!(fake_rcs.take_events(), vec![]);
+            assert_vec_empty!(fake_rcs.take_events());
 
             assert!(proxy.remove_repository(REPO_NAME).await.unwrap());
 
             // Make sure the repository was removed.
-            assert_eq!(get_repositories(&proxy).await, vec![]);
+            assert_vec_empty!(get_repositories(&proxy).await);
         })
     }
 
@@ -2804,68 +3138,89 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
         // Make sure there is nothing in the registry.
-        assert_eq!(fake_engine.take_events(), vec![]);
-        assert_eq!(get_repositories(&proxy).await, vec![]);
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+        assert_vec_empty!(get_repositories(&proxy).await);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         add_repo(&proxy, REPO_NAME).await;
 
         // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
 
-        assert_eq!(fake_repo_manager.take_events(), vec![]);
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        register_target(
-            &proxy,
-            ffx::RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NODENAME.to_string()),
-                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
-                ..ffx::RepositoryTarget::EMPTY
-            },
-        )
-        .await;
+        let target = ffx::RepositoryTarget {
+            repo_name: Some(REPO_NAME.to_string()),
+            target_identifier: Some(TARGET_NODENAME.to_string()),
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
+            ..ffx::RepositoryTarget::EMPTY
+        };
+
+        register_target(&proxy, target.clone()).await;
 
         // Registering the target should have set up a repository.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL populated.
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
                 );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    },]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
 
         // Adding the registration should have set up rewrite rules.
-        assert_eq!(
-            fake_engine.take_events(),
-            vec![
-                RewriteEngineEvent::ListDynamic,
-                RewriteEngineEvent::IteratorNext,
-                RewriteEngineEvent::ResetAll,
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("example.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionCommit,
-            ],
-        );
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_target_alias_ssh(&repo, REPO_NAME, &target).await
+                    },]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_engine.take_events());
+            }
+        }
 
         // The RepositoryRegistry should remember we set up the registrations.
         assert_eq!(
@@ -2893,9 +3248,10 @@ mod tests {
         assert!(proxy.remove_repository(REPO_NAME).await.expect("communicated with proxy"));
 
         // We should not have communicated with the device.
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         // The registration should have been cleared from the config.
         assert_matches!(pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await, Ok(None));
@@ -2949,35 +3305,31 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
         // Make sure there is nothing in the registry.
-        assert_eq!(fake_engine.take_events(), vec![]);
-        assert_eq!(get_repositories(&proxy).await, vec![]);
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+        assert_vec_empty!(get_repositories(&proxy).await);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         add_repo(&proxy, REPO_NAME).await;
 
         // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
-        assert_eq!(fake_repo_manager.take_events(), vec![]);
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        register_target(
-            &proxy,
-            ffx::RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NODENAME.to_string()),
-                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                aliases: None,
-                ..ffx::RepositoryTarget::EMPTY
-            },
-        )
-        .await;
+        let target = ffx::RepositoryTarget {
+            repo_name: Some(REPO_NAME.to_string()),
+            target_identifier: Some(TARGET_NODENAME.to_string()),
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            aliases: None,
+            ..ffx::RepositoryTarget::EMPTY
+        };
+
+        register_target(&proxy, target.clone()).await;
 
         // Registering the target should have set up a repository.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
@@ -2985,38 +3337,63 @@ mod tests {
 
                 // Registering a repository should create a tunnel.
                 assert_eq!(fake_rcs.take_events(), vec![RcsEvent::ReverseTcp]);
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    },]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
 
                 // Registering a repository won't create a tunnel.
-                assert_eq!(fake_rcs.take_events(), vec![]);
+                assert_vec_empty!(fake_rcs.take_events());
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
 
         // Adding the registration should have set up rewrite rules from the repository
         // aliases.
-        assert_eq!(
-            fake_engine.take_events(),
-            vec![
-                RewriteEngineEvent::ListDynamic,
-                RewriteEngineEvent::IteratorNext,
-                RewriteEngineEvent::ResetAll,
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionCommit,
-            ],
-        );
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_target_alias_ssh(&repo, REPO_NAME, &target).await
+                    },]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_engine.take_events());
+            }
+        }
 
         // The RepositoryRegistry should remember we set up the registrations.
         assert_eq!(
@@ -3048,9 +3425,10 @@ mod tests {
             .expect("target unregistration to succeed");
 
         // We should not have communicated with the device.
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         // The registration should have been cleared from the config.
         assert_matches!(pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await, Ok(None));
@@ -3104,35 +3482,31 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
         // Make sure there is nothing in the registry.
-        assert_eq!(fake_engine.take_events(), vec![]);
-        assert_eq!(get_repositories(&proxy).await, vec![]);
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+        assert_vec_empty!(get_repositories(&proxy).await);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         add_repo(&proxy, REPO_NAME).await;
 
         // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
-        assert_eq!(fake_repo_manager.take_events(), vec![]);
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        register_target(
-            &proxy,
-            ffx::RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NODENAME.to_string()),
-                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-                ..ffx::RepositoryTarget::EMPTY
-            },
-        )
-        .await;
+        let target = ffx::RepositoryTarget {
+            repo_name: Some(REPO_NAME.to_string()),
+            target_identifier: Some(TARGET_NODENAME.to_string()),
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+            ..ffx::RepositoryTarget::EMPTY
+        };
+
+        register_target(&proxy, target.clone()).await;
 
         // Registering the target should have set up a repository.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
@@ -3140,38 +3514,63 @@ mod tests {
 
                 // Registering a repository should create a tunnel.
                 assert_eq!(fake_rcs.take_events(), vec![RcsEvent::ReverseTcp]);
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    },]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
 
                 // Registering a repository won't create a tunnel.
-                assert_eq!(fake_rcs.take_events(), vec![]);
+                assert_vec_empty!(fake_rcs.take_events());
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
 
         // Adding the registration should have set up rewrite rules from the registration
         // aliases.
-        assert_eq!(
-            fake_engine.take_events(),
-            vec![
-                RewriteEngineEvent::ListDynamic,
-                RewriteEngineEvent::IteratorNext,
-                RewriteEngineEvent::ResetAll,
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("example.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionCommit,
-            ],
-        );
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_target_alias_ssh(&repo, REPO_NAME, &target).await
+                    },]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_engine.take_events());
+            }
+        }
 
         // The RepositoryRegistry should remember we set up the registrations.
         assert_eq!(
@@ -3203,9 +3602,10 @@ mod tests {
             .expect("target unregistration to succeed");
 
         // We should not have communicated with the device.
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         // The registration should have been cleared from the config.
         assert_matches!(pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await, Ok(None));
@@ -3270,15 +3670,17 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
         // Make sure there is nothing in the registry.
-        assert_eq!(fake_engine.take_events(), vec![]);
-        assert_eq!(get_repositories(&proxy).await, vec![]);
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+        assert_vec_empty!(get_repositories(&proxy).await);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         add_repo(&proxy, REPO_NAME).await;
 
         // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
-        assert_eq!(fake_repo_manager.take_events(), vec![]);
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
         register_target(
             &proxy,
@@ -3293,7 +3695,7 @@ mod tests {
         .await;
 
         // Registering the target should have set up a repository.
-        let (device_addr, args) = test_repo_config_ssh_with_repo_host(
+        let args = test_repo_config_ssh_with_repo_host(
             &repo,
             Some(expected_repo_host.clone()),
             REPO_NAME.into(),
@@ -3301,28 +3703,30 @@ mod tests {
         .await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 let repo_config = test_repo_config_fidl_with_repo_host(
                     &repo,
                     Some(expected_repo_host.clone()),
                     REPO_NAME.into(),
                 )
                 .await;
+
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: repo_config }]
                 );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
+                let device_addr = SocketAddr::from_str(DEVICE_ADDR).unwrap();
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent { device_addr, args }]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
     }
@@ -3604,55 +4008,75 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
         add_repo(&proxy, REPO_NAME).await;
 
-        register_target(
-            &proxy,
-            ffx::RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: None,
-                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                ..ffx::RepositoryTarget::EMPTY
-            },
-        )
-        .await;
+        let target = ffx::RepositoryTarget {
+            repo_name: Some(REPO_NAME.to_string()),
+            target_identifier: None,
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            ..ffx::RepositoryTarget::EMPTY
+        };
+
+        register_target(&proxy, target.clone()).await;
 
         // Registering the target should have set up a repository.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
                 );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    },]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
 
-        assert_eq!(
-            fake_engine.take_events(),
-            vec![
-                RewriteEngineEvent::ListDynamic,
-                RewriteEngineEvent::IteratorNext,
-                RewriteEngineEvent::ResetAll,
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionCommit,
-            ],
-        );
+        // Adding the registration should have set up rewrite rules.
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_target_alias_ssh(&repo, REPO_NAME, &target).await
+                    },]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_engine.take_events());
+            }
+        }
     }
 
     #[test]
@@ -3705,11 +4129,12 @@ mod tests {
         add_repo(&proxy, REPO_NAME).await;
 
         // Make sure there's no repositories or registrations on the device.
-        assert_eq!(fake_repo_manager.take_events(), vec![]);
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_repo_manager.take_events());
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
         // Make sure the registry doesn't have any registrations.
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         register_target(
             &proxy,
@@ -3724,28 +4149,33 @@ mod tests {
         .await;
 
         // We should have added a repository to the device, but not added any rewrite rules.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
                 );
+
+                // Expected SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    }]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
+
+                // Expected FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
-        assert_eq!(fake_engine.take_events(), vec![]);
+
+        // Make sure we didn't communicate with the device.
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
         // Make sure we can query the registration.
         assert_eq!(
@@ -3808,57 +4238,76 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
         add_repo(&proxy, REPO_NAME).await;
 
-        register_target(
-            &proxy,
-            ffx::RepositoryTarget {
-                repo_name: Some(REPO_NAME.to_string()),
-                target_identifier: Some(TARGET_NODENAME.to_string()),
-                storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                aliases: None,
-                ..ffx::RepositoryTarget::EMPTY
-            },
-        )
-        .await;
+        let target = ffx::RepositoryTarget {
+            repo_name: Some(REPO_NAME.to_string()),
+            target_identifier: Some(TARGET_NODENAME.to_string()),
+            storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+            aliases: None,
+            ..ffx::RepositoryTarget::EMPTY
+        };
+
+        register_target(&proxy, target.clone()).await;
 
         // Make sure we set up the repository on the device.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 assert_eq!(
                     fake_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
                 );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    },]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(fake_repo_manager.take_events(), vec![]);
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_repo_manager.take_events());
             }
         }
 
         // We should have set up the default rewrite rules.
-        assert_eq!(
-            fake_engine.take_events(),
-            vec![
-                RewriteEngineEvent::ListDynamic,
-                RewriteEngineEvent::IteratorNext,
-                RewriteEngineEvent::ResetAll,
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionCommit,
-            ],
-        );
+        match test_run_mode {
+            TestRunMode::Fidl => {
+                assert_eq!(
+                    fake_engine.take_events(),
+                    vec![
+                        RewriteEngineEvent::ListDynamic,
+                        RewriteEngineEvent::IteratorNext,
+                        RewriteEngineEvent::ResetAll,
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionAdd {
+                            rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
+                        },
+                        RewriteEngineEvent::EditTransactionCommit,
+                    ],
+                );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
+            }
+            TestRunMode::Ssh => {
+                assert_eq!(
+                    repo.borrow().take_events(PkgctlCommandType::RuleReplace),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_target_alias_ssh(&repo, REPO_NAME, &target).await
+                    },]
+                );
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(fake_engine.take_events());
+            }
+        }
 
         assert_eq!(
             get_target_registrations(&proxy).await,
@@ -3947,33 +4396,36 @@ mod tests {
         );
 
         // Make sure we tried to add the repository.
-        let (device_addr, args) = test_repo_config_ssh(&repo).await;
         match test_run_mode {
             TestRunMode::Fidl => {
-                // Expected SSH registration flow empty.
-                assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-                // Expected FIDL registration flow used.
                 assert_eq!(
                     erroring_repo_manager.take_events(),
                     vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
                 );
+
+                // Expect SSH flow untouched.
+                assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
             }
             TestRunMode::Ssh => {
-                // Expected SSH registration flow empty.
                 assert_eq!(
-                    repo.borrow().registrar.ssh_provider.take_events(),
-                    vec![PkgctlCommandEvent::RepoAdd { device_addr, args }]
+                    repo.borrow().take_events(PkgctlCommandType::RepoAdd),
+                    vec![PkgctlCommandEvent {
+                        device_addr: SocketAddr::from_str(DEVICE_ADDR).unwrap(),
+                        args: test_repo_config_ssh(&repo).await
+                    }]
                 );
-                // Expected FIDL registration flow used.
-                assert_eq!(erroring_repo_manager.take_events(), vec![]);
+
+                // Expect FIDL flow untouched.
+                assert_vec_empty!(erroring_repo_manager.take_events());
             }
         }
 
         // Make sure we didn't communicate with the device.
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
 
         // Make sure the repository registration wasn't added.
-        assert_eq!(get_target_registrations(&proxy).await, vec![]);
+        assert_vec_empty!(get_target_registrations(&proxy).await);
 
         // Make sure nothing was saved to the config.
         assert_matches!(pkg::config::get_registration(REPO_NAME, TARGET_NODENAME).await, Ok(None));
@@ -4041,9 +4493,10 @@ mod tests {
         );
 
         // Make sure we didn't communicate with the device.
-        assert_eq!(erroring_repo_manager.take_events(), vec![]);
-        assert_eq!(repo.borrow().registrar.ssh_provider.take_events(), vec![]);
-        assert_eq!(fake_engine.take_events(), vec![]);
+        assert_vec_empty!(erroring_repo_manager.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
+        assert_vec_empty!(fake_engine.take_events());
+        assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
     }
 
     #[test]
@@ -4094,8 +4547,9 @@ mod tests {
             );
 
             // Make sure we didn't communicate with the device.
-            assert_eq!(erroring_repo_manager.take_events(), vec![]);
-            assert_eq!(fake_engine.take_events(), vec![]);
+            assert_vec_empty!(erroring_repo_manager.take_events());
+            assert_vec_empty!(fake_engine.take_events());
+            assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RuleReplace));
         });
     }
 
