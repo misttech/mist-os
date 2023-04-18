@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::pin::Pin;
+use std::{collections::HashSet, pin::Pin};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_name as fnet_name;
+use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
@@ -16,6 +17,8 @@ use async_utils::{
 };
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use futures::stream::TryStreamExt as _;
+use net_declare::fidl_subnet;
+use net_types::{ip::Ipv4Addr, SpecifiedAddr, Witness as _};
 use tracing::{info, warn};
 
 use crate::{dns, errors};
@@ -23,8 +26,10 @@ use crate::{dns, errors};
 #[derive(Debug)]
 pub(super) struct ClientState {
     client: fnet_dhcp::ClientProxy,
+    routers: HashSet<SpecifiedAddr<Ipv4Addr>>,
 }
 
+pub(super) const DEFAULT_SUBNET: fnet::Subnet = fidl_subnet!("0.0.0.0/0");
 pub(super) const NEW_CLIENT_PARAMS: fnet_dhcp::NewClientParams = fnet_dhcp::NewClientParams {
     configuration_to_request: Some(fnet_dhcp::ConfigurationToRequest {
         routers: Some(true),
@@ -42,14 +47,15 @@ pub(super) type ConfigurationStream =
 
 pub(super) async fn update_configuration(
     interface_id: u64,
-    ClientState { client: _ }: &mut ClientState,
+    ClientState { client: _, routers: configured_routers }: &mut ClientState,
     fnet_dhcp::ClientWatchConfigurationResponse {
         address: _,
         dns_servers: new_dns_servers,
-        routers: _,
+        routers: new_routers,
         ..
     }: fnet_dhcp::ClientWatchConfigurationResponse,
     dns_servers: &mut DnsServers,
+    stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
     dns::update_servers(
@@ -76,7 +82,51 @@ pub(super) async fn update_configuration(
             .flatten()
             .collect(),
     )
-    .await
+    .await;
+
+    let new_routers = HashSet::from_iter(
+        new_routers
+            .into_iter()
+            .flatten()
+            .filter_map(|fnet::Ipv4Address { addr }| SpecifiedAddr::new(Ipv4Addr::new(addr))),
+    );
+
+    let fwd_entry = |next_hop: &SpecifiedAddr<Ipv4Addr>| fnet_stack::ForwardingEntry {
+        subnet: DEFAULT_SUBNET,
+        device_id: interface_id,
+        next_hop: Some(Box::new(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
+            addr: next_hop.get().ipv4_bytes(),
+        }))),
+        metric: fnet_stack::UNSPECIFIED_METRIC,
+    };
+
+    for router in new_routers.difference(configured_routers) {
+        stack
+            .add_forwarding_entry(&mut fwd_entry(router))
+            .await
+            .expect("send add forwarding entry request")
+            .unwrap_or_else(|e| {
+                warn!(
+                    "error adding route for DHCPv4-learned router {} on interface {}: {:?}",
+                    router, interface_id, e,
+                )
+            })
+    }
+
+    for router in configured_routers.difference(&new_routers) {
+        stack
+            .del_forwarding_entry(&mut fwd_entry(router))
+            .await
+            .expect("send del forwarding entry request")
+            .unwrap_or_else(|e| {
+                warn!(
+                    "error deleting route for DHCPv4-learned router {} on interface {}: {:?}",
+                    router, interface_id, e,
+                )
+            })
+    }
+
+    *configured_routers = new_routers;
 }
 
 pub(super) fn start_client(
@@ -106,7 +156,7 @@ pub(super) fn start_client(
         unreachable!("only one DHCPv4 client may exist on {} (id={})", interface_name, interface_id)
     }
 
-    ClientState { client }
+    ClientState { client, routers: Default::default() }
 }
 
 pub(super) async fn stop_client(
@@ -115,6 +165,7 @@ pub(super) async fn stop_client(
     mut state: ClientState,
     configuration_streams: &mut ConfigurationStreamMap,
     dns_servers: &mut DnsServers,
+    stack: &fnet_stack::StackProxy,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
     info!("stopping DHCPv4 client for {} (id={})", interface_name, interface_id);
@@ -124,11 +175,12 @@ pub(super) async fn stop_client(
         &mut state,
         fnet_dhcp::ClientWatchConfigurationResponse::EMPTY,
         dns_servers,
+        stack,
         lookup_admin,
     )
     .await;
 
-    let ClientState { client } = state;
+    let ClientState { client, routers: _ } = state;
 
     let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> =
         configuration_streams.remove(&interface_id).unwrap_or_else(|| {

@@ -10,6 +10,9 @@ using fuchsia.net.interfaces.admin;
 /// A path to a device node.
 alias DevicePath = string:255;
 
+/// A value indicating that a [`ForwardingEntry`]'s metric is unspecified.
+const UNSPECIFIED_METRIC uint32 = 0;
+
 /// An entry in the forwarding table for the network stack.
 ///
 /// Valid if at least one of [`device_id`] and [`next_hop`] is specified.
@@ -25,7 +28,9 @@ type ForwardingEntry = struct {
     /// The IP address of the next hop. Used for link-layer address resolution, if present.
     next_hop fuchsia.net.IpAddress:optional;
 
-    /// This entry's metric. The zero value is interpreted as unspecified.
+    /// This entry's metric.
+    ///
+    /// [`UNSPECIFIED_METRIC`] is interpreted as unspecified.
     metric uint32;
 };
 

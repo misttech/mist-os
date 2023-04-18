@@ -1134,10 +1134,19 @@ impl<'a> NetCfg<'a> {
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
+        stack: &fnet_stack::StackProxy,
         lookup_admin: &fnet_name::LookupAdminProxy,
     ) {
         if let Some(fut) = dhcpv4_client.take().map(|c| {
-            dhcpv4::stop_client(id, name, c, configuration_streams, dns_servers, lookup_admin)
+            dhcpv4::stop_client(
+                id,
+                name,
+                c,
+                configuration_streams,
+                dns_servers,
+                stack,
+                lookup_admin,
+            )
         }) {
             fut.await
         }
@@ -1162,6 +1171,7 @@ impl<'a> NetCfg<'a> {
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
+        stack: &fnet_stack::StackProxy,
         lookup_admin: &fnet_name::LookupAdminProxy,
     ) {
         if online {
@@ -1179,6 +1189,7 @@ impl<'a> NetCfg<'a> {
                 dhcpv4_client,
                 configuration_streams,
                 dns_servers,
+                stack,
                 lookup_admin,
             )
             .await
@@ -1193,6 +1204,7 @@ impl<'a> NetCfg<'a> {
         virtualization_handler: &mut impl virtualization::Handler,
     ) -> Result<(), anyhow::Error> {
         let Self {
+            stack,
             interface_properties,
             dns_servers,
             interface_states,
@@ -1216,6 +1228,7 @@ impl<'a> NetCfg<'a> {
             interface_states,
             dhcpv4_configuration_streams,
             dhcpv6_prefixes_streams,
+            stack,
             lookup_admin,
             dhcp_server,
             dhcpv4_client_provider,
@@ -1251,6 +1264,7 @@ impl<'a> NetCfg<'a> {
         interface_states: &mut HashMap<u64, InterfaceState>,
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
+        stack: &fnet_stack::StackProxy,
         lookup_admin: &fnet_name::LookupAdminProxy,
         dhcp_server: &Option<fnet_dhcp::Server_Proxy>,
         dhcpv4_client_provider: &Option<fnet_dhcp::ClientProviderProxy>,
@@ -1319,6 +1333,7 @@ impl<'a> NetCfg<'a> {
                             dhcpv4_client_provider.as_ref(),
                             dhcpv4_configuration_streams,
                             dns_servers,
+                            stack,
                             lookup_admin,
                         )
                         .await;
@@ -1467,6 +1482,7 @@ impl<'a> NetCfg<'a> {
                                     &mut dhcpv4_client,
                                     dhcpv4_configuration_streams,
                                     dns_servers,
+                                    stack,
                                     lookup_admin,
                                 )
                                     .await;
@@ -1999,7 +2015,7 @@ impl<'a> NetCfg<'a> {
                 subnet,
                 device_id: interface_id,
                 next_hop: None,
-                metric: 0,
+                metric: fnet_stack::UNSPECIFIED_METRIC,
             })
             .await
             .unwrap_or_else(|err| exit_with_fidl_error(err))
@@ -2424,6 +2440,7 @@ impl<'a> NetCfg<'a> {
             dhcpv4_client,
             configuration,
             &mut self.dns_servers,
+            &self.stack,
             &self.lookup_admin,
         )
         .await
@@ -2683,6 +2700,7 @@ mod tests {
     }
 
     struct ServerEnds {
+        stack: fnet_stack::StackRequestStream,
         lookup_admin: fnet_name::LookupAdminRequestStream,
         dhcpv4_client_provider: fnet_dhcp::ClientProviderRequestStream,
         dhcpv6_client_provider: fnet_dhcpv6::ClientProviderRequestStream,
@@ -2717,7 +2735,7 @@ mod tests {
     fn test_netcfg(
         with_dhcpv4_client_provider: bool,
     ) -> Result<(NetCfg<'static>, ServerEnds), anyhow::Error> {
-        let (stack, _stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>()
+        let (stack, stack_server) = fidl::endpoints::create_proxy::<fnet_stack::StackMarker>()
             .context("error creating stack endpoints")?;
         let (lookup_admin, lookup_admin_server) =
             fidl::endpoints::create_proxy::<fnet_name::LookupAdminMarker>()
@@ -2767,6 +2785,9 @@ mod tests {
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             },
             ServerEnds {
+                stack: stack_server
+                    .into_stream()
+                    .context("error converting stack server to stream")?,
                 lookup_admin: lookup_admin_server
                     .into_stream()
                     .context("error converting lookup_admin server to stream")?,
@@ -2902,7 +2923,12 @@ mod tests {
     async fn test_stopping_dhcpv6_with_down_lookup_admin() {
         let (
             mut netcfg,
-            ServerEnds { lookup_admin, dhcpv4_client_provider: _, mut dhcpv6_client_provider },
+            ServerEnds {
+                stack: _,
+                lookup_admin,
+                dhcpv4_client_provider: _,
+                mut dhcpv6_client_provider,
+            },
         ) = test_netcfg(false /* with_dhcpv4_client_provider */)
             .expect("error creating test netcfg");
         let mut dns_watchers = DnsServerWatchers::empty();
@@ -3017,7 +3043,12 @@ mod tests {
     async fn test_dhcpv4(added_online: bool, remove_interface: bool) {
         let (
             mut netcfg,
-            ServerEnds { mut lookup_admin, mut dhcpv4_client_provider, dhcpv6_client_provider: _ },
+            ServerEnds {
+                stack,
+                mut lookup_admin,
+                mut dhcpv4_client_provider,
+                dhcpv6_client_provider: _,
+            },
         ) = test_netcfg(true /* with_dhcpv4_client_provider */)
             .expect("error creating test netcfg");
         let mut dns_watchers = DnsServerWatchers::empty();
@@ -3106,11 +3137,22 @@ mod tests {
             (client_req_stream, responder)
         };
 
-        {
+        let check_fwd_entry =
+            |fnet_stack::ForwardingEntry { subnet, device_id, next_hop, metric },
+             routers: &mut HashSet<_>| {
+                assert_eq!(subnet, dhcpv4::DEFAULT_SUBNET);
+                assert_eq!(device_id, INTERFACE_ID);
+                assert_eq!(metric, 0);
+                assert!(routers.insert(*next_hop.expect("specified next hop")))
+            };
+
+        let (expected_routers, stack) = {
             let dns_servers = vec![fidl_ip_v4!("192.0.2.1"), fidl_ip_v4!("192.0.2.2")];
+            let routers = vec![fidl_ip_v4!("192.0.2.3"), fidl_ip_v4!("192.0.2.4")];
             responder
                 .send(fnet_dhcp::ClientWatchConfigurationResponse {
                     dns_servers: Some(dns_servers.clone()),
+                    routers: Some(routers.clone()),
                     ..fnet_dhcp::ClientWatchConfigurationResponse::EMPTY
                 })
                 .expect("send configuration update");
@@ -3132,21 +3174,55 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
 
-            let ((), ()) = future::join(
+            let expect_add_default_routers = futures::stream::repeat(()).take(routers.len()).fold(
+                (HashSet::new(), stack),
+                |(mut routers, mut stack), ()| async move {
+                    let (entry, responder) = assert_matches!(
+                        stack.next().await.expect("stack request stream should not be exhausted"),
+                        Ok(fnet_stack::StackRequest::AddForwardingEntry { entry, responder }) => {
+                            (entry, responder)
+                        }
+                    );
+                    check_fwd_entry(entry, &mut routers);
+                    responder.send(&mut Ok(())).expect("send add fwd entry response");
+                    (routers, stack)
+                },
+            );
+
+            let ((), (), (added_routers, stack)) = future::join3(
                 netcfg.handle_dhcpv4_configuration(got_interface_id, got_response),
                 run_lookup_admin_once(&mut lookup_admin, &dns_servers),
+                expect_add_default_routers,
             )
             .await;
             assert_eq!(netcfg.dns_servers.consolidated(), dns_servers);
-        }
+            let expected_routers =
+                routers.iter().cloned().map(fnet::IpAddress::Ipv4).collect::<HashSet<_>>();
+            assert_eq!(added_routers, expected_routers);
+            (expected_routers, stack)
+        };
 
         // Netcfg always keeps the server hydrated with a WatchConfiguration
         // request.
         let _responder: fnet_dhcp::ClientWatchConfigurationResponder =
             expect_watch_dhcpv4_configuration(&mut client_stream);
 
+        let expect_delete_default_routers = futures::stream::repeat(())
+            .take(expected_routers.len())
+            .fold((HashSet::new(), stack), |(mut routers, mut stack), ()| async move {
+                let (entry, responder) = assert_matches!(
+                    stack.next().await.expect("stack request stream should not be exhausted"),
+                    Ok(fnet_stack::StackRequest::DelForwardingEntry { entry, responder }) => {
+                        (entry, responder)
+                    }
+                );
+                check_fwd_entry(entry, &mut routers);
+                responder.send(&mut Ok(())).expect("send del fwd entry response");
+                (routers, stack)
+            });
+
         // Make sure the DHCPv4 client is shutdown on interface disable/removal.
-        let ((), (), ()) = future::join3(
+        let ((), (), (), (deleted_routers, mut stack)) = future::join4(
             async {
                 if remove_interface {
                     netcfg
@@ -3177,9 +3253,15 @@ mod tests {
                 }
             },
             run_lookup_admin_once(&mut lookup_admin, &Vec::new()),
+            expect_delete_default_routers,
         )
         .await;
         assert_eq!(netcfg.dns_servers.consolidated(), []);
+        assert_eq!(deleted_routers, expected_routers);
+
+        // No more requests sent by NetCfg.
+        assert_matches!(lookup_admin.next().now_or_never(), None);
+        assert_matches!(stack.next().now_or_never(), None);
     }
 
     /// Waits for a `SetDnsServers` request with the specified servers.
@@ -3485,6 +3567,7 @@ mod tests {
         let (
             mut netcfg,
             ServerEnds {
+                stack: _,
                 lookup_admin: lookup_admin_request_stream,
                 dhcpv4_client_provider: _,
                 dhcpv6_client_provider: mut dhcpv6_client_provider_request_stream,
@@ -3879,6 +3962,7 @@ mod tests {
         let (
             mut netcfg,
             ServerEnds {
+                stack: _,
                 lookup_admin: _,
                 dhcpv4_client_provider: _,
                 dhcpv6_client_provider: mut dhcpv6_client_provider_request_stream,
