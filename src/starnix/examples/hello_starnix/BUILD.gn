@@ -25,13 +25,8 @@ executable("bin") {
   ]
 }
 
-fuchsia_component("hello_starnix") {
+fuchsia_package_with_single_component("hello_starnix") {
   component_name = "hello_starnix"
   manifest = "meta/hello_starnix.cml"
-
   deps = [ ":bin" ]
-}
-
-fuchsia_package("hello-starnix") {
-  deps = [ ":hello_starnix" ]
 }

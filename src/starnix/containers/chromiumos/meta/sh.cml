@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 {
     program: {
-        runner: "starnix_chromiumos",
+        runner: "starnix_container",
         binary: "/bin/sh",
-        args: [ "-i" ],
+        args: [
+            "--noediting",
+            "-i",
+        ],
         user: "root:x:0:0",
     },
 }

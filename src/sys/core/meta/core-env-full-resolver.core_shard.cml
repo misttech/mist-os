@@ -22,10 +22,6 @@
                     runner: "stardroid",
                     from: "#starnix_runner",
                 },
-                {
-                    runner: "starnix_chromiumos",
-                    from: "#starnix_runner",
-                },
             ],
             resolvers: [
                 {

@@ -13,11 +13,6 @@
             url: "fuchsia-pkg://fuchsia.com/stardroid#meta/stardroid.cm",
             environment: "#container-env",
         },
-        {
-            name: "chromiumos",
-            url: "fuchsia-pkg://fuchsia.com/starmium#meta/chromiumos_container.cm",
-            environment: "#container-env",
-        },
     ],
     collections: [
         {
@@ -53,12 +48,6 @@
             protocol: "fuchsia.starnix.container.Controller",
             from: "#stardroid",
             path: "/stardroid/fuchsia.starnix.container.Controller",
-            dependency: "weak",
-        },
-        {
-            protocol: "fuchsia.starnix.container.Controller",
-            from: "#chromiumos",
-            path: "/chromiumos/fuchsia.starnix.container.Controller",
             dependency: "weak",
         },
         {
@@ -117,11 +106,6 @@
         },
         {
             runner: "starnix",
-            from: "#chromiumos",
-            as: "starnix_chromiumos",
-        },
-        {
-            runner: "starnix",
             from: "self",
         },
         {
@@ -134,11 +118,6 @@
             name: "starnix-env",
             extends: "realm",
             runners: [
-                {
-                    runner: "starnix",
-                    from: "#chromiumos",
-                    as: "starnix_chromiumos",
-                },
                 {
                     runner: "starnix",
                     from: "#stardroid",

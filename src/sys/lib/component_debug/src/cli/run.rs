@@ -32,23 +32,17 @@ use {
 // transfers.
 const TRANSFER_CHUNK_SIZE: usize = 8192;
 
-fn spawn_copy<W: std::io::Write + Sync + Send + 'static>(source: fidl::Socket, mut sink: W) {
-    std::thread::spawn(move || {
-        let mut executor = fuchsia_async::LocalExecutor::new();
-        let result: Result<(), anyhow::Error> = executor.run_singlethreaded(async move {
-            let mut source = fuchsia_async::Socket::from_socket(source)?;
-            let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
-            loop {
-                let bytes_read = source.read(&mut buf).await?;
-                if bytes_read == 0 {
-                    std::process::exit(0);
-                }
-                sink.write_all(&buf[..bytes_read])?;
-                sink.flush()?;
-            }
-        });
-        result.expect("copy failed");
-    });
+async fn copy<W: std::io::Write>(source: fidl::Socket, mut sink: W) -> Result<()> {
+    let mut source = fuchsia_async::Socket::from_socket(source)?;
+    let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
+    loop {
+        let bytes_read = source.read(&mut buf).await?;
+        if bytes_read == 0 {
+            return Ok(());
+        }
+        sink.write_all(&buf[..bytes_read])?;
+        sink.flush()?;
+    }
 }
 
 // The normal Rust representation of this constant is in fuchsia-runtime, which
@@ -59,31 +53,62 @@ fn handle_id_for_fd(fd: u32) -> u32 {
     PA_FD | fd << 16
 }
 
-fn create_stdio_handles() -> Vec<fprocess::HandleInfo> {
-    let (local_in, remote_in) = fidl::Socket::create_stream();
-    let (local_out, remote_out) = fidl::Socket::create_stream();
-    let (local_err, remote_err) = fidl::Socket::create_stream();
+struct Stdio {
+    local_in: fidl::Socket,
+    local_out: fidl::Socket,
+    local_err: fidl::Socket,
+}
 
-    std::thread::spawn(move || {
-        let mut term_in = std::io::stdin().lock();
-        let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
-        loop {
-            let bytes_read = term_in.read(&mut buf)?;
-            if bytes_read == 0 {
-                return Ok::<(), anyhow::Error>(());
+impl Stdio {
+    fn new() -> (Self, Vec<fprocess::HandleInfo>) {
+        let (local_in, remote_in) = fidl::Socket::create_stream();
+        let (local_out, remote_out) = fidl::Socket::create_stream();
+        let (local_err, remote_err) = fidl::Socket::create_stream();
+
+        (
+            Self { local_in, local_out, local_err },
+            vec![
+                fprocess::HandleInfo { handle: remote_in.into_handle(), id: handle_id_for_fd(0) },
+                fprocess::HandleInfo { handle: remote_out.into_handle(), id: handle_id_for_fd(1) },
+                fprocess::HandleInfo { handle: remote_err.into_handle(), id: handle_id_for_fd(2) },
+            ],
+        )
+    }
+
+    async fn forward(self) {
+        let local_in = self.local_in;
+        let local_out = self.local_out;
+        let local_err = self.local_err;
+
+        std::thread::spawn(move || {
+            let mut term_in = std::io::stdin().lock();
+            let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
+            loop {
+                let bytes_read = term_in.read(&mut buf)?;
+                if bytes_read == 0 {
+                    return Ok::<(), anyhow::Error>(());
+                }
+                local_in.write(&buf[..bytes_read])?;
             }
-            local_in.write(&buf[..bytes_read])?;
-        }
-    });
+        });
 
-    spawn_copy(local_out, std::io::stdout());
-    spawn_copy(local_err, std::io::stderr());
+        std::thread::spawn(move || {
+            let mut executor = fuchsia_async::LocalExecutor::new();
+            let _result: Result<()> = executor
+                .run_singlethreaded(async move { copy(local_err, std::io::stderr()).await });
+        });
 
-    vec![
-        fprocess::HandleInfo { handle: remote_in.into_handle(), id: handle_id_for_fd(0) },
-        fprocess::HandleInfo { handle: remote_out.into_handle(), id: handle_id_for_fd(1) },
-        fprocess::HandleInfo { handle: remote_err.into_handle(), id: handle_id_for_fd(2) },
-    ]
+        std::thread::spawn(move || {
+            let mut executor = fuchsia_async::LocalExecutor::new();
+            let _result: Result<()> = executor
+                .run_singlethreaded(async move { copy(local_out, std::io::stdout().lock()).await });
+            std::process::exit(0);
+        });
+
+        // If we're following stdio, we just wait forever. When stdout or stderr is
+        // closed, the whole process will exit.
+        let () = futures::future::pending().await;
+    }
 }
 
 pub async fn run_cmd<W: std::io::Write>(
@@ -134,6 +159,20 @@ pub async fn run_cmd<W: std::io::Write>(
         }
     }
 
+    let (maybe_stdio, child_args) = if connect_stdio {
+        let (stdio, numbered_handles) = Stdio::new();
+
+        (
+            Some(stdio),
+            Some(fcomponent::CreateChildArgs {
+                numbered_handles: Some(numbered_handles),
+                ..fcomponent::CreateChildArgs::EMPTY
+            }),
+        )
+    } else {
+        (None, None)
+    };
+
     writeln!(writer, "URL: {}", url)?;
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Creating component instance...")?;
@@ -144,10 +183,7 @@ pub async fn run_cmd<W: std::io::Write>(
         collection,
         child_name,
         &url,
-        connect_stdio.then(|| fcomponent::CreateChildArgs {
-            numbered_handles: Some(create_stdio_handles()),
-            ..fcomponent::CreateChildArgs::EMPTY
-        }),
+        child_args,
     )
     .await;
 
@@ -172,10 +208,8 @@ pub async fn run_cmd<W: std::io::Write>(
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 
-    if connect_stdio {
-        // If we're following stdio, we just wait forever. When stdout or stderr is
-        // closed, the whole process will exit.
-        let () = futures::future::pending().await;
+    if let Some(stdio) = maybe_stdio {
+        stdio.forward().await;
     }
 
     writeln!(writer, "Ran component instance!")?;

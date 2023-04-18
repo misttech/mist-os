@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/proc/tests/chromiumos/meta/chromiumos_container.shard.cml",
         "//src/proc/tests/starnix_test.shard.cml",
+        "//src/starnix/containers/chromiumos/meta/chromiumos_container.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],

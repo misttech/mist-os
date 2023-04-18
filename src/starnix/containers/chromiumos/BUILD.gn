@@ -5,7 +5,7 @@
 import("//build/components.gni")
 
 group("chromiumos") {
-  deps = [ ":chromiumos_package" ]
+  deps = [ ":starmium" ]
 }
 
 if (target_cpu == "x64") {
@@ -15,12 +15,20 @@ if (target_cpu == "x64") {
   }
 }
 
-fuchsia_package_with_single_component("chromiumos_package") {
+fuchsia_component("chromiumos_container") {
   manifest = "meta/chromiumos_container.cml"
-  package_name = "starmium"
-  component_name = "chromiumos_container"
+}
 
-  deps = [ "//src/starnix/containers:default_init" ]
+fuchsia_component("sh") {
+  manifest = "meta/sh.cml"
+}
+
+fuchsia_package("starmium") {
+  deps = [
+    ":chromiumos_container",
+    ":sh",
+    "//src/starnix/containers:default_init",
+  ]
 
   if (target_cpu == "x64") {
     deps += [
