@@ -106,22 +106,26 @@ class Dispatcher : public async_dispatcher_t,
     zx_packet_interrupt_t interrupt_packet_ = {};
   };
 
-  class ThreadPool : public fbl::DoublyLinkedListable<std::unique_ptr<ThreadPool>> {
+  class ThreadPool : public fbl::WAVLTreeContainable<std::unique_ptr<ThreadPool>> {
    public:
     // The default pool is for the dispatchers with no specified scheduler role.
     static constexpr std::string_view kNoSchedulerRole = "";
 
     explicit ThreadPool(std::string_view scheduler_role = kNoSchedulerRole)
-        : scheduler_role_(scheduler_role), config_(MakeConfig()), loop_(&config_) {
-      if (scheduler_role_ == kNoSchedulerRole) {
-        applied_scheduler_role_ = true;
-      }
-    }
+        : scheduler_role_(scheduler_role),
+          config_(MakeConfig(this, scheduler_role)),
+          loop_(&config_) {}
 
-    // Starts another thread on |loop_|.
+    // Required to instantiate fbl::DefaultKeyedObjectTraits.
+    std::string GetKey() const { return scheduler_role_; }
+
+    // Increments the number of required threads, and starts a new thread if
+    // there are not enough threads running.
     zx_status_t AddThread();
+
+    void OnDispatcherAdded();
     // Updates the number of threads needed in the thread pool.
-    void OnDispatcherRemoved();
+    void OnDispatcherRemoved(Dispatcher& dispatcher);
     // Requests the profile provider set the role profile.
     zx_status_t SetRoleProfile();
 
@@ -147,11 +151,12 @@ class Dispatcher : public async_dispatcher_t,
       return num_threads_;
     }
 
-    std::string_view scheduler_role() { return scheduler_role_; }
-    bool applied_scheduler_role() {
+    uint32_t num_dispatchers() {
       fbl::AutoLock al(&lock_);
-      return applied_scheduler_role_;
+      return num_dispatchers_;
     }
+
+    std::string_view scheduler_role() { return scheduler_role_; }
     async::Loop* loop() { return &loop_; }
 
    private:
@@ -201,11 +206,23 @@ class Dispatcher : public async_dispatcher_t,
       std::atomic<uint32_t> cur_generation_id_ = 0;
     };
 
-    static constexpr async_loop_config_t MakeConfig() {
+    static constexpr async_loop_config_t MakeConfig(ThreadPool* self,
+                                                    std::string_view scheduler_role) {
       async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
       config.irq_support = true;
+      if (scheduler_role != kNoSchedulerRole) {
+        config.data = self;
+        // Add a thread wakeup handler.
+        config.prologue = [](async_loop_t* loop, void* data) {
+          ThreadPool* thread_pool = static_cast<ThreadPool*>(data);
+          thread_pool->ThreadWakeupPrologue();
+        };
+      }
       return config;
     }
+
+    // Function that runs for every thread wakeup before any handler is called.
+    void ThreadWakeupPrologue();
 
     std::string scheduler_role_;
 
@@ -215,8 +232,7 @@ class Dispatcher : public async_dispatcher_t,
     uint32_t dispatcher_threads_needed_ __TA_GUARDED(&lock_) = 0;
     // Tracks the number of threads we've spawned via |loop_|.
     uint32_t num_threads_ __TA_GUARDED(&lock_) = 0;
-    // Whether the scheduler role has been successfully applied.
-    bool applied_scheduler_role_ __TA_GUARDED(&lock_) = false;
+    uint32_t num_dispatchers_ __TA_GUARDED(&lock_) = 0;
 
     // Stores unbound irqs which will be garbage collected at a later time.
     CachedIrqs cached_irqs_;
@@ -747,20 +763,15 @@ class DispatcherCoordinator {
   // deadlock.
   void Reset();
 
-  // Creates a thread pool for |scheduler_role| and starts the initial thread.
-  zx::result<Dispatcher::ThreadPool*> CreateThreadPool(std::string_view scheduler_role);
+  // Returns the thread pool for |scheduler_role|.
+  // If the thread pool does not exists, creates the thread pool and starts the initial thread.
+  zx::result<Dispatcher::ThreadPool*> GetOrCreateThreadPool(std::string_view scheduler_role);
   // This will schedule the thread pool to be deleted on a thread on the default thread pool.
-  void RemoveThreadPool(Dispatcher::ThreadPool* thread_pool);
+  void DestroyThreadPool(Dispatcher::ThreadPool* thread_pool) __TA_REQUIRES(&lock_);
 
   Dispatcher::ThreadPool* default_thread_pool() { return &default_thread_pool_; }
 
  private:
-  static constexpr async_loop_config_t MakeConfig() {
-    async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
-    config.irq_support = true;
-    return config;
-  }
-
   // Tracks the dispatchers owned by a driver.
   class DriverState : public fbl::WAVLTreeContainable<std::unique_ptr<DriverState>> {
    public:
@@ -856,7 +867,7 @@ class DispatcherCoordinator {
   fbl::ConditionVariable drivers_destroyed_event_ __TA_GUARDED(&lock_);
 
   // Thread pools which have scheduler roles.
-  fbl::DoublyLinkedList<std::unique_ptr<Dispatcher::ThreadPool>> role_thread_pools_
+  fbl::WAVLTree<std::string, std::unique_ptr<Dispatcher::ThreadPool>> role_to_thread_pool_
       __TA_GUARDED(&lock_);
   // Thread pool which has no scheduler role applied.
   // This must come after |role_thread_pools_|, so that we shutdown the loop first,

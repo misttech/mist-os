@@ -7,6 +7,8 @@
 
 #include <zircon/types.h>
 
+#include <optional>
+
 namespace driver_runtime {
 class Dispatcher;
 }  // namespace driver_runtime
@@ -44,6 +46,13 @@ uint32_t GetIrqGenerationId();
 
 // Sets the latest generation id seen by the current thread.
 void SetIrqGenerationId(uint32_t id);
+
+// Returns the result of setting the role profile for the current thread.
+// May be std::nullopt if no attempt has been made to set the role profile.
+std::optional<zx_status_t> GetRoleProfileStatus();
+
+// Sets the result of setting the role profile for the current thread.
+void SetRoleProfileStatus(zx_status_t status);
 
 }  // namespace driver_context
 

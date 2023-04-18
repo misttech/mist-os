@@ -22,6 +22,9 @@ static thread_local std::vector<Entry> g_driver_call_stack;
 static thread_local Entry g_default_testing_state = {nullptr, nullptr};
 // The latest generation seen by this thread.
 static thread_local uint32_t g_cached_irqs_generation = 0;
+// The result of setting the role profile for the current thread.
+// May be std::nullopt if no attempt has been made to set the role profile.
+static thread_local std::optional<zx_status_t> g_role_profile_status;
 
 }  // namespace
 
@@ -70,5 +73,9 @@ bool IsCallStackEmpty() { return g_driver_call_stack.empty(); }
 uint32_t GetIrqGenerationId() { return g_cached_irqs_generation; }
 
 void SetIrqGenerationId(uint32_t id) { g_cached_irqs_generation = id; }
+
+std::optional<zx_status_t> GetRoleProfileStatus() { return g_role_profile_status; }
+
+void SetRoleProfileStatus(zx_status_t status) { g_role_profile_status = status; }
 
 }  // namespace driver_context

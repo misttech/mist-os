@@ -322,10 +322,7 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // If there is a scheduler role specified, we would have already started a thread
-  // when creating the thraed pool, and currently we are creating a thread pool per
-  // scheduler role.
-  if (allow_sync_calls && (scheduler_role == Dispatcher::ThreadPool::kNoSchedulerRole)) {
+  if (allow_sync_calls) {
     zx_status_t status = adder();
     if (status != ZX_OK) {
       return status;
@@ -356,18 +353,22 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
     return status;
   }
   if (scheduler_role != ThreadPool::kNoSchedulerRole) {
-    // We need to set the scheduler role on the thread pool's thread.
-    status = async::PostTask(thread_pool->loop()->dispatcher(), [dispatcher]() mutable {
-      zx_status_t status = dispatcher->thread_pool_->SetRoleProfile();
+    if (thread_pool->num_dispatchers() == 0) {
+      // Each thread in the thread pool will check whether it needs to set the scheduler
+      // role when it wakes up. If this is the first dispatcher, we might as well
+      // post a task so we can get the scheduler role set ASAP. Otherwise, if there
+      // are multiple dispatchers and threads, it becomes less likely that we would
+      // happen to post the task to a thread that doesn't already have the scheduler role set,
+      // so we'll leave any unset thread to set it's role on next wakeup.
+      status = async::PostTask(thread_pool->loop()->dispatcher(), [dispatcher]() mutable {
+        // This task is intentionally empty, the actual work takes place in the async loop's
+        // prologue function. See |Dispatcher::ThreadPool::ThreadWakeupPrologue|.
+      });
       if (status != ZX_OK) {
-        // Failing to set the role profile is not a fatal error.
-        LOGF(ERROR, "Failed to set scheduler role: %d\n", status);
+        // Posting a task would only fail if global loop (and probably process) was shutting down.
+        LOGF(ERROR, "Failed to post task to set scheduler role");
+        return status;
       }
-    });
-    if (status != ZX_OK) {
-      // Posting a task would only fail if global loop (and probably process) was shutting down.
-      LOGF(ERROR, "Failed to post task to set scheduler role");
-      return status;
     }
   }
 
@@ -406,7 +407,7 @@ zx_status_t Dispatcher::Create(uint32_t options, std::string_view name,
                                Dispatcher** out_dispatcher) {
   auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
   if (scheduler_role != ThreadPool::kNoSchedulerRole) {
-    auto result = GetDispatcherCoordinator().CreateThreadPool(scheduler_role);
+    auto result = GetDispatcherCoordinator().GetOrCreateThreadPool(scheduler_role);
     if (result.is_error()) {
       return result.status_value();
     }
@@ -1498,6 +1499,7 @@ zx_status_t DispatcherCoordinator::AddDispatcher(fbl::RefPtr<Dispatcher> dispatc
     }
   }
   driver_state->AddDispatcher(dispatcher);
+  dispatcher->thread_pool()->OnDispatcherAdded();
   return ZX_OK;
 }
 
@@ -1568,20 +1570,17 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   auto driver_state = drivers_.find(dispatcher.owner());
   ZX_ASSERT(driver_state != drivers_.end());
 
-  // We need to check the process shared dispatcher matches as tests inject their own.
   auto thread_pool = dispatcher.thread_pool();
-  if (dispatcher.allow_sync_calls() &&
-      dispatcher.process_shared_dispatcher() == thread_pool->loop()->dispatcher()) {
-    thread_pool->OnDispatcherRemoved();
+  thread_pool->OnDispatcherRemoved(dispatcher);
+  if (thread_pool->num_dispatchers() == 0) {
+    DestroyThreadPool(thread_pool);
   }
+
   driver_state->RemoveDispatcher(dispatcher);
   // If the driver has completely shutdown, and all dispatchers have been destroyed,
   // the driver state can also be destroyed.
   if (!driver_state->HasDispatchers() && !driver_state->IsShuttingDown()) {
     drivers_.erase(driver_state);
-  }
-  if (thread_pool != default_thread_pool()) {
-    GetDispatcherCoordinator().RemoveThreadPool(thread_pool);
   }
 
   if (drivers_.size() == 0) {
@@ -1614,33 +1613,52 @@ void DispatcherCoordinator::Reset() {
   default_thread_pool()->Reset();
 }
 
-zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::CreateThreadPool(
+zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::GetOrCreateThreadPool(
     std::string_view scheduler_role) {
+  fbl::AutoLock al(&lock_);
+  auto iter = role_to_thread_pool_.find(std::string(scheduler_role));
+  if (iter != role_to_thread_pool_.end()) {
+    return zx::ok(&(*iter));
+  }
   auto thread_pool = std::make_unique<Dispatcher::ThreadPool>(scheduler_role);
   zx_status_t status = thread_pool->AddThread();
   if (status != ZX_OK) {
     return zx::error(status);
   }
   auto* thread_pool_ptr = thread_pool.get();
-  {
-    fbl::AutoLock al(&lock_);
-    role_thread_pools_.push_back(std::move(thread_pool));
-  }
+  role_to_thread_pool_.insert(std::move(thread_pool));
   return zx::ok(thread_pool_ptr);
 }
 
-void DispatcherCoordinator::RemoveThreadPool(Dispatcher::ThreadPool* thread_pool) {
-  async::PostTask(default_thread_pool()->loop()->dispatcher(), [thread_pool]() {
-    auto& coordinator = GetDispatcherCoordinator();
-    // We need to declare this outside the lock.
-    std::unique_ptr<Dispatcher::ThreadPool> owned_thread_pool;
-    {
-      fbl::AutoLock al(&coordinator.lock_);
-      owned_thread_pool = coordinator.role_thread_pools_.erase(*thread_pool);
-      ZX_ASSERT(owned_thread_pool != nullptr);
-    }
-    // This will destruct the thread pool and join with its threads.
-  });
+void DispatcherCoordinator::DestroyThreadPool(Dispatcher::ThreadPool* thread_pool) {
+  if (thread_pool == default_thread_pool()) {
+    return;
+  }
+
+  // We should immediately remove the thread pool from the coordinator
+  // map, so that a new driver doesn't try to use a destructing thread pool.
+  std::unique_ptr<Dispatcher::ThreadPool> owned_thread_pool =
+      role_to_thread_pool_.erase(*thread_pool);
+  ZX_ASSERT(owned_thread_pool != nullptr);
+
+  // Ensure we are running on a default thread pool thread.
+  async::PostTask(default_thread_pool()->loop()->dispatcher(),
+                  [thread_pool = std::move(owned_thread_pool)]() {
+                    // This will destruct the thread pool and join with its threads.
+                  });
+}
+
+void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
+  if (driver_context::GetRoleProfileStatus().has_value()) {
+    // We have already attempted to set the role profile for the current thread.
+    return;
+  }
+  zx_status_t status = SetRoleProfile();
+  if (status != ZX_OK) {
+    // Failing to set the role profile is not a fatal error.
+    LOGF(ERROR, "Failed to set scheduler role: %d\n", status);
+  }
+  driver_context::SetRoleProfileStatus(status);
 }
 
 zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
@@ -1667,8 +1685,6 @@ zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
   if (result.value().status != ZX_OK) {
     return result.value().status;
   }
-  fbl::AutoLock lock(&lock_);
-  applied_scheduler_role_ = true;
   return ZX_OK;
 #endif  // #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
   return ZX_ERR_NOT_SUPPORTED;
@@ -1677,6 +1693,15 @@ zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
 zx_status_t Dispatcher::ThreadPool::AddThread() {
   fbl::AutoLock lock(&lock_);
   dispatcher_threads_needed_++;
+
+  // This avoids starting an additional thread when there is only 1 dispatcher and
+  // we have already started an initial thread for the thread pool.
+  // Note this check is before we have incremented |num_dispatchers_| for the current dispatcher.
+  // TODO(fxbug.dev/125695): we should be able to remove the scheduler role check.
+  if ((scheduler_role_ != kNoSchedulerRole) && (num_threads_ > num_dispatchers_)) [[likely]] {
+    return ZX_OK;
+  }
+
   // TODO(surajmalhotra): We are clamping number_threads_ to 10 to avoid spawning too many threads.
   // Technically this can result in a deadlock scenario in a very complex driver host. We need
   // better support for dynamically starting threads as necessary.
@@ -1695,10 +1720,23 @@ zx_status_t Dispatcher::ThreadPool::AddThread() {
   return status;
 }
 
-void Dispatcher::ThreadPool::OnDispatcherRemoved() {
+void Dispatcher::ThreadPool::OnDispatcherAdded() {
   fbl::AutoLock lock(&lock_);
-  ZX_ASSERT(dispatcher_threads_needed_ > 0);
-  dispatcher_threads_needed_--;
+  num_dispatchers_++;
+}
+
+void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher) {
+  fbl::AutoLock lock(&lock_);
+
+  // We need to check the process shared dispatcher matches as tests inject their own.
+  if (dispatcher.allow_sync_calls() &&
+      dispatcher.process_shared_dispatcher() == loop()->dispatcher()) {
+    ZX_ASSERT(dispatcher_threads_needed_ > 0);
+    dispatcher_threads_needed_--;
+  }
+
+  ZX_ASSERT(num_dispatchers_ > 0);
+  num_dispatchers_--;
 }
 
 void Dispatcher::ThreadPool::Reset() {
@@ -1717,6 +1755,7 @@ void Dispatcher::ThreadPool::Reset() {
     fbl::AutoLock al(&lock_);
     num_threads_ = 0;
     dispatcher_threads_needed_ = 0;
+    num_dispatchers_ = 0;
   }
 }
 
