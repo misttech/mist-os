@@ -407,15 +407,17 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
     DEBUG_ASSERT(arch_ints_disabled());
     const TlbInvalidatePage_context* context = static_cast<TlbInvalidatePage_context*>(raw_context);
 
+    const paddr_t current_root_ptable = arch::X86Cr3::Read().base();
+
     kcounter_add(tlb_invalidations_received, 1);
 
     /* This invalidation doesn't apply to this CPU if:
      * - PCID feature is not being used
      * - It doesn't contain any global pages (ie, isn't the kernel)
-     * - The target aspace is different (different target cr3)
+     * - The target aspace is different (different root page table in cr3)
      */
     if (!g_x86_feature_pcid_enabled && !context->pending->contains_global &&
-        context->target_root_ptable != arch::X86Cr3::Read().base()) {
+        context->target_root_ptable != current_root_ptable) {
       tlb_invalidations_received_invalid.Add(1);
       return;
     }
@@ -448,12 +450,11 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
           /* Terminal entry is being asked to be flushed. If it's a global page
            * or not belonging to a special pcid, use the invlpg instruction.
            */
-          if (item.is_global() || context->pcid == MMU_X86_UNUSED_PCID) {
+          if (context->target_root_ptable == current_root_ptable || item.is_global() ||
+              context->pcid == MMU_X86_UNUSED_PCID) {
             invlpg(item.addr());
           } else {
             /* This is a user page with a tagged PCID.
-             * TODO: benchmark if it's worth adding a conditional here to use invlpg
-             * if its the active aspace on this cpu.
              */
             invpcid_va_pcid(item.addr(), context->pcid);
           }
