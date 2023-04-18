@@ -1599,7 +1599,8 @@ zx_status_t VmObjectPaged::ReadUser(VmAspace* current_aspace, user_out_ptr<char>
   auto read_routine = [ptr, current_aspace, out_actual](
                           const char* src, size_t offset, size_t len,
                           Guard<CriticalMutex>* guard) -> zx_status_t {
-    auto copy_result = ptr.byte_offset(offset).copy_array_to_user_capture_faults(src, len);
+    __UNINITIALIZED auto copy_result =
+        ptr.byte_offset(offset).copy_array_to_user_capture_faults(src, len);
 
     // If a fault has actually occurred, then we will have captured fault info that we can use to
     // handle the fault.
@@ -1648,7 +1649,8 @@ zx_status_t VmObjectPaged::WriteUser(VmAspace* current_aspace, user_in_ptr<const
   auto write_routine = [ptr, current_aspace, base_vmo_offset = offset, out_actual,
                         &on_bytes_transferred](char* dst, size_t offset, size_t len,
                                                Guard<CriticalMutex>* guard) -> zx_status_t {
-    auto copy_result = ptr.byte_offset(offset).copy_array_from_user_capture_faults(dst, len);
+    __UNINITIALIZED auto copy_result =
+        ptr.byte_offset(offset).copy_array_from_user_capture_faults(dst, len);
 
     // If a fault has actually occurred, then we will have captured fault info that we can use to
     // handle the fault.
