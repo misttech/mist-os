@@ -136,8 +136,25 @@ fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetCons
   return buffer_collection;
 }
 
+namespace {
+
+zx_vm_option_t HostPointerAccessModeToVmoOptions(HostPointerAccessMode host_pointer_access_mode) {
+  switch (host_pointer_access_mode) {
+    case HostPointerAccessMode::kReadOnly:
+      return ZX_VM_PERM_READ;
+    case HostPointerAccessMode::kWriteOnly:
+    case HostPointerAccessMode::kReadWrite:
+      return ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
+    default:
+      ZX_ASSERT_MSG(false, "Invalid HostPointerAccessMode %u", host_pointer_access_mode);
+  }
+}
+
+}  // namespace
+
 void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
-                    uint32_t vmo_idx, std::function<void(uint8_t*, uint32_t)> callback) {
+                    uint32_t vmo_idx, HostPointerAccessMode host_pointer_access_mode,
+                    std::function<void(uint8_t*, uint32_t)> callback) {
   // If the vmo idx is out of bounds pass in a nullptr and 0 bytes back to the caller.
   if (vmo_idx >= collection_info.buffer_count) {
     callback(nullptr, 0);
@@ -149,11 +166,26 @@ void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_in
   FX_DCHECK(vmo_bytes > 0);
 
   uint8_t* vmo_host = nullptr;
-  auto status = zx::vmar::root_self()->map(ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, /*vmar_offset*/ 0,
-                                           vmo, /*vmo_offset*/ 0, vmo_bytes,
-                                           reinterpret_cast<uintptr_t*>(&vmo_host));
+  const uint32_t vmo_options = HostPointerAccessModeToVmoOptions(host_pointer_access_mode);
+  auto status = zx::vmar::root_self()->map(vmo_options, /*vmar_offset*/ 0, vmo, /*vmo_offset*/ 0,
+                                           vmo_bytes, reinterpret_cast<uintptr_t*>(&vmo_host));
   FX_DCHECK(status == ZX_OK);
+
+  if (host_pointer_access_mode == HostPointerAccessMode::kReadOnly ||
+      host_pointer_access_mode == HostPointerAccessMode::kReadWrite) {
+    // Flush the cache before reading back from the host VMO.
+    status = zx_cache_flush(vmo_host, vmo_bytes, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+    FX_DCHECK(status == ZX_OK);
+  }
+
   callback(vmo_host, vmo_bytes);
+
+  if (host_pointer_access_mode == HostPointerAccessMode::kWriteOnly ||
+      host_pointer_access_mode == HostPointerAccessMode::kReadWrite) {
+    // Flush the cache after writing to the host VMO.
+    status = zx_cache_flush(vmo_host, vmo_bytes, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+    FX_DCHECK(status == ZX_OK);
+  }
 
   // Unmap the pointer.
   uintptr_t address = reinterpret_cast<uintptr_t>(vmo_host);

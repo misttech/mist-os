@@ -246,7 +246,7 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
                                                  response_vmo, 0, response_vmo_size,
                                                  reinterpret_cast<uintptr_t*>(&response_vmo_base)));
     flatland::MapHostPointer(
-        buffer_collection_info_, kBufferIndex,
+        buffer_collection_info_, kBufferIndex, flatland::HostPointerAccessMode::kReadOnly,
         [&response_vmo_base, bytes_per_row, display_size = display_size_, valid_bytes_per_row,
          response_vmo_size](uint8_t* vmo_host, uint32_t num_bytes) {
           for (size_t i = 0; i < display_size.height; ++i) {

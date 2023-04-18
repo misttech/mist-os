@@ -60,13 +60,19 @@ fuchsia::sysmem::BufferCollectionSyncPtr CreateBufferCollectionSyncPtrAndSetCons
     std::optional<fuchsia::sysmem::BufferMemoryConstraints> memory_constraints = std::nullopt,
     std::optional<uint64_t> pixel_format_modifier = std::nullopt);
 
+enum class HostPointerAccessMode : uint32_t {
+  kReadOnly = 0b01,
+  kWriteOnly = 0b10,
+  kReadWrite = 0b11,
+};
+
 // Maps a sysmem vmo's bytes into host memory that can be accessed via a callback function. The
 // callback provides the caller with a raw pointer to the vmo memory as well as an int for the
 // number of bytes. If an out of bounds vmo_idx is provided, the callback function will call the
 // user callback with mapped_ptr equal to nullptr. Once the callback function returns, the host
 // pointer is unmapped and so cannot continue to be used outside of the scope of the callback.
 void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_info,
-                    uint32_t vmo_idx,
+                    uint32_t vmo_idx, HostPointerAccessMode host_pointer_access_mode,
                     std::function<void(uint8_t* mapped_ptr, uint32_t num_bytes)> callback);
 
 }  // namespace flatland

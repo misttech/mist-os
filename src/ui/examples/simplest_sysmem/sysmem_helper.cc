@@ -57,11 +57,20 @@ void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_in
   FX_DCHECK(vmo_bytes > 0);
 
   uint8_t* vmo_host = nullptr;
-  auto status = zx::vmar::root_self()->map(ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, /*vmar_offset*/ 0,
-                                           vmo, /*vmo_offset*/ 0, vmo_bytes,
-                                           reinterpret_cast<uintptr_t*>(&vmo_host));
+  zx_status_t status = zx::vmar::root_self()->map(
+      ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, /*vmar_offset*/ 0, vmo, /*vmo_offset*/ 0, vmo_bytes,
+      reinterpret_cast<uintptr_t*>(&vmo_host));
   FX_DCHECK(status == ZX_OK);
+
+  // Flush the cache before reading back from host VMO.
+  status = zx_cache_flush(vmo_host, vmo_bytes, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+  FX_DCHECK(status == ZX_OK);
+
   callback(vmo_host, vmo_bytes);
+
+  // Flush the cache after writing to host VMO.
+  status = zx_cache_flush(vmo_host, vmo_bytes, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+  FX_DCHECK(status == ZX_OK);
 
   // Unmap the pointer.
   uintptr_t address = reinterpret_cast<uintptr_t>(vmo_host);

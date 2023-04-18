@@ -69,7 +69,7 @@ static constexpr float kDegreesToRadians = glm::pi<float>() / 180.f;
 
 const size_t kBytesPerRGBAPixel = 4;
 
-glm::ivec4 GetPixel(uint8_t* vmo_host, uint32_t width, uint32_t x, uint32_t y) {
+glm::ivec4 GetPixel(const uint8_t* vmo_host, uint32_t width, uint32_t x, uint32_t y) {
   uint32_t r = vmo_host[y * width * 4 + x * 4];
   uint32_t g = vmo_host[y * width * 4 + x * 4 + 1];
   uint32_t b = vmo_host[y * width * 4 + x * 4 + 2];
@@ -800,7 +800,7 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
 
   // Have the client write pixel values to the renderable's texture.
   MapHostPointer(
-      client_collection_info, renderable_texture.vmo_index,
+      client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
         const uint32_t pixels_per_row =
             GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kTextureWidth);
@@ -815,11 +815,6 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
                    x < kTextureWidth / 2 ? kWriteRed : kWriteGreen, kBytesPerRGBAPixel);
           }
         }
-
-        // Flush the cache after writing to host VMO.
-        EXPECT_EQ(ZX_OK,
-                  zx_cache_flush(vmo_host, pixels_per_row * kTextureHeight * kBytesPerRGBAPixel,
-                                 ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
       });
 
   // Render the renderable to the render target.
@@ -829,26 +824,22 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   // Make sure the pixels are in the right order.
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), glm::ivec4(255, 0, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), glm::ivec4(255, 0, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), glm::ivec4(0, 255, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), glm::ivec4(0, 255, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), glm::ivec4(255, 0, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), glm::ivec4(255, 0, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), glm::ivec4(0, 255, 0, 255));
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), glm::ivec4(0, 255, 0, 255));
 
-        // Make sure the pixels are in the right order.
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), glm::ivec4(255, 0, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), glm::ivec4(255, 0, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), glm::ivec4(0, 255, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), glm::ivec4(0, 255, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), glm::ivec4(255, 0, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), glm::ivec4(255, 0, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), glm::ivec4(0, 255, 0, 255));
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), glm::ivec4(0, 255, 0, 255));
-
-        // Make sure the remaining pixels are black.
-        CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight, kTextureWidth * kTextureHeight);
-      });
+                   // Make sure the remaining pixels are black.
+                   CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight,
+                                      kTextureWidth * kTextureHeight);
+                 });
 
   // Now let's update the uvs of the renderable so only the green portion of the image maps onto
   // the rect. Take the rightmost column of the image, which is green, to eliminate any linear
@@ -867,12 +858,8 @@ VK_TEST_F(VulkanRendererTest, RenderTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         // All of the renderable's pixels should be green.
         for (uint32_t i = 6; i < 6 + kTextureWidth; i++) {
           for (uint32_t j = 3; j < 3 + kTextureHeight; j++) {
@@ -945,25 +932,25 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
       Orientation::CCW_0_DEGREES);
 
   // Have the client write pixel values to the renderable's texture.
-  MapHostPointer(client_collection_info, renderable_texture.vmo_index,
-                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   const uint32_t pixels_per_row =
-                       GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kWidth);
+  MapHostPointer(
+      client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
+      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+        const uint32_t pixels_per_row =
+            GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kWidth);
 
-                   const uint8_t kWriteRed[] = {/*red*/ 255U, 0, 0, 255U};
-                   const uint8_t kWriteGreen[] = {/*green*/ 0, 255U, 0, 255U};
-                   for (size_t y = 0; y < kHeight; ++y) {
-                     for (size_t x = 0; x < kWidth; ++x) {
-                       memcpy(&vmo_host[(y * pixels_per_row + x) * kBytesPerRGBAPixel],
-                              x < kWidth / 2 ? kWriteRed : kWriteGreen, kBytesPerRGBAPixel);
-                     }
-                   }
+        const uint8_t kWriteRed[] = {/*red*/ 255U, 0, 0, 255U};
+        const uint8_t kWriteGreen[] = {/*green*/ 0, 255U, 0, 255U};
+        for (size_t y = 0; y < kHeight; ++y) {
+          for (size_t x = 0; x < kWidth; ++x) {
+            memcpy(&vmo_host[(y * pixels_per_row + x) * kBytesPerRGBAPixel],
+                   x < kWidth / 2 ? kWriteRed : kWriteGreen, kBytesPerRGBAPixel);
+          }
+        }
 
-                   // Flush the cache after writing to host VMO.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, pixels_per_row * kHeight * kBytesPerRGBAPixel,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-                 });
+        // Flush the cache after writing to host VMO.
+        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, pixels_per_row * kHeight * kBytesPerRGBAPixel,
+                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+      });
 
   // Render the renderable to the render target.
   renderer->Render(render_target, {renderable}, {renderable_texture});
@@ -972,7 +959,7 @@ VK_TEST_F(VulkanRendererTest, FullScreenRenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(client_target_info, render_target.vmo_index,
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
                  [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    const uint32_t pixels_per_row =
                        GetPixelsPerRow(client_target_info.settings, kBytesPerRGBAPixel, kWidth);
@@ -1112,7 +1099,7 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
 
   // Have the client write pixel values to the renderable's texture.
   MapHostPointer(
-      client_collection_info, renderable_texture.vmo_index,
+      client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
         const uint32_t pixels_per_row =
             GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kTextureWidth);
@@ -1127,11 +1114,6 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
                    x < kTextureWidth / 2 ? kWriteRed : kWriteGreen, kBytesPerRGBAPixel);
           }
         }
-
-        // Flush the cache after writing to host VMO.
-        EXPECT_EQ(ZX_OK,
-                  zx_cache_flush(vmo_host, pixels_per_row * kTextureHeight * kBytesPerRGBAPixel,
-                                 ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
       });
 
   // Render the renderable to the render target.
@@ -1141,36 +1123,32 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   // Make sure the pixels are in the right order.
+                   const auto red = glm::ivec4(255, 0, 0, 255);
+                   const auto green = glm::ivec4(0, 255, 0, 255);
 
-        // Make sure the pixels are in the right order.
-        const auto red = glm::ivec4(255, 0, 0, 255);
-        const auto green = glm::ivec4(0, 255, 0, 255);
+                   // Reds (left)
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 4), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), red);
 
-        // Reds (left)
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 4), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), red);
+                   // Greens (right)
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 4), green);
 
-        // Greens (right)
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 4), green);
-
-        // Make sure the remaining pixels are black.
-        CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight, kTextureWidth * kTextureHeight);
-      });
+                   // Make sure the remaining pixels are black.
+                   CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight,
+                                      kTextureWidth * kTextureHeight);
+                 });
 
   // Now let's update the renderable so it is rotated 90 deg.
   auto renderables_90deg = screen_capture::ScreenCapture::RotateRenderables(
@@ -1184,12 +1162,8 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target_flipped.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidthFlipped * kTargetHeightFlipped * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target_flipped.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         // Make sure the pixels are in the right order.
         const auto red = glm::ivec4(255, 0, 0, 255);
         const auto green = glm::ivec4(0, 255, 0, 255);
@@ -1225,36 +1199,32 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   // Make sure the pixels are in the right order.
+                   const auto red = glm::ivec4(255, 0, 0, 255);
+                   const auto green = glm::ivec4(0, 255, 0, 255);
 
-        // Make sure the pixels are in the right order.
-        const auto red = glm::ivec4(255, 0, 0, 255);
-        const auto green = glm::ivec4(0, 255, 0, 255);
+                   // Greens (left)
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 4), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), green);
 
-        // Greens (left)
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 4), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), green);
+                   // Reds (right)
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 4), red);
 
-        // Reds (right)
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 4), red);
-
-        // Make sure the remaining pixels are black.
-        CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight, kTextureWidth * kTextureHeight);
-      });
+                   // Make sure the remaining pixels are black.
+                   CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight,
+                                      kTextureWidth * kTextureHeight);
+                 });
 
   // Now let's update the renderable so it is rotated 270 deg.
   auto renderables_270deg = screen_capture::ScreenCapture::RotateRenderables(
@@ -1268,12 +1238,8 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target_flipped.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidthFlipped * kTargetHeightFlipped * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target_flipped.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         // Make sure the pixels are in the right order.
         const auto red = glm::ivec4(255, 0, 0, 255);
         const auto green = glm::ivec4(0, 255, 0, 255);
@@ -1396,7 +1362,7 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
 
   // Have the client write pixel values to the renderable's texture.
   MapHostPointer(
-      client_collection_info, renderable_texture.vmo_index,
+      client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
         const uint32_t pixels_per_row =
             GetPixelsPerRow(client_collection_info.settings, kBytesPerRGBAPixel, kTextureWidth);
@@ -1411,11 +1377,6 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
                    x < kTextureWidth / 2 ? kWriteRed : kWriteGreen, kBytesPerRGBAPixel);
           }
         }
-
-        // Flush the cache after writing to host VMO.
-        EXPECT_EQ(ZX_OK,
-                  zx_cache_flush(vmo_host, pixels_per_row * kTextureHeight * kBytesPerRGBAPixel,
-                                 ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
       });
 
   // Render the renderable to the render target.
@@ -1425,36 +1386,32 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   // Make sure the pixels are in the right order.
+                   const auto red = glm::ivec4(255, 0, 0, 255);
+                   const auto green = glm::ivec4(0, 255, 0, 255);
 
-        // Make sure the pixels are in the right order.
-        const auto red = glm::ivec4(255, 0, 0, 255);
-        const auto green = glm::ivec4(0, 255, 0, 255);
+                   // Greens (left)
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 4), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), green);
 
-        // Greens (left)
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 5, 4), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 6, 4), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 3), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 7, 4), green);
+                   // Reds (right)
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 3), red);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 4), red);
 
-        // Reds (right)
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 8, 4), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 9, 4), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 3), red);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, 10, 4), red);
-
-        // Make sure the remaining pixels are black.
-        CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight, kTextureWidth * kTextureHeight);
-      });
+                   // Make sure the remaining pixels are black.
+                   CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight,
+                                      kTextureWidth * kTextureHeight);
+                 });
 
   // Now let's update the renderable so it is rotated 90 deg.
   auto renderables_90deg = screen_capture::ScreenCapture::RotateRenderables(
@@ -1468,12 +1425,8 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target_flipped.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidthFlipped * kTargetHeightFlipped * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target_flipped.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         // Make sure the pixels are in the right order.
         const auto red = glm::ivec4(255, 0, 0, 255);
         const auto green = glm::ivec4(0, 255, 0, 255);
@@ -1586,7 +1539,7 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
 
   // Have the client write pixel values to the renderable's texture.
   MapHostPointer(
-      client_collection_info, renderable_texture.vmo_index,
+      client_collection_info, renderable_texture.vmo_index, HostPointerAccessMode::kWriteOnly,
       [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
         uint32_t pixels_per_row = GetPixelsPerRow(client_collection_info.settings, 4U, 1U);
 
@@ -1597,10 +1550,6 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
 
         memcpy(vmo_host, kWriteRed, sizeof(kWriteRed));
         memcpy(&vmo_host[pixels_per_row * 4], kWriteGreen, sizeof(kWriteGreen));
-
-        // Flush the cache after writing to host VMO.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kNumWrites,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
       });
 
   // Render the renderable to the render target.
@@ -1610,13 +1559,8 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(client_target_info, render_target.vmo_index,
-                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   // Flush the cache before reading back target image.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    // Make sure the pixels are in the right order.
                    const auto red = glm::ivec4(255, 0, 0, 255);
                    const auto green = glm::ivec4(0, 255, 0, 255);
@@ -1641,25 +1585,21 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(
-      client_target_info, render_target_flipped.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidthFlipped * kTargetHeightFlipped * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+  MapHostPointer(client_target_info, render_target_flipped.vmo_index,
+                 HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   // Make sure the pixels are in the right order.
+                   const auto red = glm::ivec4(255, 0, 0, 255);
+                   const auto green = glm::ivec4(0, 255, 0, 255);
 
-        // Make sure the pixels are in the right order.
-        const auto red = glm::ivec4(255, 0, 0, 255);
-        const auto green = glm::ivec4(0, 255, 0, 255);
+                   // Green is on the right, as rotation is applied after flip.
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidthFlipped, 15, 0), green);
+                   EXPECT_EQ(GetPixel(vmo_host, kTargetWidthFlipped, 14, 0), red);
 
-        // Green is on the right, as rotation is applied after flip.
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidthFlipped, 15, 0), green);
-        EXPECT_EQ(GetPixel(vmo_host, kTargetWidthFlipped, 14, 0), red);
-
-        // Make sure the remaining pixels are black.
-        CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight,
-                           kRenderableWidth * kRenderableHeight);
-      });
+                   // Make sure the remaining pixels are black.
+                   CHECK_BLACK_PIXELS(vmo_host, kTargetWidth, kTargetHeight,
+                                      kRenderableWidth * kRenderableHeight);
+                 });
 }
 
 // Tests if the VK renderer can handle rendering an image without a provided image
@@ -1705,13 +1645,8 @@ VK_TEST_F(VulkanRendererTest, SolidColorTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
-  MapHostPointer(client_target_info, render_target.vmo_index,
-                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   // Flush the cache before reading back target image.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    uint8_t linear_vals[num_bytes];
                    sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
@@ -1797,12 +1732,8 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         uint8_t linear_vals[num_bytes];
         sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
@@ -1877,12 +1808,8 @@ VK_TEST_F(VulkanRendererTest, MultipleSolidColorTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         uint8_t linear_vals[num_bytes];
         sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
@@ -1952,6 +1879,7 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
 
   // Have the client write pixel values to the renderable's texture. They should all be red.
   MapHostPointer(client_collection_info, renderable_image_data_2.vmo_index,
+                 HostPointerAccessMode::kWriteOnly,
                  [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    uint8_t writeValues[num_bytes];
                    for (uint32_t i = 0; i < num_bytes; i += 4) {
@@ -1962,11 +1890,6 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
                    }
 
                    memcpy(vmo_host, writeValues, sizeof(writeValues));
-
-                   // Flush the cache after writing to host VMO.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, num_bytes,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
                  });
 
   renderer->ImportBufferImage(renderable_image_data_2, BufferCollectionUsage::kClientImage);
@@ -1985,13 +1908,8 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target
   // and read its values. This should show that the two renderables were rendered side by
   // side at the same size.
-  MapHostPointer(client_target_info, render_target.vmo_index,
-                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   // Flush the cache before reading back target image.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+  MapHostPointer(client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    uint8_t linear_vals[num_bytes];
                    sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
@@ -2081,29 +1999,21 @@ VK_TEST_F(VulkanRendererTest, TransparencyTest) {
 
   // Have the client write pixel values to the renderable's texture.
   MapHostPointer(client_collection_info, renderable_texture.vmo_index,
+                 HostPointerAccessMode::kWriteOnly,
                  [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    // Create a red opaque pixel.
                    const uint8_t kNumWrites = 4;
                    const uint8_t kWriteValues[] = {/*red*/ 255U, 0, 0, 255U};
                    memcpy(vmo_host, kWriteValues, sizeof(kWriteValues));
-
-                   // Flush the cache after writing to host VMO.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, kNumWrites,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
                  });
 
   MapHostPointer(client_collection_info, transparent_texture.vmo_index,
+                 HostPointerAccessMode::kWriteOnly,
                  [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    // Create a green pixel with an alpha of 0.5.
                    const uint8_t kNumWrites = 4;
                    const uint8_t kWriteValues[] = {/*red*/ 0, 255, 0, 128U};
                    memcpy(vmo_host, kWriteValues, sizeof(kWriteValues));
-
-                   // Flush the cache after writing to host VMO.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, kNumWrites,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
                  });
 
   // Render the renderable to the render target.
@@ -2115,12 +2025,8 @@ VK_TEST_F(VulkanRendererTest, TransparencyTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         uint8_t linear_vals[num_bytes];
         sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
@@ -2220,17 +2126,13 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
 
   // Have the client write white pixel values to image backing the above two renderables.
   MapHostPointer(client_collection_info, renderable_texture.vmo_index,
+                 HostPointerAccessMode::kWriteOnly,
                  [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    // Create a red opaque pixel.
                    const uint8_t kNumWrites = 4;
                    const uint8_t kWriteValues[] = {/*red*/ 255U, /*green*/ 255U, /*blue*/ 255U,
                                                    /*alpha*/ 255U};
                    memcpy(vmo_host, kWriteValues, sizeof(kWriteValues));
-
-                   // Flush the cache after writing to host VMO.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, kNumWrites,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
                  });
 
   // Render the renderable to the render target.
@@ -2242,12 +2144,8 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
   // and read its values. This should show that the renderable was rendered to the center
   // of the render target, with its associated texture.
   MapHostPointer(
-      client_target_info, render_target.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        // Flush the cache before reading back target image.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+      client_target_info, render_target.vmo_index, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
         uint8_t linear_vals[num_bytes];
         sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
@@ -2382,36 +2280,32 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
   const uint8_t kFuchsiaYuvValues[] = {110U, 192U, 192U};
   const uint8_t kFuchsiaRgbaValues[] = {228U, 68U, 246U, 255U};
   // Have the client write pixel values to the renderable Image's texture.
-  MapHostPointer(
-      image_collection_info, image_metadata.vmo_index,
-      [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-        for (uint32_t i = 0; i < num_pixels; ++i) {
-          vmo_host[i] = kFuchsiaYuvValues[0];
-        }
-        switch (GetParam()) {
-          case fuchsia::sysmem::PixelFormatType::NV12:
-            for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 2; i += 2) {
-              vmo_host[i] = kFuchsiaYuvValues[1];
-              vmo_host[i + 1] = kFuchsiaYuvValues[2];
-            }
-            break;
-            break;
-          case fuchsia::sysmem::PixelFormatType::I420:
-            for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 4; ++i) {
-              vmo_host[i] = kFuchsiaYuvValues[1];
-            }
-            for (uint32_t i = num_pixels + num_pixels / 4; i < num_pixels + num_pixels / 2; ++i) {
-              vmo_host[i] = kFuchsiaYuvValues[2];
-            }
-            break;
-          default:
-            FX_NOTREACHED();
-        }
-
-        // Flush the cache after writing to host VMO.
-        EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, num_pixels + num_pixels / 2,
-                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-      });
+  MapHostPointer(image_collection_info, image_metadata.vmo_index, HostPointerAccessMode::kWriteOnly,
+                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   for (uint32_t i = 0; i < num_pixels; ++i) {
+                     vmo_host[i] = kFuchsiaYuvValues[0];
+                   }
+                   switch (GetParam()) {
+                     case fuchsia::sysmem::PixelFormatType::NV12:
+                       for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 2; i += 2) {
+                         vmo_host[i] = kFuchsiaYuvValues[1];
+                         vmo_host[i + 1] = kFuchsiaYuvValues[2];
+                       }
+                       break;
+                       break;
+                     case fuchsia::sysmem::PixelFormatType::I420:
+                       for (uint32_t i = num_pixels; i < num_pixels + num_pixels / 4; ++i) {
+                         vmo_host[i] = kFuchsiaYuvValues[1];
+                       }
+                       for (uint32_t i = num_pixels + num_pixels / 4;
+                            i < num_pixels + num_pixels / 2; ++i) {
+                         vmo_host[i] = kFuchsiaYuvValues[2];
+                       }
+                       break;
+                     default:
+                       FX_NOTREACHED();
+                   }
+                 });
 
   // Render the renderable to the render target.
   renderer->Render(render_target_metadata, {image_renderable}, {image_metadata});
@@ -2420,12 +2314,8 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
   // Get a raw pointer from the client collection's vmo that represents the render target and read
   // its values. This should show that the renderable was rendered with expected BGRA colors.
   MapHostPointer(render_target_collection_info, render_target_metadata.vmo_index,
-                 [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-                   // Flush the cache before reading back target image.
-                   EXPECT_EQ(ZX_OK,
-                             zx_cache_flush(vmo_host, num_pixels * 4,
-                                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-
+                 HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
                    // Make sure the pixels are fuchsia.
                    for (uint32_t y = 0; y < kTargetHeight; y++) {
                      for (uint32_t x = 0; x < kTargetWidth; x++) {
@@ -2614,25 +2504,23 @@ VK_TEST_F(VulkanRendererTest, ReadbackTest) {
 
   // Get a raw pointer from the readback collection's vmo that represents the copied render target
   // and read its values.
-  MapHostPointer(readback_info, 0, [&](uint8_t* vmo_host, uint32_t num_bytes) mutable {
-    // Flush the cache before reading back target image.
-    EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, kTargetWidth * kTargetHeight * 4,
-                                    ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+  MapHostPointer(readback_info, 0, HostPointerAccessMode::kReadOnly,
+                 [&](const uint8_t* vmo_host, uint32_t num_bytes) mutable {
+                   uint8_t linear_vals[num_bytes];
+                   sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
-    uint8_t linear_vals[num_bytes];
-    sRGBtoLinear(vmo_host, linear_vals, num_bytes);
-
-    // Make sure the pixels are in the right order give that we rotated
-    // the rectangle. Values are BGRA.
-    for (uint32_t i = 0; i < kTargetWidth; i++) {
-      for (uint32_t j = 0; j < kTargetHeight; j++) {
-        auto pixel = GetPixel(linear_vals, kTargetWidth, i, j);
-        // The sRGB conversion function provides slightly different results depending
-        // on the platform.
-        EXPECT_TRUE(pixel == glm::ivec4(255, 101, 0, 255) || pixel == glm::ivec4(255, 102, 0, 255));
-      }
-    }
-  });
+                   // Make sure the pixels are in the right order give that we rotated
+                   // the rectangle. Values are BGRA.
+                   for (uint32_t i = 0; i < kTargetWidth; i++) {
+                     for (uint32_t j = 0; j < kTargetHeight; j++) {
+                       auto pixel = GetPixel(linear_vals, kTargetWidth, i, j);
+                       // The sRGB conversion function provides slightly different results depending
+                       // on the platform.
+                       EXPECT_TRUE(pixel == glm::ivec4(255, 101, 0, 255) ||
+                                   pixel == glm::ivec4(255, 102, 0, 255));
+                     }
+                   }
+                 });
 }
 
 class VulkanRendererParameterizedAFBCTest

@@ -63,6 +63,7 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
       utils::GetPixelsPerRow(buffer_collection_info.settings, kBytesPerPixel, image_width);
 
   MapHostPointer(buffer_collection_info, buffer_collection_idx,
+                 flatland::HostPointerAccessMode::kReadWrite,
                  [&write_values, pixels_per_row, kBytesPerPixel, image_width, image_height](
                      uint8_t* vmo_host, uint32_t num_bytes) {
                    uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
@@ -151,9 +152,9 @@ std::vector<uint8_t> ExtractScreenCapture(
   read_values.resize(static_cast<size_t>(render_target_width) * render_target_height *
                      kBytesPerPixel);
 
-  MapHostPointer(buffer_collection_info, buffer_id,
+  MapHostPointer(buffer_collection_info, buffer_id, flatland::HostPointerAccessMode::kReadOnly,
                  [&read_values, kBytesPerPixel, pixels_per_row, render_target_width,
-                  render_target_height](uint8_t* vmo_host, uint32_t num_bytes) {
+                  render_target_height](const uint8_t* vmo_host, uint32_t num_bytes) {
                    uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
                    uint32_t valid_bytes_per_row = render_target_width * kBytesPerPixel;
 
