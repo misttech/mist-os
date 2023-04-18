@@ -167,9 +167,7 @@ class CxxRemoteAction(object):
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
-        assert (
-            not self.local_only,
-            "This should not be reached in local-only mode.")
+        # This should not be reached in local-only mode.
 
         if self._prepare_status is not None:
             return self._prepare_status
