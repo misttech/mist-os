@@ -28,6 +28,10 @@ type RendererConfig = table {
 
     /// How to set the reference clock.
     2: clock ClockType;
+
+    /// How many packets to use when sending data to an AudioRenderer.
+    /// Optional. If not specified, AudioDaemon will use four packets.
+    3: packet_count uint32;
 };
 
 /// Options for AudioRenderers.
@@ -36,7 +40,11 @@ type RendererType = flexible union {
     1: standard_renderer RendererConfig;
 
     /// Renderer for ultrasonic frequencies.
-    2: ultrasound_renderer struct {};
+    2: ultrasound_renderer table {
+        /// How many packets to use when sending data to an AudioRenderer.
+        /// Optional. If not specified, AudioDaemon will use four packets.
+        1: packet_count uint32;
+    };
 };
 
 /// Reference clock options for AudioRenderer and AudioCapturer.

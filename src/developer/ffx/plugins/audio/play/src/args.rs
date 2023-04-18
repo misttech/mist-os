@@ -33,6 +33,13 @@ pub struct PlayCommand {
 
     #[argh(
         option,
+        description = "how many packets to use when sending data to an AudioRenderer.\
+        Defaults to 4 packets."
+    )]
+    pub packet_count: Option<u32>,
+
+    #[argh(
+        option,
         description = "gain (decibels) for the renderer. Default: 0 dB",
         default = "0.0f32"
     )]

@@ -74,12 +74,12 @@ impl AudioDaemon {
         )
         .await?;
 
-        let num_packets = 4;
+        let packet_count = 4;
         let bytes_per_frame = format.bytes_per_frame() as u64;
         let buffer_size_bytes =
             request.buffer_size.unwrap_or(format.frames_per_second as u64 * bytes_per_frame);
 
-        let bytes_per_packet = buffer_size_bytes / num_packets;
+        let bytes_per_packet = buffer_size_bytes / packet_count;
 
         let frames_per_packet = bytes_per_packet / bytes_per_frame;
 
@@ -429,8 +429,6 @@ impl AudioDaemon {
         request: AudioDaemonPlayRequest,
         stdout_local: zx::Socket,
     ) -> Result<(), anyhow::Error> {
-        let num_packets = 4;
-
         let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
         let mut socket = socket::Socket {
@@ -442,6 +440,20 @@ impl AudioDaemon {
         let format = format_utils::Format::from(&spec);
 
         let location = request.location.ok_or(anyhow::anyhow!("PlayLocation argument missing."))?;
+        let default_packet_count = 4;
+
+        let packet_count = match &location {
+            PlayLocation::Renderer(renderer_type) => match &renderer_type {
+                StandardRenderer(renderer_info) => {
+                    renderer_info.packet_count.unwrap_or(default_packet_count)
+                }
+                UltrasoundRenderer(renderer_info) => {
+                    renderer_info.packet_count.unwrap_or(default_packet_count)
+                }
+                _ => default_packet_count,
+            },
+            _ => default_packet_count,
+        } as usize;
 
         let audio_renderer_proxy = Rc::new(
             Self::create_renderer_from_location(location, &format, request.gain_settings).await?,
@@ -450,7 +462,7 @@ impl AudioDaemon {
         let vmo_size_bytes = format.frames_per_second as usize * format.bytes_per_frame() as usize;
         let vmo = zx::Vmo::create(vmo_size_bytes as u64)?;
 
-        let bytes_per_packet = cmp::min(vmo_size_bytes / num_packets as usize, 32000 as usize);
+        let bytes_per_packet = cmp::min(vmo_size_bytes / packet_count, 32000 as usize);
 
         audio_renderer_proxy
             .add_payload_buffer(0, vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
@@ -471,7 +483,7 @@ impl AudioDaemon {
             }
         }
 
-        let offsets: Vec<usize> = (0..num_packets).map(|x| x * bytes_per_packet).collect();
+        let offsets: Vec<usize> = (0..packet_count).map(|x| x * bytes_per_packet).collect();
 
         let futs = offsets.iter().map(|offset| async {
             Self::send_next_packet(

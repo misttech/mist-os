@@ -23,7 +23,10 @@ pub async fn play_cmd(audio_proxy: AudioDaemonProxy, cmd: PlayCommand) -> Result
 
     let renderer = match cmd.usage {
         Ultrasound => fidl_fuchsia_audio_ffxdaemon::RendererType::UltrasoundRenderer(
-            fidl_fuchsia_audio_ffxdaemon::UltrasoundRenderer {},
+            fidl_fuchsia_audio_ffxdaemon::UltrasoundRenderer {
+                packet_count: cmd.packet_count,
+                ..fidl_fuchsia_audio_ffxdaemon::UltrasoundRenderer::EMPTY
+            },
         ),
 
         Background(usage) | Media(usage) | SystemAgent(usage) | Communication(usage)
@@ -31,6 +34,7 @@ pub async fn play_cmd(audio_proxy: AudioDaemonProxy, cmd: PlayCommand) -> Result
             fidl_fuchsia_audio_ffxdaemon::RendererConfig {
                 usage: Some(usage),
                 clock: Some(cmd.clock),
+                packet_count: cmd.packet_count,
                 ..fidl_fuchsia_audio_ffxdaemon::RendererConfig::EMPTY
             },
         ),
