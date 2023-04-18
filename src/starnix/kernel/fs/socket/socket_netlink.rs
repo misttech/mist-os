@@ -9,11 +9,13 @@ use crate::device::{DeviceListener, DeviceListenerKey};
 use crate::fs::buffers::*;
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::logging::not_implemented;
+use crate::logging::{log, not_implemented};
 use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 use std::sync::Arc;
+
+const NETLINK_LOG_TAG: &str = "netlink";
 
 // From netlink/socket.go in gVisor.
 pub const SOCKET_MIN_SIZE: usize = 4 << 10;
@@ -25,6 +27,7 @@ pub fn new_netlink_socket(
     socket_type: SocketType,
     family: NetlinkFamily,
 ) -> Result<Box<dyn SocketOps>, Errno> {
+    log!(level = info, tag = NETLINK_LOG_TAG, "Creating {:?} Netlink Socket", family);
     if socket_type != SocketType::Datagram && socket_type != SocketType::Raw {
         return error!(ESOCKTNOSUPPORT);
     }
