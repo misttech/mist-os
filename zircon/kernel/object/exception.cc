@@ -85,15 +85,16 @@ class ExceptionHandlerIterator final {
       bool second_chance = exception_->IsSecondChance();
 
       switch (next_method_) {
-        case ExceptionDeliveryMethod::kDebugChannel:
+        case ExceptionDeliveryMethod::kFirstChanceDebugChannel:
           *result =
               thread_->HandleException(thread_->process()->debug_exceptionate(), exception_, &sent);
-          if (second_chance) {
-            next_method_ = ExceptionDeliveryMethod::kJobChannel;
-            next_job_ = thread_->process()->job();
-          } else {
-            next_method_ = ExceptionDeliveryMethod::kThreadChannel;
-          }
+          next_method_ = ExceptionDeliveryMethod::kThreadChannel;
+          break;
+        case ExceptionDeliveryMethod::kSecondChanceDebugChannel:
+          *result =
+              thread_->HandleException(thread_->process()->debug_exceptionate(), exception_, &sent);
+          next_method_ = ExceptionDeliveryMethod::kJobChannel;
+          next_job_ = thread_->process()->job();
           break;
         case ExceptionDeliveryMethod::kThreadChannel:
           *result = thread_->HandleException(thread_->exceptionate(), exception_, &sent);
@@ -103,7 +104,7 @@ class ExceptionHandlerIterator final {
           *result = thread_->HandleException(thread_->process()->exceptionate(), exception_, &sent);
 
           if (second_chance) {
-            next_method_ = ExceptionDeliveryMethod::kDebugChannel;
+            next_method_ = ExceptionDeliveryMethod::kSecondChanceDebugChannel;
           } else {
             next_method_ = ExceptionDeliveryMethod::kJobChannel;
             next_job_ = thread_->process()->job();
@@ -129,15 +130,16 @@ class ExceptionHandlerIterator final {
 
  private:
   enum class ExceptionDeliveryMethod {
-    kDebugChannel,
+    kFirstChanceDebugChannel,
     kThreadChannel,
     kProcessChannel,
+    kSecondChanceDebugChannel,
     kJobChannel,
   };
 
   ThreadDispatcher* thread_;
   fbl::RefPtr<ExceptionDispatcher> exception_;
-  ExceptionDeliveryMethod next_method_ = ExceptionDeliveryMethod::kDebugChannel;
+  ExceptionDeliveryMethod next_method_ = ExceptionDeliveryMethod::kFirstChanceDebugChannel;
   fbl::RefPtr<JobDispatcher> next_job_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(ExceptionHandlerIterator);
