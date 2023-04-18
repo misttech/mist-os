@@ -274,12 +274,6 @@ function is-listening-on-port {
   return 1
 }
 
-function ffx-default-repository-name {
-    # Use the build directory's name by default. Note that package URLs are not
-    # allowed to have underscores, so replace them with hyphens.
-    basename "${FUCHSIA_BUILD_DIR}" | tr '_' '-'
-}
-
 function ffx-start-server {
   local ip="$1"
   local port="$2"

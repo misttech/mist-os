@@ -257,6 +257,16 @@ function fx-change-build-dir {
       ln -sf "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
     fi
   done
+
+  # Set relevant variables in the ffx build-level config file
+  json-config-set "${FUCHSIA_BUILD_DIR}.json" "repository.default" "$(ffx-default-repository-name)"
+  json-config-set "${FUCHSIA_BUILD_DIR}.json" "sdk.root" '$BUILD_DIR'
+}
+
+function ffx-default-repository-name {
+    # Use the build directory's name by default. Note that package URLs are not
+    # allowed to have underscores, so replace them with hyphens.
+    basename "${FUCHSIA_BUILD_DIR}" | tr '_' '-'
 }
 
 # Runs a jq command against an existing file that will edit it, taking care

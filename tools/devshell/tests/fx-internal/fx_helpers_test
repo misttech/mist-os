@@ -5,14 +5,17 @@
 
 ### Test the helper functions defined in //tools/devshell/README.md#helper-functions
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../lib/vars.sh || exit $?
+
 BT_FILE_DEPS=(
+  "prebuilt/third_party/jq/${HOST_PLATFORM}/bin/jq"
+  "tools/devshell/jq.fx"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-optional-features.sh"
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/platform.sh"
 )
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../lib/vars.sh || exit $?
 unset -f fx-gen
 
 # Replace fx-gen with a stub.
