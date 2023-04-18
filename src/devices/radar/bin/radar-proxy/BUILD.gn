@@ -7,6 +7,7 @@ import("//build/test.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 _common_deps = [
+  ":config",
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp",
   "//sdk/lib/component/incoming/cpp",
   "//sdk/lib/component/outgoing/cpp",
@@ -34,14 +35,40 @@ executable("radar-proxy-bin") {
   deps = _common_deps
 }
 
-fuchsia_component("radar-proxy-component") {
+fuchsia_component_manifest("manifest") {
   component_name = "radar-proxy"
   manifest = "meta/radar-proxy.cml"
+}
+
+fuchsia_structured_config_values("disable-burst-reader-proxying-config") {
+  cm_label = ":manifest"
+  values = {
+    proxy_radar_burst_reader = false
+  }
+}
+
+fuchsia_structured_config_values("enable-burst-reader-proxying-config") {
+  cm_label = ":manifest"
+  values = {
+    proxy_radar_burst_reader = true
+  }
+}
+
+fuchsia_structured_config_cpp_elf_lib("config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_component("radar-proxy-component") {
+  component_name = "radar-proxy"
+  cm_label = ":manifest"
   deps = [ ":radar-proxy-bin" ]
 }
 
 fuchsia_package("radar-proxy") {
-  deps = [ ":radar-proxy-component" ]
+  deps = [
+    ":disable-burst-reader-proxying-config",
+    ":radar-proxy-component",
+  ]
 }
 
 core_shard("radar-proxy-shard") {

@@ -9,6 +9,6 @@ group("tests") {
     "bin/radar-proxy:tests",
     "bin/radarutil:tests",
     "lib/vmo-manager:tests",
-    "tests/radar-integration-test",
+    "tests/radar-integration-test:tests",
   ]
 }

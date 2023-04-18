@@ -26,8 +26,30 @@ fuchsia_test_component("component") {
 
 fuchsia_test_package("radar-integration-test") {
   test_components = [ ":component" ]
-  deps = [ "//src/devices/radar/bin/radar-proxy:radar-proxy-component" ]
+  deps = [
+    "//src/devices/radar/bin/radar-proxy:disable-burst-reader-proxying-config",
+    "//src/devices/radar/bin/radar-proxy:radar-proxy-component",
+  ]
   test_specs = {
     environments = [ nelson_env ]
   }
+}
+
+fuchsia_test_package("radar-integration-reader-proxying-test") {
+  test_components = [ ":component" ]
+  deps = [
+    "//src/devices/radar/bin/radar-proxy:enable-burst-reader-proxying-config",
+    "//src/devices/radar/bin/radar-proxy:radar-proxy-component",
+  ]
+  test_specs = {
+    environments = [ nelson_env ]
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":radar-integration-reader-proxying-test",
+    ":radar-integration-test",
+  ]
 }

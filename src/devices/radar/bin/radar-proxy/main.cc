@@ -13,8 +13,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <memory>
+
 #include "radar-provider-proxy.h"
 #include "radar-proxy.h"
+#include "radar-reader-proxy.h"
+#include "src/devices/radar/bin/radar-proxy/config.h"
 #include "src/lib/fsl/io/device_watcher.h"
 
 namespace radar {
@@ -57,10 +61,19 @@ class DefaultRadarDeviceConnector : public RadarDeviceConnector {
 }  // namespace radar
 
 int main(int argc, const char** argv) {
+  radar::DefaultRadarDeviceConnector connector;
+  std::unique_ptr<radar::RadarProxy> proxy;
+
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  radar::DefaultRadarDeviceConnector connector;
-  radar::RadarProviderProxy proxy(loop.dispatcher(), &connector);
+  const auto config = config::Config::TakeFromStartupHandle();
+  if (config.proxy_radar_burst_reader()) {
+    FX_LOGS(INFO) << "Burst reader proxying enabled";
+    proxy = std::make_unique<radar::RadarReaderProxy>(loop.dispatcher(), &connector);
+  } else {
+    FX_LOGS(INFO) << "Burst reader proxying disabled";
+    proxy = std::make_unique<radar::RadarProviderProxy>(loop.dispatcher(), &connector);
+  }
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
 
@@ -72,7 +85,7 @@ int main(int argc, const char** argv) {
 
   result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstReaderProvider>(
       [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> server_end) {
-        fidl::BindServer(loop.dispatcher(), std::move(server_end), &proxy);
+        fidl::BindServer(loop.dispatcher(), std::move(server_end), proxy.get());
       });
 
   if (result.is_error()) {
