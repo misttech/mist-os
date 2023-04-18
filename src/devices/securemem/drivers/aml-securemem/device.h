@@ -11,10 +11,11 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <lib/async_patterns/cpp/dispatcher_bound.h>
+#include <lib/async_patterns/cpp/receiver.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/bti.h>
-#include <threads.h>
 #include <zircon/types.h>
 
 #include <optional>
@@ -52,11 +53,15 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   fpromise::result<zx_paddr_t, zx_status_t> GetSecureMemoryPhysicalAddress(zx::vmo secure_mem);
 
  private:
-  explicit AmlogicSecureMemDevice(zx_device_t* device) : AmlogicSecureMemDeviceBase(device) {}
+  explicit AmlogicSecureMemDevice(zx_device_t* device);
 
   zx_status_t CreateAndServeSysmemTee();
 
-  fdf_dispatcher_t* fdf_dispatcher_ = nullptr;
+  void SysmemSecureMemServerOnUnbound(bool is_success);
+
+  // The dispatcher that this |AmlogicSecureMemDevice| lives on.
+  fdf_dispatcher_t* const fdf_dispatcher_;
+
   ddk::PDevFidl pdev_proto_client_;
   ddk::SysmemProtocolClient sysmem_proto_client_;
   fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;
@@ -65,20 +70,23 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   // time a secure memory VMO is passed to be pinned.
   zx::bti bti_;
 
-  // Created by ddk_dispatcher_thead_.  Ownership transferred to sysmem_secure_mem_server_thread_ by
-  // successful BindAsync().  We use a separate thread because llcpp doesn't provide any way to
-  // force unbind other than dispatcher shutdown (client channel closing doesn't count).  Since we
-  // can't shutdown the devhost's main dispatcher, we use a separate dispatcher and shutdown that
-  // dispatcher when we want to unbind.
-  //
-  // TODO(dustingreen): llcpp should provide a way to force unbind without shutdown of the whole
-  // dispatcher.
-  std::optional<SysmemSecureMemServer> sysmem_secure_mem_server_;
-  thrd_t sysmem_secure_mem_server_thread_ = {};
-  bool is_suspend_mexec_ = false;
+  // By destroying/shutting down the loop after the |DispatcherBound|, we know that we won't
+  // trigger a synchronous call to any method calls queued via the normally-async
+  // |sysmem_secure_mem_server_| below, nor any synchronous call to the
+  // |SysmemSecureMemServer| constructor, nor any synchronous call to the
+  // |SysmemSecureMemServer| destructor.
+  async::Loop sysmem_secure_mem_server_loop_{&kAsyncLoopConfigNeverAttachToThread};
 
-  // Last on purpose.
-  ClosureQueue fdf_dispatcher_closure_queue_;
+  // |sysmem_secure_mem_server_| lives on |sysmem_secure_mem_server_loop_|.
+  // This shields the fdf dispatcher away from blocking TEE calls.
+  async_patterns::DispatcherBound<SysmemSecureMemServer> sysmem_secure_mem_server_{
+      sysmem_secure_mem_server_loop_.dispatcher()};
+
+  bool is_suspend_mexec_ = false;
+  std::optional<ddk::SuspendTxn> suspend_txn_;
+
+  // Used to receive messages from |SysmemSecureMemServer|, e.g. the server has stopped.
+  async_patterns::Receiver<AmlogicSecureMemDevice> receiver_;
 };
 
 }  // namespace amlogic_secure_mem

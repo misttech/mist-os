@@ -7,30 +7,32 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/closure-queue/closure_queue.h>
+#include <lib/async/cpp/sequence_checker.h>
 #include <lib/fdf/dispatcher.h>
-#include <threads.h>
 
 #include <optional>
 #include <set>
 
 #include <tee-client-api/tee_client_api.h>
 
-#include "fidl/fuchsia.sysmem/cpp/wire_types.h"
 #include "secmem-session.h"
 
-// This is used with fidl::BindSingleInFlightOnly() to dispatch fuchsia::sysmem::Tee requests.
+// This class is thread-unsafe and must be used from a synchronized dispatcher.
+//
+// The dispatcher thread for this class must be separate from the ddk_dispatcher_thread_ so that
+// TEEC_* calls made by the |SysmemSecureMemServer| can be served by the fdf dispatcher without
+// deadlock.
 class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem> {
  public:
-  using SecureMemServerDone = fit::callback<void(bool is_success)>;
+  using SecureMemServerOnUnbound = fit::callback<void(bool is_success)>;
 
-  SysmemSecureMemServer(const fdf_dispatcher_t* fdf_dispatcher, zx::channel tee_client_channel);
+  // |dispatcher| must be the current dispatcher of the thread creating this object.
+  SysmemSecureMemServer(async_dispatcher_t* dispatcher, zx::channel tee_client_channel);
   ~SysmemSecureMemServer() override;
 
-  zx_status_t BindAsync(fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
-                        thrd_t* sysmem_secure_mem_server_thread,
-                        SecureMemServerDone secure_mem_server_done);
-  void StopAsync();
+  void Bind(fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
+            SecureMemServerOnUnbound secure_mem_server_on_unbound);
+  void Unbind();
 
   // fidl::WireServer<fuchsia_sysmem::SecureMem> impl
   void GetPhysicalSecureHeaps(GetPhysicalSecureHeapsCompleter::Sync& completer) override;
@@ -101,10 +103,8 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
 
   using Ranges = std::set<Range, CompareRangeByBegin>;
 
-  void PostToLoop(fit::closure to_run);
-
   bool TrySetupSecmemSession();
-  void EnsureLoopDone(bool is_success);
+  void OnUnbound(bool is_success);
 
   zx_status_t GetPhysicalSecureHeapsInternal(
       fidl::AnyArena* allocator, fuchsia_sysmem::wire::SecureHeapsAndRanges* heaps_and_ranges);
@@ -133,13 +133,9 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
   static bool IsOverlap(const Range& a, const Range& b);
   static std::pair<Range, Range> SubtractRanges(const Range& a, const Range& b);
 
-  const fdf_dispatcher_t* fdf_dispatcher_ = nullptr;
+  async_dispatcher_t* const dispatcher_;
   fuchsia::tee::ApplicationSyncPtr tee_connection_ = {};
-  async::Loop loop_;
-  thrd_t loop_thread_ = {};
-  bool was_thread_started_ = {};
-  bool is_loop_done_ = {};
-  SecureMemServerDone secure_mem_server_done_;
+  SecureMemServerOnUnbound secure_mem_server_on_unbound_;
 
   bool is_get_physical_secure_heaps_called_ = {};
 
@@ -149,13 +145,13 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
 
   // We try to open a SecmemSession once.  If that fails, we remember the status and
   // EnsureSecmemSession() will return that status without trying Init() again.
-  bool has_attempted_secmem_session_connection_ = false;
-  std::optional<SecmemSession> secmem_session_ = std::nullopt;
+  bool has_attempted_secmem_session_connection_ __TA_GUARDED(checker_) = false;
+  std::optional<SecmemSession> secmem_session_ __TA_GUARDED(checker_) = std::nullopt;
 
-  Ranges ranges_;
+  Ranges ranges_ __TA_GUARDED(checker_);
 
-  // Last on purpose.
-  ClosureQueue closure_queue_;
+  std::optional<fidl::ServerBinding<fuchsia_sysmem::SecureMem>> binding_;
+  async::synchronization_checker checker_;
 };
 
 #endif  // SRC_DEVICES_SECUREMEM_DRIVERS_AML_SECUREMEM_SYSMEM_SECURE_MEM_SERVER_H_

@@ -4,9 +4,7 @@
 
 #include "sysmem-secure-mem-server.h"
 
-#include <lib/async-loop/default.h>
 #include <lib/fdf/dispatcher.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/fit/defer.h>
@@ -182,93 +180,46 @@ bool ValidateSecureHeapAndRangeModification(
   return true;
 }
 
+constexpr char kSysmemSecureMemServerThreadSafetyDescription[] =
+    "|SysmemSecureMemServer| is thread-unsafe.";
+
 }  // namespace
 
-SysmemSecureMemServer::SysmemSecureMemServer(const fdf_dispatcher_t* fdf_dispatcher,
+SysmemSecureMemServer::SysmemSecureMemServer(async_dispatcher_t* dispatcher,
                                              zx::channel tee_client_channel)
-    : fdf_dispatcher_(fdf_dispatcher), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+    : dispatcher_(dispatcher), checker_(dispatcher, kSysmemSecureMemServerThreadSafetyDescription) {
   ZX_DEBUG_ASSERT(tee_client_channel);
   tee_connection_.Bind(std::move(tee_client_channel));
 }
 
 SysmemSecureMemServer::~SysmemSecureMemServer() {
-  ZX_DEBUG_ASSERT(fdf_dispatcher_get_current_dispatcher() == fdf_dispatcher_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.empty());
-  ZX_DEBUG_ASSERT(is_loop_done_ || !was_thread_started_);
-  if (was_thread_started_) {
-    // Call StopAsync() first, and only do ~SysmemSecureMemServer() when secure_mem_server_done has
-    // been called.
-    ZX_DEBUG_ASSERT(loop_.GetState() == ASYNC_LOOP_QUIT);
-    ZX_DEBUG_ASSERT(is_loop_done_);
-    // EnsureLoopDone() was already previously called.
-    ZX_DEBUG_ASSERT(!secure_mem_server_done_);
-    loop_.JoinThreads();
-    // This will cancel the wait, which will run EnsureLoopDone(), but since is_loop_done_ is
-    // already true, the EnsureLoopDone() that runs here won't do anything.  This call to Shutdown()
-    // is necessary to complete the llcpp unbind.
-    loop_.Shutdown();
-  }
 }
 
-zx_status_t SysmemSecureMemServer::BindAsync(
+void SysmemSecureMemServer::Bind(
     fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
-    thrd_t* sysmem_secure_mem_server_thread, SecureMemServerDone secure_mem_server_done) {
+    SecureMemServerOnUnbound secure_mem_server_on_unbound) {
   ZX_DEBUG_ASSERT(sysmem_secure_mem_server);
-  ZX_DEBUG_ASSERT(sysmem_secure_mem_server_thread);
-  ZX_DEBUG_ASSERT(secure_mem_server_done);
-  ZX_DEBUG_ASSERT(fdf_dispatcher_get_current_dispatcher() == fdf_dispatcher_);
-  zx_status_t status = loop_.StartThread("sysmem_secure_mem_server_loop", &loop_thread_);
-  if (status != ZX_OK) {
-    LOG(ERROR, "loop_.StartThread() failed - status: %d", status);
-    return status;
-  }
-  was_thread_started_ = true;
-  // This probably goes without saying, but it's worth pointing out that the loop_thread_ must be
-  // separate from the ddk_dispatcher_thread_ so that TEEC_* calls made on the loop_thread_ can be
-  // served by the fdf dispatcher without deadlock.
-  ZX_DEBUG_ASSERT(thrd_current() != loop_thread_);
-  closure_queue_.SetDispatcher(loop_.dispatcher(), loop_thread_);
-  *sysmem_secure_mem_server_thread = loop_thread_;
-  secure_mem_server_done_ = std::move(secure_mem_server_done);
-  PostToLoop([this, sysmem_secure_mem_server = std::move(sysmem_secure_mem_server)]() mutable {
-    ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
-    zx_status_t status = fidl::BindSingleInFlightOnly<SysmemSecureMemServer>(
-        loop_.dispatcher(), std::move(sysmem_secure_mem_server), this,
-        [this](SysmemSecureMemServer* sysmem_secure_mem_server) {
-          // This can get called from the fdf dispatcher if
-          // we're doing loop_.Shutdown() to unbind an llcpp server (so
-          // far the only way to unbind an llcpp server).  However, in
-          // this case the call to EnsureLoopDone() will idempotently do
-          // nothing because is_loop_done_ is already true.
-          ZX_DEBUG_ASSERT(thrd_current() == loop_thread_ || is_loop_done_);
-          // If secure_mem_server_done_ still set by this point, !is_success.
-          EnsureLoopDone(false);
-        });
-    if (status != ZX_OK) {
-      LOG(ERROR, "fidl::BindSingleInFlightOnly() failed - status: %d", status);
-      ZX_DEBUG_ASSERT(secure_mem_server_done_);
-      EnsureLoopDone(false);
-    }
-  });
-  return ZX_OK;
+  ZX_DEBUG_ASSERT(secure_mem_server_on_unbound);
+  ZX_DEBUG_ASSERT(!secure_mem_server_on_unbound_);
+  ZX_DEBUG_ASSERT(!binding_);
+
+  secure_mem_server_on_unbound_ = std::move(secure_mem_server_on_unbound);
+  binding_.emplace(
+      dispatcher_, std::move(sysmem_secure_mem_server), this,
+      [](SysmemSecureMemServer* self, fidl::UnbindInfo info) { self->OnUnbound(false); });
 }
 
-void SysmemSecureMemServer::StopAsync() {
-  // The only way to unbind an llcpp server is to Shutdown() the loop, but before we can do that we
-  // have to Quit() the loop.
-  ZX_DEBUG_ASSERT(fdf_dispatcher_get_current_dispatcher() == fdf_dispatcher_);
-  ZX_DEBUG_ASSERT(was_thread_started_);
-  PostToLoop([this] {
-    ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
-    // Stopping the loop intentionally is considered is_success, if that happens before channel
-    // failure.  EnsureLoopDone() is idempotent so it'll early out if already called previously.
-    EnsureLoopDone(true);
-  });
+void SysmemSecureMemServer::Unbind() {
+  std::scoped_lock lock{checker_};
+  binding_.reset();
+  OnUnbound(true);
 }
 
 void SysmemSecureMemServer::GetPhysicalSecureHeaps(
     GetPhysicalSecureHeapsCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   fidl::Arena allocator;
   fuchsia_sysmem::wire::SecureHeapsAndRanges heaps;
   zx_status_t status = GetPhysicalSecureHeapsInternal(&allocator, &heaps);
@@ -283,7 +234,7 @@ void SysmemSecureMemServer::GetPhysicalSecureHeaps(
 void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
     GetPhysicalSecureHeapPropertiesRequestView request,
     GetPhysicalSecureHeapPropertiesCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
   fuchsia_sysmem::wire::SecureHeapProperties properties;
@@ -300,7 +251,7 @@ void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
 void SysmemSecureMemServer::AddSecureHeapPhysicalRange(
     AddSecureHeapPhysicalRangeRequestView request,
     AddSecureHeapPhysicalRangeCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
   zx_status_t status = AddSecureHeapPhysicalRangeInternal(request->heap_range);
@@ -315,7 +266,7 @@ void SysmemSecureMemServer::AddSecureHeapPhysicalRange(
 void SysmemSecureMemServer::DeleteSecureHeapPhysicalRange(
     DeleteSecureHeapPhysicalRangeRequestView request,
     DeleteSecureHeapPhysicalRangeCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
   zx_status_t status = DeleteSecureHeapPhysicalRangeInternal(request->heap_range);
@@ -330,7 +281,7 @@ void SysmemSecureMemServer::DeleteSecureHeapPhysicalRange(
 void SysmemSecureMemServer::ModifySecureHeapPhysicalRange(
     ModifySecureHeapPhysicalRangeRequestView request,
     ModifySecureHeapPhysicalRangeCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
   zx_status_t status = ModifySecureHeapPhysicalRangeInternal(request->range_modification);
@@ -344,7 +295,7 @@ void SysmemSecureMemServer::ModifySecureHeapPhysicalRange(
 
 void SysmemSecureMemServer::ZeroSubRange(ZeroSubRangeRequestView request,
                                          ZeroSubRangeCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
   zx_status_t status =
@@ -357,14 +308,8 @@ void SysmemSecureMemServer::ZeroSubRange(ZeroSubRangeRequestView request,
   completer.ReplySuccess();
 }
 
-void SysmemSecureMemServer::PostToLoop(fit::closure to_run) {
-  // For now this is only expected to be called from ddk_dispatcher_thread_.
-  ZX_DEBUG_ASSERT(fdf_dispatcher_get_current_dispatcher() == fdf_dispatcher_);
-  closure_queue_.Enqueue(std::move(to_run));
-}
-
 bool SysmemSecureMemServer::TrySetupSecmemSession() {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   // We only try this once; if it doesn't work the first time, it's very
   // unlikely to work on retry anyway, and this avoids some retry complexity.
   if (!has_attempted_secmem_session_connection_) {
@@ -388,19 +333,10 @@ bool SysmemSecureMemServer::TrySetupSecmemSession() {
   return secmem_session_.has_value();
 }
 
-void SysmemSecureMemServer::EnsureLoopDone(bool is_success) {
-  if (is_loop_done_) {
-    return;
-  }
-  // We can't assert this any sooner, because when unbinding llcpp server using loop_.Shutdown()
-  // we'll be on ddk_dispatcher_thread_.  But in that case, the first run of EnsureLoopDone()
-  // happened on the loop_thread_.
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
-  is_loop_done_ = true;
-  closure_queue_.StopAndClear();
-  loop_.Quit();
+void SysmemSecureMemServer::OnUnbound(bool is_success) {
+  std::scoped_lock lock{checker_};
+
   if (has_attempted_secmem_session_connection_ && secmem_session_.has_value()) {
-    ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
     for (auto& range : ranges_) {
       TEEC_Result tee_status = secmem_session_->ProtectMemoryRange(
           static_cast<uint32_t>(range.begin()), static_cast<uint32_t>(range.length()), false);
@@ -412,17 +348,16 @@ void SysmemSecureMemServer::EnsureLoopDone(bool is_success) {
     ranges_.clear();
     secmem_session_.reset();
   } else {
-    // We could be running on the loop_thread_ or the ddk_dispatcher_thread_ in this case.
     ZX_DEBUG_ASSERT(!secmem_session_);
   }
-  if (secure_mem_server_done_) {
-    secure_mem_server_done_(is_success);
+  if (secure_mem_server_on_unbound_) {
+    secure_mem_server_on_unbound_(is_success);
   }
 }
 
 zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapsInternal(
     fidl::AnyArena* allocator, fuchsia_sysmem::wire::SecureHeapsAndRanges* heaps_and_ranges) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
 
   if (is_get_physical_secure_heaps_called_) {
     LOG(ERROR, "GetPhysicalSecureHeaps may only be called at most once - reply status: %d",
@@ -466,7 +401,7 @@ zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapsInternal(
 zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapPropertiesInternal(
     const fuchsia_sysmem::wire::SecureHeapAndRange& entire_heap, fidl::AnyArena& allocator,
     fuchsia_sysmem::wire::SecureHeapProperties* properties) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
 
   if (!entire_heap.has_heap()) {
     LOG(INFO, "!entire_heap.has_heap()");
@@ -517,7 +452,7 @@ zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapPropertiesInternal(
 
 zx_status_t SysmemSecureMemServer::AddSecureHeapPhysicalRangeInternal(
     fuchsia_sysmem::wire::SecureHeapAndRange heap_range) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
@@ -556,7 +491,7 @@ zx_status_t SysmemSecureMemServer::AddSecureHeapPhysicalRangeInternal(
 
 zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
     fuchsia_sysmem::wire::SecureHeapAndRange heap_range) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
@@ -652,7 +587,7 @@ zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
 
 zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
     bool is_covering_range_explicit, fuchsia_sysmem::wire::SecureHeapAndRange heap_range) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
@@ -740,7 +675,7 @@ zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
 
 zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
     fuchsia_sysmem::wire::SecureHeapAndRangeModification range_modification) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
@@ -817,7 +752,7 @@ zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
 }
 
 zx_status_t SysmemSecureMemServer::SetupVdec(uint64_t* physical_address, size_t* size_bytes) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(has_attempted_secmem_session_connection_);
   ZX_DEBUG_ASSERT(secmem_session_.has_value());
   uint32_t start;
@@ -834,7 +769,7 @@ zx_status_t SysmemSecureMemServer::SetupVdec(uint64_t* physical_address, size_t*
 
 zx_status_t SysmemSecureMemServer::ProtectMemoryRange(uint64_t physical_address, size_t size_bytes,
                                                       bool enable) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(has_attempted_secmem_session_connection_);
   ZX_DEBUG_ASSERT(secmem_session_.has_value());
   if (!VerifyRange(physical_address, size_bytes, kProtectedRangeGranularity)) {
@@ -855,7 +790,7 @@ zx_status_t SysmemSecureMemServer::ProtectMemoryRange(uint64_t physical_address,
 zx_status_t SysmemSecureMemServer::AdjustMemoryRange(uint64_t physical_address, size_t size_bytes,
                                                      uint32_t adjustment_magnitude, bool at_start,
                                                      bool longer) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(has_attempted_secmem_session_connection_);
   ZX_DEBUG_ASSERT(secmem_session_.has_value());
   if (!VerifyRange(physical_address, size_bytes, kProtectedRangeGranularity)) {
@@ -893,7 +828,7 @@ zx_status_t SysmemSecureMemServer::AdjustMemoryRange(uint64_t physical_address, 
 zx_status_t SysmemSecureMemServer::ZeroSubRangeIncrementally(bool is_covering_range_explicit,
                                                              uint64_t physical_address,
                                                              size_t size_bytes) {
-  ZX_DEBUG_ASSERT(thrd_current() == loop_thread_);
+  std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(has_attempted_secmem_session_connection_);
   ZX_DEBUG_ASSERT(secmem_session_.has_value());
   if (!VerifyRange(physical_address, size_bytes, zx_system_get_page_size())) {

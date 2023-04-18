@@ -38,10 +38,6 @@ zx_status_t AmlogicSecureMemDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t AmlogicSecureMemDevice::Bind() {
-  fdf_dispatcher_ = fdf_dispatcher_get_current_dispatcher();
-  fdf_dispatcher_closure_queue_.SetDispatcher(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_),
-                                              0);
-
   zx_status_t status = ZX_OK;
   status = ddk::PDevFidl::FromFragment(parent(), &pdev_proto_client_);
   if (status != ZX_OK) {
@@ -107,23 +103,66 @@ void AmlogicSecureMemDevice::DdkSuspend(ddk::SuspendTxn txn) {
   ZX_DEBUG_ASSERT((txn.suspend_reason() & DEVICE_MASK_SUSPEND_REASON) ==
                   DEVICE_SUSPEND_REASON_MEXEC);
 
-  if (sysmem_secure_mem_server_) {
+  // If the server is running, rendezvous with server shutdown and suspend asynchronously.
+  if (sysmem_secure_mem_server_.has_value()) {
     is_suspend_mexec_ = true;
+    suspend_txn_.emplace(std::move(txn));
 
-    // We'd like this to be able to suspend async, but instead since DdkSuspend() is a sync call, we
-    // have to pump the fdf_dispatcher_closure_queue_ below (so far).
-    sysmem_secure_mem_server_->StopAsync();
-
-    // TODO(dustingreen): If DdkSuspend() becomes async, consider not running closures directly
-    // here.  Or, if llcpp server binding permits unbind by an owner of the binding without
-    // requiring the whole dispatcher to shutdown, consider not running closures directly here.
-    while (sysmem_secure_mem_server_) {
-      fdf_dispatcher_closure_queue_.RunOneHere();
+    // We are shutting down the sysmem_secure_mem_server_ intentionally before any channel close. In
+    // this case, tell sysmem that all is well, before the sysmem_secure_mem_server_ closes the
+    // channel (which sysmem would otherwise intentionally interpret as justifying a hard reboot).
+    LOG(DEBUG, "calling sysmem_proto_client_.UnregisterSecureMem()...");
+    zx_status_t status = sysmem_proto_client_.UnregisterSecureMem();
+    LOG(DEBUG, "sysmem_proto_client_.UnregisterSecureMem() returned");
+    if (status != ZX_OK) {
+      // Ignore this failure here, but sysmem may panic if sysmem sees
+      // sysmem_secure_mem_server_ channel close without seeing UnregisterSecureMem() first.
+      LOG(ERROR, "sysmem_proto_client_.UnregisterSecureMem() failed (ignoring here) - status: %d",
+          status);
     }
+
+    sysmem_secure_mem_server_.AsyncCall(&SysmemSecureMemServer::Unbind);
+    // Suspend will continue at |SysmemSecureMemServerOnUnbound|.
+    return;
   }
 
   LOG(DEBUG, "aml-securemem: end DdkSuspend()");
   txn.Reply(ZX_OK, txn.requested_state());
+}
+
+void AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound(bool is_success) {
+  // We can assert this because we set up the call to this method using `receiver_.Once`.
+  ZX_DEBUG_ASSERT(fdf_dispatcher_get_current_dispatcher() == fdf_dispatcher_);
+  // Else the current lambda wouldn't be running.
+  ZX_DEBUG_ASSERT(sysmem_secure_mem_server_.has_value());
+
+  if (!is_success) {
+    // This unexpected loss of connection to sysmem should never happen.  Complain if it
+    // does happen.
+    //
+    // TODO(dustingreen): Determine if there's a way to cause the aml-securemem's devhost
+    // to get re-started cleanly.  Currently this is leaving the overall device in a state
+    // where DRM playback will likely be impossible (we should never get here).
+    //
+    // We may or may not see this message, depending on whether the sysmem failure causes a
+    // hard reboot first.
+    LOG(ERROR, "fuchsia::sysmem::Tee channel close !is_success - DRM playback will fail");
+  } else {
+    // If is_success, that means the sysmem_secure_mem_server_ is being shut down
+    // intentionally before any channel close.  So far, we only do this for suspend(mexec).
+    // See the initiation logic in AmlogicSecureMemDevice::DdkSuspend.
+    ZX_DEBUG_ASSERT(is_suspend_mexec_);
+  }
+
+  // Regardless of whether this is due to DdkSuspend() or unexpected channel closure, we
+  // won't be serving the fuchsia::sysmem::Tee channel any more. Destroy the SysmemSecureMemServer.
+  sysmem_secure_mem_server_.reset();
+  LOG(DEBUG, "Done serving fuchsia::sysmem::Tee");
+
+  if (suspend_txn_) {
+    suspend_txn_->Reply(ZX_OK, suspend_txn_->requested_state());
+    suspend_txn_.reset();
+  }
 }
 
 void AmlogicSecureMemDevice::GetSecureMemoryPhysicalAddress(
@@ -174,93 +213,49 @@ fpromise::result<zx_paddr_t, zx_status_t> AmlogicSecureMemDevice::GetSecureMemor
   return fpromise::ok(paddr);
 }
 
+AmlogicSecureMemDevice::AmlogicSecureMemDevice(zx_device_t* device)
+    : AmlogicSecureMemDeviceBase(device),
+      fdf_dispatcher_(fdf_dispatcher_get_current_dispatcher()),
+      receiver_(this, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_)) {
+  sysmem_secure_mem_server_loop_.StartThread("sysmem_secure_mem_server_loop");
+}
+
 zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
   ZX_DEBUG_ASSERT(tee_proto_client_.is_valid());
 
-  auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+  zx::result tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
   if (!tee_endpoints.is_ok()) {
     return tee_endpoints.status_value();
   }
+  auto& [tee_client, tee_server] = tee_endpoints.value();
+  sysmem_secure_mem_server_.emplace(async_patterns::PassDispatcher, tee_client.TakeChannel());
 
   const fuchsia_tee::wire::Uuid kSecmemUuid = {
       0x2c1a33c0, 0x44cc, 0x11e5, {0xbc, 0x3b, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
 
-  auto result = tee_proto_client_->ConnectToApplication(
-      kSecmemUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
-      std::move(tee_endpoints->server));
+  fidl::OneWayStatus result = tee_proto_client_->ConnectToApplication(
+      kSecmemUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(), std::move(tee_server));
   if (!result.ok()) {
     LOG(ERROR, "optee: tee_client_.ConnectToApplication() failed - status: %d", result.status());
     return result.status();
   }
-  sysmem_secure_mem_server_.emplace(fdf_dispatcher_, tee_endpoints->client.TakeChannel());
+
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::SecureMem>();
   if (endpoints.is_error()) {
     LOG(ERROR, "failed to create sysmem tee channels - status: %d", endpoints.status_value());
     return endpoints.status_value();
   }
   auto& [sysmem_secure_mem_client, sysmem_secure_mem_server] = endpoints.value();
-  zx_status_t status = sysmem_secure_mem_server_->BindAsync(
-      std::move(sysmem_secure_mem_server), &sysmem_secure_mem_server_thread_,
-      [this](bool is_success) {
-        ZX_DEBUG_ASSERT(thrd_current() == sysmem_secure_mem_server_thread_);
-        fdf_dispatcher_closure_queue_.Enqueue([this, is_success] {
-          ZX_DEBUG_ASSERT(fdf_dispatcher_get_current_dispatcher() == fdf_dispatcher_);
-          // Else the current lambda wouldn't be running.
-          ZX_DEBUG_ASSERT(sysmem_secure_mem_server_);
-          if (!is_success) {
-            // This unexpected loss of connection to sysmem should never happen.  Complain if it
-            // does happen.
-            //
-            // TODO(dustingreen): Determine if there's a way to cause the aml-securemem's devhost
-            // to get re-started cleanly.  Currently this is leaving the overall device in a state
-            // where DRM playback will likely be impossible (we should never get here).
-            //
-            // We may or may not see this message, depending on whether the sysmem failure causes a
-            // hard reboot first.
-            LOG(ERROR, "fuchsia::sysmem::Tee channel close !is_success - DRM playback will fail");
-          } else {
-            // If is_success, that means the sysmem_secure_mem_server_ is being shut down
-            // intentionally before any channel close.  So far, we only do this for suspend(mexec).
-            // In this case, tell sysmem that all is well, before the
-            // sysmem_secure_mem_server_.reset() below causes the channel to close (which sysmem
-            // would otherwise intentionally interpret as justifying a hard reboot).
-            ZX_DEBUG_ASSERT(is_suspend_mexec_);
-            LOG(DEBUG, "calling sysmem_proto_client_.UnregisterSecureMem()...");
-            zx_status_t status = sysmem_proto_client_.UnregisterSecureMem();
-            LOG(DEBUG, "sysmem_proto_client_.UnregisterSecureMem() returned");
-            if (status != ZX_OK) {
-              // Ignore this failure here, but sysmem may panic if sysmem sees
-              // sysmem_secure_mem_server_ channel close without seeing UnregisterSecureMem() first.
-              LOG(ERROR,
-                  "sysmem_proto_client_.UnregisterSecureMem() failed (ignoring here) - status: %d",
-                  status);
-            }
-          }
 
-          // Regardless of whether this is due to DdkSuspend() or unexpected channel closure, we
-          // won't be serving the fuchsia::sysmem::Tee channel any more. The ~SysmemSecureMemServer
-          // is designed to be called on the DDK thread.
-          //
-          // If DdkSuspend() is presently running, this lets it continue.
-          sysmem_secure_mem_server_.reset();
-          LOG(DEBUG, "Done serving fuchsia::sysmem::Tee");
-          // TODO(dustingreen): If DdkSuspend() were async, we could potentially finish the suspend
-          // here instead of pumping fdf_dispatcher_closure_queue_ until !sysmem_secure_mem_server_.
-          // Similar for an async DdkUnbind() (assuming that ever needs to be handled in this
-          // driver).
-        });
-      });
-  if (status != ZX_OK) {
-    LOG(ERROR, "sysmem_secure_mem_server_->BindAsync() failed - status: %d", status);
-    // When BindAsync() fails, we don't call StopAsync().
-    sysmem_secure_mem_server_.reset();
-    return status;
-  }
+  sysmem_secure_mem_server_.AsyncCall(
+      &SysmemSecureMemServer::Bind, std::move(sysmem_secure_mem_server),
+      receiver_.Once(&AmlogicSecureMemDevice::SysmemSecureMemServerOnUnbound));
 
   // Tell sysmem about the fidl::sysmem::Tee channel that sysmem will use (async) to configure
   // secure memory ranges.  Sysmem won't fidl call back during this banjo call.
   LOG(DEBUG, "calling sysmem_proto_client_.RegisterSecureMem()...");
-  status = sysmem_proto_client_.RegisterSecureMem(sysmem_secure_mem_client.TakeChannel());
+  zx_status_t status =
+      sysmem_proto_client_.RegisterSecureMem(sysmem_secure_mem_client.TakeChannel());
   if (status != ZX_OK) {
     // In this case sysmem_secure_mem_server_ will get cleaned up when the channel close is noticed
     // soon.
