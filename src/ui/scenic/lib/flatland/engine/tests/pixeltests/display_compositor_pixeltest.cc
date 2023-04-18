@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
@@ -155,6 +157,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   // display controllers are the AMLOGIC devices, and so we hardcode some of those AMLOGIC
   // assumptions here, such as making the pixel format for the capture image BGR24, as that
   // is the only capture format that AMLOGIC supports.
+  //
+  // TODO(fxbug.dev/125735): Instead of providing hardcoded pixel type for
+  // capture buffer, tests should let display driver make decision for the
+  // capture buffer format, and use the sysmem format in BufferCollectionInfo
+  // for capture-and-golden comparison.
   fpromise::result<fuchsia::sysmem::BufferCollectionSyncPtr, zx_status_t> SetupCapture(
       allocation::GlobalBufferCollectionId collection_id,
       fuchsia::sysmem::PixelFormatType pixel_type,
@@ -335,25 +342,28 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 #ifdef FAKE_DISPLAY
   bool CaptureCompare(cpp20::span<const uint8_t> captured_image,
                       cpp20::span<const uint8_t> input_image,
-                      zx_pixel_format_t input_image_pixel_format, uint32_t height, uint32_t width) {
-    FX_CHECK(input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
-             input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
-             input_image_pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
-             input_image_pixel_format == ZX_PIXEL_FORMAT_BGR_888x);
-    const int input_image_formats_bytes_per_pixel = ZX_PIXEL_FORMAT_BYTES(input_image_pixel_format);
+                      fuchsia::sysmem::PixelFormatType input_image_pixel_format_type,
+                      uint32_t height, uint32_t width) {
+    fuchsia_sysmem::wire::PixelFormat pixel_format = {
+        .type = static_cast<fuchsia_sysmem::wire::PixelFormatType>(input_image_pixel_format_type),
+        .format_modifier = {
+          .value = 0,
+        }};
+    FX_CHECK(input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::R8G8B8A8 ||
+             input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::BGRA32);
+    const int image_formats_bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(pixel_format);
     EXPECT_EQ(captured_image.size(),
-              static_cast<size_t>(width) * height * input_image_formats_bytes_per_pixel);
+              static_cast<size_t>(width) * height * image_formats_bytes_per_pixel);
     EXPECT_EQ(captured_image.size(), input_image.size());
     return memcmp(captured_image.data(), input_image.data(), captured_image.size()) == 0;
   }
 #else
   bool CaptureCompare(cpp20::span<const uint8_t> captured_image,
                       cpp20::span<const uint8_t> input_image,
-                      zx_pixel_format_t input_image_pixel_format, int height, int width) {
-    FX_CHECK(input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
-             input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
-             input_image_pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
-             input_image_pixel_format == ZX_PIXEL_FORMAT_BGR_888x);
+                      fuchsia::sysmem::PixelFormatType input_image_pixel_format_type, int height,
+                      int width) {
+    FX_CHECK(input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::R8G8B8A8 ||
+             input_image_pixel_format_type == fuchsia::sysmem::PixelFormatType::BGRA32);
 
     auto expected_rgba_image = std::vector<uint8_t>(input_image.begin(), input_image.end());
 
@@ -362,9 +372,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // images to R8G8B8A8 (where R8 is the least significant byte) for easier
     // comparison.
     for (size_t i = 0; i + 3 < expected_rgba_image.size(); i += 4) {
-      switch (input_image_pixel_format) {
-        case ZX_PIXEL_FORMAT_ARGB_8888:
-        case ZX_PIXEL_FORMAT_RGB_x888: {
+      switch (input_image_pixel_format_type) {
+        case fuchsia::sysmem::PixelFormatType::BGRA32: {
           uint8_t r, g, b, a;
           std::tie(b, g, r, a) = std::tie(expected_rgba_image[i + 0], expected_rgba_image[i + 1],
                                           expected_rgba_image[i + 2], expected_rgba_image[i + 3]);
@@ -372,10 +381,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
                    expected_rgba_image[i + 2], expected_rgba_image[i + 3]) = std::tie(r, g, b, a);
           break;
         }
-        case ZX_PIXEL_FORMAT_ABGR_8888:
-        case ZX_PIXEL_FORMAT_BGR_888x:
+        case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
           // No need to convert.
           break;
+        default:
+          FX_NOTREACHED();
       }
     }
 
@@ -385,8 +395,13 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // use ZX_PIXEL_FORMAT_RGB_888.
     const int capture_stride =
         ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888)), 64);
+    fuchsia_sysmem::wire::PixelFormat pixel_format = {
+        .type = static_cast<fuchsia_sysmem::wire::PixelFormatType>(input_image_pixel_format_type),
+        .format_modifier = {
+            .value = 0,
+        }};
     const int expected_stride =
-        ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(input_image_pixel_format)), 64);
+        ZX_ALIGN(width * static_cast<int>(ImageFormatStrideBytesPerWidthPixel(pixel_format)), 64);
 
     // Ignore the first row. It sometimes contains junk (hardware bug).
     const int start_row = 1;
@@ -565,11 +580,22 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
         ReleaseClientTextureBufferCollection(display_compositor, kTextureCollectionId);
       });
 
-  // Get a raw pointer for the texture's vmo and make it green.
-  const uint32_t num_pixels = kTextureWidth * kTextureHeight;
-  uint32_t col = (255U << 24) | (255U << 8);
+  // Setup the values we will compare the display capture against.
+  const uint32_t color = [pixel_format = GetParam()] {
+    switch (pixel_format) {
+      case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+        return /*A*/ (255U << 24) | /*B*/ (255U << 16);
+      case fuchsia::sysmem::PixelFormatType::BGRA32:
+        return /*A*/ (255U << 24) | /*B*/ (255U << 0);
+      default:
+        FX_NOTREACHED();
+        return 0u;
+    }
+  }();
 
-  // Get a raw pointer for the texture's vmo and make it green.
+  // Get a raw pointer for the texture's vmo and make it blue.
+  // We use blue instead of other colors, since it's easy to distinguish
+  // incorrect byte ordering of RGBA / BGRA.
   const size_t num_bytes = texture_bytes_per_row * kTextureHeight;
   std::vector<uint8_t> write_bytes(num_bytes, 0);
   for (int64_t row = 0; row < kTextureHeight; row++) {
@@ -577,7 +603,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
         reinterpret_cast<uint32_t*>(write_bytes.data() + texture_bytes_per_row * row),
         kTextureWidth);
     int64_t offset = reinterpret_cast<uint8_t*>(row_pixels.data()) - write_bytes.data();
-    std::fill(row_pixels.begin(), row_pixels.end(), col);
+    std::fill(row_pixels.begin(), row_pixels.end(), color);
   }
 
   switch (GetParam()) {
@@ -640,10 +666,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   std::vector<uint8_t> read_values;
   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-  // Compare the capture vmo data to the texture data above. Since we're doing a full screen
-  // render, the two should be identical. The comparison is a bit complicated though since
-  // the images are of two different formats.
-  bool images_are_same = CaptureCompare(read_values, write_bytes, kPixelFormat,
+  // Compare the capture vmo data to the texture data above.
+  bool images_are_same = CaptureCompare(read_values, write_bytes, GetParam(),
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
@@ -765,19 +789,17 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
     std::vector<uint8_t> read_values;
     CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-    // Compare the capture vmo data to the texture data above. Since we're doing a full screen
-    // render, the two should be identical. The comparison is a bit complicated though since
-    // the images are of two different formats.
+    // Compare the capture vmo data to the texture data above.
     bool images_are_same =
         CaptureCompare(read_values,
                        cpp20::span(reinterpret_cast<uint8_t*>(write_values.data()),
                                    write_values.size() * sizeof(uint32_t)),
-                       kPixelFormat, display->height_in_px(), display->width_in_px());
+                       GetParam(), display->height_in_px(), display->width_in_px());
     EXPECT_TRUE(images_are_same);
   }
 }
 
-// Renders a fullscreen green rectangle to the provided display using a solid color rect
+// Renders a fullscreen blue rectangle to the provided display using a solid color rect
 // instead of an image. Use the NullRenderer to confirm this is being rendered through
 // the display hardware.
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangleTest) {
@@ -828,8 +850,17 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
       utils::GetBytesPerRow(compare_collection_info.settings, kTextureWidth);
 
   // Setup the values we will compare the display capture against.
-  const uint32_t num_pixels = kTextureWidth * kTextureHeight;
-  uint32_t col = /*A*/ (255U << 24) | /*G*/ (51U << 8);
+  const uint32_t color = [pixel_format = GetParam()] {
+    switch (pixel_format) {
+      case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+        return /*A*/ (255U << 24) | /*B*/ (51U << 16);
+      case fuchsia::sysmem::PixelFormatType::BGRA32:
+        return /*A*/ (255U << 24) | /*B*/ (51U << 0);
+      default:
+        FX_NOTREACHED();
+        return 0u;
+    }
+  }();
 
   const size_t num_bytes = texture_bytes_per_row * kTextureHeight;
   std::vector<uint8_t> write_bytes(num_bytes, 0);
@@ -838,7 +869,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
         reinterpret_cast<uint32_t*>(write_bytes.data() + texture_bytes_per_row * row),
         kTextureWidth);
     int64_t offset = reinterpret_cast<uint8_t*>(row_pixels.data()) - write_bytes.data();
-    std::fill(row_pixels.begin(), row_pixels.end(), col);
+    std::fill(row_pixels.begin(), row_pixels.end(), color);
   }
 
   switch (GetParam()) {
@@ -897,10 +928,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   std::vector<uint8_t> read_values;
   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-  // Compare the capture vmo data to the texture data above. Since we're doing a full screen
-  // render, the two should be identical. The comparison is a bit complicated though since
-  // the images are of two different formats.
-  bool images_are_same = CaptureCompare(read_values, write_bytes, kPixelFormat,
+  // Compare the capture vmo data to the texture data above.
+  bool images_are_same = CaptureCompare(read_values, write_bytes, GetParam(),
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
@@ -1018,10 +1047,8 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   std::vector<uint8_t> readback_values;
   CaptureDisplayOutput(capture_info, capture_image_id, &readback_values);
 
-  // Compare the capture vmo data to the expected data above. Since we're doing a full screen
-  // render, the two should be identical. The comparison is a bit complicated though since
-  // the images are of two different formats.
-  bool images_are_same = CaptureCompare(readback_values, expected_values, kPixelFormat,
+  // Compare the capture vmo data to the expected data above.
+  bool images_are_same = CaptureCompare(readback_values, expected_values, GetParam(),
                                         display->height_in_px(), display->width_in_px());
   EXPECT_TRUE(images_are_same);
 }
@@ -1182,10 +1209,11 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                    CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
                    // Compare the capture vmo data to the values we are expecting.
-
-                   bool images_are_same =
-                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
-                                      display->height_in_px(), display->width_in_px());
+                   const fuchsia::sysmem::PixelFormatType render_target_pixel_format =
+                       render_target_info.settings.image_format_constraints.pixel_format.type;
+                   bool images_are_same = CaptureCompare(
+                       read_values, cpp20::span(vmo_host, num_bytes), render_target_pixel_format,
+                       display->height_in_px(), display->width_in_px());
                    EXPECT_TRUE(images_are_same);
 
                    // Make sure that the vmo_host has the right amount of blue and red colors, so
@@ -1277,11 +1305,13 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
       });
 
   // Write to the two textures. Make the first blue and opaque and the second red and
-  // half transparent. Format is ARGB.
-  uint32_t cols[] = {(255 << 24) | (255U << 0), (128 << 24) | (255U << 16)};
+  // half transparent. Format is BGRA32.
+  constexpr uint32_t kBgraBlue = (255 << 24) | (255U << 0);
+  constexpr uint32_t kBgraRedTranslucent = (128 << 24) | (255U << 16);
+  constexpr uint32_t kBgraColors[] = {kBgraBlue, kBgraRedTranslucent};
   for (uint32_t i = 0; i < 2; i++) {
     std::vector<uint32_t> write_values;
-    write_values.assign(kTextureWidth * kTextureHeight, cols[i]);
+    write_values.assign(kTextureWidth * kTextureHeight, kBgraColors[i]);
     MapHostPointer(texture_collection_info, /*vmo_index*/ i, HostPointerAccessMode::kWriteOnly,
                    [write_values](uint8_t* vmo_host, uint32_t num_bytes) {
                      EXPECT_TRUE(num_bytes >= sizeof(uint32_t) * write_values.size());
@@ -1325,44 +1355,64 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
-  MapHostPointer(render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
-                 [&](const uint8_t* vmo_host, uint32_t num_bytes) {
-                   // Grab the capture vmo data.
-                   std::vector<uint8_t> read_values;
-                   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+  MapHostPointer(
+      render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) {
+        // Grab the capture vmo data.
+        std::vector<uint8_t> read_values;
+        CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-                   // Compare the capture vmo data to the values we are expecting.
-                   bool images_are_same =
-                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
-                                      display->height_in_px(), display->width_in_px());
-                   EXPECT_TRUE(images_are_same);
+        const fuchsia::sysmem::PixelFormatType render_target_pixel_format_type =
+            render_target_info.settings.image_format_constraints.pixel_format.type;
 
-                   // Make sure that the vmo_host has the right amount of blue and red colors, so
-                   // that we know that even if the display matches the render target, that its not
-                   // just because both are black or some other wrong colors.
-                   uint32_t num_blue = 0, num_red = 0, num_overlap = 0;
-                   uint32_t num_pixels = num_bytes / 4;
-                   const uint32_t* host_ptr = reinterpret_cast<const uint32_t*>(vmo_host);
-                   for (uint32_t i = 0; i < num_pixels; i++) {
-                     uint32_t curr_col = host_ptr[i];
-                     if (curr_col == cols[0]) {
-                       num_blue++;
-                     } else if (curr_col == cols[1]) {
-                       num_red++;
-                     } else if (curr_col != 0) {
-                       num_overlap++;
-                     }
-                   }
+        // Compare the capture vmo data to the values we are expecting.
+        bool images_are_same = CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes),
+                                              render_target_pixel_format_type,
+                                              display->height_in_px(), display->width_in_px());
+        EXPECT_TRUE(images_are_same);
 
-                   // Due to image formating, the number of "pixels" in the image above might not be
-                   // the same as the number of pixels that are actually on the screen.
-                   uint32_t num_screen_pixels =
-                       (display->width_in_px() / 2 - kNumOverlappingRows) * display->height_in_px();
-                   EXPECT_EQ(num_blue, num_screen_pixels);
-                   EXPECT_EQ(num_red, num_screen_pixels);
-                   EXPECT_EQ(num_overlap, (display->width_in_px() * display->height_in_px()) -
-                                              2 * num_screen_pixels);
-                 });
+        // Make sure that the vmo_host has the right amount of blue and red colors, so
+        // that we know that even if the display matches the render target, that its not
+        // just because both are black or some other wrong colors.
+        uint32_t num_blue = 0, num_red = 0, num_overlap = 0;
+        uint32_t num_pixels = num_bytes / 4;
+        const uint32_t* host_ptr = reinterpret_cast<const uint32_t*>(vmo_host);
+        for (uint32_t i = 0; i < num_pixels; i++) {
+          const uint32_t current_color_render_target_format = host_ptr[i];
+          uint32_t current_color_bgra = 0;
+          switch (render_target_pixel_format_type) {
+            case fuchsia::sysmem::PixelFormatType::BGRA32:
+              current_color_bgra = current_color_render_target_format;
+              break;
+            case fuchsia::sysmem::PixelFormatType::R8G8B8A8: {
+              cpp20::span<const uint8_t> rgba(
+                  reinterpret_cast<const uint8_t*>(&current_color_render_target_format), 4);
+              current_color_bgra =
+                  (rgba[3] << 24) | (rgba[0] << 16) | (rgba[1] << 8) | (rgba[2] << 0);
+              break;
+            }
+            default:
+              GTEST_FAIL() << "Unsupported pixel format "
+                           << static_cast<int>(render_target_pixel_format_type);
+          }
+          if (current_color_bgra == kBgraColors[0]) {
+            num_blue++;
+          } else if (current_color_bgra == kBgraColors[1]) {
+            num_red++;
+          } else if (current_color_bgra != 0) {
+            num_overlap++;
+          }
+        }
+
+        // Due to image formating, the number of "pixels" in the image above might not be
+        // the same as the number of pixels that are actually on the screen.
+        uint32_t num_screen_pixels =
+            (display->width_in_px() / 2 - kNumOverlappingRows) * display->height_in_px();
+        EXPECT_EQ(num_blue, num_screen_pixels);
+        EXPECT_EQ(num_red, num_screen_pixels);
+        EXPECT_EQ(num_overlap,
+                  (display->width_in_px() * display->height_in_px()) - 2 * num_screen_pixels);
+      });
 }
 
 class DisplayCompositorParameterizedTest
@@ -1527,7 +1577,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
 
                    // Compare the capture vmo data to the values we are expecting.
                    bool images_are_same =
-                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
+                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), GetParam(),
                                       display->height_in_px(), display->width_in_px());
                    EXPECT_TRUE(images_are_same);
 
@@ -1698,53 +1748,76 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
-  MapHostPointer(render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
-                 [&](const uint8_t* vmo_host, uint32_t num_bytes) {
-                   // Grab the capture vmo data.
-                   std::vector<uint8_t> read_values;
-                   CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+  MapHostPointer(
+      render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) {
+        // Grab the capture vmo data.
+        std::vector<uint8_t> read_values;
+        CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
 
-                   // Compare the capture vmo data to the values we are expecting.
-                   bool images_are_same =
-                       CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), kPixelFormat,
-                                      display->height_in_px(), display->width_in_px());
-                   EXPECT_TRUE(images_are_same);
+        const fuchsia::sysmem::PixelFormatType render_target_pixel_format_type =
+            render_target_info.settings.image_format_constraints.pixel_format.type;
 
-                   // There should be a total of 3 white pixels and 1 blue pixel.
-                   uint32_t num_white = 0, num_blue = 0;
-                   uint32_t num_pixels = num_bytes / 4;
-                   const uint32_t kWhiteColor = 0xFFFFFFFF;
-                   const uint32_t kBlueColor = 0xFF0000FF;
-                   for (uint32_t i = 0; i < num_pixels; i += 4) {
-                     // |vmo_host| has BGRA sequence in pixel values.
-                     auto a = vmo_host[i];
-                     auto b = vmo_host[i + 1];
-                     auto c = vmo_host[i + 2];
-                     auto d = vmo_host[i + 3];
-                     uint32_t val = (a << 24) | (b << 16) | (c << 8) | d;
-                     if (val == kWhiteColor) {
-                       num_white++;
-                     } else if (val == kBlueColor) {
-                       num_blue++;
-                     }
-                   }
-                   EXPECT_EQ(num_white, 3U);
-                   EXPECT_EQ(num_blue, 1U);
+        // Compare the capture vmo data to the values we are expecting.
+        bool images_are_same = CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes),
+                                              render_target_pixel_format_type,
+                                              display->height_in_px(), display->width_in_px());
+        EXPECT_TRUE(images_are_same);
 
-                   auto get_pixel = [&display](const uint8_t* vmo_host, uint32_t x,
-                                               uint32_t y) -> uint32_t {
-                     uint32_t index = y * display->width_in_px() * 4 + x * 4;
-                     auto a = vmo_host[index];
-                     auto b = vmo_host[index + 1];
-                     auto c = vmo_host[index + 2];
-                     auto d = vmo_host[index + 3];
-                     return (a << 24) | (b << 16) | (c << 8) | d;
-                   };
+        // There should be a total of 3 white pixels and 1 blue pixel.
+        uint32_t num_white = 0, num_blue = 0;
+        uint32_t num_pixels = num_bytes / 4;
+        const uint32_t kWhiteColorBgra = 0xFFFFFFFF;
+        const uint32_t kBlueColorBgra = 0xFF0000FF;
+        for (uint32_t i = 0; i < num_pixels; i += 4) {
+          // |vmo_host| has BGRA sequence in pixel values.
+          uint32_t bgra = 0;
+          switch (render_target_pixel_format_type) {
+            case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+              bgra = (vmo_host[i + 3] << 24) | (vmo_host[i + 0] << 16) | (vmo_host[i + 1] << 8) |
+                     vmo_host[i + 2];
+              break;
+            case fuchsia::sysmem::PixelFormatType::BGRA32:
+              bgra = (vmo_host[i + 3] << 24) | (vmo_host[i + 2] << 16) | (vmo_host[i + 1] << 8) |
+                     vmo_host[i + 0];
+              break;
+            default:
+              GTEST_FAIL() << "Unexpected pixel format "
+                           << static_cast<int>(render_target_pixel_format_type);
+          }
+          if (bgra == kWhiteColorBgra) {
+            num_white++;
+          } else if (bgra == kBlueColorBgra) {
+            num_blue++;
+          }
+        }
+        EXPECT_EQ(num_white, 3U);
+        EXPECT_EQ(num_blue, 1U);
 
-                   // Expect the top-right corner of the rect to be blue.
-                   EXPECT_EQ(get_pixel(vmo_host, 0, 0), kWhiteColor);
-                   EXPECT_EQ(get_pixel(vmo_host, 1, 0), kBlueColor);
-                 });
+        auto get_bgra_pixel =
+            [&display, pixel_format_type =
+                           render_target_info.settings.image_format_constraints.pixel_format.type](
+                const uint8_t* vmo_host, uint32_t x, uint32_t y) -> uint32_t {
+          uint32_t index = y * display->width_in_px() * 4 + x * 4;
+
+          switch (pixel_format_type) {
+            case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
+              return (vmo_host[index + 3] << 24) | (vmo_host[index + 0] << 16) |
+                     (vmo_host[index + 1] << 8) | vmo_host[index + 2];
+            case fuchsia::sysmem::PixelFormatType::BGRA32:
+              return (vmo_host[index + 3] << 24) | (vmo_host[index + 2] << 16) |
+                     (vmo_host[index + 1] << 8) | vmo_host[index + 0];
+            default:
+              EXPECT_TRUE(false) << "Unexpected pixel format "
+                                 << static_cast<int>(pixel_format_type);
+              return 0;
+          }
+        };
+
+        // Expect the top-right corner of the rect to be blue.
+        EXPECT_EQ(get_bgra_pixel(vmo_host, 0, 0), kWhiteColorBgra);
+        EXPECT_EQ(get_bgra_pixel(vmo_host, 1, 0), kBlueColorBgra);
+      });
 }
 
 }  // namespace test
