@@ -192,12 +192,13 @@ zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
     return client_end.status_value();
   }
 
-  ddk::GpioProtocolClient gpio(parent, "gpio");
-  if (!gpio.is_valid()) {
-    zxlogf(ERROR, "Failed to get GPIO for interrupt pin");
-    return ZX_ERR_INTERNAL;
+  ddk::GpioProtocolClient gpio;
+  zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(parent, "gpio", &gpio);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get GPIO for interrupt pin: %s", zx_status_get_string(status));
+    return status;
   }
-  zx_status_t status = gpio.ConfigIn(GPIO_PULL_UP);
+  status = gpio.ConfigIn(GPIO_PULL_UP);
   if (status != ZX_OK) {
     zxlogf(ERROR, "GPIO ConfigIn() failed: %s", zx_status_get_string(status));
   }
