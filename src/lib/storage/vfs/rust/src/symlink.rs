@@ -14,14 +14,16 @@ use {
         path::Path,
     },
     anyhow::Error,
+    async_trait::async_trait,
     fidl::endpoints::{ControlHandle as _, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, select, StreamExt},
     std::sync::Arc,
 };
 
+#[async_trait]
 pub trait Symlink: Send + Sync {
-    fn read_target(&self) -> Result<Vec<u8>, zx::Status>;
+    async fn read_target(&self) -> Result<Vec<u8>, zx::Status>;
 }
 
 pub struct Connection {
@@ -88,7 +90,7 @@ impl Connection {
         }
 
         let target = if describe {
-            match symlink.read_target() {
+            match symlink.read_target().await {
                 Ok(target) => Some(target),
                 Err(status) => {
                     send_on_open_with_error(describe, server_end, status);
@@ -186,7 +188,7 @@ impl Connection {
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target() {
+            fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target().await {
                 Ok(target) => responder
                     .send(fio::SymlinkInfo { target: Some(target), ..fio::SymlinkInfo::EMPTY })?,
                 Err(status) => {
@@ -230,7 +232,7 @@ impl Connection {
             mode: fio::MODE_TYPE_SYMLINK
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false),
             id: fio::INO_UNKNOWN,
-            content_size: self.symlink.read_target()?.len() as u64,
+            content_size: self.symlink.read_target().await?.len() as u64,
             storage_size: 0,
             link_count: 1,
             creation_time: 0,
@@ -266,6 +268,7 @@ mod tests {
         super::{Connection, Symlink},
         crate::{common::rights_to_posix_mode_bits, execution_scope::ExecutionScope},
         assert_matches::assert_matches,
+        async_trait::async_trait,
         fidl::endpoints::{create_proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::StreamExt,
@@ -274,8 +277,9 @@ mod tests {
 
     struct TestSymlink;
 
+    #[async_trait]
     impl Symlink for TestSymlink {
-        fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
+        async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
             Ok(b"target".to_vec())
         }
     }

@@ -155,6 +155,9 @@ impl MutableConnection {
             | fio::DirectoryRequest::Watch { .. }) => {
                 return this.as_mut().base.handle_request(request).await;
             }
+            fio::DirectoryRequest::CreateSymlink { responder, .. } => {
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            }
         }
         Ok(ConnectionState::Alive)
     }

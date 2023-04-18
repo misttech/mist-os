@@ -73,7 +73,7 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
               fidl::InterfaceRequest<fuchsia::io::Node> object_request) override {
     object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
-  void UpdateAttributes(fuchsia::io::MutableNodeAttributes MutableNodeAttributes,
+  void UpdateAttributes(fuchsia::io::MutableNodeAttributes mutable_node_attributes,
                         UpdateAttributesCallback callback) override {
     callback(fuchsia::io::Node2_UpdateAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
@@ -82,6 +82,12 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
     fidl::InterfaceRequest<fuchsia::io::Node>(std::move(object_request))
         .Close(ZX_ERR_NOT_SUPPORTED);
   }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  void CreateSymlink(std::string name, std::vector<uint8_t> target,
+                     CreateSymlinkCallback callback) override {
+    callback(fuchsia::io::Directory2_CreateSymlink_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
+#endif
 
  protected:
   // |Connection| Implementation:

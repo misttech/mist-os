@@ -319,4 +319,24 @@ protocol Directory2 {
     //     dst_parent_token Token;
     //     dst Name;
     // }) -> () error zx.status;
+
+    /// Creates a symbolic link.
+    ///
+    /// `name` is the name to be given to the created symbolic link.
+    /// `target` is the target of the symbolic link, which has no meaning on the server. The server
+    /// will perform no validation of `target` except for a server chosen maximum length.
+    ///
+    /// * [`Rights.MODIFY_DIRECTORY`]
+    ///
+    /// * error `ZX_ERR_ALREADY_EXISTS` if `name` already exists.
+    /// * error `ZX_ERR_BAD_PATH` if `target` exceeds the server length limit for symbolic links.
+    /// * error `ZX_ERR_INVALID_ARGS` if `name` is not a valid [`Name`].
+    /// * error `ZX_ERR_NOT_SUPPORTED` if creating symbolic links is not supported by the server.
+    @available(added=HEAD)
+    @selector("fuchsia.io/Directory.CreateSymlink")
+    @transitional
+    CreateSymlink(struct {
+        name Name;
+        target SymlinkTarget;
+    }) -> () error zx.status;
 };
