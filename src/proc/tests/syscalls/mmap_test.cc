@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <lib/stdcompat/string_view.h>
+#include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
@@ -11,6 +12,8 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <charconv>
+#include <optional>
 #include <string>
 #include <thread>
 
@@ -18,6 +21,7 @@
 
 #include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/split_string.h"
+#include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/proc/tests/syscalls/proc_test.h"
 #include "src/proc/tests/syscalls/test_helper.h"
@@ -29,6 +33,64 @@ constexpr size_t PAGE_SIZE = 0x1000;
 #endif
 
 namespace {
+
+struct MemoryMapping {
+  uintptr_t start;
+  uintptr_t end;
+  std::string perms;
+  size_t offset;
+  std::string device;
+  size_t inode;
+  std::string pathname;
+};
+
+std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps) {
+  std::vector<std::string_view> lines =
+      fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+  // format:
+  // start-end perms offset device inode path
+  for (auto line : lines) {
+    std::vector<std::string_view> parts =
+        fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (parts.size() < 5) {
+      return std::nullopt;
+    }
+    std::vector<std::string_view> addrs =
+        fxl::SplitString(parts[0], "-", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (addrs.size() != 2) {
+      return std::nullopt;
+    }
+
+    uintptr_t start;
+    uintptr_t end;
+
+    if (!fxl::StringToNumberWithError(addrs[0], &start, fxl::Base::k16) ||
+        !fxl::StringToNumberWithError(addrs[1], &end, fxl::Base::k16)) {
+      return std::nullopt;
+    }
+
+    if (addr >= start && addr < end) {
+      size_t offset;
+      size_t inode;
+      if (!fxl::StringToNumberWithError(parts[2], &offset, fxl::Base::k16) ||
+          !fxl::StringToNumberWithError(parts[4], &inode, fxl::Base::k10)) {
+        return std::nullopt;
+      }
+
+      std::string pathname;
+      if (parts.size() > 5) {
+        pathname = parts[5];
+      }
+
+      MemoryMapping mapping = {
+          start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
+      };
+
+      return mapping;
+    }
+  }
+  return std::nullopt;
+}
 
 #if __x86_64__
 
@@ -149,33 +211,41 @@ TEST(MMapTest, MapFileThenGrow) {
 
 class MMapProcTest : public ProcTest {};
 
+TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
+  uintptr_t stack_addr = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  uintptr_t vdso_addr = reinterpret_cast<uintptr_t>(getauxval(AT_SYSINFO_EHDR));
+
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
+  auto stack_mapping = find_memory_mapping(stack_addr, maps);
+  ASSERT_NE(stack_mapping, std::nullopt);
+  EXPECT_EQ(stack_mapping->pathname, "[stack]");
+
+  if (vdso_addr) {
+    auto vdso_mapping = find_memory_mapping(vdso_addr, maps);
+    ASSERT_NE(vdso_mapping, std::nullopt);
+    EXPECT_EQ(vdso_mapping->pathname, "[vdso]");
+  }
+}
+
 TEST_F(MMapProcTest, MapFileWithNewlineInName) {
-  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
   std::string path = dir + "/mmap\nnewline";
-  int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777);
-  ASSERT_GE(fd, 0);
-  SAFE_SYSCALL(ftruncate(fd, page_size));
-  void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd, 0);
+  ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  ASSERT_TRUE(fd);
+  SAFE_SYSCALL(ftruncate(fd.get(), page_size));
+  void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
   std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
-  std::vector<std::string_view> lines =
-      fxl::SplitString(maps, "\n", fxl::kKeepWhitespace, fxl::kSplitWantNonEmpty);
-  bool found_entry = false;
-  for (auto line : lines) {
-    if (cpp20::starts_with(line, address_formatted)) {
-      std::vector<std::string_view> parts =
-          fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-      ASSERT_FALSE(parts.empty()) << line;
-      EXPECT_EQ(parts.back(), dir + "/mmap\\012newline");
-      found_entry = true;
-    }
-  }
-  EXPECT_TRUE(found_entry);
-  close(fd);
+  auto mapping = find_memory_mapping(reinterpret_cast<uintptr_t>(p), maps);
+  EXPECT_NE(mapping, std::nullopt);
+  EXPECT_EQ(mapping->pathname, dir + "/mmap\\012newline");
+
+  munmap(p, page_size);
   unlink(path.c_str());
 }
 
@@ -628,32 +698,28 @@ bool TryWrite(uintptr_t addr) {
 TEST_F(MMapProcTest, MProtectIsThreadSafe) {
   ForkHelper helper;
   helper.RunInForkedProcess([&] {
-    const size_t kPageSize = sysconf(_SC_PAGE_SIZE);
-    const size_t kMmapSize = kPageSize * 3;
-    // Map 3 pages, with PROT_READ, so once we change the permissions in the
-    // middle one it will be singled out in /proc/self/maps.
-    void* mmap1 = mmap(NULL, kMmapSize, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    const size_t page_size = sysconf(_SC_PAGE_SIZE);
+    void* mmap1 = mmap(NULL, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     ASSERT_NE(mmap1, MAP_FAILED);
-    uintptr_t addr = reinterpret_cast<uintptr_t>(mmap1) + kPageSize;
+    uintptr_t addr = reinterpret_cast<uintptr_t>(mmap1);
     ASSERT_TRUE(TryRead(addr));
     ASSERT_FALSE(TryWrite(addr));
 
-    std::string address_formatted = fxl::StringPrintf("%8lx", addr);
     std::atomic<bool> start = false;
     std::atomic<int> count = 2;
 
-    std::thread protect_rw([addr, &start, &count, kPageSize]() {
+    std::thread protect_rw([addr, &start, &count, page_size]() {
       count -= 1;
       while (!start) {
       }
-      ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), kPageSize, PROT_READ | PROT_WRITE));
+      ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), page_size, PROT_READ | PROT_WRITE));
     });
 
-    std::thread protect_none([addr, &start, &count, kPageSize]() {
+    std::thread protect_none([addr, &start, &count, page_size]() {
       count -= 1;
       while (!start) {
       }
-      ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), kPageSize, PROT_NONE));
+      ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), page_size, PROT_NONE));
     });
 
     while (count != 0) {
@@ -665,16 +731,10 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
     std::string maps;
 
     ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
-    std::vector<std::string_view> lines =
-        fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-    std::string perms = "";
-    for (auto line : lines) {
-      if (cpp20::starts_with(line, address_formatted)) {
-        std::vector<std::string_view> parts =
-            fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
-        perms = parts[1];
-      }
-    }
+    auto mapping = find_memory_mapping(addr, maps);
+    ASSERT_NE(mapping, std::nullopt);
+
+    std::string perms = mapping->perms;
     ASSERT_FALSE(perms.empty());
 
     if (cpp20::starts_with(std::string_view(perms), "---p")) {
@@ -691,13 +751,13 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
       *ptr = 5;
       EXPECT_EQ(*ptr, 5);
     } else {
-      ASSERT_FALSE(true);
+      ASSERT_FALSE(true) << "invalid perms for mapping: " << perms;
     }
   });
 }
 
 TEST(Mprotect, GrowTempFilePermisisons) {
-  const size_t kPageSize = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
   std::string path = dir + "/grow_temp_file_permissions";
@@ -717,10 +777,10 @@ TEST(Mprotect, GrowTempFilePermisisons) {
     ScopedFD fd = ScopedFD(open(path.c_str(), O_RDONLY));
     ASSERT_EQ(-1, write(fd.get(), buf, sizeof(buf)));
 
-    void* ptr = mmap(NULL, kPageSize, PROT_READ, MAP_SHARED, fd.get(), 0);
+    void* ptr = mmap(NULL, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
     EXPECT_NE(ptr, MAP_FAILED);
 
-    EXPECT_NE(mprotect(ptr, kPageSize, PROT_READ | PROT_WRITE), 0);
+    EXPECT_NE(mprotect(ptr, page_size, PROT_READ | PROT_WRITE), 0);
     ForkHelper helper;
     helper.RunInForkedProcess([ptr] { *reinterpret_cast<volatile char*>(ptr) = 'b'; });
     EXPECT_FALSE(helper.WaitForChildren());
