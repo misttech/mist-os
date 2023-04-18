@@ -1421,7 +1421,7 @@ Set to true to use the Python implementation for remote wrappers,
 as opposed to the older (slower) bash scripts.  This option will
 eventually disappear upon completing the transition to the Python scripts.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //build/toolchain/rbe.gni:22
 
@@ -7377,7 +7377,7 @@ From //build/toolchain/rbe.gni:103
 
 ### rust_rbe_use_python_impl
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //build/toolchain/rbe.gni:23
 
@@ -7817,9 +7817,9 @@ From //src/starnix/kernel/BUILD.gn:23
 
 ### starnix_restricted_mode
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:16
+From //src/starnix/kernel/BUILD.gn:14
 
 ### target_cpu
 
