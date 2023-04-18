@@ -139,12 +139,10 @@ void RadarReaderProxy::HandleFatalError(const zx_status_t status) {
       [&](auto client_end) { return ValidateDevice(std::move(client_end)); });
 }
 
-void RadarReaderProxy::UpdateVmoCount(const size_t count,
-                                      ReaderInstance::RegisterVmosCompleter::Async completer) {
+void RadarReaderProxy::UpdateVmoCount(const size_t count) {
   ZX_DEBUG_ASSERT(burst_size_);
 
   if (count <= vmo_pool_.size()) {
-    completer.Reply(fit::success());
     return;
   }
 
@@ -163,14 +161,12 @@ void RadarReaderProxy::UpdateVmoCount(const size_t count,
         vmo.mapped_vmo.CreateAndMap(*burst_size_, ZX_VM_PERM_READ, nullptr, &vmo.vmo);
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to create and map VMO";
-      completer.Close(status);
       HandleFatalError(status);
       return;
     }
 
     if ((status = vmo.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmos[i])) != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to duplicate VMO";
-      completer.Close(status);
       HandleFatalError(status);
       return;
     }
@@ -178,22 +174,18 @@ void RadarReaderProxy::UpdateVmoCount(const size_t count,
     vmo_pool_.push_back(std::move(vmo));
   }
 
-  radar_client_->RegisterVmos({std::move(vmo_ids), std::move(vmos)})
-      .Then([&, comp = std::move(completer)](const auto& result) mutable {
-        if (result.is_error()) {
-          zx_status_t status = ZX_ERR_BAD_STATE;
-          if (result.error_value().is_framework_error()) {
-            status = result.error_value().is_framework_error();
-            FX_PLOGS(ERROR, status) << "Failed to send register VMOs request";
-          } else {
-            FX_LOGS(ERROR) << "Failed to register VMOs";
-          }
-          comp.Close(status);
-          HandleFatalError(status);
-        } else {
-          comp.Reply(fit::success());
-        }
-      });
+  radar_client_->RegisterVmos({std::move(vmo_ids), std::move(vmos)}).Then([&](const auto& result) {
+    if (result.is_error()) {
+      zx_status_t status = ZX_ERR_BAD_STATE;
+      if (result.error_value().is_framework_error()) {
+        status = result.error_value().is_framework_error();
+        FX_PLOGS(ERROR, status) << "Failed to send register VMOs request";
+      } else {
+        FX_LOGS(ERROR) << "Failed to register VMOs";
+      }
+      HandleFatalError(status);
+    }
+  });
 }
 
 void RadarReaderProxy::StartBursts() {
@@ -203,26 +195,18 @@ void RadarReaderProxy::StartBursts() {
   }
 }
 
-void RadarReaderProxy::StopBursts(
-    std::optional<ReaderInstance::StopBurstsCompleter::Async> completer) {
+void RadarReaderProxy::StopBursts() {
   for (const auto& instance : instances_) {
+    // Don't stop bursts if any client still wants to receive them.
     if (instance->bursts_started()) {
-      if (completer) {
-        completer->Reply();
-      }
       return;
     }
   }
 
-  radar_client_->StopBursts().Then([&, comp = std::move(completer)](const auto& result) mutable {
+  radar_client_->StopBursts().Then([&](const auto& result) {
     if (result.is_error()) {
       FX_PLOGS(ERROR, result.error_value().status()) << "Failed to send stop bursts request";
-      if (comp) {
-        comp->Close(result.error_value().status());
-      }
       HandleFatalError(result.error_value().status());
-    } else if (comp) {
-      comp->Reply();
     }
   });
 }
@@ -236,7 +220,7 @@ void RadarReaderProxy::InstanceUnbound(ReaderInstance* const instance) {
       // Stop bursts if this was the last client that wanted to receive them. We may be handling a
       // fatal error in which case the client has already been unbound.
       if (radar_client_) {
-        StopBursts({});
+        StopBursts();
       }
       return;
     }
@@ -261,10 +245,9 @@ void RadarReaderProxy::ReaderInstance::GetBurstSize(GetBurstSizeCompleter::Sync&
 void RadarReaderProxy::ReaderInstance::RegisterVmos(RegisterVmosRequest& request,
                                                     RegisterVmosCompleter::Sync& completer) {
   const fit::result result = manager_.RegisterVmos(request.vmo_ids(), std::move(request.vmos()));
+  completer.Reply(result);
   if (result.is_ok()) {
-    parent_->UpdateVmoCount(vmo_count_ += request.vmo_ids().size(), completer.ToAsync());
-  } else {
-    completer.Reply(result);
+    parent_->UpdateVmoCount(vmo_count_ += request.vmo_ids().size());
   }
 }
 
@@ -281,7 +264,10 @@ void RadarReaderProxy::ReaderInstance::StartBursts(StartBurstsCompleter::Sync& c
 
 void RadarReaderProxy::ReaderInstance::StopBursts(StopBurstsCompleter::Sync& completer) {
   bursts_started_ = false;
-  parent_->StopBursts(completer.ToAsync());
+  // We know that no more bursts will be sent on the channel after setting this flag, so it is safe
+  // to immediately reply.
+  completer.Reply();
+  parent_->StopBursts();
 }
 
 void RadarReaderProxy::ReaderInstance::UnlockVmo(UnlockVmoRequest& request,

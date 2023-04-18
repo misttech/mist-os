@@ -88,9 +88,9 @@ class RadarReaderProxy : public RadarProxy,
   void HandleFatalError(zx_status_t status);
 
   // Called by ReaderInstance
-  void UpdateVmoCount(size_t count, ReaderInstance::RegisterVmosCompleter::Async completer);
+  void UpdateVmoCount(size_t count);
   void StartBursts();
-  void StopBursts(std::optional<ReaderInstance::StopBurstsCompleter::Async> completer);
+  void StopBursts();
   void InstanceUnbound(ReaderInstance* instance);
 
   async_dispatcher_t* const dispatcher_;
