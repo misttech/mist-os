@@ -47,6 +47,88 @@ class BoolGolangFlagTests(unittest.TestCase):
                 cl_utils.bool_golang_flag(v)
 
 
+class PartitionSequenceTests(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(
+            cl_utils.partition_sequence([], 28),
+            ([], None, []),
+        )
+
+    def test_int_not_found(self):
+        seq = [5, 234, 1, 9]
+        self.assertEqual(
+            cl_utils.partition_sequence(seq, 28),
+            (seq, None, []),
+        )
+
+    def test_sep_found_at_beginning(self):
+        left = []
+        sep = 'z'
+        right = ['x', 'y']
+        seq = left + [sep] + right
+        self.assertEqual(
+            cl_utils.partition_sequence(seq, sep),
+            (left, sep, right),
+        )
+
+    def test_sep_found_in_middle(self):
+        left = ['12', '34']
+        sep = 'zz'
+        right = ['23', 'asdf']
+        seq = left + [sep] + right
+        self.assertEqual(
+            cl_utils.partition_sequence(seq, sep),
+            (left, sep, right),
+        )
+
+    def test_sep_found_at_end(self):
+        left = ['12', '34', 'qw', 'er']
+        sep = 'yy'
+        right = []
+        seq = left + [sep] + right
+        self.assertEqual(
+            cl_utils.partition_sequence(seq, sep),
+            (left, sep, right),
+        )
+
+
+class SplitIntoSubequencesTests(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(
+            list(cl_utils.split_into_subsequences([], None)),
+            [[]],
+        )
+
+    def test_only_separators(self):
+        sep = ':'
+        self.assertEqual(
+            list(cl_utils.split_into_subsequences([sep] * 4, sep)),
+            [[]] * 5,
+        )
+
+    def test_no_match_separators(self):
+        seq = ['a', 'b', 'c', 'd', 'e']
+        sep = '%'
+        self.assertEqual(
+            list(cl_utils.split_into_subsequences(seq, sep)),
+            [seq],
+        )
+
+    def test_different_size_slices(self):
+        seq = ['a', 'b', '%', 'c', '%', 'd', 'e', 'f']
+        sep = '%'
+        self.assertEqual(
+            list(cl_utils.split_into_subsequences(seq, sep)),
+            [
+                ['a', 'b'],
+                ['c'],
+                ['d', 'e', 'f'],
+            ],
+        )
+
+
 class FlattenCommaListTests(unittest.TestCase):
 
     def test_empty(self):

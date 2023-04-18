@@ -15,6 +15,7 @@ from unittest import mock
 
 import cxx_remote_wrapper
 
+import cl_utils
 import fuchsia
 import remote_action
 
@@ -195,9 +196,10 @@ class CxxRemoteActionTests(unittest.TestCase):
             self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
         remote_action_command = c.remote_compile_action.launch_command
-        ddash = remote_action_command.index('--')
-        self.assertIn(flag, remote_action_command[:ddash])
-        self.assertEqual(remote_action_command[ddash + 1:], filtered_command)
+        prefix, sep, wrapped_command = cl_utils.partition_sequence(
+            remote_action_command, '--')
+        self.assertIn(flag, prefix)
+        self.assertEqual(wrapped_command, filtered_command)
 
     def test_gcc_cxx(self):
         compiler = Path('g++')
@@ -265,10 +267,11 @@ class CxxRemoteActionTests(unittest.TestCase):
                 set(c.remote_compile_action.inputs_relative_to_project_root),
                 {Path('path/to/clang/linux-x64/clang++'), compiler_swapper})
             remote_compile_command = c.remote_compile_action.launch_command
-            ddash = remote_compile_command.index('--')
-            rewrapper_prefix = remote_compile_command[:ddash]
+            rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
+                remote_compile_command, '--')
             self.assertIn(
                 f'--remote_wrapper=../{compiler_swapper}', rewrapper_prefix)
+            self.assertEqual(wrapped_command, command)
 
         # make sure preprocessing status is propagated (if it is run)
         for status in (0, 1):
@@ -331,10 +334,12 @@ class CxxRemoteActionTests(unittest.TestCase):
                     fake_builddir / c.cxx_action.preprocessed_output
                 })
             remote_compile_command = c.remote_compile_action.launch_command
-            ddash = remote_compile_command.index('--')
-            rewrapper_prefix = remote_compile_command[:ddash]
+            rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
+                remote_compile_command, '--')
             self.assertIn(
                 f'--remote_wrapper=../{compiler_swapper}', rewrapper_prefix)
+            self.assertIn(
+                str(c.cxx_action.preprocessed_output), wrapped_command)
 
         # make sure preprocessing status is propagated (if it is run)
         for status in (0, 1):
@@ -389,10 +394,11 @@ class CxxRemoteActionTests(unittest.TestCase):
                         c.remote_compile_action.inputs_relative_to_project_root
                     ), {Path('path/to/gcc/linux-x64/g++'), compiler_swapper})
                 remote_compile_command = c.remote_compile_action.launch_command
-                ddash = remote_compile_command.index('--')
-                rewrapper_prefix = remote_compile_command[:ddash]
+                rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
+                    remote_compile_command, '--')
                 self.assertIn(
                     f'--remote_wrapper=../{compiler_swapper}', rewrapper_prefix)
+                self.assertEqual(wrapped_command, command)
 
 
 class MainTests(unittest.TestCase):

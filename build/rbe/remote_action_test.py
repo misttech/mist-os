@@ -442,9 +442,9 @@ class RemoteActionMainParserTests(unittest.TestCase):
         build_dir = Path('build-out')
         working_dir = exec_root / build_dir
         output = Path('hello.txt')
+        command = ['touch', str(output)]
         p = self._make_main_parser()
-        main_args, other = p.parse_known_args(
-            ['--log', '--', 'touch', str(output)])
+        main_args, other = p.parse_known_args(['--log', '--'] + command)
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -460,17 +460,18 @@ class RemoteActionMainParserTests(unittest.TestCase):
             set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.launch_command
-        first_ddash = full_command.index('--')
+        command_slices = list(
+            cl_utils.split_into_subsequences(full_command, '--'))
+        prefix, log_wrapper, main_command = command_slices
         # Confirm that the remote command is wrapped with the logger script.
-        remote_command = full_command[first_ddash + 1:]
-        next_ddash = remote_command.index('--')
         self.assertEqual(
-            remote_command[:next_ddash],
+            log_wrapper,
             _strs(
                 [
                     Path('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
                     str(output) + '.remote-log'
                 ]))
+        self.assertEqual(main_command, command)
 
     def test_remote_log_from_main_args_explicitly_named(self):
         exec_root = Path('/home/project')
@@ -479,9 +480,9 @@ class RemoteActionMainParserTests(unittest.TestCase):
         output = Path('hello.txt')
         log_base = 'debug'
         p = self._make_main_parser()
+        command = ['touch', str(output)]
         main_args, other = p.parse_known_args(
-            ['--log', log_base, '--', 'touch',
-             str(output)])
+            ['--log', log_base, '--'] + command)
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -498,18 +499,18 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 build_dir / (log_base + '.remote-log'),
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
-        full_command = action.launch_command
-        first_ddash = full_command.index('--')
+        command_slices = list(
+            cl_utils.split_into_subsequences(action.launch_command, '--'))
+        prefix, log_wrapper, main_command = command_slices
         # Confirm that the remote command is wrapped with the logger script.
-        remote_command = full_command[first_ddash + 1:]
-        next_ddash = remote_command.index('--')
         self.assertEqual(
-            remote_command[:next_ddash],
+            log_wrapper,
             _strs(
                 [
                     Path('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
                     log_base + '.remote-log'
                 ]))
+        self.assertEqual(main_command, command)
 
     def test_remote_fsatrace_from_main_args(self):
         exec_root = Path('/home/project')
@@ -539,32 +540,30 @@ class RemoteActionMainParserTests(unittest.TestCase):
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.launch_command
-        first_ddash = full_command.index('--')
+        command_slices = list(
+            cl_utils.split_into_subsequences(action.launch_command, '--'))
+        prefix, trace_wrapper, main_command = command_slices
         # Confirm that the remote command is wrapped with fsatrace
-        remote_command = full_command[first_ddash + 1:]
-        next_ddash = remote_command.index('--')
-        self.assertIn(str(fake_fsatrace_rel), remote_command[:next_ddash])
+        self.assertIn(str(fake_fsatrace_rel), trace_wrapper)
         self.assertEqual(
-            remote_command[:next_ddash + 1],
+            trace_wrapper + ['--'],
             action._fsatrace_command_prefix(
                 Path(str(output) + '.remote-fsatrace')))
-        self.assertEqual(
-            remote_command[next_ddash + 1:], ['touch', str(output)])
+        self.assertEqual(main_command, ['touch', str(output)])
 
     def test_remote_log_and_fsatrace_from_main_args(self):
         exec_root = Path('/home/project')
         build_dir = Path('build-out')
         working_dir = exec_root / build_dir
         output = Path('hello.txt')
+        command = ['touch', str(output)]
         fake_fsatrace = Path('tools/debug/fsatrace')
         fake_fsatrace_rel = Path('..', fake_fsatrace)
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             _strs(
-                [
-                    '--fsatrace-path', fake_fsatrace_rel, '--log', '--',
-                    'touch', output
-                ]))
+                ['--fsatrace-path', fake_fsatrace_rel, '--log', '--'] +
+                command))
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -585,27 +584,23 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 build_dir / (str(output) + '.remote-fsatrace'),
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
-        full_command = action.launch_command
-        first_ddash = full_command.index('--')
+        command_slices = list(
+            cl_utils.split_into_subsequences(action.launch_command, '--'))
+        rewrapper_prefix, log_wrapper, trace_wrapper, main_command = command_slices
         # Confirm that the outer wrapper is for logging
-        remote_command = full_command[first_ddash + 1:]
-        second_ddash = remote_command.index('--')
         self.assertEqual(
-            remote_command[:second_ddash],
+            log_wrapper,
             _strs(
                 [
                     Path('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
                     str(output) + '.remote-log'
                 ]))
         # Confirm that the inner wrapper is for fsatrace
-        logged_command = remote_command[second_ddash + 1:]
-        third_ddash = logged_command.index('--')
         self.assertEqual(
-            logged_command[:third_ddash + 1],
+            trace_wrapper + ['--'],
             action._fsatrace_command_prefix(
                 Path(str(output) + '.remote-fsatrace')))
-        self.assertEqual(
-            logged_command[third_ddash + 1:], ['touch', str(output)])
+        self.assertEqual(main_command, command)
 
     def test_local_only_no_compare(self):
         # --compare does nothing with --local
@@ -827,16 +822,17 @@ class RemoteActionMainParserTests(unittest.TestCase):
         args, kwargs = mock_run.call_args_list[0]
         launch_command = args[0]
         self.assertEqual(kwargs['cwd'], working_dir)
-        first_ddash = launch_command.index('--')
-        check_prefix = launch_command[:first_ddash]
+        check_prefix, sep, main_command = cl_utils.partition_sequence(
+            launch_command, '--')
         self.assertEqual(check_prefix[0], sys.executable)
         self.assertIn(
             str(exec_root_rel / remote_action._CHECK_DETERMINISM_SCRIPT),
             check_prefix)
         self.assertIn('--check-repeatability', check_prefix)
-        outputs_index = check_prefix.index('--outputs')
-        self.assertEqual(check_prefix[outputs_index + 1:], [str(output)])
-        self.assertEqual(launch_command[first_ddash + 1:], base_command)
+        _, _, output_list = cl_utils.partition_sequence(
+            check_prefix, '--outputs')
+        self.assertEqual(output_list, [str(output)])
+        self.assertEqual(main_command, base_command)
 
     def test_output_leak_scan_with_canonical_working_dir_mocked(self):
         exec_root = Path('/home/project')

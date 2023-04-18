@@ -50,6 +50,53 @@ def bool_golang_flag(value: str) -> bool:
     }[value.lower()]
 
 
+def partition_sequence(seq: Sequence[Any],
+                       sep: Any) -> Tuple[Sequence[Any], Any, Sequence[Any]]:
+    """Similar to string.partition, but for arbitrary sequences.
+
+    Args:
+      seq: sequence of values.
+      sep: a value to be sought as the separator
+
+    Returns:
+      if sep is not found, returns (the original sequence, None, [])
+      otherwise returns a triple:
+        the subsequence before the first occurrencee of sep,
+        sep (the separator),
+        the subsequence after the first occurrence of sep.
+    """
+    try:
+        sep_position = seq.index(sep)
+    except ValueError:
+        return seq, None, []
+
+    left = seq[:sep_position]
+    remainder = seq[sep_position + 1:]
+    return left, sep, remainder
+
+
+def split_into_subsequences(seq: Iterable[Any],
+                            sep: Any) -> Iterable[Sequence[Any]]:
+    """Similar to string.split, but for arbitrary sequences.
+
+    Args:
+      seq: sequence of values.
+      sep: a value to be sought as the separator
+
+    Returns:
+      sequence of subsequences between occurrences of the separator.
+    """
+    subseq = []
+    for elem in seq:
+        if elem == sep:
+            yield subseq
+            subseq = []
+        else:
+            subseq.append(elem)
+
+    yield subseq
+
+
 def command_quoted_str(command: Iterable[str]) -> str:
     return ' '.join(shlex.quote(t) for t in command)
 
