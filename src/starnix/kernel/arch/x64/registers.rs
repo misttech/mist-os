@@ -73,6 +73,16 @@ impl RegisterState {
     pub fn set_arg2_register(&mut self, rdx: u64) {
         self.real_registers.rdx = rdx;
     }
+
+    /// Returns the register that contains the syscall number.
+    pub fn syscall_register(&self) -> u64 {
+        self.real_registers.rax
+    }
+
+    /// Sets the register that contains the application status flags.
+    pub fn set_flags_register(&mut self, flags: u64) {
+        self.real_registers.rflags = flags;
+    }
 }
 
 impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {

@@ -10,7 +10,7 @@ import("//src/starnix/kernel/starnix.gni")
 
 declare_args() {
   # Restricted mode is currently only supported by Zircon on x64.
-  if (target_cpu == "x64") {
+  if (target_cpu == "x64" || target_cpu == "arm64") {
     starnix_restricted_mode = true
   } else {
     starnix_restricted_mode = false

@@ -39,7 +39,6 @@ macro_rules! trace_duration {
     };
 }
 
-#[cfg(target_arch = "x86_64")]
 macro_rules! trace_duration_begin {
     ($category:expr, $name:expr $(, $($key:expr => $val:expr)*)?) => {
         if !cfg!(feature = "disable_tracing") {
@@ -48,7 +47,6 @@ macro_rules! trace_duration_begin {
     };
 }
 
-#[cfg(target_arch = "x86_64")]
 macro_rules! trace_duration_end {
     ($category:expr, $name:expr $(, $($key:expr => $val:expr)*)?) => {
         if !cfg!(feature = "disable_tracing") {

@@ -9,9 +9,7 @@ import("//src/starnix/kernel/starnix.gni")
 
 group("tests") {
   testonly = true
-  if (target_cpu == "x64") {
-    deps = [ ":starnix_syscall_tests" ]
-  }
+  deps = [ ":starnix_syscall_tests" ]
 }
 
 source_set("test_utils") {

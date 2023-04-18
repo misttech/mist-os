@@ -17,6 +17,10 @@ pub struct RegisterState {
     /// important to store, as the return value of a syscall overwrites `x0`, making it impossible
     /// to recover the original `x0` value in the case of syscall restart and strace output.
     pub orig_x0: u64,
+
+    /// The contents of the Exception Link Register. This register is used to jump to a code
+    /// location in restricted mode, as arm64 does not allow the PC to be set directly.
+    pub elr: u64,
 }
 
 impl RegisterState {
@@ -73,11 +77,21 @@ impl RegisterState {
     pub fn set_arg2_register(&mut self, x2: u64) {
         self.real_registers.r[2] = x2;
     }
+
+    /// Returns the register that contains the syscall number.
+    pub fn syscall_register(&self) -> u64 {
+        self.real_registers.r[8]
+    }
+
+    /// Sets the register that contains the application status flags.
+    pub fn set_flags_register(&mut self, flags: u64) {
+        self.real_registers.cpsr = flags;
+    }
 }
 
 impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {
     fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
-        RegisterState { real_registers: regs, orig_x0: 0 }
+        RegisterState { real_registers: regs, orig_x0: 0, elr: 0 }
     }
 }
 

@@ -1159,9 +1159,9 @@ impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
             ],
             lr: state.r[30],
             sp: state.sp,
-            pc: 0,
+            pc: state.pc,
             cpsr: state.cpsr as u64,
-            tpidr: 0,
+            tpidr: state.tpidr_el0,
         }
     }
 }
@@ -1270,8 +1270,8 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
                 registers.r[29],
                 registers.lr,
             ],
-            pc: 0,
-            tpidr_el0: 0,
+            pc: registers.pc,
+            tpidr_el0: registers.tpidr,
             sp: registers.sp,
             cpsr: registers.cpsr as u32,
             padding1: [0, 0, 0, 0],

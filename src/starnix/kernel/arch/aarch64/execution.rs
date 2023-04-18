@@ -13,3 +13,6 @@ macro_rules! generate_cfi_directives {
 macro_rules! restore_cfi_directives {
     () => {};
 }
+
+pub(crate) use generate_cfi_directives;
+pub(crate) use restore_cfi_directives;

@@ -4,30 +4,60 @@
 
 .globl restricted_enter
 restricted_enter:
-  // TODO implement and test this.
-  //
   // This function takes two arguments, the options value (in r0) and the vector_table (in r1) to
   // pass to the zx_restricted_enter() syscall. These are untouched as they are also the first two
   // parameters to zx_restricted_enter().
   //
-  // This function should (see the x86 version):
-  //   - Save the callee saved registers (including the link register) on the stack.
-  //   - Pass the stack pointer as the third ("context") parameter (in r2) to zx_restricted_enter().
-  //   - Call zx_restricted_enter().
-  //   - Return any failures (this will not return at all on success).
+  // This function:
+  //   - Saves the callee saved registers (including the link register) on the stack.
+  //   - Passes the stack pointer as the third ("context") parameter (in r2) to zx_restricted_enter().
+  //   - Calls zx_restricted_enter().
+  //   - Returns any failures (this will not return at all on success).
 
-  // So it's obvious this is not implemented, issue a debug break.
-  brk 0
+  // Save the shadow call stack pointer.
+  str x18, [sp, #-16]!
+
+  // Save the callee saved registers (including the link register).
+  stp x20, x19, [sp, #-16]!
+  stp x22, x21, [sp, #-16]!
+  stp x24, x23, [sp, #-16]!
+  stp x26, x25, [sp, #-16]!
+  stp x28, x27, [sp, #-16]!
+  stp x30, x29, [sp, #-16]!
+
+  // Pass the stack pointer as the "context" parameter to zx_restricted_enter().
+  mov x2, sp
+
+  bl zx_restricted_enter
+
+  // If we got here we must have failed.
+  add sp, sp, #(14 * 8) // Pop the previous state on the stack.
+  ret
 
 .globl restricted_return
 restricted_return:
-  // TODO implement and test this.
-  //
-  // This function should do the reverse of restricted_enter:
+  // This function does the reverse of restricted_enter:
   //   - Restore the stack pointer which will be passed in as the first parameter (r0).
   //   - Pop the callee saved registers we pushed in restricted_enter() above.
   //   - Return to the link register. This will be the one passed in to restricted_enter so will
   //     have the effect of returning from that call.
 
-  // So it's obvious this is not implemented, issue a debug break.
-  brk 0
+  // Restore the stack pointer.
+  mov sp, x0
+
+  // Set the return value to ZX_OK.
+  mov x0, xzr
+
+  // Restore the callee saved registers.
+  ldp x30, x29, [sp], #16
+  ldp x28, x27, [sp], #16
+  ldp x26, x25, [sp], #16
+  ldp x24, x23, [sp], #16
+  ldp x22, x21, [sp], #16
+  ldp x20, x19, [sp], #16
+
+  // Restore the shadow call stack pointer.
+  ldr x18, [sp], #16
+
+  ret
+

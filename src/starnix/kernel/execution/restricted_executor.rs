@@ -160,7 +160,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
         // Store the new register state in the current task before dispatching the system call.
         current_task.registers = zx::sys::zx_thread_state_general_regs_t::from(&state).into();
-        syscall_decl = SyscallDecl::from_number(state.rax);
+        syscall_decl = SyscallDecl::from_number(current_task.registers.syscall_register());
 
         // Generate CFI directives so the unwinder will be redirected to unwind the restricted
         // stack.
@@ -286,7 +286,7 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
                         thread.read_state_general_regs().unwrap().into();
 
                     // TODO: Should this be 0, does it matter?
-                    registers.rflags = 0;
+                    registers.set_flags_register(0);
 
                     deliver_signal(&task, signal, &mut registers);
 
