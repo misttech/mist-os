@@ -789,7 +789,7 @@ class WebEngineTestIp : public TouchInputBase<> {
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target, ChildRef{kWebContextProvider}}},
+         .targets = {target}},
         {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
          .source = ChildRef{kIntl},
          .targets = {target}},

@@ -394,7 +394,7 @@ class ChromiumInputTest : public MouseInputBase {
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target, ChildRef{kWebContextProvider}}},
+         .targets = {target}},
         {.capabilities = {Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,

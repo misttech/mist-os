@@ -463,7 +463,7 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Protocol{fuchsia::input::virtualkeyboard::Manager::Name_},
                           Protocol{fuchsia::input::virtualkeyboard::ControllerCreator::Name_}},
          .source = ParentRef(),
-         .targets = {ChildRef{kWebVirtualKeyboardClient}, ChildRef{kWebContextProvider}}},
+         .targets = {ChildRef{kWebVirtualKeyboardClient}}},
         {.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
          .source = ChildRef{kMemoryPressureProvider},
          .targets = {target}},
@@ -496,7 +496,7 @@ class WebEngineTest : public VirtualKeyboardBase {
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target, ChildRef{kWebContextProvider}}},
+         .targets = {target}},
         // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
         // successful transition to CFv2.
         {

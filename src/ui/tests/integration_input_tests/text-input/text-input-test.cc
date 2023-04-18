@@ -192,10 +192,14 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.passthrough_capabilities = {
-        {// Uncomment the configuration below if you want to run chrome remote
+        {// Uncomment the configuration below if you want to run Chrome remote
          // devtools. See README.md for details.
          // Protocol{fuchsia::posix::socket::Provider::Name_},
          // Protocol{fuchsia::net::interfaces::State::Name_},
+         // TODO(fxbug.dev/123550): Do the feedback protocols need to be here? Is
+         // including launch_context_provider.shard.cml sufficient?
+         // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+         // successful transition to CFv2.
          Protocol{fuchsia::kernel::Stats::Name_}, Protocol{fuchsia::process::Launcher::Name_},
          Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
          Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
@@ -489,12 +493,12 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
          .source = ChildRef{kMockCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {
-            .capabilities = {Protocol{fuchsia::ui::input3::Keyboard::Name_},
-                             Protocol{fuchsia::sysmem::Allocator::Name_}},
-            .source = ParentRef(),
-            .targets = {target, ChildRef{kMemoryPressureProvider}, ChildRef{kWebContextProvider}},
-        },
+        {.capabilities = {Protocol{fuchsia::ui::input3::Keyboard::Name_}},
+         .source = ParentRef(),
+         .targets = {target}},
+        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
+         .source = ParentRef(),
+         .targets = {target, ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::scheduler::ProfileProvider::Name_}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
@@ -512,7 +516,7 @@ class ChromiumInputTest : public ChromiumInputBase {
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
-         .targets = {target, ChildRef{kWebContextProvider}}},
+         .targets = {target}},
         {.capabilities = {Directory{
              .name = "root-ssl-certificates",
              .type = fuchsia::component::decl::DependencyType::STRONG,
