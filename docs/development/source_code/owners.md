@@ -24,8 +24,7 @@ files modified in a given change. More information on this is available on the
 ## Format
 
 Fuchsia uses the [Gerrit file syntax][owners-syntax] for `OWNERS`
-files, with the addition of a comment indicating the default Monorail component
-to use when filing issues related to the contents of this directory.
+files.
 
 Here's an example `OWNERS` file:
 
@@ -39,9 +38,6 @@ include /path/to/another/OWNERS
 
 # This user is only an owner of the listed file
 per-file main.c = validuser3@example.com
-
-# The line below helps automate bug triage
-# COMPONENT: TopComponent>SubComponent
 ```
 
 ## Best practices
