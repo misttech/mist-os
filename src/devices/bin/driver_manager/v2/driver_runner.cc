@@ -683,6 +683,7 @@ void DriverRunner::ProcessPendingBindRequests() {
     if (request.tracker) {
       request.tracker->ReportNoBind();
     }
+    tracker->ReportNoBind();
   }
   pending_bind_requests_.clear();
 
