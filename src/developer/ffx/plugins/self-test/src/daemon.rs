@@ -61,3 +61,35 @@ pub(crate) async fn test_stop() -> Result<()> {
 
     Ok(())
 }
+
+pub(crate) async fn test_no_autostart() -> Result<()> {
+    let isolate = new_isolate("daemon-no-autostart").await?;
+    let out = isolate.ffx(&["config", "set", "daemon.autostart", "false"]).await?;
+    assert!(out.status.success());
+    let out = isolate.ffx(&["daemon", "echo"]).await?;
+    assert!(!out.status.success());
+    assert!(out.stderr.contains(
+        "FFX Daemon was told not to autostart and no existing Daemon instance was found"
+    ));
+    // Build the actual daemon command
+    let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
+
+    #[cfg(target_os = "macos")]
+    let daemon_wait_time = 500;
+    #[cfg(not(target_os = "macos"))]
+    let daemon_wait_time = 100;
+    // wait a bit to make sure the daemon has had a chance to start up, then check that it's
+    // still running
+    fuchsia_async::Timer::new(Duration::from_millis(daemon_wait_time)).await;
+    assert_eq!(None, daemon.try_wait()?, "Daemon exited quickly after starting");
+
+    let out = isolate.ffx(&["daemon", "echo"]).await?;
+    // Don't assert here -- it if fails, we still want to kill the daemon
+    let echo_succeeded = out.status.success();
+
+    let _ = daemon.kill();
+
+    assert!(echo_succeeded);
+
+    Ok(())
+}

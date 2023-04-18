@@ -12,6 +12,10 @@ When updating, please add the value in alphabetical order.
 
 | Configuration Value                     | Documentation                      |
 | --------------------------------------- | ---------------------------------- |
+| `daemon.autostart`                      | Determines if the daemon should    |
+:                                         : start automatically when a subtool :
+:                                         : that requires the daemon is        :
+:                                         : invoked.  Defaults to `true`.      :
 | `discovery.expire_targets`              | Determines if targets discovered   |
 :                                         : should expire. Defaults to `true`  :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |

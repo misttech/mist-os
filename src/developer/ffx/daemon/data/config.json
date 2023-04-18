@@ -1,4 +1,7 @@
 {
+    "daemon": {
+        "autostart": true
+    },
     "discovery": {
         "zedboot": {
             "enabled": false

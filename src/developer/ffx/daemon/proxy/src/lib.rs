@@ -41,6 +41,8 @@ pub struct Injection {
     remote_once: Once<RemoteControlProxy>,
 }
 
+const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
+
 impl std::fmt::Debug for Injection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Injection").finish()
@@ -124,9 +126,12 @@ impl Injector for Injection {
     // the spawning only happens one thread at a time.
     #[tracing::instrument]
     async fn daemon_factory(&self) -> Result<DaemonProxy> {
+        let autostart = self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().await.unwrap_or(true);
+        let start_mode =
+            if autostart { DaemonStart::AutoStart } else { DaemonStart::DoNotAutoStart };
         self.daemon_once
             .get_or_try_init(init_daemon_proxy(
-                DaemonStart::AutoStart,
+                start_mode,
                 self.hoist.clone(),
                 self.env_context.clone(),
                 self.daemon_check.clone(),
