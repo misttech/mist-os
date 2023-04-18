@@ -120,6 +120,7 @@ RECLIENT_BINDIR = Path(
 
 REMOTE_RUSTC_SUBDIR = Path('prebuilt', 'third_party', 'rust', REMOTE_PLATFORM)
 REMOTE_CLANG_SUBDIR = Path('prebuilt', 'third_party', 'clang', REMOTE_PLATFORM)
+REMOTE_GCC_SUBDIR = Path('prebuilt', 'third_party', 'gcc', REMOTE_PLATFORM)
 
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.

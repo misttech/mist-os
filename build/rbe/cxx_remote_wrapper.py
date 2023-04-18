@@ -65,7 +65,20 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 _MAIN_ARG_PARSER = _main_arg_parser()
 
 
-def check_missing_remote_tools(compiler_type: cxx.Compiler) -> Iterable[Path]:
+def check_missing_remote_tools(
+        compiler_type: cxx.Compiler,
+        project_root: Path = None) -> Iterable[Path]:
+    """Check for the existence of tools needed for remote execution.
+
+    Args:
+      compiled_type (cxx.Compiler): clang or gcc
+      project_root: location of project root from which the compilers
+        can be found.  Path may be absolute or relative.
+
+    Yields:
+      Paths to missing but required tool directories.
+    """
+    root = project_root or remote_action.PROJECT_ROOT_REL
     required_remote_tools = []
     if compiler_type == cxx.Compiler.CLANG:
         required_remote_tools.append(fuchsia.REMOTE_CLANG_SUBDIR)
@@ -73,7 +86,7 @@ def check_missing_remote_tools(compiler_type: cxx.Compiler) -> Iterable[Path]:
         required_remote_tools.append(fuchsia.REMOTE_GCC_SUBDIR)
 
     for d in required_remote_tools:
-        if not (remote_action.PROJECT_ROOT_REL / d).exists():
+        if not (root / d).is_dir():
             yield d
 
 
@@ -107,16 +120,7 @@ class CxxRemoteAction(object):
         self._cxx_action = cxx.CxxAction(command=filtered_command)
 
         # Determine whether this action can be done remotely.
-        self._local_only = False
-        if self.cxx_action.sources:
-            first_source = self.cxx_action.sources[0]
-            if first_source.file.name.endswith('.S'):
-                # Compiling un-preprocessed assembly is not supported remotely.
-                self._local_only = True
-            elif first_source.dialect not in {cxx.SourceLanguage.C,
-                                              cxx.SourceLanguage.CXX}:
-                # e.g. Obj-C must be compiled locally
-                self._local_only = True
+        self._local_only = self._main_args.local or self._detect_local_only()
 
         self._local_preprocess_command = None
         self._cpp_strategy = self._resolve_cpp_strategy()
@@ -132,9 +136,9 @@ class CxxRemoteAction(object):
             )
 
         # check for required remote tools
-        # TODO: bypass this check when remote execution is disabled.
         missing_required_tools = list(
-            check_missing_remote_tools(self.cxx_action.compiler.type))
+            check_missing_remote_tools(
+                self.cxx_action.compiler.type, self.exec_root_rel))
         if missing_required_tools:
             raise Exception(
                 f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563565 for how to fetch the needed packages."
@@ -142,18 +146,31 @@ class CxxRemoteAction(object):
 
     @property
     def command_line_inputs(self) -> Sequence[Path]:
-        return [Path(p) for p in cl_utils.flatten_comma_list(self._main_args.inputs)]
+        return [
+            Path(p)
+            for p in cl_utils.flatten_comma_list(self._main_args.inputs)
+        ]
 
     @property
     def command_line_output_files(self) -> Sequence[Path]:
-        return [Path(p) for p in cl_utils.flatten_comma_list(self._main_args.output_files)]
+        return [
+            Path(p)
+            for p in cl_utils.flatten_comma_list(self._main_args.output_files)
+        ]
 
     @property
     def command_line_output_dirs(self) -> Sequence[Path]:
-        return [Path(p) for p in cl_utils.flatten_comma_list(self._main_args.output_directories)]
+        return [
+            Path(p) for p in cl_utils.flatten_comma_list(
+                self._main_args.output_directories)
+        ]
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
+        assert (
+            not self.local_only,
+            "This should not be reached in local-only mode.")
+
         if self._prepare_status is not None:
             return self._prepare_status
 
@@ -230,6 +247,10 @@ class CxxRemoteAction(object):
         return self._exec_root
 
     @property
+    def exec_root_rel(self) -> Path:
+        return cl_utils.relpath(self.exec_root, start=self.working_dir)
+
+    @property
     def host_platform(self) -> str:
         return self._host_platform
 
@@ -260,6 +281,19 @@ class CxxRemoteAction(object):
     @property
     def original_compile_command(self) -> Sequence[str]:
         return self.cxx_action.command
+
+    def _detect_local_only(self) -> bool:
+        if self.cxx_action.sources:
+            first_source = self.cxx_action.sources[0]
+            if first_source.file.name.endswith('.S'):
+                # Compiling un-preprocessed assembly is not supported remotely.
+                return True
+            elif first_source.dialect not in {cxx.SourceLanguage.C,
+                                              cxx.SourceLanguage.CXX}:
+                # e.g. Obj-C must be compiled locally
+                return True
+
+        return False
 
     @property
     def local_only(self) -> bool:

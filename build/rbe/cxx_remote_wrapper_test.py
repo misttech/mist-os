@@ -17,6 +17,7 @@ import cxx_remote_wrapper
 
 import cl_utils
 import fuchsia
+import cxx
 import remote_action
 
 from typing import Any, Sequence
@@ -36,6 +37,47 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
     t = type(items)
     raise TypeError("Unhandled sequence type: {t}")
+
+
+class CheckMissingRemoteToolsTests(unittest.TestCase):
+
+    _PROJECT_ROOT = Path('..', '..', 'fake', 'project', 'root')
+
+    def test_clang_exists(self):
+        with mock.patch.object(Path, 'is_dir', return_value=True):
+            self.assertEqual(
+                list(
+                    cxx_remote_wrapper.check_missing_remote_tools(
+                        cxx.Compiler.CLANG, self._PROJECT_ROOT)),
+                [],
+            )
+
+    def test_clang_not_exists(self):
+        with mock.patch.object(Path, 'is_dir', return_value=False):
+            self.assertEqual(
+                list(
+                    cxx_remote_wrapper.check_missing_remote_tools(
+                        cxx.Compiler.CLANG, self._PROJECT_ROOT)),
+                [fuchsia.REMOTE_CLANG_SUBDIR],
+            )
+
+    def test_gcc_exists(self):
+        with mock.patch.object(Path, 'is_dir', return_value=True):
+            self.assertEqual(
+                list(
+                    cxx_remote_wrapper.check_missing_remote_tools(
+                        cxx.Compiler.GCC, self._PROJECT_ROOT)),
+                [],
+            )
+
+    def test_gcc_not_exists(self):
+        with mock.patch.object(Path, 'is_dir', return_value=False):
+            self.assertEqual(
+                list(
+                    cxx_remote_wrapper.check_missing_remote_tools(
+                        cxx.Compiler.GCC, self._PROJECT_ROOT)),
+                [fuchsia.REMOTE_GCC_SUBDIR],
+            )
 
 
 class CxxRemoteActionTests(unittest.TestCase):
@@ -428,6 +470,17 @@ class MainTests(unittest.TestCase):
                                        'run', return_value=0):
                     self.assertEqual(cxx_remote_wrapper.main(['--help']), 0)
             mock_exit.assert_called_with(0)
+
+    def test_local_mode_forced(self):
+        exit_code = 24
+        with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                               '_run_locally',
+                               return_value=exit_code) as mock_run:
+            self.assertEqual(
+                cxx_remote_wrapper.main(
+                    ['--local', '--', 'clang++', '-c', 'foo.cc', '-o',
+                     'foo.o']), exit_code)
+        mock_run.assert_called_with()
 
 
 if __name__ == '__main__':
