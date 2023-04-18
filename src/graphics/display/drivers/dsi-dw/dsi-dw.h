@@ -140,7 +140,8 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
                           fidl::VectorView<uint8_t>& response);
   zx_status_t GetColorCode(color_code_t c, bool& packed, uint8_t& code);
   zx_status_t GetVideoMode(video_mode_t v, uint8_t& mode);
-  std::optional<fdf::MmioBuffer> dsi_mmio_;
+
+  fdf::MmioBuffer dsi_mmio_;
 
   // Save video config to enable seamless switching between command and video modes.
   uint32_t last_vidmode_ = 0;

@@ -77,7 +77,7 @@ void DsiDwBase::DdkRelease() { delete this; }
 
 DsiDw::DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio)
     : DeviceType(parent), dsi_mmio_(std::move(mmio)) {
-  last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value();
+  last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value();
   DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
 }
 
@@ -85,13 +85,13 @@ DsiDw::~DsiDw() = default;
 
 zx_status_t DsiDw::DsiImplWriteReg(uint32_t reg, uint32_t val) {
   // TODO(payamm): Verify register offset is valid
-  dsi_mmio_->Write32(val, reg);
+  dsi_mmio_.Write32(val, reg);
   return ZX_OK;
 }
 
 zx_status_t DsiDw::DsiImplReadReg(uint32_t reg, uint32_t* val) {
   // TODO(payamm): Verify register offset is valid
-  *val = dsi_mmio_->Read32(reg);
+  *val = dsi_mmio_.Read32(reg);
   return ZX_OK;
 }
 
@@ -140,65 +140,61 @@ zx_status_t DsiDw::GetVideoMode(video_mode_t v, uint8_t& mode) {
 }
 
 void DsiDw::DsiImplPowerUp() {
-  DsiDwPwrUpReg::Get().ReadFrom(&(*dsi_mmio_)).set_shutdown(kPowerOn).WriteTo(&(*dsi_mmio_));
+  DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).set_shutdown(kPowerOn).WriteTo(&dsi_mmio_);
 }
 
 void DsiDw::DsiImplPowerDown() {
-  DsiDwPwrUpReg::Get().ReadFrom(&(*dsi_mmio_)).set_shutdown(kPowerReset).WriteTo(&(*dsi_mmio_));
+  DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).set_shutdown(kPowerReset).WriteTo(&dsi_mmio_);
 }
 
 bool DsiDw::DsiImplIsPoweredUp() {
-  return (DsiDwPwrUpReg::Get().ReadFrom(&(*dsi_mmio_)).shutdown() == kPowerOn);
+  return (DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).shutdown() == kPowerOn);
 }
 
 zx_status_t DsiDw::DsiImplEnableBist(uint32_t pattern) {
   // enable video mode
   DsiImplSetMode(DSI_MODE_VIDEO);
 
-  DsiDwVidModeCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
-      .set_vpg_mode(1)
-      .set_vpg_en(1)
-      .WriteTo(&(*dsi_mmio_));
+  DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_vpg_mode(1).set_vpg_en(1).WriteTo(&dsi_mmio_);
   return ZX_OK;
 }
 void DsiDw::DsiImplPhySendCode(uint32_t code, uint32_t parameter) {
   // Write code
-  DsiDwPhyTstCtrl1Reg::Get().FromValue(0).set_reg_value(code).WriteTo(&(*dsi_mmio_));
+  DsiDwPhyTstCtrl1Reg::Get().FromValue(0).set_reg_value(code).WriteTo(&dsi_mmio_);
 
   // Toggle PhyTestClk
-  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlSet).WriteTo(&(*dsi_mmio_));
-  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlClr).WriteTo(&(*dsi_mmio_));
+  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlSet).WriteTo(&dsi_mmio_);
+  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlClr).WriteTo(&dsi_mmio_);
 
   // Write parameter
-  DsiDwPhyTstCtrl1Reg::Get().FromValue(0).set_reg_value(parameter).WriteTo(&(*dsi_mmio_));
+  DsiDwPhyTstCtrl1Reg::Get().FromValue(0).set_reg_value(parameter).WriteTo(&dsi_mmio_);
 
   // Toggle PhyTestClk
-  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlSet).WriteTo(&(*dsi_mmio_));
-  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlClr).WriteTo(&(*dsi_mmio_));
+  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlSet).WriteTo(&dsi_mmio_);
+  DsiDwPhyTstCtrl0Reg::Get().FromValue(0).set_reg_value(kPhyTestCtrlClr).WriteTo(&dsi_mmio_);
 }
 
 void DsiDw::DsiImplPhyPowerUp() {
   DsiDwPhyRstzReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_phy_forcepll(1)
       .set_phy_enableclk(1)
       .set_phy_rstz(1)
       .set_phy_shutdownz(1)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 }
 
 void DsiDw::DsiImplPhyPowerDown() {
   DsiDwPhyRstzReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_phy_rstz(0)
       .set_phy_shutdownz(0)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 }
 
 zx_status_t DsiDw::DsiImplPhyWaitForReady() {
   int timeout = kDPhyTimeout;
-  while ((DsiDwPhyStatusReg::Get().ReadFrom(&(*dsi_mmio_)).phy_lock() == 0) && timeout--) {
+  while ((DsiDwPhyStatusReg::Get().ReadFrom(&dsi_mmio_).phy_lock() == 0) && timeout--) {
     zx_nanosleep(zx_deadline_after(ZX_USEC(kPhyDelay)));
   }
   if (timeout <= 0) {
@@ -207,8 +203,7 @@ zx_status_t DsiDw::DsiImplPhyWaitForReady() {
   }
 
   timeout = kDPhyTimeout;
-  while ((DsiDwPhyStatusReg::Get().ReadFrom(&(*dsi_mmio_)).phy_stopstateclklane() == 0) &&
-         timeout--) {
+  while ((DsiDwPhyStatusReg::Get().ReadFrom(&dsi_mmio_).phy_stopstateclklane() == 0) && timeout--) {
     zx_nanosleep(zx_deadline_after(ZX_USEC(kPhyDelay)));
   }
   if (timeout <= 0) {
@@ -259,7 +254,7 @@ zx_status_t DsiDw::SendCommand(const fidl_dsi::wire::MipiDsiCmd& cmd,
 
 void DsiDw::DsiImplSetMode(dsi_mode_t mode) {
   // Configure the operation mode (cmd or vid)
-  DsiDwModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).set_cmd_video_mode(mode).WriteTo(&(*dsi_mmio_));
+  DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
   DsiImplWriteReg(DW_DSI_VID_MODE_CFG, last_vidmode_);
 }
 
@@ -285,7 +280,7 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
 
   // Enable LP transmission in CMD Mode
   DsiDwCmdModeCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_max_rd_pkt_size(1)
       .set_dcs_lw_tx(1)
       .set_dcs_sr_0p_tx(1)
@@ -298,38 +293,38 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
       .set_gen_sw_2p_tx(1)
       .set_gen_sw_1p_tx(1)
       .set_gen_sw_0p_tx(1)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // Packet header settings - Enable CRC and ECC. BTA will be enabled based on CMD
   DsiDwPckhdlCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_crc_rx_en(1)
       .set_ecc_rx_en(1)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // DesignWare DSI Host Setup based on MIPI DSI Host Controller User Guide (Sec 3.1.1)
 
   // 1. Global configuration: Lane number and PHY stop wait time
   DsiDwPhyIfCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_phy_stop_wait_time(kPhyStopWaitTime)
       .set_n_lanes(disp_setting.lane_num - 1)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // 2.1 Configure virtual channel
   DsiDwDpiVcidReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_dpi_vcid(kMipiDsiVirtualChanId)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // 2.2, Configure Color format
   DsiDwDpiColorCodingReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_loosely18_en(!packed)
       .set_dpi_color_coding(code)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
   // 2.3 Configure Signal polarity - Keep as default
-  DsiDwDpiCfgPolReg::Get().FromValue(0).set_reg_value(0).WriteTo(&(*dsi_mmio_));
+  DsiDwDpiCfgPolReg::Get().FromValue(0).set_reg_value(0).WriteTo(&dsi_mmio_);
 
   // The following values are relevent for video mode
   // 3.1 Configure low power transitions and video mode type
@@ -339,7 +334,7 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
   // the area where each command can be sent and no programming or calculation is required.
 
   auto vidmode_reg = DsiDwVidModeCfgReg::Get()
-                         .ReadFrom(&(*dsi_mmio_))
+                         .ReadFrom(&dsi_mmio_)
                          .set_vpg_en(0)
                          .set_lp_cmd_en(0)
                          .set_frame_bta_ack_en(1)
@@ -352,210 +347,203 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
                          .set_vid_mode_type(video_mode);
   last_vidmode_ = vidmode_reg.reg_value();
   DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
-  vidmode_reg.WriteTo(&(*dsi_mmio_));
+  vidmode_reg.WriteTo(&dsi_mmio_);
 
   // Define the max pkt size during Low Power mode
   DsiDwDpiLpCmdTimReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_outvact_lpcmd_time(dw_cfg.lp_cmd_pkt_size)
       .set_invact_lpcmd_time(dw_cfg.lp_cmd_pkt_size)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // 3.2   Configure video packet size settings
   DsiDwVidPktSizeReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vid_pkt_size(disp_setting.h_active)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // Disable sending vid in chunk since they are ignored by DW host IP in burst mode
-  DsiDwVidNumChunksReg::Get().FromValue(0).set_reg_value(0).WriteTo(&(*dsi_mmio_));
-  DsiDwVidNullSizeReg::Get().FromValue(0).set_reg_value(0).WriteTo(&(*dsi_mmio_));
+  DsiDwVidNumChunksReg::Get().FromValue(0).set_reg_value(0).WriteTo(&dsi_mmio_);
+  DsiDwVidNullSizeReg::Get().FromValue(0).set_reg_value(0).WriteTo(&dsi_mmio_);
 
   // 4 Configure the video relative parameters according to the output type
 
   DsiDwVidHsaTimeReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vid_hsa_time(disp_setting.hsync_width)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwVidHbpTimeReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vid_hbp_time(disp_setting.hsync_bp)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwVidHlineTimeReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vid_hline_time(disp_setting.h_period)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwVidVsaLinesReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vsa_lines(disp_setting.vsync_width)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwVidVbpLinesReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vbp_lines(disp_setting.vsync_bp)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwVidVactiveLinesReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vactive_lines(disp_setting.v_active)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwVidVfpLinesReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_vfp_lines(disp_setting.v_period - disp_setting.v_active - disp_setting.vsync_bp -
                      disp_setting.vsync_width)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // Internal dividers to divide lanebyteclk for timeout purposes
   DsiDwClkmgrCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_to_clk_div(1)
       .set_tx_esc_clk_div(dw_cfg.lp_escape_time)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   // Setup Phy Timers as provided by vendor
   DsiDwPhyTmrLpclkCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_phy_clkhs2lp_time(dw_cfg.phy_timer_clkhs_to_lp)
       .set_phy_clklp2hs_time(dw_cfg.phy_timer_clklp_to_hs)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
   DsiDwPhyTmrCfgReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_phy_hs2lp_time(dw_cfg.phy_timer_hs_to_lp)
       .set_phy_lp2hs_time(dw_cfg.phy_timer_lp_to_hs)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   DsiDwLpclkCtrlReg::Get()
-      .ReadFrom(&(*dsi_mmio_))
+      .ReadFrom(&dsi_mmio_)
       .set_auto_clklane_ctrl(dw_cfg.auto_clklane)
       .set_phy_txrequestclkhs(1)
-      .WriteTo(&(*dsi_mmio_));
+      .WriteTo(&dsi_mmio_);
 
   return ZX_OK;
 }
 
 void DsiDw::DsiImplPrintDsiRegisters() {
   DSI_INFO("%s: DUMPING DSI HOST REGS\n", __func__);
-  DSI_INFO("DW_DSI_VERSION = 0x%x\n", DsiDwVersionReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_PWR_UP = 0x%x\n", DsiDwPwrUpReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_CLKMGR_CFG = 0x%x\n",
-           DsiDwClkmgrCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_DPI_VCID = 0x%x\n", DsiDwDpiVcidReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+  DSI_INFO("DW_DSI_VERSION = 0x%x\n", DsiDwVersionReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_PWR_UP = 0x%x\n", DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_CLKMGR_CFG = 0x%x\n", DsiDwClkmgrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_DPI_VCID = 0x%x\n", DsiDwDpiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_DPI_COLOR_CODING = 0x%x\n",
-           DsiDwDpiColorCodingReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwDpiColorCodingReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_DPI_CFG_POL = 0x%x\n",
-           DsiDwDpiCfgPolReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwDpiCfgPolReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_DPI_LP_CMD_TIM = 0x%x\n",
-           DsiDwDpiLpCmdTimReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_DBI_VCID = 0x%x\n", DsiDwDbiVcidReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_DBI_CFG = 0x%x\n", DsiDwDbiCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwDpiLpCmdTimReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_DBI_VCID = 0x%x\n", DsiDwDbiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_DBI_CFG = 0x%x\n", DsiDwDbiCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_DBI_PARTITIONING_EN = 0x%x\n",
-           DsiDwDbiPartitioningEnReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwDbiPartitioningEnReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_DBI_CMDSIZE = 0x%x\n",
-           DsiDwDbiCmdsizeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_PCKHDL_CFG = 0x%x\n",
-           DsiDwPckhdlCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_GEN_VCID = 0x%x\n", DsiDwGenVcidReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_MODE_CFG = 0x%x\n", DsiDwModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwDbiCmdsizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_PCKHDL_CFG = 0x%x\n", DsiDwPckhdlCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_GEN_VCID = 0x%x\n", DsiDwGenVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_MODE_CFG = 0x%x\n", DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_MODE_CFG = 0x%x\n",
-           DsiDwVidModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_PKT_SIZE = 0x%x\n",
-           DsiDwVidPktSizeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidPktSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_NUM_CHUNKS = 0x%x\n",
-           DsiDwVidNumChunksReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidNumChunksReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_NULL_SIZE = 0x%x\n",
-           DsiDwVidNullSizeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidNullSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_HSA_TIME = 0x%x\n",
-           DsiDwVidHsaTimeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidHsaTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_HBP_TIME = 0x%x\n",
-           DsiDwVidHbpTimeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidHbpTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_HLINE_TIME = 0x%x\n",
-           DsiDwVidHlineTimeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidHlineTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_VSA_LINES = 0x%x\n",
-           DsiDwVidVsaLinesReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidVsaLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_VBP_LINES = 0x%x\n",
-           DsiDwVidVbpLinesReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidVbpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_VFP_LINES = 0x%x\n",
-           DsiDwVidVfpLinesReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidVfpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_VID_VACTIVE_LINES = 0x%x\n",
-           DsiDwVidVactiveLinesReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwVidVactiveLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_EDPI_CMD_SIZE = 0x%x\n",
-           DsiDwEdpiCmdSizeReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwEdpiCmdSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_CMD_MODE_CFG = 0x%x\n",
-           DsiDwCmdModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_GEN_HDR = 0x%x\n", DsiDwGenHdrReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwCmdModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_GEN_HDR = 0x%x\n", DsiDwGenHdrReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_GEN_PLD_DATA = 0x%x\n",
-           DsiDwGenPldDataReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_CMD_PKT_STATUS = 0x%x\n",
-           DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_TO_CNT_CFG = 0x%x\n",
-           DsiDwToCntCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_TO_CNT_CFG = 0x%x\n", DsiDwToCntCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_HS_RD_TO_CNT = 0x%x\n",
-           DsiDwHsRdToCntReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwHsRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_LP_RD_TO_CNT = 0x%x\n",
-           DsiDwLpRdToCntReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwLpRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_HS_WR_TO_CNT = 0x%x\n",
-           DsiDwHsWrToCntReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwHsWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_LP_WR_TO_CNT = 0x%x\n",
-           DsiDwLpWrToCntReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_BTA_TO_CNT = 0x%x\n",
-           DsiDwBtaToCntReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_SDF_3D = 0x%x\n", DsiDwSdf3dReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_LPCLK_CTRL = 0x%x\n",
-           DsiDwLpclkCtrlReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwLpWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_BTA_TO_CNT = 0x%x\n", DsiDwBtaToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_SDF_3D = 0x%x\n", DsiDwSdf3dReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_LPCLK_CTRL = 0x%x\n", DsiDwLpclkCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_PHY_TMR_LPCLK_CFG = 0x%x\n",
-           DsiDwPhyTmrLpclkCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwPhyTmrLpclkCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_PHY_TMR_CFG = 0x%x\n",
-           DsiDwPhyTmrCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_PHY_RSTZ = 0x%x\n", DsiDwPhyRstzReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_PHY_IF_CFG = 0x%x\n",
-           DsiDwPhyIfCfgReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwPhyTmrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_PHY_RSTZ = 0x%x\n", DsiDwPhyRstzReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_PHY_IF_CFG = 0x%x\n", DsiDwPhyIfCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_PHY_ULPS_CTRL = 0x%x\n",
-           DsiDwPhyUlpsCtrlReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwPhyUlpsCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_PHY_TX_TRIGGERS = 0x%x\n",
-           DsiDwPhyTxTriggersReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_PHY_STATUS = 0x%x\n",
-           DsiDwPhyStatusReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwPhyTxTriggersReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_PHY_STATUS = 0x%x\n", DsiDwPhyStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_PHY_TST_CTRL0 = 0x%x\n",
-           DsiDwPhyTstCtrl0Reg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwPhyTstCtrl0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
   DSI_INFO("DW_DSI_PHY_TST_CTRL1 = 0x%x\n",
-           DsiDwPhyTstCtrl1Reg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_INT_ST0 = 0x%x\n", DsiDwIntSt0Reg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_INT_ST1 = 0x%x\n", DsiDwIntSt1Reg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_INT_MSK0 = 0x%x\n", DsiDwIntMsk0Reg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
-  DSI_INFO("DW_DSI_INT_MSK1 = 0x%x\n", DsiDwIntMsk1Reg::Get().ReadFrom(&(*dsi_mmio_)).reg_value());
+           DsiDwPhyTstCtrl1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_INT_ST0 = 0x%x\n", DsiDwIntSt0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_INT_ST1 = 0x%x\n", DsiDwIntSt1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_INT_MSK0 = 0x%x\n", DsiDwIntMsk0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  DSI_INFO("DW_DSI_INT_MSK1 = 0x%x\n", DsiDwIntMsk1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
 }
 
 inline bool DsiDw::IsPldREmpty() {
-  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_pld_r_empty() == 1);
+  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_pld_r_empty() == 1);
 }
 
 inline bool DsiDw::IsPldRFull() {
-  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_pld_r_full() == 1);
+  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_pld_r_full() == 1);
 }
 
 inline bool DsiDw::IsPldWEmpty() {
-  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_pld_w_empty() == 1);
+  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_pld_w_empty() == 1);
 }
 
 inline bool DsiDw::IsPldWFull() {
-  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_pld_w_full() == 1);
+  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_pld_w_full() == 1);
 }
 
 inline bool DsiDw::IsCmdEmpty() {
-  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_cmd_empty() == 1);
+  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_cmd_empty() == 1);
 }
 
 inline bool DsiDw::IsCmdFull() {
-  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_cmd_full() == 1);
+  return (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_cmd_full() == 1);
 }
 
 zx_status_t DsiDw::WaitforFifo(uint32_t bit, bool val) {
   int retry = kRetryMax;
-  while (((DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value() >> bit) & 1) != val &&
+  while (((DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value() >> bit) & 1) != val &&
          retry--) {
     zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
   }
@@ -597,7 +585,7 @@ zx_status_t DsiDw::GenericPayloadRead(uint32_t* data) {
     DSI_ERROR("Timeout! PLD R FIFO remained empty\n");
     return ZX_ERR_TIMED_OUT;
   }
-  *data = DsiDwGenPldDataReg::Get().ReadFrom(&(*dsi_mmio_)).reg_value();
+  *data = DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value();
   return ZX_OK;
 }
 
@@ -607,7 +595,7 @@ zx_status_t DsiDw::GenericHdrWrite(uint32_t data) {
     DSI_ERROR("Timeout! CMD FIFO remained full\n");
     return ZX_ERR_TIMED_OUT;
   }
-  DsiDwGenHdrReg::Get().FromValue(0).set_reg_value(data).WriteTo(&(*dsi_mmio_));
+  DsiDwGenHdrReg::Get().FromValue(0).set_reg_value(data).WriteTo(&dsi_mmio_);
   return ZX_OK;
 }
 
@@ -617,28 +605,28 @@ zx_status_t DsiDw::GenericPayloadWrite(uint32_t data) {
     DSI_ERROR("Timeout! PLD W FIFO remained full!\n");
     return ZX_ERR_TIMED_OUT;
   }
-  DsiDwGenPldDataReg::Get().FromValue(0).set_reg_value(data).WriteTo(&(*dsi_mmio_));
+  DsiDwGenPldDataReg::Get().FromValue(0).set_reg_value(data).WriteTo(&dsi_mmio_);
   return ZX_OK;
 }
 
 void DsiDw::EnableBta() {
   // enable ack req after each packet transmission
-  DsiDwCmdModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).set_ack_rqst_en(1).WriteTo(&(*dsi_mmio_));
+  DsiDwCmdModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_ack_rqst_en(1).WriteTo(&dsi_mmio_);
   // enable But Turn-Around request
-  DsiDwPckhdlCfgReg::Get().ReadFrom(&(*dsi_mmio_)).set_bta_en(1).WriteTo(&(*dsi_mmio_));
+  DsiDwPckhdlCfgReg::Get().ReadFrom(&dsi_mmio_).set_bta_en(1).WriteTo(&dsi_mmio_);
 }
 
 void DsiDw::DisableBta() {
   // disable ack req after each packet transmission
-  DsiDwCmdModeCfgReg::Get().ReadFrom(&(*dsi_mmio_)).set_ack_rqst_en(0).WriteTo(&(*dsi_mmio_));
+  DsiDwCmdModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_ack_rqst_en(0).WriteTo(&dsi_mmio_);
 
   // disable But Turn-Around request
-  DsiDwPckhdlCfgReg::Get().ReadFrom(&(*dsi_mmio_)).set_bta_en(0).WriteTo(&(*dsi_mmio_));
+  DsiDwPckhdlCfgReg::Get().ReadFrom(&dsi_mmio_).set_bta_en(0).WriteTo(&dsi_mmio_);
 }
 
 zx_status_t DsiDw::WaitforBtaAck() {
   int retry = kRetryMax;
-  while (DsiDwCmdPktStatusReg::Get().ReadFrom(&(*dsi_mmio_)).gen_rd_cmd_busy() && retry--) {
+  while (DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).gen_rd_cmd_busy() && retry--) {
     zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
   }
   if (retry <= 0) {
