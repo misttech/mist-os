@@ -23,6 +23,7 @@
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
+#include <vm/vm_object_physical.h>
 
 #include "vm/vm_address_region.h"
 #include "vm_priv.h"
@@ -674,67 +675,82 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
       base_ + offset, len,
       [this, commit, dirty_tracked, ignore_existing](vaddr_t base, size_t len, uint mmu_flags) {
         AssertHeld(aspace_->lock_ref());
-        AssertHeld(object_->lock_ref());
+
         // Remove the write permission if this maps a vmo that supports dirty tracking, in order to
         // trigger write permission faults when writes occur, enabling us to track when pages are
         // dirtied.
         if (dirty_tracked) {
           mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
         }
-        // precompute the flags we'll pass LookupPagesLocked
-        uint pf_flags = (mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ? VMM_PF_FLAG_WRITE : 0;
-        // if committing, then tell it to soft fault in a page
-        if (commit) {
-          pf_flags |= VMM_PF_FLAG_SW_FAULT;
-        }
 
-        // In the scenario where we are committing, and are setting the SW_FAULT flag, we are
-        // supposed to pass in a non-null LazyPageRequest to LookupPagesLocked. Technically we could
-        // get away with not passing in a PageRequest since:
+        // In the scenario where we are committing, and calling RequireOwnedPage, we are supposed to
+        // pass in a non-null LazyPageRequest. Technically we could get away with not passing in a
+        // PageRequest since:
         //  * Only internal kernel VMOs will have the 'commit' flag passed in for their mappings
-        //  * Only pager backed VMOs need to fill out a PageRequest
-        //  * Internal kernel VMOs are never pager backed.
+        //  * Only pager backed VMOs or VMOs that support delayed memory allocations need to fill
+        //    out a PageRequest
+        //  * Internal kernel VMOs are never pager backed or have the delayed memory allocation flag
+        //    set.
         // However, should these assumptions ever get violated it's better to catch this gracefully
-        // than have LookupPagesLocked error/crash internally, and it costs nothing to create and
+        // than have RequireOwnedPage error/crash internally, and it costs nothing to create and
         // pass in.
         __UNINITIALIZED LazyPageRequest page_request;
 
-        // iterate through the range, grabbing a page from the underlying object and
-        // mapping it in
         VmMappingCoalescer coalescer(this, base, mmu_flags,
                                      ignore_existing ? ArchVmAspace::ExistingEntryAction::Skip
                                                      : ArchVmAspace::ExistingEntryAction::Error);
-        __UNINITIALIZED VmObject::LookupInfo pages;
-        for (size_t offset = 0; offset < len;) {
-          const uint64_t vmo_offset = object_offset_ + (base - base_) + offset;
-
-          zx_status_t status;
-          status = object_->LookupPagesLocked(
-              vmo_offset, pf_flags, VmObject::DirtyTrackingAction::None,
-              ktl::min((len - offset) / PAGE_SIZE, VmObject::LookupInfo::kMaxPages), 1, nullptr,
-              &page_request, &pages);
-          if (status != ZX_OK) {
-            // As per the comment above page_request definition, there should never be SW_FAULT +
-            // pager backed VMO and so we should never end up with a PageRequest needing to be
-            // waited on.
-            ASSERT(status != ZX_ERR_SHOULD_WAIT);
-            // no page to map
-            if (commit) {
-              // fail when we can't commit every requested page
-              coalescer.Abort();
-              return status;
-            }
-
-            // skip ahead
-            offset += PAGE_SIZE;
-            continue;
+        const uint64_t vmo_offset = object_offset_locked() + (base - base_);
+        if (likely(object_->is_paged())) {
+          VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
+          AssertHeld(object->lock_ref());
+          const bool writing = mmu_flags & ARCH_MMU_FLAG_PERM_WRITE;
+          __UNINITIALIZED auto cursor = object->GetLookupCursorLocked(vmo_offset, len);
+          if (cursor.is_error()) {
+            return cursor.error_value();
           }
-          DEBUG_ASSERT(pages.num_pages > 0);
+          // Do not consider pages touched when mapping in, if they are actually touched they will
+          // get an accessed bit set in the hardware.
+          cursor->DisableMarkAccessed();
+          AssertHeld(cursor->lock_ref());
+          for (uint64_t off = 0; off < len; off += PAGE_SIZE) {
+            vm_page_t* page = nullptr;
+            if (commit) {
+              __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
+                  cursor->RequireOwnedPage(writing, 1, &page_request);
+              if (result.is_error()) {
+                zx_status_t status = result.error_value();
+                // As per the comment above page_request definition, there should never be commit
+                // + pager backed VMO and so we should never end up with a PageRequest needing to be
+                // waited on.
+                ASSERT(status != ZX_ERR_SHOULD_WAIT);
+                // fail when we can't commit every requested page
+                coalescer.Abort();
+                return status;
+              }
+              page = result->page;
+            } else {
+              // Not committing so get a page if one exists. This increments the cursor, returning
+              // nullptr if no page.
+              page = cursor->MaybePage(writing);
+            }
+            if (page) {
+              zx_status_t status = coalescer.Append(base + off, page->paddr());
+              if (status != ZX_OK) {
+                return status;
+              }
+            }
+          }
+        } else {
+          VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
+          AssertHeld(object->lock_ref());
 
-          vaddr_t va = base + offset;
-          for (uint32_t i = 0; i < pages.num_pages; i++, va += PAGE_SIZE, offset += PAGE_SIZE) {
-            LTRACEF_LEVEL(2, "mapping pa %#" PRIxPTR " to va %#" PRIxPTR "\n", pages.paddrs[i], va);
-            status = coalescer.Append(va, pages.paddrs[i]);
+          // Physical VMOs are always allocated and contiguous, just need to get the paddr.
+          paddr_t phys_base = 0;
+          zx_status_t status = object->LookupContiguousLocked(vmo_offset, len, &phys_base);
+          ASSERT(status == ZX_OK);
+
+          for (size_t offset = 0; offset < len; offset += PAGE_SIZE) {
+            status = coalescer.Append(base + offset, phys_base + offset);
             if (status != ZX_OK) {
               return status;
             }
@@ -852,7 +868,8 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   if (pf_flags & VMM_PF_FLAG_USER) {
     needed_mmu_flags |= ARCH_MMU_FLAG_PERM_USER;
   }
-  if (pf_flags & VMM_PF_FLAG_WRITE) {
+  const bool write = pf_flags & VMM_PF_FLAG_WRITE;
+  if (write) {
     needed_mmu_flags |= ARCH_MMU_FLAG_PERM_WRITE;
   } else {
     needed_mmu_flags |= ARCH_MMU_FLAG_PERM_READ;
@@ -884,25 +901,6 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   // grab the lock for the vmo
   Guard<CriticalMutex> guard{object_->lock()};
 
-  // Determine how far to the end of the page table so we do not cause extra allocations.
-  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
-  // Find the minimum between the size of this protection range and the end of the page table.
-  const uint64_t max_map = ktl::min(next_pt_base, range.region_top);
-  // Convert this into a number of pages, limited by the max lookup window.
-  //
-  // If this is a write fault and the VMO supports dirty tracking, only lookup 1 page. The pages
-  // will also be marked dirty for a write, which we only want for the current page. We could
-  // optimize this to lookup following pages here too and map them in, however we would have to not
-  // mark them dirty in LookupPagesLocked, and map them in without write permissions here, so that
-  // we can take a permission fault on a write to update their dirty tracking later. Instead, we can
-  // keep things simple by just looking up 1 page.
-  // TODO(rashaeqbal): Revisit this decision if there are performance issues.
-  const uint64_t max_out_pages =
-      (pf_flags & VMM_PF_FLAG_WRITE && object_->is_dirty_tracked_locked())
-          ? 1
-          : ktl::min((max_map - va) / PAGE_SIZE, VmObject::LookupInfo::kMaxPages);
-  DEBUG_ASSERT(max_out_pages > 0);
-
   // set the currently faulting flag for any recursive calls the vmo may make back into us
   // The specific path we're avoiding is if the VMO calls back into us during
   // vmo->LookupPagesLocked() via AspaceUnmapVmoRangeLocked(). Since we're responsible for that
@@ -914,34 +912,98 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
     currently_faulting_ = false;
   });
 
-  // fault in or grab existing pages.
-  __UNINITIALIZED VmObject::LookupInfo lookup_info;
-  zx_status_t status = object_->LookupPagesLocked(
-      vmo_offset, pf_flags, VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, max_out_pages, 1,
-      nullptr, page_request, &lookup_info);
-  if (status != ZX_OK) {
-    // TODO(cpu): This trace was originally TRACEF() always on, but it fires if the
-    // VMO was resized, rather than just when the system is running out of memory.
-    LTRACEF("ERROR: failed to fault in or grab existing page: %d\n", (int)status);
-    LTRACEF("%p vmo_offset %#" PRIx64 ", pf_flags %#x\n", this, vmo_offset, pf_flags);
-    // TODO(rashaeqbal): Audit error codes from LookupPagesLocked and make sure we're not returning
-    // something unexpected. Document expected return codes and constrain them if required.
-    return status;
-  }
-  DEBUG_ASSERT(lookup_info.num_pages > 0);
+  // Determine how far to the end of the page table so we do not cause extra allocations.
+  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
+  // Find the minimum between the size of this protection range and the end of the page table.
+  const uint64_t max_map = ktl::min(next_pt_base, range.region_top);
+  // Convert this into a number of pages, limited by the max lookup window.
+  static constexpr uint64_t kMaxPages = 16;
+  uint64_t max_out_pages = ktl::min((max_map - va) / PAGE_SIZE, kMaxPages);
+  DEBUG_ASSERT(max_out_pages > 0);
 
-  // We looked up in order to write. Mark as modified.
-  if (pf_flags & VMM_PF_FLAG_WRITE) {
-    object_->mark_modified_locked();
-  }
+  uint64_t out_pages = 0;
+  __UNINITIALIZED paddr_t pages[kMaxPages];
 
-  // if we read faulted, and lookup didn't say that this is always writable, then we map or modify
-  // the page without any write permissions. This ensures we will fault again if a write is
-  // attempted so we can potentially replace this page with a copy or a new one, or update the
-  // page's dirty state.
-  if (!(pf_flags & VMM_PF_FLAG_WRITE) && !lookup_info.writable) {
-    // we read faulted, so only map with read permissions
-    range.mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+  if (likely(object_->is_paged())) {
+    VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
+    AssertHeld(object->lock_ref());
+    const uint64_t vmo_size = object->size_locked();
+    if (vmo_offset >= vmo_size) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    // Trim out pages to the limit of the VMO.
+    max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
+
+    // If this is a write fault and the VMO supports dirty tracking, only lookup 1 page. The pages
+    // will also be marked dirty for a write, which we only want for the current page. We could
+    // optimize this to lookup following pages here too and map them in, however we would have to
+    // not mark them dirty in LookupPagesLocked, and map them in without write permissions here, so
+    // that we can take a permission fault on a write to update their dirty tracking later. Instead,
+    // we can keep things simple by just looking up 1 page.
+    // TODO(rashaeqbal): Revisit this decision if there are performance issues.
+    if (write && object->is_dirty_tracked_locked()) {
+      max_out_pages = 1;
+    }
+
+    // fault in or grab existing pages.
+    __UNINITIALIZED auto cursor =
+        object->GetLookupCursorLocked(vmo_offset, max_out_pages * PAGE_SIZE);
+    if (cursor.is_error()) {
+      return cursor.error_value();
+    }
+    // Do not consider pages touched when mapping in, if they are actually touched they will
+    // get an accessed bit set in the hardware.
+    cursor->DisableMarkAccessed();
+    AssertHeld(cursor->lock_ref());
+    __UNINITIALIZED
+    zx::result<VmCowPages::LookupCursor::RequireResult> result =
+        cursor->RequirePage(write, 1, page_request);
+    if (result.is_error()) {
+      return result.error_value();
+    }
+    pages[0] = result->page->paddr();
+    out_pages = 1;
+
+    // Acquire any additional pages, but only if they already exist as the user has not actually
+    // attempted to use these pages yet.
+    if (max_out_pages > 1) {
+      out_pages +=
+          cursor->IfExistPages(result->writable, static_cast<uint>(max_out_pages - 1), &pages[1]);
+    }
+
+    // We looked up in order to write. Mark as modified.
+    if (write) {
+      DEBUG_ASSERT(result->writable);
+      object->mark_modified_locked();
+    }
+
+    // if we read faulted, and lookup didn't say that this is always writable, then we map or modify
+    // the page without any write permissions. This ensures we will fault again if a write is
+    // attempted so we can potentially replace this page with a copy or a new one, or update the
+    // page's dirty state.
+    if (!write && !result->writable) {
+      // we read faulted, so only map with read permissions
+      range.mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+    }
+  } else {
+    VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
+    AssertHeld(object->lock_ref());
+    const uint64_t vmo_size = object->size();
+    if (vmo_offset >= vmo_size) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+    // Trim out pages to the limit of the VMO.
+    out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
+
+    zx_status_t status =
+        object->LookupContiguousLocked(vmo_offset, out_pages * PAGE_SIZE, &pages[0]);
+    // Already validated the size, and since physical VMOs are always allocated this should never
+    // fail.
+    ASSERT(status == ZX_OK);
+    // Extrapolate the remaining pages from the base address.
+    for (uint64_t i = 1; i < out_pages; i++) {
+      pages[i] = pages[0] + i * PAGE_SIZE;
+    }
   }
 
 #if ARCH_ARM64
@@ -952,13 +1014,13 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   // sensitive) data in memory that hasn't been written back yet.
   if ((pf_flags & VMM_PF_FLAG_GUEST) != 0) {
     ArchVmICacheConsistencyManager sync_cm;
-    for (size_t i = 0; i < lookup_info.num_pages; i++) {
+    for (size_t i = 0; i < out_pages; i++) {
       // Ignore non-physmap pages, such as passed through device ranges.
-      if (unlikely(!is_physmap_phys_addr(lookup_info.paddrs[i]))) {
+      if (unlikely(!is_physmap_phys_addr(pages[i]))) {
         continue;
       }
 
-      vaddr_t vaddr = reinterpret_cast<vaddr_t>(paddr_to_physmap(lookup_info.paddrs[i]));
+      vaddr_t vaddr = reinterpret_cast<vaddr_t>(paddr_to_physmap(pages[i]));
       arch_clean_cache_range(vaddr, PAGE_SIZE);  // Clean d-cache
       sync_cm.SyncAddr(vaddr, PAGE_SIZE);        // Sync i-cache with d-cache.
     }
@@ -974,7 +1036,7 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   zx_status_t err = aspace_->arch_aspace().Query(va, &pa, &page_flags);
   if (err >= 0) {
     LTRACEF("queried va, page at pa %#" PRIxPTR ", flags %#x is already there\n", pa, page_flags);
-    if (pa == lookup_info.paddrs[0]) {
+    if (pa == pages[0]) {
       // Faulting on a mapping that is the correct page could happen for a few reasons
       //  1. Permission are incorrect and this fault is a write fault for a read only mapping.
       //  2. Fault was caused by (1), but we were racing with another fault and the mapping is
@@ -994,7 +1056,7 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
                    !(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE));
 
       // same page, different permission
-      status = aspace_->arch_aspace().Protect(va, 1, range.mmu_flags);
+      zx_status_t status = aspace_->arch_aspace().Protect(va, 1, range.mmu_flags);
       if (unlikely(status != ZX_OK)) {
         // ZX_ERR_NO_MEMORY is the only legitimate reason for Protect to fail.
         ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from protect: %d\n", status);
@@ -1009,11 +1071,12 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
 
       // assert that we're not accidentally mapping the zero page writable
       DEBUG_ASSERT(!(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ||
-                   ktl::all_of(lookup_info.paddrs, &lookup_info.paddrs[lookup_info.num_pages],
+                   ktl::all_of(pages, &pages[out_pages],
                                [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
 
       // unmap the old one and put the new one in place
-      status = aspace_->arch_aspace().Unmap(va, 1, aspace_->EnlargeArchUnmap(), nullptr);
+      zx_status_t status =
+          aspace_->arch_aspace().Unmap(va, 1, aspace_->EnlargeArchUnmap(), nullptr);
       if (status != ZX_OK) {
         ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from unmap: %d\n", status);
         TRACEF("failed to remove old mapping before replacing\n");
@@ -1021,9 +1084,8 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
       }
 
       size_t mapped;
-      status =
-          aspace_->arch_aspace().Map(va, lookup_info.paddrs, lookup_info.num_pages, range.mmu_flags,
-                                     ArchVmAspace::ExistingEntryAction::Skip, &mapped);
+      status = aspace_->arch_aspace().Map(va, pages, out_pages, range.mmu_flags,
+                                          ArchVmAspace::ExistingEntryAction::Skip, &mapped);
       if (status != ZX_OK) {
         ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
         TRACEF("failed to map replacement page\n");
@@ -1038,13 +1100,12 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
 
     // assert that we're not accidentally mapping the zero page writable
     DEBUG_ASSERT(!(range.mmu_flags & ARCH_MMU_FLAG_PERM_WRITE) ||
-                 ktl::all_of(lookup_info.paddrs, &lookup_info.paddrs[lookup_info.num_pages],
+                 ktl::all_of(pages, &pages[out_pages],
                              [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
 
     size_t mapped;
-    status =
-        aspace_->arch_aspace().Map(va, lookup_info.paddrs, lookup_info.num_pages, range.mmu_flags,
-                                   ArchVmAspace::ExistingEntryAction::Skip, &mapped);
+    zx_status_t status = aspace_->arch_aspace().Map(
+        va, pages, out_pages, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Skip, &mapped);
     if (status != ZX_OK) {
       ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
       TRACEF("failed to map page %d\n", status);

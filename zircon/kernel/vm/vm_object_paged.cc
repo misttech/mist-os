@@ -1352,7 +1352,6 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     }
   });
 
-  __UNINITIALIZED LookupInfo pages;
   // Record the current generation count, we can use this to attempt to avoid re-performing checks
   // whilst copying.
   uint64_t gen_count = GetHierarchyGenerationCountLocked();
@@ -1363,41 +1362,51 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
   while (len > 0) {
     const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
     const size_t last_page_offset = ROUNDDOWN(src_offset + len - 1, PAGE_SIZE);
-    const size_t max_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
+    size_t remaining_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
+    __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+        GetLookupCursorLocked(first_page_offset, remaining_pages * PAGE_SIZE);
+    if (cursor.is_error()) {
+      return cursor.status_value();
+    }
+    // Performing explicit accesses by request of the user, so disable zero forking.
+    cursor->DisableZeroFork();
+    AssertHeld(cursor->lock_ref());
 
-    // Lookup and prefetch pages, since subsequent pages will very likely be needed.
-    const uint64_t max_waitable_pages = ktl::min(max_pages, LookupInfo::kMaxPages);
-    // fault in the page(s)
-    zx_status_t status =
-        LookupPagesLocked(first_page_offset, VMM_PF_FLAG_SW_FAULT | (write ? VMM_PF_FLAG_WRITE : 0),
-                          VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, max_waitable_pages,
-                          max_waitable_pages, nullptr, &page_request, &pages);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      // Must block on asynchronous page requests whilst not holding the lock.
-      DEBUG_ASSERT(can_block_on_page_requests());
-      guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
-      if (status != ZX_OK) {
-        if (status == ZX_ERR_TIMED_OUT) {
-          DumpLocked(0, false);
+    while (remaining_pages > 0) {
+      // If we need to wait on pages then we would like to wait on as many as possible, up to the
+      // actual limit of the read/write operation. As we would otherwise have to wait for all pages
+      // before resuming the copy, cap the maximum number to limit the latency before we start
+      // making progress.
+      constexpr uint64_t kMaxWaitPages = 16;
+      const uint64_t max_waitable_pages = ktl::min(remaining_pages, kMaxWaitPages);
+
+      // Attempt to lookup a page
+      __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
+          cursor->RequirePage(write, static_cast<uint>(max_waitable_pages), &page_request);
+
+      zx_status_t status = result.status_value();
+      if (status == ZX_ERR_SHOULD_WAIT) {
+        DEBUG_ASSERT(can_block_on_page_requests());
+        guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
+        if (status != ZX_OK) {
+          if (status == ZX_ERR_TIMED_OUT) {
+            DumpLocked(0, false);
+          }
+          return status;
         }
+        // Recheck properties and if all is good go back to the top of the outer loop to attempt
+        // to acquire a fresh cursor and try again.
+        status = check();
+        if (status == ZX_OK) {
+          break;
+        }
+      }
+      if (status != ZX_OK) {
         return status;
       }
-      // Recheck properties and if all is good go back to the top of the loop to attempt to fault in
-      // the page again.
-      status = check();
-      if (status == ZX_OK) {
-        continue;
-      }
-    }
-    if (status != ZX_OK) {
-      return status;
-    }
-    DEBUG_ASSERT(pages.num_pages > 0);
-    for (uint32_t i = 0; i < pages.num_pages; i++) {
-      DEBUG_ASSERT(len > 0);
+      const paddr_t pa = result->page->paddr();
       const size_t page_offset = src_offset % PAGE_SIZE;
       const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, len);
-      paddr_t pa = pages.paddrs[i];
 
       // Compute the kernel mapping of this page.
       char* page_ptr = reinterpret_cast<char*>(paddr_to_physmap(pa));
@@ -1420,6 +1429,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         if (status == ZX_OK) {
           break;
         }
+        return status;
       }
       if (status != ZX_OK) {
         return status;
@@ -1429,6 +1439,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       src_offset += tocopy;
       dest_offset += tocopy;
       len -= tocopy;
+      remaining_pages--;
     }
   }
 

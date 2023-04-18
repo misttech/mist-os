@@ -2745,10 +2745,8 @@ TEST(Pager, EvictionHintAlwaysNeed) {
   ASSERT_TRUE(t.Start());
 
   // Verify read requests for pages [10,15).
-  for (uint64_t i = 10; i < 15; i++) {
-    ASSERT_TRUE(pager.WaitForPageRead(vmo, i, 1, ZX_TIME_INFINITE));
-    ASSERT_TRUE(pager.SupplyPages(vmo, i, 1));
-  }
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 10, 5, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 10, 5));
 
   // The thread should now successfully terminate.
   ASSERT_TRUE(t.Wait());
@@ -2837,10 +2835,8 @@ TEST(Pager, EvictionHintsOpRange) {
   ASSERT_TRUE(t.Start());
 
   // We should see read requests for pages 14 and 15.
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 14, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 14, 1));
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 15, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 15, 1));
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 14, 2, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 14, 2));
 
   ASSERT_TRUE(t.Wait());
 
@@ -2896,10 +2892,8 @@ TEST(Pager, EvictionHintsWithClones) {
   ASSERT_TRUE(t1.Start());
 
   // Verify read requests for all pages in the range [23,27) except the forked page 25.
-  for (uint64_t i = 23; i < 25; i++) {
-    ASSERT_TRUE(pager.WaitForPageRead(vmo, i, 1, ZX_TIME_INFINITE));
-    ASSERT_TRUE(pager.SupplyPages(vmo, i, 1));
-  }
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 23, 2, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 23, 2));
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 26, 1, ZX_TIME_INFINITE));
   ASSERT_TRUE(pager.SupplyPages(vmo, 26, 1));
 
@@ -2961,10 +2955,8 @@ TEST(Pager, EvictionHintsWithResize) {
   ASSERT_TRUE(t.Start());
 
   // Supply a couple of pages, and then resize down across the hinted range, cutting it short.
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 10, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 10, 1));
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 11, 1, ZX_TIME_INFINITE));
-  ASSERT_TRUE(pager.SupplyPages(vmo, 11, 1));
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 10, 10, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 10, 2));
   ASSERT_OK(vmo->vmo().set_size(12 * zx_system_get_page_size()));
 
   // The hinting range should terminate now.

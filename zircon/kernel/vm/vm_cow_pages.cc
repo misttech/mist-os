@@ -3350,66 +3350,44 @@ zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_
 
   const uint64_t start_offset = offset;
   const uint64_t end = offset + len;
-  bool have_page_request = false;
-  LookupInfo lookup_info;
-  while (offset < end) {
-    // Don't commit if we already have this page
-    const VmPageOrMarker* p = page_list_.Lookup(offset);
-    if (!p || !p->IsPage()) {
-      const uint flags = VMM_PF_FLAG_SW_FAULT | VMM_PF_FLAG_WRITE;
-      // A commit does not imply that pages are being dirtied, they are just being populated.
-      zx_status_t res = LookupPagesLocked(offset, flags, DirtyTrackingAction::None, 1, 1,
-                                          &page_list, page_request, &lookup_info);
-      if (unlikely(res == ZX_ERR_SHOULD_WAIT)) {
-        if (page_request->get()->BatchAccepting()) {
-          // In batch mode, will need to finalize the request later.
-          if (!have_page_request) {
-            // Stash how much we have committed right now, as we are going to have to reprocess this
-            // range so we do not want to claim it was committed.
-            *committed_len = offset - start_offset;
-            have_page_request = true;
-          }
-        } else {
-          // We can end up here in two cases:
-          // 1. We were in batch mode but had to terminate the batch early.
-          // 2. We hit the first missing page and we were not in batch mode.
-          //
-          // If we do have a page request, that means the batch was terminated early by
-          // pre-populated pages (case 1). Return immediately.
-          //
-          // Do not update the |committed_len| for case 1 as we are returning on encountering
-          // pre-populated pages while processing a batch. When that happens, we will terminate the
-          // batch we were processing and send out a page request for the contiguous range we've
-          // accumulated in the batch so far. And we will need to come back into this function again
-          // to reprocess the range the page request spanned, so we cannot claim any pages have been
-          // committed yet.
-          if (!have_page_request) {
-            // Not running in batch mode, and this is the first missing page (case 2). Update the
-            // committed length we have so far and return.
-            *committed_len = offset - start_offset;
-          }
-          return ZX_ERR_SHOULD_WAIT;
-        }
-      } else if (unlikely(res != ZX_OK)) {
-        VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-        VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-        return res;
-      }
-    }
+  __UNINITIALIZED auto cursor = GetLookupCursorLocked(start_offset, len);
+  if (cursor.is_error()) {
+    return cursor.error_value();
+  }
+  AssertHeld(cursor->lock_ref());
+  // Commit represents an explicit desire to have pages and should not be deduped back to the zero
+  // page.
+  cursor->DisableZeroFork();
+  cursor->GiveAllocList(&page_list);
 
+  zx_status_t status = ZX_OK;
+  while (offset < end) {
+    __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
+        cursor->RequireOwnedPage(false, static_cast<uint>((end - offset) / PAGE_SIZE),
+                                 page_request);
+
+    if (result.is_error()) {
+      status = result.error_value();
+      if (status == ZX_ERR_SHOULD_WAIT) {
+        // Will have already grabbed the longest contiguous run of missing pages for a request, so
+        // finalize any outstanding batch request.
+        if (page_request->get()->BatchAccepting()) {
+          status = page_request->get()->FinalizeRequest();
+        }
+      }
+      break;
+    }
     offset += PAGE_SIZE;
   }
+  // Record how much we were able to process.
+  *committed_len = offset - start_offset;
 
-  if (have_page_request) {
-    // commited_len was set when have_page_request was set so can just return.
-    return page_request->get()->FinalizeRequest();
-  }
+  // Clear the alloc list from the cursor and let list_cleanup free any remaining pages.
+  cursor->ClearAllocList();
 
-  // Processed the full range successfully
-  *committed_len = len;
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  return ZX_OK;
+  return status;
 }
 
 zx_status_t VmCowPages::PinRangeLocked(uint64_t offset, uint64_t len) {
@@ -3751,18 +3729,16 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
               if (p->Page()->object.pin_count > 0) {
                 // Cannot remove this page if it is pinned. Lookup the page and zero it. Looking up
                 // ensures that we request dirty transition if needed by the pager.
-                __UNINITIALIZED LookupInfo lookup_page;
-                zx_status_t st =
-                    LookupPagesLocked(off, VMM_PF_FLAG_SW_FAULT | VMM_PF_FLAG_WRITE,
-                                      VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, 1, 1,
-                                      nullptr, page_request, &lookup_page);
-                if (st != ZX_OK) {
-                  return st;
+                LookupCursor cursor(this, off, PAGE_SIZE);
+                AssertHeld(cursor.lock_ref());
+                zx::result<LookupCursor::RequireResult> result =
+                    cursor.RequireOwnedPage(true, 1, page_request);
+                if (result.is_error()) {
+                  return result.error_value();
                 }
+                DEBUG_ASSERT(result->page == p->Page());
                 // Zero the page we looked up.
-                DEBUG_ASSERT(lookup_page.num_pages == 1);
-                DEBUG_ASSERT(lookup_page.paddrs[0] == p->Page()->paddr());
-                ZeroPage(lookup_page.paddrs[0]);
+                ZeroPage(result->page->paddr());
                 *zeroed_len_out += PAGE_SIZE;
                 next_start_offset = off + PAGE_SIZE;
                 return ZX_ERR_NEXT;
@@ -4005,17 +3981,16 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
 
       // Lookup the page which will potentially fault it in via the page source. Zeroing is
       // equivalent to a VMO write with zeros, so simulate a write fault.
-      __UNINITIALIZED LookupInfo lookup_page;
-      zx_status_t status = LookupPagesLocked(offset, VMM_PF_FLAG_SW_FAULT | VMM_PF_FLAG_WRITE,
-                                             VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, 1,
-                                             1, nullptr, page_request, &lookup_page);
-      if (status != ZX_OK) {
-        return status;
+      zx::result<VmCowPages::LookupCursor> cursor = GetLookupCursorLocked(offset, PAGE_SIZE);
+      if (cursor.is_error()) {
+        return cursor.error_value();
       }
-
-      // Zero the page we looked up.
-      DEBUG_ASSERT(lookup_page.num_pages == 1);
-      ZeroPage(lookup_page.paddrs[0]);
+      AssertHeld(cursor->lock_ref());
+      auto result = cursor->RequirePage(true, 1, page_request);
+      if (result.is_error()) {
+        return result.error_value();
+      }
+      ZeroPage(result->page->paddr());
       return ZX_ERR_NEXT;
     }
 
@@ -4272,6 +4247,10 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
   if (!can_root_source_evict_locked()) {
     return;
   }
+  // Zero lengths have no work to do.
+  if (len == 0) {
+    return;
+  }
 
   // Walk up the tree to get to the root parent. A raw pointer is fine as we're holding the lock and
   // won't drop it in this function.
@@ -4282,18 +4261,19 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
   uint64_t start_offset = ROUNDDOWN(offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
-  __UNINITIALIZED LookupInfo lookup;
+  __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+      GetLookupCursorLocked(start_offset, end_offset - start_offset);
+  if (cursor.is_error()) {
+    return;
+  }
+  // Do not consider pages accessed as the goal is reclaim them, not consider them used.
+  cursor->DisableMarkAccessed();
+  AssertHeld(cursor->lock_ref());
   while (start_offset < end_offset) {
-    // Don't pass in any fault flags. We only want to lookup an existing page. Note that we do want
-    // to look up the page in the child, instead of just forwarding the entire range lookup to the
-    // parent, because we do NOT want to hint pages in the parent that have already been forked in
-    // the child. That is, we need to first lookup the page and then check for ownership.
-    zx_status_t status = LookupPagesLocked(start_offset, 0, DirtyTrackingAction::None, 1, 1,
-                                           nullptr, nullptr, &lookup);
-    // Successfully found an existing page.
-    if (status == ZX_OK) {
-      DEBUG_ASSERT(lookup.num_pages == 1);
-      vm_page_t* page = paddr_to_vm_page(lookup.paddrs[0]);
+    // Lookup the page if it exists, but do not let it get allocated or say we are writing to it.
+    // On success or failure this causes the cursor to go to the next offset.
+    vm_page_t* page = cursor->MaybePage(false);
+    if (page) {
       // Check to see if the page is owned by the root VMO. Hints only apply to the root.
       // Don't move a pinned page or a dirty page to the DontNeed queue.
       // Note that this does not unset the always_need bit if it has been previously set. The
@@ -4316,26 +4296,38 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
   if (!can_root_source_evict_locked()) {
     return;
   }
+  // Zero lengths have no work to do.
+  if (len == 0) {
+    return;
+  }
 
   uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
-  __UNINITIALIZED LookupInfo lookup;
   __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+      GetLookupCursorLocked(cur_offset, end_offset - cur_offset);
+  // Track the validity of the cursor as we would like to efficiently look up runs where possible,
+  // but due to both errors and lock drops will need to acquire new cursors on occasion.
+  bool cursor_valid = true;
   for (; cur_offset < end_offset; cur_offset += PAGE_SIZE) {
-    // Simulate a read fault. We simply want to lookup the page in the parent (if visible from the
-    // child), without forking the page in the child. Note that we do want to look up the page in
-    // the child, instead of just forwarding the entire range lookup to the parent, because we do
-    // NOT want to hint pages in the parent that have already been forked in the child. That is, we
-    // need to first lookup the page and then check for ownership.
-    zx_status_t status =
-        LookupPagesLocked(cur_offset, VMM_PF_FLAG_SW_FAULT, DirtyTrackingAction::None, 1, 1,
-                          nullptr, &page_request, &lookup);
-
+    const uint64_t remaining = end_offset - cur_offset;
+    if (!cursor_valid) {
+      cursor = GetLookupCursorLocked(cur_offset, remaining);
+      if (cursor.is_error()) {
+        return;
+      }
+      cursor_valid = true;
+    }
+    AssertHeld(cursor->lock_ref());
+    // Lookup the page, this will fault in the page from the parent if neccessary, but will not
+    // allocate pages directly in this if it is a child.
+    auto result =
+        cursor->RequirePage(false, static_cast<uint>(remaining / PAGE_SIZE), &page_request);
+    zx_status_t status = result.status_value();
     if (status == ZX_OK) {
       // If we reached here, we successfully found a page at the current offset.
-      DEBUG_ASSERT(lookup.num_pages == 1);
-      vm_page_t* page = paddr_to_vm_page(lookup.paddrs[0]);
+      vm_page_t* page = result->page;
 
       // The root might have gone away when the lock was dropped while waiting above. Compute the
       // root again and check if we still have a page source backing it before applying the hint.
@@ -4369,10 +4361,11 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
         continue;
       }
     }
+    // There was either an error in the original require page, or in processing what was looked up.
+    // Either way when go back around in the loop we are going to need a new cursor.
+    cursor_valid = false;
 
-    // We need to wait for the page to be faulted in or available for allocation.
-    // We will drop the lock as we wait.
-    if (status == ZX_ERR_SHOULD_WAIT) {
+    if (result.error_value() == ZX_ERR_SHOULD_WAIT) {
       guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
 
       // The size might have changed since we dropped the lock. Adjust the range if required.
