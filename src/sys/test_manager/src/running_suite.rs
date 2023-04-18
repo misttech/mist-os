@@ -195,7 +195,6 @@ impl RunningSuite {
                 }
             };
 
-            info!("SETTING LOG INTEREST: {:?}", log_interest);
             let fut = log_settings.set_interest(&mut log_interest.iter_mut());
             if let Err(e) = fut.await {
                 warn!("Error setting log interest");
