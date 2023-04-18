@@ -13,18 +13,20 @@ use {
 // TODO(fxbug.dev/50451): Add support for CSV.
 #[derive(Debug, PartialEq, Clone)]
 pub enum OutputFormat {
-    Text,
     Structured,
+    Text,
+    VerboseText,
 }
 
 impl FromStr for OutputFormat {
     type Err = anyhow::Error;
     fn from_str(output_format: &str) -> Result<Self, Self::Err> {
         match output_format {
-            "text" => Ok(OutputFormat::Text),
             "structured" => Ok(OutputFormat::Structured),
+            "text" => Ok(OutputFormat::Text),
+            "verbose-text" => Ok(OutputFormat::VerboseText),
             incorrect => Err(format_err!(
-                "Invalid output type '{}' - must be 'text' or 'structured",
+                "Invalid output type '{}' - must be 'text' or 'verbose-text' or 'structured",
                 incorrect
             )),
         }
@@ -62,10 +64,12 @@ mod test {
     #[fuchsia::test]
     fn output_format_from_string() -> Result<(), Error> {
         assert_eq!(OutputFormat::from_str("text")?, OutputFormat::Text);
+        assert_eq!(OutputFormat::from_str("verbose-text")?, OutputFormat::VerboseText);
         assert_eq!(OutputFormat::from_str("structured")?, OutputFormat::Structured);
         assert!(OutputFormat::from_str("").is_err(), "Should have returned 'Err' on ''");
         assert!(OutputFormat::from_str("CSV").is_err(), "Should have returned 'Err' on 'CSV'");
         assert!(OutputFormat::from_str("Text").is_err(), "Should have returned 'Err' on 'Text'");
+        assert!(OutputFormat::from_str("verbose_text").is_err(), "Should reject underscore");
         assert!(
             OutputFormat::from_str("GARBAGE").is_err(),
             "Should have returned 'Err' on 'GARBAGE'"

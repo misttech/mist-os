@@ -9,8 +9,8 @@ use {
     },
     anyhow::{bail, Context as _, Error},
     fuchsia_triage::{
-        analyze, analyze_structured, ActionResultFormatter, ActionResults, DiagnosticData,
-        ParseResult, TriageOutput,
+        analyze, analyze_structured, analyze_verbose, ActionResultFormatter, ActionResults,
+        DiagnosticData, ParseResult, TriageOutput,
     },
 };
 
@@ -42,7 +42,7 @@ impl App {
                 structured_run_result.write_report(dest)?;
                 Ok(structured_run_result.has_reportable_issues())
             }
-            OutputFormat::Text => {
+            OutputFormat::Text | OutputFormat::VerboseText => {
                 let run_result =
                     self.run_unstructured(diagnostic_data, parse_result, output_format)?;
                 run_result.write_report(dest)?;
@@ -57,7 +57,11 @@ impl App {
         parse_result: ParseResult,
         output_format: OutputFormat,
     ) -> Result<RunResult, Error> {
-        let action_results = analyze(&diagnostic_data, &parse_result)?;
+        let action_results = match output_format {
+            OutputFormat::Text => analyze(&diagnostic_data, &parse_result)?,
+            OutputFormat::VerboseText => analyze_verbose(&diagnostic_data, &parse_result)?,
+            _ => unreachable!(),
+        };
 
         Ok(RunResult::new(output_format, action_results))
     }
@@ -96,7 +100,9 @@ impl RunResult {
     ///
     /// This method can be used to output the results to a file or stdout.
     pub fn write_report(&self, dest: &mut dyn std::io::Write) -> Result<(), Error> {
-        if self.output_format != OutputFormat::Text {
+        if self.output_format != OutputFormat::Text
+            && self.output_format != OutputFormat::VerboseText
+        {
             bail!("BUG: Incorrect output format requested");
         }
 
@@ -156,16 +162,23 @@ mod tests {
         action_results.add_warning("oops".to_string());
         action_results.add_error("fail".to_string());
 
-        let run_result = RunResult::new(OutputFormat::Text, action_results);
+        let readable_run_result = RunResult::new(OutputFormat::Text, action_results.clone());
+        action_results.set_verbose(true);
+        let verbose_run_result = RunResult::new(OutputFormat::VerboseText, action_results.clone());
 
-        let mut dest = vec![];
-        run_result.write_report(&mut dest)?;
+        let mut readable_dest = vec![];
+        readable_run_result.write_report(&mut readable_dest)?;
+        let mut verbose_dest = vec![];
+        verbose_run_result.write_report(&mut verbose_dest)?;
 
-        let output = String::from_utf8(dest)?;
+        let output = String::from_utf8(readable_dest)?;
+        assert_eq!("Errors\n------\nfail\n\nWarnings\n--------\noops\n\n", output,);
+        let output = String::from_utf8(verbose_dest)?;
         assert_eq!(
             "Errors\n------\nfail\n\nWarnings\n--------\noops\n\nInfo\n----\nhmmm\n\n",
             output,
         );
+
         Ok(())
     }
 
@@ -179,7 +192,11 @@ mod tests {
         run_result.write_report(&mut dest)?;
 
         let output = String::from_utf8(dest)?;
-        assert_eq!("Gauges\n------\ngauge\n\nNo actions were triggered. All targets OK.\n", output);
+        assert_eq!(
+            "Featured Values\n---------------\ngauge\n\n\
+            No actions were triggered. All targets OK.\n",
+            output
+        );
 
         Ok(())
     }

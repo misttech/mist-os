@@ -73,6 +73,7 @@ fn run_command(
     configs: Vec<String>,
     tags: Vec<String>,
     exclude_tags: Vec<String>,
+    verbose: bool,
 ) -> Result<Output, Error> {
     let mut args = Vec::new();
 
@@ -98,6 +99,10 @@ fn run_command(
         args.push(tag);
     }
 
+    if verbose {
+        args.push("--output-format".to_string());
+        args.push("verbose-text".to_string());
+    }
     match Command::new(binary_path()?).args(args).output() {
         Ok(o) => Ok(o),
         Err(err) => Err(anyhow!("Command didn't run: {:?}", err.kind())),
@@ -171,7 +176,7 @@ fn binary_path_should_find_binary() {
 /// ```
 macro_rules! integration_test {
     (@internal $name:ident, $config:expr, $tags:expr, $exclude_tags:expr,
-        $status_code:expr, $string_match:expr) => {
+        $status_code:expr, $string_match:expr, $verbose:expr) => {
 
         #[test]
         fn $name() -> Result<(), Error> {
@@ -183,6 +188,7 @@ macro_rules! integration_test {
                     .collect(),
                 $tags.into_iter().map(|t: &str| t.to_string()).collect(),
                 $exclude_tags.into_iter().map(|t: &str| t.to_string()).collect(),
+                $verbose,
             )?;
             crate::test::integration::verify_output(output, $status_code, $string_match);
             Ok(())
@@ -192,12 +198,23 @@ macro_rules! integration_test {
         $status_code:expr, not $substring:expr
     ) => {
         integration_test!(@internal $name, $config, $tags,
-            $exclude_tags ,$status_code, StringMatch::DoesNotContain($substring));
+            $exclude_tags ,$status_code, StringMatch::DoesNotContain($substring), false);
     };
     ($name:ident, $config:expr, $tags:expr, $exclude_tags:expr,
         $status_code:expr, $substring:expr) => {
         integration_test!(@internal $name, $config, $tags,
-            $exclude_tags, $status_code, StringMatch::Contains($substring));
+            $exclude_tags, $status_code, StringMatch::Contains($substring), false);
+    };
+    ($name:ident, $config:expr, $tags:expr, $exclude_tags:expr,
+        $status_code:expr, not $substring:expr, verbose
+    ) => {
+        integration_test!(@internal $name, $config, $tags,
+            $exclude_tags ,$status_code, StringMatch::DoesNotContain($substring), true);
+    };
+    ($name:ident, $config:expr, $tags:expr, $exclude_tags:expr,
+        $status_code:expr, $substring:expr, verbose) => {
+        integration_test!(@internal $name, $config, $tags,
+            $exclude_tags, $status_code, StringMatch::Contains($substring), true);
     };
 }
 
@@ -210,6 +227,7 @@ fn report_missing_inspect() -> Result<(), Error> {
         vec![config_file_path("sample.triage")?],
         vec![],
         vec![],
+        /* verbose */ false,
     )?;
     verify_output(
         output,
@@ -223,8 +241,13 @@ fn report_missing_inspect() -> Result<(), Error> {
 fn report_missing_config_file() -> Result<(), Error> {
     //note: we do not use the macro here because we want to not fail on the
     // file conversion logic
-    let output =
-        run_command(Input::Snapshot(snapshot_path()?), vec!["cfg".to_string()], vec![], vec![])?;
+    let output = run_command(
+        Input::Snapshot(snapshot_path()?),
+        vec!["cfg".to_string()],
+        vec![],
+        vec![],
+        /* verbose */ false,
+    )?;
     verify_output(output, 1, StringMatch::Contains("Couldn't read config file"));
     Ok(())
 }
@@ -361,12 +384,22 @@ integration_test!(log_tests, vec!["log_tests.triage"], vec![], vec![], 0, "");
 integration_test!(bundle_test, vec!["sample_bundle.json"], vec![], vec![], 0, "gauge: 120");
 
 integration_test!(
-    checked_ratio_test,
+    checked_ratio_verbose_test,
     vec!["sample_checked_ratio.json"],
     vec![],
     vec![],
     0,
-    "gauge: N/A"
+    "gauge: N/A",
+    verbose
+);
+
+integration_test!(
+    checked_ratio_readable_test,
+    vec!["sample_checked_ratio.json"],
+    vec![],
+    vec![],
+    0,
+    not "gauge: N/A"
 );
 
 integration_test!(

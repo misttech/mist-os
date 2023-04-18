@@ -41,8 +41,13 @@ impl<'a> ActionResultFormatter<'a> {
             sections.push(plugins);
             problem = problem || plugin_problem
         }
-        if let Some(infos) = self.to_infos() {
-            sections.push(infos);
+        if self.action_results.verbose() {
+            if let Some(gauges) = self.to_broken_gauges() {
+                sections.push(gauges);
+            }
+            if let Some(infos) = self.to_infos() {
+                sections.push(infos);
+            }
         }
         (problem, sections.join("\n"))
     }
@@ -91,7 +96,7 @@ impl<'a> ActionResultFormatter<'a> {
             return None;
         }
 
-        let header = Self::make_underline("Gauges");
+        let header = Self::make_underline("Featured Values");
         let lines = &mut self.action_results.get_gauges().iter().cloned();
         let lines: Vec<String> = match self.action_results.sort_gauges() {
             true => lines.sorted().collect(),
@@ -99,6 +104,19 @@ impl<'a> ActionResultFormatter<'a> {
         };
 
         Some(format!("{}{}\n", header, lines.join("\n")))
+    }
+
+    fn to_broken_gauges(&self) -> Option<String> {
+        if self.action_results.get_broken_gauges().is_empty() {
+            return None;
+        }
+
+        let header = Self::make_underline("Featured Values (Not Computable)");
+        Some(format!(
+            "{}{}\n",
+            header,
+            self.action_results.get_broken_gauges().into_iter().sorted().join("\n")
+        ))
     }
 
     fn to_plugins(&self) -> Option<(bool, String)> {
@@ -168,8 +186,9 @@ mod test {
     #[fuchsia::test]
     fn action_result_formatter_to_text_with_gauges() {
         let warnings = String::from(
-            "Gauges\n\
-            ------\n\
+            "\
+            Featured Values\n\
+            ---------------\n\
             g1\n\n\
             Warnings\n\
         --------\n\
@@ -191,8 +210,9 @@ mod test {
     #[fuchsia::test]
     fn action_result_formatter_sorts_output() {
         let warnings = String::from(
-            "Gauges\n\
-            ------\n\
+            "\
+            Featured Values\n\
+            ---------------\n\
             g1\n\
             g2\n\n\
             Warnings\n\
@@ -206,8 +226,8 @@ mod test {
         w1\n\
         w2\n\n\
         Gauges Plugin - OK\n\
-        Gauges\n\
-        ------\n\
+        Featured Values\n\
+        ---------------\n\
         g2\n\
         g1\n\
         ",
@@ -269,5 +289,42 @@ mod test {
 
             assert_eq!(warnings, formatter.to_text());
         }
+    }
+
+    #[fuchsia::test]
+    fn action_result_verbose_works() {
+        let readable_warnings = String::from(
+            "\
+            Featured Values\n\
+            ---------------\n\
+            g1: 42\n\
+            \n\
+            Warnings\n\
+            --------\n\
+            w1\n\
+            ",
+        );
+        let verbose_warnings = format!(
+            "{}{}",
+            readable_warnings,
+            "\n\
+            Featured Values (Not Computable)\n\
+            --------------------------------\n\
+            g2: N/A\n\
+            \n\
+            Info\n\
+            ----\n\
+            i1\n\
+            "
+        );
+        let mut action_results = ActionResults::new();
+        action_results.add_warning(String::from("w1"));
+        action_results.add_gauge(String::from("g1: 42"));
+        action_results.add_info(String::from("i1"));
+        action_results.add_broken_gauge(String::from("g2: N/A"));
+        let mut verbose_action_results = action_results.clone();
+        verbose_action_results.set_verbose(true);
+        assert_eq!(readable_warnings, ActionResultFormatter::new(&action_results).to_text());
+        assert_eq!(verbose_warnings, ActionResultFormatter::new(&verbose_action_results).to_text());
     }
 }

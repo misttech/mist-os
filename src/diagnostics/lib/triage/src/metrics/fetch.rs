@@ -37,7 +37,7 @@ pub struct FileDataFetcher<'a> {
 }
 
 impl<'a> FileDataFetcher<'a> {
-    pub fn new(data: &'a Vec<DiagnosticData>) -> FileDataFetcher<'a> {
+    pub fn new(data: &'a [DiagnosticData]) -> FileDataFetcher<'a> {
         let mut fetcher = FileDataFetcher {
             inspect: InspectFetcher::ref_empty(),
             syslog: TextFetcher::ref_empty(),

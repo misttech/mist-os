@@ -26,7 +26,7 @@ pub use result_format::ActionResultFormatter;
 
 const DEVICE_UPTIME_KEY: &str = "device.uptime";
 
-fn time_from_snapshot(files: &Vec<DiagnosticData>) -> Option<i64> {
+fn time_from_snapshot(files: &[DiagnosticData]) -> Option<i64> {
     if let Some(file) = files.iter().find(|file| file.source == Source::Annotations) {
         if let DataFetcher::KeyValue(fetcher) = &file.data {
             if let MetricValue::String(duration) = fetcher.fetch(DEVICE_UPTIME_KEY) {
@@ -53,14 +53,34 @@ fn time_from_snapshot(files: &Vec<DiagnosticData>) -> Option<i64> {
 
 /// Analyze all DiagnosticData against loaded configs and generate corresponding ActionResults.
 /// Each DiagnosticData will yield a single ActionResults instance.
+/// Minor errors will not be included.
 pub fn analyze(
     diagnostic_data: &Vec<DiagnosticData>,
     parse_result: &ParseResult,
+) -> Result<ActionResults, Error> {
+    inner_analyze(diagnostic_data, parse_result, false /* verbose */)
+}
+
+/// Analyze all DiagnosticData against loaded configs and generate corresponding ActionResults.
+/// Each DiagnosticData will yield a single ActionResults instance.
+/// Include minor errors.
+pub fn analyze_verbose(
+    diagnostic_data: &[DiagnosticData],
+    parse_result: &ParseResult,
+) -> Result<ActionResults, Error> {
+    inner_analyze(diagnostic_data, parse_result, true /* verbose */)
+}
+
+fn inner_analyze(
+    diagnostic_data: &[DiagnosticData],
+    parse_result: &ParseResult,
+    verbose: bool,
 ) -> Result<ActionResults, Error> {
     parse_result.reset_state();
     let now = time_from_snapshot(diagnostic_data);
     let mut action_context =
         ActionContext::new(&parse_result.metrics, &parse_result.actions, diagnostic_data, now);
+    action_context.set_verbose(verbose);
     Ok(action_context.process().clone())
 }
 

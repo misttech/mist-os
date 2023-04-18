@@ -36,7 +36,7 @@ impl<'a> ActionContext<'a> {
     pub(crate) fn new(
         metrics: &'a Metrics,
         actions: &'a Actions,
-        diagnostic_data: &'a Vec<DiagnosticData>,
+        diagnostic_data: &'a [DiagnosticData],
         now: Option<i64>,
     ) -> ActionContext<'a> {
         let fetcher = FileDataFetcher::new(diagnostic_data);
@@ -61,8 +61,10 @@ pub struct ActionResults {
     warnings: Vec<String>,
     errors: Vec<String>,
     gauges: Vec<String>,
+    broken_gauges: Vec<String>,
     snapshots: Vec<SnapshotTrigger>,
     sort_gauges: bool,
+    verbose: bool,
     sub_results: Vec<(String, Box<ActionResults>)>,
 }
 
@@ -73,8 +75,10 @@ impl ActionResults {
             warnings: Vec::new(),
             errors: Vec::new(),
             gauges: Vec::new(),
+            broken_gauges: Vec::new(),
             snapshots: Vec::new(),
             sort_gauges: true,
+            verbose: false,
             sub_results: Vec::new(),
         }
     }
@@ -95,8 +99,20 @@ impl ActionResults {
         self.gauges.push(gauge);
     }
 
+    pub fn add_broken_gauge(&mut self, gauge: String) {
+        self.broken_gauges.push(gauge);
+    }
+
     pub fn add_snapshot(&mut self, snapshot: SnapshotTrigger) {
         self.snapshots.push(snapshot);
+    }
+
+    pub fn set_verbose(&mut self, v: bool) {
+        self.verbose = v;
+    }
+
+    pub fn verbose(&self) -> bool {
+        self.verbose
     }
 
     pub fn set_sort_gauges(&mut self, v: bool) {
@@ -121,6 +137,10 @@ impl ActionResults {
 
     pub fn get_gauges(&self) -> &Vec<String> {
         &self.gauges
+    }
+
+    pub fn get_broken_gauges(&self) -> &Vec<String> {
+        &self.broken_gauges
     }
 
     pub fn get_sub_results_mut(&mut self) -> &mut Vec<(String, Box<ActionResults>)> {
@@ -417,6 +437,10 @@ impl ActionContext<'_> {
         &self.action_results
     }
 
+    pub(crate) fn set_verbose(&mut self, verbose: bool) {
+        self.action_results.set_verbose(verbose);
+    }
+
     /// Evaluate and return snapshots. Consume self.
     pub fn into_snapshots(mut self) -> (Vec<SnapshotTrigger>, WarningVec) {
         for (namespace, actions) in self.actions.iter() {
@@ -526,7 +550,10 @@ impl ActionContext<'_> {
         let value = self.metric_state.eval_action_metric(namespace, &action.value);
         match value {
             MetricValue::Problem(Problem::Ignore(_)) => {
-                self.action_results.add_gauge(format!("{}: N/A", name));
+                self.action_results.add_broken_gauge(format!("{}: N/A", name));
+            }
+            MetricValue::Problem(problem) => {
+                self.action_results.add_broken_gauge(format!("{}: {:?}", name, problem));
             }
             value => {
                 self.action_results.add_gauge(format!(
