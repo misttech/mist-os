@@ -2888,6 +2888,484 @@ static bool vmpl_interval_clip_end_test() {
   END_TEST;
 }
 
+static bool vmpl_awaiting_clean_split_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length.
+  constexpr uint64_t expected_len = end - start + PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Split the interval in the middle.
+  constexpr uint64_t mid = end - 2 * PAGE_SIZE;
+  ASSERT_OK(list.PopulateSlotsInInterval(mid, mid + PAGE_SIZE));
+
+  // Awaiting clean length remains unchanged.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(mid)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(mid + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Split the interval at the end.
+  ASSERT_OK(list.PopulateSlotsInInterval(end, end + PAGE_SIZE));
+
+  // Awaiting clean length remains unchanged.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(mid)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(mid + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(end)->GetZeroIntervalAwaitingCleanLength());
+
+  // Split the interval at the start.
+  ASSERT_OK(list.PopulateSlotsInInterval(start, start + PAGE_SIZE));
+
+  // Awaiting clean length now moves to the new start.
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(expected_len - PAGE_SIZE,
+            list.Lookup(start + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(mid)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(mid + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(end)->GetZeroIntervalAwaitingCleanLength());
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_awaiting_clean_clip_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length.
+  constexpr uint64_t expected_len = end - start + PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Clip the interval at the end.
+  ASSERT_OK(list.ClipIntervalEnd(end, 2 * PAGE_SIZE));
+
+  // Awaiting clean length is unchanged.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Clip the interval at the start.
+  ASSERT_OK(list.ClipIntervalStart(start, 2 * PAGE_SIZE));
+
+  // Awaiting clean length is clipped too.
+  EXPECT_EQ(expected_len - 2 * PAGE_SIZE,
+            list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_awaiting_clean_return_slot_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length.
+  constexpr uint64_t expected_len = end - start + PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Split the interval at the start.
+  ASSERT_OK(list.PopulateSlotsInInterval(start, start + PAGE_SIZE));
+
+  // Awaiting clean length now moves to the new start.
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(expected_len - PAGE_SIZE,
+            list.Lookup(start + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the populated slot.
+  list.ReturnIntervalSlot(start);
+
+  // Awaiting clean length is now restored.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_awaiting_clean_return_slots_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length.
+  constexpr uint64_t expected_len = end - start + PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Split the start multiple times, so that all the resultant slots have non-zero awaiting clean
+  // lengths.
+  ASSERT_OK(list.PopulateSlotsInInterval(start, start + PAGE_SIZE));
+  ASSERT_OK(list.PopulateSlotsInInterval(start + PAGE_SIZE, start + 2 * PAGE_SIZE));
+  ASSERT_OK(list.PopulateSlotsInInterval(start + 2 * PAGE_SIZE, start + 3 * PAGE_SIZE));
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(expected_len - 3 * PAGE_SIZE,
+            list.Lookup(start + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the first slot. This will combine the first two slots into an interval.
+  list.ReturnIntervalSlot(start);
+  EXPECT_TRUE(list.Lookup(start)->IsIntervalStart());
+  EXPECT_TRUE(list.Lookup(start + PAGE_SIZE)->IsIntervalEnd());
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(static_cast<uint64_t>(2 * PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(expected_len - 3 * PAGE_SIZE,
+            list.Lookup(start + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the third slot. This will merge all the intervals and return everything to the original
+  // state.
+  list.ReturnIntervalSlot(start + 2 * PAGE_SIZE);
+  // Awaiting clean length is restored.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  zx_status_t status = list.ForEveryPage([](const VmPageOrMarker* p, uint64_t off) {
+    if (p->IsIntervalStart()) {
+      if (off != start) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    if (p->IsIntervalEnd()) {
+      if (off != end) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    return ZX_ERR_BAD_STATE;
+  });
+  EXPECT_OK(status);
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_awaiting_clean_populate_slots_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length.
+  constexpr uint64_t expected_len = end - start + PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Populate some slots at the start.
+  ASSERT_OK(list.PopulateSlotsInInterval(start, start + 3 * PAGE_SIZE));
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(expected_len - 3 * PAGE_SIZE,
+            list.Lookup(start + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the first slot. This will combine the first two slots into an interval.
+  list.ReturnIntervalSlot(start);
+  EXPECT_TRUE(list.Lookup(start)->IsIntervalStart());
+  EXPECT_TRUE(list.Lookup(start + PAGE_SIZE)->IsIntervalEnd());
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(static_cast<uint64_t>(2 * PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(expected_len - 3 * PAGE_SIZE,
+            list.Lookup(start + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the third slot. This will merge all the intervals and return everything to the original
+  // state.
+  list.ReturnIntervalSlot(start + 2 * PAGE_SIZE);
+  // Awaiting clean length is restored.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  zx_status_t status = list.ForEveryPage([](const VmPageOrMarker* p, uint64_t off) {
+    if (p->IsIntervalStart()) {
+      if (off != start) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    if (p->IsIntervalEnd()) {
+      if (off != end) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    return ZX_ERR_BAD_STATE;
+  });
+  EXPECT_OK(status);
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_awaiting_clean_intersecting_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length to only a portion of the interval.
+  constexpr uint64_t expected_len = 2 * PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Populate some slots at the start, some of them within the awating clean length, and some
+  // outside.
+  ASSERT_OK(list.PopulateSlotsInInterval(start, start + 3 * PAGE_SIZE));
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(static_cast<uint64_t>(PAGE_SIZE),
+            list.Lookup(start + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(start + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the first slot. This will combine the first two slots into an interval.
+  list.ReturnIntervalSlot(start);
+  EXPECT_TRUE(list.Lookup(start)->IsIntervalStart());
+  EXPECT_TRUE(list.Lookup(start + PAGE_SIZE)->IsIntervalEnd());
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(start + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the third slot. This will merge all the intervals and return everything to the original
+  // state.
+  list.ReturnIntervalSlot(start + 2 * PAGE_SIZE);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  zx_status_t status = list.ForEveryPage([](const VmPageOrMarker* p, uint64_t off) {
+    if (p->IsIntervalStart()) {
+      if (off != start) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    if (p->IsIntervalEnd()) {
+      if (off != end) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    return ZX_ERR_BAD_STATE;
+  });
+  EXPECT_OK(status);
+
+  // Populate a slot again, but starting partway into the interval.
+  ASSERT_OK(list.PopulateSlotsInInterval(start + PAGE_SIZE, start + 2 * PAGE_SIZE));
+
+  // The start's awaiting clean length should remain unchanged.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  // The awaiting clean length for the populated slot and the remaining interval is 0.
+  EXPECT_EQ(0u, list.Lookup(start + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(start + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the slot. This should return to the original state.
+  list.ReturnIntervalSlot(start + PAGE_SIZE);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  status = list.ForEveryPage([](const VmPageOrMarker* p, uint64_t off) {
+    if (p->IsIntervalStart()) {
+      if (off != start) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    if (p->IsIntervalEnd()) {
+      if (off != end) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    return ZX_ERR_BAD_STATE;
+  });
+  EXPECT_OK(status);
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_awaiting_clean_non_intersecting_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t start = PAGE_SIZE, end = 2 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut * PAGE_SIZE;
+  ASSERT_GT(size, end);
+  ASSERT_OK(
+      list.AddZeroInterval(start, end + PAGE_SIZE, VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size));
+
+  // Set awaiting clean length to only a portion of the interval.
+  constexpr uint64_t expected_len = 2 * PAGE_SIZE;
+  list.LookupMutable(start).SetZeroIntervalAwaitingCleanLength(expected_len);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+
+  // Populate some slots that do not insersect with the awaiting clean length.
+  ASSERT_OK(
+      list.PopulateSlotsInInterval(start + expected_len, start + expected_len + 3 * PAGE_SIZE));
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u, list.Lookup(start + expected_len)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(0u,
+            list.Lookup(start + expected_len + PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(
+      0u, list.Lookup(start + expected_len + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(
+      0u, list.Lookup(start + expected_len + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the first slot. This will merge the first two slots back into the interval.
+  list.ReturnIntervalSlot(start + expected_len);
+  EXPECT_TRUE(list.Lookup(start + expected_len + PAGE_SIZE)->IsIntervalEnd());
+
+  // Verify awaiting clean lengths.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(
+      0u, list.Lookup(start + expected_len + 2 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+  EXPECT_EQ(
+      0u, list.Lookup(start + expected_len + 3 * PAGE_SIZE)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the third slot. This will merge all the intervals and return everything to the original
+  // state.
+  list.ReturnIntervalSlot(start + expected_len + 2 * PAGE_SIZE);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  zx_status_t status = list.ForEveryPage([](const VmPageOrMarker* p, uint64_t off) {
+    if (p->IsIntervalStart()) {
+      if (off != start) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    if (p->IsIntervalEnd()) {
+      if (off != end) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    return ZX_ERR_BAD_STATE;
+  });
+  EXPECT_OK(status);
+
+  // Populate a slot again, this time at the end.
+  ASSERT_OK(list.PopulateSlotsInInterval(end, end + PAGE_SIZE));
+
+  // The start's awaiting clean length should remain unchanged.
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  // The awaiting clean length for the populated slot is 0.
+  EXPECT_EQ(0u, list.Lookup(end)->GetZeroIntervalAwaitingCleanLength());
+
+  // Return the slot. This should return to the original state.
+  list.ReturnIntervalSlot(end);
+  EXPECT_EQ(expected_len, list.Lookup(start)->GetZeroIntervalAwaitingCleanLength());
+  status = list.ForEveryPage([](const VmPageOrMarker* p, uint64_t off) {
+    if (p->IsIntervalStart()) {
+      if (off != start) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    if (p->IsIntervalEnd()) {
+      if (off != end) {
+        return ZX_ERR_BAD_STATE;
+      }
+      return ZX_ERR_NEXT;
+    }
+    return ZX_ERR_BAD_STATE;
+  });
+  EXPECT_OK(status);
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vm_page_list_tests)
 VM_UNITTEST(vmpl_add_remove_page_test)
 VM_UNITTEST(vmpl_basic_marker_test)
@@ -2934,6 +3412,13 @@ VM_UNITTEST(vmpl_interval_populate_end_test)
 VM_UNITTEST(vmpl_interval_populate_slot_test)
 VM_UNITTEST(vmpl_interval_clip_start_test)
 VM_UNITTEST(vmpl_interval_clip_end_test)
+VM_UNITTEST(vmpl_awaiting_clean_split_test)
+VM_UNITTEST(vmpl_awaiting_clean_clip_test)
+VM_UNITTEST(vmpl_awaiting_clean_return_slot_test)
+VM_UNITTEST(vmpl_awaiting_clean_return_slots_test)
+VM_UNITTEST(vmpl_awaiting_clean_populate_slots_test)
+VM_UNITTEST(vmpl_awaiting_clean_intersecting_test)
+VM_UNITTEST(vmpl_awaiting_clean_non_intersecting_test)
 UNITTEST_END_TESTCASE(vm_page_list_tests, "vmpl", "VmPageList tests")
 
 }  // namespace vm_unittest

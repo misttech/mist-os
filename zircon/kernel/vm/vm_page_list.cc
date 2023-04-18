@@ -500,6 +500,23 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
     *slot = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Slot);
   } else {
     DEBUG_ASSERT(slot->IsIntervalStart() || slot->IsIntervalEnd());
+    // If we're overwriting the start or end sentinel, carry over any relevant state information to
+    // the rest of the interval that remains (if required).
+    //
+    // For zero intervals, this means preserving any non-zero AwaitingCleanLength in the start
+    // sentinel. We only need to do this if the zero interval is being split at the start.
+    // This is an optimization to avoid having to potentially walk to another node to find
+    // the relevant start to update. So the AwaitingCleanLength can be larger than the length of the
+    // resultant interval; the caller will take that into account and carry over larger
+    // AwaitingCleanLengths across multiple intervals if they exist. (See related comment in
+    // VmCowPages::WritebackEndLocked.)
+    if (slot->IsIntervalStart()) {
+      uint64_t awaiting_clean_len = slot->GetZeroIntervalAwaitingCleanLength();
+      if (awaiting_clean_len > PAGE_SIZE) {
+        new_start->SetZeroIntervalAwaitingCleanLength(awaiting_clean_len - PAGE_SIZE);
+        slot->SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
+      }
+    }
     slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
   }
 
@@ -516,11 +533,14 @@ void VmPageList::ReturnIntervalSlot(uint64_t offset) {
   // them here.
   DEBUG_ASSERT(slot->IsIntervalZero());
   auto dirty_state = slot->GetZeroIntervalDirtyState();
+  auto awaiting_clean_len = slot->GetZeroIntervalAwaitingCleanLength();
   // Temporarily free up the slot and then add a zero interval back in at the same spot using
   // AddZeroInterval, which will ensure that the slot is merged to the left and/or right as
   // applicable.
   *slot = VmPageOrMarker::Empty();
-  [[maybe_unused]] zx_status_t status = AddZeroInterval(offset, offset + PAGE_SIZE, dirty_state);
+  ReturnEmptySlot(offset);
+  [[maybe_unused]] zx_status_t status =
+      AddZeroIntervalInternal(offset, offset + PAGE_SIZE, dirty_state, awaiting_clean_len);
   DEBUG_ASSERT(status == ZX_OK);
 }
 
@@ -569,6 +589,8 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
   }
   DEBUG_ASSERT(is_end_in_interval);
   DEBUG_ASSERT(end_slot->IsIntervalSlot());
+  // We only support zero intervals and the start and end dirty state should match.
+  DEBUG_ASSERT(start_slot->GetZeroIntervalDirtyState() == end_slot->GetZeroIntervalDirtyState());
 
   // If there are no more empty slots to consider between start and end, return early.
   if (end_offset == start_offset + PAGE_SIZE) {
@@ -612,21 +634,22 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
     }
   }
 
-  // Helper to mint new slot sentinels to insert. Currently we only support zero intervals. If we
-  // support other page interval types in the future, we will need to modify this to support them.
-  const VmPageOrMarker* start = start_slot;
-  const VmPageOrMarker* end = end_slot;
-  auto mint_new_slot = [start, end]() -> VmPageOrMarker {
-    DEBUG_ASSERT(start->GetZeroIntervalDirtyState() == end->GetZeroIntervalDirtyState());
-    return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot,
-                                        start->GetZeroIntervalDirtyState());
-  };
-
   // Now that all allocations have succeeded, we know that the rest of the operation cannot fail.
   // Walk all offsets after start_offset and before end_offset, overwriting all the slots as
   // interval slots.
   uint64_t node_offset = first_node_offset;
   auto pln = list_.find(node_offset);
+  // This has to emulate calls to LookupOrAllocateCheckForInterval for all slots in the range, which
+  // includes retaining AwaitingCleanLength. After the start_slot split, the slot following it might
+  // contain a non-zero AwaitingCleanLength for the interval following it, this needs to be
+  // "shifted" to the slot after the last one we populate, adjusting for all the populated slots we
+  // encounter in the middle.
+  //
+  // For example, if we were populating 3 slots starting at the interval start, whose
+  // AwaitingCleanLength was 5 pages, the AwaitingCleanLength's for the 3 slots and the remaining
+  // interval at the end of the call should be (in pages): [1, 1, 1, 2]
+  // If AwaitingCleanLength had initially been 2, we would instead have: [1, 1, 0, 0]
+  uint64_t awaiting_clean_len = pln->Lookup(first_node_index).GetZeroIntervalAwaitingCleanLength();
   while (node_offset <= last_node_offset) {
     DEBUG_ASSERT(pln.IsValid());
     DEBUG_ASSERT(pln->offset() == node_offset);
@@ -634,10 +657,31 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
          index <=
          (node_offset == last_node_offset ? last_node_index : VmPageListNode::kPageFanOut - 1);
          index++) {
-      pln->Lookup(index) = mint_new_slot();
+      auto cur = &pln->Lookup(index);
+      *cur = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot,
+                                          start_slot->GetZeroIntervalDirtyState());
+      if (awaiting_clean_len > 0) {
+        cur->SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
+        awaiting_clean_len -= PAGE_SIZE;
+      }
     }
     pln++;
     node_offset += VmPageListNode::kPageFanOut * PAGE_SIZE;
+  }
+
+  if (awaiting_clean_len > 0) {
+    // Set AwaitingCleanLength for the last populated slot too.
+    LookupMutable(end_offset).SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
+    awaiting_clean_len -= PAGE_SIZE;
+    // If there is still a remaining AwaitingCleanLength, carry it over to the interval next to the
+    // last slot, if there is one.
+    if (awaiting_clean_len > 0) {
+      auto next = LookupMutable(end_offset + PAGE_SIZE);
+      if (next && (next->IsIntervalStart() || next->IsIntervalSlot())) {
+        uint64_t old_len = next->GetZeroIntervalAwaitingCleanLength();
+        next.SetZeroIntervalAwaitingCleanLength(ktl::max(old_len, awaiting_clean_len));
+      }
+    }
   }
 
 #if DEBUG_ASSERT_IMPLEMENTED
@@ -775,12 +819,14 @@ bool VmPageList::IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode&
   return false;
 }
 
-zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offset,
-                                        VmPageOrMarker::IntervalDirtyState dirty_state) {
+zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t end_offset,
+                                                VmPageOrMarker::IntervalDirtyState dirty_state,
+                                                uint64_t awaiting_clean_len) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
   DEBUG_ASSERT(start_offset < end_offset);
   DEBUG_ASSERT(!AnyPagesOrIntervalsInRange(start_offset, end_offset));
+  DEBUG_ASSERT(awaiting_clean_len == 0 || dirty_state == VmPageOrMarker::IntervalDirtyState::Dirty);
 
   const uint64_t interval_start = start_offset;
   const uint64_t interval_end = end_offset - PAGE_SIZE;
@@ -802,6 +848,9 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
   // Check if we can merge this zero interval with a preceding one.
   bool merge_with_prev = false;
   VmPageOrMarker* prev_slot = nullptr;
+  // The final start slot and offset after the merge. Used for AwaitingCleanLength updates.
+  VmPageOrMarkerRef final_start;
+  uint64_t final_start_offset = 0;
   if (interval_start > 0) {
     prev_slot = lookup_slot(prev_offset);
     // We can merge to the left if we find a zero interval end or slot, and the dirty state matches.
@@ -809,6 +858,23 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
         (prev_slot->IsIntervalEnd() || prev_slot->IsIntervalSlot()) &&
         prev_slot->GetZeroIntervalDirtyState() == dirty_state) {
       merge_with_prev = true;
+
+      // Later we will also try to merge the new awaiting_clean_len into the interval with which
+      // we're merging on the left. So stash the start sentinel for that update later. We need to
+      // compute this before we start making changes to the page list.
+      if (awaiting_clean_len > 0) {
+        if (prev_slot->IsIntervalSlot()) {
+          final_start = VmPageOrMarkerRef(prev_slot);
+          final_start_offset = prev_offset;
+        } else {
+          auto [_, off] = FindIntervalStartForEnd(prev_offset);
+          final_start_offset = off;
+          // This redundant lookup is so we can get a mutable reference to update the
+          // AwaitingCleanLength. It is fine to be inefficient here as this case (i.e.
+          // awaiting_clean_len > 0) is unlikely.
+          final_start = LookupMutable(final_start_offset);
+        }
+      }
     }
   }
 
@@ -850,6 +916,17 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
 
   // Now that we've checked for all error conditions perform the actual update.
   if (merge_with_prev) {
+    // Try to merge the new awaiting_clean_len into the previous interval.
+    if (awaiting_clean_len > 0) {
+      uint64_t old_len = final_start->GetZeroIntervalAwaitingCleanLength();
+      // Can only merge the new AwaitingCleanLength if there is no gap between the range described
+      // by final_start's AwaitingCleanLength and the start of the new interval we're trying to add.
+      if (final_start_offset + old_len >= interval_start) {
+        final_start.SetZeroIntervalAwaitingCleanLength(
+            ktl::max(final_start_offset + old_len, interval_start + awaiting_clean_len) -
+            final_start_offset);
+      }
+    }
     if (prev_slot->IsIntervalEnd()) {
       // If the prev_slot was an interval end, we can simply extend that interval to include the new
       // interval. Free up the old interval end.
@@ -865,9 +942,34 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
     // We could not merge with an interval to the left. Start a new interval.
     DEBUG_ASSERT(new_start->IsEmpty());
     *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, dirty_state);
+    if (awaiting_clean_len > 0) {
+      final_start = VmPageOrMarkerRef(new_start);
+      final_start_offset = interval_start;
+      new_start->SetZeroIntervalAwaitingCleanLength(awaiting_clean_len);
+    }
   }
 
   if (merge_with_next) {
+    // First see if we can merge the AwaitingCleanLength of the interval we're merging with the
+    // interval we have constructed so far on the left.
+    // Note that it might still be possible to merge the AwaitingCleanLength's of the left and right
+    // intervals even if the specified awaiting_clean_len is 0, due to the interval being inserted
+    // in the middle bridging the gap. We choose to skip that case however to keep things more
+    // efficient; we don't want to needlessly lookup the final_start unless we're also updating
+    // AwaitingCleanLength for the interval being added. Instead we choose to lose the
+    // AwaitingCleanLength for the interval on the right - this is also consistent with not being
+    // able to retain the AwaitingCleanLength if an interval is simply extended on the left.
+    if (awaiting_clean_len > 0) {
+      uint64_t len = next_slot->GetZeroIntervalAwaitingCleanLength();
+      uint64_t old_len = final_start->GetZeroIntervalAwaitingCleanLength();
+      // Can only merge the new AwaitingCleanLength if there is no gap between the range described
+      // by final_start's AwaitingCleanLength and the start of the next interval.
+      if (len > 0 && final_start_offset + old_len >= next_offset) {
+        final_start.SetZeroIntervalAwaitingCleanLength(
+            ktl::max(final_start_offset + old_len, next_offset + len) - final_start_offset);
+      }
+    }
+
     if (next_slot->IsIntervalStart()) {
       // If the next_slot was an interval start, we can move back the start to include the new
       // interval. Free up the old start.
@@ -877,6 +979,7 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
       // the old interval slot into an interval end.
       DEBUG_ASSERT(next_slot->IsIntervalSlot());
       DEBUG_ASSERT(next_slot->GetZeroIntervalDirtyState() == dirty_state);
+      next_slot->SetZeroIntervalAwaitingCleanLength(0);
       next_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
     }
   } else {
@@ -939,22 +1042,25 @@ zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len)
     return ZX_ERR_NO_MEMORY;
   }
 
-  // Helper to create the new start sentinel using the old start sentinel.
-  auto create_new_start = [old_start]() -> VmPageOrMarker {
-    // We only support zero intervals for now.
-    DEBUG_ASSERT(old_start->IsIntervalZero());
-    return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
-                                        old_start->GetZeroIntervalDirtyState());
-  };
-
   // It is possible that we are moving the start all the way to the end, leaving behind a single
   // interval slot.
   if (new_start->IsIntervalEnd()) {
     new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
   } else {
     DEBUG_ASSERT(new_start->IsEmpty());
-    *new_start = create_new_start();
+    // We only support zero intervals for now.
+    DEBUG_ASSERT(old_start->IsIntervalZero());
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+                                              old_start->GetZeroIntervalDirtyState());
   }
+
+  // Now that the new start has been created, carry over any remaining AwaitingCleanLength from the
+  // old start.
+  uint64_t old_len = old_start->GetZeroIntervalAwaitingCleanLength();
+  if (old_len > len) {
+    new_start->SetZeroIntervalAwaitingCleanLength(old_len - len);
+  }
+
   // Free up the old start.
   RemoveContent(interval_start);
   return ZX_OK;
@@ -986,21 +1092,16 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  // Helper to create the new end sentinel using the old end sentinel.
-  auto create_new_end = [old_end]() -> VmPageOrMarker {
-    // We only support zero intervals for now.
-    DEBUG_ASSERT(old_end->IsIntervalZero());
-    return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
-                                        old_end->GetZeroIntervalDirtyState());
-  };
-
   // It is possible that we are moving the end all the way to the start, leaving behind a single
   // interval slot.
   if (new_end->IsIntervalStart()) {
     new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
   } else {
     DEBUG_ASSERT(new_end->IsEmpty());
-    *new_end = create_new_end();
+    // We only support zero intervals for now.
+    DEBUG_ASSERT(old_end->IsIntervalZero());
+    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+                                            old_end->GetZeroIntervalDirtyState());
   }
   // Free up the old end.
   RemoveContent(interval_end);

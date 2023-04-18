@@ -5623,9 +5623,10 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
         for (uint64_t off = start_offset; off < state.start; off += PAGE_SIZE) {
           auto slot = page_list_.Lookup(off);
           if (slot) {
-            // If this is an interval sentinel, it should only be a slot, since we've populated
-            // all intervals so far.
-            DEBUG_ASSERT(!slot->IsInterval() || slot->IsIntervalSlot());
+            // If this is an interval slot, return it. Note that even though we did populate all
+            // slots until this point, not all will remain slots in this for-loop. When returning
+            // slots, they can merge with intervals both before and after, so it's possible that the
+            // next slot we were expecting has already been consumed.
             if (slot->IsIntervalSlot()) {
               page_list_.ReturnIntervalSlot(off);
             }
@@ -5910,13 +5911,15 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
   // This tracks the end offset until which all zero intervals can be marked clean. This is a
   // running counter that is maintained across multiple zero intervals. Each time we encounter
   // a new interval start, we take the max of the existing value and the AwaitingCleanLength of the
-  // new interval. This is because when zero intervals are truncated at the end, their
+  // new interval. This is because when zero intervals are truncated at the end or split, their
   // AwaitingCleanLength does not get updated, even if it's larger than the current interval length.
-  // The reason here is that it should be possible to apply the AwaitingCleanLength to any new zero
-  // intervals that get added later beyond the truncated interval. The user pager has indicated its
-  // intent to write a range as zeros, so until the point that is actually completes the writeback,
-  // it doesn't matter if zero intervals are removed and re-added, as long as they fall in the range
-  // that was initially indicated as being written back as zeros.
+  // This is an optimization to avoid having to potentially walk to another node to find the
+  // relevant start to update. The reason it is safe to leave the AwaitingCleanLength unchanged is
+  // that it should be possible to apply the AwaitingCleanLength to any new zero intervals that get
+  // added later beyond the truncated interval. The user pager has indicated its intent to write a
+  // range as zeros, so until the point that it actually completes the writeback, it doesn't matter
+  // if zero intervals are removed and re-added, as long as they fall in the range that was
+  // initially indicated as being written back as zeros.
   uint64_t interval_awaiting_clean_end = start_offset;
   page_list_.RemovePages(
       [&interval_start, &interval_start_off, &interval_awaiting_clean_end, this](VmPageOrMarker* p,
@@ -5960,7 +5963,7 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
                 *p = VmPageOrMarker::Empty();
               } else {
                 // The entire interval cannot be marked clean. Move forward the start by awaiting
-                // clean length, which will also clear the AwaitingCleanLength for the resulting
+                // clean length, which will also set the AwaitingCleanLength for the resulting
                 // interval.
                 // Ignore any errors. Cleaning is best effort. If this fails, the interval will
                 // remain as is and get retried on another writeback attempt.

@@ -291,6 +291,9 @@ class VmPageOrMarker {
     void SetAwaitingCleanLength(uint64_t len) {
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
       DEBUG_ASSERT(IS_ALIGNED(len, (1 << kAwaitingCleanLengthShift)));
+      // Clear the old value.
+      value_ &= BIT_MASK(kAwaitingCleanLengthShift);
+      // Set the new value.
       value_ |= (len & ~BIT_MASK(kAwaitingCleanLengthShift));
     }
     uint64_t GetAwaitingCleanLength() const {
@@ -1001,7 +1004,9 @@ class VmPageList final {
   // dirty_state. The specified range must be previously unpopulated. This will try to merge the new
   // zero interval with existing intervals to the left and/or right, if the dirty_state allows it.
   zx_status_t AddZeroInterval(uint64_t start_offset, uint64_t end_offset,
-                              VmPageOrMarker::IntervalDirtyState dirty_state);
+                              VmPageOrMarker::IntervalDirtyState dirty_state) {
+    return AddZeroIntervalInternal(start_offset, end_offset, dirty_state, 0);
+  }
 
   // Populates individual interval slots in the range [start_offset, end_offset) that falls inside a
   // sparse interval. The intent of this function is to allow the caller to prepare the range for
@@ -1039,6 +1044,11 @@ class VmPageList final {
   // lies in.
   bool IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode& lower_bound,
                                 const VmPageOrMarker** interval_out = nullptr) const;
+
+  // Internal helper for AddZeroInterval.
+  zx_status_t AddZeroIntervalInternal(uint64_t start_offset, uint64_t end_offset,
+                                      VmPageOrMarker::IntervalDirtyState dirty_state,
+                                      uint64_t awaiting_clean_len);
 
   template <typename PTR_TYPE, typename S, typename F>
   static zx_status_t ForEveryPage(S self, F per_page_func) {
