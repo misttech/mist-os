@@ -555,7 +555,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t ConfigureAssoc() {
+  zx_status_t NotifyAssociationComplete() {
     fidl::Arena fidl_arena;
     auto builder = fuchsia_wlan_softmac::wire::WlanAssociationConfig::Builder(fidl_arena);
     builder.listen_interval(kListenInterval);
@@ -574,7 +574,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     builder.vht_cap_is_valid(false);
     builder.ht_op_is_valid(false);
     builder.vht_op_is_valid(false);
-    auto result = client_.buffer(test_arena_)->ConfigureAssoc(builder.Build());
+    auto result = client_.buffer(test_arena_)->NotifyAssociationComplete(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
@@ -628,7 +628,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     builder.vht_cap_is_valid(false);
     builder.ht_op_is_valid(false);
     builder.vht_op_is_valid(false);
-    auto result = client_.buffer(test_arena_)->ConfigureAssoc(builder.Build());
+    auto result = client_.buffer(test_arena_)->NotifyAssociationComplete(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
@@ -636,10 +636,10 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t ClearAssoc() {
+  zx_status_t ClearAssociation() {
     // Not used since all info were saved in mvmvif_sta_ already.
     fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> fidl_peer_addr;
-    auto result = client_.buffer(test_arena_)->ClearAssoc(fidl_peer_addr);
+    auto result = client_.buffer(test_arena_)->ClearAssociation(fidl_peer_addr);
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
@@ -1039,7 +1039,7 @@ TEST_F(MacInterfaceTest, TestExceptionHandling) {
   // AP sta (for WLAN_MAC_ROLE_CLIENT). However, in this case, we break the assumption so that the
   // ap_sta_id was populated with the last successful STA ID. Thus, we reset the mvmvif_->ap_sta_id
   // so that the SoftMacDevices destructor will not release the resource twice by calling
-  // ClearAssoc().
+  // ClearAssociation().
   mvmvif_->ap_sta_id = IWL_MVM_INVALID_STA;
 }
 
@@ -1053,13 +1053,13 @@ TEST_F(MacInterfaceTest, AssociateToOpenNetwork) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc());
+  ASSERT_OK(NotifyAssociationComplete());
   ASSERT_EQ(IWL_STA_AUTHORIZED, mvm_sta->sta_state);
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
   ASSERT_EQ(kListenInterval, mvmvif_->bss_conf.listen_interval);
   ASSERT_EQ(mvm_sta->sta_state, iwl_sta_state::IWL_STA_AUTHORIZED);
 
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
   ASSERT_EQ(nullptr, mvmvif_->phy_ctxt);
   ASSERT_EQ(IWL_MVM_INVALID_STA, mvmvif_->ap_sta_id);
   ASSERT_EQ(list_length(&mvm->time_event_list), 0);
@@ -1074,7 +1074,7 @@ TEST_F(MacInterfaceTest, CheckStaState) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc());
+  ASSERT_OK(NotifyAssociationComplete());
   ASSERT_EQ(IWL_STA_AUTHORIZED, mvm_sta->sta_state);
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
   ASSERT_EQ(kListenInterval, mvmvif_->bss_conf.listen_interval);
@@ -1082,17 +1082,17 @@ TEST_F(MacInterfaceTest, CheckStaState) {
 
   ASSERT_EQ(ZX_OK, iwl_mvm_mac_sta_state(mvmvif_, mvm_sta, IWL_STA_AUTHORIZED, IWL_STA_ASSOC));
   ASSERT_EQ(mvm_sta->sta_state, iwl_sta_state::IWL_STA_ASSOC);
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
 }
 
-// Back to back calls of ClearAssoc().
-TEST_F(MacInterfaceTest, ClearAssocAfterClearAssoc) {
-  ASSERT_NE(ZX_OK, ClearAssoc());
-  ASSERT_NE(ZX_OK, ClearAssoc());
+// Back to back calls of ClearAssociation().
+TEST_F(MacInterfaceTest, ClearAssociationAfterClearAssociation) {
+  ASSERT_NE(ZX_OK, ClearAssociation());
+  ASSERT_NE(ZX_OK, ClearAssociation());
 }
 
-// ClearAssoc() should cleanup when called without Assoc
-TEST_F(MacInterfaceTest, ClearAssocAfterNoAssoc) {
+// ClearAssociation() should cleanup when called without Assoc
+TEST_F(MacInterfaceTest, ClearAssociationAfterNoAssoc) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
@@ -1100,17 +1100,17 @@ TEST_F(MacInterfaceTest, ClearAssocAfterNoAssoc) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
   ASSERT_EQ(nullptr, mvmvif_->phy_ctxt);
   ASSERT_EQ(IWL_MVM_INVALID_STA, mvmvif_->ap_sta_id);
   ASSERT_EQ(list_length(&mvm->time_event_list), 0);
 
-  // Call ClearAssoc() again to check if it is handled correctly.
-  ASSERT_NE(ZX_OK, ClearAssoc());
+  // Call ClearAssociation() again to check if it is handled correctly.
+  ASSERT_NE(ZX_OK, ClearAssociation());
 }
 
-// ClearAssoc() should cleanup when called after a failed Assoc
-TEST_F(MacInterfaceTest, ClearAssocAfterFailedAssoc) {
+// ClearAssociation() should cleanup when called after a failed Assoc
+TEST_F(MacInterfaceTest, ClearAssociationAfterFailedAssoc) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
 
@@ -1119,21 +1119,21 @@ TEST_F(MacInterfaceTest, ClearAssocAfterFailedAssoc) {
   // Fail the association by forcing some relevant internal state.
   auto orig = mvmvif_->uploaded;
   mvmvif_->uploaded = false;
-  ASSERT_EQ(ZX_ERR_IO, ConfigureAssoc());
+  ASSERT_EQ(ZX_ERR_IO, NotifyAssociationComplete());
   mvmvif_->uploaded = orig;
 
-  // ClearAssoc will clean up the failed association.
-  ASSERT_OK(ClearAssoc());
+  // ClearAssociation will clean up the failed association.
+  ASSERT_OK(ClearAssociation());
   ASSERT_EQ(nullptr, mvmvif_->phy_ctxt);
   ASSERT_EQ(IWL_MVM_INVALID_STA, mvmvif_->ap_sta_id);
   ASSERT_EQ(list_length(&mvm->time_event_list), 0);
 
-  // Call ClearAssoc() again to check if it is handled correctly.
-  ASSERT_NE(ZX_OK, ClearAssoc());
+  // Call ClearAssociation() again to check if it is handled correctly.
+  ASSERT_NE(ZX_OK, ClearAssociation());
 }
 
-// This test case is to verify ConfigureAssoc() with HT wlan_association_config_t input can
-// successfully trigger LQ_CMD with correct data.
+// This test case is to verify NotifyAssociationComplete() with HT wlan_association_config_t input
+// can successfully trigger LQ_CMD with correct data.
 TEST_F(MacInterfaceTest, AssocWithHtConfig) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
@@ -1183,7 +1183,7 @@ TEST_F(MacInterfaceTest, AssocWithHtConfig) {
   ResetSendCmdFunc();
 
   // Clean up the association states.
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
 }
 
 TEST_F(MacInterfaceTest, StartPassiveScanTest) {
@@ -1290,7 +1290,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc());
+  ASSERT_OK(NotifyAssociationComplete());
   ASSERT_EQ(IWL_STA_AUTHORIZED, mvm_sta->sta_state);
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
   ASSERT_EQ(kListenInterval, mvmvif_->bss_conf.listen_interval);
@@ -1332,7 +1332,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
     ASSERT_EQ(*mvm->fw_key_table, 0x3);
   }
 
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
   ASSERT_EQ(nullptr, mvmvif_->phy_ctxt);
   ASSERT_EQ(IWL_MVM_INVALID_STA, mvmvif_->ap_sta_id);
   ASSERT_EQ(list_length(&mvm->time_event_list), 0);
@@ -1344,7 +1344,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
 TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
-  ASSERT_OK(ConfigureAssoc());
+  ASSERT_OK(NotifyAssociationComplete());
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
 
   fidl::Arena fidl_arena;
@@ -1382,7 +1382,7 @@ TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
     ASSERT_OK(InstallKey(&key_config));
   }
 
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
 }
 
 // Test setting TKIP. Mainly for group key (backward-compatible for many APs).
@@ -1390,7 +1390,7 @@ TEST_F(MacInterfaceTest, InstallKeysTKIP) {
   constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
-  ASSERT_OK(ConfigureAssoc());
+  ASSERT_OK(NotifyAssociationComplete());
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
 
   fidl::Arena fidl_arena;
@@ -1426,7 +1426,7 @@ TEST_F(MacInterfaceTest, InstallKeysTKIP) {
     ASSERT_OK(InstallKey(&key_config));
   }
 
-  ASSERT_OK(ClearAssoc());
+  ASSERT_OK(ClearAssociation());
 }
 
 TEST_F(MacInterfaceTest, TxPktTooLong) {

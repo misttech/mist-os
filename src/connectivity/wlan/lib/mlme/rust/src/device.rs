@@ -192,18 +192,21 @@ impl Device {
         self.raw_device.set_eth_link(LinkStatus::DOWN)
     }
 
-    pub fn configure_assoc(&self, assoc_cfg: WlanAssociationConfig) -> Result<(), zx::Status> {
+    pub fn notify_association_complete(
+        &self,
+        assoc_cfg: WlanAssociationConfig,
+    ) -> Result<(), zx::Status> {
         if let Some(minstrel) = &self.minstrel {
             minstrel.lock().add_peer(&assoc_cfg);
         }
-        self.raw_device.configure_assoc(assoc_cfg)
+        self.raw_device.notify_association_complete(assoc_cfg)
     }
 
-    pub fn clear_assoc(&self, addr: &MacAddr) -> Result<(), zx::Status> {
+    pub fn clear_association(&self, addr: &MacAddr) -> Result<(), zx::Status> {
         if let Some(minstrel) = &self.minstrel {
             minstrel.lock().remove_peer(addr);
         }
-        self.raw_device.clear_assoc(addr)
+        self.raw_device.clear_association(addr)
     }
 }
 
@@ -442,10 +445,10 @@ pub struct DeviceInterface {
     set_link_status: extern "C" fn(device: *mut c_void, status: u8) -> i32,
     /// Configure the association context.
     /// |assoc_cfg| is mutable because the underlying API does not take a const wlan_association_config_t.
-    configure_assoc:
+    notify_association_complete:
         extern "C" fn(device: *mut c_void, assoc_cfg: *mut WlanAssociationConfig) -> i32,
     /// Clear the association context.
-    clear_assoc: extern "C" fn(device: *mut c_void, addr: &[u8; 6]) -> i32,
+    clear_association: extern "C" fn(device: *mut c_void, addr: &[u8; 6]) -> i32,
 }
 
 impl DeviceInterface {
@@ -590,14 +593,19 @@ impl DeviceInterface {
         zx::ok(status)
     }
 
-    fn configure_assoc(&self, mut assoc_cfg: WlanAssociationConfig) -> Result<(), zx::Status> {
-        let status =
-            (self.configure_assoc)(self.device, &mut assoc_cfg as *mut WlanAssociationConfig);
+    fn notify_association_complete(
+        &self,
+        mut assoc_cfg: WlanAssociationConfig,
+    ) -> Result<(), zx::Status> {
+        let status = (self.notify_association_complete)(
+            self.device,
+            &mut assoc_cfg as *mut WlanAssociationConfig,
+        );
         zx::ok(status)
     }
 
-    fn clear_assoc(&self, addr: &MacAddr) -> Result<(), zx::Status> {
-        let status = (self.clear_assoc)(self.device, addr);
+    fn clear_association(&self, addr: &MacAddr) -> Result<(), zx::Status> {
+        let status = (self.clear_association)(self.device, addr);
         zx::ok(status)
     }
 }
@@ -1060,7 +1068,7 @@ pub mod test_utils {
 
         // Cannot mark fn unsafe because it has to match fn signature in DeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn configure_assoc(
+        pub extern "C" fn notify_association_complete(
             device: *mut c_void,
             cfg: *mut WlanAssociationConfig,
         ) -> i32 {
@@ -1070,7 +1078,7 @@ pub mod test_utils {
             zx::sys::ZX_OK
         }
 
-        pub extern "C" fn clear_assoc(device: *mut c_void, addr: &MacAddr) -> i32 {
+        pub extern "C" fn clear_association(device: *mut c_void, addr: &MacAddr) -> i32 {
             unsafe {
                 (*(device as *mut Self)).assocs.remove(addr);
                 (*(device as *mut Self)).join_bss_request = None;
@@ -1119,8 +1127,8 @@ pub mod test_utils {
                 disable_beaconing: Self::disable_beaconing,
                 configure_beacon: Self::configure_beacon,
                 set_link_status: Self::set_link_status,
-                configure_assoc: Self::configure_assoc,
-                clear_assoc: Self::clear_assoc,
+                notify_association_complete: Self::notify_association_complete,
+                clear_association: Self::clear_association,
             }
         }
 
@@ -1601,11 +1609,11 @@ mod tests {
     }
 
     #[test]
-    fn configure_assoc() {
+    fn notify_association_complete() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
-        dev.configure_assoc(WlanAssociationConfig {
+        dev.notify_association_complete(WlanAssociationConfig {
             bssid: [1, 2, 3, 4, 5, 6],
             aid: 1,
             listen_interval: 2,
@@ -1639,7 +1647,7 @@ mod tests {
         assert!(fake_device.assocs.contains_key(&[1, 2, 3, 4, 5, 6]));
     }
     #[test]
-    fn clear_assoc() {
+    fn clear_association() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
@@ -1668,9 +1676,9 @@ mod tests {
             None,
         );
         assert!(fake_device.join_bss_request.is_some());
-        dev.configure_assoc(assoc_cfg).expect("error configuring assoc");
+        dev.notify_association_complete(assoc_cfg).expect("error configuring assoc");
         assert_eq!(fake_device.assocs.len(), 1);
-        dev.clear_assoc(&[1, 2, 3, 4, 5, 6]).expect("error clearing assoc");
+        dev.clear_association(&[1, 2, 3, 4, 5, 6]).expect("error clearing assoc");
         assert_eq!(fake_device.assocs.len(), 0);
         assert!(fake_device.join_bss_request.is_none());
     }

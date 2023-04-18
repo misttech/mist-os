@@ -327,7 +327,7 @@ type WlanHtOp = struct {
 const WLAN_MAC_MAX_RATES uint32 = 263; // (8 + 255)
 
 /// Argument table to be passed as the single argument to
-/// WlanSoftmac.ConfigureAssoc.
+/// WlanSoftmac.NotifyAssociationComplete.
 /// All information here is relevant only in the context of the association with
 /// the given peer_addr.
 /// All fields in this table are required unless stated otherwise.
@@ -496,13 +496,18 @@ protocol WlanSoftmac {
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
     InstallKey(WlanKeyConfiguration) -> () error zx.status;
 
-    /// Notifies MAC and PHY parameters negotiated through a successful association
-    ConfigureAssoc(struct {
+    /// Indicate the device of a successful association and configure additional
+    /// parameters necessary to participate in that association.
+    ///
+    /// Common errors include:
+    ///   ZX_ERR_BAD_STATE: The device was not previously informed of this BSS
+    ///       via WlanSoftmac.JoinBss().
+    NotifyAssociationComplete(struct {
         assoc_cfg WlanAssociationConfig;
     }) -> () error zx.status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
-    ClearAssoc(struct {
+    ClearAssociation(struct {
         peer_addr ieee80211.MacAddr;
     }) -> () error zx.status;
 

@@ -88,7 +88,7 @@ impl Joined {
 
         result.map_err(|status_code| {
             sta.send_connect_conf_failure(status_code);
-            if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+            if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
                 error!("Auth Alg Error: clear_connect_context failed: {}", e);
             }
         })
@@ -96,7 +96,7 @@ impl Joined {
 
     fn on_sme_deauthenticate(&mut self, sta: &mut BoundClient<'_>) {
         // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             warn!("SME Deauthenticate: Error clearing association in vendor driver: {}", e);
         }
     }
@@ -133,7 +133,7 @@ impl Authenticating {
                 error!("authentication with BSS failed");
                 // TODO(fxbug.dev/83828): pass the status code from the original auth frame
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+                if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
                     error!("Auth Failed: clear_connect_context failed: {}", e);
                 }
                 AuthProgress::Failed
@@ -142,7 +142,7 @@ impl Authenticating {
                 error!("Internal error while authenticating: {}", e);
                 // TODO(fxbug.dev/83828): pass the status code from the original auth frame
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+                if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
                     error!("Auth Internal Err: clear_connect_context failed: {}", e);
                 }
                 AuthProgress::Failed
@@ -211,7 +211,7 @@ impl Authenticating {
 
         sta.sta.connect_timeout.take();
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             error!("Deauth Frame: clear_connect_context failed: {}", e);
         }
     }
@@ -219,7 +219,7 @@ impl Authenticating {
     fn on_sme_deauthenticate(&mut self, sta: &mut BoundClient<'_>) {
         sta.sta.connect_timeout.take();
         // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             error!("SME Deauthenticate: Error clearing association in vendor driver: {}", e);
         }
     }
@@ -342,7 +342,7 @@ impl Associating {
         // BlockAck session, independently of 40MHz operation.
         let qos = assoc_cfg.qos.into();
 
-        if let Err(status) = sta.ctx.device.configure_assoc(assoc_cfg) {
+        if let Err(status) = sta.ctx.device.notify_association_complete(assoc_cfg) {
             // Device cannot handle this association. Something is seriously wrong.
             error!("device failed to configure association: {}", status);
             sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
@@ -399,7 +399,7 @@ impl Associating {
             { deauth_hdr.reason_code }
         );
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             error!("Deauth Frame: clear_connect_context failed: {}", e);
         }
     }
@@ -407,7 +407,7 @@ impl Associating {
     fn on_sme_deauthenticate(&mut self, sta: &mut BoundClient<'_>) {
         sta.sta.connect_timeout.take();
         // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             error!("Assoc timeout: Error clearing association in vendor driver: {}", e);
         }
     }
@@ -537,7 +537,7 @@ impl Associated {
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
         sta.send_deauthenticate_ind(reason_code, LocallyInitiated(false));
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             error!("Deauth Frame: clear_connect_context failed: {}", e);
         }
     }
@@ -790,7 +790,7 @@ impl Associated {
 
         self.pre_leaving_associated_state(sta);
         // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
             error!("Error clearing association in vendor driver: {}", e);
         }
 
@@ -1117,7 +1117,7 @@ impl States {
                 }
                 sta.sta.connect_timeout.take();
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RejectedSequenceTimeout);
-                if let Err(e) = sta.ctx.device.clear_assoc(&sta.sta.bssid().0) {
+                if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().0) {
                     error!("Connect Timeout: clear_connect_context failed: {}", e);
                 }
                 match self {
@@ -1933,7 +1933,7 @@ mod tests {
         // ddk_assoc_cfg will be cleared when MLME receives deauth frame.
         sta.ctx
             .device
-            .configure_assoc(fake_ddk_assoc_cfg())
+            .notify_association_complete(fake_ddk_assoc_cfg())
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device.assocs.len());
 
@@ -1977,7 +1977,7 @@ mod tests {
         // ddk_assoc_cfg must be cleared when MLME receives disassociation frame later.
         sta.ctx
             .device
-            .configure_assoc(fake_ddk_assoc_cfg())
+            .notify_association_complete(fake_ddk_assoc_cfg())
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device.assocs.len());
 
@@ -3265,7 +3265,7 @@ mod tests {
         })));
         sta.ctx
             .device
-            .configure_assoc(fake_ddk_assoc_cfg())
+            .notify_association_complete(fake_ddk_assoc_cfg())
             .expect("valid assoc ctx should not fail");
         assert_eq!(1, m.fake_device.assocs.len());
 

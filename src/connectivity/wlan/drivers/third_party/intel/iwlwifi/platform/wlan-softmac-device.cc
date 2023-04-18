@@ -323,15 +323,16 @@ void WlanSoftmacDevice::InstallKey(InstallKeyRequestView request, fdf::Arena& ar
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanSoftmacDevice::ConfigureAssoc(ConfigureAssocRequestView request, fdf::Arena& arena,
-                                       ConfigureAssocCompleter::Sync& completer) {
+void WlanSoftmacDevice::NotifyAssociationComplete(
+    NotifyAssociationCompleteRequestView request, fdf::Arena& arena,
+    NotifyAssociationCompleteCompleter::Sync& completer) {
   if (ap_mvm_sta_ == nullptr) {
     IWL_ERR(this, "Ap sta does not exist.");
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
-  zx_status_t status = mac_configure_assoc(mvmvif_, &request->assoc_cfg);
+  zx_status_t status = mac_notify_association_complete(mvmvif_, &request->assoc_cfg);
   if (status != ZX_OK) {
     IWL_ERR(this, "failed mac configure assoc: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
@@ -341,8 +342,8 @@ void WlanSoftmacDevice::ConfigureAssoc(ConfigureAssocRequestView request, fdf::A
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanSoftmacDevice::ClearAssoc(ClearAssocRequestView request, fdf::Arena& arena,
-                                   ClearAssocCompleter::Sync& completer) {
+void WlanSoftmacDevice::ClearAssociation(ClearAssociationRequestView request, fdf::Arena& arena,
+                                         ClearAssociationCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
 
   if (ap_mvm_sta_ == nullptr) {
@@ -357,7 +358,7 @@ void WlanSoftmacDevice::ClearAssoc(ClearAssocRequestView request, fdf::Arena& ar
   mvmvif_->bss_conf.assoc = false;
   ap_mvm_sta_.reset();
 
-  if ((status = mac_clear_assoc(mvmvif_, request->peer_addr.data())) != ZX_OK) {
+  if ((status = mac_clear_association(mvmvif_, request->peer_addr.data())) != ZX_OK) {
     IWL_ERR(this, "failed clear assoc: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;

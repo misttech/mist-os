@@ -66,10 +66,10 @@ zx_status_t mac_leave_bss(struct iwl_mvm_vif* mvmvif);
 zx_status_t mac_enable_beaconing(void* ctx,
                                  const wlan_softmac_wire::WlanBeaconConfiguration* beacon_config);
 zx_status_t mac_configure_beacon(void* ctx, const wlan_softmac_wire::WlanTxPacket* packet_template);
-zx_status_t mac_configure_assoc(struct iwl_mvm_vif* mvmvif,
-                                const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg);
-zx_status_t mac_clear_assoc(struct iwl_mvm_vif* mvmvif,
-                            const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]);
+zx_status_t mac_notify_association_complete(
+    struct iwl_mvm_vif* mvmvif, const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg);
+zx_status_t mac_clear_association(struct iwl_mvm_vif* mvmvif,
+                                  const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]);
 zx_status_t mac_start_passive_scan(
     void* ctx, const wlan_softmac_wire::WlanSoftmacStartPassiveScanRequest* passive_scan_args,
     uint64_t* out_scan_id);

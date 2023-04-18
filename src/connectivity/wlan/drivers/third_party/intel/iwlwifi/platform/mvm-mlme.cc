@@ -473,7 +473,7 @@ zx_status_t mac_configure_beacon(void* ctx,
 // The current mac context is set by mac_join_bss() with default values.
 //   TODO(fxbug.dev/36684): supports VHT (802.11ac)
 //
-zx_status_t mac_configure_assoc(
+zx_status_t mac_notify_association_complete(
     struct iwl_mvm_vif* mvmvif,
     const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg) {
   zx_status_t ret = ZX_OK;
@@ -575,8 +575,9 @@ zx_status_t mac_configure_assoc(
   return ZX_OK;
 }
 
-zx_status_t mac_clear_assoc(struct iwl_mvm_vif* mvmvif,
-                            const uint8_t peer_addr[fuchsia_wlan_ieee80211::wire::kMacAddrLen]) {
+zx_status_t mac_clear_association(
+    struct iwl_mvm_vif* mvmvif,
+    const uint8_t peer_addr[fuchsia_wlan_ieee80211::wire::kMacAddrLen]) {
   IWL_INFO(ctx, "Disassociating ...\n");
 
   zx_status_t ret = ZX_OK;

@@ -202,15 +202,15 @@ struct WlantapMacImpl : WlantapMac,
     completer.buffer(arena).ReplySuccess();
   }
 
-  void ConfigureAssoc(ConfigureAssocRequestView request, fdf::Arena& arena,
-                      ConfigureAssocCompleter::Sync& completer) override {
+  void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request, fdf::Arena& arena,
+                                 NotifyAssociationCompleteCompleter::Sync& completer) override {
     // This is the test driver, so we can just pretend the association was configured.
     // TODO(fxbug.dev/28907): Evaluate the use and implement
     completer.buffer(arena).ReplySuccess();
   }
 
-  void ClearAssoc(ClearAssocRequestView request, fdf::Arena& arena,
-                  ClearAssocCompleter::Sync& completer) override {
+  void ClearAssociation(ClearAssociationRequestView request, fdf::Arena& arena,
+                        ClearAssociationCompleter::Sync& completer) override {
     // TODO(fxbug.dev/28907): Evaluate the use and implement. Association is never
     // configured, so there is nothing to clear.
     completer.buffer(arena).ReplySuccess();

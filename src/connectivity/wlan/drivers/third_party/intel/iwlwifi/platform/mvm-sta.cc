@@ -53,7 +53,7 @@ MvmSta::~MvmSta() {
     }
     if ((mvmvif) && (mvmvif->ap_sta_id != IWL_MVM_INVALID_STA)) {
       // STA is still in a connected state, clean it up.
-      if (mac_clear_assoc(mvmvif, mvmvif->addr) != ZX_OK) {
+      if (mac_clear_association(mvmvif, mvmvif->addr) != ZX_OK) {
         IWL_ERR(mvmvif, "Unable to clear assoc during sta delete");
       }
     }

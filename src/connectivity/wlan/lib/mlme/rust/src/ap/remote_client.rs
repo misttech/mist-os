@@ -201,7 +201,7 @@ impl RemoteClient {
         match self.state.as_mut() {
             State::Associated { .. } => {
                 ctx.device
-                    .clear_assoc(&self.addr)
+                    .clear_association(&self.addr)
                     .map_err(|s| Error::Status(format!("failed to clear association"), s))?;
             }
             _ => (),
@@ -438,7 +438,7 @@ impl RemoteClient {
             // idle timer.
             self.reset_bss_max_idle_timeout(ctx);
             ctx.device
-                .configure_assoc(banjo_fuchsia_wlan_softmac::WlanAssociationConfig {
+                .notify_association_complete(banjo_fuchsia_wlan_softmac::WlanAssociationConfig {
                     bssid: self.addr,
                     aid: aid,
                     listen_interval: 0, // This field is not used for AP.

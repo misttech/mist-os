@@ -68,8 +68,8 @@ class DeviceInterface {
   virtual zx_status_t StartActiveScan(
       const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) = 0;
   virtual zx_status_t CancelScan(uint64_t scan_id) = 0;
-  virtual zx_status_t ConfigureAssoc(wlan_association_config_t* assoc_cfg) = 0;
-  virtual zx_status_t ClearAssoc(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) = 0;
+  virtual zx_status_t NotifyAssociationComplete(wlan_association_config_t* assoc_cfg) = 0;
+  virtual zx_status_t ClearAssociation(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;
   virtual const wlan_softmac_query_response_t& GetWlanSoftmacQueryResponse() const = 0;

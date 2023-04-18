@@ -151,15 +151,15 @@ typedef struct {
    */
   int32_t (*set_link_status)(void *device, uint8_t status);
   /**
-   * Configure the association context.
+   * Notify about association completion.
    * |assoc_cfg| is mutable because the underlying API does not take a const
    * wlan_association_config_t.
    */
-  int32_t (*configure_assoc)(void *device, wlan_association_config_t *assoc_cfg);
+  int32_t (*notify_association_complete)(void *device, wlan_association_config_t *assoc_cfg);
   /**
    * Clear the association context.
    */
-  int32_t (*clear_assoc)(void *device, const uint8_t (*addr)[6]);
+  int32_t (*clear_association)(void *device, const uint8_t (*addr)[6]);
 } rust_device_interface_t;
 
 /**

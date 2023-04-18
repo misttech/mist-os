@@ -188,11 +188,10 @@ zx_status_t WlanSoftmacHandle::Init() {
       },
       .set_link_status = [](void* device,
                             uint8_t status) { return DEVICE(device)->SetStatus(status); },
-      .configure_assoc = [](void* device, wlan_association_config_t* assoc_cfg) -> zx_status_t {
-        return DEVICE(device)->ConfigureAssoc(assoc_cfg);
-      },
-      .clear_assoc = [](void* device, const uint8_t(*addr)[6]) -> zx_status_t {
-        return DEVICE(device)->ClearAssoc(*addr);
+      .notify_association_complete = [](void* device, wlan_association_config_t* assoc_cfg)
+          -> zx_status_t { return DEVICE(device)->NotifyAssociationComplete(assoc_cfg); },
+      .clear_association = [](void* device, const uint8_t(*addr)[6]) -> zx_status_t {
+        return DEVICE(device)->ClearAssociation(*addr);
       },
   };
 
@@ -939,7 +938,7 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
   return result.status();
 }
 
-zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
+zx_status_t Device::NotifyAssociationComplete(wlan_association_config_t* assoc_cfg) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -954,19 +953,20 @@ zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
     return status;
   }
 
-  auto result = client_.sync().buffer(*std::move(arena))->ConfigureAssoc(fidl_assoc_cfg);
+  auto result = client_.sync().buffer(*std::move(arena))->NotifyAssociationComplete(fidl_assoc_cfg);
   if (!result.ok()) {
-    lerror("ConfigureAssoc failed (FIDL error %s)", result.status_string());
+    lerror("NotifyAssociationComplete failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    lerror("ConfigureAssoc failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("NotifyAssociationComplete failed (status %s)",
+           zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
 }
 
-zx_status_t Device::ClearAssoc(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) {
+zx_status_t Device::ClearAssociation(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -975,13 +975,13 @@ zx_status_t Device::ClearAssoc(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MA
 
   fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> fidl_peer_addr;
   memcpy(fidl_peer_addr.begin(), peer_addr, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  auto result = client_.sync().buffer(*std::move(arena))->ClearAssoc(fidl_peer_addr);
+  auto result = client_.sync().buffer(*std::move(arena))->ClearAssociation(fidl_peer_addr);
   if (!result.ok()) {
-    lerror("ClearAssoc failed (FIDL error %s)", result.status_string());
+    errorf("ClearAssoc failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    lerror("ClearAssoc failed (status %s)", zx_status_get_string(result->error_value()));
+    errorf("ClearAssoc failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;

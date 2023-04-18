@@ -56,10 +56,10 @@ class WlanSoftmacDevice
                           ConfigureBeaconingCompleter::Sync& completer);
   void InstallKey(InstallKeyRequestView request, fdf::Arena& arena,
                   InstallKeyCompleter::Sync& completer);
-  void ConfigureAssoc(ConfigureAssocRequestView request, fdf::Arena& arena,
-                      ConfigureAssocCompleter::Sync& completer);
-  void ClearAssoc(ClearAssocRequestView request, fdf::Arena& arena,
-                  ClearAssocCompleter::Sync& completer);
+  void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request, fdf::Arena& arena,
+                                 NotifyAssociationCompleteCompleter::Sync& completer);
+  void ClearAssociation(ClearAssociationRequestView request, fdf::Arena& arena,
+                        ClearAssociationCompleter::Sync& completer);
   void StartPassiveScan(StartPassiveScanRequestView request, fdf::Arena& arena,
                         StartPassiveScanCompleter::Sync& completer);
   void StartActiveScan(StartActiveScanRequestView request, fdf::Arena& arena,
