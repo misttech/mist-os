@@ -22,6 +22,7 @@
 #include <linux/close_range.h>
 #include <linux/errno.h>
 #include <linux/eventpoll.h>
+#include <linux/fadvise.h>
 #include <linux/fb.h>
 #include <linux/fcntl.h>
 #include <linux/filter.h>

@@ -1935,6 +1935,42 @@ pub fn sys_fdatasync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Err
     Ok(())
 }
 
+pub fn sys_fadvise64(
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    offset: off_t,
+    len: off_t,
+    advice: u32,
+) -> Result<(), Errno> {
+    // TODO(fxbug.dev/125680): Implement fadvise.
+    match advice {
+        POSIX_FADV_NORMAL
+        | POSIX_FADV_RANDOM
+        | POSIX_FADV_SEQUENTIAL
+        | POSIX_FADV_WILLNEED
+        | POSIX_FADV_DONTNEED
+        | POSIX_FADV_NOREUSE => (),
+        _ => return error!(EINVAL),
+    }
+
+    if offset < 0 || len < 0 {
+        return error!(EINVAL);
+    }
+
+    let file = current_task.files.get(fd)?;
+    // fadvise does not work on pipes.
+    if file.downcast_file::<PipeFileObject>().is_some() {
+        return error!(ESPIPE);
+    }
+
+    // fadvise does not work on paths.
+    if file.flags().contains(OpenFlags::PATH) {
+        return error!(EBADF);
+    }
+
+    Ok(())
+}
+
 pub fn sys_fallocate(
     current_task: &CurrentTask,
     fd: FdNumber,
