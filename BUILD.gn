@@ -971,6 +971,7 @@ group("tool_paths.metadata") {
     "//prebuilt/proprietary/third_party/reclient/$host_platform/reproxy",
     "//prebuilt/proprietary/third_party/reclient/$host_platform/rewrapper",
     "//prebuilt/sdk/bazel/bazel",
+    "//prebuilt/third_party/buildifier/$host_platform/buildifier",
     "//prebuilt/third_party/clang/$host_platform/share/clang/clang-format-diff.py",
     "//prebuilt/third_party/clang/$host_platform/share/clang/clang-tidy-diff.py",
     "//prebuilt/third_party/dart/$host_platform/bin/dart",
