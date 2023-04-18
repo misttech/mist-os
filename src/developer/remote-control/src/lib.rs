@@ -5,9 +5,11 @@
 use {
     crate::host_identifier::HostIdentifier,
     anyhow::{Context as _, Result},
+    component_debug::dirs::*,
+    component_debug::lifecycle::*,
     fidl::endpoints::ServerEnd,
     fidl::prelude::*,
-    fidl_fuchsia_component as fcomp, fidl_fuchsia_developer_remotecontrol as rcs,
+    fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_diagnostics::Selector,
     fidl_fuchsia_io as io,
     fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt,
@@ -16,7 +18,7 @@ use {
     fuchsia_zircon as zx,
     futures::future::join,
     futures::prelude::*,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
+    moniker::{RelativeMoniker, RelativeMonikerBase},
     selector_maps::{MappingError, SelectorMappingList},
     selectors::{StringSelector, TreeSelector},
     std::{borrow::Borrow, cell::RefCell, net::SocketAddr, rc::Rc, rc::Weak},
@@ -454,14 +456,25 @@ async fn connect_to_exposed_protocol(
 
     let moniker_parts = moniker.path().iter().map(|part| part.to_string()).collect();
 
-    // CF APIs expect the moniker to be relative.
-    let moniker = moniker.to_string();
-    let moniker = format!(".{}", moniker);
-
     // This is a no-op if already resolved.
-    resolve_component(&moniker, lifecycle).await?;
+    resolve_instance(&lifecycle, &moniker)
+        .map_err(|err| match err {
+            ResolveError::ActionError(ActionError::InstanceNotFound) => {
+                rcs::ConnectError::NoMatchingServices
+            }
+            err => {
+                error!(?err, "error resolving component");
+                rcs::ConnectError::ServiceConnectFailed
+            }
+        })
+        .await?;
 
-    let exposed_dir = get_exposed_dir(&moniker, query).await?;
+    let exposed_dir = open_instance_dir_root_readable(&moniker, OpenDirType::Exposed, &query)
+        .map_err(|err| {
+            error!(?err, "error opening exposed dir");
+            rcs::ConnectError::ServiceConnectFailed
+        })
+        .await?;
 
     connect_to_protocol_in_exposed_dir(&exposed_dir, &protocol_name, server_end).await?;
 
@@ -474,7 +487,7 @@ async fn connect_to_exposed_protocol(
 
 fn extract_moniker_and_protocol_from_selector(
     selector: Selector,
-) -> Option<(AbsoluteMoniker, String)> {
+) -> Option<(RelativeMoniker, String)> {
     // Construct the moniker from the selector
     let moniker_segments = selector.component_selector?.moniker_segments?;
     let mut children = vec![];
@@ -482,7 +495,7 @@ fn extract_moniker_and_protocol_from_selector(
         let child = segment.exact_match()?.to_string();
         children.push(child);
     }
-    let moniker = format!("/{}", children.join("/"));
+    let moniker = format!("./{}", children.join("/"));
 
     let tree_selector = selector.tree_selector?;
 
@@ -497,7 +510,7 @@ fn extract_moniker_and_protocol_from_selector(
     let protocol_name = property_selector.exact_match()?.to_string();
 
     // Make sure the moniker is valid
-    let moniker = AbsoluteMoniker::parse_str(&moniker)
+    let moniker = RelativeMoniker::try_from(moniker.as_str())
         .map_err(|err| {
             error!(%err, "moniker invalid");
             err
@@ -505,52 +518,6 @@ fn extract_moniker_and_protocol_from_selector(
         .ok()?;
 
     Some((moniker, protocol_name))
-}
-
-async fn resolve_component(
-    moniker: &str,
-    lifecycle: fsys::LifecycleControllerProxy,
-) -> Result<(), rcs::ConnectError> {
-    lifecycle
-        .resolve(moniker)
-        .await
-        .map_err(|err| {
-            error!(%err, "error using lifecycle controller");
-            rcs::ConnectError::ServiceConnectFailed
-        })?
-        .map_err(|err| match err {
-            fcomp::Error::InstanceNotFound => rcs::ConnectError::NoMatchingServices,
-            fcomp::Error::InstanceCannotResolve => rcs::ConnectError::ServiceConnectFailed,
-            err => {
-                error!(?err, "error resolving component");
-                rcs::ConnectError::ServiceConnectFailed
-            }
-        })
-}
-
-async fn get_exposed_dir(
-    moniker: &str,
-    query: fsys::RealmQueryProxy,
-) -> Result<io::DirectoryProxy, rcs::ConnectError> {
-    // Get all directories of the instance.
-    let resolved_dirs = query
-        .get_instance_directories(&moniker)
-        .await
-        .map_err(|err| {
-            error!(%err, "error using realm query");
-            rcs::ConnectError::ServiceConnectFailed
-        })?
-        .map_err(|err| match err {
-            fsys::RealmQueryError::BadMoniker => rcs::ConnectError::ServiceConnectFailed,
-            fsys::RealmQueryError::InstanceNotFound => rcs::ConnectError::NoMatchingServices,
-            err => {
-                error!(?err, "error getting resolved dirs of component");
-                rcs::ConnectError::ServiceConnectFailed
-            }
-        })?
-        .ok_or(rcs::ConnectError::ServiceConnectFailed)?;
-
-    resolved_dirs.exposed_dir.into_proxy().map_err(|_| rcs::ConnectError::ServiceConnectFailed)
 }
 
 async fn connect_to_protocol_in_exposed_dir(
@@ -570,7 +537,7 @@ async fn connect_to_protocol_in_exposed_dir(
     // Connect to the capability
     exposed_dir
         .open(
-            io::OpenFlags::RIGHT_READABLE | io::OpenFlags::POSIX_WRITABLE,
+            io::OpenFlags::RIGHT_READABLE,
             io::ModeType::empty(),
             protocol_name,
             ServerEnd::new(server_end),
@@ -688,14 +655,12 @@ async fn forward_traffic(
 
 #[cfg(test)]
 mod tests {
-    use fidl::endpoints::ClientEnd;
-
     use {
         super::*,
         assert_matches::assert_matches,
         fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
-        fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_net as fnet,
-        fidl_fuchsia_net_interfaces as fnet_interfaces,
+        fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio,
+        fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
         fuchsia_component::server::ServiceFs,
         fuchsia_zircon as zx,
         selectors::{parse_selector, VerboseError},
@@ -888,47 +853,47 @@ mod tests {
         fidl::endpoints::spawn_stream_handler(
             move |request: fsys::LifecycleControllerRequest| async move {
                 match request {
-                    fsys::LifecycleControllerRequest::Resolve { moniker, responder } => {
+                    fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                         assert_eq!(moniker, "./core/my_component");
                         responder.send(&mut Ok(())).unwrap()
                     }
-                    _ => panic!("unexpected request"),
+                    _ => panic!("unexpected request: {:?}", request),
                 }
             },
         )
         .unwrap()
     }
 
-    fn setup_exposed_dir() -> ClientEnd<io::DirectoryMarker> {
+    fn setup_exposed_dir(server: ServerEnd<fio::DirectoryMarker>) {
         let mut fs = ServiceFs::new();
         fs.add_fidl_service(move |_: hwinfo::BoardRequestStream| {});
-
-        let (client, server) = fidl::endpoints::create_endpoints();
         fs.serve_connection(server).unwrap();
-
         fasync::Task::spawn(fs.collect::<()>()).detach();
-
-        client
     }
 
     fn setup_fake_realm_query() -> fsys::RealmQueryProxy {
         fidl::endpoints::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
             match request {
-                fsys::RealmQueryRequest::GetInstanceDirectories { moniker, responder } => {
+                fsys::RealmQueryRequest::Open {
+                    moniker,
+                    dir_type,
+                    flags,
+                    mode,
+                    path,
+                    object,
+                    responder,
+                } => {
                     assert_eq!(moniker, "./core/my_component");
+                    assert_eq!(dir_type, fsys::OpenDirType::ExposedDir);
+                    assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
+                    assert_eq!(mode, fio::ModeType::empty());
+                    assert_eq!(path, ".");
 
-                    let exposed_dir = setup_exposed_dir();
+                    setup_exposed_dir(object.into_channel().into());
 
-                    responder
-                        .send(&mut Ok(Some(Box::new(fsys::ResolvedDirectories {
-                            exposed_dir,
-                            ns_entries: vec![],
-                            pkg_dir: None,
-                            execution_dirs: None,
-                        }))))
-                        .unwrap()
+                    responder.send(&mut Ok(())).unwrap()
                 }
-                _ => panic!("unexpected request"),
+                _ => panic!("unexpected request: {:?}", request),
             }
         })
         .unwrap()
@@ -940,7 +905,7 @@ mod tests {
             parse_selector::<VerboseError>("core/my_component:expose:fuchsia.foo.bar").unwrap();
         let (moniker, protocol) = extract_moniker_and_protocol_from_selector(selector).unwrap();
 
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/core/my_component").unwrap());
+        assert_eq!(moniker, RelativeMoniker::try_from("./core/my_component").unwrap());
         assert_eq!(protocol, "fuchsia.foo.bar");
 
         for selector in [
