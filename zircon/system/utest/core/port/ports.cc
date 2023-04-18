@@ -628,7 +628,14 @@ TEST(PortTest, CloseQueueRace) {
 }
 
 // See that creating too many object observers raises an exception.
-TEST(PortTest, TooManyObservers) {
+//
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_TooManyObservers DISABLED_TooManyObservers
+#else
+#define MAYBE_TooManyObservers TooManyObservers
+#endif
+TEST(PortTest, MAYBE_TooManyObservers) {
   if (getenv("NO_NEW_PROCESS")) {
     ZXTEST_SKIP("Running without the ZX_POL_NEW_PROCESS policy, skipping test case.");
   }

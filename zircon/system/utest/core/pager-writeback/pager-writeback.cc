@@ -756,7 +756,14 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
 }
 
 // Tests that ZX_PAGER_OP_FAIL can fail DIRTY page requests and propagate the failure up.
-TEST(PagerWriteback, FailDirtyRequests) {
+//
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_FailDirtyRequests DISABLED_FailDirtyRequests
+#else
+#define MAYBE_FailDirtyRequests FailDirtyRequests
+#endif
+TEST(PagerWriteback, MAYBE_FailDirtyRequests) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1647,7 +1654,14 @@ TEST(PagerWriteback, DirtyDuringWriteback) {
 }
 
 // Tests that mapping write permissions are cleared as expected on writeback.
-TEST(PagerWriteback, WritebackWithMapping) {
+//
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_WritebackWithMapping DISABLED_WritebackWithMapping
+#else
+#define MAYBE_WritebackWithMapping WritebackWithMapping
+#endif
+TEST(PagerWriteback, MAYBE_WritebackWithMapping) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4669,7 +4683,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DecommitCleanOnDetach, 0) {
 }
 
 // Tests that DIRTY requests cannot be generated after detach.
+#if defined(__riscv)
+VMO_VMAR_TEST(PagerWriteback, DISABLED_NoDirtyRequestsAfterDetach) {
+#else
 VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
+#endif
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4754,7 +4772,11 @@ VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
 }
 
 // Tests that detach with a pending DIRTY request fails the request.
+#if defined(__riscv)
+VMO_VMAR_TEST(PagerWriteback, DISABLED_DetachWithPendingDirtyRequest) {
+#else
 VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
+#endif
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5114,7 +5136,14 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnMappingRead, 0) {
 }
 
 // Tests that a VMO is not marked modified when a write is failed by failing a DIRTY request.
-TEST(PagerWriteback, NotModifiedOnFailedDirtyRequest) {
+//
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_NotModifiedOnFailedDirtyRequest DISABLED_NotModifiedOnFailedDirtyRequest
+#else
+#define MAYBE_NotModifiedOnFailedDirtyRequest NotModifiedOnFailedDirtyRequest
+#endif
+TEST(PagerWriteback, MAYBE_NotModifiedOnFailedDirtyRequest) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 

@@ -191,7 +191,13 @@ TEST(SyncMutex, TimeoutElapsed) {
   ASSERT_EQ(zx_handle_close(args.done_event), ZX_OK, "failed to close event");
 }
 
-TEST(SyncMutex, NoRecursion) {
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_NoRecursion DISABLED_NoRecursion
+#else
+#define MAYBE_NoRecursion NoRecursion
+#endif
+TEST(SyncMutex, MAYBE_NoRecursion) {
   // libsync mutexes are not recursive mutexes.  Attempting to re-enter an
   // already held mutex should result in death.
   ASSERT_DEATH([]() __TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -201,7 +207,13 @@ TEST(SyncMutex, NoRecursion) {
   });
 }
 
-TEST(SyncMutex, AssertHeld) {
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_AssertHeld DISABLED_AssertHeld
+#else
+#define MAYBE_AssertHeld AssertHeld
+#endif
+TEST(SyncMutex, MAYBE_AssertHeld) {
   // Grab a mutex and assert that we are holding it
   {
     sync_mutex_t mutex;

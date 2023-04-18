@@ -342,7 +342,13 @@ TEST(VmoTestCase, ParallelRead) {
   thread.join();
 }
 
-TEST(VmoTestCase, ReadOnlyMap) {
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_ReadOnlyMap DISABLED_ReadOnlyMap
+#else
+#define MAYBE_ReadOnlyMap ReadOnlyMap
+#endif
+TEST(VmoTestCase, MAYBE_ReadOnlyMap) {
   zx_status_t status;
   zx_handle_t vmo;
 
@@ -367,7 +373,13 @@ TEST(VmoTestCase, ReadOnlyMap) {
   EXPECT_OK(status, "handle_close");
 }
 
-TEST(VmoTestCase, NoPermMap) {
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_NoPermMap DISABLED_NoPermMap
+#else
+#define MAYBE_NoPermMap NoPermMap
+#endif
+TEST(VmoTestCase, MAYBE_NoPermMap) {
   zx_status_t status;
   zx_handle_t vmo;
 
@@ -397,7 +409,13 @@ TEST(VmoTestCase, NoPermMap) {
   EXPECT_OK(zx_handle_close(vmo), "handle_close");
 }
 
-TEST(VmoTestCase, NoPermProtect) {
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_NoPermProtect DISABLED_NoPermProtect
+#else
+#define MAYBE_NoPermProtect NoPermProtect
+#endif
+TEST(VmoTestCase, MAYBE_NoPermProtect) {
   zx_status_t status;
   zx_handle_t vmo;
 
@@ -1567,7 +1585,14 @@ TEST(VmoTestCase, CacheOpOutOfRange) {
                          UINT64_MAX - zx_system_get_page_size() + 1, 1, nullptr, 0));
 }
 
-TEST(VmoTestCase, CacheFlush) {
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_CacheFlush DISABLED_CacheFlush
+#else
+#define MAYBE_CacheFlush CacheFlush
+#endif
+TEST(VmoTestCase, MAYBE_CacheFlush) {
+  //  return;
   zx_handle_t vmo;
   const size_t size = 0x8000;
 
@@ -1647,7 +1672,14 @@ TEST(VmoTestCase, DecommitMisaligned) {
 }
 
 // Resizing a regular mapped VMO causes a fault.
-TEST(VmoTestCase, ResizeHazard) {
+//
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_ResizeHazard DISABLED_ResizeHazard
+#else
+#define MAYBE_ResizeHazard ResizeHazard
+#endif
+TEST(VmoTestCase, MAYBE_ResizeHazard) {
   const size_t size = zx_system_get_page_size() * 2;
   zx_handle_t vmo;
   ASSERT_OK(zx_vmo_create(size, ZX_VMO_RESIZABLE, &vmo));

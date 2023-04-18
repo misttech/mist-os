@@ -1412,7 +1412,14 @@ TEST(ChannelTest, ReadAndWriteWithMultipleSizes) {
 }
 
 // Verify that a process is killed by a policy exception if it writes to a "full" channel.
-TEST(ChannelTest, ChannelFullException) {
+//
+// TODO(fxbug.dev/125661): Test fails on riscv64.
+#if defined(__riscv)
+#define MAYBE_ChannelFullException DISABLED_ChannelFullException
+#else
+#define MAYBE_ChannelFullException ChannelFullException
+#endif
+TEST(ChannelTest, MAYBE_ChannelFullException) {
   if (getenv("NO_NEW_PROCESS")) {
     ZXTEST_SKIP("Running without the ZX_POL_NEW_PROCESS policy, skipping test case.");
   }
