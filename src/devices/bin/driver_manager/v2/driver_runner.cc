@@ -267,6 +267,10 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
     }
   }
 
+  orphans.RecordBool("bind_orphan_ongoing", bind_orphan_ongoing_);
+  orphans.RecordUint("pending_bind_requests", pending_bind_requests_.size());
+  orphans.RecordUint("pending_orphan_rebind_callbacks", pending_orphan_rebind_callbacks_.size());
+
   inspector.GetRoot().Record(std::move(orphans));
 
   auto dfv1_composites = inspector.GetRoot().CreateChild("dfv1_composites");
