@@ -29,8 +29,9 @@ use {
     },
     fuchsia_url::RepositoryUrl,
     fuchsia_zircon_status::Status,
+    fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::{FutureExt as _, StreamExt as _},
-    itertools::Itertools as _,
+    measure_fuchsia_developer_ffx::Measurable,
     pkg::config as pkg_config,
     protocols::prelude::*,
     shared_child::SharedChild,
@@ -53,9 +54,6 @@ const REWRITE_PROTOCOL_SELECTOR: &str = "core/pkg-resolver:expose:fuchsia.pkg.re
 
 const TARGET_CONNECT_TIMEOUT: Duration = Duration::from_secs(60);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
-
-const MAX_PACKAGES: i64 = 512;
-const MAX_REGISTERED_TARGETS: i64 = 512;
 
 #[derive(Debug)]
 struct ServerInfo {
@@ -963,7 +961,7 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         // Make sure the repository is up to date.
         update_repository(repository_name, &repo).await?;
 
-        let values = repo.read().await.list_packages(include_fields).await.map_err(|err| {
+        let mut values = repo.read().await.list_packages(include_fields).await.map_err(|err| {
             tracing::error!("Unable to list packages: {:#?}", err);
 
             match err {
@@ -975,27 +973,31 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         })?;
 
         fasync::Task::spawn(async move {
-            let mut pos = 0;
+            let mut chunks = SliceChunker::new(&mut values);
+
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(ffx::RepositoryPackagesIteratorRequest::Next { responder }) => {
-                        let len = values.len();
-                        let chunk = &mut values[pos..]
-                            [..std::cmp::min(len - pos, MAX_PACKAGES as usize)]
-                            .into_iter()
-                            .map(|p| p.clone());
-                        pos += MAX_PACKAGES as usize;
-                        pos = std::cmp::min(pos, len);
+                        let chunk = chunks.next();
 
-                        if let Err(e) = responder.send(chunk) {
+                        if let Err(e) = responder.send(&mut chunk.iter().cloned()) {
                             tracing::warn!(
-                                "Error responding to RepositoryPackagesIterator request: {}",
+                                "Error responding to RepositoryPackagesIterator request: {:?}",
                                 e
                             );
+                            break;
+                        }
+
+                        if chunk.is_empty() {
+                            break;
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Error in RepositoryPackagesIterator request stream: {}", e)
+                        tracing::warn!(
+                            "Error in RepositoryPackagesIterator request stream: {:?}",
+                            e
+                        );
+                        break;
                     }
                 }
             }
@@ -1036,30 +1038,34 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         if values.is_none() {
             return Err(ffx::RepositoryError::TargetCommunicationFailure);
         }
-        let values = values.unwrap();
+        let mut values = values.unwrap();
 
         fasync::Task::spawn(async move {
-            let mut pos = 0;
+            let mut chunks = SliceChunker::new(&mut values);
+
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(ffx::PackageEntryIteratorRequest::Next { responder }) => {
-                        let len = values.len();
-                        let chunk = &mut values[pos..]
-                            [..std::cmp::min(len - pos, MAX_PACKAGES as usize)]
-                            .into_iter()
-                            .map(|p| p.clone());
-                        pos += MAX_PACKAGES as usize;
-                        pos = std::cmp::min(pos, len);
+                        let chunk = chunks.next();
 
-                        if let Err(e) = responder.send(chunk) {
+                        if let Err(e) = responder.send(&mut chunk.iter().cloned()) {
                             tracing::warn!(
-                                "Error responding to PackageEntryIteratorRequest request: {}",
+                                "Error responding to PackageEntryIteratorRequest request: {:?}",
                                 e
                             );
+                            break;
+                        }
+
+                        if chunk.is_empty() {
+                            break;
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Error in PackageEntryIteratorRequest request stream: {}", e)
+                        tracing::warn!(
+                            "Error in PackageEntryIteratorRequest request stream: {:?}",
+                            e
+                        );
+                        break;
                     }
                 }
             }
@@ -1268,31 +1274,32 @@ impl<
                     });
                 }
 
-                let mut pos = 0;
-
                 fasync::Task::spawn(async move {
+                    let mut chunks = SliceChunker::new(&mut values);
+
                     while let Some(request) = stream.next().await {
                         match request {
                             Ok(ffx::RepositoryIteratorRequest::Next { responder }) => {
-                                let len = values.len();
-                                let chunk = &mut values[pos..]
-                                    [..std::cmp::min(len - pos, ffx::MAX_REPOS as usize)]
-                                    .iter_mut();
-                                pos += ffx::MAX_REPOS as usize;
-                                pos = std::cmp::min(pos, len);
+                                let chunk = chunks.next();
 
-                                if let Err(err) = responder.send(chunk) {
+                                if let Err(err) = responder.send(&mut chunk.iter_mut()) {
                                     tracing::warn!(
                                         "Error responding to RepositoryIterator request: {:#?}",
                                         err
                                     );
+                                    break;
+                                }
+
+                                if chunk.is_empty() {
+                                    break;
                                 }
                             }
                             Err(err) => {
                                 tracing::warn!(
                                     "Error in RepositoryIterator request stream: {:#?}",
                                     err
-                                )
+                                );
+                                break;
                             }
                         }
                     }
@@ -1308,25 +1315,31 @@ impl<
                     .map(|targets| targets.into_values())
                     .flatten()
                     .map(|x| x.into())
-                    .chunks(MAX_REGISTERED_TARGETS as usize)
-                    .into_iter()
-                    .map(|chunk| chunk.collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
-                    .into_iter();
+                    .collect::<Vec<_>>();
 
                 fasync::Task::spawn(async move {
+                    let mut chunks = SliceChunker::new(&mut values);
+
                     while let Some(request) = stream.next().await {
                         match request {
                             Ok(ffx::RepositoryTargetsIteratorRequest::Next { responder }) => {
-                                if let Err(err) = responder.send(&mut values.next().unwrap_or_else(Vec::new).into_iter()) {
+                                let chunk = chunks.next();
+
+                                if let Err(err) = responder.send(&mut chunk.iter().cloned()) {
                                     tracing::warn!(
-                                        "Error responding to RepositoryTargetsIterator request: {:#?}",
+                                        "Error responding to RepositoryTargetsIterator request: {:?}",
                                         err
                                     );
+                                    break;
+                                }
+
+                                if chunk.is_empty() {
+                                    break;
                                 }
                             }
                             Err(err) => {
-                                tracing::warn!("Error in RepositoryTargetsIterator request stream: {:#?}", err)
+                                tracing::warn!("Error in RepositoryTargetsIterator request stream: {:?}", err);
+                                break;
                             }
                         }
                     }
@@ -1571,6 +1584,63 @@ impl<R: Registrar> EventHandler<TargetEvent> for TargetEventHandler<R> {
 
         Ok(EventStatus::Waiting)
     }
+}
+
+/// Helper to split a slice of items into chunks that will fit in a single FIDL vec response.
+///
+/// Note, SliceChunker assumes the fixed overhead of a single fidl response header and a single vec
+/// header per chunk.  It must not be used with more complex responses.
+struct SliceChunker<'a, I> {
+    items: &'a mut [I],
+}
+
+impl<'a, I> SliceChunker<'a, I>
+where
+    I: Measurable,
+{
+    fn new(items: &'a mut [I]) -> Self {
+        Self { items }
+    }
+
+    /// Produce the next chunk of items to respond with. Iteration stops when this method returns
+    /// an empty slice, which occurs when either:
+    /// * All items have been returned
+    /// * SliceChunker encounters an item so large that it cannot even be stored in a response
+    ///   dedicated to just that one item.
+    ///
+    /// Once next() returns an empty slice, it will continue to do so in future calls.
+    fn next(&mut self) -> &'a mut [I] {
+        let entry_count = how_many_items_fit_in_fidl_vec_response(self.items.iter());
+        // tmp/swap dance to appease the borrow checker.
+        let tmp = std::mem::replace(&mut self.items, &mut []);
+        let (chunk, rest) = tmp.split_at_mut(entry_count);
+        self.items = rest;
+        chunk
+    }
+}
+
+// FIXME(52297) This constant would ideally be exported by the `fidl` crate.
+// sizeof(TransactionHeader) + sizeof(VectorHeader)
+const FIDL_VEC_RESPONSE_OVERHEAD_BYTES: usize = 32;
+
+/// Assumes the fixed overhead of a single fidl response header and a single vec header per chunk.
+/// It must not be used with more complex responses.
+fn how_many_items_fit_in_fidl_vec_response<'a, I, T>(items: I) -> usize
+where
+    I: IntoIterator<Item = &'a T>,
+    T: Measurable + 'a,
+{
+    let mut bytes_used: usize = FIDL_VEC_RESPONSE_OVERHEAD_BYTES;
+    let mut count = 0;
+
+    for item in items {
+        bytes_used += item.measure().num_bytes;
+        if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {
+            break;
+        }
+        count += 1;
+    }
+    count
 }
 
 #[cfg(test)]

@@ -4,8 +4,20 @@
 
 import("//build/rust/rustc_library.gni")
 import("//build/testing/host_test_data.gni")
+import("//tools/fidl/measure-tape/measure_tape.gni")
 
 if (is_host) {
+  measure_tape("measure_fuchsia_developer_ffx") {
+    fidls = [ "//sdk/fidl/fuchsia.developer.ffx" ]
+    target_types = [
+      "fuchsia.developer.ffx/PackageEntry",
+      "fuchsia.developer.ffx/RepositoryConfig",
+      "fuchsia.developer.ffx/RepositoryPackage",
+      "fuchsia.developer.ffx/RepositoryTarget",
+    ]
+    target_binding = "rust"
+  }
+
   host_test_data("empty-repo") {
     sources = [
       "//src/sys/pkg/tests/pkg-resolver/template/repository/1.root.json",
@@ -25,6 +37,7 @@ if (is_host) {
     with_unit_tests = true
 
     deps = [
+      ":measure_fuchsia_developer_ffx",
       "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
       "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
@@ -43,13 +56,13 @@ if (is_host) {
       "//src/lib/fuchsia-url",
       "//src/lib/network/fidl_fuchsia_net_ext",
       "//src/lib/zircon/rust:fuchsia-zircon-status",
+      "//src/lib/zircon/rust:fuchsia-zircon-types",
       "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
       "//src/sys/pkg/lib/fuchsia-repo",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-lock",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:itertools",
       "//third_party/rust_crates:shared_child",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:tuf",
