@@ -4,6 +4,7 @@
 
 use {
     anyhow::Error,
+    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common::WlanMacRole,
@@ -87,11 +88,9 @@ pub fn wlantap_config_ap(name: String, mac_addr: [u8; 6]) -> WlantapPhyConfig {
 }
 
 pub fn create_rx_info(channel: &Channel, rssi_dbm: i8) -> WlanRxInfo {
-    // should match enum WlanRxInfoValid::RSSI in zircon/system/banjo/fuchsia.hardware.wlan.associnfo/info.banjo
-    const WLAN_RX_INFO_VALID_RSSI: u32 = 0x10;
     WlanRxInfo {
         rx_flags: 0,
-        valid_fields: if rssi_dbm == 0 { 0 } else { WLAN_RX_INFO_VALID_RSSI },
+        valid_fields: if rssi_dbm == 0 { 0 } else { banjo_wlan_softmac::WlanRxInfoValid::RSSI.0 },
         phy: fidl_common::WlanPhyType::Dsss,
         data_rate: 0,
         channel: fidl_common::WlanChannel::from(channel),

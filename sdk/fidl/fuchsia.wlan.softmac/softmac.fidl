@@ -67,6 +67,17 @@ type WlanSoftmacQueryResponse = table {
     5: band_caps vector<WlanSoftmacBandCapability>:fuchsia.wlan.common.MAX_BANDS;
 };
 
+
+type WlanRxInfoValid = flexible bits : uint32 {
+    PHY = 0x1;
+    DATA_RATE = 0x2;
+    CHAN_WIDTH = 0x4;
+    MCS = 0x8;
+    RSSI = 0x10;
+    SNR = 0x20;
+    // Bits 6-31 reserved
+};
+
 type WlanRxInfoFlags = flexible bits : uint32 {
     /// The FCS for the received frame was invalid.
     FCS_INVALID = 0x1;
@@ -82,7 +93,8 @@ type WlanRxInfo = struct {
 
     /// Bitmask indicating which of the following fields are valid in this struct. Reserved flags
     /// must be zero.
-    valid_fields uint32;
+    valid_fields WlanRxInfoValid;
+
     /// The PHY format of the device at the time of the operation.
     phy fuchsia.wlan.common.WlanPhyType;
     /// The data rate of the device, measured in units of 0.5 Mb/s.

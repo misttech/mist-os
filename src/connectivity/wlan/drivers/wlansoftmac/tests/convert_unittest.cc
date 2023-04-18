@@ -68,6 +68,8 @@ static constexpr wlan_common::MacImplementationType kFakeFidlMacImplementationTy
     wlan_common::MacImplementationType::kFullmac;
 static constexpr wlan_softmac::WlanRxInfoFlags kFakeRxFlags =
     wlan_softmac::WlanRxInfoFlags::TruncatingUnknown(kRandomPopulaterUint32);
+static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
+    wlan_softmac::WlanRxInfoValid::TruncatingUnknown(kRandomPopulaterUint32);
 
 // Fake metadata -- banjo
 static constexpr uint32_t kFakeBanjoMacRole = WLAN_MAC_ROLE_AP;
@@ -269,7 +271,7 @@ TEST_F(ConvertTest, ToBanjoRxPacket) {
       .info =
           {
               .rx_flags = kFakeRxFlags,
-              .valid_fields = kRandomPopulaterUint32,
+              .valid_fields = kFakeRxValid,
               .phy = kFakeFidlPhyType,
               .data_rate = kRandomPopulaterUint32,
               .channel =
@@ -296,7 +298,7 @@ TEST_F(ConvertTest, ToBanjoRxPacket) {
   }
 
   EXPECT_EQ(static_cast<uint32_t>(kFakeRxFlags), out.info.rx_flags);
-  EXPECT_EQ(kRandomPopulaterUint32, out.info.valid_fields);
+  EXPECT_EQ(static_cast<uint32_t>(kFakeRxValid), out.info.valid_fields);
   EXPECT_EQ(kFakeBanjoPhyType, out.info.phy);
   EXPECT_EQ(kRandomPopulaterUint32, out.info.data_rate);
   EXPECT_EQ(kFakeChannel, out.info.channel.primary);

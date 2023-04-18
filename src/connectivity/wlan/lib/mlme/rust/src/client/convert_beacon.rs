@@ -87,7 +87,7 @@ mod tests {
 
         // Unused fields
         rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-        valid_fields: 0,
+        valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
         phy: banjo_common::WlanPhyType::DSSS,
         data_rate: 0,
         mcs: 0,

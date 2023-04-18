@@ -1346,7 +1346,6 @@ mod tests {
             test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo},
         },
         akm::AkmAlgorithm,
-        banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
         banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_internal as banjo_internal,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         ieee80211::Bssid,
@@ -3717,7 +3716,7 @@ mod tests {
         rssi_dbm: i8,
     ) -> banjo_wlan_softmac::WlanRxInfo {
         let mut rx_info = banjo_wlan_softmac::WlanRxInfo { rssi_dbm, ..mock_rx_info(client) };
-        rx_info.valid_fields |= banjo_wlan_associnfo::WlanRxInfoValid::RSSI.0;
+        rx_info.valid_fields |= banjo_wlan_softmac::WlanRxInfoValid::RSSI;
         rx_info
     }
 

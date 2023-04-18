@@ -236,10 +236,7 @@ async fn main_loop_impl<T: MlmeImpl>(
 
 #[cfg(test)]
 pub mod test_utils {
-    use {
-        super::*, banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
-        banjo_fuchsia_wlan_common as banjo_common, wlan_common::channel,
-    };
+    use {super::*, banjo_fuchsia_wlan_common as banjo_common, wlan_common::channel};
 
     pub struct FakeMlme {
         device: Device,
@@ -298,7 +295,7 @@ pub mod test_utils {
     #[derive(Copy, Clone, Debug)]
     pub struct MockWlanRxInfo {
         pub rx_flags: banjo_wlan_softmac::WlanRxInfoFlags,
-        pub valid_fields: u32,
+        pub valid_fields: banjo_wlan_softmac::WlanRxInfoValid,
         pub phy: banjo_common::WlanPhyType,
         pub data_rate: u32,
         pub channel: banjo_common::WlanChannel,
@@ -310,9 +307,11 @@ pub mod test_utils {
     impl MockWlanRxInfo {
         pub(crate) fn with_channel(channel: banjo_common::WlanChannel) -> Self {
             Self {
-                valid_fields: banjo_wlan_associnfo::WlanRxInfoValid::CHAN_WIDTH.0
-                    | banjo_wlan_associnfo::WlanRxInfoValid::RSSI.0
-                    | banjo_wlan_associnfo::WlanRxInfoValid::SNR.0,
+                valid_fields: banjo_wlan_softmac::WlanRxInfoValid(
+                    banjo_wlan_softmac::WlanRxInfoValid::CHAN_WIDTH.0
+                        | banjo_wlan_softmac::WlanRxInfoValid::RSSI.0
+                        | banjo_wlan_softmac::WlanRxInfoValid::SNR.0,
+                ),
                 channel,
                 rssi_dbm: -40,
                 snr_dbh: 35,

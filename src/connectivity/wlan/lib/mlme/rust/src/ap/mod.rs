@@ -790,7 +790,7 @@ mod tests {
             &[0][..],
             banjo_wlan_softmac::WlanRxInfo {
                 rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-                valid_fields: 0,
+                valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
                 phy: banjo_common::WlanPhyType::DSSS,
                 data_rate: 0,
                 channel: banjo_common::WlanChannel {
@@ -836,7 +836,7 @@ mod tests {
         ];
         let rx_info_wrong_channel = banjo_wlan_softmac::WlanRxInfo {
             rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-            valid_fields: 0,
+            valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
             phy: banjo_common::WlanPhyType::DSSS,
             data_rate: 0,
             channel: banjo_common::WlanChannel {

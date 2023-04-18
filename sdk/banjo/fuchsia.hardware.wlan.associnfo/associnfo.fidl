@@ -12,16 +12,6 @@ type WlanKeyType = strict enum : uint8 {
 };
 // LINT.ThenChange(//src/connectivity/wlan/lib/mlme/rust/src/key.rs)
 
-type WlanRxInfoValid = strict enum : uint32 {
-    /// Bits 6-31 reserved
-    PHY = 0x1;
-    DATA_RATE = 0x2;
-    CHAN_WIDTH = 0x4;
-    MCS = 0x8;
-    RSSI = 0x10;
-    SNR = 0x20;
-};
-
 /// Guard Interval
 type WlanGi = strict enum : uint8 {
     /// all 802.11 phy

@@ -207,7 +207,7 @@ zx_status_t ConvertRxInfo(const fuchsia_wlan_softmac::wire::WlanRxInfo& in, wlan
 
   // WlanRxInfo class overrides uint32_t cast to return internal bitmap.
   out->rx_flags = static_cast<uint32_t>(in.rx_flags);
-  out->valid_fields = in.valid_fields;
+  out->valid_fields = static_cast<uint32_t>(in.valid_fields);
 
   if ((status = ConvertWlanPhyType(in.phy, &out->phy)) != ZX_OK) {
     lerror("WlanPhyType is not supported.");

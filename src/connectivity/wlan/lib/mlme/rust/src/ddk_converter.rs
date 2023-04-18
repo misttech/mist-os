@@ -81,7 +81,8 @@ pub fn build_ddk_assoc_cfg(
 }
 
 pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
-    match rx_info.valid_fields & banjo_wlan_associnfo::WlanRxInfoValid::RSSI.0 != 0
+    match rx_info.valid_fields & banjo_wlan_softmac::WlanRxInfoValid::RSSI
+        != banjo_wlan_softmac::WlanRxInfoValid(0)
         && rx_info.rssi_dbm != 0
     {
         true => Some(rx_info.rssi_dbm),
@@ -309,8 +310,8 @@ mod tests {
 
     fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {
         banjo_wlan_softmac::WlanRxInfo {
-            rx_flags: banjo_fuchsia_wlan_softmac::WlanRxInfoFlags(0),
-            valid_fields: 0,
+            rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
+            valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
             phy: banjo_common::WlanPhyType::DSSS,
             data_rate: 0,
             channel: banjo_common::WlanChannel {
@@ -326,15 +327,18 @@ mod tests {
 
     #[test]
     fn test_get_rssi_dbm_field_not_valid() {
-        let rx_info =
-            banjo_wlan_softmac::WlanRxInfo { valid_fields: 0, rssi_dbm: 20, ..empty_rx_info() };
+        let rx_info = banjo_wlan_softmac::WlanRxInfo {
+            valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
+            rssi_dbm: 20,
+            ..empty_rx_info()
+        };
         assert_eq!(get_rssi_dbm(rx_info), None);
     }
 
     #[test]
     fn test_get_rssi_dbm_zero_dbm() {
         let rx_info = banjo_wlan_softmac::WlanRxInfo {
-            valid_fields: banjo_wlan_associnfo::WlanRxInfoValid::RSSI.0,
+            valid_fields: banjo_wlan_softmac::WlanRxInfoValid::RSSI,
             rssi_dbm: 0,
             ..empty_rx_info()
         };
@@ -344,7 +348,7 @@ mod tests {
     #[test]
     fn test_get_rssi_dbm_all_good() {
         let rx_info = banjo_wlan_softmac::WlanRxInfo {
-            valid_fields: banjo_wlan_associnfo::WlanRxInfoValid::RSSI.0,
+            valid_fields: banjo_wlan_softmac::WlanRxInfoValid::RSSI,
             rssi_dbm: 20,
             ..empty_rx_info()
         };

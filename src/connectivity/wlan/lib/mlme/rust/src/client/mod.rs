@@ -1591,7 +1591,7 @@ mod tests {
             BEACON_FRAME,
             banjo_wlan_softmac::WlanRxInfo {
                 rx_flags: banjo_fuchsia_wlan_softmac::WlanRxInfoFlags(0),
-                valid_fields: 0,
+                valid_fields: banjo_fuchsia_wlan_softmac::WlanRxInfoValid(0),
                 phy: banjo_common::WlanPhyType::DSSS,
                 data_rate: 0,
                 channel: me.channel_state.get_main_channel().unwrap(),
