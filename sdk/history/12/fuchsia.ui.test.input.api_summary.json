@@ -382,6 +382,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.test.input/TouchInputListenerReportTouchInputRequest.phase",
+        "ordinal": "6",
+        "type": "fuchsia.ui.pointer/EventPhase"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.test.input/TouchInputListenerReportTouchInputRequest.time_received",
         "ordinal": "3",
         "type": "int64"
