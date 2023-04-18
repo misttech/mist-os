@@ -92,12 +92,14 @@ there is no [paver API] to read the firmware. An update is not triggered
 even though the update package has changed. Until this is fixed, you
 should use `update force-install <update-pkg-url>` to force an update.
 
-If no update is required, the update checker saves the last known update
-package hash. On subsequent checks for an update, the hash
-of the update package that is fetched is checked against the last known
-hash. If the hashes are the same, no update is triggered. If the hashes
-are different, the vbmeta and ZBI are  checked for changes to determine
-if an update is necessary.
+If no update is required, the update checker saves the last known
+update package it saw on the server. On subsequent checks for an update,
+the hash of the update package that is fetched is checked against the last
+known hash on the server. If the hash of the latest update package has
+changed since the last check, the update checker compares the vbmeta and
+ZBI on the running system against the respective images in the update
+package. If either the vbmeta or ZBI are different between the running
+image and the update package, the checker kicks off a system update.
 
 ## Monitoring {#monitoring-update}
 
