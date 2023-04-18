@@ -42,8 +42,6 @@ namespace amlogic_display {
 #define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
 
 namespace {
-constexpr uint32_t VpuViuOsd1BlkCfgOsdBlkMode32Bit = 5;
-constexpr uint32_t VpuViuOsd1BlkCfgColorMatrixArgb = 1;
 constexpr uint32_t kMaximumAlpha = 0xff;
 
 // We use bicubic interpolation for scaling.
@@ -341,8 +339,6 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
     }
   }
   auto cfg_w0 = osd1_registers.blk0_cfg_w0.FromValue(0);
-  cfg_w0.set_blk_mode(VpuViuOsd1BlkCfgOsdBlkMode32Bit)
-      .set_color_matrix(VpuViuOsd1BlkCfgColorMatrixArgb);
   if (supports_afbc_ && info->is_afbc) {
     // AFBC: Enable sourcing from mali + configure as big endian
     cfg_w0.set_mali_src_en(1).set_little_endian(0);
@@ -350,9 +346,29 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
     // Update CFG_W0 with correct Canvas Index
     cfg_w0.set_mali_src_en(0).set_little_endian(1).set_tbl_addr(idx);
   }
-  rdma_->SetRdmaTableValue(next_table_idx, IDX_BLK0_CFG_W0, cfg_w0.reg_value());
+  cfg_w0.set_blk_mode(OsdBlk0CfgW0Reg::kBlockMode32Bit);
 
-  auto primary_layer = config->layer_list[0]->cfg.primary;
+  // This is guaranteed by AmlogicDisplay::CheckConfiguration().
+  ZX_DEBUG_ASSERT(config->layer_count > 0);
+  ZX_DEBUG_ASSERT(config->layer_list[0]->type == LAYER_TYPE_PRIMARY);
+
+  const primary_layer_t& primary_layer = config->layer_list[0]->cfg.primary;
+  switch (primary_layer.image.pixel_format) {
+    case ZX_PIXEL_FORMAT_ARGB_8888:
+    case ZX_PIXEL_FORMAT_RGB_x888:
+      cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixArgb8888);
+      break;
+    case ZX_PIXEL_FORMAT_ABGR_8888:
+    case ZX_PIXEL_FORMAT_BGR_888x:
+      cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixAbgr8888);
+      break;
+    default:
+      // This should never happen. The image validity is guaranteed in
+      // ImportImage() / CheckConfiguration().
+      ZX_ASSERT_MSG(false, "Unsupported image format %08x", primary_layer.image.pixel_format);
+      return;
+  }
+  rdma_->SetRdmaTableValue(next_table_idx, IDX_BLK0_CFG_W0, cfg_w0.reg_value());
 
   // Configure ctrl_stat and ctrl_stat2 registers
   auto osd_ctrl_stat_val = osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_));

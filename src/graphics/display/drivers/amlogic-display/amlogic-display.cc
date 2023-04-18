@@ -604,7 +604,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     }
     if (format_support_check_(ZX_PIXEL_FORMAT_BGR_888x) ||
         format_support_check_(ZX_PIXEL_FORMAT_ABGR_8888)) {
-      for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16,
+      for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierLinear,
+                                         fuchsia_sysmem::wire::kFormatModifierArmLinearTe,
+                                         fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16,
                                          fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16Te}) {
         const size_t index = constraints.image_format_constraints_count++;
         auto& image_constraints = constraints.image_format_constraints[index];

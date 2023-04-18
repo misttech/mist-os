@@ -96,29 +96,44 @@ class MockBufferCollection : public MockBufferCollectionBase {
     EXPECT_FALSE(constraints.buffer_memory_constraints.cpu_domain_supported);
     EXPECT_EQ(64u, constraints.image_format_constraints[0].bytes_per_row_divisor);
 
-    bool has_rgba =
-        std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
-                  fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8) !=
-        supported_pixel_format_types_.end();
-    bool has_bgra =
-        std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
-                  fuchsia_sysmem::wire::PixelFormatType::kBgra32) !=
-        supported_pixel_format_types_.end();
-
     size_t expected_format_constraints_count = 0u;
-    const auto& image_format_constraints = constraints.image_format_constraints;
+    const cpp20::span<const sysmem::wire::ImageFormatConstraints> image_format_constraints(
+        constraints.image_format_constraints.data(), constraints.image_format_constraints_count);
+
+    const bool has_bgra =
+        std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
+                  sysmem::wire::PixelFormatType::kBgra32) != supported_pixel_format_types_.end();
     if (has_bgra) {
       expected_format_constraints_count += 2;
-      EXPECT_TRUE(std::find_if(
-                      image_format_constraints.begin(),
-                      image_format_constraints.begin() + constraints.image_format_constraints_count,
-                      [](const auto& format) {
-                        return format.pixel_format.format_modifier.value ==
-                               sysmem::wire::kFormatModifierArmLinearTe;
-                      }) != image_format_constraints.end());
+      const bool image_constraints_contains_bgra32_and_linear = std::any_of(
+          image_format_constraints.begin(), image_format_constraints.end(),
+          [](const sysmem::wire::ImageFormatConstraints& format) {
+            return format.pixel_format.type == sysmem::wire::PixelFormatType::kBgra32 &&
+                   format.pixel_format.format_modifier.value == sysmem::wire::kFormatModifierLinear;
+          });
+      EXPECT_TRUE(image_constraints_contains_bgra32_and_linear);
     }
+
+    const bool has_rgba =
+        std::find(supported_pixel_format_types_.begin(), supported_pixel_format_types_.end(),
+                  sysmem::wire::PixelFormatType::kR8G8B8A8) != supported_pixel_format_types_.end();
     if (has_rgba) {
-      expected_format_constraints_count += 2;
+      expected_format_constraints_count += 4;
+      const bool image_constraints_contains_rgba32_and_linear = std::any_of(
+          image_format_constraints.begin(), image_format_constraints.end(),
+          [](const sysmem::wire::ImageFormatConstraints& format) {
+            return format.pixel_format.type == sysmem::wire::PixelFormatType::kR8G8B8A8 &&
+                   format.pixel_format.format_modifier.value == sysmem::wire::kFormatModifierLinear;
+          });
+      EXPECT_TRUE(image_constraints_contains_rgba32_and_linear);
+      const bool image_constraints_contains_rgba32_and_afbc_16x16 = std::any_of(
+          image_format_constraints.begin(), image_format_constraints.end(),
+          [](const sysmem::wire::ImageFormatConstraints& format) {
+            return format.pixel_format.type == sysmem::wire::PixelFormatType::kR8G8B8A8 &&
+                   format.pixel_format.format_modifier.value ==
+                       sysmem::wire::kFormatModifierArmAfbc16X16;
+          });
+      EXPECT_TRUE(image_constraints_contains_rgba32_and_afbc_16x16);
     }
 
     EXPECT_EQ(expected_format_constraints_count, constraints.image_format_constraints_count);
