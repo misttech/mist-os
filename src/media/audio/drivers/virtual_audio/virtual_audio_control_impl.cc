@@ -99,8 +99,11 @@ void VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t msg,
 }
 
 namespace {
+// TODO(fxbug.dev/124865): Consider adding per-driver type constructors to explicity declare their
+// defaults.
 VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
   VirtualAudioDeviceImpl::Config config;
+  config.device_type = fuchsia_virtualaudio::wire::DeviceType::kStreamConfig;
   config.is_input = is_input;
 
   config.device_name = "Virtual Audio Device";
@@ -159,6 +162,9 @@ zx::result<VirtualAudioDeviceImpl::Config> ConfigFromFIDL(
     const fuchsia_virtualaudio::wire::Configuration& fidl, bool is_input) {
   auto config = DefaultConfig(is_input);
 
+  if (fidl.has_device_type()) {
+    config.device_type = fidl.device_type();
+  }
   if (fidl.has_device_name()) {
     config.device_name = std::string(fidl.device_name().get());
   }
@@ -236,6 +242,7 @@ zx::result<VirtualAudioDeviceImpl::Config> ConfigFromFIDL(
 
 void VirtualAudioControlImpl::AddInput(AddInputRequestView request,
                                        AddInputCompleter::Sync& completer) {
+  // TODO(fxbug.dev/124865): Return INVALID_ARGS if config is not valid its device_type.
   auto cfg = ConfigFromFIDL(request->config, true);
   auto result = VirtualAudioDeviceImpl::Create(cfg.value(), std::move(request->server), dev_node_,
                                                dispatcher_);
@@ -245,13 +252,13 @@ void VirtualAudioControlImpl::AddInput(AddInputRequestView request,
     completer.ReplyError(result.error_value());
     return;
   }
-  auto device = result.value();
-  devices_.insert(device);
+  devices_.insert(result.value());
   completer.ReplySuccess();
 }
 
 void VirtualAudioControlImpl::AddOutput(AddOutputRequestView request,
                                         AddOutputCompleter::Sync& completer) {
+  // TODO(fxbug.dev/124865): Return INVALID_ARGS if config is not valid its device_type.
   auto cfg = ConfigFromFIDL(request->config, false);
   auto result = VirtualAudioDeviceImpl::Create(cfg.value(), std::move(request->server), dev_node_,
                                                dispatcher_);
@@ -261,11 +268,11 @@ void VirtualAudioControlImpl::AddOutput(AddOutputRequestView request,
     completer.ReplyError(result.error_value());
     return;
   }
-  auto device = result.value();
-  devices_.insert(device);
+  devices_.insert(result.value());
   completer.ReplySuccess();
 }
 
+// TODO(fxbug.dev/124865): Consider adding per-driver type info here.
 void VirtualAudioControlImpl::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;

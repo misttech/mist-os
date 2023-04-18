@@ -23,7 +23,7 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
       rb_(format, frame_count) {
   // Setup the device's configuration.
   fuchsia::virtualaudio::Configuration config;
-
+  config.set_device_type(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG);
   std::copy(std::begin(device_id.data), std::end(device_id.data),
             std::begin(*config.mutable_unique_id()));
 

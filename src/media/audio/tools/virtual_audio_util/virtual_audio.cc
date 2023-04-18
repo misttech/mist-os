@@ -230,7 +230,7 @@ class VirtualAudioUtil {
   template <bool is_out>
   static void GainNotification(bool current_mute, bool current_agc, float gain_db);
   template <bool is_out>
-  static void GainCallback(bool current_mute, bool current_agc, float gain_db);
+  static void GainCallback(fuchsia::virtualaudio::Device_GetGain_Result result);
 
   template <bool is_out>
   static void BufferNotification(zx::vmo ring_buffer_vmo, uint32_t num_ring_buffer_frames,
@@ -977,9 +977,10 @@ bool VirtualAudioUtil::AdjustClockRate(const std::string& clock_adjust_str) {
   if (clock_domain == 0 && rate_adjustment_ppm != 0) {
     printf("WARNING: by definition, a clock in domain 0 should never have rate variance!\n");
   }
-
-  (*device())->AdjustClockRate(rate_adjustment_ppm);
-  return WaitForNoCallback();
+  (*device())->AdjustClockRate(
+      rate_adjustment_ppm,
+      [](fuchsia::virtualaudio::Device_AdjustClockRate_Result result) { CallbackReceived(); });
+  return WaitForCallback();
 }
 
 bool VirtualAudioUtil::ResetConfiguration() {
@@ -1043,8 +1044,10 @@ bool VirtualAudioUtil::ChangePlugState(const std::string& plug_time_str, bool pl
   auto plug_change_time = (plug_time_str.empty() ? zx::clock::get_monotonic().get()
                                                  : fxl::StringToNumber<zx_time_t>(plug_time_str));
 
-  (*device())->ChangePlugState(plug_change_time, plugged);
-  return WaitForNoCallback();
+  (*device())->ChangePlugState(
+      plug_change_time, plugged,
+      [](fuchsia::virtualaudio::Device_ChangePlugState_Result result) { CallbackReceived(); });
+  return WaitForCallback();
 }
 
 bool VirtualAudioUtil::GetFormat() {
@@ -1144,12 +1147,20 @@ bool VirtualAudioUtil::SetNotificationFrequency(const std::string& notifs_str) {
       (notifs_str.empty() ? kDefaultNotificationFrequency
                           : fxl::StringToNumber<uint32_t>(notifs_str));
   if (configuring_output_) {
-    output_device_->SetNotificationFrequency(notifications_per_ring);
+    output_device_->SetNotificationFrequency(
+        notifications_per_ring,
+        [](fuchsia::virtualaudio::Device_SetNotificationFrequency_Result result) {
+          CallbackReceived();
+        });
   } else {
-    input_device_->SetNotificationFrequency(notifications_per_ring);
+    input_device_->SetNotificationFrequency(
+        notifications_per_ring,
+        [](fuchsia::virtualaudio::Device_SetNotificationFrequency_Result result) {
+          CallbackReceived();
+        });
   }
 
-  return WaitForNoCallback();
+  return WaitForCallback();
 }
 
 void VirtualAudioUtil::CallbackReceived() {
@@ -1186,9 +1197,15 @@ void VirtualAudioUtil::GainNotification(bool mute, bool agc, float gain_db) {
          (is_out ? "output" : "input"));
 }
 template <bool is_out>
-void VirtualAudioUtil::GainCallback(bool mute, bool agc, float gain_db) {
+void VirtualAudioUtil::GainCallback(fuchsia::virtualaudio::Device_GetGain_Result result) {
   VirtualAudioUtil::CallbackReceived();
-  VirtualAudioUtil::GainNotification<is_out>(mute, agc, gain_db);
+  if (result.is_err()) {
+    printf("ERROR: Get gain failed\n");
+    return;
+  }
+  VirtualAudioUtil::GainNotification<is_out>(result.response().current_mute,
+                                             result.response().current_agc,
+                                             result.response().current_gain_db);
 }
 
 template <bool is_out>

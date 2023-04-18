@@ -53,10 +53,16 @@ type Configuration = table {
     3: product_name string:MAX_UI_STRING_SIZE;
 
     /// Device's unique identifier, a 16 byte string.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `CODEC`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If not specified, a default ID is used.
     4: unique_id array<uint8, 16>;
 
     /// FIFO depth in bytes.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If not specified, defaults to an arbitrary amount.
     5: fifo_depth_bytes uint32;
 
@@ -64,31 +70,53 @@ type Configuration = table {
     /// If not specified, defaults to an arbitrary duration.
     6: external_delay zx.duration;
 
-    /// Supported format ranges for this virtual audio device.
+    /// Supported ring buffer format ranges for this virtual audio device.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If empty, supports only a 48kHz stereo int16 format by default.
     7: supported_formats vector<FormatRange>:MAX_FORMAT_RANGES;
 
     /// Configuration for the device's clock.
+    /// This field is only valid for `device_type` `STREAM_CONFIG`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If not specified, use the domain of the monotonic clock.
     8: clock_properties ClockProperties;
 
     /// Constraints on the ring buffer.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If not specified, there are no constraints.
     9: ring_buffer_constraints RingBufferConstraints;
 
     /// Configuration of the device gain.
+    /// This field is only valid for `device_type` `STREAM_CONFIG`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If not specified, the device has unity gain and cannot mute, enable AGC,
     /// or change gain.
    10: gain_properties GainProperties;
 
     /// Configuration of the device's plug state.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `CODEC`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// If not specified, the device starts plugged in, with plug notifications
     /// enabled, and is not hardwired.
    11: plug_properties PlugProperties;
 
     /// Initial notification frequency.
+    /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
+    /// If it is specified for another device_type, the AddDevice call will
+    /// fail with `INVALID_ARGS`.
     /// This can be changed later with SetNotificationFrequency.
    12: initial_notifications_per_ring uint32;
+
+    /// Device type.
+    /// If not specified, StreamConfig.
+   13: device_type DeviceType;
 };
 
 type FormatRange = struct {
@@ -180,7 +208,7 @@ protocol Device {
         current_mute bool;
         current_agc bool;
         current_gain_db float32;
-    });
+    }) error Error;
 
     /// Notifies all subscribed listeners when the above gain is set or changed.
     -> OnSetGain(struct {
@@ -211,7 +239,7 @@ protocol Device {
     /// driver APIs.
     SetNotificationFrequency(struct {
         notifications_per_ring uint32;
-    });
+    }) -> () error Error;
 
     /// Notifies all subscribed listeners when the device is commanded to Start
     /// streaming. This can only occur after a device is fully configured
@@ -253,7 +281,7 @@ protocol Device {
     ChangePlugState(struct {
         plug_change_time zx.time;
         plugged bool;
-    });
+    }) -> () error Error;
 
     /// Immediately change the virtual device's clock rate, as expressed in the
     /// timing and content of position notifications the driver emits.
@@ -261,7 +289,18 @@ protocol Device {
     /// standalone; i.e. successive rate changes are not cumulative.
     AdjustClockRate(struct {
         ppm_from_monotonic int32;
-    });
+    }) -> () error Error;
+};
+
+type DeviceType = flexible enum {
+    /// Device supports the fuchsia.hardware.audio/StreamConfig protocol.
+    STREAM_CONFIG = 1;
+
+    /// Device supports the fuchsia.hardware.audio/Dai protocol.
+    DAI = 2;
+
+    /// Device supports the fuchsia.hardware.audio/Codec protocol.
+    CODEC = 3;
 };
 
 type Error = flexible enum {
@@ -273,4 +312,10 @@ type Error = flexible enum {
 
     /// The device has not yet started streaming.
     NOT_STARTED = 3;
+
+    /// The operation is not implemented, supported, or enabled.
+    NOT_SUPPORTED = 4;
+
+    /// An argument is invalid.
+    INVALID_ARGS = 5;
 };

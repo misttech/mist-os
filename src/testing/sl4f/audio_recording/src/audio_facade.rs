@@ -113,7 +113,7 @@ impl OutputWorker {
         Ok(())
     }
 
-    fn on_buffer_created(
+    async fn on_buffer_created(
         &mut self,
         ring_buffer: zx::Vmo,
         num_ring_buffer_frames: u32,
@@ -126,7 +126,10 @@ impl OutputWorker {
             u64::from(num_ring_buffer_frames) / self.frames_per_notification;
         let target_notifications_per_ring = target_notifications_per_ring.try_into()?;
 
-        va_output.set_notification_frequency(target_notifications_per_ring)?;
+        va_output
+            .set_notification_frequency(target_notifications_per_ring)
+            .await?
+            .map_err(|status| anyhow!("SetNotificationFrequency returned error {:?}", status))?;
         trace!(
             "AudioFacade::OutputWorker: created buffer with {:?} frames, {:?} notifications",
             num_ring_buffer_frames,
@@ -242,7 +245,7 @@ impl OutputWorker {
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnBufferCreated { ring_buffer, num_ring_buffer_frames,
                                                             notifications_per_ring }) => {
                             self.on_buffer_created(ring_buffer, num_ring_buffer_frames,
-                                                   notifications_per_ring)?;
+                                                   notifications_per_ring).await?;
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStart { start_time }) => {
                             if self.capturing && last_timestamp > zx::Time::from_nanos(0) {
@@ -353,6 +356,7 @@ impl VirtualOutput {
         let frames_modulo = 1 * frames_1ms;
 
         let config = fidl_fuchsia_virtualaudio::Configuration {
+            device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
             unique_id: Some(AUDIO_OUTPUT_ID),
             fifo_depth_bytes: Some(0),
             external_delay: Some(0),
@@ -539,7 +543,7 @@ impl InputWorker {
         Ok(())
     }
 
-    fn on_buffer_created(
+    async fn on_buffer_created(
         &mut self,
         ring_buffer: zx::Vmo,
         num_ring_buffer_frames: u32,
@@ -551,7 +555,10 @@ impl InputWorker {
         let target_notifications_per_ring =
             num_ring_buffer_frames / u32::try_from(self.frames_per_notification)?;
 
-        va_input.set_notification_frequency(target_notifications_per_ring)?;
+        va_input
+            .set_notification_frequency(target_notifications_per_ring)
+            .await?
+            .map_err(|status| anyhow!("SetNotificationFrequency returned error {:?}", status))?;
 
         // The buffer starts zeroed and our write pointer starts target_frames in the future.
         self.work_space = usize::try_from(num_ring_buffer_frames)? * self.frame_size;
@@ -639,7 +646,7 @@ impl InputWorker {
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnBufferCreated { ring_buffer, num_ring_buffer_frames,
                                                           notifications_per_ring }) => {
                             self.on_buffer_created(ring_buffer, num_ring_buffer_frames,
-                                                   notifications_per_ring)?;
+                                                   notifications_per_ring).await?;
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStart { start_time }) => {
                             if last_timestamp > zx::Time::from_nanos(0) {
@@ -742,6 +749,7 @@ impl VirtualInput {
         let frames_modulo = 1 * frames_1ms;
 
         let config = fidl_fuchsia_virtualaudio::Configuration {
+            device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
             fifo_depth_bytes: Some(0),
             external_delay: Some(0),
             supported_formats: Some(vec![fidl_fuchsia_virtualaudio::FormatRange {

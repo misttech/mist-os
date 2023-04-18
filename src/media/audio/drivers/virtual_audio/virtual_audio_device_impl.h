@@ -35,6 +35,7 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
                                public std::enable_shared_from_this<VirtualAudioDeviceImpl> {
  public:
   struct Config {
+    fuchsia_virtualaudio::wire::DeviceType device_type;
     bool is_input;
 
     std::string device_name;

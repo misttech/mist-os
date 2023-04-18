@@ -182,13 +182,19 @@ TEST_F(AudioDeviceEnumeratorTest, AddRemoveDevice_Output) {
 
 TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Input) {
   auto device = CreateInput({0xff, 0x00}, kFormat, kFrameRate);
-  device->fidl()->ChangePlugState(zx::clock::get_monotonic().get(), false);
+  device->fidl()->ChangePlugState(zx::clock::get_monotonic().get(), false,
+                                  [](fuchsia::virtualaudio::Device_ChangePlugState_Result result) {
+                                    ASSERT_FALSE(result.is_err());
+                                  });
   RunLoopUntilIdle();
 }
 
 TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Output) {
   auto device = CreateOutput({0xff, 0x00}, kFormat, kFrameRate);
-  device->fidl()->ChangePlugState(zx::clock::get_monotonic().get(), false);
+  device->fidl()->ChangePlugState(zx::clock::get_monotonic().get(), false,
+                                  [](fuchsia::virtualaudio::Device_ChangePlugState_Result result) {
+                                    ASSERT_FALSE(result.is_err());
+                                  });
   RunLoopUntilIdle();
 }
 

@@ -132,7 +132,7 @@ void VirtualAudioDeviceImpl::GetGain(GetGainCompleter::Sync& completer) {
   stream_->PostToDispatcher([stream = stream_.get(), completer = completer.ToAsync()]() mutable {
     audio::ScopedToken t(stream->domain_token());
     auto v = stream->GetGainForVA();
-    completer.Reply(v.mute, v.agc, v.gain_db);
+    completer.ReplySuccess(v.mute, v.agc, v.gain_db);
   });
 }
 
@@ -195,12 +195,14 @@ void VirtualAudioDeviceImpl::SetNotificationFrequency(
     return;
   }
 
-  stream_->PostToDispatcher(
-      [stream = stream_.get(), notifications_per_ring = request->notifications_per_ring]() {
-        audio::ScopedToken t(stream->domain_token());
-        // This method has no return value.
-        stream->SetNotificationFrequencyFromVA(notifications_per_ring);
-      });
+  stream_->PostToDispatcher([stream = stream_.get(),
+                             notifications_per_ring = request->notifications_per_ring,
+                             completer = completer.ToAsync()]() mutable {
+    audio::ScopedToken t(stream->domain_token());
+    // This method has no return value.
+    stream->SetNotificationFrequencyFromVA(notifications_per_ring);
+    completer.ReplySuccess();
+  });
 }
 
 void VirtualAudioDeviceImpl::NotifyStart(zx_time_t start_time) {
@@ -270,10 +272,12 @@ void VirtualAudioDeviceImpl::ChangePlugState(ChangePlugStateRequestView request,
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(), plugged = request->plugged]() {
+  stream_->PostToDispatcher([stream = stream_.get(), plugged = request->plugged,
+                             completer = completer.ToAsync()]() mutable {
     audio::ScopedToken t(stream->domain_token());
     // This method has no return value.
     stream->ChangePlugStateFromVA(plugged);
+    completer.ReplySuccess();
   });
 }
 
@@ -284,12 +288,14 @@ void VirtualAudioDeviceImpl::AdjustClockRate(AdjustClockRateRequestView request,
     return;
   }
 
-  stream_->PostToDispatcher(
-      [stream = stream_.get(), ppm_from_monotonic = request->ppm_from_monotonic]() {
-        audio::ScopedToken t(stream->domain_token());
-        // This method has no return value.
-        stream->AdjustClockRateFromVA(ppm_from_monotonic);
-      });
+  stream_->PostToDispatcher([stream = stream_.get(),
+                             ppm_from_monotonic = request->ppm_from_monotonic,
+                             completer = completer.ToAsync()]() mutable {
+    audio::ScopedToken t(stream->domain_token());
+    // This method has no return value.
+    stream->AdjustClockRateFromVA(ppm_from_monotonic);
+    completer.ReplySuccess();
+  });
 }
 
 }  // namespace virtual_audio
