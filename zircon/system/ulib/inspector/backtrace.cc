@@ -292,7 +292,7 @@ extern "C" __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t p
 void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
                             inspector_dsoinfo_t* dso_list, uintptr_t pc, uintptr_t sp, uintptr_t fp,
                             const bool skip_markup_context) {
-  constexpr bool kUseNewUnwinder = false;
+  constexpr bool kUseNewUnwinder = true;
 
   std::vector<Frame> stack;
   if (kUseNewUnwinder) {
