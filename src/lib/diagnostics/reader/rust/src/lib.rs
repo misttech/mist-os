@@ -244,7 +244,9 @@ impl ArchiveReader {
         Ok(data)
     }
 
-    pub fn snapshot_then_subscribe<D>(&self) -> Result<Subscription<D>, Error>
+    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
+    /// current buffer in the Archivist as well as new data that arrives.
+    pub fn snapshot_then_subscribe<D>(&self) -> Result<Subscription<Data<D>>, Error>
     where
         D: DiagnosticsData + 'static,
     {
@@ -265,6 +267,20 @@ impl ArchiveReader {
             None => data_future.await?,
         };
         Ok(T::from(data))
+    }
+
+    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
+    /// current buffer in the Archivist as well as new data that arrives.
+    pub fn snapshot_then_subscribe_raw<D, T: SerializableValue + 'static>(
+        &self,
+    ) -> Result<Subscription<T>, Error>
+    where
+        D: DiagnosticsData + 'static,
+        T: for<'a> Deserialize<'a> + Send,
+    {
+        let iterator =
+            self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, T::FORMAT_OF_VALUE)?;
+        Ok(Subscription::new(iterator))
     }
 
     async fn snapshot_inner<D, T>(&self, format: Format) -> Result<Vec<T>, Error>
@@ -393,18 +409,18 @@ where
 }
 
 #[pin_project]
-pub struct Subscription<M: DiagnosticsData> {
+pub struct Subscription<T> {
     #[pin]
-    recv: mpsc::Receiver<Result<Data<M>, Error>>,
+    recv: mpsc::Receiver<Result<T, Error>>,
     _drain_task: Task<()>,
 }
 
 const DATA_CHANNEL_SIZE: usize = 32;
 const ERROR_CHANNEL_SIZE: usize = 2;
 
-impl<M> Subscription<M>
+impl<T> Subscription<T>
 where
-    M: DiagnosticsData + 'static,
+    T: for<'a> Deserialize<'a> + Send + 'static,
 {
     /// Creates a new subscription stream to a batch iterator.
     /// The stream will return diagnostics data structures.
@@ -428,7 +444,7 @@ where
     }
 
     /// Splits the subscription into two separate streams: results and errors.
-    pub fn split_streams(mut self) -> (SubscriptionResultsStream<M>, mpsc::Receiver<Error>) {
+    pub fn split_streams(mut self) -> (SubscriptionResultsStream<T>, mpsc::Receiver<Error>) {
         let (mut errors_sender, errors) = mpsc::channel(ERROR_CHANNEL_SIZE);
         let (mut results_sender, recv) = mpsc::channel(DATA_CHANNEL_SIZE);
         let _drain_task = fasync::Task::spawn(async move {
@@ -443,11 +459,11 @@ where
     }
 }
 
-impl<M> Stream for Subscription<M>
+impl<T> Stream for Subscription<T>
 where
-    M: DiagnosticsData + 'static,
+    T: for<'a> Deserialize<'a>,
 {
-    type Item = Result<Data<M>, Error>;
+    type Item = Result<T, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
@@ -455,9 +471,9 @@ where
     }
 }
 
-impl<M> FusedStream for Subscription<M>
+impl<T> FusedStream for Subscription<T>
 where
-    M: DiagnosticsData + 'static,
+    T: for<'a> Deserialize<'a>,
 {
     fn is_terminated(&self) -> bool {
         self.recv.is_terminated()
@@ -465,17 +481,17 @@ where
 }
 
 #[pin_project]
-pub struct SubscriptionResultsStream<M: DiagnosticsData> {
+pub struct SubscriptionResultsStream<T> {
     #[pin]
-    recv: mpsc::Receiver<Data<M>>,
+    recv: mpsc::Receiver<T>,
     _drain_task: fasync::Task<()>,
 }
 
-impl<M> Stream for SubscriptionResultsStream<M>
+impl<T> Stream for SubscriptionResultsStream<T>
 where
-    M: DiagnosticsData + 'static,
+    T: for<'a> Deserialize<'a>,
 {
-    type Item = Data<M>;
+    type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
@@ -483,9 +499,9 @@ where
     }
 }
 
-impl<M> FusedStream for SubscriptionResultsStream<M>
+impl<T> FusedStream for SubscriptionResultsStream<T>
 where
-    M: DiagnosticsData + 'static,
+    T: for<'a> Deserialize<'a>,
 {
     fn is_terminated(&self) -> bool {
         self.recv.is_terminated()
@@ -496,12 +512,15 @@ where
 mod tests {
     use super::*;
     use diagnostics_hierarchy::assert_data_tree;
+    use diagnostics_log::{PublishOptions, Publisher};
     use fidl_fuchsia_diagnostics as fdiagnostics;
+    use fidl_fuchsia_logger as flogger;
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
     use fuchsia_zircon as zx;
     use futures::TryStreamExt;
+    use tracing::{error, info};
 
     const TEST_COMPONENT_URL: &str =
         "fuchsia-pkg://fuchsia.com/diagnostics-reader-tests#meta/inspect_test_component.cm";
@@ -689,6 +708,38 @@ mod tests {
         }
     }
 
+    #[fuchsia::test]
+    async fn snapshot_then_subscribe() {
+        let (_instance, publisher, reader) = init_isolated_logging().await;
+        let (mut stream, _errors) =
+            reader.snapshot_then_subscribe::<Logs>().expect("subscribed to logs").split_streams();
+        tracing::subscriber::with_default(publisher, || {
+            info!("hello from test");
+            error!("error from test");
+        });
+        let log = stream.next().await.unwrap();
+        assert_eq!(log.msg().unwrap(), "hello from test");
+        let log = stream.next().await.unwrap();
+        assert_eq!(log.msg().unwrap(), "error from test");
+    }
+
+    #[fuchsia::test]
+    async fn snapshot_then_subscribe_raw() {
+        let (_instance, publisher, reader) = init_isolated_logging().await;
+        let (mut stream, _errors) = reader
+            .snapshot_then_subscribe_raw::<Logs, serde_json::Value>()
+            .expect("subscribed to logs")
+            .split_streams();
+        tracing::subscriber::with_default(publisher, || {
+            info!("hello from test");
+            error!("error from test");
+        });
+        let log = stream.next().await.unwrap();
+        assert_eq!(log["payload"]["root"]["message"]["value"], "hello from test");
+        let log = stream.next().await.unwrap();
+        assert_eq!(log["payload"]["root"]["message"]["value"], "error from test");
+    }
+
     fn spawn_fake_archive(data_to_send: serde_json::Value) -> fdiagnostics::ArchiveAccessorProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fdiagnostics::ArchiveAccessorMarker>()
@@ -738,5 +789,57 @@ mod tests {
         })
         .detach();
         return proxy;
+    }
+
+    async fn create_realm() -> RealmBuilder {
+        let builder = RealmBuilder::new().await.expect("create realm builder");
+        let archivist = builder
+            .add_child("archivist", "#meta/archivist-for-embedding.cm", ChildOptions::new().eager())
+            .await
+            .expect("add child archivist");
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .capability(Capability::protocol_by_name("fuchsia.sys2.EventSource"))
+                    .capability(
+                        Capability::protocol_by_name("fuchsia.tracing.provider.Registry")
+                            .optional(),
+                    )
+                    .capability(Capability::event_stream("stopped"))
+                    .capability(Capability::event_stream("directory_ready"))
+                    .capability(Capability::event_stream("capability_requested"))
+                    .from(Ref::parent())
+                    .to(&archivist),
+            )
+            .await
+            .expect("added routes from parent to archivist");
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
+                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
+                    .from(&archivist)
+                    .to(Ref::parent()),
+            )
+            .await
+            .expect("added routes from archivist to parent");
+        builder
+    }
+
+    async fn init_isolated_logging() -> (RealmInstance, Publisher, ArchiveReader) {
+        let instance = create_realm().await.build().await.unwrap();
+        let log_sink_proxy =
+            instance.root.connect_to_protocol_at_exposed_dir::<flogger::LogSinkMarker>().unwrap();
+        let accessor_proxy = instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
+            .unwrap();
+        let mut reader = ArchiveReader::new();
+        reader.with_archive(accessor_proxy);
+        let options =
+            PublishOptions { wait_for_initial_interest: false, ..PublishOptions::default() };
+        let (publisher, _) = Publisher::new_with_proxy(log_sink_proxy, options).unwrap();
+        (instance, publisher, reader)
     }
 }

@@ -69,7 +69,7 @@ fn device_name_provider_component() -> fnetemul::ChildDef {
 }
 
 async fn wait_for_log(
-    stream: diagnostics_reader::Subscription<diagnostics_reader::Logs>,
+    stream: diagnostics_reader::Subscription<diagnostics_reader::Data<diagnostics_reader::Logs>>,
     log: &str,
 ) {
     stream

@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use diagnostics_log_encoding::{Argument, Record, Severity, Value};
-use diagnostics_reader::{ArchiveReader, Logs, SubscriptionResultsStream};
+use diagnostics_reader::{ArchiveReader, Data, Logs, SubscriptionResultsStream};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_validate_logs::{LogSinkPuppetProxy, PuppetInfo, RecordSpec};
 use fuchsia_async::Task;
@@ -16,7 +16,7 @@ struct Puppet {
     proxy: LogSinkPuppetProxy,
     device_proxy: ControllerProxy,
     _reader_errors_task: Task<()>,
-    logs: SubscriptionResultsStream<Logs>,
+    logs: SubscriptionResultsStream<Data<Logs>>,
 }
 
 impl Puppet {

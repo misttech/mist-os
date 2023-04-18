@@ -21,7 +21,7 @@ use {
 struct WorkerData {
     /// The active log subscription created with Archivist.
     /// Used by the reader action to get logs.
-    pub subscription: Subscription<Logs>,
+    pub subscription: Subscription<Data<Logs>>,
 }
 
 #[fuchsia::main]

@@ -81,14 +81,13 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
     use {
-        super::*, diagnostics_data::Logs, diagnostics_reader::Subscription,
-        fidl_fuchsia_diagnostics::BatchIteratorMarker,
+        super::*, diagnostics_reader::Subscription, fidl_fuchsia_diagnostics::BatchIteratorMarker,
     };
 
     #[pin_project]
     pub struct BatchLogStream {
         #[pin]
-        subscription: Subscription<Logs>,
+        subscription: Subscription<LogsData>,
     }
 
     impl BatchLogStream {

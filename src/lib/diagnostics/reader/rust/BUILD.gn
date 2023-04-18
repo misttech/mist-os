@@ -42,9 +42,12 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+    "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "src/lib.rs" ]
@@ -54,6 +57,7 @@ fuchsia_unittest_package("diagnostics-reader-tests") {
   manifest = "meta/diagnostics-reader-unittest.cml"
   deps = [
     ":lib_test",
+    "//src/diagnostics/archivist:archivist-for-embedding-v2",
     "//src/lib/diagnostics/inspect/runtime/rust:inspect_test_component",
   ]
 }
