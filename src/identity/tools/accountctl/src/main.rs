@@ -5,12 +5,11 @@
 mod args;
 
 use {
-    anyhow::{anyhow, format_err, Context, Error},
+    anyhow::{anyhow, Context, Error},
+    component_debug::dirs::{connect_to_instance_protocol_at_path, OpenDirType},
     fidl_fuchsia_identity_account::{AccountManagerMarker, AccountManagerProxy, AccountMetadata},
     fidl_fuchsia_sys2::RealmQueryMarker,
-    fuchsia_component::client::{
-        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
-    },
+    fuchsia_component::client::connect_to_protocol_at_path,
 };
 
 const ACCOUNT_MANAGER_MONIKER: &str = "./core/account/account_manager";
@@ -70,13 +69,15 @@ async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMar
 ) -> Result<P::Proxy, Error> {
     let realm_query = connect_to_protocol_at_path::<RealmQueryMarker>(REALM_QUERY_PATH)
         .context("Failed to connect to realm query")?;
-    let resolved_dirs = realm_query
-        .get_instance_directories(moniker)
-        .await?
-        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
-        .ok_or(format_err!("{} could not be resolved", moniker))?;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-    connect_to_named_protocol_at_dir_root::<P>(&exposed_dir, protocol_name)
+    let moniker = moniker.try_into()?;
+    let proxy = connect_to_instance_protocol_at_path::<P>(
+        &moniker,
+        OpenDirType::Exposed,
+        protocol_name,
+        &realm_query,
+    )
+    .await?;
+    Ok(proxy)
 }
 
 /// Connects to the account manager protocol at the first available location.
