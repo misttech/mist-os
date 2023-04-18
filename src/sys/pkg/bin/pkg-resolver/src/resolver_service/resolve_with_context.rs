@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    super::QueuedResolver, crate::eager_package_manager::EagerPackageManager, anyhow::anyhow,
+    super::QueuedResolver,
+    crate::eager_package_manager::EagerPackageManager,
+    anyhow::anyhow,
     fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
-    fidl_fuchsia_pkg_ext as pkg, tracing::error,
+    fidl_fuchsia_pkg_ext as pkg,
+    tracing::{error, info},
 };
 
 pub(super) async fn resolve_with_context(
@@ -49,25 +52,34 @@ async fn resolve_relative(
     dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
     pkg_cache: &pkg::cache::Client,
 ) -> Result<fpkg::ResolutionContext, pkg::ResolveError> {
-    resolve_relative_impl(url, context, dir, pkg_cache).await.map(Into::into).map_err(|e| {
-        let fidl_err = e.to_fidl_err();
-        error!(
-            "failed to resolve relative url {} with context {:?} {:#}",
-            url,
-            context,
-            anyhow!(e)
-        );
-        fidl_err
-    })
+    let context = pkg::ResolutionContext::try_from(context).map_err(|e| {
+        error!("failed to parse relative url {} context {:?}: {:#}", url, context, anyhow!(e));
+        pkg::ResolveError::InvalidContext
+    })?;
+
+    let child_context =
+        resolve_relative_impl(url, &context, dir, pkg_cache).await.map_err(|e| {
+            let fidl_err = e.to_fidl_err();
+            error!(
+                "failed to resolve relative url {} with parent {:?} {:#}",
+                url,
+                context.blob_id(),
+                anyhow!(e)
+            );
+            fidl_err
+        })?;
+
+    info!("resolved relative url {} with parent {:?}", url, context.blob_id());
+
+    Ok(child_context.into())
 }
 
 async fn resolve_relative_impl(
     url: &fuchsia_url::RelativePackageUrl,
-    context: &fpkg::ResolutionContext,
+    context: &pkg::ResolutionContext,
     dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
     pkg_cache: &pkg::cache::Client,
 ) -> Result<pkg::ResolutionContext, ResolveWithContextError> {
-    let context: pkg::ResolutionContext = context.try_into()?;
     let super_blob = if let Some(blob) = context.blob_id() {
         blob
     } else {
