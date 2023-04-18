@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 use {
+    crate::device::Device,
     anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_hardware_block_volume::VolumeProxy,
+    fidl_fuchsia_hardware_block_partition::Guid,
+    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeProxy},
+    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon as zx,
     std::cmp,
 };
@@ -88,6 +91,36 @@ pub async fn resize_volume(
             .context(format!("Failed to extend partition (slice count: {:?})", slice_count))?;
     }
     return Ok(slice_count * slice_size);
+}
+
+pub async fn set_partition_max_bytes(
+    device: &mut dyn Device,
+    max_byte_size: u64,
+) -> Result<(), Error> {
+    if max_byte_size == 0 {
+        return Ok(());
+    }
+
+    let index =
+        device.topological_path().rfind("/fvm").ok_or(anyhow!("fvm is not in the device path"))?;
+    // The 4 is from the 4 characters in "/fvm"
+    let fvm_path = &device.topological_path()[..index + 4];
+
+    let fvm_proxy = connect_to_protocol_at_path::<VolumeManagerMarker>(&fvm_path)
+        .context("Failed to connect to fvm volume manager")?;
+    let (status, info) = fvm_proxy.get_info().await.context("Transport error in get_info call")?;
+    zx::Status::ok(status).context("get_info call failed")?;
+    let info = info.ok_or(anyhow!("Expected info"))?;
+    let slice_size = info.slice_size;
+    let max_slice_count = max_byte_size / slice_size;
+    let mut instance_guid =
+        Guid { value: *device.partition_instance().await.context("Expected partition instance")? };
+    let status = fvm_proxy
+        .set_partition_limit(&mut instance_guid, max_slice_count)
+        .await
+        .context("Transport error on set_partition_limit")?;
+    zx::Status::ok(status).context("set_partition_limit failed")?;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -52,6 +52,12 @@ pub trait Device: Send + Sync {
         Err(anyhow!("Unimplemented"))
     }
 
+    /// Sets the maximum size of an partition.
+    /// Attempts to resize above this value will fail.
+    async fn set_partition_max_bytes(&mut self, _max_bytes: u64) -> Result<(), Error> {
+        Err(anyhow!("Unimplemented"))
+    }
+
     /// Returns the Controller interface for the device.
     fn controller(&self) -> &ControllerProxy;
 
@@ -136,6 +142,10 @@ impl Device for NandDevice {
 
     async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
         self.block_device.resize(target_size_bytes).await
+    }
+
+    async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {
+        self.block_device.set_partition_max_bytes(max_bytes).await
     }
 
     fn controller(&self) -> &ControllerProxy {
@@ -275,6 +285,10 @@ impl Device for BlockDevice {
     async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
         let volume_proxy = self.volume_proxy()?;
         crate::volume::resize_volume(&volume_proxy, target_size_bytes, false).await
+    }
+
+    async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {
+        crate::volume::set_partition_max_bytes(self, max_bytes).await
     }
 
     fn controller(&self) -> &ControllerProxy {

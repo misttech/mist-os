@@ -154,6 +154,10 @@ impl Device for ZxcryptDevice {
         crate::volume::resize_volume(&volume_proxy, target_size_bytes, true).await
     }
 
+    async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {
+        self.inner_device.set_partition_max_bytes(max_bytes).await
+    }
+
     fn controller(&self) -> &ControllerProxy {
         self.inner_device.controller()
     }
