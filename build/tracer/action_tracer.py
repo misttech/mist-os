@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 """Validates file system accesses of a subprocess command.
 
 This uses a traced exection wrapper (fsatrace) to invoke a command,
