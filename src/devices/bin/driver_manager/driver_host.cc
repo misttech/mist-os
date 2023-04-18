@@ -144,13 +144,8 @@ zx_status_t DriverHost::Launch(const DriverHostConfig& config, fbl::RefPtr<Drive
 
 void DriverHost::Start(fidl::ClientEnd<fdf::Node> client_end, std::string node_name,
                        fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
-                       frunner::wire::ComponentStartInfo start_info, StartCallback cb) {
-  auto endpoints = fidl::CreateEndpoints<fdh::Driver>();
-  if (endpoints.is_error()) {
-    cb(endpoints.take_error());
-    return;
-  }
-
+                       frunner::wire::ComponentStartInfo start_info,
+                       fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
   auto binary = fdf::ProgramValue(start_info.program(), "binary").value_or("");
   fidl::Arena arena;
   auto args = fdf::wire::DriverStartArgs::Builder(arena);
@@ -171,13 +166,12 @@ void DriverHost::Start(fidl::ClientEnd<fdf::Node> client_end, std::string node_n
     args.symbols(symbols);
   }
 
-  auto start = controller_->Start(args.Build(), std::move(endpoints->server));
+  fidl::OneWayStatus start = controller_->Start(args.Build(), std::move(driver));
   if (!start.ok()) {
     LOGF(ERROR, "Failed to start driver '%s' in driver host: %s", binary.data(),
          start.FormatDescription().data());
     cb(zx::error(start.status()));
     return;
   }
-
-  cb(zx::ok(std::move(endpoints->client)));
+  cb(zx::ok());
 }

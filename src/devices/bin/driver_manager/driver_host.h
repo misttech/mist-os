@@ -81,7 +81,7 @@ class DriverHost final : public dfv2::DriverHost,
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
-             StartCallback cb) override;
+             fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override;
 
   virtual zx::result<uint64_t> GetProcessKoid() const override { return zx::ok(koid_); }
 

@@ -949,19 +949,21 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
-  driver_host_.value()->Start(
-      std::move(endpoints->client), name_, std::move(symbols), std::move(start_info),
-      [this, cb = std::move(cb), url = std::string(url), controller = std::move(controller)](
-          zx::result<fidl::ClientEnd<fuchsia_driver_host::Driver>> result) mutable {
-        if (result.is_error()) {
-          cb(result.take_error());
-          return;
-        }
-
-        driver_component_.emplace(*this, url, std::move(controller), std::move(result.value()));
-
-        cb(zx::ok());
-      });
+  zx::result driver_endpoints = fidl::CreateEndpoints<fuchsia_driver_host::Driver>();
+  if (driver_endpoints.is_error()) {
+    cb(driver_endpoints.take_error());
+    return;
+  }
+  driver_component_.emplace(*this, std::string(url), std::move(controller),
+                            std::move(driver_endpoints->client));
+  driver_host_.value()->Start(std::move(endpoints->client), name_, std::move(symbols),
+                              std::move(start_info), std::move(driver_endpoints->server),
+                              [this, cb = std::move(cb)](zx::result<> result) mutable {
+                                if (result.is_error()) {
+                                  driver_component_.reset();
+                                }
+                                cb(result);
+                              });
 }
 
 void Node::ScheduleStopComponent() {
