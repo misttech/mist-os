@@ -1947,13 +1947,6 @@ void Scheduler::TimerTick(SchedTime now) {
   Thread::Current::preemption_state().PreemptSetPending();
 }
 
-zx_time_t Scheduler::GetTargetPreemptionTime() {
-  DEBUG_ASSERT(Thread::Current::preemption_state().PreemptDisableCount() > 0);
-  Scheduler* const current = Get();
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  return current->target_preemption_time_ns_.raw_value();
-}
-
 void Scheduler::InitializePerformanceScale(SchedPerformanceScale scale) {
   DEBUG_ASSERT(scale > 0);
   performance_scale_ = scale;

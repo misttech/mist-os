@@ -226,11 +226,6 @@ class Scheduler {
   static void SplitNodeFromPiGraph(UpstreamType& upstream, TargetType& target)
       TA_REQ(thread_lock, preempt_disabled_token);
 
-  // Return the time at which the current thread should be preempted.
-  //
-  // May only be called with preemption disabled.
-  static zx_time_t GetTargetPreemptionTime() TA_EXCL(thread_lock);
-
   // Updates the performance scales of the requested CPUs and returns the
   // effective values in place, which may be different than the requested values
   // if they are below the minimum safe values for the respective CPUs.
