@@ -37,5 +37,8 @@ restricted_return:
   pop  %rbp
   pop  %rbx
 
+  // Zero out rax (return ZX_OK).
+  xor %eax, %eax
+
   // return back to whatever the address was on the stack
   ret
