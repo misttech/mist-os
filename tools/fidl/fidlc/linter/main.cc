@@ -55,9 +55,7 @@ fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag,
       check_id = "parse-warning";
       break;
     case fidl::DiagnosticKind::kRetired:
-      assert(false &&
-             "this diagnostic kind must never be shown - it only reserves retired error numerals");
-      break;
+      ZX_PANIC("should never emit a retired diagnostic");
   }
   return fidl::Finding(diag.span, check_id, diag.Format(program_invocation));
 }

@@ -173,15 +173,20 @@ class TestLibrary final : public SharedInterface {
     return all_libraries()->AddAttributeSchema(std::move(name));
   }
 
+  static std::string TestFilePath(const std::string& name) {
+    return "host_x64/fidlc-tests/" + name;
+  }
+
   // Read the source from an associated external file.
-  void AddFile(const std::filesystem::path& path) {
-    const std::ifstream reader("host_x64/fidlc-tests/" + path.string());
+  void AddFile(const std::string& name) {
+    auto path = TestFilePath(name);
+    const std::ifstream reader(path);
     if (!reader) {
-      ZX_PANIC("AddFile failed to read %s: errno = %s\n", path.string().c_str(), strerror(errno));
+      ZX_PANIC("AddFile failed to read %s: errno = %s\n", path.c_str(), strerror(errno));
     }
     std::stringstream buffer;
     buffer << reader.rdbuf();
-    AddSource(path.filename(), buffer.str());
+    AddSource(name, buffer.str());
   }
 
   // TODO(fxbug.dev/118282): remove (or rename this class to be more general), as this does not use

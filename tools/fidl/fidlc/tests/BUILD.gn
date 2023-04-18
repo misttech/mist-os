@@ -23,6 +23,21 @@ host_test_data("errcat_fidl_good") {
   outputs = [ "$root_out_dir/fidlc-tests/good/{{source_file_part}}" ]
 }
 
+host_test_data("errcat_md") {
+  _dir = "//docs/reference/fidl/language/error-catalog"
+  sources = rebase_path(read_file("$_dir/_files.txt", "list lines"), ".", _dir)
+  outputs = [ "$root_out_dir/fidlc-tests/error-catalog/{{source_file_part}}" ]
+}
+
+host_test_data("errcat_other") {
+  sources = [
+    "//docs/error/_redirects.yaml",
+    "//docs/reference/fidl/language/errcat.md",
+    "errcat_good_tests.cc",
+  ]
+  outputs = [ "$root_out_dir/fidlc-tests/{{source_file_part}}" ]
+}
+
 test("fidlc-test") {
   sources = [
     "alias_tests.cc",
@@ -35,9 +50,9 @@ test("fidlc-test") {
     "compiled_transformer_tests.cc",
     "consts_tests.cc",
     "declaration_order_tests.cc",
-    "decomposition_tests.cc",
     "direct_dependencies_tests.cc",
     "enums_tests.cc",
+    "errcat_docs_tests.cc",
     "errcat_good_tests.cc",
     "errors_tests.cc",
     "fix_tests.cc",
@@ -88,6 +103,8 @@ test("fidlc-test") {
   deps = [
     ":errcat_fidl_bad",
     ":errcat_fidl_good",
+    ":errcat_md",
+    ":errcat_other",
     "//third_party/boringssl",
     "//tools/fidl/fidlc:fidl",
     "//zircon/system/ulib/zxtest",

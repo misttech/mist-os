@@ -20,14 +20,14 @@ using fidl::SourceSpan;
 using fidl::VirtualSourceFile;
 using fidl::WarningDef;
 
-const fidl::ErrorId kTestErrorId = 9998;
-const std::string kTestErrorIdStr = "fi-9998";
-const fidl::ErrorId kTestWarningId = 9999;
-const std::string kTestWarningIdStr = "fi-9999";
-const fidl::ErrorId kTestFixableErrorId = 9997;
-const std::string kTestFixableErrorIdStr = "fi-9997";
-const fidl::ErrorId kTestFixableWarningId = 9996;
-const std::string kTestFixableWarningIdStr = "fi-9996";
+const fidl::ErrorId kTestErrorId = 123;
+const std::string kTestErrorIdStr = "fi-0123";
+const fidl::ErrorId kTestWarningId = 124;
+const std::string kTestWarningIdStr = "fi-0124";
+const fidl::ErrorId kTestFixableErrorId = 125;
+const std::string kTestFixableErrorIdStr = "fi-0125";
+const fidl::ErrorId kTestFixableWarningId = 126;
+const std::string kTestFixableWarningIdStr = "fi-0126";
 
 const std::string kFakeBinaryLocation = "fake/bin/path";
 const std::string kFixMeTagOpen = "[[[ FIXME ]]]";

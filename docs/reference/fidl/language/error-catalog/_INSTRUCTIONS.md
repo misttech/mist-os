@@ -18,6 +18,10 @@ Follow these steps if the script doesn't work:
 - Create `//docs/reference/fidl/language/error-catalog/_fi-NNNN.md`, replacing
   the `NNNN` with the new error code.
 
+- Add the new error to the end of `//docs/reference/fidl/language/_files.txt`:
+
+      _fi-NNNN.md
+
 - Add the new error to the end of `//docs/reference/fidl/language/errcat.md`:
 
       <<error-catalog/_fi-NNNN.md>>

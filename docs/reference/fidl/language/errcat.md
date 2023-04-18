@@ -4,12 +4,6 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 `fidlc`. Error identifiers in this domain are always rendered with the prefix
 `fi-` followed by a four digit code, like `fi-0123`.
 
-<!--
-
-// LINT.IfChange
-
--->
-
 <<error-catalog/_fi-0001.md>>
 
 <<error-catalog/_fi-0002.md>>
@@ -402,14 +396,4 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0196.md>>
 
-<!--
-
-// LINT.ThenChange(/tools/fidl/fidlc/include/fidl/diagnostics.h)
-
--->
-
 [docs-fidlc]: ../language/fidlc.md
-
-
-
-

@@ -192,15 +192,13 @@ struct Diagnostic {
   // functions because it doesn't have to try every constructor.
 
   template <ErrorId Id, typename... Args>
-  static std::unique_ptr<Diagnostic> MakeError(const ErrorDef<Id, Args...>& def,
-
-                                               SourceSpan span, const identity_t<Args>&... args) {
+  static std::unique_ptr<Diagnostic> MakeError(const ErrorDef<Id, Args...>& def, SourceSpan span,
+                                               const identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
 
   template <ErrorId Id, typename... Args>
   static std::unique_ptr<Diagnostic> MakeWarning(const WarningDef<Id, Args...>& def,
-
                                                  SourceSpan span, const identity_t<Args>&... args) {
     return std::make_unique<Diagnostic>(def, span, args...);
   }
@@ -209,8 +207,8 @@ struct Diagnostic {
   std::string Format(const ProgramInvocation& program_invocation) const;
 
   const DiagnosticDef& def;
-  SourceSpan span;
-  std::string msg;
+  const SourceSpan span;
+  const std::string msg;
 };
 
 }  // namespace fidl

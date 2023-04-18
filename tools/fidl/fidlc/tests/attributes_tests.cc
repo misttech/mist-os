@@ -642,9 +642,7 @@ protocol MyProtocol {
   }
 }
 
-// A test error, with a notably high power level, used for the fictitious `MustHaveThreeMembers`
-// constraint we define below for testing purposes.
-constexpr fidl::ErrorDef<9001> TestErrIncorrectNumberOfMembers("incorrect number of members");
+constexpr fidl::ErrorDef<123> TestErrIncorrectNumberOfMembers("incorrect number of members");
 
 bool MustHaveThreeMembers(fidl::Reporter* reporter, const fidl::ExperimentalFlags flags,
                           const fidl::flat::Attribute* attribute,

@@ -17,6 +17,7 @@ FUCHSIA_DIR = Path(os.environ["FUCHSIA_DIR"])
 INDEX_FILE = FUCHSIA_DIR / "docs/reference/fidl/language/errcat.md"
 REDIRECT_FILE = FUCHSIA_DIR / "docs/error/_redirects.yaml"
 ERRCAT_DIR = FUCHSIA_DIR / "docs/reference/fidl/language/error-catalog"
+ERRCAT_TXT = FUCHSIA_DIR / "docs/reference/fidl/language/error-catalog/_files.txt"
 
 # fidlc paths
 BAD_FIDL_DIR = FUCHSIA_DIR / "tools/fidl/fidlc/tests/fidl/bad"
@@ -34,8 +35,9 @@ GOOD_TEMPLATE = FUCHSIA_DIR / "tools/fidl/scripts/add_errcat_templates/good.fidl
 # Regexes used to find insertion locations.
 REGEX_INDEX_ENTRY = r'^<<error-catalog/_fi-(\d+)\.md>>'
 REGEX_REDIRECT_ENTRY = r'^- from: /fuchsia-src/error/fi-(\d+)'
+REGEX_ERRCAT_TXT_LINE = r'^_fi-(\d+)\.md$'
 REGEX_FIDL_TXT_LINE = r'^fi-(\d+)(?:-[a-z])?\.test.fidl$'
-REGEX_GOOD_TEST = r'TEST\(ErrcatTests, Good(\d+)'
+REGEX_GOOD_TEST = r'TEST\(ErrcatGoodTests, Good(\d+)'
 
 # Use this weird string concatenation so that this string literal does not show
 # up in search results when people grep for it.
@@ -116,6 +118,7 @@ def create_file(file_path, template_path, subs):
 @dataclass
 class Change:
     markdown_file_created: int = 0
+    markdown_txt_line_added: int = 0
     index_entry_added: int = 0
     redirect_entry_added: int = 0
     bad_fidl_created: int = 0
@@ -231,6 +234,10 @@ def main(args):
             'bad_includecodes': '\n'.join(bad_includecodes),
         })
 
+    # Insert the Markdown filename into _files.txt.
+    change.markdown_txt_line_added += insert_entry(
+        ERRCAT_TXT, REGEX_ERRCAT_TXT_LINE, n, markdown_filename, after_offset=1)
+
     if not (any(asdict(change).values())):
         print(f"There is nothing to do for fi-{ns}")
         return
@@ -240,6 +247,8 @@ def main(args):
     rel = lambda path: path.relative_to(Path.cwd())
     if change.markdown_file_created:
         print(f"* {created} {rel(ERRCAT_DIR / markdown_filename)}")
+    if change.markdown_txt_line_added:
+        print(f"* {added} 1 line to {rel(ERRCAT_TXT)}")
     if change.index_entry_added:
         print(f"* {added} index entry in {rel(INDEX_FILE)}")
     if change.redirect_entry_added:

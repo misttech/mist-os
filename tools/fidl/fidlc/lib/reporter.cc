@@ -8,6 +8,7 @@
 
 #include <sstream>
 
+#include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/diagnostics_json.h"
 
 namespace fidl {
@@ -90,6 +91,8 @@ void Reporter::AddWarning(std::unique_ptr<Diagnostic> warning) {
 //        ^~~~
 void Reporter::Report(std::unique_ptr<Diagnostic> diag) {
   ZX_ASSERT_MSG(diag, "should not report nullptr diagnostic");
+  ZX_ASSERT_MSG(diag->def.id <= kNumDiagnosticDefs,
+                "a static_assert should have ensured id <= kNumDiagnosticDefs");
   if (diag->def.opts.fixable && ignore_fixables_) {
     return;
   }
@@ -101,9 +104,7 @@ void Reporter::Report(std::unique_ptr<Diagnostic> diag) {
       AddWarning(std::move(diag));
       break;
     case DiagnosticKind::kRetired:
-      ZX_PANIC(
-          "this diagnostic kind must never be shown - it only reserves retired error numerals");
-      break;
+      ZX_PANIC("should never emit a retired diagnostic");
   }
 }
 

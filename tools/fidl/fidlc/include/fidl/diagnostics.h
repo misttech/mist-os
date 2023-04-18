@@ -6,17 +6,15 @@
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_H_
 
 #include <string_view>
+#include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
-// LINT.IfChange
-
 namespace fidl {
 
-constexpr RetiredDef<0> ErrAlwaysRetired;
 constexpr ErrorDef<1, std::string_view> ErrInvalidCharacter("invalid character '{}'");
 constexpr ErrorDef<2> ErrUnexpectedLineBreak("unexpected line-break in string literal");
 constexpr ErrorDef<3, std::string_view> ErrInvalidEscapeSequence("invalid escape sequence '{}'");
@@ -457,8 +455,233 @@ constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain re
 constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
     "overlays may not contain reserved members", {.documented = false});
 
-}  // namespace fidl
+// To add a new error:
+//
+// 1. Define it above using the last error's number + 1
+// 2. Add it to the end of kAllDiagnosticDefs below
+// 3. Run $FUCHSIA_DIR/tools/fidl/scripts/add_errcat_entry.py
 
-// LINT.ThenChange(/tools/fidl/fidlc/tests/errcat_good_tests.cc)
+static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
+    /* fi-0001 */ &ErrInvalidCharacter,
+    /* fi-0002 */ &ErrUnexpectedLineBreak,
+    /* fi-0003 */ &ErrInvalidEscapeSequence,
+    /* fi-0004 */ &ErrInvalidHexDigit,
+    /* fi-0005 */ &ErrInvalidOctDigit,
+    /* fi-0006 */ &ErrExpectedDeclaration,
+    /* fi-0007 */ &ErrUnexpectedToken,
+    /* fi-0008 */ &ErrUnexpectedTokenOfKind,
+    /* fi-0009 */ &ErrUnexpectedIdentifier,
+    /* fi-0010 */ &ErrInvalidIdentifier,
+    /* fi-0011 */ &ErrInvalidLibraryNameComponent,
+    /* fi-0012 */ &ErrInvalidLayoutClass,
+    /* fi-0013 */ &ErrInvalidWrappedType,
+    /* fi-0014 */ &ErrAttributeWithEmptyParens,
+    /* fi-0015 */ &ErrAttributeArgsMustAllBeNamed,
+    /* fi-0016 */ &ErrMissingOrdinalBeforeMember,
+    /* fi-0017 */ &ErrOrdinalOutOfBound,
+    /* fi-0018 */ &ErrOrdinalsMustStartAtOne,
+    /* fi-0019 */ &ErrMustHaveOneMember,
+    /* fi-0020 */ &ErrInvalidProtocolMember,
+    /* fi-0021 */ &ErrExpectedProtocolMember,
+    /* fi-0022 */ &ErrCannotAttachAttributeToIdentifier,
+    /* fi-0023 */ &ErrRedundantAttributePlacement,
+    /* fi-0024 */ &ErrDocCommentOnParameters,
+    /* fi-0025 */ &ErrLibraryImportsMustBeGroupedAtTopOfFile,
+    /* fi-0026 */ &WarnCommentWithinDocCommentBlock,
+    /* fi-0027 */ &WarnBlankLinesWithinDocCommentBlock,
+    /* fi-0028 */ &WarnDocCommentMustBeFollowedByDeclaration,
+    /* fi-0029 */ &ErrMustHaveOneProperty,
+    /* fi-0030 */ &ErrCannotSpecifyModifier,
+    /* fi-0031 */ &ErrCannotSpecifySubtype,
+    /* fi-0032 */ &ErrDuplicateModifier,
+    /* fi-0033 */ &ErrConflictingModifier,
+    /* fi-0034 */ &ErrNameCollision,
+    /* fi-0035 */ &ErrNameCollisionCanonical,
+    /* fi-0036 */ &ErrNameOverlap,
+    /* fi-0037 */ &ErrNameOverlapCanonical,
+    /* fi-0038 */ &ErrDeclNameConflictsWithLibraryImport,
+    /* fi-0039 */ &ErrDeclNameConflictsWithLibraryImportCanonical,
+    /* fi-0040 */ &ErrFilesDisagreeOnLibraryName,
+    /* fi-0041 */ &ErrMultipleLibrariesWithSameName,
+    /* fi-0042 */ &ErrDuplicateLibraryImport,
+    /* fi-0043 */ &ErrConflictingLibraryImport,
+    /* fi-0044 */ &ErrConflictingLibraryImportAlias,
+    /* fi-0045 */ &ErrAttributesNotAllowedOnLibraryImport,
+    /* fi-0046 */ &ErrUnknownLibrary,
+    /* fi-0047 */ &ErrProtocolComposedMultipleTimes,
+    /* fi-0048 */ &ErrOptionalTableMember,
+    /* fi-0049 */ &ErrOptionalUnionMember,
+    /* fi-0050 */ &ErrDeprecatedStructDefaults,
+    /* fi-0051 */ &ErrUnknownDependentLibrary,
+    /* fi-0052 */ &ErrNameNotFound,
+    /* fi-0053 */ &ErrCannotReferToMember,
+    /* fi-0054 */ &ErrMemberNotFound,
+    /* fi-0055 */ &ErrInvalidReferenceToDeprecated,
+    /* fi-0056 */ &ErrInvalidReferenceToDeprecatedOtherPlatform,
+    /* fi-0057 */ &ErrIncludeCycle,
+    /* fi-0058 */ &ErrAnonymousNameReference,
+    /* fi-0059 */ &ErrInvalidConstantType,
+    /* fi-0060 */ &ErrCannotResolveConstantValue,
+    /* fi-0061 */ &ErrOrOperatorOnNonPrimitiveValue,
+    /* fi-0062 */ &ErrNewTypesNotAllowed,
+    /* fi-0063 */ &ErrExpectedValueButGotType,
+    /* fi-0064 */ &ErrMismatchedNameTypeAssignment,
+    /* fi-0065 */ &ErrTypeCannotBeConvertedToType,
+    /* fi-0066 */ &ErrConstantOverflowsType,
+    /* fi-0067 */ &ErrBitsMemberMustBePowerOfTwo,
+    /* fi-0068 */ &ErrFlexibleEnumMemberWithMaxValue,
+    /* fi-0069 */ &ErrBitsTypeMustBeUnsignedIntegralPrimitive,
+    /* fi-0070 */ &ErrEnumTypeMustBeIntegralPrimitive,
+    /* fi-0071 */ &ErrUnknownAttributeOnStrictEnumMember,
+    /* fi-0072 */ &ErrUnknownAttributeOnMultipleEnumMembers,
+    /* fi-0073 */ &ErrComposingNonProtocol,
+    /* fi-0074 */ &ErrInvalidMethodPayloadLayoutClass,
+    /* fi-0075 */ &ErrInvalidMethodPayloadType,
+    /* fi-0076 */ &ErrResponsesWithErrorsMustNotBeEmpty,
+    /* fi-0077 */ &ErrEmptyPayloadStructs,
+    /* fi-0078 */ &ErrDuplicateMethodName,
+    /* fi-0079 */ &ErrDuplicateMethodNameCanonical,
+    /* fi-0080 */ &ErrGeneratedZeroValueOrdinal,
+    /* fi-0081 */ &ErrDuplicateMethodOrdinal,
+    /* fi-0082 */ &ErrInvalidSelectorValue,
+    /* fi-0083 */ &ErrFuchsiaIoExplicitOrdinals,
+    /* fi-0084 */ &ErrPayloadStructHasDefaultMembers,
+    /* fi-0085 */ &ErrDuplicateServiceMemberName,
+    /* fi-0086 */ &ErrStrictUnionMustHaveNonReservedMember,
+    /* fi-0087 */ &ErrDuplicateServiceMemberNameCanonical,
+    /* fi-0088 */ &ErrOptionalServiceMember,
+    /* fi-0089 */ &ErrDuplicateStructMemberName,
+    /* fi-0090 */ &ErrDuplicateStructMemberNameCanonical,
+    /* fi-0091 */ &ErrInvalidStructMemberType,
+    /* fi-0092 */ &ErrTooManyTableOrdinals,
+    /* fi-0093 */ &ErrMaxOrdinalNotTable,
+    /* fi-0094 */ &ErrDuplicateTableFieldOrdinal,
+    /* fi-0095 */ &ErrDuplicateTableFieldName,
+    /* fi-0096 */ &ErrDuplicateTableFieldNameCanonical,
+    /* fi-0097 */ &ErrDuplicateUnionMemberOrdinal,
+    /* fi-0098 */ &ErrDuplicateUnionMemberName,
+    /* fi-0099 */ &ErrDuplicateUnionMemberNameCanonical,
+    /* fi-0100 */ &ErrNonDenseOrdinal,
+    /* fi-0101 */ &ErrCouldNotResolveSizeBound,
+    /* fi-0102 */ &ErrCouldNotResolveMember,
+    /* fi-0103 */ &ErrCouldNotResolveMemberDefault,
+    /* fi-0104 */ &ErrCouldNotResolveAttributeArg,
+    /* fi-0105 */ &ErrDuplicateMemberName,
+    /* fi-0106 */ &ErrDuplicateMemberNameCanonical,
+    /* fi-0107 */ &ErrDuplicateMemberValue,
+    /* fi-0108 */ &ErrDuplicateResourcePropertyName,
+    /* fi-0109 */ &ErrDuplicateResourcePropertyNameCanonical,
+    /* fi-0110 */ &ErrTypeMustBeResource,
+    /* fi-0111 */ &ErrInlineSizeExceedsLimit,
+    /* fi-0112 */ &ErrOnlyClientEndsInServices,
+    /* fi-0113 */ &ErrMismatchedTransportInServices,
+    /* fi-0114 */ &ErrComposedProtocolTooOpen,
+    /* fi-0115 */ &ErrFlexibleTwoWayMethodRequiresOpenProtocol,
+    /* fi-0116 */ &ErrFlexibleOneWayMethodInClosedProtocol,
+    /* fi-0117 */ &ErrHandleUsedInIncompatibleTransport,
+    /* fi-0118 */ &ErrTransportEndUsedInIncompatibleTransport,
+    /* fi-0119 */ &ErrEventErrorSyntaxDeprecated,
+    /* fi-0120 */ &ErrInvalidAttributePlacement,
+    /* fi-0121 */ &ErrDeprecatedAttribute,
+    /* fi-0122 */ &ErrDuplicateAttribute,
+    /* fi-0123 */ &ErrDuplicateAttributeCanonical,
+    /* fi-0124 */ &ErrCanOnlyUseStringOrBool,
+    /* fi-0125 */ &ErrAttributeArgMustNotBeNamed,
+    /* fi-0126 */ &ErrAttributeArgNotNamed,
+    /* fi-0127 */ &ErrMissingRequiredAttributeArg,
+    /* fi-0128 */ &ErrMissingRequiredAnonymousAttributeArg,
+    /* fi-0129 */ &ErrUnknownAttributeArg,
+    /* fi-0130 */ &ErrDuplicateAttributeArg,
+    /* fi-0131 */ &ErrDuplicateAttributeArgCanonical,
+    /* fi-0132 */ &ErrAttributeDisallowsArgs,
+    /* fi-0133 */ &ErrAttributeArgRequiresLiteral,
+    /* fi-0134 */ &ErrAttributeConstraintNotSatisfied,
+    /* fi-0135 */ &ErrInvalidDiscoverableName,
+    /* fi-0136 */ &ErrTableCannotBeSimple,
+    /* fi-0137 */ &ErrUnionCannotBeSimple,
+    /* fi-0138 */ &ErrElementMustBeSimple,
+    /* fi-0139 */ &ErrTooManyBytes,
+    /* fi-0140 */ &ErrTooManyHandles,
+    /* fi-0141 */ &ErrInvalidErrorType,
+    /* fi-0142 */ &ErrInvalidTransportType,
+    /* fi-0143 */ &ErrBoundIsTooBig,
+    /* fi-0144 */ &ErrUnableToParseBound,
+    /* fi-0145 */ &WarnAttributeTypo,
+    /* fi-0146 */ &ErrInvalidGeneratedName,
+    /* fi-0147 */ &ErrAvailableMissingArguments,
+    /* fi-0148 */ &ErrNoteWithoutDeprecation,
+    /* fi-0149 */ &ErrPlatformNotOnLibrary,
+    /* fi-0150 */ &ErrLibraryAvailabilityMissingAdded,
+    /* fi-0151 */ &ErrMissingLibraryAvailability,
+    /* fi-0152 */ &ErrInvalidPlatform,
+    /* fi-0153 */ &ErrInvalidVersion,
+    /* fi-0154 */ &ErrInvalidAvailabilityOrder,
+    /* fi-0155 */ &ErrAvailabilityConflictsWithParent,
+    /* fi-0156 */ &ErrCannotBeOptional,
+    /* fi-0157 */ &ErrMustBeAProtocol,
+    /* fi-0158 */ &ErrCannotBoundTwice,
+    /* fi-0159 */ &ErrStructCannotBeOptional,
+    /* fi-0160 */ &ErrCannotIndicateOptionalTwice,
+    /* fi-0161 */ &ErrMustHaveNonZeroSize,
+    /* fi-0162 */ &ErrWrongNumberOfLayoutParameters,
+    /* fi-0163 */ &ErrMultipleConstraintDefinitions,
+    /* fi-0164 */ &ErrTooManyConstraints,
+    /* fi-0165 */ &ErrExpectedType,
+    /* fi-0166 */ &ErrUnexpectedConstraint,
+    /* fi-0167 */ &ErrCannotConstrainTwice,
+    /* fi-0168 */ &ErrProtocolConstraintRequired,
+    /* fi-0169 */ &ErrBoxCannotBeOptional,
+    /* fi-0170 */ &ErrBoxedTypeCannotBeOptional,
+    /* fi-0171 */ &ErrCannotBeBoxedShouldBeOptional,
+    /* fi-0172 */ &ErrResourceMustBeUint32Derived,
+    /* fi-0173 */ &ErrResourceMissingSubtypeProperty,
+    /* fi-0174 */ &ErrResourceMissingRightsProperty,
+    /* fi-0175 */ &ErrResourceSubtypePropertyMustReferToEnum,
+    /* fi-0176 */ &ErrHandleSubtypeMustReferToResourceSubtype,
+    /* fi-0177 */ &ErrResourceRightsPropertyMustReferToBits,
+    /* fi-0178 */ &ErrUnusedImport,
+    /* fi-0179 */ &ErrNewTypeCannotHaveConstraint,
+    /* fi-0180 */ &ErrExperimentalZxCTypesDisallowed,
+    /* fi-0181 */ &ErrReferenceInLibraryAttribute,
+    /* fi-0182 */ &ErrLegacyWithoutRemoval,
+    /* fi-0183 */ &ErrLegacyConflictsWithParent,
+    /* fi-0184 */ &ErrUnexpectedControlCharacter,
+    /* fi-0185 */ &ErrUnicodeEscapeMissingBraces,
+    /* fi-0186 */ &ErrUnicodeEscapeUnterminated,
+    /* fi-0187 */ &ErrUnicodeEscapeEmpty,
+    /* fi-0188 */ &ErrUnicodeEscapeTooLong,
+    /* fi-0189 */ &ErrUnicodeEscapeTooLarge,
+    /* fi-0190 */ &ErrSimpleProtocolMustBeClosed,
+    /* fi-0191 */ &ErrMethodMustDefineStrictness,
+    /* fi-0192 */ &ErrProtocolMustDefineOpenness,
+    /* fi-0193 */ &ErrCannotBeBoxedNorOptional,
+    /* fi-0194 */ &ErrEmptyPayloadStructsWhenResultUnion,
+    /* fi-0195 */ &ErrExperimentalOverflowingAttributeMissingExperimentalFlag,
+    /* fi-0196 */ &ErrExperimentalOverflowingIncorrectUsage,
+    /* fi-0197 */ &ErrOverlayMustBeStrict,
+    /* fi-0198 */ &ErrOverlayMustBeValue,
+    /* fi-0199 */ &ErrOverlayMemberMustBeValue,
+    /* fi-0200 */ &ErrOverlayMustNotContainReserved,
+};
+
+// In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.
+// This combined with the assert below ensures kAllDiagnosticDefs is complete.
+static constexpr size_t kNumDiagnosticDefs =
+    sizeof(kAllDiagnosticDefs) / sizeof(kAllDiagnosticDefs[0]);
+
+// If anything is missing or out of order in kAllDiagnosticDefs, this assertion
+// will fail and the message will include the position where it happened.
+static_assert([] {
+  ErrorId expected = 1;
+  for (auto def : kAllDiagnosticDefs) {
+    if (def->id != expected) {
+      return expected;
+    }
+    expected++;
+  }
+  return 0u;
+}() == 0);
+
+}  // namespace fidl
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_H_

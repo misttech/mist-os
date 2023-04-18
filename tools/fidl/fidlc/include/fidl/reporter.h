@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
+#include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/program_invocation.h"
@@ -50,12 +51,16 @@ class Reporter {
 
   template <ErrorId Id, typename... Args>
   bool Fail(const ErrorDef<Id, Args...>& def, SourceSpan span, const identity_t<Args>&... args) {
+    static_assert(Id <= kNumDiagnosticDefs,
+                  "please add this ErrorDef to kAllDiagnosticDefs in diagnostics.h");
     Report(Diagnostic::MakeError(def, span, args...));
     return false;
   }
 
   template <ErrorId Id, typename... Args>
   void Warn(const WarningDef<Id, Args...>& def, SourceSpan span, const identity_t<Args>&... args) {
+    static_assert(Id <= kNumDiagnosticDefs,
+                  "please add this WarningDef to kAllDiagnosticDefs in diagnostics.h");
     Report(Diagnostic::MakeWarning(def, span, args...));
   }
 
