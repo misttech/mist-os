@@ -190,6 +190,12 @@ impl From<ConnectError> for LogError {
     }
 }
 
+#[derive(Clone)]
+struct LocalStreamParameters {
+    daemon_parameters: DaemonDiagnosticsStreamParameters,
+    boot_ts: i64,
+}
+
 impl RemoteDiagnosticsBridgeProxyWrapper {
     pub fn new(target_collection_proxy: TargetCollectionProxy, node_name: String) -> Self {
         Self {
@@ -211,6 +217,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
             ServerEnd<ArchiveIteratorMarker>,
             ArchiveIteratorProxy,
         )>,
+        parameters: LocalStreamParameters,
     ) -> Result<(), LogError> {
         let mut pending_request = None;
         loop {
@@ -221,10 +228,15 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                 write_logs_to_file(streamer.clone(), Some(&streamer.config))?;
             let this = self.clone();
             let this_2 = self.clone();
-
+            let parameters = parameters.clone();
             let frontend = fuchsia_async::Task::local(async move {
                 this_2
-                    .frontend_to_daemon(iterator.into_stream()?, receiver, pending_request.take())
+                    .frontend_to_daemon(
+                        iterator.into_stream()?,
+                        receiver,
+                        pending_request.take(),
+                        parameters,
+                    )
                     .await
             });
 
@@ -254,15 +266,20 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         mut server: ArchiveIteratorRequestStream,
         mut receiver: Receiver<LogEntry>,
         mut old_request: Option<ArchiveIteratorGetNextResponder>,
+        parameters: LocalStreamParameters,
     ) -> Result<ArchiveIteratorGetNextResponder, LogError> {
         // Handle the old request if present.
         if let Some(responder) = old_request.take() {
-            if let Some(responder) = self.handle_frontend_request(&mut receiver, responder).await? {
+            if let Some(responder) =
+                self.handle_frontend_request(&mut receiver, responder, &parameters).await?
+            {
                 return Ok(responder);
             }
         }
         while let Some(Ok(ArchiveIteratorRequest::GetNext { responder })) = server.next().await {
-            if let Some(responder) = self.handle_frontend_request(&mut receiver, responder).await? {
+            if let Some(responder) =
+                self.handle_frontend_request(&mut receiver, responder, &parameters).await?
+            {
                 return Ok(responder);
             }
         }
@@ -290,8 +307,27 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         self: &Arc<Self>,
         receiver: &mut Receiver<LogEntry>,
         responder: ArchiveIteratorGetNextResponder,
+        parameters: &LocalStreamParameters,
     ) -> Result<Option<ArchiveIteratorGetNextResponder>, LogError> {
-        Ok(if let Some(value) = receiver.next().await {
+        loop {
+            let Some(value) = receiver.next().await else {
+                return Ok(Some(responder));
+            };
+
+            // Skip if timestamp is not within specified range
+            match (&parameters.daemon_parameters.min_timestamp_nanos, &value.data) {
+                (Some(TimeBound::Absolute(utc)), LogData::TargetLog(target))
+                    if (target.metadata.timestamp + parameters.boot_ts) <= (*utc) as i64 =>
+                {
+                    continue;
+                }
+                (Some(TimeBound::Monotonic(device_ts)), LogData::TargetLog(target))
+                    if target.metadata.timestamp <= (*device_ts) as i64 =>
+                {
+                    continue;
+                }
+                _ => {}
+            }
             let translated = ArchiveIteratorEntry {
                 data: None,
                 truncated_chars: None,
@@ -302,10 +338,8 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                 ..ArchiveIteratorEntry::EMPTY
             };
             responder.send(&mut Ok(vec![translated]))?;
-            None
-        } else {
-            Some(responder)
-        })
+            return Ok(None);
+        }
     }
 
     async fn connect(&self) -> Result<RemoteDiagnosticsBridgeProxy, LogError> {
@@ -421,10 +455,20 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         if let Some(daemon) = &state.running_daemon_channel {
             daemon.send((iterator, proxy)).await?;
         } else {
+            let boot_ts = state.boot_timestamp;
             // root task
             let (sender, receiver) = unbounded();
             state.current_task = Some(fuchsia_async::Task::local(async move {
-                this.translate_logs(iterator, proxy, receiver).await
+                this.translate_logs(
+                    iterator,
+                    proxy,
+                    receiver,
+                    LocalStreamParameters {
+                        daemon_parameters: parameters,
+                        boot_ts: boot_ts as i64,
+                    },
+                )
+                .await
             }));
             state.running_daemon_channel = Some(sender);
         }
@@ -992,6 +1036,124 @@ mod test {
             );
             assert_matches!(receiver.next().await.unwrap().unwrap().data, LogData::TargetLog(value) if value == log);
         }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_dump_logs_with_monotonic_timestamp_filter() {
+        let env = test_init().await.unwrap();
+        env.load().await;
+        let (sender, mut receiver) = unbounded();
+        let params = DaemonDiagnosticsStreamParameters {
+            stream_mode: Some(StreamMode::Subscribe),
+            min_timestamp_nanos: Some(TimeBound::Monotonic(BOOT_TS)),
+            ..DaemonDiagnosticsStreamParameters::EMPTY
+        };
+
+        let log_0 = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            timestamp_nanos: Timestamp::from(BOOT_TS as i64),
+            severity: diagnostics_data::Severity::Info,
+        })
+        .set_message("Discarded message")
+        .build();
+
+        let log_1 = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            timestamp_nanos: Timestamp::from((BOOT_TS + 1) as i64),
+            severity: diagnostics_data::Severity::Info,
+        })
+        .set_message("Received message")
+        .build();
+
+        let expected_responses = vec![FakeArchiveIteratorResponse::new_with_values(vec![
+            serde_json::to_string(&log_0).unwrap(),
+            serde_json::to_string(&log_1).unwrap(),
+        ])];
+
+        let mut formatter = FakeLogFormatter::new_with_stream(sender);
+        let _logger_task = fuchsia_async::Task::local(async move {
+            let mut writer = Vec::new();
+            exec_log_cmd(
+                LogCommandParameters::from(params.clone()),
+                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses)),
+                &mut formatter,
+                &mut writer,
+            )
+            .await
+            .unwrap();
+        });
+
+        // First message should be skipped
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::FfxEvent(EventType::LoggingStarted)
+        );
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::TargetLog(value)
+            if value == log_1
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_dump_logs_with_utc_timestamp_filter() {
+        let env = test_init().await.unwrap();
+        env.load().await;
+        let (sender, mut receiver) = unbounded();
+        let params = DaemonDiagnosticsStreamParameters {
+            stream_mode: Some(StreamMode::Subscribe),
+            min_timestamp_nanos: Some(TimeBound::Absolute(BOOT_TS)),
+            ..DaemonDiagnosticsStreamParameters::EMPTY
+        };
+
+        let log_0 = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            timestamp_nanos: Timestamp::from(0),
+            severity: diagnostics_data::Severity::Info,
+        })
+        .set_message("Discarded message")
+        .build();
+
+        let log_1 = LogsDataBuilder::new(BuilderArgs {
+            component_url: None,
+            moniker: "ffx".to_string(),
+            timestamp_nanos: Timestamp::from(1),
+            severity: diagnostics_data::Severity::Info,
+        })
+        .set_message("Received message")
+        .build();
+
+        let expected_responses = vec![FakeArchiveIteratorResponse::new_with_values(vec![
+            serde_json::to_string(&log_0).unwrap(),
+            serde_json::to_string(&log_1).unwrap(),
+        ])];
+
+        let mut formatter = FakeLogFormatter::new_with_stream(sender);
+        let _logger_task = fuchsia_async::Task::local(async move {
+            let mut writer = Vec::new();
+            exec_log_cmd(
+                LogCommandParameters::from(params.clone()),
+                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses)),
+                &mut formatter,
+                &mut writer,
+            )
+            .await
+            .unwrap();
+        });
+
+        // First message should be skipped
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::FfxEvent(EventType::LoggingStarted)
+        );
+        assert_matches!(
+            receiver.next().await.unwrap().unwrap().data,
+            LogData::TargetLog(value)
+            if value == log_1
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
