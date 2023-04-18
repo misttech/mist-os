@@ -55,24 +55,24 @@ class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstRe
       for (auto& vmo : registered_vmos_) {
         if (!vmo.locked) {
           vmo.locked = true;
-          const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurstResult::WithResponse(
+          const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::WithBurst(
               {{vmo.vmo_id, zx::clock::get_monotonic().get()}});
-          EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst(burst).is_ok());
+          EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst2(burst).is_ok());
           return;
         }
       }
 
-      const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurstResult::WithErr(
+      const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::WithError(
           fuchsia_hardware_radar::StatusCode::kOutOfVmos);
-      EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst(burst).is_ok());
+      EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst2(burst).is_ok());
     });
   }
 
   void SendError(fuchsia_hardware_radar::StatusCode status) {
     async::PostTask(dispatcher_, [&, error = status]() {
       ASSERT_TRUE(reader_binding_);
-      const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurstResult::WithErr(error);
-      EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst(burst).is_ok());
+      const auto burst = fuchsia_hardware_radar::RadarBurstReaderOnBurst2Request::WithError(error);
+      EXPECT_TRUE(fidl::SendEvent(*reader_binding_)->OnBurst2(burst).is_ok());
     });
   }
 

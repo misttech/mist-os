@@ -451,12 +451,26 @@ zx_status_t RadarUtil::ReadBursts() {
   return ZX_OK;
 }
 
+// TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
 void RadarUtil::OnBurst(fidl::WireEvent<BurstReader::OnBurst>* event) {
   {
     fbl::AutoLock lock(&lock_);
     if (event->result.is_response()) {
       burst_vmo_ids_.push(event->result.response().burst.vmo_id);
     } else if (event->result.is_err()) {
+      burst_vmo_ids_.push(kInvalidVmoId);
+    }
+  }
+
+  worker_event_.Broadcast();
+}
+
+void RadarUtil::OnBurst2(fidl::WireEvent<BurstReader::OnBurst2>* event) {
+  {
+    fbl::AutoLock lock(&lock_);
+    if (event->is_burst()) {
+      burst_vmo_ids_.push(event->burst().vmo_id);
+    } else if (event->is_error()) {
       burst_vmo_ids_.push(kInvalidVmoId);
     }
   }

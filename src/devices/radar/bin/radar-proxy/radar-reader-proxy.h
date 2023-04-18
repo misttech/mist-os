@@ -37,7 +37,13 @@ class RadarReaderProxy : public RadarProxy,
 
   void on_fidl_error(fidl::UnbindInfo info) override;
 
+  // TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
   void OnBurst(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) override;
+
+  // This is a temporary event that exists to enable a soft transition away from the error syntax
+  // used by OnBurst. For now, RadarReaderProxy can receive bursts through either interface, but
+  // eventually all servers will use OnBurst2.
+  void OnBurst2(fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) override;
 
  private:
   struct MappedVmo {

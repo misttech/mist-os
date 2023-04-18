@@ -38,6 +38,7 @@ void RadarReaderProxy::on_fidl_error(const fidl::UnbindInfo info) {
   HandleFatalError(info.status());
 }
 
+// TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
 void RadarReaderProxy::OnBurst(
     fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) {
   ZX_DEBUG_ASSERT(burst_size_);
@@ -55,6 +56,36 @@ void RadarReaderProxy::OnBurst(
   const auto* burst_data = reinterpret_cast<uint8_t*>(vmo_pool_[vmo_id].mapped_vmo.start());
   for (auto& instance : instances_) {
     instance->SendBurst({burst_data, *burst_size_}, zx::time(response->burst().timestamp()));
+  }
+
+  if (radar_client_) {
+    if (auto result = radar_client_->UnlockVmo(vmo_id); result.is_error()) {
+      HandleFatalError(result.error_value().status());
+    }
+  }
+}
+
+void RadarReaderProxy::OnBurst2(
+    fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) {
+  ZX_DEBUG_ASSERT(burst_size_);
+
+  if (event.IsUnknown()) {
+    HandleFatalError(ZX_ERR_BAD_STATE);
+    return;
+  }
+
+  if (event.error() || event.burst()->vmo_id() >= vmo_pool_.size()) {
+    const auto status = event.error().value_or(fuchsia_hardware_radar::StatusCode::kVmoNotFound);
+    for (auto& instance : instances_) {
+      instance->SendError(status);
+    }
+    return;
+  }
+
+  const uint32_t vmo_id = event.burst()->vmo_id();
+  const auto* burst_data = reinterpret_cast<uint8_t*>(vmo_pool_[vmo_id].mapped_vmo.start());
+  for (auto& instance : instances_) {
+    instance->SendBurst({burst_data, *burst_size_}, zx::time(event.burst()->timestamp()));
   }
 
   if (radar_client_) {

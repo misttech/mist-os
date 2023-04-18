@@ -21,7 +21,7 @@ namespace {
 
 using BurstReaderProvider = fuchsia_hardware_radar::RadarBurstReaderProvider;
 using BurstReader = fuchsia_hardware_radar::RadarBurstReader;
-using BurstResult = fuchsia_hardware_radar::wire::RadarBurstReaderOnBurstResult;
+using BurstRequest = fuchsia_hardware_radar::wire::RadarBurstReaderOnBurst2Request;
 
 constexpr size_t kBurstSize = 23247;
 
@@ -36,7 +36,7 @@ class RadarIntegrationTest : public zxtest::Test {
     return MakeRadarClient({}, out_client);
   }
 
-  std::future<void> MakeRadarClient(fit::function<void(const BurstResult&)> burst_handler,
+  std::future<void> MakeRadarClient(fit::function<void(const BurstRequest&)> burst_handler,
                                     fidl::WireSharedClient<BurstReader>* out_client) {
     std::future<void> out_client_torn_down;
     MakeRadarClient(std::move(burst_handler), out_client, &out_client_torn_down);
@@ -68,7 +68,7 @@ class RadarIntegrationTest : public zxtest::Test {
   }
 
  private:
-  void MakeRadarClient(fit::function<void(const BurstResult&)> burst_handler,
+  void MakeRadarClient(fit::function<void(const BurstRequest&)> burst_handler,
                        fidl::WireSharedClient<BurstReader>* out_client,
                        std::future<void>* out_client_torn_down) {
     auto provider_client_end_or = component::Connect<BurstReaderProvider>();
@@ -94,23 +94,36 @@ class RadarIntegrationTest : public zxtest::Test {
 
   class EventHandler : public fidl::WireAsyncEventHandler<BurstReader> {
    public:
-    explicit EventHandler(fit::function<void(const BurstResult&)> burst_handler,
+    explicit EventHandler(fit::function<void(const BurstRequest&)> burst_handler,
                           std::promise<void> client_torn_down_promise)
         : burst_handler_(std::move(burst_handler)),
           client_torn_down_promise_(std::move(client_torn_down_promise)) {}
 
     ~EventHandler() override { client_torn_down_promise_.set_value(); }
 
+    // TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
     void OnBurst(fidl::WireEvent<BurstReader::OnBurst>* event) override {
       if (burst_handler_) {
-        burst_handler_(event->result);
+        if (event->result.is_response()) {
+          const auto burst = fidl::ObjectView<fuchsia_hardware_radar::wire::Burst>::FromExternal(
+              &event->result.response().burst);
+          burst_handler_(BurstRequest::WithBurst(burst));
+        } else if (event->result.is_err()) {
+          burst_handler_(BurstRequest::WithError(event->result.err()));
+        }
+      }
+    }
+
+    void OnBurst2(fidl::WireEvent<BurstReader::OnBurst2>* event) override {
+      if (burst_handler_) {
+        burst_handler_(*event);
       }
     }
 
     void on_fidl_error(fidl::UnbindInfo info) override {}
 
    private:
-    fit::function<void(const BurstResult&)> burst_handler_;
+    fit::function<void(const BurstRequest&)> burst_handler_;
     std::promise<void> client_torn_down_promise_;
   };
 
@@ -162,9 +175,9 @@ TEST_F(RadarIntegrationTest, BurstFormat) {
 
   fidl::WireSharedClient<BurstReader> client;
   ASSERT_NO_FAILURES(MakeRadarClient(
-      [&](const BurstResult& result) {
-        if (result.is_response()) {
-          received_id = result.response().burst.vmo_id;
+      [&](const BurstRequest& request) {
+        if (request.is_burst()) {
+          received_id = request.burst().vmo_id;
           sync_completion_signal(&completion);
         }
       },
@@ -222,9 +235,9 @@ TEST_F(RadarIntegrationTest, ReadManyBursts) {
 
   fidl::WireSharedClient<BurstReader> client;
   ASSERT_NO_FAILURES(MakeRadarClient(
-      [&](const BurstResult& result) {
-        if (result.is_response()) {
-          [[maybe_unused]] auto call_result = client->UnlockVmo(result.response().burst.vmo_id);
+      [&](const BurstRequest& request) {
+        if (request.is_burst()) {
+          [[maybe_unused]] auto call_result = client->UnlockVmo(request.burst().vmo_id);
           if (++received_burst_count >= kBurstCount) {
             sync_completion_signal(&completion);
           }
@@ -288,10 +301,9 @@ TEST_F(RadarIntegrationTest, ReadManyBurstsMultipleClients) {
   for (auto& client : clients) {
     sync_completion_reset(&client.completion);
     ASSERT_NO_FAILURES(MakeRadarClient(
-        [&](const BurstResult& result) {
-          if (result.is_response()) {
-            [[maybe_unused]] auto call_result =
-                client.client->UnlockVmo(result.response().burst.vmo_id);
+        [&](const BurstRequest& request) {
+          if (request.is_burst()) {
+            [[maybe_unused]] auto call_result = client.client->UnlockVmo(request.burst().vmo_id);
             if (++client.received_burst_count >= kBurstCount) {
               sync_completion_signal(&client.completion);
             }
