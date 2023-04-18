@@ -4,17 +4,21 @@
 
 use std::pin::Pin;
 
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
+use fidl_fuchsia_net_name as fnet_name;
 use fuchsia_zircon as zx;
 
-use crate::errors;
 use anyhow::Context as _;
 use async_utils::{
     hanging_get::client::HangingGetStream,
     stream::{StreamMap, Tagged, WithTag as _},
 };
+use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use futures::stream::TryStreamExt as _;
 use tracing::{info, warn};
+
+use crate::{dns, errors};
 
 #[derive(Debug)]
 pub(super) struct ClientState {
@@ -35,6 +39,45 @@ pub(super) type ConfigurationStreamMap = StreamMap<u64, InterfaceIdTaggedConfigu
 pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<u64, ConfigurationStream>;
 pub(super) type ConfigurationStream =
     HangingGetStream<fnet_dhcp::ClientProxy, fnet_dhcp::ClientWatchConfigurationResponse>;
+
+pub(super) async fn update_configuration(
+    interface_id: u64,
+    ClientState { client: _ }: &mut ClientState,
+    fnet_dhcp::ClientWatchConfigurationResponse {
+        address: _,
+        dns_servers: new_dns_servers,
+        routers: _,
+        ..
+    }: fnet_dhcp::ClientWatchConfigurationResponse,
+    dns_servers: &mut DnsServers,
+    lookup_admin: &fnet_name::LookupAdminProxy,
+) {
+    dns::update_servers(
+        lookup_admin,
+        dns_servers,
+        DnsServersUpdateSource::Dhcpv4 { interface_id },
+        new_dns_servers
+            .map(|servers| {
+                servers.into_iter().map(|address| fnet_name::DnsServer_ {
+                    address: Some(fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                        address,
+                        port: DEFAULT_DNS_PORT,
+                    })),
+                    source: Some(fnet_name::DnsServerSource::Dhcp(
+                        fnet_name::DhcpDnsServerSource {
+                            source_interface: Some(interface_id),
+                            ..fnet_name::DhcpDnsServerSource::EMPTY
+                        },
+                    )),
+                    ..fnet_name::DnsServer_::EMPTY
+                })
+            })
+            .into_iter()
+            .flatten()
+            .collect(),
+    )
+    .await
+}
 
 pub(super) fn start_client(
     interface_id: u64,
@@ -69,10 +112,23 @@ pub(super) fn start_client(
 pub(super) async fn stop_client(
     interface_id: u64,
     interface_name: &str,
-    ClientState { client }: ClientState,
+    mut state: ClientState,
     configuration_streams: &mut ConfigurationStreamMap,
+    dns_servers: &mut DnsServers,
+    lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
     info!("stopping DHCPv4 client for {} (id={})", interface_name, interface_id);
+
+    update_configuration(
+        interface_id,
+        &mut state,
+        fnet_dhcp::ClientWatchConfigurationResponse::EMPTY,
+        dns_servers,
+        lookup_admin,
+    )
+    .await;
+
+    let ClientState { client } = state;
 
     let _: Pin<Box<InterfaceIdTaggedConfigurationStream>> =
         configuration_streams.remove(&interface_id).unwrap_or_else(|| {

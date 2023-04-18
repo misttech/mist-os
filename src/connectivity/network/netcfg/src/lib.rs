@@ -915,6 +915,9 @@ impl<'a> NetCfg<'a> {
                 )>,
             ),
             RequestStream(Option<RequestStream>),
+            Dhcpv4Configuration(
+                Option<(u64, Result<fnet_dhcp::ClientWatchConfigurationResponse, fidl::Error>)>,
+            ),
             Dhcpv6PrefixProviderRequest(Result<fnet_dhcpv6::PrefixProviderRequest, fidl::Error>),
             Dhcpv6PrefixControlRequest(
                 Option<Result<Option<fnet_dhcpv6::PrefixControlRequest>, fidl::Error>>,
@@ -943,6 +946,9 @@ impl<'a> NetCfg<'a> {
                 }
                 req_stream = fs.next() => {
                     Event::RequestStream(req_stream)
+                }
+                dhcpv4_configuration = self.dhcpv4_configuration_streams.next() => {
+                    Event::Dhcpv4Configuration(dhcpv4_configuration)
                 }
                 dhcpv6_prefix_req = dhcpv6_prefix_provider_requests.select_next_some() => {
                     Event::Dhcpv6PrefixProviderRequest(dhcpv6_prefix_req)
@@ -1025,6 +1031,11 @@ impl<'a> NetCfg<'a> {
                             dhcpv6_prefix_provider_requests.push(req_stream);
                         }
                     }
+                }
+                Event::Dhcpv4Configuration(config) => {
+                    let (interface_id, config) =
+                        config.expect("DHCPv4 configuration stream is never exhausted");
+                    self.handle_dhcpv4_configuration(interface_id, config).await
                 }
                 Event::Dhcpv6PrefixProviderRequest(res) => {
                     match res {
@@ -1122,10 +1133,12 @@ impl<'a> NetCfg<'a> {
         name: &str,
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
+        dns_servers: &mut DnsServers,
+        lookup_admin: &fnet_name::LookupAdminProxy,
     ) {
-        if let Some(fut) =
-            dhcpv4_client.take().map(|c| dhcpv4::stop_client(id, name, c, configuration_streams))
-        {
+        if let Some(fut) = dhcpv4_client.take().map(|c| {
+            dhcpv4::stop_client(id, name, c, configuration_streams, dns_servers, lookup_admin)
+        }) {
             fut.await
         }
     }
@@ -1148,6 +1161,8 @@ impl<'a> NetCfg<'a> {
         dhcpv4_client: &mut Option<dhcpv4::ClientState>,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
+        dns_servers: &mut DnsServers,
+        lookup_admin: &fnet_name::LookupAdminProxy,
     ) {
         if online {
             Self::handle_dhcpv4_client_start(
@@ -1158,7 +1173,15 @@ impl<'a> NetCfg<'a> {
                 configuration_streams,
             )
         } else {
-            Self::handle_dhcpv4_client_stop(id, name, dhcpv4_client, configuration_streams).await
+            Self::handle_dhcpv4_client_stop(
+                id,
+                name,
+                dhcpv4_client,
+                configuration_streams,
+                dns_servers,
+                lookup_admin,
+            )
+            .await
         }
     }
 
@@ -1295,6 +1318,8 @@ impl<'a> NetCfg<'a> {
                             dhcpv4_client,
                             dhcpv4_client_provider.as_ref(),
                             dhcpv4_configuration_streams,
+                            dns_servers,
+                            lookup_admin,
                         )
                         .await;
 
@@ -1441,6 +1466,8 @@ impl<'a> NetCfg<'a> {
                                     name,
                                     &mut dhcpv4_client,
                                     dhcpv4_configuration_streams,
+                                    dns_servers,
+                                    lookup_admin,
                                 )
                                     .await;
 
@@ -2352,6 +2379,56 @@ impl<'a> NetCfg<'a> {
         }
     }
 
+    async fn handle_dhcpv4_configuration(
+        &mut self,
+        interface_id: u64,
+        res: Result<fnet_dhcp::ClientWatchConfigurationResponse, fidl::Error>,
+    ) {
+        let configuration = match res {
+            Ok(o) => o,
+            Err(e) => {
+                warn!(
+                    "DHCPv4 client on interface={} error while watching for configuration: {:?}",
+                    interface_id, e,
+                );
+
+                return;
+            }
+        };
+
+        let dhcpv4_client = {
+            let InterfaceState { config, control: _, device_class: _ } = self
+                .interface_states
+                .get_mut(&interface_id)
+                .unwrap_or_else(|| panic!("interface {} not found", interface_id));
+
+            match config {
+                InterfaceConfigState::Host(HostInterfaceState {
+                    dhcpv4_client,
+                    dhcpv6_client_state: _,
+                    dhcpv6_pd_config: _,
+                }) => dhcpv4_client.as_mut().unwrap_or_else(|| {
+                    panic!("interface {} does not have a running DHCPv4 client", interface_id)
+                }),
+                InterfaceConfigState::WlanAp(wlan_ap_state) => {
+                    panic!(
+                        "interface {} expected to be host but is WLAN AP with state {:?}",
+                        interface_id, wlan_ap_state
+                    );
+                }
+            }
+        };
+
+        dhcpv4::update_configuration(
+            interface_id,
+            dhcpv4_client,
+            configuration,
+            &mut self.dns_servers,
+            &self.lookup_admin,
+        )
+        .await
+    }
+
     async fn handle_dhcpv6_prefixes(
         &mut self,
         interface_id: u64,
@@ -2590,7 +2667,7 @@ fn exit_with_fidl_error(cause: fidl::Error) -> ! {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use futures::future::{self, FutureExt as _, TryFutureExt as _};
+    use futures::future::{self, FutureExt as _};
     use futures::stream::{FusedStream as _, TryStreamExt as _};
     use net_declare::{fidl_ip, fidl_ip_v6, fidl_ip_v6_with_prefix};
     use test_case::test_case;
@@ -2809,6 +2886,18 @@ mod tests {
         Ok(client_server)
     }
 
+    fn expect_watch_dhcpv4_configuration(
+        stream: &mut fnet_dhcp::ClientRequestStream,
+    ) -> fnet_dhcp::ClientWatchConfigurationResponder {
+        assert_matches::assert_matches!(
+            stream.try_next().now_or_never(),
+            Some(Ok(Some(fnet_dhcp::ClientRequest::WatchConfiguration { responder }))) => {
+                responder
+            },
+            "expect a watch_configuration call immediately"
+        )
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stopping_dhcpv6_with_down_lookup_admin() {
         let (
@@ -2928,7 +3017,7 @@ mod tests {
     async fn test_dhcpv4(added_online: bool, remove_interface: bool) {
         let (
             mut netcfg,
-            ServerEnds { lookup_admin: _, mut dhcpv4_client_provider, dhcpv6_client_provider: _ },
+            ServerEnds { mut lookup_admin, mut dhcpv4_client_provider, dhcpv6_client_provider: _ },
         ) = test_netcfg(true /* with_dhcpv4_client_provider */)
             .expect("error creating test netcfg");
         let mut dns_watchers = DnsServerWatchers::empty();
@@ -2966,7 +3055,7 @@ mod tests {
         }
 
         // Make sure the DHCPv4 client is created on interface up.
-        let mut client_stream = {
+        let (mut client_stream, responder) = {
             netcfg
                 .handle_interface_watcher_event(
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
@@ -3013,19 +3102,51 @@ mod tests {
                 }
             };
 
-            assert_matches::assert_matches!(
-                client_req_stream.try_next().now_or_never(),
-                Some(Ok(Some(fnet_dhcp::ClientRequest::WatchConfiguration { responder }))) => {
-                    responder.drop_without_shutdown();
-                },
-                "expect a watch_configuration call immediately"
-            );
-
-            client_req_stream
+            let responder = expect_watch_dhcpv4_configuration(&mut client_req_stream);
+            (client_req_stream, responder)
         };
 
+        {
+            let dns_servers = vec![fidl_ip_v4!("192.0.2.1"), fidl_ip_v4!("192.0.2.2")];
+            responder
+                .send(fnet_dhcp::ClientWatchConfigurationResponse {
+                    dns_servers: Some(dns_servers.clone()),
+                    ..fnet_dhcp::ClientWatchConfigurationResponse::EMPTY
+                })
+                .expect("send configuration update");
+
+            let (got_interface_id, got_response) = netcfg
+                .dhcpv4_configuration_streams
+                .next()
+                .await
+                .expect("DHCPv4 configuration streams should never be exhausted");
+            assert_eq!(got_interface_id, INTERFACE_ID);
+
+            let dns_servers = dns_servers
+                .into_iter()
+                .map(|address| {
+                    fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                        address,
+                        port: DEFAULT_DNS_PORT,
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            let ((), ()) = future::join(
+                netcfg.handle_dhcpv4_configuration(got_interface_id, got_response),
+                run_lookup_admin_once(&mut lookup_admin, &dns_servers),
+            )
+            .await;
+            assert_eq!(netcfg.dns_servers.consolidated(), dns_servers);
+        }
+
+        // Netcfg always keeps the server hydrated with a WatchConfiguration
+        // request.
+        let _responder: fnet_dhcp::ClientWatchConfigurationResponder =
+            expect_watch_dhcpv4_configuration(&mut client_stream);
+
         // Make sure the DHCPv4 client is shutdown on interface disable/removal.
-        let ((), ()) = futures::future::join(
+        let ((), (), ()) = future::join3(
             async {
                 if remove_interface {
                     netcfg
@@ -3055,60 +3176,55 @@ mod tests {
                         .expect("send client exit reason"),
                 }
             },
+            run_lookup_admin_once(&mut lookup_admin, &Vec::new()),
         )
         .await;
+        assert_eq!(netcfg.dns_servers.consolidated(), []);
+    }
+
+    /// Waits for a `SetDnsServers` request with the specified servers.
+    async fn run_lookup_admin_once(
+        server: &mut fnet_name::LookupAdminRequestStream,
+        expected_servers: &Vec<fnet::SocketAddress>,
+    ) {
+        let req = server
+            .try_next()
+            .await
+            .expect("get next lookup admin request")
+            .expect("lookup admin request stream should not be exhausted");
+        let (servers, responder) = assert_matches!(
+            req,
+            fnet_name::LookupAdminRequest::SetDnsServers { servers, responder } => {
+                (servers, responder)
+            }
+        );
+
+        assert_eq!(expected_servers, &servers);
+        responder.send(&mut Ok(())).expect("send set dns servers response");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_dhcpv6() {
-        /// Waits for a `SetDnsServers` request with the specified servers.
-        async fn run_lookup_admin_once(
-            server: &mut fnet_name::LookupAdminRequestStream,
-            expected_servers: &Vec<fnet::SocketAddress>,
-        ) -> Result<(), anyhow::Error> {
-            let req = server
-                .try_next()
-                .await
-                .context("error getting next lookup admin request")?
-                .context("expected lookup admin request")?;
-            if let fnet_name::LookupAdminRequest::SetDnsServers { servers, responder } = req {
-                if expected_servers != &servers {
-                    return Err(anyhow::anyhow!(
-                        "got SetDnsServers servers = {:?}, want = {:?}",
-                        servers,
-                        expected_servers
-                    ));
-                }
-                responder.send(&mut Ok(())).context("error sending set dns servers response")
-            } else {
-                Err(anyhow::anyhow!("unknown request = {:?}", req))
-            }
-        }
-
         let (mut netcfg, mut servers) = test_netcfg(false /* with_dhcpv4_client_provider */)
             .expect("error creating test netcfg");
         let mut dns_watchers = DnsServerWatchers::empty();
 
         // Mock a fake DNS update from the netstack.
         let netstack_servers = vec![DNS_SERVER1];
-        let ((), ()) = future::try_join(
-            netcfg
-                .update_dns_servers(
-                    DnsServersUpdateSource::Netstack,
-                    vec![fnet_name::DnsServer_ {
-                        address: Some(DNS_SERVER1),
-                        source: Some(fnet_name::DnsServerSource::StaticSource(
-                            fnet_name::StaticDnsServerSource::EMPTY,
-                        )),
-                        ..fnet_name::DnsServer_::EMPTY
-                    }],
-                )
-                .map(Ok),
-            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
-                .map(|r| r.context("error running lookup admin")),
+        let ((), ()) = future::join(
+            netcfg.update_dns_servers(
+                DnsServersUpdateSource::Netstack,
+                vec![fnet_name::DnsServer_ {
+                    address: Some(DNS_SERVER1),
+                    source: Some(fnet_name::DnsServerSource::StaticSource(
+                        fnet_name::StaticDnsServerSource::EMPTY,
+                    )),
+                    ..fnet_name::DnsServer_::EMPTY
+                }],
+            ),
+            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
         )
-        .await
-        .expect("error setting netstack DNS servers");
+        .await;
 
         // Mock a new interface being discovered by NetCfg (we only need to make NetCfg aware of a
         // NIC with ID `INTERFACE_ID` to test DHCPv6).
@@ -3153,42 +3269,36 @@ mod tests {
         .expect("error checking for new client with sockaddr1");
 
         // Mock a fake DNS update from the DHCPv6 client.
-        let ((), ()) = future::try_join(
-            netcfg
-                .update_dns_servers(
-                    DHCPV6_DNS_SOURCE,
-                    vec![fnet_name::DnsServer_ {
-                        address: Some(DNS_SERVER2),
-                        source: Some(fnet_name::DnsServerSource::Dhcpv6(
-                            fnet_name::Dhcpv6DnsServerSource {
-                                source_interface: Some(INTERFACE_ID),
-                                ..fnet_name::Dhcpv6DnsServerSource::EMPTY
-                            },
-                        )),
-                        ..fnet_name::DnsServer_::EMPTY
-                    }],
-                )
-                .map(Ok),
-            run_lookup_admin_once(&mut servers.lookup_admin, &vec![DNS_SERVER2, DNS_SERVER1])
-                .map(|r| r.context("error running lookup admin")),
+        let ((), ()) = future::join(
+            netcfg.update_dns_servers(
+                DHCPV6_DNS_SOURCE,
+                vec![fnet_name::DnsServer_ {
+                    address: Some(DNS_SERVER2),
+                    source: Some(fnet_name::DnsServerSource::Dhcpv6(
+                        fnet_name::Dhcpv6DnsServerSource {
+                            source_interface: Some(INTERFACE_ID),
+                            ..fnet_name::Dhcpv6DnsServerSource::EMPTY
+                        },
+                    )),
+                    ..fnet_name::DnsServer_::EMPTY
+                }],
+            ),
+            run_lookup_admin_once(&mut servers.lookup_admin, &vec![DNS_SERVER2, DNS_SERVER1]),
         )
-        .await
-        .expect("error setting dhcpv6 DNS servers");
+        .await;
 
         // Not having any more link local IPv6 addresses should terminate the client.
-        let ((), ()) = future::try_join(
+        let ((), ()) = future::join(
             handle_interface_changed_event(
                 &mut netcfg,
                 &mut dns_watchers,
                 None,
                 Some(ipv6addrs(None)),
             )
-            .map(|r| r.context("error handling interface changed event with sockaddr1 removed")),
-            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
-                .map(|r| r.context("error running lookup admin")),
+            .map(|r| r.expect("error handling interface changed event with sockaddr1 removed")),
+            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
         )
-        .await
-        .expect("error handling client termination due to empty addresses");
+        .await;
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
 
@@ -3213,19 +3323,17 @@ mod tests {
         .expect("error checking for new client with sockaddr2");
 
         // Interface being down should terminate the client.
-        let ((), ()) = future::try_join(
+        let ((), ()) = future::join(
             handle_interface_changed_event(
                 &mut netcfg,
                 &mut dns_watchers,
                 Some(false), /* down */
                 None,
             )
-            .map(|r| r.context("error handling interface changed event with interface down")),
-            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
-                .map(|r| r.context("error running lookup admin")),
+            .map(|r| r.expect("error handling interface changed event with interface down")),
+            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
         )
-        .await
-        .expect("error handling client termination due to interface down");
+        .await;
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
 
@@ -3251,7 +3359,7 @@ mod tests {
 
         // Should start a new DHCPv6 client when we get an interface changed event that shows the
         // interface as up with a new link-local address.
-        let ((), ()) = future::try_join(
+        let ((), ()) = future::join(
             handle_interface_changed_event(
                 &mut netcfg,
                 &mut dns_watchers,
@@ -3259,15 +3367,11 @@ mod tests {
                 Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR1))),
             )
             .map(|r| {
-                r.context(
-                    "error handling interface change event with sockaddr1 replacing sockaddr2",
-                )
+                r.expect("error handling interface change event with sockaddr1 replacing sockaddr2")
             }),
-            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
-                .map(|r| r.context("error running lookup admin")),
+            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
         )
-        .await
-        .expect("error handling client termination due to address change");
+        .await;
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
         let _client_server: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
             &mut servers.dhcpv6_client_provider,
@@ -3280,16 +3384,13 @@ mod tests {
         .expect("error checking for new client with sockaddr1 after address change");
 
         // Complete the DNS server watcher then start a new one.
-        let ((), ()) = future::try_join(
+        let ((), ()) = future::join(
             netcfg
                 .handle_dns_server_watcher_done(DHCPV6_DNS_SOURCE, &mut dns_watchers)
-                .map(|r| r.context("error handling completion of dns server watcher"))
-                .map_err(Into::into),
-            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
-                .map(|r| r.context("error running lookup admin")),
+                .map(|r| r.expect("error handling completion of dns server watcher")),
+            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
         )
-        .await
-        .expect("error handling DNS server watcher completion");
+        .await;
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         let () = handle_interface_changed_event(
             &mut netcfg,
@@ -3310,20 +3411,17 @@ mod tests {
         .expect("error checking for new client with sockaddr2 after completing dns watcher");
 
         // An event that indicates the interface is removed should stop the client.
-        let ((), ()) = future::try_join(
+        let ((), ()) = future::join(
             netcfg
                 .handle_interface_watcher_event(
                     fnet_interfaces::Event::Removed(INTERFACE_ID),
                     &mut dns_watchers,
                     &mut virtualization::Stub,
                 )
-                .map(|r| r.context("error handling interface removed event"))
-                .map_err(Into::into),
-            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers)
-                .map(|r| r.context("error running lookup admin")),
+                .map(|r| r.expect("error handling interface removed event")),
+            run_lookup_admin_once(&mut servers.lookup_admin, &netstack_servers),
         )
-        .await
-        .expect("error handling client termination due to interface removal");
+        .await;
         assert!(!dns_watchers.contains_key(&DHCPV6_DNS_SOURCE), "should not have a watcher");
         assert_matches::assert_matches!(client_server.try_next().await, Ok(None));
         assert!(!netcfg.interface_states.contains_key(&INTERFACE_ID));
