@@ -40,8 +40,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/connectivity/bluetooth/profiles/bt-device-id:*",
   "//src/connectivity/bluetooth/tools/bt-bredr-profile:*",
   "//src/connectivity/bluetooth/tools/bt-snoop:*",
-  "//src/connectivity/location/emergency:*",
-  "//src/connectivity/location/regulatory_region:*",
   "//src/sys/pkg/bin/system-updater:*",
 ]
 
