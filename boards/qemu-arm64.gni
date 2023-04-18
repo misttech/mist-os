@@ -30,4 +30,5 @@ board_is_emu = true
 board_is_phys = false
 
 images_config_label = "//boards/images:qemu-arm64"
+partitions_config_label = "//boards/partitions:default"
 zedboot_images_config_label = "//boards/images:zedboot_qemu"
