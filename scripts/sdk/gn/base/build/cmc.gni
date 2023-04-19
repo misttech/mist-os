@@ -17,7 +17,7 @@ declare_args() {
 # Example:
 #
 # ```
-# _cmc_tool("validate_cmx") {
+# _cmc_tool("validate") {
 #   inputs = [ manifest ]
 #   outputs = [ stamp_file ]
 #
@@ -81,7 +81,7 @@ template("_cmc_tool") {
   }
 }
 
-# Compiles a Components Framework v2 manifest (.cml) file to .cm
+# Compiles a Components Framework manifest (.cml) file to .cm
 #
 # Example:
 #
@@ -95,7 +95,7 @@ template("_cmc_tool") {
 # Parameters:
 #
 #   manifest (required)
-#     The input Component Framework v2 manifest source (.cml) file.
+#     The input Component Framework manifest source (.cml) file.
 #     The file must have the extension ".cml".
 #
 #   output_name (optional)
@@ -187,20 +187,22 @@ template("cmc_compile") {
 
 # Validates a component manifest file
 #
-# The cmc_validate template will ensure that a given cmx file is conformant to
-# the cmx schema, as defined by //tools/cmc/schema.json. A stamp file is
-# generated to mark that a given cmx file has passed.
+# The cmc_validate template will ensure that a given file is a valid
+# CML component manifest. A stamp file is generated to mark that a
+# given file has passed.
 #
 # Parameters:
 #
 #   manifest (required)
-#     [file] The path to the cmx file that is to be validated
+#     [file] The path to the file that is to be validated
 #
 #   deps
 #   testonly
 #   visibility
 #
 template("cmc_validate") {
+  assert(defined(invoker.manifest), "manifest file required")
+
   _cmc_tool(target_name) {
     forward_variables_from(invoker,
                            [
@@ -210,12 +212,8 @@ template("cmc_validate") {
                              "visibility",
                            ])
 
-    # Use the manifest name here so that it can be inferred in
-    # prepare_package_inputs.py
-    _manifest_name = get_path_info(manifest, "name")
-    stamp_file = "$target_gen_dir/$_manifest_name.cmx.verified"
-
-    assert(defined(manifest), "manifest file required")
+    _manifest_file = get_path_info(manifest, "file")
+    stamp_file = "$target_gen_dir/$_manifest_file.validated"
 
     inputs = [ manifest ]
 
@@ -239,22 +237,22 @@ template("cmc_validate") {
 # Example
 #
 # ```
-#   cmc_merge("combined_cmx") {
-#     sources = ["sandbox.cmx", "services.cmx", "program.cmx"]
-#     output_name = "my-component.cmx"
+#   cmc_merge("combined_cml") {
+#     sources = ["sandbox.cml", "services.cml", "program.cml"]
+#     output_name = "my-component.cml"
 #   }
 # ```
 #
 # Parameters
 #
 #   sources
-#     The list of cmx files to merge together.
+#     The list of cml files to merge together.
 #
 #     Type: list of strings (filepath)
 #
 #   output_name [optional]
-#     The name of the merged cmx file. This file is created in $target_out_dir.
-#     If not specified, $target_name.cmx is used.
+#     The name of the merged cml file. This file is created in $target_out_dir.
+#     If not specified, $target_name.cml is used.
 #
 #     Type: string
 #
@@ -274,7 +272,7 @@ template("cmc_merge") {
                              "visibility",
                            ])
     if (!defined(output_name)) {
-      output_name = "${target_name}.cmx"
+      output_name = "${target_name}.cml"
     }
 
     merged_output = "${target_out_dir}/${output_name}"

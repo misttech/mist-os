@@ -77,8 +77,7 @@ fi
 # Check for component manifest
 COMPONENT_MANIFEST_ERR=0
 NUM_CM_FILES=$(find "$FAR_EXTRACTED_META_DIR" -name "*.cm" | wc -l)
-NUM_CMX_FILES=$(find "$FAR_EXTRACTED_META_DIR" -name "*.cmx" | wc -l)
-if [ "$NUM_CM_FILES" -eq 0 ] && [ "$NUM_CMX_FILES" -eq 0 ]; then
+if [ "$NUM_CM_FILES" -eq 0 ]; then
   echo "**** Failed to find component manifest in ${FAR_FILE} ****"
   COMPONENT_MANIFEST_ERR=1
 fi
