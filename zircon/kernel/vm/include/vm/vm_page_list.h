@@ -305,16 +305,6 @@ class VmPageOrMarker {
   };
   using IntervalDirtyState = ZeroRange::DirtyState;
 
-  // Only support creation of zero interval type for now.
-  // TODO(fxbug.dev/122842): Make this private and only expose it to VmPageList so that an external
-  // caller cannot arbitrarily create interval sentinels.
-  [[nodiscard]] static VmPageOrMarker ZeroInterval(IntervalSentinel sentinel,
-                                                   IntervalDirtyState state) {
-    uint64_t sentinel_bits = static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
-    uint64_t type_bits = static_cast<uint64_t>(IntervalType::Zero) << kIntervalTypeShift;
-    return VmPageOrMarker(ZeroRange(0, state).value() | type_bits | sentinel_bits | kIntervalType);
-  }
-
   // Getters and setters for the interval type.
   bool IsIntervalStart() const {
     return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Start;
@@ -326,26 +316,6 @@ class VmPageOrMarker {
     return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Slot;
   }
   bool IsIntervalZero() const { return IsInterval() && GetIntervalType() == IntervalType::Zero; }
-
-  // Change the interval sentinel type for an existing interval, while preserving the rest of the
-  // original state. Only valid to call on an existing interval type. The only permissible
-  // transitions are from Slot to Start/End and vice versa, as these are the only valid transitions
-  // when extending or clipping intervals.
-  void ChangeIntervalSentinel(IntervalSentinel new_sentinel) {
-#if ZX_DEBUG_ASSERT_IMPLEMENTED
-    DEBUG_ASSERT(IsInterval());
-    auto old_sentinel = GetIntervalSentinel();
-    DEBUG_ASSERT(old_sentinel != new_sentinel);
-    if (old_sentinel == IntervalSentinel::Start || old_sentinel == IntervalSentinel::End) {
-      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Slot);
-    } else {
-      DEBUG_ASSERT(old_sentinel == IntervalSentinel::Slot);
-      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Start ||
-                   new_sentinel == IntervalSentinel::End);
-    }
-#endif
-    SetIntervalSentinel(new_sentinel);
-  }
 
   // Getters and setter for the zero interval type.
   bool IsZeroIntervalClean() const {
@@ -432,6 +402,38 @@ class VmPageOrMarker {
   static constexpr uint64_t kIntervalBits = kTypeBits + kIntervalSentinelBits + kIntervalTypeBits;
   static_assert(ZeroRange::kAlignBits == kIntervalBits);
 
+  // Only support creation of zero interval type for now.
+  // Private and only friended with VmPageList so that an external caller cannot arbitrarily create
+  // interval sentinels.
+  [[nodiscard]] static VmPageOrMarker ZeroInterval(IntervalSentinel sentinel,
+                                                   IntervalDirtyState state) {
+    uint64_t sentinel_bits = static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
+    uint64_t type_bits = static_cast<uint64_t>(IntervalType::Zero) << kIntervalTypeShift;
+    return VmPageOrMarker(ZeroRange(0, state).value() | type_bits | sentinel_bits | kIntervalType);
+  }
+
+  // Change the interval sentinel type for an existing interval, while preserving the rest of the
+  // original state. Only valid to call on an existing interval type. The only permissible
+  // transitions are from Slot to Start/End and vice versa, as these are the only valid transitions
+  // when extending or clipping intervals.
+  // Private and only friended with VmPageList so that an external caller cannot arbitrarily
+  // manipulate interval sentinels.
+  void ChangeIntervalSentinel(IntervalSentinel new_sentinel) {
+#if ZX_DEBUG_ASSERT_IMPLEMENTED
+    DEBUG_ASSERT(IsInterval());
+    auto old_sentinel = GetIntervalSentinel();
+    DEBUG_ASSERT(old_sentinel != new_sentinel);
+    if (old_sentinel == IntervalSentinel::Start || old_sentinel == IntervalSentinel::End) {
+      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(old_sentinel == IntervalSentinel::Slot);
+      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Start ||
+                   new_sentinel == IntervalSentinel::End);
+    }
+#endif
+    SetIntervalSentinel(new_sentinel);
+  }
+
   uint64_t GetType() const { return raw_ & BIT_MASK(kTypeBits); }
 
   uint64_t Release() {
@@ -441,6 +443,8 @@ class VmPageOrMarker {
   }
 
   uint64_t raw_;
+
+  friend VmPageList;
 };
 
 // Limited reference to a VmPageOrMarker. This reference provides unrestricted const access to the
