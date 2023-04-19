@@ -219,7 +219,7 @@ void riscv64_breakpoint_handler(int64_t cause, uint64_t tval, struct iframe_t* f
     exception_die(frame, cause, tval,
                   "ebreak instruction exception in kernel: PC at %#" PRIx64 "\n", frame->regs.pc);
   }
-  try_dispatch_user_exception(ZX_EXCP_HW_BREAKPOINT, cause, tval, frame, 0);
+  try_dispatch_user_exception(ZX_EXCP_SW_BREAKPOINT, cause, tval, frame, 0);
 }
 
 void riscv64_syscall_handler(struct iframe_t* frame) {
