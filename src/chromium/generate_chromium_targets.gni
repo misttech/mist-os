@@ -325,14 +325,6 @@ if (is_host) {
       log_settings = {
         max_severity = "ERROR"
       }
-      disabled_tests = [
-        # TODO(fxbug.dev/90466): Remove this once the prebuilt from chromium
-        # without this test has rolled into fuchsia
-        {
-          component_name = "web_runner_integration_tests.cm"
-          package = "web_runner_integration_tests"
-        },
-      ]
       deps = [ ":web_engine" ]
     }
 
