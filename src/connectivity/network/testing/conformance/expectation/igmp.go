@@ -31,3 +31,27 @@ var igmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{6, 2}:  Pass,
 	{6, 8}:  Pass,
 }
+
+var igmpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
+	{1, 1}:  Pass,
+	{2, 9}:  Pass,
+	{2, 10}: Pass,
+	{2, 11}: Pass,
+	{3, 1}:  Pass,
+	{3, 4}:  Pass,
+	{3, 5}:  Pass,
+	// TODO(https://fxbug.dev/104720): Investigate flake.
+	{3, 6}: Flaky,
+	{3, 7}: Pass,
+	{5, 1}: Pass,
+	{5, 2}: Pass,
+	{5, 3}: Pass,
+	{5, 5}: Pass,
+	{5, 7}: Pass,
+	{5, 8}: Fail,
+	{5, 9}: Pass,
+	// TODO(https://fxbug.dev/118202): Fix.
+	{5, 11}: Fail,
+	{6, 2}:  Pass,
+	{6, 8}:  Pass,
+}

@@ -59,6 +59,7 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 
 	// keep-sorted start
 	addAllExpectations("arp", platform.NS3, arpExpectationsNS3)
+	addAllExpectations("igmp", platform.NS3, igmpExpectationsNS3)
 	addAllExpectations("ip", platform.NS3, ipExpectationsNS3)
 	addAllExpectations("ipv6", platform.NS3, ipv6ExpectationsNS3)
 	addAllExpectations("tcp-advanced", platform.NS3, tcpAdvancedExpectationsNS3)
