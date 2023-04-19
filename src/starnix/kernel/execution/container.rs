@@ -74,7 +74,6 @@ fn get_config() -> ConfigWrapper {
         let apex_hack = get_config_strvec(&program_dict, "apex_hack").unwrap_or_default();
         let features = get_config_strvec(&program_dict, "features").unwrap_or_default();
         let init = get_config_strvec(&program_dict, "init").unwrap_or_default();
-        let init_user = get_config_str(&program_dict, "init_user").unwrap_or_default();
         let kernel_cmdline = get_config_str(&program_dict, "kernel_cmdline").unwrap_or_default();
         let mounts = get_config_strvec(&program_dict, "mounts").unwrap_or_default();
         let name = get_config_str(&program_dict, "name").unwrap_or_default();
@@ -94,7 +93,6 @@ fn get_config() -> ConfigWrapper {
                 apex_hack,
                 features,
                 init,
-                init_user,
                 kernel_cmdline,
                 mounts,
                 name,
@@ -376,7 +374,7 @@ fn create_task(
 }
 
 fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<CurrentTask, Error> {
-    let credentials = Credentials::from_passwd(&config.init_user)?;
+    let credentials = Credentials::root();
     let name = if config.init.is_empty() { "" } else { &config.init[0] };
     create_task(kernel, None, name, credentials)
 }

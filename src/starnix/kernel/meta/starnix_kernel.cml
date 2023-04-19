@@ -106,12 +106,6 @@
             max_count: 100,
         },
 
-        // The user string used when creating the `init` task.
-        init_user: {
-            type: "string",
-            max_size: 256,
-        },
-
         // The command line arguments for the kernel.
         kernel_cmdline: {
             type: "string",

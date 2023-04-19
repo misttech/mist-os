@@ -50,7 +50,6 @@ appropriate container configuration values. For example,
             "test_data",
         ],
         init: [],
-        init_user: "root:x:0:0",
         kernel_cmdline: "",
         mounts: [
             "/:ext4:data/system.img",

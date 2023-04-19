@@ -9,6 +9,6 @@
             "--noediting",
             "-i",
         ],
-        user: "root:x:0:0",
+        uid: "0",
     },
 }

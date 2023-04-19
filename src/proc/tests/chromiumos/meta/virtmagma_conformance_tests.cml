@@ -8,7 +8,7 @@
     ],
     program: {
         binary: "data/tests/virtmagma_conformance_tests",
-        user: "root:x:0:0",
+        uid: "0",
         component_features: [ "magma" ],
     },
 }

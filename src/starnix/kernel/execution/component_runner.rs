@@ -119,8 +119,8 @@ pub async fn start_component(
         .chdir(&current_task, cwd)
         .map_err(|e| anyhow!("Failed to set cwd to package directory: {:?}", e))?;
 
-    let user_passwd = get_program_string(&start_info, "user").unwrap_or("fuchsia:x:42:42");
-    let credentials = Credentials::from_passwd(user_passwd)?;
+    let uid = get_program_string(&start_info, "uid").unwrap_or("42").parse()?;
+    let credentials = Credentials::with_ids(uid, uid);
     current_task.set_creds(credentials);
 
     if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {

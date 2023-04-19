@@ -8,7 +8,7 @@
     ],
     program: {
         binary: "/vendor/data/nativetest64/adbd_test/adbd_test",
-        user: "root:x:0:0",
+        uid: "0",
         test_type: "gtest",
     },
 }

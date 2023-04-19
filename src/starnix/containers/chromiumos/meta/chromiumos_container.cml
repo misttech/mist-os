@@ -8,7 +8,6 @@
         apex_hack: [],
         features: [ "magma" ],
         init: [],
-        init_user: "root:x:0:0",
         kernel_cmdline: "",
         mounts: [
             "/:ext4:data/system.img",

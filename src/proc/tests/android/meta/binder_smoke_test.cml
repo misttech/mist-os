@@ -8,6 +8,6 @@
     ],
     program: {
         binary: "data/tests/binder_smoke_test",
-        user: "root:x:0:0",
+        uid: "0",
     },
 }

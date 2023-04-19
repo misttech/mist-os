@@ -8,7 +8,7 @@
     ],
     program: {
         binary: "data/tests/syscalls_test_bin",
-        user: "fuchsia:x:0:0",
+        uid: "0",
         test_type: "gtest",
     },
     use: [

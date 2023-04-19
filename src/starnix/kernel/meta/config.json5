@@ -2,7 +2,6 @@
     apex_hack: [],
     features: [],
     init: [],
-    init_user: "root:x:0:0",
     kernel_cmdline: "",
     mounts: [
         "/:remotefs",

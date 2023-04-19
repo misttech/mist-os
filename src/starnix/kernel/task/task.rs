@@ -1411,8 +1411,7 @@ mod test {
     fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
         assert!(current_task.creds().has_capability(CAP_SYS_ADMIN));
-        current_task
-            .set_creds(Credentials::from_passwd("foo:x:1:1").expect("Credentials::from_passwd"));
+        current_task.set_creds(Credentials::with_ids(1, 1));
         assert!(!current_task.creds().has_capability(CAP_SYS_ADMIN));
     }
 }
