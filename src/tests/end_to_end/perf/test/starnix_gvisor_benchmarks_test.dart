@@ -41,7 +41,7 @@ void main(List<String> args) {
     'read_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.read.txt',
     'sched_yield_benchmark.cm':
         'fuchsia.starnix.gvisor_benchmarks.sched_yield.txt',
-    // 'send_recv_benchmar'k - not passing
+    'send_recv_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.send_recv.txt',
     'seqwrite_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.seqwrite.txt',
     'signal_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.signal.txt',
     'sleep_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.sleep.txt',
@@ -59,6 +59,13 @@ void main(List<String> args) {
         '|BM_ProcessSwitch'
         '|BM_ThreadStart'
         '|BM_ProcessLifecycle"',
+    // TODO(b/275745984): Add BM_RecvmsgWithControlBuf and
+    // variants of BM_SendmsgTCP when they pass.
+    'send_recv_benchmark.cm': '--benchmark_filter_internal="'
+        'BM_Recvmsg/real_time'
+        '|BM_Sendmsg/real_time'
+        '|BM_Recvfrom/real_time'
+        '|BM_Sendto/real_time"',
     // The following benchmarks run with large ranges of arguments.
     // Run a subset of them.
     'futex_benchmark.cm': '--benchmark_filter_internal="'

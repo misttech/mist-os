@@ -223,6 +223,7 @@ if (is_host) {
     "fuchsia.starnix.gvisor_benchmarks.randread.txt",
     "fuchsia.starnix.gvisor_benchmarks.read.txt",
     "fuchsia.starnix.gvisor_benchmarks.sched_yield.txt",
+    "fuchsia.starnix.gvisor_benchmarks.send_recv.txt",
     "fuchsia.starnix.gvisor_benchmarks.seqwrite.txt",
     "fuchsia.starnix.gvisor_benchmarks.signal.txt",
     "fuchsia.starnix.gvisor_benchmarks.sleep.txt",
