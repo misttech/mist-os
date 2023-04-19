@@ -1,0 +1,21 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.overnet;
+
+using zx;
+
+protocol Callback {
+    // Called when a new link is ready to be serviced. RCS should serve a circuit link over the
+    // given socket.
+    NewLink(resource struct {
+        socket zx.handle:SOCKET;
+    }) -> ();
+};
+
+protocol Device {
+    // Called by RCS to set a callback through which RCS can receive sockets.
+    SetCallback(resource struct {
+        callback client_end:Callback;
+    }) -> ();
+};

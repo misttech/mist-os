@@ -39,5 +39,6 @@ group("tests_no_e2e") {
     "overnetstack:tests",
     "tests:tests_no_e2e",
     "tools:tests",
+    "usb:tests",
   ]
 }
