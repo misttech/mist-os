@@ -49,7 +49,10 @@ pub async fn start_component(
         start_info.ns,
     );
 
+    // TODO(fxbug.dev/125782): We leak the directory created by this function.
     let component_path = generate_component_path(&container)?;
+
+    let mut mount_record = MountRecord::default();
 
     let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
 
@@ -62,11 +65,15 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount(&container, &dir_proxy, &dir_path)?;
+                    mount_record.mount_remote(&container, &dir_proxy, &dir_path)?;
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount(&container, &dir_proxy, &format!("{component_path}/{dir_path}"))?;
+                    mount_record.mount_remote(
+                        &container,
+                        &dir_proxy,
+                        &format!("{component_path}/{dir_path}"),
+                    )?;
                     if dir_path == "/pkg" {
                         maybe_pkg = Some(dir_proxy);
                     }
@@ -120,7 +127,7 @@ pub async fn start_component(
         for mount in local_mounts.iter() {
             let (mount_point, child_fs) = create_filesystem_from_spec(&current_task, &pkg, mount)?;
             let mount_point = current_task.lookup_path_from_root(mount_point)?;
-            mount_point.mount(child_fs, MountFlags::empty())?;
+            mount_record.mount(mount_point, child_fs, MountFlags::empty())?;
         }
     }
 
@@ -137,13 +144,16 @@ pub async fn start_component(
             log_error!(current_task, "failed to set component features for {} - {:?}", url, e);
         });
 
-    execute_task(current_task, |result| {
+    execute_task(current_task, move |result| {
         let _ = match result {
             Ok(ExitStatus::Exit(0)) => controller.close_with_epitaph(zx::Status::OK),
             _ => controller.close_with_epitaph(zx::Status::from_raw(
                 fcomponent::Error::InstanceDied.into_primitive() as i32,
             )),
         };
+
+        // Unmount all the directories for this component.
+        std::mem::drop(mount_record);
     });
 
     Ok(())
@@ -176,46 +186,87 @@ fn generate_component_path(container: &Container) -> Result<String, Error> {
     Ok(component_path)
 }
 
-fn mount(
-    container: &Container,
-    directory: &fio::DirectorySynchronousProxy,
-    path: &str,
-) -> Result<(), Error> {
-    // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
-    // Iterate through each component directory starting from the parent and
-    // create it if it doesn't exist.
-    let mut current_node = container.system_task.lookup_path_from_root(b".")?;
-    let mut context = LookupContext::default();
+/// A record of the mounts created when starting a component.
+///
+/// When the record is dropped, the mounts are unmounted.
+#[derive(Default)]
+struct MountRecord {
+    /// The namespace nodes at which we have crated mounts for this component.
+    mounts: Vec<NamespaceNode>,
+}
 
-    // Extract each component using Path::new(path).components(). For example,
-    // Path::new("/foo/bar").components() will return [RootDir, Normal("foo"), Normal("bar")].
-    // We're not interested in the RootDir, so we drop the prefix "/" if it exists.
-    let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
-
-    for sub_dir in Path::new(path).components() {
-        let sub_dir = sub_dir.as_os_str().as_bytes();
-
-        current_node = match current_node.create_node(
-            &container.system_task,
-            sub_dir,
-            mode!(IFDIR, 0o755),
-            DeviceType::NONE,
-        ) {
-            Ok(node) => node,
-            Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                current_node.lookup_child(&container.system_task, &mut context, sub_dir)?
-            }
-            Err(e) => bail!(e),
-        };
+impl MountRecord {
+    fn mount(
+        &mut self,
+        mount_point: NamespaceNode,
+        what: WhatToMount,
+        flags: MountFlags,
+    ) -> Result<(), Errno> {
+        mount_point.mount(what, flags)?;
+        self.mounts.push(mount_point);
+        Ok(())
     }
 
-    let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
-    zx::Status::ok(status)?;
+    fn mount_remote(
+        &mut self,
+        container: &Container,
+        directory: &fio::DirectorySynchronousProxy,
+        path: &str,
+    ) -> Result<(), Error> {
+        // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
+        // Iterate through each component directory starting from the parent and
+        // create it if it doesn't exist.
+        let mut current_node = container.system_task.lookup_path_from_root(b".")?;
+        let mut context = LookupContext::default();
 
-    let (client_end, server_end) = zx::Channel::create();
-    directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
+        // Extract each component using Path::new(path).components(). For example,
+        // Path::new("/foo/bar").components() will return [RootDir, Normal("foo"), Normal("bar")].
+        // We're not interested in the RootDir, so we drop the prefix "/" if it exists.
+        let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
 
-    let fs = RemoteFs::new_fs(&container.kernel, client_end, rights)?;
-    current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
-    Ok(())
+        for sub_dir in Path::new(path).components() {
+            let sub_dir = sub_dir.as_os_str().as_bytes();
+
+            current_node = match current_node.create_node(
+                &container.system_task,
+                sub_dir,
+                mode!(IFDIR, 0o755),
+                DeviceType::NONE,
+            ) {
+                Ok(node) => node,
+                Err(errno) if errno == EEXIST || errno == ENOTDIR => {
+                    current_node.lookup_child(&container.system_task, &mut context, sub_dir)?
+                }
+                Err(e) => bail!(e),
+            };
+        }
+
+        let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
+        zx::Status::ok(status)?;
+
+        let (client_end, server_end) = zx::Channel::create();
+        directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
+
+        let fs = RemoteFs::new_fs(&container.kernel, client_end, rights)?;
+        current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
+        self.mounts.push(current_node);
+
+        Ok(())
+    }
+
+    fn unmount(&mut self) -> Result<(), Errno> {
+        while let Some(node) = self.mounts.pop() {
+            node.unmount()?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for MountRecord {
+    fn drop(&mut self) {
+        match self.unmount() {
+            Ok(()) => {}
+            Err(e) => log_error!("failed to unmount during component exit: {:?}", e),
+        }
+    }
 }
