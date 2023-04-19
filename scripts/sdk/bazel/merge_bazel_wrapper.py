@@ -48,15 +48,15 @@ def merge_fuchsia_select(source_file: str, dest_file: str) -> bool:
     for (select_source, select_dest) in zip(source_list, dest_list):
         dict_source = ast.literal_eval(select_source)
         dict_dest = ast.literal_eval(select_dest)
-        dict_source.update(dict_dest)
-        merged_dict_str = str(dict_source).strip("{}")
-        merged_map[select_source.strip("{}").strip()] = merged_dict_str
+        dict_dest.update(dict_source)
+        merged_dict_str = str(dict_dest).strip("{}")
+        merged_map[select_dest.strip("{}").strip()] = merged_dict_str
 
     for src in merged_map:
-        source = source.replace(src, merged_map[src])
+        dest = dest.replace(src, merged_map[src])
 
-    with open(source_file, "w") as f:
-        f.write(source)
+    with open(dest_file, "w") as f:
+        f.write(dest)
 
     return True
 
