@@ -6,6 +6,10 @@ use {
     anyhow::Error,
     argh::FromArgs,
     async_utils::stream::{StreamItem, WithEpitaph},
+    component_debug::{
+        dirs::{open_instance_dir_root_readable, OpenDirType},
+        lifecycle::start_instance,
+    },
     fidl::endpoints::{create_proxy, ControlHandle, RequestStream},
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::{
@@ -86,23 +90,18 @@ async fn run_component_controller(
 ) -> Result<(), Error> {
     let is_test = component_is_test(&start_info);
 
-    let relative_moniker = format!("./{}:{}", RUNNER_COLLECTION, nested_runner.child_name());
+    let moniker = format!("./{}:{}", RUNNER_COLLECTION, nested_runner.child_name());
+    let moniker = moniker.as_str().try_into().expect("nested runner moniker parse");
 
     let controller = connect_to_protocol::<fsys::LifecycleControllerMarker>()?;
-    controller.start(&relative_moniker).await?.expect("nested runer could not be started");
+    start_instance(&controller, &moniker).await.expect("nested runner could not be started");
 
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>()?;
-    let resolved_dirs = realm_query
-        .get_instance_directories(&relative_moniker)
-        .await?
-        .unwrap()
-        .expect("nested runner was not resolved");
-    let execution_dirs = resolved_dirs.execution_dirs.expect("nested runner was not started");
-    let out_dir = execution_dirs.out_dir.expect("nested runner does not have out dir");
-    let out_dir = out_dir.into_proxy().unwrap();
-
+    let out_dir = open_instance_dir_root_readable(&moniker, OpenDirType::Outgoing, &realm_query)
+        .await
+        .expect("could not connect to ComponentRunner protocol of nested runner");
     let component_runner =
-        connect_to_protocol_at_dir_svc::<fcrunner::ComponentRunnerMarker>(&out_dir)?;
+        connect_to_protocol_at_dir_svc::<fcrunner::ComponentRunnerMarker>(&out_dir).unwrap();
     let (nested_controller, server_end) = create_proxy::<fcrunner::ComponentControllerMarker>()?;
     component_runner.start(start_info, server_end)?;
     proxy_component_controller(nested_controller, request_stream, is_test).await
