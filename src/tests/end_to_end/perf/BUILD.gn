@@ -215,6 +215,7 @@ if (is_host) {
     "fuchsia.starnix.gvisor_benchmarks.futex.txt",
     "fuchsia.starnix.gvisor_benchmarks.getdents.txt",
     "fuchsia.starnix.gvisor_benchmarks.getpid.txt",
+    "fuchsia.starnix.gvisor_benchmarks.gettid.txt",
     "fuchsia.starnix.gvisor_benchmarks.mapping.txt",
     "fuchsia.starnix.gvisor_benchmarks.open_read_close.txt",
     "fuchsia.starnix.gvisor_benchmarks.open.txt",

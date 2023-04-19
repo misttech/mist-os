@@ -31,7 +31,7 @@ void main(List<String> args) {
     'futex_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.futex.txt',
     'getdents_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.getdents.txt',
     'getpid_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.getpid.txt',
-    // 'gettid_benchmark' - long running
+    'gettid_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.gettid.txt',
     'mapping_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.mapping.txt',
     'open_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.open.txt',
     'open_read_close_benchmark.cm':
@@ -68,6 +68,12 @@ void main(List<String> args) {
         '|BM_FutexWakeNop'
         '|BM_FutexWaitNop'
         '|BM_FutexWaitRealtimeDeadline"',
+    'gettid_benchmark.cm': '--benchmark_filter_internal="'
+        r'(BM_Gettid/real_time/threads:1'
+        r'|BM_Gettid/real_time/threads:2'
+        r'|BM_Gettid/real_time/threads:4'
+        r'|BM_Gettid/real_time/threads:8'
+        r'|BM_Gettid/real_time/threads:16)$"',
   };
 
   benchmarks.forEach((String componentName, String expectedMetricNamesFile) {
