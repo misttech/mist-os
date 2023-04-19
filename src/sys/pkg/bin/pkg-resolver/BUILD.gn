@@ -204,7 +204,7 @@ structured_config_values = {
   fetch_delivery_blob = false
   delivery_blob_fallback = false
   allow_local_mirror = false
-  create_ota_channel_rewrite_rule = true
+  create_ota_channel_rewrite_rule = false
 
   # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
   # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf
