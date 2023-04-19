@@ -5185,9 +5185,10 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   }
   VmCompression* compression = pmm_page_compression();
 
-  // TODO(fxbug.dev/122842): Ensure that the range does not entirely fall in an interval.
+  bool found_page = false;
   page_list_.ForEveryPageInRangeMutable(
-      [&compression, this](VmPageOrMarkerRef p, uint64_t off) {
+      [&compression, &found_page, this](VmPageOrMarkerRef p, uint64_t off) {
+        found_page = true;
         // Splice lists do not support page intervals.
         ASSERT(!p->IsInterval());
         if (p->IsPage()) {
@@ -5210,6 +5211,10 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
         return ZX_ERR_NEXT;
       },
       offset, offset + len);
+
+  // If we did not find any pages, we could either be entirely inside a gap or an interval. Make
+  // sure we're not inside an interval; checking a single offset for membership should suffice.
+  ASSERT(found_page || !page_list_.IsOffsetInZeroInterval(offset));
 
   *pages = page_list_.TakePages(offset, len);
 
@@ -6441,10 +6446,12 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_
                                                    non_loaned_len);
   }
 
-  // TODO(fxbug.dev/122842): Also return ZX_ERR_BAD_STATE if the entire range lies in an interval.
   *non_loaned_len = 0;
-  return page_list_.ForEveryPageAndGapInRange(
-      [page_request, non_loaned_len, this](const VmPageOrMarker* p, uint64_t off) {
+  bool found_page_or_gap = false;
+  zx_status_t status = page_list_.ForEveryPageAndGapInRange(
+      [page_request, non_loaned_len, &found_page_or_gap, this](const VmPageOrMarker* p,
+                                                               uint64_t off) {
+        found_page_or_gap = true;
         // We only expect committed pages in the specified range.
         if (p->IsMarker() || p->IsReference() || p->IsInterval()) {
           return ZX_ERR_BAD_STATE;
@@ -6469,11 +6476,24 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_
         *non_loaned_len += PAGE_SIZE;
         return ZX_ERR_NEXT;
       },
-      [](uint64_t start, uint64_t end) {
+      [&found_page_or_gap](uint64_t start, uint64_t end) {
+        found_page_or_gap = true;
         // We only expect committed pages in the specified range.
         return ZX_ERR_BAD_STATE;
       },
       offset, offset + len);
+
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // If we did not find a page or a gap, the entire range fell inside an interval. We only expect
+  // committed pages in the range.
+  if (!found_page_or_gap) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  return ZX_OK;
 }
 
 zx_status_t VmCowPages::ReplacePageWithLoaned(vm_page_t* before_page, uint64_t offset) {
