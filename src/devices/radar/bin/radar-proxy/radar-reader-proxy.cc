@@ -16,7 +16,7 @@ RadarReaderProxy::~RadarReaderProxy() {
 void RadarReaderProxy::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
   if (radar_client_) {
     // Our driver client is bound, so we must have already set these fields.
-    ZX_DEBUG_ASSERT(burst_size_);
+    ZX_DEBUG_ASSERT(burst_properties_);
 
     instances_.emplace_back(std::make_unique<ReaderInstance>(this, std::move(request.server())));
     completer.Reply(fit::ok());
@@ -41,7 +41,7 @@ void RadarReaderProxy::on_fidl_error(const fidl::UnbindInfo info) {
 // TODO(fxbug.dev/99924): Remove this after all servers have switched to OnBurst2.
 void RadarReaderProxy::OnBurst(
     fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst>& event) {
-  ZX_DEBUG_ASSERT(burst_size_);
+  ZX_DEBUG_ASSERT(burst_properties_);
 
   const auto& response = event.result().response();
   if (!response || response->burst().vmo_id() >= vmo_pool_.size()) {
@@ -53,9 +53,9 @@ void RadarReaderProxy::OnBurst(
   }
 
   const uint32_t vmo_id = response->burst().vmo_id();
-  const auto* burst_data = reinterpret_cast<uint8_t*>(vmo_pool_[vmo_id].mapped_vmo.start());
+  const cpp20::span<const uint8_t> burst_data{vmo_pool_[vmo_id].start(), burst_properties_->size()};
   for (auto& instance : instances_) {
-    instance->SendBurst({burst_data, *burst_size_}, zx::time(response->burst().timestamp()));
+    instance->SendBurst(burst_data, zx::time(response->burst().timestamp()));
   }
 
   if (radar_client_) {
@@ -67,7 +67,7 @@ void RadarReaderProxy::OnBurst(
 
 void RadarReaderProxy::OnBurst2(
     fidl::Event<fuchsia_hardware_radar::RadarBurstReader::OnBurst2>& event) {
-  ZX_DEBUG_ASSERT(burst_size_);
+  ZX_DEBUG_ASSERT(burst_properties_);
 
   if (event.IsUnknown()) {
     HandleFatalError(ZX_ERR_BAD_STATE);
@@ -83,9 +83,9 @@ void RadarReaderProxy::OnBurst2(
   }
 
   const uint32_t vmo_id = event.burst()->vmo_id();
-  const auto* burst_data = reinterpret_cast<uint8_t*>(vmo_pool_[vmo_id].mapped_vmo.start());
+  const cpp20::span<const uint8_t> burst_data{vmo_pool_[vmo_id].start(), burst_properties_->size()};
   for (auto& instance : instances_) {
-    instance->SendBurst({burst_data, *burst_size_}, zx::time(event.burst()->timestamp()));
+    instance->SendBurst(burst_data, zx::time(event.burst()->timestamp()));
   }
 
   if (radar_client_) {
@@ -108,12 +108,13 @@ bool RadarReaderProxy::ValidateDevice(
 
   // If this is our first connection, save the burst size. If this is not our first connection, make
   // sure that the burst size reported by this device matches what we have saved.
-  const auto burst_size = reader->GetBurstSize();
-  if (burst_size.is_error() || (burst_size_ && *burst_size_ != burst_size->burst_size())) {
+  const auto burst_properties = reader->GetBurstProperties();
+  if (burst_properties.is_error() ||
+      (burst_properties_ && burst_properties_->size() != burst_properties->size())) {
     return false;
   }
-  if (!burst_size_) {
-    burst_size_ = burst_size->burst_size();
+  if (!burst_properties_) {
+    burst_properties_ = *burst_properties;
   }
 
   if (!vmo_pool_.empty()) {
@@ -171,7 +172,7 @@ void RadarReaderProxy::HandleFatalError(const zx_status_t status) {
 }
 
 void RadarReaderProxy::UpdateVmoCount(const size_t count) {
-  ZX_DEBUG_ASSERT(burst_size_);
+  ZX_DEBUG_ASSERT(burst_properties_);
 
   if (count <= vmo_pool_.size()) {
     return;
@@ -189,7 +190,7 @@ void RadarReaderProxy::UpdateVmoCount(const size_t count) {
 
     // The radar driver writes to these VMOs, so we only need read access.
     zx_status_t status =
-        vmo.mapped_vmo.CreateAndMap(*burst_size_, ZX_VM_PERM_READ, nullptr, &vmo.vmo);
+        vmo.mapped_vmo.CreateAndMap(burst_properties_->size(), ZX_VM_PERM_READ, nullptr, &vmo.vmo);
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to create and map VMO";
       HandleFatalError(status);
@@ -266,11 +267,18 @@ RadarReaderProxy::ReaderInstance::ReaderInstance(
                                [](ReaderInstance* instance, auto, auto) {
                                  instance->parent_->InstanceUnbound(instance);
                                })),
-      manager_(parent->burst_size_.value_or(0)) {}
+      manager_(parent->burst_properties_ ? parent->burst_properties_->size() : 0) {}
 
+// TODO(fxbug.dev/100020): Remove this after all clients have switched to GetBurstProperties.
 void RadarReaderProxy::ReaderInstance::GetBurstSize(GetBurstSizeCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(parent_->burst_size_);
-  completer.Reply(*parent_->burst_size_);
+  ZX_DEBUG_ASSERT(parent_->burst_properties_);
+  completer.Reply(parent_->burst_properties_->size());
+}
+
+void RadarReaderProxy::ReaderInstance::GetBurstProperties(
+    GetBurstPropertiesCompleter::Sync& completer) {
+  ZX_DEBUG_ASSERT(parent_->burst_properties_);
+  completer.Reply(*parent_->burst_properties_);
 }
 
 void RadarReaderProxy::ReaderInstance::RegisterVmos(RegisterVmosRequest& request,

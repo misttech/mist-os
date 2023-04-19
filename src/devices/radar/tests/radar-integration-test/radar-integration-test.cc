@@ -134,9 +134,9 @@ TEST_F(RadarIntegrationTest, BurstSize) {
   fidl::WireSharedClient<BurstReader> client;
   ASSERT_NO_FAILURES(MakeRadarClient(&client));
 
-  auto result = client.sync()->GetBurstSize();
+  auto result = client.sync()->GetBurstProperties();
   ASSERT_OK(result.status());
-  EXPECT_EQ(result->burst_size, kBurstSize);
+  EXPECT_EQ(result->size, kBurstSize);
 }
 
 TEST_F(RadarIntegrationTest, Reconnect) {
@@ -145,9 +145,9 @@ TEST_F(RadarIntegrationTest, Reconnect) {
   ASSERT_NO_FAILURES(client1_torn_down = MakeRadarClient(&client1));
 
   {
-    const auto result = client1.sync()->GetBurstSize();
+    const auto result = client1.sync()->GetBurstProperties();
     ASSERT_OK(result.status());
-    EXPECT_EQ(result->burst_size, kBurstSize);
+    EXPECT_EQ(result->size, kBurstSize);
   }
 
   // Unbind and close our end of the channel. We should eventually be able to reconnect, after the
@@ -159,9 +159,9 @@ TEST_F(RadarIntegrationTest, Reconnect) {
   ASSERT_NO_FAILURES(MakeRadarClient(&client2));
 
   {
-    const auto result = client2.sync()->GetBurstSize();
+    const auto result = client2.sync()->GetBurstProperties();
     ASSERT_OK(result.status());
-    EXPECT_EQ(result->burst_size, kBurstSize);
+    EXPECT_EQ(result->size, kBurstSize);
   }
 }
 

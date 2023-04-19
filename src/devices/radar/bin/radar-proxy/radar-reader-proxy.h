@@ -49,6 +49,8 @@ class RadarReaderProxy : public RadarProxy,
   struct MappedVmo {
     fzl::VmoMapper mapped_vmo;
     zx::vmo vmo;
+
+    const uint8_t* start() const { return reinterpret_cast<uint8_t*>(mapped_vmo.start()); }
   };
 
   class ReaderInstance : public fidl::Server<fuchsia_hardware_radar::RadarBurstReader> {
@@ -59,6 +61,7 @@ class RadarReaderProxy : public RadarProxy,
     // RadarBurstReader implementation
 
     void GetBurstSize(GetBurstSizeCompleter::Sync& completer) override;
+    void GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) override;
     void RegisterVmos(RegisterVmosRequest& request,
                       RegisterVmosCompleter::Sync& completer) override;
     void UnregisterVmos(UnregisterVmosRequest& request,
@@ -102,7 +105,8 @@ class RadarReaderProxy : public RadarProxy,
   async_dispatcher_t* const dispatcher_;
   RadarDeviceConnector* const connector_;
   fidl::Client<fuchsia_hardware_radar::RadarBurstReader> radar_client_;
-  std::optional<uint32_t> burst_size_;
+  std::optional<fuchsia_hardware_radar::RadarBurstReaderGetBurstPropertiesResponse>
+      burst_properties_;
   std::vector<MappedVmo> vmo_pool_;
   std::vector<std::unique_ptr<ReaderInstance>> instances_;
   std::vector<std::tuple<fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReader>,

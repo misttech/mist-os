@@ -263,13 +263,14 @@ zx_status_t RadarUtil::ConnectToDevice(fidl::ClientEnd<BurstReaderProvider> devi
 }
 
 zx_status_t RadarUtil::RegisterVmos() {
-  const auto burst_size = client_.sync()->GetBurstSize();
-  if (!burst_size.ok()) {
-    fprintf(stderr, "Failed to get burst size: %s\n", zx_status_get_string(burst_size.status()));
-    return burst_size.status();
+  const auto burst_properties = client_.sync()->GetBurstProperties();
+  if (!burst_properties.ok()) {
+    fprintf(stderr, "Failed to get burst size: %s\n",
+            zx_status_get_string(burst_properties.status()));
+    return burst_properties.status();
   }
 
-  burst_buffer_ = fbl::Array(new uint8_t[burst_size->burst_size], burst_size->burst_size);
+  burst_buffer_ = fbl::Array(new uint8_t[burst_properties->size], burst_properties->size);
 
   fidl::Arena allocator;
 

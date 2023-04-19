@@ -66,8 +66,8 @@ class FakeRadarDevice : public fidl::WireServer<BurstReader> {
 
   void SetErrorOnBurst(size_t burst) { error_burst_ = burst; }
 
-  void GetBurstSize(GetBurstSizeCompleter::Sync& completer) override {
-    completer.Reply(kBurstSize);
+  void GetBurstProperties(GetBurstPropertiesCompleter::Sync& completer) override {
+    completer.Reply(kBurstSize, 0);
   }
 
   void RegisterVmos(RegisterVmosRequestView request,
