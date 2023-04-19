@@ -26,19 +26,15 @@ use crate::logging::{log_error, log_info};
 use crate::task::*;
 use crate::types::*;
 
-/// Starts a component in an isolated environment, called a "container".
-///
-/// The container will be configured according to a configuration file in the Starnix kernel's package.
-/// The configuration file specifies, for example, which binary to run as "init", whether or not the
-/// system should wait for the existence of a given file path to run the component, etc.
-///
-/// The Starnix kernel's package also contains the system image to mount.
+/// Starts a component inside the given container.
 ///
 /// The component's `binary` can either:
 ///   - an absolute path, in which case the path is treated as a path into the root filesystem that
 ///     is mounted by the container's configuration
 ///   - relative path, in which case the binary is read from the component's package (which is
 ///     mounted at /container/component/{random}/pkg.)
+///
+/// The directories in the component's namespace are mounted at /container/component/{random}.
 pub async fn start_component(
     mut start_info: ComponentStartInfo,
     controller: ServerEnd<ComponentControllerMarker>,
@@ -59,57 +55,45 @@ pub async fn start_component(
 
     let mut maybe_pkg = None;
     for entry in ns {
-        let dir_path = if let Some(dir_path) = entry.path {
-            dir_path
-        } else {
-            continue;
-        };
-
-        let directory = if let Some(directory) = entry.directory {
-            directory
-        } else {
-            continue;
-        };
-
-        match dir_path.as_str() {
-            "/svc" => continue,
-            "/custom_artifacts" | "/test_data" => {
-                // Mount custom_artifacts and test_data directory at root of container
-                // We may want to transition to have these directories unique per component
-                let dir_proxy = fio::DirectorySynchronousProxy::new(directory.into_channel());
-                mount(&container, &dir_proxy, &dir_path)?;
-            }
-            _ => {
-                let dir_proxy = fio::DirectorySynchronousProxy::new(directory.into_channel());
-                mount(&container, &dir_proxy, &format!("{component_path}/{dir_path}"))?;
-                if dir_path == "/pkg" {
-                    maybe_pkg = Some(dir_proxy);
+        if let (Some(dir_path), Some(dir_handle)) = (entry.path, entry.directory) {
+            match dir_path.as_str() {
+                "/svc" => continue,
+                "/custom_artifacts" | "/test_data" => {
+                    // Mount custom_artifacts and test_data directory at root of container
+                    // We may want to transition to have these directories unique per component
+                    let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
+                    mount(&container, &dir_proxy, &dir_path)?;
+                }
+                _ => {
+                    let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
+                    mount(&container, &dir_proxy, &format!("{component_path}/{dir_path}"))?;
+                    if dir_path == "/pkg" {
+                        maybe_pkg = Some(dir_proxy);
+                    }
                 }
             }
         }
     }
 
     let pkg = maybe_pkg.ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?;
-    let pkg_directory = format!("{component_path}/pkg");
+    let pkg_path = format!("{component_path}/pkg");
 
     let resolve_template = |value: &str| {
-        value.replace("{pkg_path}", &pkg_directory).replace("{component_path}", &component_path)
+        value.replace("{pkg_path}", &pkg_path).replace("{component_path}", &component_path)
     };
 
-    let args = get_program_strvec(&start_info, "args")
-        .map(|args| {
-            args.iter()
-                .map(|arg| CString::new(resolve_template(arg)))
-                .collect::<Result<Vec<CString>, _>>()
-        })
-        .unwrap_or(Ok(vec![]))?;
-    let environ = get_program_strvec(&start_info, "environ")
-        .map(|args| {
-            args.iter()
-                .map(|arg| CString::new(resolve_template(arg)))
-                .collect::<Result<Vec<CString>, _>>()
-        })
-        .unwrap_or(Ok(vec![]))?;
+    let resolve_program_strvec = |key| {
+        get_program_strvec(&start_info, key)
+            .map(|args: &Vec<String>| {
+                args.iter()
+                    .map(|arg| CString::new(resolve_template(arg)))
+                    .collect::<Result<Vec<CString>, _>>()
+            })
+            .unwrap_or(Ok(vec![]))
+    };
+
+    let args = resolve_program_strvec("args")?;
+    let environ = resolve_program_strvec("environ")?;
     let component_features =
         get_program_strvec(&start_info, "features").cloned().unwrap_or_default();
     log_info!("start_component environment: {:?}", environ);
@@ -121,11 +105,7 @@ pub async fn start_component(
     let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
 
     let cwd = current_task
-        .lookup_path(
-            &mut LookupContext::default(),
-            current_task.fs().root(),
-            pkg_directory.as_bytes(),
-        )
+        .lookup_path(&mut LookupContext::default(), current_task.fs().root(), pkg_path.as_bytes())
         .map_err(|e| anyhow!("Could not find package directory: {:?}", e))?;
     current_task
         .fs()
@@ -146,11 +126,11 @@ pub async fn start_component(
 
     parse_numbered_handles(&current_task, start_info.numbered_handles, &current_task.files)?;
 
-    let mut argv = vec![binary_path];
+    let mut argv = vec![binary_path.clone()];
     argv.extend(args.into_iter());
 
-    let executable = current_task.open_file(argv[0].as_bytes(), OpenFlags::RDONLY)?;
-    current_task.exec(executable, argv[0].clone(), argv.clone(), environ)?;
+    let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+    current_task.exec(executable, binary_path, argv, environ)?;
 
     run_component_features(&component_features, &current_task, &mut start_info.outgoing_dir)
         .unwrap_or_else(|e| {
@@ -169,7 +149,7 @@ pub async fn start_component(
     Ok(())
 }
 
-// Returns /container/component/{random} that doesn't already exist
+/// Returns /container/component/{random} that doesn't already exist
 fn generate_component_path(container: &Container) -> Result<String, Error> {
     // Checking container directory already exists
     let mount_point = container.system_task.lookup_path_from_root(b"/container/component/")?;
