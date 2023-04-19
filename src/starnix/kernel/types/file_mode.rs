@@ -61,7 +61,7 @@ impl FileMode {
         self.0
     }
 
-    pub fn contains(&self, other: FileMode) -> bool {
+    pub fn intersects(&self, other: FileMode) -> bool {
         *self & other != FileMode::EMPTY
     }
 
