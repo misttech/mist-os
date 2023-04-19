@@ -101,18 +101,20 @@ func (cmd *productListCmd) execute(ctx context.Context) error {
 	}
 	defer sink.Close()
 
+	return cmd.executeWithSink(ctx, sink)
+}
+
+func (cmd *productListCmd) executeWithSink(ctx context.Context, sink bundler.DataSink) error {
 	productList := build.ProductBundlesManifest{}
 
 	buildIDsList := strings.Split(cmd.buildIDs, ",")
 	for _, buildID := range buildIDsList {
 		buildID = strings.TrimSpace(buildID)
-		buildsNamespaceDir := filepath.Join(buildsDirName, buildID)
-
-		productBundleAbsPath := filepath.Join(buildsNamespaceDir, buildApiDirName, productBundlesJSONName)
-		logger.Debugf(ctx, "Build %s contains the product bundles in abs path %s", buildID, productBundleAbsPath)
-		productBundles, err := getProductListFromJSON(ctx, sink, productBundleAbsPath)
+		productBundlePath := filepath.Join(buildsDirName, buildID, buildApiDirName, productBundlesJSONName)
+		logger.Debugf(ctx, "Build %s contains the product bundles in path %s", buildID, productBundlePath)
+		productBundles, err := getProductListFromJSON(ctx, sink, productBundlePath)
 		if err != nil {
-			return fmt.Errorf("unable to read product bundle metdadata for build_id %s: %w", buildID, err)
+			return fmt.Errorf("unable to read product bundle metdadata for build_id %s: %s %w", buildID, productBundlePath, err)
 		}
 		for _, productBundle := range *productBundles {
 			productEntry := build.ProductBundle{
@@ -124,12 +126,11 @@ func (cmd *productListCmd) execute(ctx context.Context) error {
 			productList = append(productList, productEntry)
 		}
 	}
-
 	outputFilePath := filepath.Join(cmd.outDir, cmd.outputProductListFileName)
 	logger.Debugf(ctx, "writing final product list file to: %s", outputFilePath)
 	f, err := os.Create(outputFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("Creating '%s' %w", outputFilePath, err)
 	}
 	var errs error
 	enc := json.NewEncoder(f)

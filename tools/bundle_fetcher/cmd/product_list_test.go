@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -138,11 +139,115 @@ func TestGetProductListFromJSON(t *testing.T) {
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("Got output for '%s': %v, want: %v", test.name, output, test.expectedOutput)
 			}
-			if err != nil && err.Error() != test.expectedErrMessage {
-				t.Errorf("Got error for '%s': %s, want: %s", test.name, err.Error(), test.expectedErrMessage)
-			}
-			if err == nil && test.expectedErrMessage != "" {
+			if err != nil {
+				if err.Error() != test.expectedErrMessage {
+					t.Errorf("Got error for '%s': %s, want: %s", test.name, err.Error(), test.expectedErrMessage)
+				}
+				// else the expected error message was given.
+			} else if test.expectedErrMessage != "" {
 				t.Errorf("Got no error for '%s', want: %s", test.name, test.expectedErrMessage)
+			}
+		})
+	}
+}
+
+func TestExecuteWithSink(t *testing.T) {
+	contents := map[string][]byte{
+		"builds/123/build_api/product_bundles.json": []byte(`[{
+			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
+			"name": "fake_product.x64",
+			"path": "obj/build/images/fuchsia/product_bundle",
+			"product_version": "fake_version",
+			"transfer_manifest_path": "obj/build/images/fuchsia/transfer.json",
+			"transfer_manifest_url": "file://obj/build/images/fuchsia/transfer.json"
+		  }]`),
+		"builds/456/build_api/product_bundles.json": []byte(`[{
+			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
+			"path": "obj/build/images/fuchsia/product_bundle",
+			"product_version": "fake_version"
+		  }]`),
+		"builds/789/build_api/product_bundles.json": []byte(`{
+			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
+			"name": "fake_product.x64",
+			"path": "obj/build/images/fuchsia/product_bundle",
+			"product_version": "fake_version"
+		  }`),
+	}
+	ctx := context.Background()
+	var tests = []struct {
+		name               string
+		buildIDs           string
+		dataSinkErr        error
+		expectedOutput     *build.ProductBundlesManifest
+		expectedErrMessage string
+	}{
+		{
+			name:     "valid_product_bundles.json",
+			buildIDs: "123",
+			expectedOutput: &build.ProductBundlesManifest{
+				build.ProductBundle{
+					Name:                "fake_product.x64",
+					ProductVersion:      "fake_version",
+					TransferManifestUrl: "gs://orange/builds/123/transfer.json",
+				},
+			},
+		},
+		{
+			name:               "missing_name_product_bundles.json",
+			buildIDs:           "456",
+			expectedErrMessage: "unable to read product bundle metdadata for build_id 456: builds/456/build_api/product_bundles.json error, the product name is empty",
+		},
+		{
+			name:               "not_a_list_product_bundles.json",
+			buildIDs:           "789",
+			expectedErrMessage: "unable to read product bundle metdadata for build_id 789: builds/789/build_api/product_bundles.json json: cannot unmarshal object into Go value of type []build.ProductBundle",
+		},
+	}
+
+	dir, err := os.MkdirTemp("", "bundle_fetcher_dir")
+	if err != nil {
+		t.Fatalf("unable to create temp dir")
+	}
+	tmpfn := filepath.Join(dir, "tmpfile")
+	if err := os.WriteFile(tmpfn, []byte("hello world"), 0644); err != nil {
+		t.Fatalf("unable to create temp file")
+	}
+	defer os.RemoveAll(dir)
+	temp_pb_output := filepath.Join(dir, productBundlesJSONName)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sink := bundler.NewMemSink(contents, test.dataSinkErr, "")
+			cmd := productListCmd{
+				buildIDs:                  test.buildIDs,
+				gcsBucket:                 "orange",
+				outDir:                    dir,
+				outputProductListFileName: productBundlesJSONName,
+			}
+			err := cmd.executeWithSink(ctx, sink)
+			if err != nil {
+				if err.Error() != test.expectedErrMessage {
+					t.Fatalf("Got error for '%s': %s, want: %s", test.name, err.Error(), test.expectedErrMessage)
+				}
+				return
+			}
+			if test.expectedErrMessage != "" {
+				t.Fatalf("Got no error for '%s', want: %s", test.name, test.expectedErrMessage)
+			}
+
+			data, err := os.ReadFile(temp_pb_output)
+			if err != nil {
+				t.Fatalf("Unable to read output: %v", err)
+				return
+			}
+			defer os.Remove(temp_pb_output)
+			listData := &build.ProductBundlesManifest{}
+			err = json.Unmarshal(data, listData)
+			if err != nil {
+				t.Fatalf("Unmarshal failed '%s': %v", test.name, listData)
+			}
+			if !reflect.DeepEqual(listData, test.expectedOutput) {
+				t.Fatalf("Got output for '%s': %v, want: %v", test.name, listData, test.expectedOutput)
 			}
 		})
 	}

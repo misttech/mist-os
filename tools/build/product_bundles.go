@@ -7,19 +7,19 @@ package build
 // ProductBundle represents an entry in the product bundles build api.
 type ProductBundle struct {
 	// Label is the GN label for the product bundle.
-	Label string `json:"label"`
+	Label string `json:"label,omitempty"`
 
 	// <product.board> label for this product bundle.
 	Name string `json:"name"`
 
 	// Path is the path to the product bundle directory.
-	Path string `json:"path"`
+	Path string `json:"path,omitempty"`
 
 	// A unique version for this <product.board>.
 	ProductVersion string `json:"product_version"`
 
 	// Local path to the transfer manifest for the product bundle.
-	TransferManifestPath string `json:"transfer_manifest_path"`
+	TransferManifestPath string `json:"transfer_manifest_path,omitempty"`
 
 	// The URL to the transfer manifest for the product bundle. i.e. it will
 	// have a "file://" prefix if the file is local.
