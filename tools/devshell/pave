@@ -95,20 +95,35 @@ function main {
     fi
   fi
 
-  if $build; then
-    local artifacts=($(fx-command-run list-build-artifacts pave)) || exit $?
-    fx-info "Building/refreshing targets ${artifacts[@]}"
-    fx-command-run build "${artifacts[@]}"
-  fi
+  # Find paving script.
+  flash_source=$(fx-command-run get-flash-source)
+  case "${flash_source}" in
+    flash-manifest:*)
+      paving_script="pave.sh"
+      if $build; then
+        local artifacts=($(fx-command-run list-build-artifacts pave)) || exit $?
+        fx-info "Building/refreshing targets ${artifacts[@]}"
+        fx-command-run build "${artifacts[@]}"
+      fi
+      ;;
+    product-bundle:*)
+      product_bundle="${flash_source#product-bundle:}"
+      paving_script="$(dirname "${product_bundle}")/pave.sh"
+      if $build; then
+        fx-info "Building/refreshing product bundle ${product_bundle}"
+        fx-command-run build "${paving_script}" "${product_bundle}"
+      fi
+      ;;
+  esac
 
-  if [[ ! -f "${FUCHSIA_BUILD_DIR}/pave.sh" ]]; then
-    fx-error "'pave.sh' script does not exist."
+  if [[ ! -f "${FUCHSIA_BUILD_DIR}/${paving_script}" ]]; then
+    fx-error "'pave.sh' script does not exist: ${paving_script}"
     fx-error "Run 'fx pave --build' or 'fx build' to build it and"
     fx-error "all the required artifacts to pave a device."
     exit 1
   fi
 
-  exec "${FUCHSIA_BUILD_DIR}/pave.sh" "${pave_args[@]}"
+  exec "${FUCHSIA_BUILD_DIR}/${paving_script}" "${pave_args[@]}"
 }
 
 main "$@"

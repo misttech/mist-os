@@ -153,9 +153,13 @@ template("bazel_product_bundle") {
         bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
         ninja = "product_bundle"
       },
+
+      # The pave.sh script contains sub-paths {{BAZEL_TARGET_NAME}}_out
+      # that need to be substituted with "product_bundle" to work correctly
+      # with the Ninja directory, so copy it for later processing.
       {
         bazel = "{{BAZEL_TARGET_OUT_DIR}}/pave.sh"
-        ninja = "pave.sh"
+        ninja = "pave.sh-original"
       },
     ]
     directory_timestamp_outputs = [
@@ -245,6 +249,31 @@ template("bazel_product_bundle") {
     }
   }
 
+  _transpose_paving_script_target = "${target_name}_paving_script_transpose"
+  _transpose_paving_script_file = "${target_gen_dir}/pave.sh"
+
+  action(_transpose_paving_script_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    script = "//build/bazel/assembly/transpose_paving_script.py"
+    inputs = [ "$target_gen_dir/pave.sh-original" ]
+    outputs = [ _transpose_paving_script_file ]
+    args = [
+      "--input",
+      rebase_path(inputs[0], root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+      "--src-dir",
+      get_label_info(invoker.bazel_product_bundle_target, "name") + "_out",
+      "--dst-dir",
+      "product_bundle",
+    ]
+    deps = [ ":${_product_bundle_bazel_action_target}" ]
+  }
+
   _package_manifests_list_target = "${target_name}_package_manifests_list"
 
   package_tool_package_manifest_list_create(_package_manifests_list_target) {
@@ -283,6 +312,7 @@ template("bazel_product_bundle") {
       ":${_package_manifests_list_target}",
       ":${_product_bundle_bazel_action_target}",
       ":${_transfer_manifest_target}",
+      ":${_transpose_paving_script_target}",
     ]
   }
 }
