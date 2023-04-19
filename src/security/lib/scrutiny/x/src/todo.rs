@@ -131,47 +131,6 @@ impl api::ComponentManager for ComponentManager {
     }
 }
 
-pub struct System;
-
-impl api::System for System {
-    type DataSourcePath = PathBuf;
-    type Zbi = Zbi;
-    type Blob = Blob<ProductBundleRepositoryBlob>;
-    type Package = ScrutinyPackage;
-    type KernelFlags = KernelFlags;
-    type VbMeta = VbMeta;
-    type DevMgrConfiguration = DevMgrConfiguration;
-    type ComponentManagerConfiguration = ComponentManagerConfiguration;
-
-    fn build_dir(&self) -> Self::DataSourcePath {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-
-    fn zbi(&self) -> Self::Zbi {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-
-    fn update_package(&self) -> Self::Package {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-
-    fn kernel_flags(&self) -> Self::KernelFlags {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-
-    fn vb_meta(&self) -> Self::VbMeta {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-
-    fn devmgr_configuration(&self) -> Self::DevMgrConfiguration {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-
-    fn component_manager_configuration(&self) -> Self::ComponentManagerConfiguration {
-        todo!("TODO(fxbug.dev/111251): Integrate with production system API");
-    }
-}
-
 pub struct Zbi;
 
 impl api::Zbi for Zbi {

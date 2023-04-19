@@ -2,7 +2,64 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/111251): Implement production System API.
+use crate::api;
+use crate::todo;
+use std::marker::PhantomData;
+use std::path::PathBuf;
+
+pub struct System<Blob: api::Blob, Package: api::Package> {
+    // TODO(fxbug.dev/111251): Add read interfaces for system artifacts such as Zbi, kernel flags,
+    // etc.
+    _marker: PhantomData<(Blob, Package)>,
+}
+
+impl<Blob: api::Blob, Package: api::Package> System<Blob, Package> {
+    pub(crate) fn new() -> Self {
+        Self { _marker: PhantomData }
+    }
+}
+
+impl<Blob: api::Blob, Package: api::Package> api::System for System<Blob, Package> {
+    type DataSourcePath = PathBuf;
+    type Blob = Blob;
+    type Package = Package;
+
+    // TODO(fxbug.dev/111251): Replace references to fake or todo implementations with production
+    // implementations.
+    type Zbi = todo::Zbi;
+    type KernelFlags = todo::KernelFlags;
+    type VbMeta = todo::VbMeta;
+    type DevMgrConfiguration = todo::DevMgrConfiguration;
+    type ComponentManagerConfiguration = todo::ComponentManagerConfiguration;
+
+    fn build_dir(&self) -> Self::DataSourcePath {
+        todo!("TODO(fxbug.dev/111251): Implement build_dir()");
+    }
+
+    fn zbi(&self) -> Self::Zbi {
+        todo!("TODO(fxbug.dev/111251): Implement zbi()");
+    }
+
+    fn update_package(&self) -> Self::Package {
+        todo!("TODO(fxbug.dev/111251): Implement update_package()");
+    }
+
+    fn kernel_flags(&self) -> Self::KernelFlags {
+        todo!("TODO(fxbug.dev/111251): Implement kernel_flags()");
+    }
+
+    fn vb_meta(&self) -> Self::VbMeta {
+        todo!("TODO(fxbug.dev/111251): Implement vb_meta()");
+    }
+
+    fn devmgr_configuration(&self) -> Self::DevMgrConfiguration {
+        todo!("TODO(fxbug.dev/111251): Implement devmgr_configuration()");
+    }
+
+    fn component_manager_configuration(&self) -> Self::ComponentManagerConfiguration {
+        todo!("TODO(fxbug.dev/111251): Implement component_manager_configuration()");
+    }
+}
 
 #[cfg(test)]
 pub mod fake {

@@ -18,6 +18,7 @@ use crate::package::ScrutinyPackage;
 use crate::product_bundle::DataSource as ProductBundleSource;
 use crate::product_bundle::ProductBundle;
 use crate::product_bundle::ProductBundleRepositoryBlob;
+use crate::system::System;
 use crate::update_package::UpdatePackage;
 use crate::update_package::UpdatePackageError;
 use fuchsia_url::AbsolutePackageUrl;
@@ -52,6 +53,7 @@ type Error = ScrutinyBuilderError<
 
 /// A builder pattern for constructing well-formed instances of [`Scrutiny`].
 pub struct ScrutinyBuilder {
+    /// The product bundle that describes where system artifacts can be found.
     product_bundle: ProductBundle,
 }
 
@@ -80,8 +82,13 @@ impl ScrutinyBuilder {
 
 /// Production implementation of the [`crate::api::Scrutiny`] API.
 pub struct Scrutiny {
+    /// A blob set that includes blobs from all repositories described by the product bundle.
     product_bundle_blobs_set: CompositeBlobSet<ProductBundleRepositoryBlob, BlobDirectoryError>,
+
+    /// The product bundle that describes where system artifacts can be found.
     product_bundle: ProductBundle,
+
+    /// The update package described by the product bundle's update package hash.
     update_package: UpdatePackage,
 }
 
@@ -112,11 +119,13 @@ impl api::Scrutiny for Scrutiny {
     type ComponentCapability = crate::todo::ComponentCapability;
     type ComponentInstance = crate::todo::ComponentInstance;
     type ComponentInstanceCapability = crate::todo::ComponentInstanceCapability;
-    type System = crate::todo::System;
+    type System = System<Self::Blob, Self::Package>;
     type ComponentManager = crate::todo::ComponentManager;
 
     fn system(&self) -> Self::System {
-        todo!("TODO(fxbug.dev/111251): Integrate Scrutiny with production System API")
+        // TODO(fxbug.dev/111251): Fully implemented `System` should be stored and cloned by
+        // `Scrutiny`, rather than reconstructed every time.
+        Self::System::new()
     }
 
     fn component_manager(&self) -> Self::ComponentManager {
