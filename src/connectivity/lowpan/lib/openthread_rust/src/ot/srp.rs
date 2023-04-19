@@ -535,7 +535,7 @@ impl SrpServer for Instance {
     }
 
     fn srp_server_set_enabled(&self, enabled: bool) {
-        unsafe { otSrpServerSetEnabled(self.as_ot_ptr(), enabled) }
+        unsafe { otSrpServerSetAutoEnableMode(self.as_ot_ptr(), enabled) }
     }
 
     fn srp_server_is_enabled(&self) -> bool {
