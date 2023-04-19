@@ -100,7 +100,7 @@ void warnOnTranscriptionNotMatching(
     return;
   }
   final notMatched =
-      transcriptions.firstWhere((t) => !t.contains(pat), orElse: () => null);
+      transcriptions.firstWhere((t) => t != null && !t.contains(pat), orElse: () => null);
   if (notMatched != null) {
     _log.warning('Audio transcription "$notMatched" did not match "$pat"');
   }
