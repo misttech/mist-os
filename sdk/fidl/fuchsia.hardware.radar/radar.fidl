@@ -65,8 +65,20 @@ protocol RadarBurstReader {
     /// should use this size to create VMOs to be registered by the driver.
     ///
     /// - response `burst_size` the size of each radar burst in bytes.
+    // TODO(fxbug.dev/100020): Remove this when all users have been switched to
+    // `GetBurstProperties()`.
+    @transitional
     GetBurstSize() -> (struct {
         burst_size uint32;
+    });
+
+    @available(added=HEAD)
+    // TODO(fxbug.dev/100020): Remove @transitional when all servers implement
+    // this method.
+    @transitional
+    GetBurstProperties() -> (struct {
+        size uint32;
+        period zx.duration;
     });
 
     /// Registers the VMOs for future use and associates them with vmo_ids,
