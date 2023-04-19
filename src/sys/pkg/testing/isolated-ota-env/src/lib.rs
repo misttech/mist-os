@@ -20,7 +20,7 @@ use {
     fuchsia_merkle::Hash,
     fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder, RepositoryBuilder},
     futures::prelude::*,
-    isolated_ota::OmahaConfig,
+    isolated_ota::{OmahaConfig, UpdateUrlSource},
     mock_omaha_server::{
         OmahaResponse, OmahaServer, OmahaServerBuilder, ResponseAndMetadata, ResponseMap,
     },
@@ -37,8 +37,8 @@ const TEST_CERTS_PATH: &str = "/pkg/data/ssl";
 const TEST_REPO_URL: &str = "fuchsia-pkg://integration.test.fuchsia.com";
 
 pub enum OmahaState {
-    /// Don't use Omaha for this update.
-    Disabled,
+    /// Don't use Omaha for this update, instead use the provided, or default, update package URL.
+    Disabled(Option<fuchsia_url::AbsolutePackageUrl>),
     /// Set up an Omaha server automatically.
     Auto(OmahaResponse),
     /// Pass the given OmahaConfig to Omaha.
@@ -55,7 +55,7 @@ pub struct TestParams {
     pub ssl_certs: DirectoryProxy,
     pub update_merkle: Hash,
     pub version: String,
-    pub omaha_config: Option<OmahaConfig>,
+    pub update_url_source: UpdateUrlSource,
     pub paver_connector: ClientEnd<fio::DirectoryMarker>,
 }
 
@@ -112,7 +112,12 @@ impl<R> TestEnvBuilder<R> {
             board: "test-board".to_owned(),
             channel: "test".to_owned(),
             images: HashMap::new(),
-            omaha: OmahaState::Disabled,
+            omaha: OmahaState::Disabled(Some(fuchsia_url::AbsolutePackageUrl::new(
+                TEST_REPO_URL.parse().unwrap(),
+                "update".parse().unwrap(),
+                None,
+                None,
+            ))),
             packages: vec![],
             paver: MockPaverServiceBuilder::new(),
             repo_config: None,
@@ -290,10 +295,13 @@ pub struct TestEnv<R> {
 }
 
 impl<R> TestEnv<R> {
-    fn start_omaha(omaha: OmahaState, merkle: Hash) -> Result<Option<OmahaConfig>, Error> {
+    fn start_omaha(omaha: OmahaState, merkle: Hash) -> Result<UpdateUrlSource, Error> {
         match omaha {
-            OmahaState::Disabled => Ok(None),
-            OmahaState::Manual(cfg) => Ok(Some(cfg)),
+            OmahaState::Disabled(url) => Ok(match url {
+                Some(url) => UpdateUrlSource::UpdateUrl(url),
+                None => UpdateUrlSource::UseDefault,
+            }),
+            OmahaState::Manual(cfg) => Ok(UpdateUrlSource::OmahaConfig(cfg)),
             OmahaState::Auto(response) => {
                 let server = OmahaServerBuilder::default()
                     .responses_by_appid(
@@ -311,14 +319,14 @@ impl<R> TestEnv<R> {
                 let config =
                     OmahaConfig { app_id: "integration-test-appid".to_owned(), server_url: addr };
 
-                Ok(Some(config))
+                Ok(UpdateUrlSource::OmahaConfig(config))
             }
         }
     }
 
     /// Run the update, consuming this |TestEnv| and returning a |TestResult|.
     pub async fn run(self) -> R {
-        let omaha_config = TestEnv::<R>::start_omaha(self.omaha, self.update_merkle)
+        let update_url_source = TestEnv::<R>::start_omaha(self.omaha, self.update_merkle)
             .expect("Starting Omaha server");
 
         let mut service_fs = ServiceFs::new();
@@ -353,7 +361,7 @@ impl<R> TestEnv<R> {
             ssl_certs: self.ssl_certs,
             update_merkle: self.update_merkle,
             version: self.version,
-            omaha_config,
+            update_url_source,
             paver_connector: client,
         };
 

@@ -18,7 +18,7 @@ use fuchsia_component_test::{
 };
 use fuchsia_pkg_testing::{make_current_epoch_json, Package, PackageBuilder};
 use futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt};
-use isolated_ota::OmahaConfig;
+use isolated_ota::{OmahaConfig, UpdateUrlSource};
 use isolated_ota_env::expose_mock_paver;
 use isolated_ota_env::{OmahaState, TestEnvBuilder, TestExecutor, TestParams};
 use mock_omaha_server::OmahaResponse;
@@ -98,7 +98,7 @@ impl TestExecutor<Result<TestResult, Error>> for OtaComponentTestExecutor {
         route_capabilities_from_parent(&builder, &system_recovery_ota_child).await;
         route_ssl_certs(&builder, &system_recovery_ota_child, params.ssl_certs).await;
 
-        if let Some(omaha_config) = params.omaha_config {
+        if let UpdateUrlSource::OmahaConfig(omaha_config) = params.update_url_source {
             route_config_data(
                 &builder,
                 &system_recovery_ota_child,

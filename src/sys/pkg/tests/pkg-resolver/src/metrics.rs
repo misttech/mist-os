@@ -395,7 +395,7 @@ async fn update_tuf_client_error() {
 
 #[fuchsia::test]
 async fn load_repository_for_channel_success_no_rewrite_rule() {
-    let env = TestEnvBuilder::new().build().await;
+    let env = TestEnvBuilder::new().create_ota_channel_rewrite_rule(true).build().await;
 
     env.assert_count_events(
         metrics::REPOSITORY_MANAGER_LOAD_REPOSITORY_FOR_CHANNEL_MIGRATED_METRIC_ID,

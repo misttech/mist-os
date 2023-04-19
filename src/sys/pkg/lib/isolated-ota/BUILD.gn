@@ -11,6 +11,7 @@ rustc_library("isolated-ota") {
 
   deps = [
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/isolated-swd",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:thiserror",

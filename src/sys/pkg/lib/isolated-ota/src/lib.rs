@@ -38,6 +38,18 @@ pub struct OmahaConfig {
     pub server_url: String,
 }
 
+/// How to obtain the URL for the update package.
+pub enum UpdateUrlSource {
+    /// Obtain the update package URL from an Omaha server.
+    OmahaConfig(OmahaConfig),
+
+    /// Use this URL.
+    UpdateUrl(fuchsia_url::AbsolutePackageUrl),
+
+    /// Use the default update package URL "fuchsia-pkg://fuchsia.com/update".
+    UseDefault,
+}
+
 /// Installs all packages and writes the Fuchsia ZBI from the latest build on the given channel. Has
 /// the same arguments as `download_and_apply_update`, but allows passing in pre-configured
 /// components for testing.
@@ -45,20 +57,26 @@ pub async fn download_and_apply_update_with_updater(
     mut updater: Updater,
     channel_name: &str,
     version: &str,
-    omaha_cfg: Option<OmahaConfig>,
+    update_url_source: UpdateUrlSource,
 ) -> Result<(), UpdateError> {
-    if let Some(cfg) = omaha_cfg {
-        let () = omaha::install_update(
-            updater,
-            cfg.app_id,
-            cfg.server_url,
-            version.to_owned(),
-            channel_name.to_owned(),
-        )
-        .await
-        .map_err(UpdateError::InstallError)?;
-    } else {
-        let () = updater.install_update(None).await.map_err(UpdateError::InstallError)?;
+    match update_url_source {
+        UpdateUrlSource::OmahaConfig(cfg) => {
+            let () = omaha::install_update(
+                updater,
+                cfg.app_id,
+                cfg.server_url,
+                version.to_owned(),
+                channel_name.to_owned(),
+            )
+            .await
+            .map_err(UpdateError::InstallError)?;
+        }
+        UpdateUrlSource::UpdateUrl(url) => {
+            let () = updater.install_update(Some(&url)).await.map_err(UpdateError::InstallError)?;
+        }
+        UpdateUrlSource::UseDefault => {
+            let () = updater.install_update(None).await.map_err(UpdateError::InstallError)?;
+        }
     }
     Ok(())
 }
@@ -86,5 +104,10 @@ pub async fn download_and_apply_update(
     omaha_cfg: Option<OmahaConfig>,
 ) -> Result<(), UpdateError> {
     let updater = Updater::new().map_err(UpdateError::UpdaterConnectError)?;
-    download_and_apply_update_with_updater(updater, channel_name, version, omaha_cfg).await
+    let update_url_source = if let Some(omaha_cfg) = omaha_cfg {
+        UpdateUrlSource::OmahaConfig(omaha_cfg)
+    } else {
+        UpdateUrlSource::UseDefault
+    };
+    download_and_apply_update_with_updater(updater, channel_name, version, update_url_source).await
 }

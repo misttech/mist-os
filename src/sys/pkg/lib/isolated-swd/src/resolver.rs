@@ -109,6 +109,13 @@ pub(crate) mod for_tests {
                 .add_child("pkg-resolver", "#meta/pkg-resolver.cm", ChildOptions::new())
                 .await
                 .unwrap();
+            if channel.is_some() {
+                realm_builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
+                realm_builder
+                    .set_config_value_bool(&pkg_resolver, "create_ota_channel_rewrite_rule", true)
+                    .await
+                    .unwrap();
+            }
 
             realm_builder
                 .read_only_directory(

@@ -357,7 +357,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
             updater,
             &channel_clone,
             &params.version,
-            params.omaha_config,
+            params.update_url_source,
         )
         .await;
 
