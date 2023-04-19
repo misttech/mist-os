@@ -18,7 +18,6 @@ use net_types::{ethernet::Mac, ip::IpAddress, SpecifiedAddr};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
-    ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 
 use crate::{
@@ -345,11 +344,18 @@ fn send_as_ethernet_frame_to_dst<
     protocol: EtherType,
     dst_mac: Mac,
 ) -> Result<(), S> {
+    /// The minimum length of bodies of Ethernet frames sent over the loopback
+    /// device.
+    ///
+    /// Use zero since the frames are never sent out a physical device, so it
+    /// doesn't matter if they are shorter than would be required.
+    const MIN_BODY_LEN: usize = 0;
+
     let frame = packet.encapsulate(EthernetFrameBuilder::new(
         LOOPBACK_MAC,
         dst_mac,
         protocol,
-        ETHERNET_MIN_BODY_LEN_NO_TAG,
+        MIN_BODY_LEN,
     ));
 
     send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|s| s.into_inner())

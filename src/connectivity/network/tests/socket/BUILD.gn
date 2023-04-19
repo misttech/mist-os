@@ -327,7 +327,6 @@ netstack3_tests = [
   },
   {
     label = packetsocket_label
-    expects = true
   },
   {
     label = rawsocket_label
