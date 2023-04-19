@@ -47,10 +47,6 @@ static const std::vector<fpbus::Mmio> usb_phy_mmios{
         .base = A311D_USBPHY21_BASE,
         .length = A311D_USBPHY21_LENGTH,
     }},
-    {{
-        .base = A311D_USB3_PCIE_PHY_BASE,
-        .length = A311D_USB3_PCIE_PHY_LENGTH,
-    }},
 };
 
 static const std::vector<fpbus::Irq> usb_phy_irqs{
@@ -251,24 +247,6 @@ zx_status_t Vim3::UsbInit() {
     return status;
   }
 
-  status = clk_impl_.Disable(g12b_clk::CLK_PCIE_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Disable(CLK_PCIE_PLL) failed: %d", status);
-    return status;
-  }
-
-  status = clk_impl_.SetRate(g12b_clk::CLK_PCIE_PLL, 100000000);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetRate(CLK_PCIE_PLL) failed: %d", status);
-    return status;
-  }
-
-  status = clk_impl_.Enable(g12b_clk::CLK_PCIE_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Unable to enable CLK_PCIE_PLL");
-    return status;
-  }
-
   // Power on USB.
   gpio_impl_.ConfigOut(VIM3_USB_PWR, 1);
 
@@ -280,12 +258,12 @@ zx_status_t Vim3::UsbInit() {
   fdf::WireUnownedResult usb_phy_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, usb_phy_dev), fidl::ToWire(fidl_arena, spec));
   if (!usb_phy_result.ok()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s",
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s", __func__,
            usb_phy_result.FormatDescription().data());
     return usb_phy_result.status();
   }
   if (usb_phy_result->is_error()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) failed: %s",
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Usb(usb_phy_dev) failed: %s", __func__,
            zx_status_get_string(usb_phy_result->error_value()));
     return usb_phy_result->error_value();
   }
@@ -306,12 +284,12 @@ zx_status_t Vim3::UsbInit() {
                                                std::size(dwc2_fragments)),
       "dwc2-phy");
   if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(dwc2_dev) request failed: %s",
+    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(dwc2_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(dwc2_dev) failed: %s",
+    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(dwc2_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -323,12 +301,12 @@ zx_status_t Vim3::UsbInit() {
                                                std::size(xhci_fragments)),
       "xhci-phy");
   if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) request failed: %s",
+    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(xhci_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) failed: %s",
+    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(xhci_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
