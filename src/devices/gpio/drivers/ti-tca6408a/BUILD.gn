@@ -13,6 +13,7 @@ driver_bind_rules("ti-tca6408a-bind") {
   tests = "ti-tca6408a-bind-test.json"
   deps = [
     "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }
