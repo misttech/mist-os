@@ -39,7 +39,8 @@ void main(List<String> args) {
     'pipe_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.pipe.txt',
     'randread_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.randread.txt',
     'read_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.read.txt',
-    // 'sched_yield_benchmark.cm' - long running
+    'sched_yield_benchmark.cm':
+        'fuchsia.starnix.gvisor_benchmarks.sched_yield.txt',
     // 'send_recv_benchmar'k - not passing
     'seqwrite_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.seqwrite.txt',
     'signal_benchmark.cm': 'fuchsia.starnix.gvisor_benchmarks.signal.txt',
@@ -74,6 +75,12 @@ void main(List<String> args) {
         r'|BM_Gettid/real_time/threads:4'
         r'|BM_Gettid/real_time/threads:8'
         r'|BM_Gettid/real_time/threads:16)$"',
+    'sched_yield_benchmark.cm': '--benchmark_filter_internal="'
+        r'(BM_Sched_yield/real_time/threads:1'
+        r'|BM_Sched_yield/real_time/threads:2'
+        r'|BM_Sched_yield/real_time/threads:4'
+        r'|BM_Sched_yield/real_time/threads:8'
+        r'|BM_Sched_yield/real_time/threads:16)$"',
   };
 
   benchmarks.forEach((String componentName, String expectedMetricNamesFile) {
