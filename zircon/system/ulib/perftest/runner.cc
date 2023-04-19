@@ -221,6 +221,8 @@ class RepeatStateImpl : public RepeatState {
       }
     }
     WriteEvent(&test_teardown_string, timestamps_[timestamps_size_ - 1], overall_end_time_);
+
+    trace_release_context(context);
 #endif
   }
 
