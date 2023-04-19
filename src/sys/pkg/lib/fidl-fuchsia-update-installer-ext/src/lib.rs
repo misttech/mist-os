@@ -28,10 +28,10 @@ use {
         prelude::*,
         task::{Context, Poll},
     },
-    log::info,
     pin_project::pin_project,
     std::{convert::TryInto, fmt, pin::Pin},
     thiserror::Error,
+    tracing::info,
 };
 
 /// Describes the errors encountered by UpdateAttempt.
