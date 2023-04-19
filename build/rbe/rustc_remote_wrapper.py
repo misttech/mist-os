@@ -149,11 +149,12 @@ def accompany_rlib_with_so(deps: Iterable[Path]) -> Iterable[Path]:
 class RustRemoteAction(object):
 
     def __init__(
-        self,
-        argv: Sequence[str],
-        exec_root: Optional[Path] = None,
-        working_dir: Optional[Path] = None,
-        host_platform: str = None,
+            self,
+            argv: Sequence[str],
+            exec_root: Optional[Path] = None,
+            working_dir: Optional[Path] = None,
+            host_platform: str = None,
+            auto_reproxy: bool = True,  # Ok to disable during unit-tests
     ):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
@@ -170,6 +171,11 @@ class RustRemoteAction(object):
         # --help here will result in early exit()
         self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
             main_argv)
+
+        # Re-launch with reproxy if needed.
+        if auto_reproxy:
+            remote_action.auto_relaunch_with_reproxy(
+                script=Path(__file__), argv=argv, args=self._main_args)
 
         if not filtered_command:  # there is no command, bail out early
             return

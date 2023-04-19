@@ -74,6 +74,13 @@ def _path_or_default(path_or_none, default: Path) -> Path:
     return default if path_or_none is None else path_or_none
 
 
+def _write_lines_to_file(path: Path, lines: Iterable[str]):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    contents = '\n'.join(lines) + '\n'
+    with open(path, 'w') as f:
+        f.write(contents)
+
+
 def _files_match(file1: Path, file2: Path) -> bool:
     """Compares two files, returns True if they both exist and match."""
     # filecmp.cmp does not invoke any subprocesses.
@@ -240,9 +247,7 @@ def _transform_file_by_lines(
     with open(src) as f:
         new_lines = [line_transform(line) for line in f]
 
-    with open(dest, 'w') as f:
-        for line in new_lines:
-            f.write(line)
+    _write_lines_to_file(dest, new_lines)
 
 
 def _rewrite_file_by_lines_in_place(
@@ -286,14 +291,14 @@ def _should_retry_remote_action(status: cl_utils.SubprocessResult) -> bool:
     return status.returncode in _RETRIABLE_REWRAPPER_STATUSES
 
 
-def _reproxy_log_dir() -> str:
+def _reproxy_log_dir() -> Optional[str]:
     # Set by build/rbe/fuchsia-reproxy-wrap.sh.
-    return os.env.get("RBE_reproxy_log_dir", None)
+    return os.environ.get("RBE_proxy_log_dir", None)
 
 
-def _rewrapper_log_dir() -> str:
+def _rewrapper_log_dir() -> Optional[str]:
     # Set by build/rbe/fuchsia-reproxy-wrap.sh.
-    return os.env.get("RBE_log_dir", None)
+    return os.environ.get("RBE_log_dir", None)
 
 
 @dataclasses.dataclass
@@ -463,10 +468,27 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
     # TODO: further analyze remote failures in --action_log (.rrpl)
 
 
+_RBE_DOWNLOAD_STUB_IDENTIFIER = '# RBE download stub'
+
+
+def _write_download_stub(
+    path: Path,
+    rrpl: Path,
+    build_id: str,
+):
+    lines = [
+        _RBE_DOWNLOAD_STUB_IDENTIFIER,
+        str(rrpl),
+        build_id,
+    ]
+    _write_lines_to_file(path, lines)
+
+
 def make_download_stubs(
     files: Iterable[Path],
     dirs: Iterable[Path],
     rrpl: Path,
+    build_id: str,
 ):
     """Establish placeholders from which real artifacts can be retrieved later.
 
@@ -475,14 +497,15 @@ def make_download_stubs(
       dirs: directories to create download stubs for.
       rrpl: single-action reproxy log (reproxy.LogRecord), which contains
           file digests.
+      build_id: any string that corresponds to a unique build.
     """
-    # TODO(http://fxbug.dev/123178): validate that we are creating links for
+    # TODO(http://fxbug.dev/123178): validate that we are creating stubs for
     # paths that are covered in the .rrpl log.  This requires parsing
     # more of the .rrpl log.
     for f in files:
-        cl_utils.symlink_relative(src=f, dest=rrpl)
+        _write_download_stub(path=f, rrpl=rrpl, build_id=build_id)
     for d in dirs:
-        cl_utils.symlink_relative(src=d, dest=rrpl)
+        _write_download_stub(path=d / '.dlstub', rrpl=rrpl, build_id=build_id)
 
 
 # TODO(http://fxbug.dev/123178): download using stub links
@@ -505,7 +528,6 @@ class RemoteAction(object):
         output_dirs: Sequence[Path] = None,
         disable: bool = False,
         save_temps: bool = False,
-        auto_reproxy: bool = False,
         remote_log: str = "",
         fsatrace_path: Optional[Path] = None,
         diagnose_nonzero: bool = False,
@@ -531,8 +553,6 @@ class RemoteAction(object):
           disable: if true, execute locally.
           check_determinism: if true, compare outputs of two local executions.
           save_temps: if true, keep around temporarily generated files after execution.
-          auto_reproxy: if true, launch reproxy around the rewrapper invocation.
-            This is not needed if reproxy is already running.
           remote_log: "" means disabled.  Any other value, remote logging is
             enabled, and stdout/stderr of the remote execution is captured
             to a file and downloaded.
@@ -557,7 +577,6 @@ class RemoteAction(object):
         self._config = cfg  # can be None
         self._exec_strategy = exec_strategy  # can be None
         self._save_temps = save_temps
-        self._auto_reproxy = auto_reproxy
         self._diagnose_nonzero = diagnose_nonzero
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or PROJECT_ROOT).absolute()
@@ -678,10 +697,6 @@ class RemoteAction(object):
         return self._rewrapper_known_options.download_outputs
 
     @property
-    def auto_reproxy(self) -> bool:
-        return self._auto_reproxy
-
-    @property
     def save_temps(self) -> bool:
         return self._save_temps
 
@@ -755,10 +770,10 @@ class RemoteAction(object):
     def _inputs_list_file(self) -> Path:
         inputs_list_file = Path(
             self._default_auxiliary_file_basename + '.inputs')
-        contents = '\n'.join(
-            str(x) for x in self.inputs_relative_to_project_root) + '\n'
-        with open(inputs_list_file, 'w') as f:
-            f.write(contents)
+        _write_lines_to_file(
+            inputs_list_file,
+            (str(x) for x in self.inputs_relative_to_project_root),
+        )
         return inputs_list_file
 
     def _generate_rewrapper_command_prefix(self) -> Iterable[str]:
@@ -812,11 +827,8 @@ class RemoteAction(object):
             ])
 
     def _generate_remote_launch_command(self) -> Iterable[str]:
-        # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment
-        if self.auto_reproxy:  # TODO: suppress reproxy in --dry-run mode
-            yield str(fuchsia.REPROXY_WRAP)
-            yield '--'
-
+        # No need to prepend with fuchsia.REPROXY_WRAP here,
+        # because auto_relaunch_with_reproxy() does that.
         yield from self._generate_rewrapper_command_prefix()
         yield '--'
 
@@ -885,6 +897,7 @@ class RemoteAction(object):
             files=self.output_files_relative_to_working_dir,
             dirs=self.output_dirs_relative_to_working_dir,
             rrpl=self._action_log,
+            build_id=_reproxy_log_dir(),  # unique per build
         )
 
     def _cleanup(self):
@@ -1260,7 +1273,7 @@ Otherwise, BASE will default to the first output file named.""",
         "--auto-reproxy",
         action="store_true",
         default=False,
-        help="Startup and shutdown reproxy around the rewrapper invocation.",
+        help="OBSOLETE: reproxy is already automatically launched if needed.",
     )
     main_group.add_argument(
         "--fsatrace-path",
@@ -1334,7 +1347,6 @@ def remote_action_from_args(
         disable=main_args.local,
         check_determinism=main_args.check_determinism,
         save_temps=main_args.save_temps,
-        auto_reproxy=main_args.auto_reproxy,
         remote_log=main_args.remote_log,
         fsatrace_path=main_args.fsatrace_path,
         diagnose_nonzero=main_args.diagnose_nonzero,
@@ -1407,14 +1419,65 @@ def forward_remote_flags(
     return script_args + forwarded_flags, filtered_command
 
 
+def auto_relaunch_with_reproxy(script: Path, argv: Sequence[str], args: argparse.Namespace):
+    """If reproxy is not already running, re-launch with reproxy running.
+
+    Args:
+      script: the invoking script
+      argv: the original complete invocation
+      args: argparse Namespace for argv.  Only needs to be partially
+          processed as far as inherit_main_arg_parser_flags().
+
+    Returns:
+      nothing when reproxy is already running.
+      If a re-launch is necessary, this does not return, as the process
+      is replaced by a os.exec*() call.
+    """
+    if args.auto_reproxy:
+        msg('You no longer need to pass --auto-reproxy, reproxy is launched automatically when needed.')
+
+    if args.dry_run or args.local:
+        # Don't need reproxy when no call to rewrapper is expected.
+        return
+
+    proxy_log_dir = _reproxy_log_dir()
+    rewrapper_log_dir = _rewrapper_log_dir()
+    if args.verbose:
+        msg(f'Detected RBE_proxy_log_dir={proxy_log_dir}')
+        msg(f'Detected RBE_log_dir={rewrapper_log_dir}')
+
+    if proxy_log_dir and rewrapper_log_dir:
+        # Ok for caller to proceed and eventually invoke rewrapper
+        return
+
+    python = cl_utils.relpath(Path(sys.executable), start=Path(os.curdir))
+    relaunch_args = ['--', str(python), '-S', str(script)] + argv
+    if args.verbose:
+        cmd_str = cl_utils.command_quoted_str(
+            [str(fuchsia.REPROXY_WRAP)] + relaunch_args)
+        msg(f'Automatically re-launching: {cmd_str}')
+    os.execv(fuchsia.REPROXY_WRAP, relaunch_args)
+    # os.exec*() does not return
+
+
 def main(argv: Sequence[str]) -> int:
+    # Move --remote-* flags from the wrapped command to equivalent main args.
     main_argv, filtered_command = forward_remote_flags(argv)
-    main_args, other_remote_options = _MAIN_ARG_PARSER.parse_known_args(
-        main_argv)
+
     # forward all unknown flags to rewrapper
     # forwarded rewrapper options with values must be written as '--flag=value',
     # not '--flag value' because argparse doesn't know what unhandled flags
     # expect values.
+    main_args, other_remote_options = _MAIN_ARG_PARSER.parse_known_args(
+        main_argv)
+
+    # Re-launch self with reproxy if needed.
+    auto_relaunch_with_reproxy(
+        script=Path(__file__),
+        argv=argv,
+        args=main_args,
+    )
+    # At this point, reproxy is guaranteed to be running.
 
     remote_action = remote_action_from_args(
         main_args=main_args,

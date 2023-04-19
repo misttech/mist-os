@@ -348,7 +348,6 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(main_args.label, '')
         self.assertEqual(main_args.remote_log, '')
         self.assertFalse(main_args.save_temps)
-        self.assertFalse(main_args.auto_reproxy)
         self.assertIsNone(main_args.fsatrace_path)
         self.assertFalse(main_args.compare)
         self.assertFalse(main_args.diagnose_nonzero)
@@ -396,13 +395,16 @@ class RemoteActionMainParserTests(unittest.TestCase):
 
     @mock.patch.object(fuchsia, 'REPROXY_WRAP', '/path/to/reproxy-wrap.sh')
     def test_auto_reproxy(self):
+        # --auto-reproxy is now obsolete, and will be removed in the future
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(['--auto-reproxy', '--', 'echo'])
         self.assertTrue(main_args.auto_reproxy)
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(action.local_command, ['echo'])
-        self.assertEqual(
-            action.launch_command[:2], ['/path/to/reproxy-wrap.sh', '--'])
+        rewrapper_prefix, _, remote_command = cl_utils.partition_sequence(
+            action.launch_command, '--')
+        self.assertEqual(Path(rewrapper_prefix[0]).name, 'rewrapper')
+        self.assertEqual(remote_command, ['echo'])
 
     def test_save_temps(self):
         p = self._make_main_parser()
@@ -1046,7 +1048,6 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
         self.assertEqual(action.exec_root_rel, Path('..'))
         self.assertFalse(action.save_temps)
-        self.assertFalse(action.auto_reproxy)
         self.assertFalse(action.remote_disable)
         self.assertEqual(action.build_subdir, Path('build_dir'))
         self.assertEqual(
@@ -1245,16 +1246,28 @@ class RemoteActionConstructionTests(unittest.TestCase):
 class DownloadStubsTests(unittest.TestCase):
 
     def test_file(self):
-        with mock.patch.object(cl_utils, 'symlink_relative') as mock_link:
+        p = Path('dir/big-file.txt')
+        rrpl = Path('action_log.rrpl')
+        build_id = 'xyzzy'
+        with mock.patch.object(remote_action,
+                               '_write_lines_to_file') as mock_write:
             remote_action.make_download_stubs(
-                files=['big-file.txt'], dirs=[], rrpl='action_log.rrpl')
-        mock_link.assert_called_once()
+                files=[p], dirs=[], rrpl=rrpl, build_id=build_id)
+        mock_write.assert_called_once()
+        args, kwargs = mock_write.call_args_list[0]
+        self.assertEqual(args[0], p)
 
     def test_dir(self):
-        with mock.patch.object(cl_utils, 'symlink_relative') as mock_link:
+        p = Path('big/bad/dir')
+        rrpl = Path('action_log.rrpl')
+        build_id = 'yzzyx'
+        with mock.patch.object(remote_action,
+                               '_write_lines_to_file') as mock_write:
             remote_action.make_download_stubs(
-                files=[], dirs=['big/bad/dir'], rrpl='action_log.rrpl')
-        mock_link.assert_called_once()
+                files=[], dirs=[p], rrpl=rrpl, build_id=build_id)
+        mock_write.assert_called_once()
+        args, kwargs = mock_write.call_args_list[0]
+        self.assertEqual(args[0], p / '.dlstub')
 
     def test_made_download_stubs(self):
         exec_root = Path('/home/project')
@@ -1276,18 +1289,23 @@ class DownloadStubsTests(unittest.TestCase):
         self.assertFalse(action.download_outputs)
         options = action.options
         self.assertIn(download_option, options)
-        with mock.patch.object(remote_action,
-                               'make_download_stubs') as mock_stub:
-            with mock.patch.object(
-                    remote_action.RemoteAction, '_run_maybe_remotely',
-                    return_value=cl_utils.SubprocessResult(0)) as mock_run:
-                exit_code = action.run()
+        logdir = '/fake/tmp/rpl/logz.932874'
+        with mock.patch.object(remote_action, '_reproxy_log_dir',
+                               return_value=logdir) as mock_log_dir:
+            with mock.patch.object(remote_action,
+                                   'make_download_stubs') as mock_stub:
+                with mock.patch.object(
+                        remote_action.RemoteAction, '_run_maybe_remotely',
+                        return_value=cl_utils.SubprocessResult(0)) as mock_run:
+                    exit_code = action.run()
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
+        mock_log_dir.assert_called_once()
         mock_stub.assert_called_with(
             files=[Path(output)],
             dirs=[],
             rrpl=Path(output + '.rrpl'),
+            build_id=logdir,
         )
 
 
@@ -1480,19 +1498,75 @@ class MainTests(unittest.TestCase):
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         with contextlib.redirect_stdout(stdout):
-            with mock.patch.object(sys, 'exit') as mock_exit:
-                # Normally, the following would not be reached due to exit(),
-                # but for testing it needs to be mocked out.
+            with mock.patch.object(
+                    remote_action,
+                    'auto_relaunch_with_reproxy') as mock_relaunch:
+                with mock.patch.object(sys, 'exit') as mock_exit:
+                    # Normally, the following would not be reached due to exit(),
+                    # but for testing it needs to be mocked out.
+                    with mock.patch.object(remote_action.RemoteAction,
+                                           'run_with_main_args',
+                                           return_value=0):
+                        self.assertEqual(remote_action.main(['--help']), 0)
+        mock_relaunch.assert_called_once()
+        mock_exit.assert_called_with(0)
+
+    def test_auto_relaunch_with_reproxy_not_needed_for_local(self):
+        command = ['--local', '--', 'echo', 'hello']
+        exit_code = 7
+        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
+                               return_value=exit_code):
+            self.assertEqual(remote_action.main(command), exit_code)
+
+    def test_auto_relaunch_with_reproxy_not_needed_for_dry_run(self):
+        command = ['--dry-run', '--', 'echo', 'hello']
+        self.assertEqual(remote_action.main(command), 0)
+
+    def test_auto_relaunch_with_reproxy_not_needed_with_env(self):
+        command = ['--', 'echo', 'hello']
+        exit_code = 9
+        with mock.patch.object(os.environ, 'get',
+                               return_value='/any/value/will/do') as mock_env:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=exit_code) as mock_run:
+                self.assertEqual(remote_action.main(command), exit_code)
+        mock_env.assert_called()
+        mock_run.assert_called_once()
+
+    def test_auto_relaunch_with_reproxy_needed(self):
+        command = ['--', 'echo', 'hello']
+        # Expect to relaunch because the necessary env variables
+        # are absent.
+        with mock.patch.object(os.environ, 'get',
+                               return_value=None) as mock_env:
+            with mock.patch.object(os, 'execv') as mock_relaunch:
+                # In reality, no other code is reached after an execv,
+                # but the following mock is still needed for unit-testing.
                 with mock.patch.object(remote_action.RemoteAction,
-                                       'run_with_main_args', return_value=0):
-                    self.assertEqual(remote_action.main(['--help']), 0)
-            mock_exit.assert_called_with(0)
+                                       'run_with_main_args') as mock_run:
+                    remote_action.main(command)
+        mock_run.assert_called_once()
+        mock_relaunch.assert_called_once()
+        args, kwargs = mock_relaunch.call_args_list[0]
+        self.assertEqual(args[0], fuchsia.REPROXY_WRAP)
+        relaunch_args = args[1]
+        cmd_slices = cl_utils.split_into_subsequences(relaunch_args, '--')
+        reproxy_args, self_script, wrapped_command = cmd_slices
+        self.assertEqual(reproxy_args, [])
+        self.assertIn('python', self_script[0])
+        self.assertTrue(self_script[-1].endswith('remote_action.py'))
+        self.assertEqual(wrapped_command, command[1:])
 
     def test_main_args_remote_inputs(self):
         command = ['--inputs', 'src/in.txt', '--', 'echo', 'hello']
-        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
-                               return_value=0) as mock_run:
-            self.assertEqual(remote_action.main(command), 0)
+        with mock.patch.object(remote_action,
+                               'auto_relaunch_with_reproxy') as mock_relaunch:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=0) as mock_run:
+                self.assertEqual(remote_action.main(command), 0)
+        mock_relaunch.assert_called_once()
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
@@ -1503,9 +1577,13 @@ class MainTests(unittest.TestCase):
             '--inputs', 'src/in.txt', '--inputs=another.s', '--', 'echo',
             'hello'
         ]
-        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
-                               return_value=0) as mock_run:
-            self.assertEqual(remote_action.main(command), 0)
+        with mock.patch.object(remote_action,
+                               'auto_relaunch_with_reproxy') as mock_relaunch:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=0) as mock_run:
+                self.assertEqual(remote_action.main(command), 0)
+        mock_relaunch.assert_called_once()
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
@@ -1513,9 +1591,13 @@ class MainTests(unittest.TestCase):
 
     def test_main_args_local(self):
         command = ['--local', '--', 'echo', 'hello']
-        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
-                               return_value=0) as mock_run:
-            self.assertEqual(remote_action.main(command), 0)
+        with mock.patch.object(remote_action,
+                               'auto_relaunch_with_reproxy') as mock_relaunch:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=0) as mock_run:
+                self.assertEqual(remote_action.main(command), 0)
+        mock_relaunch.assert_called_once()
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
@@ -1523,9 +1605,13 @@ class MainTests(unittest.TestCase):
 
     def test_flag_forwarding_remote_disable(self):
         command = ['--', 'echo', '--remote-disable', 'hello']
-        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
-                               return_value=0) as mock_run:
-            self.assertEqual(remote_action.main(command), 0)
+        with mock.patch.object(remote_action,
+                               'auto_relaunch_with_reproxy') as mock_relaunch:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=0) as mock_run:
+                self.assertEqual(remote_action.main(command), 0)
+        mock_relaunch.assert_called_once()
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]
@@ -1533,9 +1619,13 @@ class MainTests(unittest.TestCase):
 
     def test_main_args_local_check_determinism(self):
         command = ['--local', '--check-determinism', '--', 'echo', 'hello']
-        with mock.patch.object(remote_action.RemoteAction, 'run_with_main_args',
-                               return_value=0) as mock_run:
-            self.assertEqual(remote_action.main(command), 0)
+        with mock.patch.object(remote_action,
+                               'auto_relaunch_with_reproxy') as mock_relaunch:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   'run_with_main_args',
+                                   return_value=0) as mock_run:
+                self.assertEqual(remote_action.main(command), 0)
+        mock_relaunch.assert_called_once()
         mock_run.assert_called_once()
         args, kwargs = mock_run.call_args_list[0]
         main_args = args[0]

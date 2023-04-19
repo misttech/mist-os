@@ -94,6 +94,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            auto_reproxy=False,
         )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
@@ -127,7 +128,10 @@ class CxxRemoteActionTests(unittest.TestCase):
                 compiler, '--target=riscv64-apple-darwin21', '-c', source, '-o',
                 output
             ])
-        c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+        c = cxx_remote_wrapper.CxxRemoteAction(
+            ['--'] + command,
+            auto_reproxy=False,
+        )
         self.assertTrue(c.local_only)
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
@@ -146,7 +150,10 @@ class CxxRemoteActionTests(unittest.TestCase):
                 compiler, '--target=riscv64-apple-darwin21', '-c', source, '-o',
                 output
             ])
-        c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+        c = cxx_remote_wrapper.CxxRemoteAction(
+            ['--'] + command,
+            auto_reproxy=False,
+        )
         self.assertTrue(c.local_only)
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
@@ -173,7 +180,10 @@ class CxxRemoteActionTests(unittest.TestCase):
             with mock.patch.object(os, 'curdir', fake_cwd):
                 with mock.patch.object(remote_action, 'PROJECT_ROOT',
                                        fake_root):
-                    c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+                    c = cxx_remote_wrapper.CxxRemoteAction(
+                        ['--'] + command,
+                        auto_reproxy=False,
+                    )
                     self.assertEqual(c.prepare(), 0)
                     self.assertEqual(
                         c.remote_compile_action.exec_root, fake_root)
@@ -198,7 +208,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                                'check_missing_remote_tools') as mock_check:
             with mock.patch.object(remote_action, 'PROJECT_ROOT', fake_root):
                 c = cxx_remote_wrapper.CxxRemoteAction(
-                    ['--'] + command, working_dir=fake_cwd)
+                    ['--'] + command, working_dir=fake_cwd, auto_reproxy=False)
                 self.assertEqual(c.prepare(), 0)
                 self.assertTrue(c.cxx_action.compiler_is_clang)
                 self.assertEqual(c.remote_compile_action.exec_root, fake_root)
@@ -231,6 +241,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            auto_reproxy=False,
         )
 
         with mock.patch.object(cxx_remote_wrapper,
@@ -251,6 +262,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            auto_reproxy=False,
         )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
@@ -296,6 +308,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                 working_dir=fake_cwd,
                 # Pretend host != 'linux-x64' to cross-compile
                 host_platform='mac-arm64',
+                auto_reproxy=False,
             )
             # compile command doesn't reference Mac SDK, so remote integrated
             # preprocessing is possible.
@@ -358,6 +371,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                 working_dir=fake_cwd,
                 # Pretend host != 'linux-x64' to cross-compile
                 host_platform='mac-arm64',
+                auto_reproxy=False,
             )
             # compile command references Mac SDK, so preprocess locally
             self.assertEqual(c.cpp_strategy, 'local')
@@ -427,6 +441,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                     working_dir=fake_cwd,
                     # Pretend host != 'linux-x64' to cross-compile
                     host_platform='mac-arm64',
+                    auto_reproxy=False,
                 )
                 self.assertEqual(c.cpp_strategy, 'integrated')
                 self.assertEqual(c.prepare(), 0)
@@ -450,37 +465,72 @@ class MainTests(unittest.TestCase):
         # due to argument parsing.
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            with mock.patch.object(sys, 'exit') as mock_exit:
-                # Normally, the following would not be reached due to exit(),
-                # but for testing it needs to be mocked out.
-                with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
-                                       'run', return_value=0):
-                    self.assertEqual(cxx_remote_wrapper.main([]), 0)
-            mock_exit.assert_called_with(0)
+            with mock.patch.object(
+                    remote_action,
+                    'auto_relaunch_with_reproxy') as mock_relaunch:
+                with mock.patch.object(sys, 'exit') as mock_exit:
+                    # Normally, the following would not be reached due to exit(),
+                    # but for testing it needs to be mocked out.
+                    with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                           'run', return_value=0):
+                        self.assertEqual(cxx_remote_wrapper.main([]), 0)
+        mock_relaunch.assert_called_once()
+        mock_exit.assert_called_with(0)
 
     def test_help_flag(self):
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            with mock.patch.object(sys, 'exit') as mock_exit:
-                # Normally, the following would not be reached due to exit(),
-                # but for testing it needs to be mocked out.
-                with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
-                                       'run', return_value=0):
-                    self.assertEqual(cxx_remote_wrapper.main(['--help']), 0)
-            mock_exit.assert_called_with(0)
+            with mock.patch.object(
+                    remote_action,
+                    'auto_relaunch_with_reproxy') as mock_relaunch:
+                with mock.patch.object(sys, 'exit') as mock_exit:
+                    # Normally, the following would not be reached due to exit(),
+                    # but for testing it needs to be mocked out.
+                    with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                           'run', return_value=0):
+                        self.assertEqual(cxx_remote_wrapper.main(['--help']), 0)
+        mock_relaunch.assert_called_once()
+        mock_exit.assert_called_with(0)
 
     def test_local_mode_forced(self):
         exit_code = 24
-        with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
-                               '_run_locally',
-                               return_value=exit_code) as mock_run:
-            self.assertEqual(
-                cxx_remote_wrapper.main(
-                    ['--local', '--', 'clang++', '-c', 'foo.cc', '-o',
-                     'foo.o']), exit_code)
+        with mock.patch.object(remote_action,
+                               'auto_relaunch_with_reproxy') as mock_relaunch:
+            with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                   '_run_locally',
+                                   return_value=exit_code) as mock_run:
+                self.assertEqual(
+                    cxx_remote_wrapper.main(
+                        [
+                            '--local', '--', 'clang++', '-c', 'foo.cc', '-o',
+                            'foo.o'
+                        ]), exit_code)
+        mock_relaunch.assert_called_once()
         mock_run.assert_called_with()
+
+    def test_auto_relaunched_with_reproxy(self):
+        argv = ['--', 'clang++', '-c', 'foo.cc', '-o', 'foo.o']
+        with mock.patch.object(os.environ, 'get',
+                               return_value=None) as mock_env:
+            with mock.patch.object(os, 'execv') as mock_relaunch:
+                # In reality, no other code is reached after an execv,
+                # but the following mocks are still needed for unit-testing.
+                with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                       'run', return_value=0) as mock_run:
+                    cxx_remote_wrapper.main(argv)
+        mock_env.assert_called()
+        mock_relaunch.assert_called_once()
+        args, kwargs = mock_relaunch.call_args_list[0]
+        self.assertEqual(args[0], fuchsia.REPROXY_WRAP)
+        relaunch_args = args[1]
+        cmd_slices = cl_utils.split_into_subsequences(relaunch_args, '--')
+        reproxy_args, self_script, wrapped_command = cmd_slices
+        self.assertEqual(reproxy_args, [])
+        self.assertIn('python', self_script[0])
+        self.assertTrue(self_script[-1].endswith('cxx_remote_wrapper.py'))
+        self.assertEqual(wrapped_command, argv[1:])
 
 
 if __name__ == '__main__':
