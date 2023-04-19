@@ -68,6 +68,11 @@ class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource>
  public:
   TestRootResource() { EXPECT_EQ(ZX_OK, zx::event::create(0, &fake_resource_)); }
 
+  fidl::ProtocolHandler<fboot::RootResource> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
  private:
   void Get(GetCompleter::Sync& completer) override {
     zx::event duplicate;
@@ -79,6 +84,7 @@ class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource>
     printf("Not implemented: RootResource::%s\n", name.data());
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
+  fidl::ServerBindingGroup<fboot::RootResource> bindings_;
 
   // An event is similar enough that we can pretend it's the root resource, in that we can
   // send it over a FIDL channel.
@@ -86,11 +92,19 @@ class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource>
 };
 
 class TestItems : public fidl::testing::WireTestBase<fboot::Items> {
+ public:
+  fidl::ProtocolHandler<fboot::Items> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
  private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     printf("Not implemented: Items::%s\n", name.data());
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
+
+  fidl::ServerBindingGroup<fboot::Items> bindings_;
 };
 
 class TestFile : public fidl::testing::WireTestBase<fio::File> {
@@ -193,6 +207,12 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
   explicit TestProfileProvider(std::string expected_role)
       : expected_role_(std::move(expected_role)) {}
 
+  fidl::ProtocolHandler<fuchsia_scheduler::ProfileProvider> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+ private:
   void GetProfile(GetProfileRequestView request, GetProfileCompleter::Sync& completer) override {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, zx::profile());
   }
@@ -219,13 +239,19 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
     printf("Not implemented: ProfileProvider::%s", name.data());
   }
 
- private:
+  fidl::ServerBindingGroup<fuchsia_scheduler::ProfileProvider> bindings_;
   std::string expected_role_;
 };
 
 class TestSystemStateTransition
     : public fidl::testing::WireTestBase<fuchsia_device_manager::SystemStateTransition> {
  public:
+  fidl::ProtocolHandler<fuchsia_device_manager::SystemStateTransition> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+ private:
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
     completer.Reply(fuchsia_device_manager::wire::SystemPowerState::kFullyOn);
   }
@@ -233,6 +259,8 @@ class TestSystemStateTransition
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     printf("Not implemented: SystemStateTransition::%s", name.data());
   }
+
+  fidl::ServerBindingGroup<fuchsia_device_manager::SystemStateTransition> bindings_;
 };
 
 class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
@@ -271,21 +299,12 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 
 class IncomingNamespace {
  public:
-  // This is to avoid the DispatcherBound raw pointer errors.
-  // We know that `sync_completion_t` is thread safe.
-  struct CompletionWrapper {
-    sync_completion_t* completion;
-  };
-  void TearDown(CompletionWrapper completion) {
-    vfs_->Shutdown([completion](auto status) { sync_completion_signal(completion.completion); });
-  }
-
   zx::result<> Start(std::string_view v1_driver_path, zx_status_t compat_file_response,
                      std::unordered_map<std::string, TestDevice> devices,
                      std::string expected_profile_role, fidl::ServerEnd<fio::Directory> pkg_server,
                      fidl::ServerEnd<fio::Directory> svc_server) {
     async_dispatcher_t* dispatcher = async_get_default_dispatcher();
-    profile_provider_ = TestProfileProvider(std::move(expected_profile_role));
+    profile_provider_.emplace(std::move(expected_profile_role));
 
     std::map<std::string, std::string> arguments;
     arguments["kernel.shell"] = "true";
@@ -313,79 +332,84 @@ class IncomingNamespace {
 
     // Setup and bind "/svc" directory.
     {
-      auto svc = fbl::MakeRefCounted<fs::PseudoDir>();
-      svc->AddEntry(fidl::DiscoverableProtocolName<flogger::LogSink>,
-                    fbl::MakeRefCounted<fs::Service>([dispatcher](zx::channel server) {
-                      fidl::ServerEnd<flogger::LogSink> server_end(std::move(server));
-                      fidl::BindServer(dispatcher, std::move(server_end),
-                                       std::make_unique<TestLogSink>());
-                      return ZX_OK;
-                    }));
-
-      svc->AddEntry(fidl::DiscoverableProtocolName<fboot::RootResource>,
-                    fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
-                      fidl::ServerEnd<fboot::RootResource> server_end(std::move(server));
-                      fidl::BindServer(dispatcher, std::move(server_end), &root_resource_);
-                      return ZX_OK;
-                    }));
-
-      svc->AddEntry(fidl::DiscoverableProtocolName<fboot::Items>,
-                    fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
-                      fidl::ServerEnd<fboot::Items> server_end(std::move(server));
-                      fidl::BindServer(dispatcher, std::move(server_end), &items_);
-                      return ZX_OK;
-                    }));
-
-      svc->AddEntry(fidl::DiscoverableProtocolName<fboot::Arguments>,
-                    fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
-                      fidl::ServerEnd<fboot::Arguments> server_end(std::move(server));
-                      fidl::BindServer(dispatcher, std::move(server_end), &boot_args_);
-                      return ZX_OK;
-                    }));
-
-      svc->AddEntry(
-          fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>,
-          fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
-            fidl::ServerEnd<fuchsia_scheduler::ProfileProvider> server_end(std::move(server));
-            fidl::BindServer(dispatcher, std::move(server_end), &profile_provider_);
-            return ZX_OK;
-          }));
-
-      svc->AddEntry(fidl::DiscoverableProtocolName<fuchsia_device_manager::SystemStateTransition>,
-                    fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
-                      fidl::ServerEnd<fuchsia_device_manager::SystemStateTransition> server_end(
-                          std::move(server));
-                      fidl::BindServer(dispatcher, std::move(server_end),
-                                       &system_state_transition_);
-                      return ZX_OK;
-                    }));
-
-      auto compat_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-      for (auto& device : devices) {
-        auto device_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-        device_dir->AddEntry(
-            fuchsia_driver_compat::Service::Device::Name,
-            fbl::MakeRefCounted<fs::Service>(
-                [dispatcher, device = std::make_shared<TestDevice>(std::move(device.second))](
-                    zx::channel server) {
-                  fidl::ServerEnd<fuchsia_driver_compat::Device> server_end(std::move(server));
-                  fidl::BindServer(dispatcher, std::move(server_end), device);
-                  return ZX_OK;
-                }));
-        compat_dir->AddEntry(device.first, device_dir);
+      zx::result result = outgoing.AddUnmanagedProtocol<flogger::LogSink>(
+          [dispatcher](fidl::ServerEnd<flogger::LogSink> server) {
+            fidl::BindServer(dispatcher, std::move(server), std::make_unique<TestLogSink>());
+          });
+      if (result.is_error()) {
+        return result.take_error();
       }
-      svc->AddEntry("fuchsia.driver.compat.Service", compat_dir);
 
-      vfs_.emplace(dispatcher);
-      vfs_->ServeDirectory(svc, std::move(svc_server));
+      result = outgoing.AddUnmanagedProtocol<fboot::RootResource>(root_resource_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      result = outgoing.AddUnmanagedProtocol<fboot::Items>(items_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      result = outgoing.AddUnmanagedProtocol<fboot::Arguments>(
+          [this, dispatcher](fidl::ServerEnd<fboot::Arguments> server) {
+            fidl::BindServer(dispatcher, std::move(server), &boot_args_);
+          });
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      result = outgoing.AddUnmanagedProtocol<fuchsia_scheduler::ProfileProvider>(
+          profile_provider_->GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::SystemStateTransition>(
+          system_state_transition_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      devices_ = std::move(devices);
+      for (auto& device : devices_) {
+        TestDevice* device_ptr = &device.second;
+        zx::result result = outgoing.AddService<fuchsia_driver_compat::Service>(
+            fuchsia_driver_compat::Service::InstanceHandler({
+                .device =
+                    [device_ptr,
+                     dispatcher](fidl::ServerEnd<fuchsia_driver_compat::Device> server) {
+                      fidl::BindServer(dispatcher, std::move(server), device_ptr);
+                    },
+            }),
+            device.first);
+        if (result.is_error()) {
+          return result.take_error();
+        }
+      }
+
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+      if (endpoints.is_error()) {
+        return endpoints.take_error();
+      }
+      if (zx::result result = outgoing.Serve(std::move(endpoints->server)); result.is_error()) {
+        return result.take_error();
+      }
+      fidl::OneWayError error =
+          fidl::WireCall(endpoints->client)
+              ->Open(fuchsia_io::wire::OpenFlags::kDirectory, fuchsia_io::ModeType(), "svc",
+                     fidl::ServerEnd<fuchsia_io::Node>(svc_server.TakeChannel()));
+      if (!error.ok()) {
+        return zx::error(error.status());
+      }
     }
 
     return zx::ok();
   }
 
  private:
+  std::unordered_map<std::string, TestDevice> devices_;
   TestRootResource root_resource_;
-  TestProfileProvider profile_provider_;
+  std::optional<TestProfileProvider> profile_provider_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
   TestFile compat_file_;
@@ -393,7 +417,7 @@ class IncomingNamespace {
   TestFile firmware_file_;
   TestDirectory pkg_directory_;
   TestSystemStateTransition system_state_transition_;
-  std::optional<fs::ManagedVfs> vfs_;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
 }  // namespace
@@ -409,12 +433,7 @@ class DriverTest : public testing::Test {
     node_.emplace("root", dispatcher());
   }
 
-  void TearDown() override {
-    libsync::Completion completion;
-    incoming_ns_.AsyncCall(&IncomingNamespace::TearDown,
-                           IncomingNamespace::CompletionWrapper{completion.get()});
-    completion.Wait();
-  }
+  void TearDown() override {}
 
   struct StartDriverArgs {
     std::string_view v1_driver_path;
