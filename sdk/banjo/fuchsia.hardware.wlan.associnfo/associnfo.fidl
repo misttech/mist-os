@@ -12,20 +12,6 @@ type WlanKeyType = strict enum : uint8 {
 };
 // LINT.ThenChange(//src/connectivity/wlan/lib/mlme/rust/src/key.rs)
 
-/// Guard Interval
-type WlanGi = strict enum : uint8 {
-    /// all 802.11 phy
-    G_800NS = 0x1;
-    /// 802.11n/ac
-    G_400NS = 0x2;
-    /// 802.11n/ac
-    G_200NS = 0x4;
-    /// 802.11ax
-    G_3200NS = 0x10;
-    /// 802.11ax
-    G_1600NS = 0x20;
-};
-
 /// Access category
 /// WFA WMM v1.2, 2.2.2 Table 6
 type WlanAccessCategory = strict enum {

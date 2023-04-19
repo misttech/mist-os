@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
+    crate::common::mac::WlanGi,
     crate::probe_sequence::{ProbeEntry, ProbeSequence},
-    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fuchsia_zircon as zx,
     log::{debug, error},
@@ -223,26 +223,26 @@ impl Peer {
         let mcs_set = ht_cap.mcs_set;
         self.add_supported_ht(
             banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
+            WlanGi::G_800NS,
             mcs_set.rx_mcs(),
         );
         if sgi_20 {
             self.add_supported_ht(
                 banjo_common::ChannelBandwidth::CBW20,
-                banjo_wlan_associnfo::WlanGi::G_400NS,
+                WlanGi::G_400NS,
                 mcs_set.rx_mcs(),
             );
         }
         if ASSOC_CHAN_WIDTH == banjo_common::ChannelBandwidth::CBW40 {
             self.add_supported_ht(
                 banjo_common::ChannelBandwidth::CBW40,
-                banjo_wlan_associnfo::WlanGi::G_800NS,
+                WlanGi::G_800NS,
                 mcs_set.rx_mcs(),
             );
             if sgi_40 {
                 self.add_supported_ht(
                     banjo_common::ChannelBandwidth::CBW40,
-                    banjo_wlan_associnfo::WlanGi::G_400NS,
+                    WlanGi::G_400NS,
                     mcs_set.rx_mcs(),
                 );
             }
@@ -256,7 +256,7 @@ impl Peer {
     fn add_supported_ht(
         &mut self,
         channel_bandwidth: banjo_common::ChannelBandwidth,
-        gi: banjo_wlan_associnfo::WlanGi,
+        gi: WlanGi,
         mcs_set: RxMcsBitmask,
     ) {
         let mut tx_stats_added = 0;
@@ -600,7 +600,7 @@ fn tx_vec_idx_opt_to_u16(tx_vec_idx: &Option<TxVecIdx>) -> u16 {
 
 fn tx_time_ht(
     channel_bandwidth: banjo_common::ChannelBandwidth,
-    gi: banjo_wlan_associnfo::WlanGi,
+    gi: WlanGi,
     relative_mcs_idx: u8,
 ) -> Duration {
     header_tx_time_ht() + payload_tx_time_ht(channel_bandwidth, gi, relative_mcs_idx)
@@ -618,7 +618,7 @@ fn header_tx_time_ht() -> Duration {
 // VHT)
 fn payload_tx_time_ht(
     channel_bandwidth: banjo_common::ChannelBandwidth,
-    gi: banjo_wlan_associnfo::WlanGi,
+    gi: WlanGi,
     mcs_idx: u8,
 ) -> Duration {
     // N_{dbps} as defined in IEEE 802.11-2016 Table 19-26
@@ -647,12 +647,12 @@ fn payload_tx_time_ht(
 
     // Perform multiplication before division to prevent precision loss
     match gi {
-        banjo_wlan_associnfo::WlanGi::G_400NS => {
+        WlanGi::G_400NS => {
             TX_TIME_PADDING_GI_400
                 + (TX_TIME_PER_SYMBOL_GI_400 * 8 * MINSTREL_FRAME_LENGTH)
                     / (nss as u32 * bits_per_symbol as u32)
         }
-        banjo_wlan_associnfo::WlanGi::G_800NS => {
+        WlanGi::G_800NS => {
             (TX_TIME_PER_SYMBOL_GI_800 * 8 * MINSTREL_FRAME_LENGTH)
                 / (nss as u32 * bits_per_symbol as u32)
         }
@@ -1095,7 +1095,7 @@ mod tests {
     #[track_caller]
     fn assert_data_rate(
         channel_bandwidth: banjo_common::ChannelBandwidth,
-        gi: banjo_wlan_associnfo::WlanGi,
+        gi: WlanGi,
         relative_mcs_idx: u8,
         expected_mbit_per_second: f64,
     ) {
@@ -1103,7 +1103,7 @@ mod tests {
         const BYTES_PER_MBIT: f64 = 125000.0;
         let mut expected_tx_time =
             (MINSTREL_FRAME_LENGTH as f64 / BYTES_PER_MBIT) / expected_mbit_per_second;
-        if gi == banjo_wlan_associnfo::WlanGi::G_400NS {
+        if gi == WlanGi::G_400NS {
             // Add 800ns test interval for short gap tx times. This becomes significant at high data rates.
             expected_tx_time += Duration::from_nanos(800).as_secs_f64();
         }
@@ -1115,82 +1115,22 @@ mod tests {
     #[test]
     fn tx_time_ht_approx_values_cbw20() {
         // IEEE 802.11-2016 Tables 19-27 through 19-30 list data rates for CBW20. We test a sample here.
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
-            0,
-            6.5,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_400NS,
-            0,
-            7.2,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
-            8,
-            13.0,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_400NS,
-            8,
-            14.4,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
-            31,
-            260.0,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW20,
-            banjo_wlan_associnfo::WlanGi::G_400NS,
-            31,
-            288.9,
-        );
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_800NS, 0, 6.5);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_400NS, 0, 7.2);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_800NS, 8, 13.0);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_400NS, 8, 14.4);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_800NS, 31, 260.0);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_400NS, 31, 288.9);
     }
 
     #[test]
     fn tx_time_ht_approx_values_cbw40() {
         // IEEE 802.11-2016 Tables 19-32 through 19-34 list data rates for CBW40. We test a sample here.
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW40,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
-            0,
-            13.5,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW40,
-            banjo_wlan_associnfo::WlanGi::G_400NS,
-            0,
-            15.0,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW40,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
-            8,
-            27.0,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW40,
-            banjo_wlan_associnfo::WlanGi::G_400NS,
-            8,
-            30.0,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW40,
-            banjo_wlan_associnfo::WlanGi::G_800NS,
-            31,
-            540.0,
-        );
-        assert_data_rate(
-            banjo_common::ChannelBandwidth::CBW40,
-            banjo_wlan_associnfo::WlanGi::G_400NS,
-            31,
-            600.0,
-        );
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_800NS, 0, 13.5);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_400NS, 0, 15.0);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_800NS, 8, 27.0);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_400NS, 8, 30.0);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_800NS, 31, 540.0);
+        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_400NS, 31, 600.0);
     }
 }

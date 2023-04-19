@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::common::mac::WlanGi,
     crate::{buffer::OutBuf, key},
     banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxStatus},
@@ -95,7 +96,7 @@ impl Device {
                 let mcs_idx = if frame_control.is_data() { 7 } else { 3 };
                 tx_vector::TxVector::new(
                     banjo_common::WlanPhyType::ERP,
-                    banjo_wlan_associnfo::WlanGi::G_800NS,
+                    WlanGi::G_800NS,
                     banjo_common::ChannelBandwidth::CBW20,
                     mcs_idx,
                 )

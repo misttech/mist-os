@@ -4,8 +4,8 @@
 
 use {
     crate::ie::SupportedRate,
+    crate::mac::WlanGi,
     anyhow::{bail, Error},
-    banjo_fuchsia_hardware_wlan_associnfo as hw_wlan_associnfo,
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as hw_wlan_softmac,
     fidl_fuchsia_wlan_common as fidl_common,
 };
@@ -67,7 +67,7 @@ pub const MAX_VALID_IDX: u16 = DSSS_CCK_START_IDX + DSSS_CCK_NUM_TX_VECTOR as u1
 ///     * 3: 22 -> 11  Mbps CCK
 pub struct TxVector {
     phy: banjo_common::WlanPhyType,
-    gi: hw_wlan_associnfo::WlanGi,
+    gi: WlanGi,
     cbw: banjo_common::ChannelBandwidth,
     nss: u8, // Number of spatial streams for VHT and beyond.
     // For HT,  see IEEE 802.11-2016 Table 19-27
@@ -79,7 +79,7 @@ pub struct TxVector {
 impl TxVector {
     pub fn new(
         phy: banjo_common::WlanPhyType,
-        gi: hw_wlan_associnfo::WlanGi,
+        gi: WlanGi,
         cbw: banjo_common::ChannelBandwidth,
         mcs_idx: u8,
     ) -> Result<Self, Error> {
@@ -88,7 +88,7 @@ impl TxVector {
             banjo_common::WlanPhyType::HR => mcs_idx == 2 || mcs_idx == 3,
             banjo_common::WlanPhyType::HT => {
                 match gi {
-                    hw_wlan_associnfo::WlanGi::G_800NS | hw_wlan_associnfo::WlanGi::G_400NS => (),
+                    WlanGi::G_800NS | WlanGi::G_400NS => (),
                     other => bail!("Unsupported GI for HT PHY: {:?}", other),
                 }
                 match cbw {
@@ -136,12 +136,7 @@ impl TxVector {
                 bail!("Invalid rate {} * 0.5 Mbps for 802.11a/b/g.", other_rate);
             }
         };
-        Self::new(
-            phy,
-            hw_wlan_associnfo::WlanGi::G_800NS,
-            banjo_common::ChannelBandwidth::CBW20,
-            mcs_idx,
-        )
+        Self::new(phy, WlanGi::G_800NS, banjo_common::ChannelBandwidth::CBW20, mcs_idx)
     }
 
     // We guarantee safety of the unwraps in the following two functions by testing all TxVecIdx
@@ -153,8 +148,8 @@ impl TxVector {
             banjo_common::WlanPhyType::HT => {
                 let group_idx = (*idx - HT_START_IDX) / HT_NUM_MCS as u16;
                 let gi = match (group_idx / HT_NUM_CBW as u16) % HT_NUM_GI as u16 {
-                    1 => hw_wlan_associnfo::WlanGi::G_400NS,
-                    _ => hw_wlan_associnfo::WlanGi::G_800NS,
+                    1 => WlanGi::G_400NS,
+                    _ => WlanGi::G_800NS,
                 };
                 let cbw = match group_idx % HT_NUM_CBW as u16 {
                     0 => banjo_common::ChannelBandwidth::CBW20,
@@ -165,14 +160,14 @@ impl TxVector {
             }
             banjo_common::WlanPhyType::ERP => Self::new(
                 phy,
-                hw_wlan_associnfo::WlanGi::G_800NS,
+                WlanGi::G_800NS,
                 banjo_common::ChannelBandwidth::CBW20,
                 (*idx - ERP_START_IDX) as u8,
             )
             .unwrap(),
             banjo_common::WlanPhyType::DSSS | banjo_common::WlanPhyType::HR => Self::new(
                 phy,
-                hw_wlan_associnfo::WlanGi::G_800NS,
+                WlanGi::G_800NS,
                 banjo_common::ChannelBandwidth::CBW20,
                 (*idx - DSSS_CCK_START_IDX) as u8,
             )
@@ -185,7 +180,7 @@ impl TxVector {
         match self.phy {
             banjo_common::WlanPhyType::HT => {
                 let group_idx = match self.gi {
-                    hw_wlan_associnfo::WlanGi::G_400NS => HT_NUM_CBW as u16,
+                    WlanGi::G_400NS => HT_NUM_CBW as u16,
                     _ => 0,
                 } + match self.cbw {
                     banjo_common::ChannelBandwidth::CBW40

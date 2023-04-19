@@ -158,3 +158,54 @@ pub trait OptionalField {
     const ABSENT: Presence<Self> = Presence::<Self>(false, PhantomData);
 }
 impl<T: ?Sized> OptionalField for T {}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct WlanGi(pub u8);
+
+// Guart intervals
+impl WlanGi {
+    pub const G_800NS: Self = Self(0x1); // all 802.11 phy
+    pub const G_400NS: Self = Self(0x2); // 802.11n/ac
+    pub const G_200NS: Self = Self(0x4); // 802.11n/ac
+    pub const G_3200NS: Self = Self(0x10); // 802.11ax
+    pub const G_1600NS: Self = Self(0x20); // 802.11ax
+}
+
+impl std::ops::BitAnd for WlanGi {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitAndAssign for WlanGi {
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = Self(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::BitOr for WlanGi {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for WlanGi {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = Self(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitXor for WlanGi {
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self {
+        Self(self.0 ^ rhs.0)
+    }
+}
+
+impl std::ops::BitXorAssign for WlanGi {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        *self = Self(self.0 ^ rhs.0)
+    }
+}
