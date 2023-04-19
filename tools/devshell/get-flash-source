@@ -65,8 +65,9 @@ function _query_manifest {
 
 function _build_gn_label {
   local target="${1#//}"
-  local default_toolchain_suffix="(//build/toolchain/fuchsia:x64)"
-  target="${target%${default_toolchain_suffix}}"
+  # Cut the toolchain suffix which begins with '(' if any.
+  # E.g. //src/foo(//build/toolchain/fuchsia:x64) --> //src/foo
+  target="$(printf %s "${target}" | cut -d'(' -f1)"
   # Important: redirect stdout to stderr to avoid polluting this script's
   # output. See https://fxbug.dev/125439
   >&2 fx-command-run build "${target}"

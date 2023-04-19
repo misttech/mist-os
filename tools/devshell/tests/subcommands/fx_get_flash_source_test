@@ -81,6 +81,28 @@ INPUT
   BT_EXPECT_FILE_CONTAINS "${build_args}" "build/images/flash:fastboot_manifest"
 }
 
+TEST_fx-get-flash-source-flash-manifest-with-build-and-toolchain() {
+  local build_args="${BT_TEMP_DIR}/build_args"
+
+  # Change the toolchain value from the default
+  cat > "${BT_TEMP_DIR}/out/default/images.json" <<EOF
+[
+  {
+    "label": "//build/images/flash:fastboot_manifest(//unknown:toolchain)",
+    "name": "flash-manifest",
+    "path": "flash.json",
+    "type": "manifest"
+  }
+]
+EOF
+  cat >"${BT_TEMP_DIR}/tools/devshell/build.mock_side_effects"<<INPUT
+printf %s "\$@" > "${build_args}"
+echo "Fake build output for testing - should be ignored"
+INPUT
+  BT_EXPECT_EQ "$(${fx} get-flash-source --build)" "flash-manifest:flash.json"
+  BT_EXPECT_FILE_CONTAINS "${build_args}" "build/images/flash:fastboot_manifest"
+}
+
 TEST_fx-get-flash-source-missing-flash-manifest() {
   cat > "${BT_TEMP_DIR}/out/default/images.json" <<EOF
 [
