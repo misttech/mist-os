@@ -7,6 +7,7 @@
 
 #include "zircon/system/ulib/inspector/backtrace.h"
 
+#include <elf-search.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -45,15 +46,13 @@ struct Frame {
   fbl::String message;
 };
 
-static std::vector<Frame> unwind_from_unwinder(zx_handle_t process, zx_handle_t thread,
-                                               inspector_dsoinfo_t* dso_list) {
+static std::vector<Frame> unwind_from_unwinder(zx_handle_t process, zx_handle_t thread) {
   // Setup memory and modules.
   unwinder::FuchsiaMemory memory(process);
   std::vector<uint64_t> modules;
-  while (dso_list) {
-    modules.push_back(dso_list->base);
-    dso_list = dso_list->next;
-  }
+  elf_search::ForEachModule(
+      *zx::unowned_process{process},
+      [&modules](const elf_search::ModuleInfo& info) { modules.push_back(info.vaddr); });
 
   // Setup registers.
   zx_thread_state_general_regs_t regs;
@@ -296,7 +295,7 @@ void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
 
   std::vector<Frame> stack;
   if (kUseNewUnwinder) {
-    stack = unwind_from_unwinder(process, thread, dso_list);
+    stack = unwind_from_unwinder(process, thread);
   } else {
     stack = unwind_from_ngunwind(process, thread, dso_list, pc, sp, fp);
   }
@@ -325,12 +324,9 @@ void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
         "warning: the backtrace above is from the shadow call stack because the backtrace from "
         "metadata-based unwinding is incomplete or corrupted. Here's the original backtrace:\n");
   } else if (!skip_markup_context) {
-    // Only print modules present in the stack.
-    std::vector<uint64_t> pcs;
-    std::transform(stack.begin(), stack.end(), std::back_inserter(pcs),
-                   [](const Frame& frame) { return frame.pc; });
-
-    print_markup_context(f, process, pcs);
+    // TODO(fxbug.dev/125728): always dump the full module list for now, because the context might
+    // be used by other threads.
+    print_markup_context(f, process, {});
   }
 
   print_stack(f, stack);
