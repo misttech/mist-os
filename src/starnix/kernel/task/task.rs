@@ -316,6 +316,10 @@ pub struct Task {
     /// It allows the calling task to block until the fork has been completed. Only populated
     /// when created with the CLONE_VFORK flag.
     vfork_event: Option<zx::Event>,
+
+    /// Whether the restricted mode executor should ignore exceptions associated with this Task's thread
+    // TODO(https://fxbug.dev/124427): Remove this mechanism once exceptions are handled inline.
+    pub ignore_exceptions: std::sync::atomic::AtomicBool,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -384,6 +388,7 @@ impl Task {
                 restricted_state_addr_and_size: None,
                 no_new_privs,
             }),
+            ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
         };
         #[cfg(any(test, debug_assertions))]
         {

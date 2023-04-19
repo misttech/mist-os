@@ -174,6 +174,20 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         restore_cfi_directives!();
 
         if let Some(exit_status) = process_completed_syscall(current_task, &error_context)? {
+            if let ExitStatus::CoreDump(_) = exit_status {
+                log_trace!("requesting backtrace");
+                // Disable exception processing on the exception handling thread since we're about
+                // to generate a SW breakpoint exception and we want the system to handle it. This
+                // is a temporary workaround. Once Zircon gains the ability to return exceptions
+                // generated from restricted mode through zx_restricted_enter's restricted_return
+                // call we can just generate an exception here in normal mode and it will not be
+                // confused with exceptions from restricted mode.
+                current_task.ignore_exceptions.store(true, std::sync::atomic::Ordering::Release);
+                // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
+                generate_cfi_directives!(state);
+                backtrace_request::backtrace_request();
+                restore_cfi_directives!();
+            }
             trace_duration_end!(
                 trace_category_starnix!(),
                 trace_name_run_task_loop!(),
@@ -273,6 +287,10 @@ fn handle_exceptions(task: Arc<Task>, exception_channel: zx::Channel) {
             let info = as_exception_info(&buffer);
             assert!(buffer.n_handles() == 1);
             let exception = zx::Exception::from(buffer.take_handle(0).unwrap());
+            if task.ignore_exceptions.load(std::sync::atomic::Ordering::Acquire) {
+                log_warn!("ignoring exception");
+                continue;
+            }
             let thread = exception.get_thread().unwrap();
             let report = thread.get_exception_report().unwrap();
 

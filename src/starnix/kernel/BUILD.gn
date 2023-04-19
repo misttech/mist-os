@@ -124,6 +124,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:utf8parse",
     "//third_party/rust_crates:vk-sys",
     "//third_party/rust_crates:zerocopy",
+    "//zircon/system/ulib/backtrace-request/rust",
   ]
 
   if (current_cpu == "x64") {
