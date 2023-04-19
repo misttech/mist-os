@@ -146,6 +146,12 @@ def accompany_rlib_with_so(deps: Iterable[Path]) -> Iterable[Path]:
                 yield so_file
 
 
+class RemoteInputProcessingError(RuntimeError):
+
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 class RustRemoteAction(object):
 
     def __init__(
@@ -180,7 +186,10 @@ class RustRemoteAction(object):
         if not filtered_command:  # there is no command, bail out early
             return
 
-        self._rust_action = rustc.RustAction(command=filtered_command)
+        self._rust_action = rustc.RustAction(
+            command=filtered_command,
+            working_dir=self.working_dir,
+        )
 
         # TODO: check for missing required flags, like --target
 
@@ -250,8 +259,12 @@ class RustRemoteAction(object):
         return self._rust_action.target
 
     @property
-    def sysroot(self) -> Optional[Path]:
-        return self._rust_action.sysroot
+    def rust_sysroot(self) -> Optional[Path]:
+        return self._rust_action.rust_sysroot
+
+    @property
+    def c_sysroot(self) -> Optional[Path]:
+        return self._rust_action.c_sysroot
 
     @property
     def linker(self) -> Optional[Path]:
@@ -288,8 +301,11 @@ class RustRemoteAction(object):
             list(self._rust_action.dep_only_command(local_depfile)))
         dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:
+            cmd_str = cl_utils.command_quoted_str(dep_only_command)
             self._prepare_status = dep_status
-            return
+            raise RemoteInputProcessingError(
+                f'Error: Local generation of depfile failed (exit={dep_status}): {cmd_str}'
+            )
 
         remote_depfile_inputs = list(
             depfile_inputs_by_line(_readlines_from_file(local_depfile)))
@@ -308,7 +324,7 @@ class RustRemoteAction(object):
         # remote compiler is an input
         remote_compiler = self.remote_compiler
         if not _tool_is_executable(remote_compiler):
-            raise Exception(
+            raise RemoteInputProcessingError(
                 f"Remote compilation requires {remote_compiler} to be available for uploading, but it is missing."
             )
         yield self.value_verbose('remote compiler', remote_compiler)
@@ -345,8 +361,9 @@ class RustRemoteAction(object):
         # instead of whole directories.
         if not self.target:
             return
-        libunwind_a = Path(
-            self.exec_root_rel, fuchsia.rust_stdlib_dir(self.target),
+        libunwind_a = (
+            self.rust_sysroot /  # relative to self.working_dir
+            fuchsia.rust_stdlib_subdir(target_triple=self.target) /
             'libunwind.a')
         if libunwind_a.exists():
             yield self.value_verbose('libunwind', libunwind_a)
@@ -451,7 +468,12 @@ class RustRemoteAction(object):
             return self._prepare_status
 
         # inputs and outputs are relative to current working dir
-        remote_inputs = list(self._remote_inputs())
+        try:
+            remote_inputs = list(self._remote_inputs())
+        except RemoteInputProcessingError as e:
+            msg(e)
+            return 1
+
         remote_output_files = list(self._remote_output_files())
         remote_output_dirs = list(self._remote_output_dirs())
 
@@ -499,21 +521,21 @@ class RustRemoteAction(object):
             yield self.value_verbose(
                 'remote runtime libdir', rt_libdir_remote[0])
         if len(rt_libdir_remote) > 1:
-            raise Exception(
+            raise RemoteInputProcessingError(
                 f"Found more than one clang runtime lib dir (don't know which one to use): {rt_libdir_remote}"
             )
 
-    def _sysroot_files(self) -> Iterable[Path]:
+    def _c_sysroot_files(self) -> Iterable[Path]:
         # sysroot files
         if not self.target:
             return
-        sysroot_dir = self.sysroot
+        c_sysroot_dir = self.c_sysroot
         sysroot_triple = fuchsia.rustc_target_to_sysroot_triple(self.target)
-        if sysroot_dir:
+        if c_sysroot_dir:
             yield from self.yield_verbose(
-                'sysroot files',
-                fuchsia.sysroot_files(
-                    sysroot_dir=sysroot_dir,
+                'C sysroot files',
+                fuchsia.c_sysroot_files(
+                    sysroot_dir=c_sysroot_dir,
                     sysroot_triple=sysroot_triple,
                     with_libgcc=self._rust_action.want_sysroot_libgcc,
                 ))
@@ -536,7 +558,7 @@ class RustRemoteAction(object):
                 'remote rust lld',
                 fuchsia.remote_rustc_to_rust_lld_path(self.remote_compiler))
 
-        yield from self._sysroot_files()
+        yield from self._c_sysroot_files()
 
     def _depfile_exists(self) -> bool:
         # Defined for easy mocking.

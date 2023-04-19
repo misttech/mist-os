@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest import mock
 
 import rustc_remote_wrapper
+import rustc
 import cl_utils
 import fuchsia
 import remote_action
@@ -131,6 +132,13 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 'remote_clang_libcxx_static',
                 return_value=libcxx_static or '')
 
+        # expected to be called through _rust_stdlib_libunwind_inputs()
+        # when --sysroot is unspecified.
+        yield mock.patch.object(
+            rustc.RustAction,
+            'default_rust_sysroot',
+            return_value=Path('../some/random/sysroot'))
+
     def test_prepare_basic(self):
         exec_root = Path('/home/project')
         working_dir = exec_root / 'build-here'
@@ -204,6 +212,30 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(
             remote_inputs, set([compiler, shlib_rel, source] + deps))
         self.assertEqual(remote_output_files, {rlib, depfile_path})
+
+    def test_prepare_depfile_failure(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/bin/rustc')
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        depfile_path = Path('obj/foo.rlib.d')
+        # mocking failure, no need for actual depfile contents
+        command = _strs(
+            [compiler, source, '-o', rlib, f'--emit=dep-info={depfile_path}'])
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            auto_reproxy=False,
+        )
+
+        # Make sure internal RuntimeError gets handled.
+        with mock.patch.object(rustc_remote_wrapper, '_make_local_depfile',
+                               return_value=1) as mock_deps:
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 1)  # failure
 
     def test_prepare_externs(self):
         exec_root = Path('/home/project')

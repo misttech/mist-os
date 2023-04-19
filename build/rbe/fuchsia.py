@@ -144,14 +144,14 @@ def remote_clang_libcxx_static(clang_lib_triple: str) -> str:
     return REMOTE_CLANG_SUBDIR / 'lib' / clang_lib_triple / 'libc++.a'
 
 
-def rust_stdlib_dir(target_triple: str) -> str:
-    """Location of rustlib standard libraries.
+def rust_stdlib_subdir(target_triple: str) -> str:
+    """Location of rustlib standard libraries relative to rust --sysroot.
 
     This depends on where target libdirs live relative to the rustc compiler.
     It is possible that the target libdirs may move to a location separate
     from where the host tools reside.  See https://fxbug.dev/111727.
     """
-    return REMOTE_RUSTC_SUBDIR / 'lib' / 'rustlib' / target_triple / 'lib'
+    return Path('lib') / 'rustlib' / target_triple / 'lib'
 
 
 def rustc_target_to_sysroot_triple(target: str) -> str:
@@ -231,7 +231,7 @@ _SYSROOT_USR_LIB_FILES = (
 )
 
 
-def sysroot_files(sysroot_dir: Path, sysroot_triple: str,
+def c_sysroot_files(sysroot_dir: Path, sysroot_triple: str,
                   with_libgcc: bool) -> Iterable[Path]:
     """Expanded list of sysroot files under the Fuchsia build output dir.
 

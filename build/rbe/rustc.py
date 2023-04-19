@@ -62,7 +62,7 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
         "--sysroot",
         type=Path,
         default=None,
-        help="compiler sysroot",
+        help="compiler sysroot, where target-specific rustlibs can be found",
     )
     parser.add_argument(
         "--target",
@@ -156,9 +156,10 @@ def find_compiler_from_command(command: Iterable[str]) -> Path:
 class RustAction(object):
     """This is a rustc compile action."""
 
-    def __init__(self, command: Sequence[str]):
+    def __init__(self, command: Sequence[str], working_dir: Path = None):
         # keep a copy of the original command
         self._command = command
+        self._working_dir = (working_dir or Path(os.curdir)).absolute()
         # analyze command using canonical expanded form
         self._attributes, remaining_args = _RUSTC_COMMAND_SCANNER.parse_known_args(
             list(
@@ -184,7 +185,7 @@ class RustAction(object):
             convert_type=Path)
 
         # post-process some flags
-        self._sysroot = ''
+        self._c_sysroot = ''
         self._want_sysroot_libgcc = False
         self._link_arg_files = []
         for arg in self._link_arg_flags:
@@ -193,7 +194,7 @@ class RustAction(object):
                 continue
             left, sep, right = arg.partition('=')
             if left == '--sysroot':
-                self._sysroot = Path(right)
+                self._c_sysroot = Path(right)
                 continue
             if is_linkable(arg):
                 self._link_arg_files.append(arg)
@@ -206,6 +207,10 @@ class RustAction(object):
     def command(self) -> Sequence[str]:
         """The original command."""
         return self._command
+
+    @property
+    def working_dir(self) -> Path:
+        return self._working_dir
 
     @property
     def output_file(self) -> Optional[Path]:
@@ -291,9 +296,26 @@ class RustAction(object):
                 return Path(_remove_prefix(arg, '--Map='))
         return None
 
+    def default_rust_sysroot(self) -> Path:
+        """This is the relative location of rust sysroot, when unspecified."""
+        command = [str(self.compiler), '--print', 'sysroot']
+        result = cl_utils.subprocess_call(
+            command, cwd=self.working_dir, quiet=True)
+        if result.returncode != 0:
+            raise RuntimeError('Error: unable to infer default rust sysroot')
+        # expect one line with the absolute path to the sysroot
+        sysroot_abs = Path(result.stdout[0].strip())
+        sysroot_rel = cl_utils.relpath(sysroot_abs, start=self.working_dir)
+        return sysroot_rel
+
     @property
-    def sysroot(self) -> Path:
-        return self._sysroot
+    def rust_sysroot(self) -> Path:
+        """This is where the target rustlibs for all platforms live."""
+        return self._attributes.sysroot or self.default_rust_sysroot()
+
+    @property
+    def c_sysroot(self) -> Path:
+        return self._c_sysroot
 
     @property
     def native(self) -> Sequence[Path]:

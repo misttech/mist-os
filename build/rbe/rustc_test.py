@@ -9,6 +9,9 @@ from unittest import mock
 from pathlib import Path
 
 import rustc
+
+import cl_utils
+
 from typing import Any, Sequence
 
 
@@ -53,7 +56,7 @@ class RustActionTests(unittest.TestCase):
         self.assertIsNone(r.linker)
         self.assertEqual(r.link_arg_files, [])
         self.assertIsNone(r.link_map_output)
-        self.assertEqual(r.sysroot, '')
+        self.assertEqual(r.c_sysroot, '')
         self.assertEqual(r.native, [])
         self.assertEqual(r.explicit_link_arg_files, [])
         self.assertEqual(r.externs, {})
@@ -183,14 +186,47 @@ class RustActionTests(unittest.TestCase):
             _paths({'obj/foo-feedbeef.bc', 'obj/foo-feedbeef.ll'}),
             set(r.extra_output_files()))
 
-    def test_sysroot(self):
-        sysroot = Path('../path/to/platform/sysroot')
+    def test_c_sysroot(self):
+        c_sysroot = Path('../path/to/platform/sysroot')
         r = rustc.RustAction(
             [
-                '../tools/rustc', f'-Clink-arg=--sysroot={sysroot}',
+                '../tools/rustc', f'-Clink-arg=--sysroot={c_sysroot}',
                 '../foo/lib.rs', '-o', 'foo.rlib'
             ])
-        self.assertEqual(r.sysroot, sysroot)
+        self.assertEqual(r.c_sysroot, c_sysroot)
+
+    def test_rust_sysroot(self):
+        rust_sysroot = Path('../path/to/rust/sysroot')
+        r = rustc.RustAction(
+            [
+                '../tools/rustc', '--sysroot',
+                str(rust_sysroot), '../foo/lib.rs', '-o', 'foo.rlib'
+            ])
+        self.assertEqual(r.rust_sysroot, rust_sysroot)
+
+    def test_rust_sysroot_default(self):
+        working_dir = Path('/home/project/build')
+        fake_default_sysroot = Path('/home/project/tools/fake/sysroot')
+        compiler = Path('../tools/rustc')
+        r = rustc.RustAction(
+            [str(compiler), '../foo/lib.rs', '-o', 'foo.rlib'],
+            working_dir=working_dir)
+        call_result = cl_utils.SubprocessResult(
+            returncode=0,
+            stdout=[f'{fake_default_sysroot}\n'],
+        )
+        with mock.patch.object(cl_utils, 'subprocess_call',
+                               return_value=call_result) as mock_call:
+            self.assertEqual(
+                r.default_rust_sysroot(), Path('../tools/fake/sysroot'))
+        mock_call.assert_called_with(
+            [str(compiler), '--print', 'sysroot'], cwd=working_dir, quiet=True)
+
+        with mock.patch.object(
+                rustc.RustAction, 'default_rust_sysroot',
+                return_value=fake_default_sysroot) as mock_default:
+            self.assertEqual(r.rust_sysroot, fake_default_sysroot)
+        mock_default.assert_called_with()
 
     def test_target(self):
         target = f'--target=powerpc32-apple-darwin8'
