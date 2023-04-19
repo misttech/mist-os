@@ -14,6 +14,8 @@
 #include <fidl/fuchsia.scheduler/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/testing.h>
@@ -269,20 +271,20 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 
 class IncomingNamespace {
  public:
-  void TearDown() {
-    bool did_shutdown = false;
-    vfs_->Shutdown([&did_shutdown](auto status) { did_shutdown = true; });
-    while (!did_shutdown) {
-      fdf_testing_run_until_idle();
-    }
-    ASSERT_TRUE(did_shutdown);
+  // This is to avoid the DispatcherBound raw pointer errors.
+  // We know that `sync_completion_t` is thread safe.
+  struct CompletionWrapper {
+    sync_completion_t* completion;
+  };
+  void TearDown(CompletionWrapper completion) {
+    vfs_->Shutdown([completion](auto status) { sync_completion_signal(completion.completion); });
   }
 
-  zx::result<> Start(async_dispatcher_t* dispatcher, async_dispatcher_t* fidl_dispatcher,
-                     std::string_view v1_driver_path, zx_status_t compat_file_response,
+  zx::result<> Start(std::string_view v1_driver_path, zx_status_t compat_file_response,
                      std::unordered_map<std::string, TestDevice> devices,
                      std::string expected_profile_role, fidl::ServerEnd<fio::Directory> pkg_server,
                      fidl::ServerEnd<fio::Directory> svc_server) {
+    async_dispatcher_t* dispatcher = async_get_default_dispatcher();
     profile_provider_ = TestProfileProvider(std::move(expected_profile_role));
 
     std::map<std::string, std::string> arguments;
@@ -313,9 +315,9 @@ class IncomingNamespace {
     {
       auto svc = fbl::MakeRefCounted<fs::PseudoDir>();
       svc->AddEntry(fidl::DiscoverableProtocolName<flogger::LogSink>,
-                    fbl::MakeRefCounted<fs::Service>([fidl_dispatcher](zx::channel server) {
+                    fbl::MakeRefCounted<fs::Service>([dispatcher](zx::channel server) {
                       fidl::ServerEnd<flogger::LogSink> server_end(std::move(server));
-                      fidl::BindServer(fidl_dispatcher, std::move(server_end),
+                      fidl::BindServer(dispatcher, std::move(server_end),
                                        std::make_unique<TestLogSink>());
                       return ZX_OK;
                     }));
@@ -335,25 +337,25 @@ class IncomingNamespace {
                     }));
 
       svc->AddEntry(fidl::DiscoverableProtocolName<fboot::Arguments>,
-                    fbl::MakeRefCounted<fs::Service>([this, fidl_dispatcher](zx::channel server) {
+                    fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
                       fidl::ServerEnd<fboot::Arguments> server_end(std::move(server));
-                      fidl::BindServer(fidl_dispatcher, std::move(server_end), &boot_args_);
+                      fidl::BindServer(dispatcher, std::move(server_end), &boot_args_);
                       return ZX_OK;
                     }));
 
       svc->AddEntry(
           fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>,
-          fbl::MakeRefCounted<fs::Service>([this, fidl_dispatcher](zx::channel server) {
+          fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
             fidl::ServerEnd<fuchsia_scheduler::ProfileProvider> server_end(std::move(server));
-            fidl::BindServer(fidl_dispatcher, std::move(server_end), &profile_provider_);
+            fidl::BindServer(dispatcher, std::move(server_end), &profile_provider_);
             return ZX_OK;
           }));
 
       svc->AddEntry(fidl::DiscoverableProtocolName<fuchsia_device_manager::SystemStateTransition>,
-                    fbl::MakeRefCounted<fs::Service>([this, fidl_dispatcher](zx::channel server) {
+                    fbl::MakeRefCounted<fs::Service>([this, dispatcher](zx::channel server) {
                       fidl::ServerEnd<fuchsia_device_manager::SystemStateTransition> server_end(
                           std::move(server));
-                      fidl::BindServer(fidl_dispatcher, std::move(server_end),
+                      fidl::BindServer(dispatcher, std::move(server_end),
                                        &system_state_transition_);
                       return ZX_OK;
                     }));
@@ -364,17 +366,17 @@ class IncomingNamespace {
         device_dir->AddEntry(
             fuchsia_driver_compat::Service::Device::Name,
             fbl::MakeRefCounted<fs::Service>(
-                [fidl_dispatcher, device = std::make_shared<TestDevice>(std::move(device.second))](
+                [dispatcher, device = std::make_shared<TestDevice>(std::move(device.second))](
                     zx::channel server) {
                   fidl::ServerEnd<fuchsia_driver_compat::Device> server_end(std::move(server));
-                  fidl::BindServer(fidl_dispatcher, std::move(server_end), device);
+                  fidl::BindServer(dispatcher, std::move(server_end), device);
                   return ZX_OK;
                 }));
         compat_dir->AddEntry(device.first, device_dir);
       }
       svc->AddEntry("fuchsia.driver.compat.Service", compat_dir);
 
-      vfs_.emplace(fidl_dispatcher);
+      vfs_.emplace(dispatcher);
       vfs_->ServeDirectory(svc, std::move(svc_server));
     }
 
@@ -403,11 +405,16 @@ class DriverTest : public testing::Test {
   void SetUp() override {
     ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
 
-    fidl_loop_.StartThread("fidl-server-thread");
+    ns_loop_.StartThread("fidl-server-thread");
     node_.emplace("root", dispatcher());
   }
 
-  void TearDown() override { incoming_ns_.TearDown(); }
+  void TearDown() override {
+    libsync::Completion completion;
+    incoming_ns_.AsyncCall(&IncomingNamespace::TearDown,
+                           IncomingNamespace::CompletionWrapper{completion.get()});
+    completion.Wait();
+  }
 
   struct StartDriverArgs {
     std::string_view v1_driver_path;
@@ -429,11 +436,11 @@ class DriverTest : public testing::Test {
     zx::result node_client = node_->CreateNodeChannel();
     EXPECT_EQ(ZX_OK, node_client.status_value());
 
-    EXPECT_EQ(ZX_OK, incoming_ns_
-                         .Start(dispatcher(), fidl_loop_.dispatcher(), args.v1_driver_path,
-                                args.compat_file_response, args.devices, args.expected_profile_role,
-                                std::move(pkg_endpoints->server), std::move(svc_endpoints->server))
-                         .status_value());
+    zx::result ns_start_result =
+        incoming_ns_.SyncCall(&IncomingNamespace::Start, args.v1_driver_path,
+                              args.compat_file_response, args.devices, args.expected_profile_role,
+                              std::move(pkg_endpoints->server), std::move(svc_endpoints->server));
+    EXPECT_EQ(ZX_OK, ns_start_result.status_value());
 
     auto entry_pkg = frunner::ComponentNamespaceEntry(
         {.path = std::string("/pkg"), .directory = std::move(pkg_endpoints->client)});
@@ -528,14 +535,12 @@ class DriverTest : public testing::Test {
   async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
 
  private:
-  IncomingNamespace incoming_ns_;
+  async::Loop ns_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_ns_{ns_loop_.dispatcher(),
+                                                                      std::in_place};
   zx_protocol_device_t device_ops_;
   fdf::TestSynchronizedDispatcher driver_dispatcher_;
   std::optional<fdf_testing::TestNode> node_;
-
-  // This loop is for FIDL servers that get called in a sync fashion from
-  // the driver.
-  async::Loop fidl_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 };
 
 class GlobalLoggerListTest : public testing::Test {
