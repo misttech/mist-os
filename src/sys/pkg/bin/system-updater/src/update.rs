@@ -19,13 +19,13 @@ use {
     },
     fuchsia_async::{Task, TimeoutExt as _},
     fuchsia_hash::Hash,
-    fuchsia_syslog::{fx_log_err, fx_log_info},
     fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl},
     futures::{prelude::*, stream::FusedStream},
     parking_lot::Mutex,
     sha2::{Digest, Sha256},
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
     thiserror::Error,
+    tracing::{error, info},
     update_package::{
         Image, ImagePackagesSlots, ImageType, ResolveImagesError, UpdateImagePackage, UpdateMode,
         UpdatePackage, VerifyError,
@@ -274,7 +274,7 @@ async fn update(
         let (mut cobalt, cobalt_forwarder_task) = env.cobalt_connector.connect();
         let cobalt_forwarder_task = Task::spawn(cobalt_forwarder_task);
 
-        fx_log_info!("starting system update with config: {:?}", config);
+        info!(?config, "starting system update");
         cobalt.log_ota_start(config.initiator, config.start_time);
 
         let mut target_version = history::Version::default();
@@ -283,7 +283,7 @@ async fn update(
             .run(&mut co, &mut phase, &mut target_version)
             .await;
 
-        fx_log_info!("system update attempt completed, logging metrics");
+        info!("system update attempt completed, logging metrics");
         let status_code = metrics::result_to_status_code(attempt_res.as_ref().map(|_| ()));
         cobalt.log_ota_result_attempt(
             config.initiator,
@@ -300,34 +300,34 @@ async fn update(
         drop(cobalt);
 
         // wait for all cobalt events to be flushed to the service.
-        fx_log_info!("flushing cobalt events");
+        info!("flushing cobalt events");
         let () = flush_cobalt(cobalt_forwarder_task, COBALT_FLUSH_TIMEOUT).await;
 
         let (state, mode, _packages) = match attempt_res {
             Ok(ok) => ok,
             Err(e) => {
-                fx_log_err!("system update failed: {:#}", anyhow!(e));
+                error!("system update failed: {:#}", anyhow!(e));
                 return target_version;
             }
         };
 
-        fx_log_info!("checking if reboot is required or should be deferred, mode: {:?}", mode);
+        info!(?mode, "checking if reboot is required or should be deferred");
         // Figure out if we should reboot.
         match mode {
             // First priority: Always reboot on ForceRecovery success, even if the caller
             // asked to defer the reboot.
             UpdateMode::ForceRecovery => {
-                fx_log_info!("system update in ForceRecovery mode complete, rebooting...");
+                info!("system update in ForceRecovery mode complete, rebooting...");
             }
             // Second priority: Use the attached reboot controller.
             UpdateMode::Normal => {
-                fx_log_info!("system update complete, waiting for initiator to signal reboot.");
+                info!("system update complete, waiting for initiator to signal reboot.");
                 match reboot_controller.wait_to_reboot().await {
                     CommitAction::Reboot => {
-                        fx_log_info!("initiator ready to reboot, rebooting...");
+                        info!("initiator ready to reboot, rebooting...");
                     }
                     CommitAction::RebootDeferred => {
-                        fx_log_info!("initiator deferred reboot to caller.");
+                        info!("initiator deferred reboot to caller.");
                         state.enter_defer_reboot(&mut co).await;
                         return target_version;
                     }
@@ -357,7 +357,7 @@ async fn update(
 
 async fn flush_cobalt(cobalt_forwarder_task: impl Future<Output = ()>, flush_timeout: Duration) {
     cobalt_forwarder_task.on_timeout(flush_timeout, || {
-        fx_log_err!(
+        error!(
             "Couldn't flush cobalt events within the timeout. Proceeding, but may have dropped metrics."
         );
     })
@@ -735,7 +735,7 @@ impl<'a> Attempt<'a> {
                 {
                     Ok(url) => images_to_write.fuchsia.set_zbi(url),
                     Err(e) => {
-                        fx_log_err!(
+                        error!(
                             "Error while determining whether to write the zbi image, assume update is needed: {:#}", anyhow!(e));
                         images_to_write.fuchsia.set_zbi(Some(fuchsia.zbi().url().to_owned()))
                     }
@@ -755,7 +755,7 @@ impl<'a> Attempt<'a> {
                     {
                         Ok(url) => images_to_write.fuchsia.set_vbmeta(url),
                         Err(e) => {
-                            fx_log_err!(
+                            error!(
                                 "Error while determining whether to write the vbmeta image, assume update is needed: {:#}", anyhow!(e));
                             images_to_write.fuchsia.set_vbmeta(Some(vbmeta_image.url().to_owned()))
                         }
@@ -771,7 +771,7 @@ impl<'a> Attempt<'a> {
                     {
                         Ok(url) => images_to_write.recovery.set_zbi(url),
                         Err(e) => {
-                            fx_log_err!(
+                            error!(
                                 "Error while determining whether to write the recovery zbi image, assume update is needed: {:#}", anyhow!(e));
                             images_to_write.recovery.set_zbi(Some(recovery.zbi().url().to_owned()))
                         }
@@ -788,7 +788,7 @@ impl<'a> Attempt<'a> {
                         {
                             Ok(url) => images_to_write.recovery.set_vbmeta(url),
                             Err(e) => {
-                                fx_log_err!("Error while determining whether to write the recovery vbmeta image, assume update is needed: {:#}", anyhow!(e));
+                                error!("Error while determining whether to write the recovery vbmeta image, assume update is needed: {:#}", anyhow!(e));
                                 images_to_write
                                     .recovery
                                     .set_vbmeta(Some(vbmeta_image.url().to_owned()))
@@ -812,7 +812,7 @@ impl<'a> Attempt<'a> {
                     Ok(None) => (),
                     Err(e) => {
                         // If an error is raised, do not fail the update.
-                        fx_log_err!("Error while determining firmware to write, assume update is needed: {:#}", anyhow!(e));
+                        error!("Error while determining firmware to write, assume update is needed: {:#}", anyhow!(e));
                         images_to_write
                             .firmware
                             .push((filename.to_string(), imagemetadata.url().to_owned()))
@@ -851,7 +851,7 @@ impl<'a> Attempt<'a> {
                 //
                 // This is a separate block so that we avoid unnecessarily replacing the retained index
                 // and garbage collecting.
-                fx_log_info!("Images have already been written!");
+                info!("Images have already been written!");
 
                 // Be sure to persist those images that were written during State::Prepare!
                 paver::paver_flush_data_sink(&self.env.data_sink)
@@ -872,7 +872,7 @@ impl<'a> Attempt<'a> {
             )
             .await
             .unwrap_or_else(|e| {
-                fx_log_err!(
+                error!(
                     "unable to replace retained packages set before gc in preparation \
                         for fetching image packages listed in update package: {:#}",
                     anyhow!(e)
@@ -880,15 +880,15 @@ impl<'a> Attempt<'a> {
             });
 
             if let Err(e) = gc(&self.env.space_manager).await {
-                fx_log_err!(
+                error!(
                     "unable to gc packages in preparation to write image packages: {:#}",
                     anyhow!(e)
                 );
             }
 
-            fx_log_info!("Images to write: {:?}", images_to_write.print_list());
+            info!("Images to write: {:?}", images_to_write.print_list());
             let desired_config = current_configuration.to_non_current_configuration();
-            fx_log_info!("Targeting configuration: {:?}", desired_config);
+            info!("Targeting configuration: {:?}", desired_config);
 
             write_image_packages(
                 images_to_write,
@@ -926,15 +926,15 @@ impl<'a> Attempt<'a> {
             if self.config.should_write_recovery {
                 true
             } else if image.classify().targets_recovery() {
-                fx_log_info!("Skipping recovery image: {}", image.name());
+                info!("Skipping recovery image: {}", image.name());
                 false
             } else {
                 true
             }
         });
-        fx_log_info!("Images to write via legacy path: {:?}", images);
+        info!("Images to write via legacy path: {:?}", images);
         let desired_config = current_configuration.to_non_current_configuration();
-        fx_log_info!("Targeting configuration: {:?}", desired_config);
+        info!("Targeting configuration: {:?}", desired_config);
 
         write_images(&self.env.data_sink, update_pkg, desired_config, images.iter())
             .await
@@ -965,7 +965,7 @@ impl<'a> Attempt<'a> {
         )
         .await
         .unwrap_or_else(|e| {
-            fx_log_err!(
+            error!(
                 "unable to replace retained packages set before gc in preparation \
                  for fetching packages listed in update package: {:#}",
                 anyhow!(e)
@@ -973,7 +973,7 @@ impl<'a> Attempt<'a> {
         });
 
         if let Err(e) = gc(&self.env.space_manager).await {
-            fx_log_err!("unable to gc packages during Fetch state: {:#}", anyhow!(e));
+            error!("unable to gc packages during Fetch state: {:#}", anyhow!(e));
         }
 
         let mut packages = Vec::with_capacity(packages_to_fetch.len());
@@ -1265,14 +1265,14 @@ async fn write_image_packages(
     }
 
     let () = replace_retained_packages(hashes, retained_packages).await.unwrap_or_else(|e| {
-        fx_log_err!(
+        error!(
             "while resolving image packages, unable to minimize retained packages set before \
                     second gc attempt: {:#}",
             anyhow!(e)
         )
     });
     if let Err(e) = gc(space_manager).await {
-        fx_log_err!(
+        error!(
             "unable to gc base packages before second image package write retry: {:#}",
             anyhow!(e)
         );
@@ -1297,7 +1297,7 @@ async fn resolve_update_package(
 
     // If the first attempt fails with NoSpace, perform a GC and retry.
     if let Err(e) = gc(space_manager).await {
-        fx_log_err!("unable to gc packages before first resolve retry: {:#}", anyhow!(e));
+        error!("unable to gc packages before first resolve retry: {:#}", anyhow!(e));
     }
     match resolver::resolve_update_package(pkg_resolver, update_url).await {
         Ok(update_pkg) => return Ok(update_pkg),
@@ -1320,7 +1320,7 @@ async fn resolve_update_package(
     }
     .await
     .unwrap_or_else(|e: anyhow::Error| {
-        fx_log_err!(
+        error!(
             "while resolving update package, unable to minimize retained packages set before \
              second gc attempt: {:#}",
             anyhow!(e)
@@ -1328,7 +1328,7 @@ async fn resolve_update_package(
     });
 
     if let Err(e) = gc(space_manager).await {
-        fx_log_err!("unable to gc packages before second resolve retry: {:#}", anyhow!(e));
+        error!("unable to gc packages before second resolve retry: {:#}", anyhow!(e));
     }
     resolver::resolve_update_package(pkg_resolver, update_url).await
 }
@@ -1350,7 +1350,7 @@ async fn update_mode(
     pkg.update_mode().await.map(|opt| {
         opt.unwrap_or_else(|| {
             let mode = UpdateMode::default();
-            fx_log_info!("update-mode file not found, using default mode: {:?}", mode);
+            info!("update-mode file not found, using default mode: {:?}", mode);
             mode
         })
     })
@@ -1366,7 +1366,7 @@ async fn validate_epoch(source_epoch_raw: &str, pkg: &UpdatePackage) -> Result<(
     };
     let target =
         pkg.epoch().await.map_err(PrepareError::ParseTargetEpochError)?.unwrap_or_else(|| {
-            fx_log_info!("no epoch in update package, assuming it's 0");
+            info!("no epoch in update package, assuming it's 0");
             0
         });
     if target < src {
@@ -1391,11 +1391,7 @@ async fn replace_retained_packages(
     )
     .await
     .unwrap_or_else(|e| {
-        fx_log_err!(
-            "error serving {} protocol: {:#}",
-            RetainedPackagesMarker::DEBUG_NAME,
-            anyhow!(e)
-        )
+        error!("error serving {} protocol: {:#}", RetainedPackagesMarker::DEBUG_NAME, anyhow!(e))
     });
     replace_resp.await.context("calling RetainedPackages.Replace")
 }

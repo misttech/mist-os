@@ -15,10 +15,10 @@ use {
     },
     fidl_fuchsia_update_installer_ext::State,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    fuchsia_syslog::{fx_log_err, fx_log_info},
     futures::prelude::*,
     parking_lot::Mutex,
     std::{convert::TryInto, sync::Arc},
+    tracing::{error, info},
 };
 
 pub enum IncomingService {
@@ -69,7 +69,7 @@ impl FidlServer {
         // Handles each client connection concurrently.
         fs.for_each_concurrent(None, |incoming_service| {
             self.handle_client(incoming_service).unwrap_or_else(|e| {
-                fx_log_err!("error encountered while handling client: {:#}", anyhow!(e))
+                error!("error encountered while handling client: {:#}", anyhow!(e))
             })
         })
         .await
@@ -126,11 +126,11 @@ impl FidlServer {
                     Some(RebootController::spawn(async move {
                         match stream.next().await {
                             None => {
-                                fx_log_info!("RebootController channel closed, unblocking reboot");
+                                info!("RebootController channel closed, unblocking reboot");
                                 ControlRequest::Unblock
                             }
                             Some(Err(e)) => {
-                                fx_log_err!(
+                                error!(
                                     "error serving RebootController, unblocking reboot: {:#}",
                                     anyhow!(e)
                                 );

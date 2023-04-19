@@ -9,10 +9,10 @@ use {
     fidl_fuchsia_mem::Buffer,
     fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy},
     fuchsia_inspect as inspect,
-    fuchsia_syslog::{fx_log_err, fx_log_info, fx_log_warn},
     mundane::hash::{Hasher as _, Sha256},
     serde::{Deserialize, Serialize},
     std::{convert::TryInto as _, str::FromStr},
+    tracing::{error, info, warn},
     update_package::{ImagePackagesSlots, ImageType, SystemVersion, UpdatePackage},
 };
 
@@ -74,13 +74,13 @@ impl Version {
         let update_hash = match update_package.hash().await {
             Ok(hash) => hash.to_string(),
             Err(e) => {
-                fx_log_err!("Failed to get update hash: {:#}", anyhow!(e));
+                error!("Failed to get update hash: {:#}", anyhow!(e));
                 "".to_string()
             }
         };
         let system_image_hash =
             get_system_image_hash_from_update_package(update_package).await.unwrap_or_else(|e| {
-                fx_log_err!("Failed to get system image hash: {:#}", anyhow!(e));
+                error!("Failed to get system image hash: {:#}", anyhow!(e));
                 "".to_string()
             });
 
@@ -99,7 +99,7 @@ impl Version {
                 get_image_hash_from_update_package(update_package, ImageType::FuchsiaVbmeta)
                     .await
                     .unwrap_or_else(|e| {
-                        fx_log_err!("Failed to read vbmeta hash: {:#}", anyhow!(e));
+                        error!("Failed to read vbmeta hash: {:#}", anyhow!(e));
                         "".to_string()
                     });
             zbi_hash = match get_image_hash_from_update_package(update_package, ImageType::Zbi)
@@ -109,24 +109,24 @@ impl Version {
                 Err(_) => get_image_hash_from_update_package(update_package, ImageType::ZbiSigned)
                     .await
                     .unwrap_or_else(|e| {
-                        fx_log_err!("Failed to read zbi hash: {:#}", anyhow!(e));
+                        error!("Failed to read zbi hash: {:#}", anyhow!(e));
                         "".to_string()
                     }),
             };
         }
 
         let build_version = update_package.version().await.unwrap_or_else(|e| {
-            fx_log_err!("Failed to read build version: {:#}", anyhow!(e));
+            error!("Failed to read build version: {:#}", anyhow!(e));
             SystemVersion::Opaque("".to_string())
         });
         let epoch = match update_package.epoch().await {
             Ok(Some(epoch)) => epoch.to_string(),
             Ok(None) => {
-                fx_log_info!("epoch.json does not exist, defaulting to zero");
+                info!("epoch.json does not exist, defaulting to zero");
                 "0".to_string()
             }
             Err(e) => {
-                fx_log_err!("Failed to read epoch: {:#}", anyhow!(e));
+                error!("Failed to read epoch: {:#}", anyhow!(e));
                 "".to_string()
             }
         };
@@ -145,32 +145,32 @@ impl Version {
         let system_image_hash = match system_info.system_image_hash().await {
             Ok(Some(hash)) => hash.to_string(),
             Ok(None) => {
-                fx_log_warn!(
+                warn!(
                     "Current system has no system_image package, so there is no system_image \
                      package hash to associate with this update attempt."
                 );
                 "".to_string()
             }
             Err(e) => {
-                fx_log_err!("Failed to read system image hash: {:#}", anyhow!(e));
+                error!("Failed to read system image hash: {:#}", anyhow!(e));
                 "".to_string()
             }
         };
         let (vbmeta_hash, zbi_hash) =
             get_vbmeta_and_zbi_hash_from_environment(data_sink, boot_manager).await.unwrap_or_else(
                 |e| {
-                    fx_log_err!("Failed to read vbmeta and/or zbi hash: {:#}", anyhow!(e));
+                    error!("Failed to read vbmeta and/or zbi hash: {:#}", anyhow!(e));
                     ("".to_string(), "".to_string())
                 },
             );
         let build_version = match build_info.version().await {
             Ok(Some(version)) => version,
             Ok(None) => {
-                fx_log_err!("Build version not found");
+                error!("Build version not found");
                 "".to_string()
             }
             Err(e) => {
-                fx_log_err!("Failed to read build version: {:#}", anyhow!(e));
+                error!("Failed to read build version: {:#}", anyhow!(e));
                 "".to_string()
             }
         };
@@ -194,7 +194,7 @@ impl Version {
         let epoch = match serde_json::from_str(source_epoch_raw) {
             Ok(EpochFile::Version1 { epoch }) => epoch.to_string(),
             Err(e) => {
-                fx_log_err!("Failed to parse source epoch: {:#}", anyhow!(e));
+                error!("Failed to parse source epoch: {:#}", anyhow!(e));
                 "".to_string()
             }
         };
@@ -261,7 +261,7 @@ fn sha256_hash_with_no_trailing_zeros(buffer: Buffer) -> Result<String, Error> {
         size -= 1;
     }
     if size == 0 {
-        fx_log_warn!("entire buffer is 0, size: {}", buffer.size);
+        warn!(size = buffer.size, "entire buffer is 0");
     }
     Ok(Sha256::hash(&data[..size]).to_string())
 }

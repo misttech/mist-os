@@ -9,9 +9,9 @@ use {
         Asset, BootManagerMarker, BootManagerProxy, Configuration, ConfigurationStatus,
         DataSinkMarker, DataSinkProxy, PaverMarker, WriteFirmwareResult,
     },
-    fuchsia_syslog::{fx_log_info, fx_log_warn},
     fuchsia_zircon::{Status, VmoChildOptions},
     thiserror::Error,
+    tracing::{info, warn},
     update_package::{Image, ImageClass, UpdatePackage},
 };
 
@@ -44,7 +44,7 @@ async fn paver_write_firmware(
             Status::ok(status).context("firmware failed to write")?;
         }
         WriteFirmwareResult::Unsupported(_) => {
-            fx_log_info!("skipping unsupported firmware type: {}", subtype);
+            info!("skipping unsupported firmware type: {}", subtype);
         }
     }
 
@@ -165,7 +165,7 @@ async fn write_asset_to_configurations(
 
             let res = paver_write_asset(data_sink, Configuration::B, asset, payload.buffer).await;
             if let Err(WriteAssetError::Status(Status::NOT_SUPPORTED)) = res {
-                fx_log_warn!("skipping writing {} to B", payload.display_name);
+                warn!("skipping writing {} to B", payload.display_name);
             } else {
                 res?;
             }
@@ -249,7 +249,7 @@ pub async fn query_current_configuration(
             Err(anyhow!("query_current_configuration responded with {}", Status::from_raw(status)))
         }
         Err(fidl::Error::ClientChannelClosed { status: Status::NOT_SUPPORTED, .. }) => {
-            fx_log_warn!("device does not support ABR. Kernel image updates will not be atomic.");
+            warn!("device does not support ABR. Kernel image updates will not be atomic.");
             Ok(CurrentConfiguration::NotSupported)
         }
         Err(err) => Err(anyhow!(err).context("while performing query_current_configuration call")),
@@ -314,7 +314,7 @@ pub async fn prepare_partition_metadata(
 
     let current_configuration = match current.to_configuration() {
         None => {
-            fx_log_info!("ABR not supported, no partition preparation necessary");
+            info!("ABR not supported, no partition preparation necessary");
             return Ok(CurrentConfiguration::NotSupported);
         }
         Some(current_configuration) => current_configuration,
@@ -451,14 +451,14 @@ pub async fn write_image(
         .await
         .with_context(|| format!("error opening {}", image.name()))?;
 
-    fx_log_info!("writing {} from update package", image.name());
+    info!("writing {} from update package", image.name());
 
     let res = write_image_buffer(data_sink, buffer, image, desired_config)
         .await
         .with_context(|| format!("error writing {}", image.name()));
 
     if let Ok(()) = &res {
-        fx_log_info!("wrote {} successfully", image.name());
+        info!("wrote {} successfully", image.name());
     }
     res
 }

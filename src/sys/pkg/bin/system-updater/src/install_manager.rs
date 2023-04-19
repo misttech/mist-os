@@ -8,15 +8,14 @@ use {
     event_queue::{EventQueue, Notify},
     fidl_fuchsia_update_installer::UpdateNotStartedReason,
     fidl_fuchsia_update_installer_ext::State,
-    fuchsia_async as fasync, fuchsia_inspect as inspect,
-    fuchsia_syslog::{fx_log_err, fx_log_warn},
-    fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         prelude::*,
         select,
         stream::FusedStream,
     },
+    tracing::{error, warn},
 };
 
 const INSPECT_STATUS_NODE_NAME: &str = "status";
@@ -71,7 +70,7 @@ async fn run<N, U, E>(
         let env = match E::connect() {
             Ok(env) => env,
             Err(e) => {
-                fx_log_err!("Error connecting to services: {:#}", anyhow!(e));
+                error!("Error connecting to services: {:#}", anyhow!(e));
                 // This fails the update attempt because it drops the responder, which closes
                 // the zx channel that we got the start request from.
                 continue;
@@ -91,7 +90,7 @@ async fn run<N, U, E>(
 
         // Don't forget to add the first monitor to the queue and respond to StartUpdate :)
         if let Err(e) = monitor_queue.add_client(monitor).await {
-            fx_log_warn!("error adding client to monitor queue: {:#}", anyhow!(e));
+            warn!("error adding client to monitor queue: {:#}", anyhow!(e));
         }
         let _ = responder.send(Ok(attempt_id.clone()));
 
@@ -126,14 +125,14 @@ async fn run<N, U, E>(
                     status_node = node.create_child(INSPECT_STATUS_NODE_NAME);
                     state.write_to_inspect(&status_node);
                     if let Err(e) = monitor_queue.queue_event(state).await {
-                        fx_log_warn!("error sending state to monitor_queue: {:#}", anyhow!(e));
+                        warn!("error sending state to monitor_queue: {:#}", anyhow!(e));
                     }
                 }
                 // The update task tells us the update is over, so let's notify all monitors.
                 Op::Status(None) => {
                     drop(status_node);
                     if let Err(e) = monitor_queue.clear().await {
-                        fx_log_warn!("error clearing clients of monitor_queue: {:#}", anyhow!(e));
+                        warn!("error clearing clients of monitor_queue: {:#}", anyhow!(e));
                     }
                     break;
                 }
@@ -199,7 +198,7 @@ async fn handle_active_control_request<N>(
                 && config.should_write_recovery == should_write_recovery
             {
                 if let Err(e) = monitor_queue.add_client(monitor).await {
-                    fx_log_warn!("error adding client to monitor queue: {:#}", anyhow!(e));
+                    warn!("error adding client to monitor queue: {:#}", anyhow!(e));
                 }
                 let _ = responder.send(Ok(attempt_id.to_string()));
             } else {
@@ -216,7 +215,7 @@ async fn handle_active_control_request<N>(
             }
 
             if let Err(e) = monitor_queue.add_client(monitor).await {
-                fx_log_warn!("error adding client to monitor queue: {:#}", anyhow!(e));
+                warn!("error adding client to monitor queue: {:#}", anyhow!(e));
             }
             let _ = responder.send(true);
         }

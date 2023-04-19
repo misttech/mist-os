@@ -9,11 +9,11 @@ use {
     fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy},
     fidl_fuchsia_update_installer_ext::{Options, State},
     fuchsia_inspect as inspect,
-    fuchsia_syslog::fx_log_warn,
     fuchsia_url::AbsolutePackageUrl,
     futures::prelude::*,
     serde::{Deserialize, Serialize},
     std::{collections::VecDeque, time::SystemTime},
+    tracing::warn,
 };
 
 mod version;
@@ -255,7 +255,7 @@ impl UpdateHistory {
                 update_attempts,
             },
             Err(e) => {
-                fx_log_warn!("Could not load update history: {:#}", anyhow!(e));
+                warn!("Could not load update history: {:#}", anyhow!(e));
                 Self {
                     update_attempts: Default::default(),
 

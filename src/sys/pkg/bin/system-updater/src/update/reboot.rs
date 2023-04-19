@@ -7,9 +7,9 @@ use {
     anyhow::{anyhow, Context},
     fidl_fuchsia_hardware_power_statecontrol::AdminProxy as PowerStateControlProxy,
     fuchsia_async::{Task, TimeoutExt},
-    fuchsia_syslog::fx_log_err,
     futures::prelude::*,
     std::time::Duration,
+    tracing::error,
 };
 
 // The system-updater does not want to manage the policy of when to schedule a reboot.  As a
@@ -46,7 +46,7 @@ impl RebootController {
     /// Wait for the external controller to signal it is time for the reboot.
     pub(super) async fn wait_to_reboot(self) -> CommitAction {
         let on_timeout = || {
-            fx_log_err!("RebootController failsafe triggered, force unblocking reboot");
+            error!("RebootController failsafe triggered, force unblocking reboot");
             ControlRequest::Unblock
         };
 
@@ -70,7 +70,7 @@ pub(super) async fn reboot(proxy: &PowerStateControlProxy) {
     }
     .await
     {
-        fx_log_err!("error initiating reboot: {:#}", anyhow!(e));
+        error!("error initiating reboot: {:#}", anyhow!(e));
     }
 }
 
