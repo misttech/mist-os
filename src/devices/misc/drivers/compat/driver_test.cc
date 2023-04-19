@@ -93,8 +93,8 @@ class TestItems : public fidl::testing::WireTestBase<fboot::Items> {
 
 class TestFile : public fidl::testing::WireTestBase<fio::File> {
  public:
-  void SetStatus(zx_status_t status) { status_ = status; }
-  void SetVmo(zx::vmo vmo) { vmo_ = std::move(vmo); }
+  TestFile() = default;
+  TestFile(zx_status_t status, zx::vmo vmo) : status_(status), vmo_(std::move(vmo)) {}
 
  private:
   void GetBackingMemory(GetBackingMemoryRequestView request,
@@ -265,7 +265,6 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 class DriverTest : public testing::Test {
  protected:
   fdf_testing::TestNode& node() { return node_.value(); }
-  TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
     ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
@@ -291,10 +290,14 @@ class DriverTest : public testing::Test {
     ASSERT_TRUE(did_shutdown);
   }
 
-  std::unique_ptr<compat::Driver> StartDriver(std::string_view v1_driver_path,
-                                              const zx_protocol_device_t* ops,
-                                              std::unordered_map<std::string, TestDevice> devices,
-                                              zx_status_t expected_status = ZX_OK) {
+  struct StartDriverArgs {
+    std::string_view v1_driver_path;
+    zx_protocol_device_t ops = {};
+    std::unordered_map<std::string, TestDevice> devices = {{"default", TestDevice()}};
+    zx_status_t expected_driver_status = ZX_OK;
+    zx_status_t compat_file_response = ZX_OK;
+  };
+  std::unique_ptr<compat::Driver> StartDriver(StartDriverArgs args) {
     auto outgoing_dir_endpoints = fidl::CreateEndpoints<fio::Directory>();
     EXPECT_TRUE(outgoing_dir_endpoints.is_ok());
     auto pkg_endpoints = fidl::CreateEndpoints<fio::Directory>();
@@ -309,9 +312,9 @@ class DriverTest : public testing::Test {
     EXPECT_EQ(ZX_OK, node_client.status_value());
 
     // Setup and bind "/pkg" directory.
-    compat_file_.SetVmo(GetVmo("/pkg/driver/compat.so"));
-    v1_test_file_.SetVmo(GetVmo(v1_driver_path));
-    firmware_file_.SetVmo(GetVmo("/pkg/lib/firmware/test"));
+    compat_file_ = TestFile(args.compat_file_response, GetVmo("/pkg/driver/compat.so"));
+    v1_test_file_ = TestFile(ZX_OK, GetVmo(args.v1_driver_path));
+    firmware_file_ = TestFile(ZX_OK, GetVmo("/pkg/lib/firmware/test"));
     pkg_directory_.SetOpenHandler([this](TestDirectory::OpenRequestView request) {
       fidl::ServerEnd<fio::File> server_end(request->object.TakeChannel());
       if (request->path.get() == "driver/compat.so") {
@@ -376,7 +379,7 @@ class DriverTest : public testing::Test {
                     }));
 
       auto compat_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-      for (auto& device : devices) {
+      for (auto& device : args.devices) {
         auto device_dir = fbl::MakeRefCounted<fs::PseudoDir>();
         device_dir->AddEntry(
             fuchsia_driver_compat::Service::Device::Name,
@@ -402,8 +405,9 @@ class DriverTest : public testing::Test {
     ns_entries.push_back(std::move(entry_pkg));
     ns_entries.push_back(std::move(entry_svc));
 
-    std::vector<fdf::NodeSymbol> symbols(
-        {fdf::NodeSymbol({.name = compat::kOps, .address = reinterpret_cast<uint64_t>(ops)})});
+    device_ops_ = args.ops;
+    std::vector<fdf::NodeSymbol> symbols({fdf::NodeSymbol(
+        {.name = compat::kOps, .address = reinterpret_cast<uint64_t>(&device_ops_)})});
 
     auto program_entry =
         fdata::DictionaryEntry("compat", std::make_unique<fdata::DictionaryValue>(
@@ -448,7 +452,7 @@ class DriverTest : public testing::Test {
     while (driver == nullptr) {
       fdf_testing_run_until_idle();
     };
-    EXPECT_EQ(status, expected_status);
+    EXPECT_EQ(status, args.expected_driver_status);
     if (status != ZX_OK) {
       EXPECT_NE(driver, nullptr);
     }
@@ -487,6 +491,7 @@ class DriverTest : public testing::Test {
   async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
 
  private:
+  zx_protocol_device_t device_ops_;
   TestRootResource root_resource_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
@@ -530,10 +535,13 @@ class GlobalLoggerListTest : public testing::Test {
 };
 
 TEST_F(DriverTest, Start) {
-  zx_protocol_device_t ops{
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_test.so",
+      .ops =
+          {
+              .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
+          },
+  });
 
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
@@ -554,8 +562,9 @@ TEST_F(DriverTest, Start) {
 }
 
 TEST_F(DriverTest, Start_WithCreate) {
-  zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_create_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_create_test.so",
+  });
 
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
@@ -576,9 +585,10 @@ TEST_F(DriverTest, Start_WithCreate) {
 }
 
 TEST_F(DriverTest, Start_MissingBindAndCreate) {
-  zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_missing_test.so", &ops, {{"default", TestDevice()}},
-                            ZX_ERR_BAD_STATE);
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_missing_test.so",
+      .expected_driver_status = ZX_ERR_BAD_STATE,
+  });
 
   // We will know the driver has finished starting when it closes its node in error.
   while (node().HasNode()) {
@@ -593,9 +603,9 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
 }
 
 TEST_F(DriverTest, Start_DeviceAddNull) {
-  zx_protocol_device_t ops{};
-  auto driver =
-      StartDriver("/pkg/driver/v1_device_add_null_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_device_add_null_test.so",
+  });
 
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
@@ -604,9 +614,9 @@ TEST_F(DriverTest, Start_DeviceAddNull) {
 }
 
 TEST_F(DriverTest, Start_CheckCompatService) {
-  zx_protocol_device_t ops{};
-  auto driver =
-      StartDriver("/pkg/driver/v1_device_add_null_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_device_add_null_test.so",
+  });
 
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
@@ -641,9 +651,9 @@ TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
     resource = kRootResource.get();
   }
 
-  zx_protocol_device_t ops{};
-  auto driver =
-      StartDriver("/pkg/driver/v1_device_add_null_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_device_add_null_test.so",
+  });
   zx_handle_t resource2 = get_root_resource();
 
   // Check that the root resource's value did not change.
@@ -651,11 +661,11 @@ TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
 }
 
 TEST_F(DriverTest, Start_GetBackingMemory) {
-  compat_file().SetStatus(ZX_ERR_UNAVAILABLE);
-
-  zx_protocol_device_t ops{};
-  auto driver =
-      StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}}, ZX_ERR_UNAVAILABLE);
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_test.so",
+      .expected_driver_status = ZX_ERR_UNAVAILABLE,
+      .compat_file_response = ZX_ERR_UNAVAILABLE,
+  });
 
   // Verify that v1_test.so has not added a child device.
   EXPECT_TRUE(node().children().empty());
@@ -667,9 +677,10 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
 }
 
 TEST_F(DriverTest, Start_BindFailed) {
-  zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}},
-                            ZX_ERR_NOT_SUPPORTED);
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_test.so",
+      .expected_driver_status = ZX_ERR_NOT_SUPPORTED,
+  });
 
   // Verify that v1_test.so has set a context.
   while (!driver->Context()) {
@@ -699,10 +710,13 @@ TEST_F(DriverTest, Start_BindFailed) {
 }
 
 TEST_F(DriverTest, GetVariable) {
-  zx_protocol_device_t ops{
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_test.so",
+      .ops =
+          {
+              .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
+          },
+  });
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
 
@@ -738,10 +752,13 @@ TEST_F(DriverTest, SetProfileByRole) {
         ASSERT_EQ("test-profile", rv->role.get());
       });
 
-  zx_protocol_device_t ops{
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops, {{"default", TestDevice()}});
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_test.so",
+      .ops =
+          {
+              .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
+          },
+  });
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
 
@@ -765,16 +782,19 @@ TEST_F(DriverTest, GetFragmentProtocol) {
   const uint64_t kFragmentOps = 0x1234;
   const uint64_t kFragmentCtx = 0x4567;
 
-  zx_protocol_device_t ops{
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-  auto driver =
-      StartDriver("/pkg/driver/v1_test.so", &ops,
-                  {
-                      {kFragmentName, TestDevice({
-                                          {kFragmentProtoId, {kFragmentCtx, kFragmentOps}},
-                                      })},
-                  });
+  auto driver = StartDriver({
+      .v1_driver_path = "/pkg/driver/v1_test.so",
+      .ops =
+          {
+              .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
+          },
+      .devices =
+          {
+              {kFragmentName, TestDevice({
+                                  {kFragmentProtoId, {kFragmentCtx, kFragmentOps}},
+                              })},
+          },
+  });
 
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
