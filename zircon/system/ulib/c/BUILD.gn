@@ -40,9 +40,26 @@ group("components") {
   deps = libc_components
 }
 
+# This isn't a test per se, but using libc_test will apply the test configs
+# we want.
+libc_test("test_utils") {
+  dir = "$llvm_libc/test/UnitTest"
+  sources = []
+
+  # TODO(fxbug.dev/125727): Add TestLogger.cpp unconditionally after roll.
+  git_revision =
+      read_file("//third_party/llvm-libc/src/.git/HEAD", "list lines")
+  if (git_revision != [ "be99ff5de207dbb5befde108055c29635bc62e58" ]) {
+    sources += [ "TestLogger.cpp" ]
+  }
+}
+
 group("unittests") {
   testonly = true
-  deps = [ "errno:errno.testonly" ]
+  deps = [
+    ":test_utils",
+    "errno:errno.testonly",
+  ]
   foreach(subdir,
           libc_components + [
                 "sanitizers",
