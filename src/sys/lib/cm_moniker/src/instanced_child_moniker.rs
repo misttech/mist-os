@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Display notation: "[collection:]name:instance_id".
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Eq, PartialEq, Debug, Clone, Hash)]
+#[derive(Eq, PartialEq, Clone, Hash)]
 pub struct InstancedChildMoniker {
     name: LongName,
     collection: Option<Name>,
@@ -106,6 +106,14 @@ impl InstancedChildMoniker {
     pub fn instance(&self) -> IncarnationId {
         self.instance
     }
+
+    pub fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(coll) = &self.collection {
+            write!(f, "{}:{}:{}", coll, self.name, self.instance)
+        } else {
+            write!(f, "{}:{}", self.name, self.instance)
+        }
+    }
 }
 
 impl TryFrom<&str> for InstancedChildMoniker {
@@ -134,11 +142,13 @@ impl PartialOrd for InstancedChildMoniker {
 
 impl fmt::Display for InstancedChildMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(coll) = &self.collection {
-            write!(f, "{}:{}:{}", coll, self.name, self.instance)
-        } else {
-            write!(f, "{}:{}", self.name, self.instance)
-        }
+        self.format(f)
+    }
+}
+
+impl fmt::Debug for InstancedChildMoniker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f)
     }
 }
 

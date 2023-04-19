@@ -24,8 +24,8 @@ pub trait ChildMonikerBase: Eq + PartialOrd + Clone + fmt::Display {
 ///
 /// The child moniker does not distinguish between instances.
 ///
-/// Display notation: "name[:collection]".
-#[derive(Eq, PartialEq, Debug, Clone, Hash)]
+/// Display notation: "[collection:]name".
+#[derive(Eq, PartialEq, Clone, Hash)]
 pub struct ChildMoniker {
     pub name: LongName,
     pub collection: Option<Name>,
@@ -34,7 +34,7 @@ pub struct ChildMoniker {
 impl ChildMonikerBase for ChildMoniker {
     /// Parses a `ChildMoniker` from a string.
     ///
-    /// Input strings should be of the format `<name>(:<collection>)?`, e.g. `foo` or `biz:foo`.
+    /// Input strings should be of the format `[collection:]name`, e.g. `foo` or `biz:foo`.
     fn parse<T: AsRef<str>>(rep: T) -> Result<Self, MonikerError> {
         let rep = rep.as_ref();
         let parts: Vec<&str> = rep.split(":").collect();
@@ -70,6 +70,14 @@ impl ChildMoniker {
         };
         Ok(Self { name, collection })
     }
+
+    fn format(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(coll) = &self.collection {
+            write!(f, "{}:{}", coll, self.name)
+        } else {
+            write!(f, "{}", self.name)
+        }
+    }
 }
 
 impl TryFrom<&str> for ChildMoniker {
@@ -94,11 +102,13 @@ impl PartialOrd for ChildMoniker {
 
 impl fmt::Display for ChildMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(coll) = &self.collection {
-            write!(f, "{}:{}", coll, self.name)
-        } else {
-            write!(f, "{}", self.name)
-        }
+        self.format(f)
+    }
+}
+
+impl fmt::Debug for ChildMoniker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f)
     }
 }
 

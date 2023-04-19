@@ -127,7 +127,7 @@ pub trait AbsoluteMonikerBase:
 /// instance ID of the child.
 ///
 /// Display notation: "/", "/name1", "/name1/name2", ...
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct AbsoluteMoniker {
     path: Vec<ChildMoniker>,
 }
@@ -177,6 +177,12 @@ impl PartialOrd for AbsoluteMoniker {
 }
 
 impl fmt::Display for AbsoluteMoniker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f)
+    }
+}
+
+impl fmt::Debug for AbsoluteMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }

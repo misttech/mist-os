@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Display notation: "/", "/name1:1", "/name1:1/name2:2", ...
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct InstancedAbsoluteMoniker {
     path: Vec<InstancedChildMoniker>,
 }
@@ -73,6 +73,12 @@ impl PartialOrd for InstancedAbsoluteMoniker {
 }
 
 impl fmt::Display for InstancedAbsoluteMoniker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f)
+    }
+}
+
+impl fmt::Debug for InstancedAbsoluteMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }

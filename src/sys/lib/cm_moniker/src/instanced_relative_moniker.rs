@@ -19,7 +19,7 @@ use {
     std::{convert::TryFrom, fmt},
 };
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct InstancedRelativeMoniker {
     path: Vec<InstancedChildMoniker>,
 }
@@ -64,6 +64,12 @@ impl RelativeMonikerBase for InstancedRelativeMoniker {
 }
 
 impl fmt::Display for InstancedRelativeMoniker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f)
+    }
+}
+
+impl fmt::Debug for InstancedRelativeMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }

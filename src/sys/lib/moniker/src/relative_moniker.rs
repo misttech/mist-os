@@ -101,7 +101,7 @@ pub trait RelativeMonikerBase: Sized {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Eq, PartialEq, Clone, Hash, Default)]
 pub struct RelativeMoniker {
     path: Vec<ChildMoniker>,
 }
@@ -123,6 +123,12 @@ impl RelativeMonikerBase for RelativeMoniker {
 }
 
 impl fmt::Display for RelativeMoniker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f)
+    }
+}
+
+impl fmt::Debug for RelativeMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.format(f)
     }
