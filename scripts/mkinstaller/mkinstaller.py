@@ -223,7 +223,9 @@ class Image:
         block_size: number of bytes to write at a time to the disk.
         file_size: total size of the image, in bytes
         partitions: list of |Partition| objects to write to disk.
-  """
+        copy_image: pre-existing USB image to copy. Only one of |partitions| or
+          |copy_image| can be set.
+    """
     SECTOR_SIZE = 512
     GPT_SECTORS = 2048
     CROS_RESERVED_SECTORS = 2048
@@ -238,25 +240,21 @@ class Image:
         self.file_size = 2 * Image.GPT_SECTORS * Image.SECTOR_SIZE
         self.partitions = []
 
-        # Set up the ChromeOS reserved partition.
-        reserved_part = Partition(
-            None, 'reserved', 'reserved',
-            self.CROS_RESERVED_SECTORS * self.SECTOR_SIZE)
-        self.AddPartition(reserved_part)
+        self.copy_image = None
 
     def _Cgpt(self, args):
         args = [CGPT_BIN] + args
         return subprocess.run(args, capture_output=True)
 
     def _CgptAdd(self, part, offset):
-        """Add a partition to the GPT represnted by thsis |Image|.
+        """Add a partition to the GPT represented by this |Image|.
 
-    Args:
-      part: partition to add
-      offset: offset to add partition at. Must be a multiple of SECTOR_SIZE.
-    Returns:
-      True if add succeded, False if it failed.
-    """
+        Args:
+          part: partition to add
+          offset: offset to add partition at. Must be a multiple of SECTOR_SIZE.
+        Returns:
+          True if add succeded, False if it failed.
+        """
         if offset % Image.SECTOR_SIZE != 0:
             raise ValueError('Offset must be a multiple of SECTOR_SIZE!')
         if part.size % Image.SECTOR_SIZE != 0:
@@ -292,31 +290,39 @@ class Image:
     def AddPartition(self, partition):
         """Add a partition to the outputted disk image.
 
-    This function does not write any data - call Finalise() to write the
-    disk image once all partitions have been added.
+        This function does not write any data - call Finalise() to write the
+        disk image once all partitions have been added.
 
-    Args:
-      partition: partition to add
-    """
+        Args:
+          partition: partition to add
+        """
         self.partitions.append(partition)
         self.file_size += partition.size
 
-    def WritePart(self, part, offset):
-        """Writes data to a partition on the output device.
+    def CopyImage(self, image):
+        """Copies a complete image to the output file.
 
-    Args:
-      part: partiton to write
-      offset: offset in bytes to write to
-    """
-        if part.path is None:
-            return
+        Args:
+          image: path to the image to copy.
+        """
+        self.copy_image = image
+        self.file_size = os.stat(image).st_size
+        self.Finalise()
+
+    def _CopyToFile(self, path, offset):
+        """Copies bytes to the output file.
+
+        |self.file| must have already been resized large enough to hold
+        the contents at |path|.
+
+        Args:
+          path: path to the source file.
+          offset: offset within |self.file| to copy to.
+        """
         self.file.seek(offset, 0)
 
         written = 0
-        logging.info(
-            '   Writing image {} to partition {}... '.format(
-                part.path.split('/')[-1], part.label))
-        with open(part.path, 'rb') as fh:
+        with open(path, 'rb') as fh:
             start = time.perf_counter()
             for block in iter(functools.partial(fh.read, self.block_size), b''):
                 written += len(block)
@@ -332,6 +338,10 @@ class Image:
 
     def Finalise(self):
         """Write all the partitions this image represents to disk/file."""
+        # Make sure we didn't try to add partitions and a full image to copy.
+        if self.partitions and self.copy_image:
+            raise ValueError('Cannot copy partitions and a full image')
+
         if not self.is_usb:
             # first, make sure the file is big enough.
             logging.info('Create image of size={} bytes'.format(self.file_size))
@@ -339,20 +349,31 @@ class Image:
             self.file.flush()
             os.fsync(self.file.fileno())
 
-        logging.info('Creating new GPT partition table...')
-        self._Cgpt(['create', self.filename])
-        self._Cgpt(['boot', '-p', self.filename])
-        logging.info('Done.')
+        if self.partitions:
+            logging.info('Creating new GPT partition table...')
+            self._Cgpt(['create', self.filename])
+            self._Cgpt(['boot', '-p', self.filename])
+            logging.info('Done.')
 
-        logging.info('Creating and writing partitions...')
-        current_offset = Image.SECTOR_SIZE * Image.GPT_SECTORS
-        for part in self.partitions:
-            if not self._CgptAdd(part, current_offset):
-                logging.warning('Write failed, aborting.')
-                self.file.close()
-                return
-            self.WritePart(part, current_offset)
-            current_offset += part.size
+            logging.info('Creating and writing partitions...')
+            current_offset = Image.SECTOR_SIZE * Image.GPT_SECTORS
+            for part in self.partitions:
+                if not self._CgptAdd(part, current_offset):
+                    logging.warning('Write failed, aborting.')
+                    self.file.close()
+                    return
+                if part.path:
+                    logging.info(
+                        '   Writing image {} to partition {}... '.format(
+                            part.path.split('/')[-1], part.label))
+                    self._CopyToFile(part.path, current_offset)
+                current_offset += part.size
+        elif self.copy_image:
+            logging.info('Copying image from %s', self.copy_image)
+            self._CopyToFile(self.copy_image, 0)
+        else:
+            raise ValueError('No contents found')
+
         logging.info('Done.')
         self.file.close()
 
@@ -462,7 +483,21 @@ def EjectDisk(path):
 
 
 def Main(args):
-    path = args.FILE
+    if args.temp_remote_image_only:
+        # We have to let the temporary directory persist past program exit
+        # since the local host will need to copy it over; it's the caller's
+        # responsibility to clean it up when finished.
+        temp_dir = tempfile.mkdtemp()
+        path = os.path.join(temp_dir, 'installer.img')
+
+        # Print the file name to stdout so the caller knows where to find it.
+        print(path)
+
+        # --temp-remote-image-only always implies --create.
+        args.create = True
+    else:
+        path = args.FILE
+
     if args.create:
         if not args.force and os.path.exists(path):
             logging.critical(
@@ -502,36 +537,52 @@ def Main(args):
 
         UnmountDisk(path)
 
-    build_dir = args.build_dir
-    if build_dir == '':
-        build_dir = paths.FUCHSIA_BUILD_DIR
+    output = Image(path, not args.create, ParseSize(args.block_size))
 
-    target_images = IMAGES_RECOVERY_FASTBOOT if args.recovery_fastboot else IMAGES_RECOVERY_INSTALLER
-    parts = GetPartitions(build_dir, args.images, target_images)
-    if not parts:
-        return 1
+    if args.from_image:
+        # Just copy the existing image file.
+        output.CopyImage(args.from_image)
+    else:
+        # Set up the ChromeOS reserved partition.
+        reserved_part = Partition(
+            None, 'reserved', 'reserved',
+            Image.CROS_RESERVED_SECTORS * Image.SECTOR_SIZE)
+        output.AddPartition(reserved_part)
 
-    # Add a abr metadata partition
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # A pre-generated abr metadata that can only boots zircon-r
-        abr_data_file = os.path.join(temp_dir, 'abr_data')
-        with open(abr_data_file, 'wb') as abr_data:
-            abr_data.write(
-                (
-                    b'\x00\x41\x42\x30\x02\x01\x00\x00\x0f\x00\x00\x00\x0e\x00\x00\x00\x00'
-                    b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x6b\xa3\x22\x12'
-                ).ljust(1024 * 1024)  # Make a 1MB partition.
-            )
+        build_dir = args.build_dir
+        if build_dir == '':
+            build_dir = paths.FUCHSIA_BUILD_DIR
 
-        #TODO(b/268532862): Use new GUID once switched to gigaboot++.
-        parts.append(
-            Partition(str(abr_data_file), ABR_META_GPT_GUID, 'durable_boot'))
+        if args.recovery_fastboot:
+            target_images = IMAGES_RECOVERY_FASTBOOT
+        else:
+            target_images = IMAGES_RECOVERY_INSTALLER
+        parts = GetPartitions(build_dir, args.images, target_images)
+        if not parts:
+            return 1
 
-        output = Image(args.FILE, not args.create, ParseSize(args.block_size))
-        for p in parts:
-            output.AddPartition(p)
+        # Add a abr metadata partition
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # A pre-generated abr metadata that can only boots zircon-r
+            abr_data_file = os.path.join(temp_dir, 'abr_data')
+            with open(abr_data_file, 'wb') as abr_data:
+                abr_data.write(
+                    (
+                        b'\x00\x41\x42\x30\x02\x01\x00\x00\x0f\x00\x00\x00\x0e\x00\x00\x00\x00'
+                        b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x6b\xa3\x22\x12'
+                    ).ljust(1024 * 1024)  # Make a 1MB partition.
+                )
 
-        output.Finalise()
+            #TODO(b/268532862): Use new GUID once switched to gigaboot++.
+            parts.append(
+                Partition(
+                    str(abr_data_file), ABR_META_GPT_GUID, 'durable_boot'))
+
+            for p in parts:
+                output.AddPartition(p)
+
+            output.Finalise()
+
     if not args.create:
         EjectDisk(path)
     return 0
@@ -539,7 +590,8 @@ def Main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Create a Fuchsia installer image.', prog='fx mkinstaller')
+        description='Create a Fuchsia installer image.',
+        prog='fx mkinstaller[-remote]')
     parser.add_argument(
         '-c',
         '--create',
@@ -586,6 +638,10 @@ if __name__ == '__main__':
         'Path to the Fuchsia build directory. The script will try and guess if no path is provided.'
     )
     parser.add_argument(
+        '--from-image',
+        help=
+        'Only write an existing installer image at this path to the out path.')
+    parser.add_argument(
         '--new-installer',
         action='store_true',
         help='DEPRECATED. Has no effect.')
@@ -593,8 +649,32 @@ if __name__ == '__main__':
         '--recovery-fastboot',
         action='store_true',
         help='Create a bootable recovery-eng image with userspace fastboot.')
+    parser.add_argument(
+        'host',
+        nargs='?',
+        help='Build host name; only used for `mkinstaller-remote`.')
+    parser.add_argument(
+        'host_dir',
+        nargs='?',
+        help='Build host root Fuchsia dir; only used for `mkinstaller-remote`.')
     parser.add_argument('FILE', help='Path to USB device or installer image')
+
+    # Internal-only helper args for mkinstaller-remote.
+
+    # --print-host-args-only just prints the host/host_dir args if they exist
+    # and exits, so we don't have to re-implement all the commandline parsing
+    # in the mkinstaller-remote shell script.
+    parser.add_argument(
+        '--print-host-args-only', action='store_true', help=argparse.SUPPRESS)
+    # --temp-remote-image-only is similar to --create, but it ignores the |FILE|
+    # argument and instead creates a new image in /tmp then prints the resulting
+    # path. Used by mkinstaller-remote to override the local |FILE| argument on
+    # the remote host.
+    parser.add_argument(
+        '--temp-remote-image-only', action='store_true', help=argparse.SUPPRESS)
+
     argv = parser.parse_args()
+
     level = logging.WARNING
     if argv.verbose:
         level = logging.DEBUG
@@ -602,4 +682,9 @@ if __name__ == '__main__':
         CGPT_BIN = argv.cgpt_path
     logging.basicConfig(
         format='mkinstaller: %(levelname)s: %(message)s', level=level)
+
+    if argv.print_host_args_only:
+        print(" ".join([arg for arg in (argv.host, argv.host_dir) if arg]))
+        sys.exit(0)
+
     sys.exit(Main(argv))
