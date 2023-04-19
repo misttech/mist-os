@@ -47,7 +47,11 @@ __attribute__((section(".text.not-split"))) void minipr_thread_loop(zx_handle_t 
     uint32_t actual = 0u;
     uint32_t actual_handles = 0u;
     zx_handle_t original_handle = ZX_HANDLE_INVALID;
-    minip_ctx_t ctx = {};
+
+    // The program that runs this function must be entirely self-contained.
+    // Mark this as uninitalized to ensure the compiler does not generate a call
+    // to memset.
+    __UNINITIALIZED minip_ctx_t ctx;
 
     zx_status_t status =
         (*read_fn)(channel, 0u, &ctx, &original_handle, sizeof(ctx), 1, &actual, &actual_handles);
