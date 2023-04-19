@@ -194,22 +194,6 @@ type WlanTxPacket = struct {
     info WlanTxInfo;
 };
 
-/// Includes the information about beacon template.
-type WlanBeaconConfiguration = table {
-    /// Points to the beacon template. Since this is just the template, some packet content can
-    /// contain only minimum valid info. They will be changed later by hardware/firmware or software.
-    /// Note that the driver must copy the packet content into its own memory and cannot rely on
-    /// the pointers in the struct.
-    1: packet_template WlanTxPacket;
-
-    /// TIM offset (in bytes) to the start of |bcn_tmpl|. This points to the first byte of TIM IE,
-    /// which is the tag ID.
-    2: tim_ele_offset uint64;
-
-    /// in TU
-    3: beacon_interval uint16;
-};
-
 @discoverable
 @transport("Driver")
 @banjo_layout("ddk-interface")
@@ -481,24 +465,29 @@ protocol WlanSoftmac {
         join_request fuchsia.wlan.internal.JoinBssRequest;
     }) -> () error zx.status;
 
-    // Enables or disables hardware Beaconing.
-    // * |beacon_config|: Pass `nullptr` to disable hardware Beacons. Used by hardware beacon offload.
-    EnableBeaconing(struct {
-        beacon_config WlanBeaconConfiguration;
-    }) -> () error zx.status;
-
-    /// Enables, disables or updates hardware beaconing.
-    /// The device should start transmitting a beacon derived from the given
-    /// configuration, or update the transmitted beacon if hardware beaconing
-    /// is already enabled.
-    /// If the config is not provided, hardware beaconing should be disabled.
-    ///
+    /// Enables hardware Beaconing. This API cannot be invoked while beaconing is active.
+    /// DisableBeaconing() must be called before this API can be re-invoked. \
+    /// All fields in the message are required. \
     /// Common errors include: \
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support hardware beacons. \
-    ///   ZX_ERR_INVALID_ARGS: The device cannot transmit the requested beacon.
-    ConfigureBeaconing(struct {
-        packet WlanTxPacket;
+    ///   ZX_ERR_INVALID_ARGS: The device cannot transmit the requested beacon. \
+    ///   ZX_ERR_BAD_STATE: The device is already beaconing.
+    EnableBeaconing(table {
+        /// Points to the beacon template. Since this is just the template, some packet content can
+        /// contain only minimum valid info. They will be changed later by hardware/firmware or
+        /// software.
+        1: packet_template WlanTxPacket;
+
+        /// TIM offset (in bytes) to the start of |bcn_tmpl|. This points to the first byte of
+        /// TIM IE, which is the tag ID.
+        2: tim_ele_offset uint64;
+
+        /// in TU
+        3: beacon_interval uint16;
     }) -> () error zx.status;
+
+    /// Disables hardware beaconing.
+    DisableBeaconing() -> () error zx.status;
 
     /// Install a key for encryption when transmitting or receiving protected
     /// frames.

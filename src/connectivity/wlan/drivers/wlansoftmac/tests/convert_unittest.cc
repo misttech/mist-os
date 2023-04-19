@@ -11,6 +11,7 @@
 #include <wlan/drivers/test/log_overrides.h>
 
 #include "fidl/fuchsia.wlan.softmac/cpp/wire_types.h"
+#include "fuchsia/wlan/softmac/c/banjo.h"
 
 namespace wlan::drivers {
 namespace {
@@ -449,12 +450,12 @@ TEST_F(ConvertTest, ToFidlJoinBssRequest) {
 
 TEST_F(ConvertTest, ToFidlBcn) {
   drivers::log::Instance::Init(0);
-  // Populate wlan_beacon_configuration_t
+  // Populate wlan_softmac_enable_beaconing_request_t
   uint8_t* tx_packet_template_buffer = (uint8_t*)calloc(kFakePacketSize, sizeof(uint8_t));
   for (size_t i = 0; i < kFakePacketSize; i++) {
     tx_packet_template_buffer[i] = kRandomPopulaterUint8;
   }
-  wlan_beacon_configuration_t in = {
+  wlan_softmac_enable_beaconing_request_t in = {
       .packet_template =
           {
               .mac_frame_buffer = tx_packet_template_buffer,
@@ -475,8 +476,8 @@ TEST_F(ConvertTest, ToFidlBcn) {
 
   // Conduct conversion
   fidl::Arena arena;
-  wlan_softmac::WlanBeaconConfiguration out;
-  ConvertBcn(in, &out, arena);
+  wlan_softmac::WlanSoftmacEnableBeaconingRequest out;
+  ConvertEnableBeaconing(in, &out, arena);
 
   // Verify outputs
   EXPECT_EQ(kFakePacketSize, out.packet_template().mac_frame.count());
@@ -499,7 +500,7 @@ TEST_F(ConvertTest, ToFidlBcn) {
   // Assign out-of-range values to these fields, and they will be adjust to the default values.
   in.packet_template.info.phy = kRandomPopulaterUint32;
   in.packet_template.info.channel_bandwidth = kRandomPopulaterUint32;
-  ConvertBcn(in, &out, arena);
+  ConvertEnableBeaconing(in, &out, arena);
   EXPECT_EQ(wlan_common::WlanPhyType::kDsss, out.packet_template().info.phy);
   EXPECT_EQ(wlan_common::ChannelBandwidth::kCbw20, out.packet_template().info.channel_bandwidth);
 

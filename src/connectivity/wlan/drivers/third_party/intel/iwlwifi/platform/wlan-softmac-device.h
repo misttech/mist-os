@@ -52,8 +52,7 @@ class WlanSoftmacDevice
   void JoinBss(JoinBssRequestView request, fdf::Arena& arena, JoinBssCompleter::Sync& completer);
   void EnableBeaconing(EnableBeaconingRequestView request, fdf::Arena& arena,
                        EnableBeaconingCompleter::Sync& completer);
-  void ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
-                          ConfigureBeaconingCompleter::Sync& completer);
+  void DisableBeaconing(fdf::Arena& arena, DisableBeaconingCompleter::Sync& completer);
   void InstallKey(InstallKeyRequestView request, fdf::Arena& arena,
                   InstallKeyCompleter::Sync& completer);
   void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request, fdf::Arena& arena,

@@ -280,7 +280,7 @@ void WlanSoftmacDevice::JoinBss(JoinBssRequestView request, fdf::Arena& arena,
 void WlanSoftmacDevice::EnableBeaconing(EnableBeaconingRequestView request, fdf::Arena& arena,
                                         EnableBeaconingCompleter::Sync& completer) {
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
-  zx_status_t status = mac_enable_beaconing(mvmvif_, &request->beacon_config);
+  zx_status_t status = mac_enable_beaconing(mvmvif_, request);
   if (status != ZX_OK) {
     // Expected for now since this is not supported yet in iwlwifi driver.
     IWL_ERR(this, "failed mac enable beaconing: %s", zx_status_get_string(status));
@@ -291,13 +291,13 @@ void WlanSoftmacDevice::EnableBeaconing(EnableBeaconingRequestView request, fdf:
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanSoftmacDevice::ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
-                                           ConfigureBeaconingCompleter::Sync& completer) {
+void WlanSoftmacDevice::DisableBeaconing(fdf::Arena& arena,
+                                         DisableBeaconingCompleter::Sync& completer) {
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
-  zx_status_t status = mac_configure_beacon(mvmvif_, &request->packet);
+  zx_status_t status = mac_disable_beaconing(mvmvif_);
   if (status != ZX_OK) {
     // Expected for now since this is not supported yet in iwlwifi driver.
-    IWL_ERR(this, "failed mac configure beacon: %s", zx_status_get_string(status));
+    IWL_ERR(this, "failed mac disable beaconing: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }

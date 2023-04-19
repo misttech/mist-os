@@ -63,9 +63,9 @@ zx_status_t mac_set_channel(struct iwl_mvm_vif* mvmvif, const wlan_channel_t* ch
 zx_status_t mac_join_bss(struct iwl_mvm_vif* mvmvif,
                          const fuchsia_wlan_internal::wire::JoinBssRequest* config);
 zx_status_t mac_leave_bss(struct iwl_mvm_vif* mvmvif);
-zx_status_t mac_enable_beaconing(void* ctx,
-                                 const wlan_softmac_wire::WlanBeaconConfiguration* beacon_config);
-zx_status_t mac_configure_beacon(void* ctx, const wlan_softmac_wire::WlanTxPacket* packet_template);
+zx_status_t mac_enable_beaconing(
+    void* ctx, const wlan_softmac_wire::WlanSoftmacEnableBeaconingRequest* request);
+zx_status_t mac_disable_beaconing(void* ctx);
 zx_status_t mac_notify_association_complete(
     struct iwl_mvm_vif* mvmvif, const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg);
 zx_status_t mac_clear_association(struct iwl_mvm_vif* mvmvif,

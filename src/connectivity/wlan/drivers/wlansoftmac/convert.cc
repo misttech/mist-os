@@ -423,9 +423,10 @@ zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
   return ZX_OK;
 }
 
-void ConvertBcn(const wlan_beacon_configuration_t& in,
-                fuchsia_wlan_softmac::wire::WlanBeaconConfiguration* out, fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_softmac::wire::WlanBeaconConfiguration::Builder(arena);
+void ConvertEnableBeaconing(const wlan_softmac_enable_beaconing_request_t& in,
+                            fuchsia_wlan_softmac::wire::WlanSoftmacEnableBeaconingRequest* out,
+                            fidl::AnyArena& arena) {
+  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacEnableBeaconingRequest::Builder(arena);
   fuchsia_wlan_softmac::wire::WlanTxPacket packet_template;
   auto mac_frame_vec =
       std::vector<uint8_t>(in.packet_template.mac_frame_buffer,

@@ -167,8 +167,7 @@ struct WlantapMacImpl : WlantapMac,
     completer.buffer(arena).ReplySuccess();
   }
 
-  void ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
-                          ConfigureBeaconingCompleter::Sync& completer) override {
+  void DisableBeaconing(fdf::Arena& arena, DisableBeaconingCompleter::Sync& completer) override {
     // This is the test driver, so we can just pretend the beacon was configured.
     completer.buffer(arena).ReplySuccess();
   }

@@ -143,10 +143,6 @@ typedef struct {
    */
   int32_t (*disable_beaconing)(void *device);
   /**
-   * Reconfigure the enabled beacon on the device.
-   */
-  int32_t (*configure_beacon)(void *device, wlansoftmac_out_buf_t buf);
-  /**
    * Sets the link status to be UP or DOWN.
    */
   int32_t (*set_link_status)(void *device, uint8_t status);
@@ -218,7 +214,6 @@ extern "C" void delete_sta(wlansoftmac_handle_t *softmac);
 
 extern "C" void sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame);
 
-extern "C" zx_status_t duplicate_inspect_vmo(wlansoftmac_handle_t *_softmac,
-                                             zx_handle_t *_inspect_vmo);
+extern "C" zx_status_t duplicate_inspect_vmo(wlansoftmac_handle_t *softmac, uint32_t *inspect_vmo);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_

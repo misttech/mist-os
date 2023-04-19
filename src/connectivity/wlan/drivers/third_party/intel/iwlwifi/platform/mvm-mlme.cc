@@ -456,14 +456,13 @@ zx_status_t mac_leave_bss(struct iwl_mvm_vif* mvmvif) {
   return ZX_OK;
 }
 
-zx_status_t mac_enable_beaconing(void* ctx,
-                                 const wlan_softmac_wire::WlanBeaconConfiguration* beacon_config) {
+zx_status_t mac_enable_beaconing(
+    void* ctx, const wlan_softmac_wire::WlanSoftmacEnableBeaconingRequest* beacon_config) {
   IWL_ERR(ctx, "%s() needs porting ... see fxbug.dev/36742\n", __func__);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t mac_configure_beacon(void* ctx,
-                                 const wlan_softmac_wire::WlanTxPacket* packet_template) {
+zx_status_t mac_disable_beaconing(void* ctx) {
   IWL_ERR(ctx, "%s() needs porting ... see fxbug.dev/36742\n", __func__);
   return ZX_ERR_NOT_SUPPORTED;
 }

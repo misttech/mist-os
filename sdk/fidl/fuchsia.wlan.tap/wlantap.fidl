@@ -148,7 +148,7 @@ protocol WlantapPhy {
         args StartScanArgs;
     });
 
-    // TODO: ConfigureBeaconing
+    // TODO: Enable/Disable Beaconing.
 
     /// The device is to install the keys (often coming from RSN, exceptions apply).
     -> SetKey(struct {

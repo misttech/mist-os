@@ -177,10 +177,6 @@ impl Device {
         self.raw_device.disable_beaconing()
     }
 
-    pub fn configure_beacon(&self, buf: OutBuf) -> Result<(), zx::Status> {
-        self.raw_device.configure_beacon(buf)
-    }
-
     pub fn set_eth_link(&self, status: LinkStatus) -> Result<(), zx::Status> {
         self.raw_device.set_eth_link(status)
     }
@@ -440,8 +436,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Disable beaconing on the device.
     disable_beaconing: extern "C" fn(device: *mut c_void) -> i32,
-    /// Reconfigure the enabled beacon on the device.
-    configure_beacon: extern "C" fn(device: *mut c_void, buf: OutBuf) -> i32,
     /// Sets the link status to be UP or DOWN.
     set_link_status: extern "C" fn(device: *mut c_void, status: u8) -> i32,
     /// Configure the association context.
@@ -581,11 +575,6 @@ impl DeviceInterface {
 
     fn disable_beaconing(&self) -> Result<(), zx::Status> {
         let status = (self.disable_beaconing)(self.device);
-        zx::ok(status)
-    }
-
-    fn configure_beacon(&self, buf: OutBuf) -> Result<(), zx::Status> {
-        let status = (self.configure_beacon)(self.device, buf);
         zx::ok(status)
     }
 
@@ -1051,21 +1040,6 @@ pub mod test_utils {
             zx::sys::ZX_OK
         }
 
-        pub extern "C" fn configure_beacon(device: *mut c_void, buf: OutBuf) -> i32 {
-            unsafe {
-                if let Some((_, tim_ele_offset, beacon_interval)) =
-                    (*(device as *mut Self)).beacon_config
-                {
-                    (*(device as *mut Self)).beacon_config =
-                        Some((buf.as_slice().to_vec(), tim_ele_offset, beacon_interval));
-                    buf.free();
-                    zx::sys::ZX_OK
-                } else {
-                    zx::sys::ZX_ERR_BAD_STATE
-                }
-            }
-        }
-
         // Cannot mark fn unsafe because it has to match fn signature in DeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn notify_association_complete(
@@ -1125,7 +1099,6 @@ pub mod test_utils {
                 join_bss: Self::join_bss,
                 enable_beaconing: Self::enable_beaconing,
                 disable_beaconing: Self::disable_beaconing,
-                configure_beacon: Self::configure_beacon,
                 set_link_status: Self::set_link_status,
                 notify_association_complete: Self::notify_association_complete,
                 clear_association: Self::clear_association,
@@ -1565,34 +1538,6 @@ mod tests {
         });
         dev.disable_beaconing().expect("error disabling beaconing");
         assert_variant!(fake_device.beacon_config.as_ref(), None);
-    }
-
-    #[test]
-    fn configure_beacon() {
-        let exec = fasync::TestExecutor::new();
-        let mut fake_device = FakeDevice::new(&exec);
-        let dev = fake_device.as_device();
-
-        {
-            let mut in_buf =
-                fake_device.buffer_provider.get_buffer(4).expect("error getting buffer");
-            in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 4][..]);
-            dev.enable_beaconing(OutBuf::from(in_buf, 4), 1, TimeUnit(2))
-                .expect("error enabling beaconing");
-            assert_variant!(fake_device.beacon_config.as_ref(), Some((buf, _, _)) => {
-                assert_eq!(&buf[..], &[1, 2, 3, 4][..]);
-            });
-        }
-
-        {
-            let mut in_buf =
-                fake_device.buffer_provider.get_buffer(4).expect("error getting buffer");
-            in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 5][..]);
-            dev.configure_beacon(OutBuf::from(in_buf, 4)).expect("error enabling beaconing");
-            assert_variant!(fake_device.beacon_config.as_ref(), Some((buf, _, _)) => {
-                assert_eq!(&buf[..], &[1, 2, 3, 5][..]);
-            });
-        }
     }
 
     #[test]
