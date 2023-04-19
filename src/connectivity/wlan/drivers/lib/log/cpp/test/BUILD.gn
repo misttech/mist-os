@@ -17,7 +17,6 @@ source_set("log_overrides") {
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/lib/ddk",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/syslog",
     "//zircon/system/ulib/zx",
   ]
 }
