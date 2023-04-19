@@ -7,6 +7,7 @@ If a meta/manifest.json is found, the arch target will be merged into that file
 """
 
 import argparse
+import ast
 import filecmp
 import os
 import shutil
@@ -14,6 +15,7 @@ import json
 import subprocess
 import sys
 import difflib
+import re
 
 GENERATED_CONTANTS_TEMPLATE = """# AUTO-GENERATED - DO NOT EDIT!
 
@@ -24,6 +26,39 @@ constants = struct(host_cpus = ["x64"], target_cpus = {target_cpu})
 """
 
 WHITELIST_DIFF_LISTS = []
+PATTERN = r'fuchsia_select\((.*?)\)'
+
+
+def merge_fuchsia_select(source_file: str, dest_file: str) -> bool:
+    if not os.path.basename(source_file).endswith(".bazel"):
+        return False
+
+    with open(source_file, "r", encoding="utf-8") as f:
+        source = f.read()
+        # If file does not contain fuchsia_select, then nothing to merge
+        if "fuchsia_select" not in source:
+            return False
+
+    with open(dest_file, "r", encoding="utf-8") as f:
+        dest = f.read()
+
+    source_list = re.findall(PATTERN, source.replace("\n", ""))
+    dest_list = re.findall(PATTERN, dest.replace("\n", ""))
+    merged_map = {}
+    for (select_source, select_dest) in zip(source_list, dest_list):
+        dict_source = ast.literal_eval(select_source)
+        dict_dest = ast.literal_eval(select_dest)
+        dict_source.update(dict_dest)
+        merged_dict_str = str(dict_source).strip("{}")
+        merged_map[select_source.strip("{}").strip()] = merged_dict_str
+
+    for src in merged_map:
+        source = source.replace(src, merged_map[src])
+
+    with open(source_file, "w") as f:
+        f.write(source)
+
+    return True
 
 
 def merge_new_manifest(manifest_json, new_manifest):
@@ -105,11 +140,12 @@ def main():
                     continue
 
                 if os.path.exists(dest_file):
-                    # Coherence check: Ensure that files with the same path have equal content.
-                    if not filecmp.cmp(source_file, dest_file):
-                        if not validate_same_json(source_file, dest_file):
-                            print_file_difference(
-                                source_file, dest_file, relpath)
+                    if filecmp.cmp(source_file, dest_file):
+                        continue
+                    if validate_same_json(source_file, dest_file):
+                        continue
+                    if not merge_fuchsia_select(source_file, dest_file):
+                        print_file_difference(source_file, dest_file, relpath)
                     continue
 
                 if not os.path.exists(os.path.dirname(dest_file)):
@@ -129,6 +165,9 @@ def main():
         f.write(
             GENERATED_CONTANTS_TEMPLATE.format(
                 target_cpu=manifest_json["arch"]["target"]))
+
+    if args.buildifier_path:
+        format_dir(args.buildifier_path, args.source_dir)
 
 
 if __name__ == "__main__":
