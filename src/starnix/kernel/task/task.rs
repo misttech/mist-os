@@ -1341,7 +1341,13 @@ impl CurrentTask {
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}[{}]", self.id, self.command.read().to_string_lossy())
+        write!(
+            f,
+            "{}:{}[{}]",
+            self.thread_group.leader,
+            self.id,
+            self.command.read().to_string_lossy()
+        )
     }
 }
 
