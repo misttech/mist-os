@@ -8,6 +8,8 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include <fbl/unique_fd.h>
 
@@ -26,29 +28,81 @@ TEST_P(DirectoryMaxTest, Max) {
   // Write the maximum number of files to a directory
   const std::string dir = "dir/";
   ASSERT_EQ(mkdir(GetPath(dir).c_str(), 0777), 0);
-  int i = 0;
-  for (;; ++i) {
-    const std::string path = GetPath(dir + std::to_string(i)) + std::string(kLargePathLength, '.');
-    if (i % 100 == 0) {
-      std::cout << "Wrote " << i << " direntries" << std::endl;
+
+  class Context {
+   public:
+    explicit Context(std::string prefix) : path_prefix_(std::move(prefix)) {}
+
+    void fill() {
+      for (;; ++cnt_) {
+        const std::string path = path_prefix_ + std::to_string(cnt_);
+        fbl::unique_fd fd(open(path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0644));
+        if (!fd) {
+          break;
+        }
+      }
     }
 
-    fbl::unique_fd fd(open(path.c_str(), O_RDWR | O_CREAT | O_EXCL, 0644));
-    if (!fd) {
-      std::cout << "Wrote " << i << " direntries" << std::endl;
-      break;
+    void unlink_all() {
+      for (cnt_ -= cnt_; cnt_ >= 0; cnt_--) {
+        const std::string path = path_prefix_ + std::to_string(cnt_);
+        int r = unlink(path.c_str());
+        if (r != 0) {
+          err_ = true;
+          break;
+        }
+      }
     }
+
+    bool err() const { return err_; }
+    int count() const { return cnt_; }
+
+   private:
+    std::string path_prefix_;
+    int cnt_ = 0;
+    bool err_ = false;
+  };
+
+  const std::string path_prefix = GetPath(dir + std::string(kLargePathLength, '.'));
+  std::vector<Context> contexts;
+  for (int i = 0; i < 16; i++) {
+    contexts.emplace_back(Context(path_prefix + std::to_string(i) + "_"));
   }
 
+  std::vector<std::thread> fillers;
+  for (auto& context : contexts) {
+    fillers.emplace_back(std::thread([&context]() { context.fill(); }));
+  }
+  for (auto& thread : fillers) {
+    thread.join();
+  }
+
+  int total_files = 0;
+  for (const auto& context : contexts) {
+    total_files += context.count();
+  }
+  std::cerr << "Wrote a total of " << total_files << "." << std::endl;
+
+  std::cerr << "Starting unmount." << std::endl;
   EXPECT_EQ(fs().Unmount().status_value(), ZX_OK);
+  std::cerr << "Starting fsck." << std::endl;
   EXPECT_EQ(fs().Fsck().status_value(), ZX_OK);
+  std::cerr << "Starting mount." << std::endl;
   EXPECT_EQ(fs().Mount().status_value(), ZX_OK);
 
-  // Unlink all those files
-  for (i -= 1; i >= 0; i--) {
-    const std::string path = GetPath(dir + std::to_string(i)) + std::string(kLargePathLength, '.');
-    ASSERT_EQ(unlink(path.c_str()), 0);
+  std::cerr << "Time to clean up." << std::endl;
+
+  std::vector<std::thread> unlinkers;
+  for (auto& context : contexts) {
+    unlinkers.emplace_back(std::thread([&context]() { context.unlink_all(); }));
   }
+  for (auto& thread : unlinkers) {
+    thread.join();
+  }
+  for (auto& context : contexts) {
+    ASSERT_FALSE(context.err());
+  }
+  std::cerr << "Done." << std::endl;
 }
 
 INSTANTIATE_TEST_SUITE_P(
