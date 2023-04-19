@@ -447,6 +447,5 @@ group("test_data_v1") {
     ":logging-component",
     ":v2_test_runs_v1_component",
     "//examples/tests/rust:custom_artifact_user_cmp",
-    "//src/sys/lib/legacy_component/tests:echo_legacy_server",
   ]
 }

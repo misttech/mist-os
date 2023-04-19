@@ -17,11 +17,18 @@ fuchsia_test_component("echo_test_modern") {
   manifest = "meta/echo_test.cml"
 }
 
+fuchsia_test_component("echo_server_legacy") {
+  component_name = "echo_server"
+  manifest = "meta/echo_server.cmx"
+  deps =
+      [ "//src/sys/component_manager/testing/echo_server:echo_server_testing" ]
+}
+
 group("echo_test") {
   testonly = true
   deps = [
+    ":echo_server_legacy",
     ":echo_test_legacy",
     ":echo_test_modern",
-    "//src/sys/lib/legacy_component/tests:echo_legacy_server",
   ]
 }

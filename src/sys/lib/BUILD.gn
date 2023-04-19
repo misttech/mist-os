@@ -34,9 +34,3 @@ group("tests") {
     "task-exceptions:tests",
   ]
 }
-
-group("legacy_tests") {
-  testonly = true
-
-  deps = [ "legacy_component:legacy_tests" ]
-}
