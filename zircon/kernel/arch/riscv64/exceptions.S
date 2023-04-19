@@ -385,7 +385,7 @@ FUNCTION(riscv64_syscall_dispatcher)
 
     // Verify syscall number and call the unknown handler if bad.
     li     t2, ZX_SYS_COUNT
-    bge    t0, t2, .Lunknown_syscall
+    bgeu   t0, t2, .Lunknown_syscall
 
     // Jump to the right syscall wrapper. The syscall table is an
     // array of 8 byte aligned routines for each syscall. Each routine
