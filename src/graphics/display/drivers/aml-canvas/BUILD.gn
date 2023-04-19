@@ -27,6 +27,9 @@ source_set("common_srcs") {
   public_deps = [
     ":aml_canvas_bind",
     "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp_wire",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -56,6 +59,7 @@ test("aml-canvas-test") {
   sources = [ "aml-canvas-test.cc" ]
   deps = [
     ":common_srcs",
+    "//sdk/lib/driver/runtime/testing/runtime",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg",

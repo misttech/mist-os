@@ -1,0 +1,69 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.amlogiccanvas;
+
+using zx;
+
+type CanvasFlags = flexible bits : uint32 {
+    READ = 0b0001;
+    WRITE = 0b0010;
+    /// Wrap accesses outside of [0, height).
+    WRAP_VERTICAL = 0b0100;
+    /// Wrap accesses outside of [0, width).
+    WRAP_HORIZONTAL = 0b1000;
+};
+
+type CanvasBlockMode = flexible enum : uint32 {
+    LINEAR = 0x0;
+    BLOCK_32X32 = 0x1;
+    BLOCK_64X32 = 0x2;
+};
+
+type CanvasEndianness = flexible bits : uint32 {
+    SWAP_8BITS = 0b0001;
+    SWAP_16BITS = 0b0010;
+    SWAP_32BITS = 0b0100;
+    SWAP_64BITS = 0b1000;
+};
+
+/// CanvasInfo corresponds to the DMC_CAV_LUT_DATAL/DATAH registers used to
+/// program memory layout and format for a single canvas.
+type CanvasInfo = struct {
+    /// Height in rows.
+    height uint32;
+    /// Offset between rows of pixels, in bytes.
+    stride_bytes uint32;
+    /// Use a tiled layout if non-zero.
+    blkmode CanvasBlockMode;
+    /// Swap words of varying size within the data.
+    endianness CanvasEndianness;
+    /// Flags to control access to canvas memory.
+    flags CanvasFlags;
+};
+
+@discoverable
+protocol Device {
+    /// Configures a canvas. Canvases are a special construct in the AMLogic
+    /// memory controller, used to turn image data accesses into memory accesses
+    /// while respecting block/tiling, stride, and endianness.
+    ///
+    /// `vmo` is the backing memory to use for this canvas.
+    /// `offset` is the relative address for image data within `vmo`.
+    /// `info` describes the canvas layout (see CanvasInfo for details).
+    Config(resource struct {
+        vmo zx.handle:VMO;
+        offset uint64;
+        info CanvasInfo;
+    }) -> (struct {
+        canvas_idx uint8;
+    }) error zx.status;
+    /// Frees up a canvas.
+    Free(struct {
+        canvas_idx uint8;
+    }) -> () error zx.status;
+};
+
+service Service {
+    device client_end:Device;
+};

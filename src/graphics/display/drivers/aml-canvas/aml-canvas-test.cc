@@ -4,6 +4,7 @@
 
 #include "aml-canvas.h"
 
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
 #include <lib/fake-bti/bti.h>
 
 #include <vector>
@@ -43,8 +44,7 @@ ddk_mock::MockMmioReg& GetMockReg(ddk_mock::MockMmioRegRegion& registers) {
 
 class AmlCanvasTest : public zxtest::Test {
  public:
-  AmlCanvasTest()
-      : mock_regs_(ddk_mock::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)) {
+  AmlCanvasTest() : mock_regs_(ddk_mock::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)) {
     fdf::MmioBuffer mmio(mock_regs_.GetMmioBuffer());
 
     zx::bti bti;
@@ -151,6 +151,7 @@ class AmlCanvasTest : public zxtest::Test {
     return lut_addr.reg_value();
   }
 
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   std::vector<uint8_t> canvas_indices_;
   ddk_mock::MockMmioRegRegion mock_regs_;

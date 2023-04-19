@@ -5,8 +5,10 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AML_CANVAS_AML_CANVAS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AML_CANVAS_AML_CANVAS_H_
 
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -52,7 +54,8 @@ struct CanvasEntry {
 };
 
 class AmlCanvas : public DeviceType,
-                  public ddk::AmlogicCanvasProtocol<AmlCanvas, ddk::base_protocol> {
+                  public ddk::AmlogicCanvasProtocol<AmlCanvas, ddk::base_protocol>,
+                  public fidl::WireServer<fuchsia_hardware_amlogiccanvas::Device> {
  public:
   // Factory method called by the device manager binding code.
   static zx_status_t Create(zx_device_t* parent);
@@ -73,6 +76,12 @@ class AmlCanvas : public DeviceType,
                                   uint8_t* canvas_idx);
   zx_status_t AmlogicCanvasFree(uint8_t canvas_idx);
 
+  // fidl::WireServer<fuchsia_hardware_amlogiccanvas::Device>
+  void Config(ConfigRequestView request, ConfigCompleter::Sync& completer) override;
+  void Free(FreeRequestView request, FreeCompleter::Sync& completer) override;
+
+  zx_status_t ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+
   // Required by ddk::Device
   void DdkRelease();
 
@@ -83,6 +92,9 @@ class AmlCanvas : public DeviceType,
   fdf::MmioBuffer dmc_regs_ __TA_GUARDED(lock_);
   zx::bti bti_ __TA_GUARDED(lock_);
   std::array<CanvasEntry, kNumCanvasEntries> entries_ __TA_GUARDED(lock_);
+  async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
+  component::OutgoingDirectory outgoing_{dispatcher_};
+  fidl::ServerBindingGroup<fuchsia_hardware_amlogiccanvas::Device> bindings_;
 
 };  // class AmlCanvas
 
