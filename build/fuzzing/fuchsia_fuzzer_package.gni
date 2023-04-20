@@ -20,27 +20,11 @@ import("//build/fuzzing/fuchsia_fuzzer_component.gni")
 #       `cpp_fuzzers` is built as a fuzzer when the toolchain variant selected for that label
 #       matches an element of `_cpp_sanitizers`.
 #
-# Additionally, as part of the migration from the CFv1 fuzzer GN templates, the following
-# parameters are supported:
-#   cpp_fuzzers (optional)
-#     [list] A list of `fuchsia_libfuzzer` targets. `cpp_fuzzer_components` will be generated
-#       automatically with default manifests.
-#
-#   fuzzers (optional)
-#     [list] Alternate name for `cpp_fuzzers`.
-#
-#   rust_fuzzers (optional)
-#     [list] A list of `rustc_fuzzer` labels or scopes with a 'label' field.
-#       `rust_fuzzer_components` will be generated automatically with default manifests.
-#
 template("fuchsia_fuzzer_package") {
   if (current_toolchain == default_toolchain) {
     no_forward = [
       "package_name",
-      "fuzzers",
-      "cpp_fuzzers",
       "cpp_fuzzer_components",
-      "rust_fuzzers",
       "rust_fuzzer_components",
       "test_components",
       "visibility",
@@ -50,53 +34,16 @@ template("fuchsia_fuzzer_package") {
     if (defined(invoker.package_name)) {
       package_name = invoker.package_name
     }
-
-    # TODO(fxbug.dev/60168): Update consumers, then drop this automatic conversion.
-    package_name = string_replace(package_name, "_", "-")
-
-    # Step 1: Generate components for fuzzer binaries.
-    # TODO(fxbug.dev/105707): Make the fuzzers more build system agnostic by adding explicitly
-    # manifests and deprecating this logic.
-    cpp_fuzzers = []
-    if (defined(invoker.fuzzers)) {
-      cpp_fuzzers += invoker.fuzzers
-    }
-    if (defined(invoker.cpp_fuzzers)) {
-      cpp_fuzzers += invoker.cpp_fuzzers
-    }
     cpp_fuzzer_components = []
-    foreach(fuzzer, cpp_fuzzers) {
-      fuzzer_name = get_label_info(fuzzer, "name")
-      component_target = "${fuzzer_name}_component"
-      fuchsia_fuzzer_component(component_target) {
-        component_name = fuzzer_name
-        deps = [ fuzzer ]
-      }
-      cpp_fuzzer_components += [ ":$component_target" ]
-    }
     if (defined(invoker.cpp_fuzzer_components)) {
-      cpp_fuzzer_components += invoker.cpp_fuzzer_components
-    }
-
-    rust_fuzzers = []
-    if (defined(invoker.rust_fuzzers)) {
-      rust_fuzzers += invoker.rust_fuzzers
+      cpp_fuzzer_components = invoker.cpp_fuzzer_components
     }
     rust_fuzzer_components = []
-    foreach(fuzzer, rust_fuzzers) {
-      fuzzer_name = get_label_info(fuzzer, "name")
-      component_target = "${fuzzer_name}_component"
-      fuchsia_fuzzer_component(component_target) {
-        component_name = fuzzer_name
-        deps = [ fuzzer ]
-      }
-      rust_fuzzer_components += [ ":$component_target" ]
-    }
     if (defined(invoker.rust_fuzzer_components)) {
-      rust_fuzzer_components += invoker.rust_fuzzer_components
+      rust_fuzzer_components = invoker.rust_fuzzer_components
     }
 
-    # Step 2: Determine which components to fuzz vs test based on which variants are active. This is
+    # Step 1: Determine which components to fuzz vs test based on which variants are active. This is
     # eager, and may include components that don't end up being selected by a fuzzer variant. This
     # is unlikely to happen with normal development workflows, but if it does, it will only
     # advertise one or more fuzzer tests as fuzzers, which will produce a descriptive error message
@@ -118,6 +65,7 @@ template("fuchsia_fuzzer_package") {
         can_fuzz_rust = true
       }
     }
+
     component_sets = [
       {
         components = cpp_fuzzer_components
@@ -129,7 +77,7 @@ template("fuchsia_fuzzer_package") {
       },
     ]
 
-    # Step 3: Assemble a package and add both fuzzers and fuzzer tests to it.
+    # Step 2: Assemble a package and add both fuzzers and fuzzer tests to it.
     package_target = "${package_name}_package"
     fuchsia_package(package_target) {
       testonly = true
@@ -142,7 +90,7 @@ template("fuchsia_fuzzer_package") {
       deps += rust_fuzzer_components
     }
 
-    # Step 4: Register fuzzers and fuzzer tests. The former are distinguished from the latter by a
+    # Step 3: Register fuzzers and fuzzer tests. The former are distinguished from the latter by a
     # fuzzer-specific `build_rule`.
     group_deps = [ ":$package_target" ]
     foreach(component_set, component_sets) {
@@ -166,7 +114,7 @@ template("fuchsia_fuzzer_package") {
       }
     }
 
-    # Step 5: Add the package and test registrations to a group with the `target_name`.
+    # Step 4: Add the package and test registrations to a group with the `target_name`.
     group(target_name) {
       testonly = true
       forward_variables_from(invoker, [ "visibility" ])

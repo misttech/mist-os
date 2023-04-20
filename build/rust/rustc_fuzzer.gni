@@ -41,11 +41,6 @@ import("//build/rust/rustc_staticlib.gni")
 #   disable_rbe
 #     Same meaning as for rustc_staticlib.
 #
-#   corpus
-#   dictionary
-#   options
-#     Same meaning as for `fuchsia_library_fuzzer` when building for Fuchsia, ignored otherwise.
-#
 #   test_inputs
 #     Same meaning as for `host_library_fuzzer` when building for host, ignored otherwise.
 #
@@ -118,11 +113,6 @@ template("rustc_fuzzer") {
     }
   } else {
     # TODO(fxbug.dev/105707): Remove once all fuzzers are using explicit manifests.
-    ignored_parameters += [
-      "corpus",
-      "dictionary",
-      "options",
-    ]
     host_library_fuzzer(target_name) {
       forward_variables_from(invoker, "*", staticlib_vars + ignored_parameters)
       deps = [ ":$fuzzer_lib" ]

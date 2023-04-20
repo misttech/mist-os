@@ -11,11 +11,6 @@ import("//build/fuzzing/host_library_fuzzer.gni")
 #
 # Parameters are the same as `executable`, plus:
 #
-#   corpus
-#   dictionary
-#   options
-#     Same meaning as for `fuchsia_library_fuzzer` when building for Fuchsia, ignored otherwise.
-#
 #   test_inputs
 #     Same meaning as for `host_library_fuzzer` when building for host, ignored otherwise.
 #
@@ -27,12 +22,6 @@ template("cpp_fuzzer") {
       forward_variables_from(invoker, "*", ignored_parameters)
     }
   } else {
-    # TODO(fxbug.dev/105707): Remove once all fuzzers are using explicit manifests.
-    ignored_parameters += [
-      "corpus",
-      "dictionary",
-      "options",
-    ]
     host_library_fuzzer(target_name) {
       forward_variables_from(invoker, "*", ignored_parameters)
     }

@@ -31,7 +31,6 @@ template("library_fuzzer") {
     forward_variables_from(invoker,
                            "*",
                            [
-                             "fuzzer_name",
                              "target_configs",
                              "target_type",
                              "variant_selector_target_type",
@@ -39,9 +38,6 @@ template("library_fuzzer") {
                              "visibility",
                            ])
     forward_variables_from(invoker, [ "visibility" ])
-    if (defined(invoker.fuzzer_name) && !defined(output_name)) {
-      output_name = invoker.fuzzer_name
-    }
     if (defined(invoker.target_configs)) {
       configs = []
       configs = invoker.target_configs

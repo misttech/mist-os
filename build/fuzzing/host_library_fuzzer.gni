@@ -20,10 +20,21 @@ template("host_library_fuzzer") {
   if (is_host) {
     fuzzer_target = "${target_name}_bin"
     fuzzer_name = target_name
+    if (defined(invoker.output_name)) {
+      fuzzer_name = invoker.output_name
+    }
+
     library_fuzzer(fuzzer_target) {
       target_type = "executable"
-      fuzzer_name = fuzzer_name
-      forward_variables_from(invoker, "*", [ "visibility" ])
+      output_name = fuzzer_name
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "configs",
+                               "output_name",
+                               "target_type",
+                               "visibility",
+                             ])
       target_configs = invoker.configs
     }
 
