@@ -125,14 +125,38 @@ authkeys_path="$(get-ssh-authkeys)" || {
 }
 
 artifact_dir="${FUCHSIA_DIR}/out/fetched"
-fetch_remote_build_artifacts "${host}" "${dir}" "${artifact_dir}" pave $build
+flash_source=$(fetch_remote_flash_source "${host}" "${dir}" "${build}")
+case "${flash_source}" in
+  flash-manifest:*)
+    flash_manifest="${flash_source#flash-manifest:}"
+    product_bundle=""
+    paving_script="pave.sh"
+    ;;
+  product-bundle:*)
+    flash_manifest=""
+    product_bundle="${flash_source#product-bundle:}"
+    paving_script="$(dirname "${product_bundle}")/pave.sh"
+    ;;
+  *)
+    fx-error "failed to find a flash manifest or product bundle on $host."
+    exit 1
+esac
+
+fx-info "Fetching artifacts from remote host: ${host}"
+if [[ -n "${flash_manifest}" ]]; then
+  fetch_remote_build_artifacts "${host}" "${dir}" "${artifact_dir}" pave $build
+else
+  fetch_remote_artifacts "${host}" "${dir}" "${artifact_dir}" "${product_bundle}" "${paving_script}"
+fi
 
 if "${pave}"; then
   if [[ -n "$(get-device-name)" ]]; then
     pave_args+=(-n $(get-device-name))
   fi
 
-  fetch_or_build_tool "${host}" "${dir}" "${artifact_dir}" bootserver
+  if [[ -n "${flash_manifest}" ]]; then
+    fetch_or_build_tool "${host}" "${dir}" "${artifact_dir}" bootserver
+  fi
   cd "${artifact_dir}"
-  ./pave.sh --authorized-keys "${authkeys_path}" "${pave_args[@]}"
+  "${paving_script}" --authorized-keys "${authkeys_path}" "${pave_args[@]}"
 fi

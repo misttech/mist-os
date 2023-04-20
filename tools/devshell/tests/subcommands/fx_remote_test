@@ -149,8 +149,30 @@ TEST_fx-pave-remote-args-given() {
   local out="${BT_TEMP_DIR}/output.log"
 
   {
+    echo "function fetch_remote_flash_source { echo flash-manifest:flash.json; }"
     echo "function fetch_remote_build_artifacts { :; }"
     echo "function fetch_or_build_tool { :; }"
+  } >> "${BT_TEMP_DIR}/tools/devshell/lib/fx-remote.sh"
+
+  echo "${testhost}:${testdir}" > "${BT_TEMP_DIR}/.fx-remote-config"
+  BT_EXPECT ${fx} pave-remote --no-pave "$anotherhost" "${testdir}" >>${out} 2>&1
+  BT_EXPECT_FILE_CONTAINS "${BT_TEMP_DIR}/.fx-remote-config" "${anotherhost}:${testdir}:"
+  btf::does-mock-args-contain "${ssh_mock}.mock_state.1" "$anotherhost"
+  btf::does-mock-args-contain "${ssh_mock}.mock_state.2" "$anotherhost"
+}
+
+# test pave-remote if the build uses a bazel product bundle, and given host
+# is used even when there's a cache file, and that the cache file is updated
+# with the given host
+TEST_fx-pave-remote-args-given-with-product-bundle() {
+  local testhost=myhostname.my.server.com
+  local testdir=~/myfuchsia/directory
+  local anotherhost=myhostname.my.server.com
+  local out="${BT_TEMP_DIR}/output.log"
+
+  {
+    echo "function fetch_remote_flash_source { echo product-bundle:acme/product_bundle; }"
+    echo "function fetch_remote_artifacts { :; }"
   } >> "${BT_TEMP_DIR}/tools/devshell/lib/fx-remote.sh"
 
   echo "${testhost}:${testdir}" > "${BT_TEMP_DIR}/.fx-remote-config"
