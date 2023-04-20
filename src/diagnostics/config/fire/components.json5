@@ -644,4 +644,9 @@
         label: "Diagnostics KCounter",
         moniker: "core/diagnostics/kcounter",
     },
+    {
+        id: 234,
+        label: "Update Committer",
+        moniker: "core/system-update/system-update-committer",
+    },
 ]
