@@ -191,7 +191,8 @@ template("clang_toolchain") {
           # Use local concurrency.
           _rewrapper_flags = [
             "--compare",
-            "--fsatrace",
+            "--fsatrace-path",
+            rebase_path("//prebuilt/fsatrace/fsatrace", root_build_dir),
             "--exec_strategy=remote",
           ]
         } else if (rust_rbe_check == "determinism") {
