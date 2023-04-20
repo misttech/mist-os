@@ -90,7 +90,7 @@ ffx component run --connect-stdio \
 The `--connect-stdio` flag is optional, but specifying this flag will cause
 stdio, stdout, and stderr from your terminal to be connected to the binary.
 Notice that this command re-uses the `<container-name>` you picked for the
-previous command. This name indicates the contianer in which you the process
+previous command. This name indicates the container in which the process
 will run.
 
 Similar to the previous command, you pick a `<component-name>` for the
