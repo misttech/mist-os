@@ -5,9 +5,10 @@
 use {
     anyhow::{format_err, Error},
     argh::FromArgs,
+    component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType},
     fidl_fuchsia_element as felement, fidl_fuchsia_session as fsession, fidl_fuchsia_sys2 as fsys,
     fuchsia_async as fasync,
-    fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path},
+    fuchsia_component::client::connect_to_protocol_at_path,
 };
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -58,13 +59,11 @@ async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMar
     realm_query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<P::Proxy, Error> {
-    let resolved_dirs = realm_query
-        .get_instance_directories(moniker)
-        .await?
-        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
-        .ok_or(format_err!("{} is not resolved", moniker))?;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-    connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+    let moniker = moniker.try_into()?;
+    let proxy =
+        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, realm_query)
+            .await?;
+    Ok(proxy)
 }
 
 #[fasync::run_singlethreaded]
