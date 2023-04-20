@@ -55,6 +55,7 @@ group("host_tools") {
   # since in that case the build happens on an X64 host.
   _all_host_tools = [
     "//src/developer/ffx:ffx_bin",
+    "//src/developer/ffx/tools:bins",
     "//src/storage/bin/fvm",
     "//tools/bootserver",
     "//tools/botanist",
