@@ -5,7 +5,6 @@
 #ifndef SRC_UI_BIN_ROOT_PRESENTER_APP_H_
 #define SRC_UI_BIN_ROOT_PRESENTER_APP_H_
 
-#include <fuchsia/accessibility/cpp/fidl.h>
 #include <fuchsia/input/virtualkeyboard/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>

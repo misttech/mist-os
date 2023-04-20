@@ -36,13 +36,12 @@
 // This test exercises the pointer injector code in the context of Input Pipeline and a real Scenic
 // client. It is a multi-component test, and carefully avoids sleeping or polling for component
 // coordination.
-// - It runs real (Root Presenter + Input Pipeline | Scene Manager) components, and a real Scenic
-// component.
+// - It runs real Scene Manager and Scenic components.
 // - It uses a fake display controller; the physical device is unused.
 //
 // Components involved
 // - This test program
-// - Root Presenter (with separate Input Pipeline) or Scene Manager
+// - Scene Manager
 // - Scenic
 // - Child view, a Scenic client
 //
@@ -51,7 +50,7 @@
 //
 // Setup sequence
 // - The test sets up this view hierarchy:
-//   - Top level scene, owned by Root Presenter.
+//   - Top level scene, owned by Scene Manager.
 //   - Child view, owned by the ui client.
 // - The test waits for a Scenic event that verifies the child has UI content in the scene graph.
 // - The test injects input into Input Pipeline, emulating a display's touch report.
@@ -186,12 +185,9 @@ struct PointerInjectorConfigTestData {
   float expected_y;
 };
 
-using PointerInjectorConfigTestParams =
-    std::tuple<ui_testing::UITestRealm::SceneOwnerType, PointerInjectorConfigTestData>;
-
 class PointerInjectorConfigTest
     : public gtest::RealLoopFixture,
-      public testing::WithParamInterface<PointerInjectorConfigTestParams> {
+      public testing::WithParamInterface<PointerInjectorConfigTestData> {
  protected:
   PointerInjectorConfigTest() = default;
   ~PointerInjectorConfigTest() override {
@@ -205,11 +201,11 @@ class PointerInjectorConfigTest
         [] { FX_LOGS(FATAL) << "\n\n>> Test did not complete in time, terminating.  <<\n\n"; },
         kTimeout);
 
-    auto [scene_owner, test_data] = GetParam();
+    auto test_data = GetParam();
 
     ui_testing::UITestRealm::Config config;
     config.display_rotation = test_data.display_rotation;
-    config.scene_owner = scene_owner;
+    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
@@ -285,7 +281,7 @@ class PointerInjectorConfigTest
   void TapTopLeft() {
     fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
 
-    auto [scene_owner, test_data] = GetParam();
+    auto test_data = GetParam();
 
     // Inject one input report, then a conclusion (empty) report.
     switch (test_data.display_rotation) {
@@ -432,16 +428,13 @@ constexpr PointerInjectorConfigTestData kTestDataScaleTranslateRotate = {
     .expected_x = 0.25f + 0.25f * (1.f - 1.f / kScale) - kClientViewTranslationX / 2.f / kScale,
     .expected_y = 0.25f + 0.25f * (1.f - 1.f / kScale) - kClientViewTranslationY / 2.f / kScale};
 
-INSTANTIATE_TEST_SUITE_P(
-    PointerInjectorConfigTestWithParams, PointerInjectorConfigTest,
-    ::testing::Combine(::testing::Values(ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER,
-                                         ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER),
-                       ::testing::Values(kTestDataBaseCase, kTestDataScale, kTestDataRotateAndScale,
-                                         kTestDataScaleAndTranslate,
-                                         kTestDataScaleTranslateRotate)));
+INSTANTIATE_TEST_SUITE_P(PointerInjectorConfigTestWithParams, PointerInjectorConfigTest,
+                         ::testing::Values(kTestDataBaseCase, kTestDataScale,
+                                           kTestDataRotateAndScale, kTestDataScaleAndTranslate,
+                                           kTestDataScaleTranslateRotate));
 
 TEST_P(PointerInjectorConfigTest, CppGfxClientTapTest) {
-  auto [scene_owner, test_data] = GetParam();
+  auto test_data = GetParam();
 
   FX_LOGS(INFO) << "Starting test with params: display_rotation=" << test_data.display_rotation
                 << ", clip_scale=" << test_data.clip_scale

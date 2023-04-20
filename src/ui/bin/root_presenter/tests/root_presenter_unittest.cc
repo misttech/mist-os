@@ -9,7 +9,6 @@
 #include <lib/inspect/cpp/reader.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/ui/scenic/cpp/commands.h>
-#include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <zircon/status.h>
 
@@ -19,7 +18,6 @@
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/ui/a11y/lib/view/gfx_accessibility_view.h"
 #include "src/ui/bin/root_presenter/app.h"
 #include "src/ui/bin/root_presenter/presentation.h"
 #include "src/ui/bin/root_presenter/tests/fakes/fake_keyboard_focus_controller.h"
@@ -27,16 +25,6 @@
 
 namespace root_presenter {
 namespace {
-
-zx_koid_t ExtractKoid(const fuchsia::ui::views::ViewRef& view_ref) {
-  zx_info_handle_basic_t info{};
-  if (view_ref.reference.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr) !=
-      ZX_OK) {
-    return ZX_KOID_INVALID;  // no info
-  }
-
-  return info.koid;
-}
 
 class RootPresenterTest : public gtest::RealLoopFixture,
                           public fuchsia::ui::focus::FocusChainListener {
@@ -82,19 +70,6 @@ class RootPresenterTest : public gtest::RealLoopFixture,
             ->AddService<fuchsia::ui::pointerinjector::Registry>(
                 [this](fidl::InterfaceRequest<fuchsia::ui::pointerinjector::Registry> request) {
                   real_component_context_->svc()->Connect(std::move(request));
-                }));
-  }
-
-  // The a11y view attempts to connect via the context's svc directory. Since
-  // root presenter serves the accessibility view registry to its public service
-  // directory, we need to re-route the service through the svc directory.
-  void ConnectAccessibilityViewRegistry() {
-    ASSERT_EQ(
-        ZX_OK,
-        context_provider_.service_directory_provider()
-            ->AddService<fuchsia::ui::accessibility::view::Registry>(
-                [this](fidl::InterfaceRequest<fuchsia::ui::accessibility::view::Registry> request) {
-                  context_provider_.public_service_directory()->Connect(std::move(request));
                 }));
   }
 
@@ -159,48 +134,6 @@ TEST_F(RootPresenterTest, TestSceneSetup) {
 
   // Run until the view is attached to the scene.
   RunLoopUntil([&fake_view]() { return fake_view.IsAttachedToScene(); });
-}
-
-TEST_F(RootPresenterTest, TestAttachA11yView) {
-  ConnectInjectorRegistry();
-  ConnectAccessibilityViewRegistry();
-  RunLoopUntilIdle();
-
-  // Present a fake view.
-  fuchsia::ui::scenic::ScenicPtr scenic =
-      context_provider_.context()->svc()->Connect<fuchsia::ui::scenic::Scenic>();
-  testing::FakeView fake_view(context_provider_.context(), std::move(scenic));
-  presentation()->PresentView(fake_view.view_holder_token(), nullptr);
-
-  // Run until the view is attached to the scene.
-  RunLoopUntil([&fake_view]() { return fake_view.IsAttachedToScene(); });
-
-  // Add an a11y view.
-  a11y::GfxAccessibilityView a11y_view(context_provider_.context());
-
-  // Verify that nothing crashes during a11y view setup.
-  RunLoopUntil([&a11y_view]() { return a11y_view.is_initialized(); });
-}
-
-TEST_F(RootPresenterTest, TestAttachA11yViewBeforeClient) {
-  ConnectInjectorRegistry();
-  ConnectAccessibilityViewRegistry();
-  RunLoopUntilIdle();
-
-  // Add an a11y view.
-  a11y::GfxAccessibilityView a11y_view(context_provider_.context());
-  RunLoopUntilIdle();
-
-  // Present a fake view.
-  fuchsia::ui::scenic::ScenicPtr scenic =
-      context_provider_.context()->svc()->Connect<fuchsia::ui::scenic::Scenic>();
-  testing::FakeView fake_view(context_provider_.context(), std::move(scenic));
-  presentation()->PresentView(fake_view.view_holder_token(), nullptr);
-
-  // Run until the view is attached to the scene.
-  RunLoopUntil([&fake_view]() { return fake_view.IsAttachedToScene(); });
-  // A11y view should initialize after client view attaches.
-  RunLoopUntil([&a11y_view]() { return a11y_view.is_initialized(); });
 }
 
 TEST_F(RootPresenterTest, SinglePresentView_ShouldSucceed) {
@@ -280,63 +213,6 @@ TEST_F(RootPresenterTest, SecondPresentOrReplaceView_ShouldSucceeed_AndOriginalS
   EXPECT_EQ(error, ZX_ERR_PEER_CLOSED) << "Should be: " << zx_status_get_string(ZX_ERR_PEER_CLOSED)
                                        << " Was: " << zx_status_get_string(error);
   EXPECT_TRUE(alive2);
-}
-
-// Tests that focus is requested for the client after the client view is connected.
-TEST_F(RootPresenterTest, FocusOnStartup) {
-  ConnectAccessibilityViewRegistry();
-  RunLoopUntilIdle();
-
-  // Set up presentation.
-  auto [view_token, view_holder_token] = scenic::ViewTokenPair::New();
-  auto [control_ref, view_ref] = scenic::ViewRefPair::New();
-  const zx_koid_t child_view_koid = ExtractKoid(view_ref);
-
-  fuchsia::ui::views::ViewRef clone;
-  fidl::Clone(view_ref, &clone);
-  presentation()->PresentOrReplaceView2(std::move(view_holder_token), std::move(clone), nullptr);
-  RunLoopUntil([this]() { return presentation()->is_initialized(); });
-
-  zx_koid_t keyboard_focus_view_koid = ZX_KOID_INVALID;
-  // Callback to verify that a focus change triggered a notification.
-  keyboard_focus_ctl_->SetOnNotify(
-      [&keyboard_focus_view_koid](const fuchsia::ui::views::ViewRef& view_ref) {
-        keyboard_focus_view_koid = ExtractKoid(view_ref);
-      });
-
-  // Connect to focus chain registry after Scenic has been set up.
-  zx_koid_t focused_view_koid = ZX_KOID_INVALID;
-  SetUpFocusChainListener([&focused_view_koid](fuchsia::ui::focus::FocusChain focus_chain) {
-    if (!focus_chain.focus_chain().empty()) {
-      focused_view_koid = ExtractKoid(focus_chain.focus_chain().back());
-    }
-  });
-
-  // Create and connect child view.
-  fuchsia::ui::scenic::ScenicPtr scenic;
-  context_provider_.context()->svc()->Connect(scenic.NewRequest());
-  scenic::Session session(scenic.get());
-  session.Enqueue({scenic::NewCommand(scenic::NewCreateViewCmd(
-      /*view_id*/ 1, std::move(view_token), std::move(control_ref), std::move(view_ref), ""))});
-  session.Present(0, [](auto) {});
-
-  // Expect focus to change to the child view.
-  RunLoopUntil([&focused_view_koid, &keyboard_focus_view_koid, child_view_koid]() {
-    return focused_view_koid == child_view_koid && keyboard_focus_view_koid == child_view_koid;
-  });
-
-  {  // Now reset and connect the A11y view and observe that focus again moves to the child view
-     // once setup completes.
-    focused_view_koid = ZX_KOID_INVALID;
-    keyboard_focus_view_koid = ZX_KOID_INVALID;
-
-    a11y::GfxAccessibilityView a11y_view(context_provider_.context());
-    RunLoopUntil([&a11y_view]() { return a11y_view.is_initialized(); });
-
-    RunLoopUntil([&focused_view_koid, &keyboard_focus_view_koid, child_view_koid]() {
-      return focused_view_koid == child_view_koid && keyboard_focus_view_koid == child_view_koid;
-    });
-  }
 }
 
 }  // namespace

@@ -64,25 +64,12 @@ Presentation::Presentation(inspect::Node inspect_node, sys::ComponentContext* co
       proxy_session_(scenic),
       display_startup_rotation_adjustment_(display_startup_rotation_adjustment),
       presentation_binding_(this),
-      a11y_binding_(this),
-      a11y_view_registry_binding_(this),
       safe_presenter_root_(root_session_.get()),
       safe_presenter_injector_(&injector_session_),
       safe_presenter_proxy_(&proxy_session_),
-      view_focuser_(std::move(focuser)),
-      color_transform_handler_(component_context, compositor_.id(), root_session_.get(),
-                               &safe_presenter_root_) {
+      view_focuser_(std::move(focuser)) {
   FX_DCHECK(component_context);
   component_context->outgoing()->AddPublicService(presenter_bindings_.GetHandler(this));
-  component_context->outgoing()->AddPublicService<fuchsia::ui::accessibility::view::Registry>(
-      [this](fidl::InterfaceRequest<fuchsia::ui::accessibility::view::Registry> request) {
-        if (a11y_view_registry_binding_.is_bound()) {
-          FX_LOGS(ERROR) << "Replacing a11y binding";
-          a11y_view_registry_binding_.Unbind();
-        }
-        a11y_view_registry_binding_.Bind(std::move(request));
-      });
-
   compositor_.SetLayerStack(layer_stack_);
   layer_stack_.AddLayer(layer_);
   renderer_.SetCamera(camera_);
@@ -213,10 +200,6 @@ Presentation::Presentation(inspect::Node inspect_node, sys::ComponentContext* co
   {
     // TODO(fxbug.dev/68206) Remove this and enable client-side FIDL errors.
     fidl::internal::TransitoryProxyControllerClientSideErrorDisabler client_side_error_disabler_;
-
-    component_context->svc()->Connect(magnifier_.NewRequest());
-    magnifier_->RegisterHandler(a11y_binding_.NewBinding());
-    a11y_binding_.set_error_handler([this](auto) { ResetClipSpaceTransform(); });
   }
 
   FX_DCHECK(root_view_holder_);
@@ -235,16 +218,12 @@ void Presentation::UpdateGraphState(GraphState updated_state) {
       updated_state.root_view_attached.value_or(graph_state_.root_view_attached.value());
   graph_state_.injector_view_attached =
       updated_state.injector_view_attached.value_or(graph_state_.injector_view_attached.value());
-  graph_state_.a11y_view_attached =
-      updated_state.a11y_view_attached.value_or(graph_state_.a11y_view_attached.value());
   graph_state_.proxy_view_attached =
       updated_state.proxy_view_attached.value_or(graph_state_.proxy_view_attached.value());
   graph_state_.client_view_attached =
       updated_state.client_view_attached.value_or(graph_state_.client_view_attached.value());
 
-  if (graph_state_.client_view_attached.value() && create_a11y_view_holder_callback_) {
-    create_a11y_view_holder_callback_();
-  } else if (IsValidSceneGraph()) {
+  if (IsValidSceneGraph()) {
     injector_->MarkSceneReady();
   }
 }
@@ -461,24 +440,6 @@ void Presentation::UpdateViewport(const DisplayMetrics& display_metrics) {
   injector_config_setup_->UpdateViewport(injector_->GetCurrentViewport());
 }
 
-void Presentation::SetClipSpaceTransform(float x, float y, float scale,
-                                         SetClipSpaceTransformCallback callback) {
-  clip_offset_x_ = x;
-  clip_offset_y_ = y;
-  clip_scale_ = scale;
-  camera_.SetClipSpaceTransform(clip_offset_x_, clip_offset_y_, clip_scale_);
-  // The callback is used to throttle magnification transition animations and is expected to
-  // approximate the framerate.
-  safe_presenter_root_.QueuePresent([this, callback = std::move(callback)] {
-    UpdateViewport(display_metrics_);
-    callback();
-  });
-}
-
-void Presentation::ResetClipSpaceTransform() {
-  SetClipSpaceTransform(0, 0, 1, [] {});
-}
-
 void Presentation::SetScenicDisplayRotation() {
   fuchsia::ui::gfx::Command command;
   fuchsia::ui::gfx::SetDisplayRotationCmdHACK display_rotation_cmd;
@@ -486,73 +447,6 @@ void Presentation::SetScenicDisplayRotation() {
   display_rotation_cmd.rotation_degrees = display_startup_rotation_adjustment_;
   command.set_set_display_rotation(std::move(display_rotation_cmd));
   root_session_->Enqueue(std::move(command));
-}
-
-void Presentation::CreateAccessibilityViewHolder(
-    fuchsia::ui::views::ViewRef a11y_view_ref,
-    fuchsia::ui::views::ViewHolderToken a11y_view_holder_token,
-    CreateAccessibilityViewHolderCallback callback) {
-  if (!graph_state_.client_view_attached.value()) {
-    // Store a callback so that CreateAccessibilityViewHolder() is always called AFTER the
-    // client view is attached. Deferring this work prevents racy ordering issues, and a11y doesn't
-    // have anything to do when there's no client view anyway.
-    create_a11y_view_holder_callback_ =
-        [this, callback = std::move(callback), a11y_view_ref = std::move(a11y_view_ref),
-         a11y_view_holder_token = std::move(a11y_view_holder_token)]() mutable {
-          FX_DCHECK(graph_state_.client_view_attached.value());
-          CreateAccessibilityViewHolder(std::move(a11y_view_ref), std::move(a11y_view_holder_token),
-                                        std::move(callback));
-        };
-    return;
-  }
-
-  FX_CHECK(injector_view_);
-  FX_LOGS(INFO) << "Inserting A11y View";
-  // Detach proxy view holder from injector view.
-  injector_view_->DetachChild(proxy_view_holder_.value());
-
-  // Detach client view from proxy view, and delete proxy view and view holder objects (which
-  // frees the scenic resources).
-  if (client_view_holder_.has_value()) {
-    proxy_view_->DetachChild(client_view_holder_.value());
-  }
-  proxy_view_.reset();
-  proxy_view_holder_.reset();
-
-  UpdateGraphState(
-      {.a11y_view_attached = false, .proxy_view_attached = false, .client_view_attached = false});
-
-  // Generate new proxy view/view holder tokens, create a new proxy view.
-  // Note that we do not create a new proxy view holder here, because the a11y
-  // manager must own the new proxy view holder.
-  auto [proxy_view_token, proxy_view_holder_token] = scenic::ViewTokenPair::New();
-  auto [control_ref, view_ref] = scenic::ViewRefPair::New();
-  proxy_view_.emplace(&proxy_session_, std::move(proxy_view_token), std::move(control_ref),
-                      std::move(view_ref), "Proxy View");
-
-  // Add the client view holder as a child of the new proxy view.
-  if (client_view_holder_.has_value()) {
-    proxy_view_->AddChild(client_view_holder_.value());
-  }
-
-  // Construct the a11y view holder.
-  proxy_view_holder_.emplace(&injector_session_, std::move(a11y_view_holder_token),
-                             "A11y View Holder");
-
-  // Add the a11y view holder as a child of the injector view.
-  injector_view_->AddChild(proxy_view_holder_.value());
-
-  // Update view holder properties. Changes are presented below.
-  if (display_model_initialized_) {
-    SetViewHolderProperties(display_metrics_);
-    safe_presenter_root_.QueuePresent([] {});
-  }
-
-  safe_presenter_injector_.QueuePresent([this] { UpdateGraphState({.a11y_view_attached = true}); });
-  safe_presenter_proxy_.QueuePresent([this] { UpdateGraphState({.client_view_attached = true}); });
-
-  create_a11y_view_holder_callback_ = nullptr;
-  callback(std::move(proxy_view_holder_token));
 }
 
 }  // namespace root_presenter

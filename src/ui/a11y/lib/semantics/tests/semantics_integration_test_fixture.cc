@@ -85,18 +85,6 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
       },
   };
 
-  // GFX x root presenter
-  {
-    ui_testing::UITestRealm::Config config;
-
-    config.device_pixel_ratio = kDevicePixelRatio;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-
-    config.passthrough_capabilities = passthrough_capabilities;
-    configs.push_back(config);
-  }
-
   // Gfx x scene manager
   {
     ui_testing::UITestRealm::Config config;

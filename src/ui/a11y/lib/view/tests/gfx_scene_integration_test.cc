@@ -112,8 +112,8 @@ class AccessibilityViewRegistryProxy : public LocalComponentImpl,
   fxl::WeakPtrFactory<AccessibilityViewRegistryProxy> weak_ptr_;  // Keep last
 };
 
-// This test exercises the handshake between a11y manager and the scene owner
-// (gfx scene manager or root presenter) to insert the a11y view into the scene.
+// This test exercises the handshake between a11y manager and
+// gfx scene manager to insert the a11y view into the scene.
 // Specifically, it verifies that:
 //
 // 1. The scene is connected properly.
@@ -212,21 +212,17 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
   fxl::WeakPtr<AccessibilityViewRegistryProxy> access_;
 };
 
-class ClientAttachesFirst
-    : public GfxAccessibilitySceneTestBase,
-      public ::testing::WithParamInterface<ui_testing::UITestRealm::SceneOwnerType> {
+class ClientAttachesFirst : public GfxAccessibilitySceneTestBase {
  public:
   ClientAttachesFirst() = default;
   ~ClientAttachesFirst() override = default;
 
-  ui_testing::UITestRealm::SceneOwnerType SceneOwner() override { return GetParam(); }
+  ui_testing::UITestRealm::SceneOwnerType SceneOwner() override {
+    return ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
+  }
 };
 
-INSTANTIATE_TEST_SUITE_P(GfxAccessibilityTestWithParams, ClientAttachesFirst,
-                         ::testing::Values(ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER,
-                                           ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER));
-
-TEST_P(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
+TEST_F(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
   FX_LOGS(INFO) << "Starting test case";
 
   // Attach the client view.
@@ -267,9 +263,7 @@ TEST_P(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
   RunLoopUntil([this] { return ui_test_manager_->ClientViewIsFocused(); });
 }
 
-// Root presenter waits for the client root view to attach before inserting the
-// a11y view, so we can only test the case where the a11y view attaches first on
-// scene manager.
+// Test the case where the a11y view attaches first on scene manager.
 class A11yViewAttachesFirstTest : public GfxAccessibilitySceneTestBase {
  public:
   A11yViewAttachesFirstTest() = default;
