@@ -51,13 +51,16 @@ where
     let products = products
         .iter()
         .filter(|x| x.name == cmd.name)
+        .filter(|x| x.product_version == cmd.version)
         .map(|x| x.to_owned())
         .collect::<Vec<ProductBundle>>();
     if products.is_empty() {
+        tracing::debug!("products {:?}", products);
         println!("Error: No product matching name {}, version {} found.", cmd.name, cmd.version);
         std::process::exit(1);
     } else if products.len() > 1 {
-        println!("More than one product found.");
+        tracing::debug!("products {:?}", products);
+        println!("More than one matching product found. The base-url may have poorly formed data.");
         std::process::exit(1);
     } else {
         println!("{}", products[0].transfer_manifest_url.to_owned());
