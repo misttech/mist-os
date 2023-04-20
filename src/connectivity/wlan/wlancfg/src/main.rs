@@ -442,8 +442,13 @@ async fn run_all_futures() -> Result<(), Error> {
 
 // The return value from main() gets swallowed, including if it returns a Result<Err>. Therefore,
 // use this simple wrapper to ensure that any errors from run_all_futures() are printed to the log.
-#[fuchsia::main(logging_tags = ["wlan"])]
+#[fasync::run_singlethreaded]
 async fn main() {
+    diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
+        tags: &["wlan"],
+        metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
+        ..Default::default()
+    });
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     ftrace_provider::trace_provider_create_with_fdio();
     ftrace::instant!(

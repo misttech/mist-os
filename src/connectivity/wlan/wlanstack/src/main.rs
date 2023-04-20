@@ -60,8 +60,14 @@ impl From<wlanstack_config::Config> for ServiceCfg {
     }
 }
 
-#[fuchsia::main(logging_tags = ["wlan"])]
+#[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {
+    diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
+        tags: &["wlan"],
+        metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
+        ..Default::default()
+    });
+
     ftrace_provider::trace_provider_create_with_fdio();
     ftrace::instant!(
         wtrace::CATEGORY_WLAN!(),

@@ -68,10 +68,14 @@ fn serve_phys(
     Box::pin(fut)
 }
 
-#[fuchsia::main(logging_tags = ["wlan"])]
+#[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
+    diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
+        tags: &["wlan"],
+        metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
+        ..Default::default()
+    });
     log::set_max_level(MAX_LOG_LEVEL);
-
     info!("Starting");
 
     let (phys, phy_events) = device::PhyMap::new();

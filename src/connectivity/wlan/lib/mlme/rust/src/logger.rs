@@ -12,6 +12,10 @@ pub fn init() {
     // a shared `Once::call_once()`.
     LOGGER_ONCE.call_once(|| {
         // Initialize logging with a tag that can be used to filter for forwarding to console
-        diagnostics_log::init!(&["wlan"]);
+        diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
+            tags: &["wlan"],
+            metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
+            ..Default::default()
+        });
     });
 }

@@ -38,7 +38,6 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/trace/rust:trace",
@@ -52,7 +51,10 @@ rustc_binary("bin") {
     "//third_party/rust_crates:rand",
   ]
 
-  test_deps = [ "//third_party/rust_crates:pin-utils" ]
+  test_deps = [
+    "//src/lib/diagnostics/log/rust",
+    "//third_party/rust_crates:pin-utils",
+  ]
 
   sources = [
     "src/device.rs",
