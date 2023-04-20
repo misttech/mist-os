@@ -102,8 +102,8 @@ async fn main() -> Result<(), Error> {
     // Wait for a connection
     let AcceptorRequest::Accept { addr: _, responder } =
         acceptor.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
-    let (mut data_stream, client_end, mut con) = make_con()?;
-    responder.send(Some(&mut con))?;
+    let (mut data_stream, client_end, con) = make_con()?;
+    responder.send(Some(con))?;
 
     // Send data then wait for other end to shut us down.
     test_read_write(&mut data_stream, &client_end).await?;
@@ -112,8 +112,8 @@ async fn main() -> Result<(), Error> {
     // Get next connection
     let AcceptorRequest::Accept { addr: _, responder } =
         acceptor2.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
-    let (mut data_stream, _client_end, mut con) = make_con()?;
-    responder.send(Some(&mut con))?;
+    let (mut data_stream, _client_end, con) = make_con()?;
+    responder.send(Some(con))?;
     // Send data until the peer closes
     let data = Box::new([42u8; TEST_DATA_LEN as usize]);
 
@@ -130,8 +130,8 @@ async fn main() -> Result<(), Error> {
     {
         let AcceptorRequest::Accept { addr: _, responder } =
             acceptor3.next().await.ok_or(format_err!("Failed to get incoming connection"))??;
-        let (mut data_stream, _client_end, mut con) = make_con()?;
-        responder.send(Some(&mut con))?;
+        let (mut data_stream, _client_end, con) = make_con()?;
+        responder.send(Some(con))?;
         // Read some data then suddenly close the connection.
         let mut val = [0];
         data_stream.read_exact(&mut val).await?;
