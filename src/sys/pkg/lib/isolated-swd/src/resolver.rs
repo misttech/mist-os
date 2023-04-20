@@ -86,7 +86,7 @@ pub(crate) mod for_tests {
             fs.dir("svc")
                 .add_fidl_service(move |stream| Self::serve_boot_args(stream, channel.clone()));
             fs.serve_connection(handles.outgoing_dir)?;
-            let () = fs.for_each_concurrent(None, |req| async { req.await }).await;
+            let () = fs.for_each_concurrent(None, |req| req).await;
             Ok(())
         }
 

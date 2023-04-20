@@ -1333,7 +1333,6 @@ async fn handle_iface_manager_request(
                 }
                 AtomicOperation::SetCountry(req) => {
                     let regulatory_fut = initiate_set_country(iface_manager, req);
-                    let regulatory_fut = async move { regulatory_fut.await };
                     regulatory_fut.boxed()
                 }
             };
@@ -5924,7 +5923,7 @@ mod tests {
 
         // Create a dummy future that waits on the receiver and just returns nil.  This will be the
         // "work" that the worker does when it receives a request.
-        let fut = Box::pin(async move { oneshot_receiver.await });
+        let fut = Box::pin(oneshot_receiver);
 
         // The mpsc_sender will send two requests to show that the second one is not processed
         // until the atomic operation completes.

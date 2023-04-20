@@ -206,8 +206,7 @@ impl TestHarness {
         let (log_sender, log_receiver) = mpsc::unbounded();
         let _log_sink_proxy = log_reader.handle_request(log_sender).await;
 
-        fasync::Task::spawn(log_receiver.for_each_concurrent(None, |rx| async move { rx.await }))
-            .detach();
+        fasync::Task::spawn(log_receiver.for_each_concurrent(None, |rx| rx)).detach();
 
         let (sin, sout) = zx::Socket::create_datagram();
         E::connect(&_log_sink_proxy, sout);

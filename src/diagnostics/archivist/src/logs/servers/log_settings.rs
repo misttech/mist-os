@@ -29,7 +29,7 @@ impl LogSettingsServer {
             logs_repo,
             task_sender,
             _drain_listeners_task: fasync::Task::spawn(async move {
-                rcv.for_each_concurrent(None, |rx| async move { rx.await }).await;
+                rcv.for_each_concurrent(None, |rx| rx).await;
             }),
         }
     }

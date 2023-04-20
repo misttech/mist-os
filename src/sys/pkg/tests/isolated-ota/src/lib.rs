@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 
 #![warn(clippy::all)]
-// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
-#![allow(unknown_lints)]
-// TODO(fxbug.dev/123778): Fix redundant async blocks.
-#![allow(clippy::redundant_async_block)]
 
 use {
     anyhow::{Context, Error},
@@ -94,7 +90,7 @@ impl IsolatedOtaTestExecutor {
         fs.dir("svc")
             .add_fidl_service(move |stream| Self::serve_boot_arguments(stream, channel.clone()));
         fs.serve_connection(handles.outgoing_dir)?;
-        fs.for_each_concurrent(None, |req| async { req.await }).await;
+        fs.for_each_concurrent(None, |req| req).await;
         Ok(())
     }
 }

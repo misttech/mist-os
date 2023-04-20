@@ -32,7 +32,7 @@ impl LogServer {
             logs_repo,
             task_sender: Arc::new(SyncMutex::new(task_sender)),
             drain_listeners_task: Mutex::new(Some(fasync::Task::spawn(async move {
-                rcv.for_each_concurrent(None, |rx| async move { rx.await }).await;
+                rcv.for_each_concurrent(None, |rx| rx).await;
             }))),
         }
     }

@@ -149,7 +149,7 @@ impl LogsRepository {
     /// consuming any messages received before this call.
     pub async fn wait_for_termination(&self) {
         let receiver = self.mutable_state.write().await.log_receiver.take().unwrap();
-        receiver.for_each_concurrent(None, |rx| async move { rx.await }).await;
+        receiver.for_each_concurrent(None, |rx| rx).await;
         // Process messages from log sink.
         debug!("Log ingestion stopped.");
         let mut repo = self.mutable_state.write().await;

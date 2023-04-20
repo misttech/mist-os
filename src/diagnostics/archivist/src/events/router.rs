@@ -809,7 +809,7 @@ mod tests {
         let (terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
         let _router_task = fasync::Task::spawn(fut);
         let on_drained = terminate_handle.terminate();
-        let drain_finished = fasync::Task::spawn(async move { on_drained.await });
+        let drain_finished = fasync::Task::spawn(on_drained);
 
         assert_event(receiver.next().await.unwrap(), diagnostics_ready(IDENTITY.clone()));
 

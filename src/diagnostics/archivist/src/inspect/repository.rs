@@ -49,7 +49,7 @@ impl InspectRepository {
                 diagnostics_containers: trie::Trie::new(),
                 diagnostics_dir_closed_snd: snd,
                 _diagnostics_dir_closed_drain: fasync::Task::spawn(async move {
-                    rcv.for_each_concurrent(None, |rx| async move { rx.await }).await
+                    rcv.for_each_concurrent(None, |rx| rx).await
                 }),
             }),
         }

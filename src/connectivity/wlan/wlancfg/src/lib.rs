@@ -5,10 +5,6 @@
 #![deny(clippy::correctness)]
 #![warn(clippy::suspicious)]
 #![warn(clippy::complexity)]
-// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
-#![allow(unknown_lints)]
-// TODO(fxbug.dev/123778): Fix redundant async blocks.
-#![allow(clippy::redundant_async_block)]
 // The complexity of a separate struct doesn't seem universally better than having many arguments
 #![allow(clippy::too_many_arguments)]
 // Turn on a couple selected lints from clippy::style

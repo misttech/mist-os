@@ -120,7 +120,7 @@ impl ArchiveAccessorServer {
             maximum_concurrent_snapshots_per_reader,
             server_task_sender: Arc::new(SyncMutex::new(snd)),
             server_task_drainer: Mutex::new(Some(fasync::Task::spawn(async move {
-                rcv.for_each_concurrent(None, |rx| async move { rx.await }).await
+                rcv.for_each_concurrent(None, |rx| rx).await
             }))),
         }
     }
