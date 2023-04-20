@@ -39,7 +39,7 @@ protocol Controller {
     AttachClientView(resource table {
         1: view_provider client_end:fuchsia.ui.app.ViewProvider;
     }) -> (struct {
-        view_ref_koid zx.koid;
+        view_ref_koid zx.Koid;
     });
 
     /// Elicits the server to create a viewport using `viewport_creation_token`.

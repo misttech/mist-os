@@ -12,8 +12,8 @@ const MAX_ARG_NAME_LENGTH uint32 = 256;
 
 type PuppetInfo = struct {
     tag string:optional;
-    pid zx.koid;
-    tid zx.koid;
+    pid zx.Koid;
+    tid zx.Koid;
 };
 
 type PrintfValue = strict union {

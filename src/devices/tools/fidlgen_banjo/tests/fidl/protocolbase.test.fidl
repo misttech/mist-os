@@ -27,10 +27,10 @@ closed protocol SynchronousBase {
         duration_2 zx.duration;
     });
     strict Koid(struct {
-        koid zx.koid;
+        koid zx.Koid;
     }) -> (struct {
-        koid zx.koid;
-        koid_2 zx.koid;
+        koid zx.Koid;
+        koid_2 zx.Koid;
     });
     strict Vaddr(struct {
         vaddr zx.vaddr;
@@ -90,10 +90,10 @@ closed protocol AsyncBase {
     });
     @async
     strict Koid(struct {
-        koid zx.koid;
+        koid zx.Koid;
     }) -> (struct {
-        koid zx.koid;
-        koid_2 zx.koid;
+        koid zx.Koid;
+        koid_2 zx.Koid;
     });
     @async
     strict Vaddr(struct {
@@ -152,10 +152,10 @@ closed protocol WrongTransport {
         duration_2 zx.duration;
     });
     strict Koid(struct {
-        koid zx.koid;
+        koid zx.Koid;
     }) -> (struct {
-        koid zx.koid;
-        koid_2 zx.koid;
+        koid zx.Koid;
+        koid_2 zx.Koid;
     });
     strict Vaddr(struct {
         vaddr zx.vaddr;

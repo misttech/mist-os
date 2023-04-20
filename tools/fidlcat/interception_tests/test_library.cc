@@ -90,7 +90,7 @@ std::string echo_service = R"({
         "zx/ticks": {
           "kind": "alias"
         },
-        "zx/koid": {
+        "zx.koid": {
           "kind": "alias"
         },
         "zx/vaddr": {

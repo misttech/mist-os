@@ -42,7 +42,7 @@ type PointerEvent = table {
     /// The viewref koid of the top most view hit for this pointer event.
     /// This field is set to `ZX_KOID_INVALID` when there is no view hit and
     /// `local_point` is undefined.
-    7: viewref_koid zx.koid;
+    7: viewref_koid zx.Koid;
     /// The point of this pointer event in local view coordinates.
     8: local_point fuchsia.math.PointF;
 };

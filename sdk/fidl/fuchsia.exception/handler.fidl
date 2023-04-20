@@ -45,10 +45,10 @@ protocol Handler {
 //                 use. When better support lands, move this to a table.
 type ExceptionInfo = struct {
     // Process ID or pid.
-    process_koid zx.koid;
+    process_koid zx.Koid;
 
     // Thread ID or tid.
-    thread_koid zx.koid;
+    thread_koid zx.Koid;
 
     type ExceptionType;
 };

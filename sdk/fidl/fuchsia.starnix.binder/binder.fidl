@@ -130,7 +130,7 @@ protocol Binder {
         mapped_address uint64;
     });
     Ioctl(struct {
-        tid zx.koid;
+        tid zx.Koid;
         request uint32;
         parameter uint64;
     }) -> () error fuchsia.posix.Errno;

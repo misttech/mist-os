@@ -9,6 +9,6 @@ using zx;
 closed protocol TestDevice {
     /// Get the pid of the driver.
     strict GetPid() -> (struct {
-        pid zx.koid;
+        pid zx.Koid;
     }) error zx.status;
 };

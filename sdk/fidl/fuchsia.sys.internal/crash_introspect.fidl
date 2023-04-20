@@ -15,7 +15,7 @@ protocol CrashIntrospect {
     // Errors:
     // - `ZX_ERR_NOT_FOUND`: If thread_koid is not found in the crashed thread list.
     FindComponentByThreadKoid(struct {
-        thread_koid zx.koid;
+        thread_koid zx.Koid;
     }) -> (struct {
         component_info SourceIdentity;
     }) error zx.status;

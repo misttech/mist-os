@@ -88,7 +88,7 @@ protocol Registry {
     /// provider. Both of these are used in logging and diagnostic messages.
     RegisterProvider(resource struct {
         provider client_end:Provider;
-        pid zx.koid;
+        pid zx.Koid;
         @available(removed=11)
         name string:MAX_PROVIDER_NAME_LENGTH;
         @available(added=11)
@@ -106,7 +106,7 @@ protocol Registry {
     /// provider. Both of these are used in logging and diagnostic messages.
     RegisterProviderSynchronously(resource struct {
         provider client_end:Provider;
-        pid zx.koid;
+        pid zx.Koid;
         @available(removed=11)
         name string:MAX_PROVIDER_NAME_LENGTH;
         @available(added=11)

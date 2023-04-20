@@ -81,7 +81,7 @@ closed protocol Api {
     });
     strict koid(resource struct {
         handle zx.handle;
-        data zx.koid;
+        data zx.Koid;
     }) -> (struct {
         status zx.status;
     });
@@ -180,7 +180,7 @@ closed protocol Api {
         handle zx.handle;
     }) -> (struct {
         status zx.status;
-        result zx.koid;
+        result zx.Koid;
     });
     strict output_paddr(resource struct {
         handle zx.handle;

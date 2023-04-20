@@ -58,7 +58,7 @@ constexpr bool IsLayoutCaseCheckExempt(std::string_view library_name, std::strin
 constexpr bool IsAliasCaseCheckExempt(std::string_view library_name, std::string_view declname) {
   return library_name == kZirconLibraryZx &&
          (declname == "status" || declname == "time" || declname == "duration" ||
-          declname == "ticks" || declname == "koid" || declname == "vaddr" || declname == "paddr" ||
+          declname == "ticks" || declname == "vaddr" || declname == "paddr" ||
           declname == "paddr32" || declname == "gpaddr");
 }
 

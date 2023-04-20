@@ -13,6 +13,6 @@ using zx;
 closed protocol ThreadKoidReporter {
     /// Reports the koid for this component's thread
     strict ReportMyThreadKoid(resource struct {
-        thread_koid zx.koid;
+        thread_koid zx.Koid;
     });
 };

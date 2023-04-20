@@ -202,7 +202,7 @@ type ProviderInfo = table {
     1: id uint32;
 
     /// The provider's pid.
-    2: pid zx.koid;
+    2: pid zx.Koid;
 
     /// The name of the provider.
     3: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;

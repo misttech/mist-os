@@ -8,9 +8,9 @@ using zx;
 /// A record of the invocation of a hook
 type HookInvocation = struct {
     /// Process that the hook was invoked in
-    process_koid zx.koid;
+    process_koid zx.Koid;
     /// Thread that the hook was invoked on
-    thread_koid zx.koid;
+    thread_koid zx.Koid;
     /// An opaque identifier identifying a specific device
     device_id uint64;
 };

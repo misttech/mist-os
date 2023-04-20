@@ -29,7 +29,7 @@ type ProcessSelector = flexible union {
     1: by_name string:zx.MAX_NAME_LEN;
 
     /// Matches the process with the given koid.
-    2: by_koid zx.koid;
+    2: by_koid zx.Koid;
 };
 
 /// An allocated memory block.

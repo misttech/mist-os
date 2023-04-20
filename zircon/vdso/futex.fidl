@@ -437,6 +437,6 @@ protocol Futexfuncs {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
     }) -> (struct {
-        koid koid;
+        koid Koid;
     }) error status;
 };

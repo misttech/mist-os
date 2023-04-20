@@ -34,9 +34,7 @@ alias duration = int64;
 alias ticks = int64;
 
 // zx_koid_t: global kernel object id.
-//
-// TODO(fxbug.dev/109734): Koid.
-alias koid = uint64;
+alias Koid = uint64;
 
 // zx_vaddr_t: virtual address.
 //

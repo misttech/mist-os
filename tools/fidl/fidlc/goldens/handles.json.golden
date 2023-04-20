@@ -60,6 +60,9 @@
         "zx/handle": {
           "kind": "experimental_resource"
         },
+        "zx/Koid": {
+          "kind": "alias"
+        },
         "zx/Off": {
           "kind": "alias"
         },
@@ -67,9 +70,6 @@
           "kind": "alias"
         },
         "zx/gpaddr": {
-          "kind": "alias"
-        },
-        "zx/koid": {
           "kind": "alias"
         },
         "zx/paddr": {

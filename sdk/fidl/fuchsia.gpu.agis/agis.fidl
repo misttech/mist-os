@@ -22,7 +22,7 @@ alias GlobalId = uint32;
 /// Vulkan Traceable Component (vtc)
 type Vtc = resource table {
     1: global_id GlobalId;
-    2: process_koid zx.koid;
+    2: process_koid zx.Koid;
     3: process_name string:zx.MAX_NAME_LEN;
 };
 
@@ -53,7 +53,7 @@ protocol ComponentRegistry {
         id ClientId;
 
         /// Process koid.
-        process_koid zx.koid;
+        process_koid zx.Koid;
 
         /// Must match ZX_PROP_NAME of the kernel object.
         process_name string:zx.MAX_NAME_LEN;

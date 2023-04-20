@@ -28,7 +28,7 @@ protocol CrashIntrospect {
     /// If there is no information available on the given thread koid,
     /// `zx::Status::NOT_FOUND` is returned.
     FindComponentByThreadKoid(resource struct {
-        thread_koid zx.koid;
+        thread_koid zx.Koid;
     }) -> (struct {
         info ComponentCrashInfo;
     }) error fuchsia.component.Error;

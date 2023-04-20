@@ -37,13 +37,13 @@ protocol Source {
     /// Asks the connected retriever to finish working with `buffer`, usually because the `Source`
     /// does not intend to write further records.
     -> OnBufferDone(struct {
-        buffer zx.koid;
+        buffer zx.Koid;
     });
 
     /// Notifies the `Source` that the retriever is done reading from the buffer. If the `Source`
     /// wishes it should zero the buffer's contents and recycle it for future records. Buffers must
     /// be re-sent via `OnBufferInit` after they're zeroed.
     RetireBuffer(struct {
-        buffer zx.koid;
+        buffer zx.Koid;
     });
 };

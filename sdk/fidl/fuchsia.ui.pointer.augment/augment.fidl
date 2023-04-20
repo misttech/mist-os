@@ -176,7 +176,7 @@ type TouchEventWithLocalHit = struct {
 
     /// Augmented data for `touch_event` that describes the top-most client
     /// KOID that it hits.
-    local_viewref_koid zx.koid;
+    local_viewref_koid zx.Koid;
 
     /// Augmented data for `touch_event` that describes its local coordinates in
     /// the coordinate space for `local_viewref_koid`.

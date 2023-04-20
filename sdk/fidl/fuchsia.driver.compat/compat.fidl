@@ -28,7 +28,7 @@ protocol Device {
     /// that both drivers are in the same process.
     GetBanjoProtocol(struct {
         proto_id uint32;
-        process_koid zx.koid;
+        process_koid zx.Koid;
     }) -> (struct {
         ops uint64;
         context uint64;

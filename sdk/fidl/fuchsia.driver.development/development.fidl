@@ -93,7 +93,7 @@ type DeviceInfo = table {
 
     /// (DFv1/DFv2) The process KOID of the driver host the driver resides
     /// within.
-    4: driver_host_koid zx.koid;
+    4: driver_host_koid zx.Koid;
 
     /// (DFv1) The topological path of the driver.
     5: topological_path string:fuchsia.device.manager.DEVICE_PATH_MAX;

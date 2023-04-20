@@ -209,7 +209,7 @@ type Layout = struct {
 /// Data for a particular view: identifier, position, and children.
 type ViewDescriptor = table {
     /// This view's fuchsia.ui.views.ViewRef koid.
-    1: view_ref_koid zx.koid;
+    1: view_ref_koid zx.Koid;
 
     /// This view's origin, logical size, pixel scale, and inset data, in the view's
     /// own coordinate system.

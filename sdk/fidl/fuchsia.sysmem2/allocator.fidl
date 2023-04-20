@@ -113,7 +113,7 @@ protocol Allocator {
     /// be a BufferCollectionToken channel.  This can be obtained from
     /// zx_object_get_info() ZX_INFO_HANDLE_BASIC related_koid.
     ValidateBufferCollectionToken(table {
-        1: token_server_koid zx.koid;
+        1: token_server_koid zx.Koid;
     }) -> (table {
         1: is_known bool;
     });

@@ -88,7 +88,7 @@ protocol ProcessLimbo {
     /// Returns ZX_ERR_NOT_FOUND if the process is not waiting on an exception.
     /// Returns ZX_ERR_UNAVAILABLE if limbo is not active.
     RetrieveException(struct {
-        process_koid zx.koid;
+        process_koid zx.Koid;
     }) -> (resource struct {
         process_exception ProcessException;
     }) error zx.status;
@@ -97,7 +97,7 @@ protocol ProcessLimbo {
     /// it "bubble up" beyond the scope of of this limbo, making it
     /// unretrievable in the future from here.
     ReleaseProcess(struct {
-        process_koid zx.koid;
+        process_koid zx.Koid;
     }) -> () error zx.status;
 
     /// Adds filters to the limbo. Filters determine what processes the limbo

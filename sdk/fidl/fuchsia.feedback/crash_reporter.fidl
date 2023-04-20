@@ -147,13 +147,13 @@ type NativeCrashReport = resource table {
     2: process_name string:MAX_PROCESS_NAME_LENGTH;
 
     /// The kernel object id of the crashed process.
-    3: process_koid zx.koid;
+    3: process_koid zx.Koid;
 
     /// The name of the crashed thread.
     4: thread_name string:MAX_THREAD_NAME_LENGTH;
 
     /// The kernel object id of the crashed thread.
-    5: thread_koid zx.koid;
+    5: thread_koid zx.Koid;
 };
 
 const MAX_EXCEPTION_TYPE_LENGTH uint32 = 128;

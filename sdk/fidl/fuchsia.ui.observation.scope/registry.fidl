@@ -45,7 +45,7 @@ protocol Registry {
     /// + request `geometry` a channel to observe `context_view`'s view tree
     /// - response acknowledgement that `geometry` is connected to the server
     RegisterScopedViewTreeWatcher(resource struct {
-        context_view zx.koid;
+        context_view zx.Koid;
         watcher server_end:fuchsia.ui.observation.geometry.ViewTreeWatcher;
     }) -> ();
 };

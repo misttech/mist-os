@@ -58,7 +58,7 @@ protocol FocusChainListenerRegistry {
 /// intended for applications that merely need to identify views in the chain
 /// and do not need to watch their state.
 type FocusKoidChain = table {
-    1: focus_chain vector<zx.koid>:MAX;
+    1: focus_chain vector<zx.Koid>:MAX;
 };
 
 /// The `FocusChainProvider` protocol allows privileged clients to watch for
