@@ -25,24 +25,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 
-#define DISPLAY_MASK(start, count) (((1 << (count)) - 1) << (start))
-#define DISPLAY_SET_MASK(mask, start, count, value) \
-  (((mask) & ~DISPLAY_MASK(start, count)) | (((value) << (start)) & DISPLAY_MASK(start, count)))
-
-#define SET_BIT32(x, dest, value, start, count)                                    \
-  WRITE32_##x##_REG(dest, (READ32_##x##_REG(dest) & ~DISPLAY_MASK(start, count)) | \
-                              (((value) << (start)) & DISPLAY_MASK(start, count)))
-
-#define GET_BIT32(x, dest, start, count) \
-  ((READ32_##x##_REG(dest) >> (start)) & ((1 << (count)) - 1))
-
-#define SET_MASK32(x, dest, mask) WRITE32_##x##_REG(dest, (READ32_##x##_REG(dest) | (mask)))
-
-#define CLEAR_MASK32(x, dest, mask) WRITE32_##x##_REG(dest, (READ32_##x##_REG(dest) & ~(mask)))
-
-#define WRITE32_REG(x, a, v) WRITE32_##x##_REG(a, v)
-#define READ32_REG(x, a) READ32_##x##_REG(a)
-
 namespace aml_hdmi {
 
 class AmlHdmiDevice;
