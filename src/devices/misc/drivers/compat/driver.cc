@@ -51,6 +51,34 @@ constexpr auto kOpenFlags = fio::wire::OpenFlags::kRightReadable |
 constexpr auto kVmoFlags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute;
 constexpr auto kLibDriverPath = "/pkg/driver/compat.so";
 
+zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path,
+                            fuchsia_io::wire::OpenFlags flags) {
+  zx::result file = ns.Open<fuchsia_io::File>(path, flags);
+  if (file.is_error()) {
+    return file.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(file.value())->GetBackingMemory(kVmoFlags);
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  if (result.value().is_error()) {
+    return result.value().take_error();
+  }
+  return zx::ok(std::move(result.value().value()->vmo));
+}
+
+zx::result<zx::resource> GetRootResource(fdf::Namespace& ns) {
+  zx::result resource = ns.Connect<fboot::RootResource>();
+  if (resource.is_error()) {
+    return resource.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  return zx::ok(std::move(result.value().resource));
+}
+
 }  // namespace
 
 namespace compat {
@@ -216,7 +244,46 @@ void Driver::Start(fdf::StartCompleter completer) {
     return;
   }
 
-  auto compat_connect =
+  {
+    std::scoped_lock lock(kDriverGlobalsLock);
+    if (!kRootResource.is_valid()) {
+      zx::result resource = GetRootResource(*context().incoming());
+      if (resource.is_error()) {
+        FDF_LOG(WARNING, "Failed to get root resource: %s", resource.status_string());
+        FDF_LOG(WARNING, "Assuming test environment and continuing");
+      } else {
+        kRootResource = std::move(resource.value());
+      }
+    }
+  }
+
+  zx::result loader_vmo = LoadVmo(*context().incoming(), kLibDriverPath, kOpenFlags);
+  if (loader_vmo.is_error()) {
+    FDF_LOG(ERROR, "Failed to open loader vmo: %s", loader_vmo.status_string());
+    completer(loader_vmo.take_error());
+    return;
+  }
+
+  zx::result driver_vmo = LoadVmo(*context().incoming(), driver_path_.c_str(), kOpenFlags);
+  if (driver_vmo.is_error()) {
+    FDF_LOG(ERROR, "Failed to open driver vmo: %s", driver_vmo.status_string());
+    completer(loader_vmo.take_error());
+    return;
+  }
+
+  if (zx::result result = LoadDriver(std::move(loader_vmo.value()), std::move(driver_vmo.value()));
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to load driver: %s", result.status_string());
+    completer(result.take_error());
+    return;
+  }
+
+  // Store start completer to be replied to later. It will either be done when the below promises
+  // hit an error or after the init hook is replied to and the node has been created and a devfs
+  // node has been exported.
+  start_completer_.emplace(std::move(completer));
+
+  auto start_driver =
       Driver::ConnectToParentDevices()
           .and_then(fit::bind_member<&Driver::GetDeviceInfo>(this))
           .then([this](result<void, zx_status_t>& result) -> fpromise::result<void, zx_status_t> {
@@ -224,52 +291,15 @@ void Driver::Start(fdf::StartCompleter completer) {
               FDF_LOG(WARNING, "Getting DeviceInfo failed with: %s",
                       zx_status_get_string(result.error()));
             }
+            if (zx::result result = StartDriver(); result.is_error()) {
+              FDF_LOG(ERROR, "Failed to start driver '%s': %s", url().value().data(),
+                      result.status_string());
+              device_.Unbind();
+              CompleteStart(result.take_error());
+              return error(result.error_value());
+            }
             return ok();
-          });
-
-  auto root_resource =
-      fpromise::make_result_promise<zx::resource, zx_status_t>(error(ZX_ERR_ALREADY_BOUND)).box();
-  {
-    std::scoped_lock lock(kDriverGlobalsLock);
-    if (!kRootResource.is_valid()) {
-      // If the root resource is invalid, try fetching it. Once we've fetched it we might find that
-      // we lost the race with another process -- we'll handle that later.
-      auto connect_promise =
-          fdf::Connect<fboot::RootResource>(*context().incoming(), dispatcher())
-              .and_then(fit::bind_member<&Driver::GetRootResource>(this))
-              .or_else([this](zx_status_t& status) {
-                FDF_LOG(WARNING, "Failed to get root resource: %s", zx_status_get_string(status));
-                FDF_LOG(WARNING, "Assuming test environment and continuing");
-                return error(status);
-              })
-              .box();
-      root_resource.swap(connect_promise);
-    }
-  }
-
-  auto StopDriver = [this](const zx_status_t& status) -> result<> {
-    FDF_LOG(ERROR, "Failed to start driver '%s': %s", url().value().data(),
-            zx_status_get_string(status));
-    CompleteStart(zx::error(status));
-    device_.Unbind();
-    return ok();
-  };
-
-  // Store start completer to be replied to later. It will either be done in StopDriver or after the
-  // init hook is replied to and the node has been created and a devfs node has been exported.
-  start_completer_.emplace(std::move(completer));
-
-  auto loader_vmo = fdf::Open(*context().incoming(), dispatcher(), kLibDriverPath, kOpenFlags)
-                        .and_then(fit::bind_member<&Driver::GetBuffer>(this));
-  auto driver_vmo = fdf::Open(*context().incoming(), dispatcher(), driver_path_.c_str(), kOpenFlags)
-                        .and_then(fit::bind_member<&Driver::GetBuffer>(this));
-  auto start_driver =
-      join_promises(std::move(root_resource), std::move(loader_vmo), std::move(driver_vmo))
-          .then(fit::bind_member<&Driver::Join>(this))
-          .and_then(fit::bind_member<&Driver::LoadDriver>(this))
-          .and_then(std::move(compat_connect))
-          .and_then(fit::bind_member<&Driver::StartDriver>(this))
-          .or_else(StopDriver)
+          })
           .wrap_with(scope_);
   executor_.schedule_task(std::move(start_driver));
 }
@@ -334,79 +364,7 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
           }));
 }
 
-promise<zx::resource, zx_status_t> Driver::GetRootResource(
-    const fidl::WireSharedClient<fboot::RootResource>& root_resource) {
-  bridge<zx::resource, zx_status_t> bridge;
-  auto callback = [completer = std::move(bridge.completer)](
-                      fidl::WireUnownedResult<fboot::RootResource::Get>& result) mutable {
-    if (!result.ok()) {
-      completer.complete_error(result.status());
-      return;
-    }
-    completer.complete_ok(std::move(result.value().resource));
-  };
-  root_resource->Get().ThenExactlyOnce(std::move(callback));
-  return bridge.consumer.promise();
-}
-
-promise<Driver::FileVmo, zx_status_t> Driver::GetBuffer(
-    const fidl::WireSharedClient<fio::File>& file) {
-  bridge<FileVmo, zx_status_t> bridge;
-  auto callback = [completer = std::move(bridge.completer)](
-                      fidl::WireUnownedResult<fio::File::GetBackingMemory>& result) mutable {
-    if (!result.ok()) {
-      completer.complete_error(result.status());
-      return;
-    }
-    const auto* res = result.Unwrap();
-    if (res->is_error()) {
-      completer.complete_error(res->error_value());
-      return;
-    }
-    zx::vmo& vmo = res->value()->vmo;
-    uint64_t size;
-    if (zx_status_t status = vmo.get_prop_content_size(&size); status != ZX_OK) {
-      completer.complete_error(status);
-      return;
-    }
-    completer.complete_ok(FileVmo{
-        .vmo = std::move(vmo),
-        .size = size,
-    });
-    return;
-  };
-  file->GetBackingMemory(kVmoFlags).ThenExactlyOnce(std::move(callback));
-  return bridge.consumer.promise().or_else([this](zx_status_t& status) {
-    FDF_LOG(WARNING, "Failed to get buffer: %s", zx_status_get_string(status));
-    return error(status);
-  });
-}
-
-result<std::tuple<zx::vmo, zx::vmo>, zx_status_t> Driver::Join(
-    result<std::tuple<result<zx::resource, zx_status_t>, result<FileVmo, zx_status_t>,
-                      result<FileVmo, zx_status_t>>>& results) {
-  if (results.is_error()) {
-    return error(ZX_ERR_INTERNAL);
-  }
-  auto& [root_resource, loader_vmo, driver_vmo] = results.value();
-  if (root_resource.is_ok()) {
-    std::scoped_lock lock(kDriverGlobalsLock);
-    if (!kRootResource.is_valid()) {
-      kRootResource = root_resource.take_value();
-    }
-  }
-  if (loader_vmo.is_error()) {
-    return loader_vmo.take_error_result();
-  }
-  if (driver_vmo.is_error()) {
-    return driver_vmo.take_error_result();
-  }
-  return fpromise::ok(
-      std::make_tuple(std::move((loader_vmo.value().vmo)), std::move((driver_vmo.value().vmo))));
-}
-
-result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos) {
-  auto& [loader_vmo, driver_vmo] = vmos;
+zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   std::string& url_str = url().value();
 
   // Replace loader service to load the DFv1 driver, load the driver,
@@ -416,7 +374,7 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
     std::scoped_lock lock(kDriverGlobalsLock);
     zx::result new_loader_endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
     if (new_loader_endpoints.is_error()) {
-      return error(new_loader_endpoints.status_value());
+      return new_loader_endpoints.take_error();
     }
     fidl::ClientEnd<fldsvc::Loader> original_loader(
         zx::channel(dl_set_loader_service(new_loader_endpoints->client.channel().release())));
@@ -430,7 +388,7 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to load driver '%s', could not start thread for loader loop: %s",
               url_str.data(), zx_status_get_string(status));
-      return error(status);
+      return zx::error(status);
     }
     Loader loader(loader_loop.dispatcher(), original_loader.borrow(), std::move(loader_vmo));
     fidl::BindServer(loader_loop.dispatcher(), std::move(new_loader_endpoints->server), &loader);
@@ -440,7 +398,7 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
     if (library_ == nullptr) {
       FDF_LOG(ERROR, "Failed to load driver '%s', could not load library: %s", url_str.data(),
               dlerror());
-      return error(ZX_ERR_INTERNAL);
+      return zx::error(ZX_ERR_INTERNAL);
     }
   }
 
@@ -448,38 +406,38 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
   auto note = static_cast<const zircon_driver_note_t*>(dlsym(library_, "__zircon_driver_note__"));
   if (note == nullptr) {
     FDF_LOG(ERROR, "Failed to load driver '%s', driver note not found", url_str.data());
-    return error(ZX_ERR_BAD_STATE);
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   FDF_LOG(INFO, "Loaded driver '%s'", note->payload.name);
   record_ = static_cast<zx_driver_rec_t*>(dlsym(library_, "__zircon_driver_rec__"));
   if (record_ == nullptr) {
     FDF_LOG(ERROR, "Failed to load driver '%s', driver record not found", url_str.data());
-    return error(ZX_ERR_BAD_STATE);
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   if (record_->ops == nullptr) {
     FDF_LOG(ERROR, "Failed to load driver '%s', missing driver ops", url_str.data());
-    return error(ZX_ERR_BAD_STATE);
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   if (record_->ops->version != DRIVER_OPS_VERSION) {
     FDF_LOG(ERROR, "Failed to load driver '%s', incorrect driver version", url_str.data());
-    return error(ZX_ERR_WRONG_TYPE);
+    return zx::error(ZX_ERR_WRONG_TYPE);
   }
   if (record_->ops->bind == nullptr && record_->ops->create == nullptr) {
     FDF_LOG(ERROR, "Failed to load driver '%s', missing '%s'", url_str.data(),
             (record_->ops->bind == nullptr ? "bind" : "create"));
-    return error(ZX_ERR_BAD_STATE);
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   if (record_->ops->bind != nullptr && record_->ops->create != nullptr) {
     FDF_LOG(ERROR, "Failed to load driver '%s', both 'bind' and 'create' are defined",
             url_str.data());
-    return error(ZX_ERR_INVALID_ARGS);
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // Create our logger.
   zx::result logger_result =
       fdf::Logger::Create(*context().incoming(), dispatcher(), note->payload.name);
   if (logger_result.is_error()) {
-    return error(logger_result.status_value());
+    return logger_result.take_error();
   }
 
   // Move the logger over into a shared_ptr instead of unique_ptr so we can pass it to the global
@@ -491,10 +449,10 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
     record_->driver = global_logger_list.AddLogger(driver_path(), inner_logger_, node_name());
   }
 
-  return ok();
+  return zx::ok();
 }
 
-result<void, zx_status_t> Driver::StartDriver() {
+zx::result<> Driver::StartDriver() {
   std::string& url_str = url().value();
   if (record_->ops->init != nullptr) {
     // If provided, run init.
@@ -502,7 +460,7 @@ result<void, zx_status_t> Driver::StartDriver() {
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to load driver '%s', 'init' failed: %s", url_str.data(),
               zx_status_get_string(status));
-      return error(status);
+      return zx::error(status);
     }
   }
   if (record_->ops->bind != nullptr) {
@@ -511,27 +469,27 @@ result<void, zx_status_t> Driver::StartDriver() {
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to load driver '%s', 'bind' failed: %s", url_str.data(),
               zx_status_get_string(status));
-      return error(status);
+      return zx::error(status);
     }
   } else {
     // Else, run create and return.
     auto client_end = context().incoming()->Connect<fboot::Items>();
     if (client_end.is_error()) {
-      return error(client_end.status_value());
+      return zx::error(client_end.status_value());
     }
     zx_status_t status = record_->ops->create(context_, device_.ZxDevice(), "proxy",
                                               client_end->channel().release());
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to load driver '%s', 'create' failed: %s", url_str.data(),
               zx_status_get_string(status));
-      return error(status);
+      return zx::error(status);
     }
   }
   if (!device_.HasChildren()) {
     FDF_LOG(ERROR, "Driver '%s' did not add a child device", url_str.data());
-    return error(ZX_ERR_BAD_STATE);
+    return zx::error(ZX_ERR_BAD_STATE);
   }
-  return ok();
+  return zx::ok();
 }
 
 fpromise::promise<void, zx_status_t> Driver::ConnectToParentDevices() {

@@ -642,17 +642,10 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
       .v1_driver_path = "/pkg/driver/v1_missing_test.so",
       .expected_driver_status = ZX_ERR_BAD_STATE,
   });
-
-  // We will know the driver has finished starting when it closes its node in error.
-  while (node().HasNode()) {
-    fdf_testing_run_until_idle();
-  }
   EXPECT_TRUE(node().children().empty());
 
   // Verify that v1_test.so has not set a context.
   EXPECT_EQ(nullptr, driver->Context());
-
-  UnbindAndFreeDriver(std::move(driver));
 }
 
 TEST_F(DriverTest, Start_DeviceAddNull) {
