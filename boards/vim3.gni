@@ -2,6 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# NOTE: if you touch this file, please add this line to your commit
+# description so that the vim3 tests are run as we do not run vim3 tests in CQ
+# by default.
+# Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
+
 import("//boards/common/arm64-common.gni")
 
 board_name = "vim3"

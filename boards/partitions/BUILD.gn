@@ -88,6 +88,10 @@ generated_partitions_config("buckeye") {
   hw_revision = "buckeye"
 }
 
+# NOTE: if you touch this target, please add this line to your commit
+# description so that the vim3 tests are run as we do not run vim3 tests in CQ
+# by default.
+# Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
 generated_partitions_config("vim3") {
   forward_variables_from(_vim3_boot, "*")
   forward_variables_from(_standard_names, "*")
