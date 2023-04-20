@@ -373,10 +373,10 @@ class AfbcHeaderBufAddrHighS0Reg : public RegisterBase<AfbcHeaderBufAddrHighS0Re
 class AfbcFormatSpecifierS0Reg : public RegisterBase<AfbcFormatSpecifierS0Reg, uint32_t> {
  public:
   DEF_BIT(19, payload_limit_en);
-  DEF_BIT(18, tiled_header_en);
+  DEF_BIT(18, tiled_header_enabled);
   DEF_FIELD(17, 16, super_block_aspect);
-  DEF_BIT(9, block_split);
-  DEF_BIT(8, yuv_transform);
+  DEF_BIT(9, block_split_mode_enabled);
+  DEF_BIT(8, yuv_transform_enabled);
   DEF_FIELD(3, 0, pixel_format);
 };
 
