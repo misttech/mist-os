@@ -13,7 +13,8 @@ bool AddPage(VmPageList* pl, vm_page_t* page, uint64_t offset) {
   if (!pl) {
     return false;
   }
-  auto [slot, is_interval] = pl->LookupOrAllocateCheckForInterval(offset, true);
+  auto [slot, is_interval] =
+      pl->LookupOrAllocate(offset, VmPageList::IntervalHandling::SplitInterval);
   if (!slot) {
     return false;
   }
@@ -29,7 +30,8 @@ bool AddMarker(VmPageList* pl, uint64_t offset) {
   if (!pl) {
     return false;
   }
-  auto [slot, is_interval] = pl->LookupOrAllocateCheckForInterval(offset, true);
+  auto [slot, is_interval] =
+      pl->LookupOrAllocate(offset, VmPageList::IntervalHandling::SplitInterval);
   if (!slot) {
     return false;
   }
@@ -46,7 +48,8 @@ bool AddReference(VmPageList* pl, VmPageOrMarker::ReferenceValue ref, uint64_t o
   if (!pl) {
     return false;
   }
-  auto [slot, is_interval] = pl->LookupOrAllocateCheckForInterval(offset, true);
+  auto [slot, is_interval] =
+      pl->LookupOrAllocate(offset, VmPageList::IntervalHandling::SplitInterval);
   if (!slot) {
     return false;
   }
@@ -322,7 +325,9 @@ static bool vmpl_near_last_offset_free() {
   EXPECT_TRUE(at_least_one, "starting address too large");
 
   VmPageList pl2;
-  EXPECT_NULL(pl2.LookupOrAllocate(0xfffffffffffe0000), "unexpected offset addable\n");
+  EXPECT_NULL(
+      pl2.LookupOrAllocate(0xfffffffffffe0000, VmPageList::IntervalHandling::NoIntervals).first,
+      "unexpected offset addable\n");
 
   END_TEST;
 }

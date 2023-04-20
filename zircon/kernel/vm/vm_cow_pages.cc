@@ -1499,34 +1499,33 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
   }
 
   VmPageOrMarker* page;
+  auto interval_handling = VmPageList::IntervalHandling::NoIntervals;
   // If we're backed by a page source that preserves content (user pager), we cannot directly update
   // empty slots in the page list. An empty slot might lie in a sparse zero interval, which would
   // require splitting the interval around the required offset before it can be manipulated.
-  //
-  // TODO(fxbug.dev/122842): Use a common LookupOrAllocate API for all cases, with a formalized
-  // interval treatment flag such that non pager-backed VMOs can skip the cost of checking for
-  // intervals.
   if (is_source_preserving_page_content()) {
     // We can overwrite zero intervals if we're allowed to overwrite zeros (or non-zeros).
-    bool can_overwrite_intervals = overwrite != CanOverwriteContent::None;
-    auto [slot, is_in_interval] =
-        page_list_.LookupOrAllocateCheckForInterval(offset, can_overwrite_intervals);
-    if (is_in_interval) {
-      // Return error if the offset lies in an interval but we cannot overwrite intervals.
-      if (!can_overwrite_intervals) {
-        // The lookup should not have returned a slot for us to manipulate if it was in an interval
-        // that cannot be overwritten, even if that slot was already populated (by an interval
-        // sentinel).
-        DEBUG_ASSERT(!slot);
-        return ZX_ERR_ALREADY_EXISTS;
-      }
-      // If offset was in an interval, we should have an interval slot to overwrite at this point.
-      DEBUG_ASSERT(slot && slot->IsIntervalSlot());
-    }
-    page = slot;
-  } else {
-    page = page_list_.LookupOrAllocate(offset);
+    interval_handling = overwrite != CanOverwriteContent::None
+                            ? VmPageList::IntervalHandling::SplitInterval
+                            : VmPageList::IntervalHandling::CheckForInterval;
   }
+  auto [slot, is_in_interval] = page_list_.LookupOrAllocate(offset, interval_handling);
+  if (is_in_interval) {
+    // We should not have found an interval if we were not expecting any.
+    DEBUG_ASSERT(interval_handling != VmPageList::IntervalHandling::NoIntervals);
+    // Return error if the offset lies in an interval but we cannot overwrite intervals.
+    if (interval_handling != VmPageList::IntervalHandling::SplitInterval) {
+      // The lookup should not have returned a slot for us to manipulate if it was in an interval
+      // that cannot be overwritten, even if that slot was already populated (by an interval
+      // sentinel).
+      DEBUG_ASSERT(!slot);
+      return ZX_ERR_ALREADY_EXISTS;
+    }
+    // If offset was in an interval, we should have an interval slot to overwrite at this point.
+    DEBUG_ASSERT(slot && slot->IsIntervalSlot());
+  }
+  page = slot;
+
   if (!page) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1863,7 +1862,9 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   // fail below. In the scenario where |slot| is empty, we do not need to worry about calling
   // ReturnEmptySlot, since there are no failure paths from here and we are guaranteed to fill the
   // slot.
-  const VmPageOrMarker* slot = page_list_.LookupOrAllocate(offset);
+  auto [slot, is_in_interval] =
+      page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
+  DEBUG_ASSERT(!is_in_interval);
 
   if (!slot) {
     return ZX_ERR_NO_MEMORY;
@@ -6298,7 +6299,9 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
   //
   // Determining what state we are in just requires re-looking up the slot and see if the temporary
   // reference we installed is still there.
-  VmPageOrMarker* slot = page_list_.LookupOrAllocate(offset);
+  auto [slot, is_in_interval] =
+      page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
+  DEBUG_ASSERT(!is_in_interval);
   if (slot && slot->IsReference() && compressor->IsTempReference(slot->Reference())) {
     // Still the original reference, need to replace it with the result of compression.
     VmPageOrMarker::ReferenceValue old_ref{0};

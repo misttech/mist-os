@@ -74,7 +74,7 @@ VmPageList& VmPageList::operator=(VmPageList&& other) {
   return *this;
 }
 
-VmPageOrMarker* VmPageList::LookupOrAllocate(uint64_t offset) {
+VmPageOrMarker* VmPageList::LookupOrAllocateInternal(uint64_t offset) {
   uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
   size_t index = offset_to_node_index(offset, list_skew_);
 
@@ -525,7 +525,7 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
 
 void VmPageList::ReturnIntervalSlot(uint64_t offset) {
   // We should be able to lookup a pre-existing interval slot.
-  auto slot = LookupOrAllocate(offset);
+  auto slot = LookupOrAllocateInternal(offset);
   DEBUG_ASSERT(slot);
   DEBUG_ASSERT(slot->IsIntervalSlot());
 
@@ -894,7 +894,7 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
   VmPageOrMarker* new_end = nullptr;
   // If we could not merge with an interval to the left, we're going to need a new start sentinel.
   if (!merge_with_prev) {
-    new_start = LookupOrAllocate(interval_start);
+    new_start = LookupOrAllocateInternal(interval_start);
     if (!new_start) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -902,7 +902,7 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
   }
   // If we could not merge with an interval to the right, we're going to need a new end sentinel.
   if (!merge_with_next) {
-    new_end = LookupOrAllocate(interval_end);
+    new_end = LookupOrAllocateInternal(interval_end);
     if (!new_end) {
       // Clean up any slot we allocated for new_start before returning.
       if (new_start) {
@@ -1037,7 +1037,7 @@ zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len)
   ASSERT(status == ZX_OK);
 #endif
 
-  VmPageOrMarker* new_start = LookupOrAllocate(new_interval_start);
+  VmPageOrMarker* new_start = LookupOrAllocateInternal(new_interval_start);
   if (!new_start) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1087,7 +1087,7 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   ASSERT(status == ZX_OK);
 #endif
 
-  VmPageOrMarker* new_end = LookupOrAllocate(new_interval_end);
+  VmPageOrMarker* new_end = LookupOrAllocateInternal(new_interval_end);
   if (!new_end) {
     return ZX_ERR_NO_MEMORY;
   }

@@ -871,8 +871,15 @@ class VmPageList final {
   // contiguous slots from the provided offset.
   VMPLCursor LookupMutableCursor(uint64_t offset);
 
+  // The interval handling flag to be used by LookupOrAllocate. See comments near LookupOrAllocate.
+  enum class IntervalHandling : uint8_t {
+    NoIntervals,
+    CheckForInterval,
+    SplitInterval,
+  };
   // Similar to `Lookup` but only returns `nullptr` if a slot cannot be allocated either due to out
-  // of memory or due to offset being invalid.
+  // of memory, due to offset being invalid, or |interval_handling| not allowing for a slot to be
+  // safely returned.
   //
   // The returned slot, if not a `nullptr`, may generally be freely manipulated with the exception
   // that if it started !Empty, then it is an error to set it to Empty. In this case the
@@ -880,31 +887,35 @@ class VmPageList final {
   //
   // If the returned slot started Empty, as it not made !Empty, then the slot must be returned with
   // ReturnEmptySlot, to ensure no empty nodes are retained.
-  VmPageOrMarker* LookupOrAllocate(uint64_t offset);
-
-  // Similar to LookupOrAllocate but also checks if offset falls in a sparse page interval,
-  // returning true via the bool in ktl::pair if it does, along with the slot. Also splits the
-  // interval around offset if split_interval is set to true. This allows the caller to freely
-  // manipulate the slot at offset similar to LookupOrAllocate. If offset is found in an interval,
-  // but split_interval was false, no VmPageOrMarker* is returned, as it is not safe to manipulate
-  // any slot in an interval without also splitting the interval around it.
   //
-  // In other words, the return values fall into three categories.
-  //  1. {page, false} : offset does not lie in an interval. |slot| is the required slot.
-  //  2. {page, true} : offset lies in an interval and split_interval was true. |page| is the
-  //  required slot. The interval has been correctly split around the slot, so |page| can be treated
-  //  similar to any non-interval type.
-  //  3. {nullptr, true} : offset lies in an interval but split_interval was false. No slot is
-  //  returned.
-  //
-  // Splitting the interval would look as follows. If the interval previously was:
-  //  [start, end) where start < offset < end.
-  // After the split we would have three intervals:
-  //  [start, offset) [offset, offset + PAGE_SIZE) [offset + PAGE_SIZE, end)
-  // The middle interval containing offset spans only a single page, i.e. offset is an
-  // IntervalSentinel::Slot, which can now be manipulated independently.
-  ktl::pair<VmPageOrMarker*, bool> LookupOrAllocateCheckForInterval(uint64_t offset,
-                                                                    bool split_interval);
+  // The bool in the ktl::pair returns whether the offset falls inside a sparse interval. And
+  // whether a valid VmPageOrMarker* is returned in the ktl::pair depends on the specified
+  // |interval_handling|.
+  //  - NoIntervals: The page list does not contain any intervals, so there is no special handling
+  //  to check for or split intervals. In other words, each slot in the page list can be manipulated
+  //  independently.
+  //  - CheckForIntervals: The page list can contain intervals, and the bool in the returned
+  //  ktl::pair indicates whether the offset fell inside an interval. Note that this only checks for
+  //  intervals but does not allow manipulating them, so a valid VmPageOrMarker* will be returned
+  //  only if the offset can safely be manipulated independently.
+  //  - SplitInterval: The page list can contain intervals and we are allowed to split intervals to
+  //  return the required slot. The returned VmPageOrMarker* can be manipulated freely. (See
+  //  comments near LookupOrAllocateCheckForInterval for an explanation of how splitting works.)
+  ktl::pair<VmPageOrMarker*, bool> LookupOrAllocate(uint64_t offset,
+                                                    IntervalHandling interval_handling) {
+    switch (interval_handling) {
+      case IntervalHandling::NoIntervals:
+        // The page list does not expect any intervals. Short circuit any checks for intervals.
+        return {LookupOrAllocateInternal(offset), false};
+      case IntervalHandling::CheckForInterval:
+        // Check for intervals but do not allow splitting them.
+        return LookupOrAllocateCheckForInterval(offset, false);
+      case IntervalHandling::SplitInterval:
+        // Check for intervals and also split them.
+        return LookupOrAllocateCheckForInterval(offset, true);
+    }
+    return {nullptr, false};
+  }
 
   // Returns a slot that was empty after LookupOrAllocate, and that the caller did not end up
   // filling.
@@ -1053,6 +1064,33 @@ class VmPageList final {
   zx_status_t AddZeroIntervalInternal(uint64_t start_offset, uint64_t end_offset,
                                       VmPageOrMarker::IntervalDirtyState dirty_state,
                                       uint64_t awaiting_clean_len);
+
+  // Internal helper for LookupOrAllocate.
+  VmPageOrMarker* LookupOrAllocateInternal(uint64_t offset);
+
+  // Similar to LookupOrAllocateInternal but also checks if offset falls in a sparse page interval,
+  // returning true via the bool in ktl::pair if it does, along with the slot. Also splits the
+  // interval around offset if split_interval is set to true. This allows the caller to freely
+  // manipulate the slot at offset similar to LookupOrAllocate. If offset is found in an interval,
+  // but split_interval was false, no VmPageOrMarker* is returned, as it is not safe to manipulate
+  // any slot in an interval without also splitting the interval around it.
+  //
+  // In other words, the return values fall into three categories.
+  //  1. {page, false} : offset does not lie in an interval. |slot| is the required slot.
+  //  2. {page, true} : offset lies in an interval and split_interval was true. |page| is the
+  //  required slot. The interval has been correctly split around the slot, so |page| can be treated
+  //  similar to any non-interval type.
+  //  3. {nullptr, true} : offset lies in an interval but split_interval was false. No slot is
+  //  returned.
+  //
+  // Splitting the interval would look as follows. If the interval previously was:
+  //  [start, end) where start < offset < end.
+  // After the split we would have three intervals:
+  //  [start, offset) [offset, offset + PAGE_SIZE) [offset + PAGE_SIZE, end)
+  // The middle interval containing offset spans only a single page, i.e. offset is an
+  // IntervalSentinel::Slot, which can now be manipulated independently.
+  ktl::pair<VmPageOrMarker*, bool> LookupOrAllocateCheckForInterval(uint64_t offset,
+                                                                    bool split_interval);
 
   template <typename PTR_TYPE, typename S, typename F>
   static zx_status_t ForEveryPage(S self, F per_page_func) {
