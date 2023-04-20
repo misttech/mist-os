@@ -701,7 +701,9 @@ mod test {
     use assert_matches::assert_matches;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Timestamp};
     use ffx_config::test_init;
-    use ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse};
+    use ffx_log_test_utils::{
+        setup_fake_archive_iterator, ArchiveIteratorParameters, FakeArchiveIteratorResponse,
+    };
     use fidl_fuchsia_developer_ffx::{
         DiagnosticsMarker, DiagnosticsRequest, TargetCollectionMarker, TargetCollectionRequest,
         TargetRequest,
@@ -783,6 +785,7 @@ mod test {
     fn setup_fake_diagnostics_server(
         expected_parameters: DaemonDiagnosticsStreamParameters,
         expected_responses: Arc<Vec<FakeArchiveIteratorResponse>>,
+        use_socket: bool,
     ) -> DiagnosticsProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<DiagnosticsMarker>().unwrap();
@@ -796,8 +799,15 @@ mod test {
                         responder,
                     } => {
                         assert_eq!(parameters, expected_parameters);
-                        setup_fake_archive_iterator(iterator, expected_responses.clone(), false)
-                            .unwrap();
+                        setup_fake_archive_iterator(
+                            iterator,
+                            ArchiveIteratorParameters {
+                                legacy_format: false,
+                                responses: expected_responses.clone(),
+                                use_socket,
+                            },
+                        )
+                        .unwrap();
                         responder
                             .send(&mut Ok(LogSession {
                                 target_identifier: target,
@@ -817,6 +827,7 @@ mod test {
     fn setup_fake_diagnostics_server_direct(
         _expected_parameters: DaemonDiagnosticsStreamParameters,
         expected_responses: Arc<Vec<FakeArchiveIteratorResponse>>,
+        use_socket: bool,
     ) -> Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         let (target_collection_proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<TargetCollectionMarker>().unwrap();
@@ -827,8 +838,14 @@ mod test {
                 responder,
             })) = stream.next().await
             {
-                if let ControlFlow::Break(_) =
-                    handle_open_target(query, responder, target_handle, &expected_responses).await
+                if let ControlFlow::Break(_) = handle_open_target(
+                    query,
+                    responder,
+                    target_handle,
+                    &expected_responses,
+                    use_socket,
+                )
+                .await
                 {
                     return;
                 }
@@ -847,6 +864,7 @@ mod test {
         responder: fidl_fuchsia_developer_ffx::TargetCollectionOpenTargetResponder,
         target_handle: ServerEnd<fidl_fuchsia_developer_ffx::TargetMarker>,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
+        use_socket: bool,
     ) -> ControlFlow<()> {
         assert_matches!(query.string_matcher, Some(value) if value == TARGET_NAME);
         responder.send(&mut Ok(())).unwrap();
@@ -854,8 +872,13 @@ mod test {
         while let Some(Ok(TargetRequest::OpenRemoteControl { remote_control, responder })) =
             target_stream.next().await
         {
-            if let Some(value) =
-                handle_open_remote_control(responder, remote_control, expected_responses).await
+            if let Some(value) = handle_open_remote_control(
+                responder,
+                remote_control,
+                expected_responses,
+                use_socket,
+            )
+            .await
             {
                 return value;
             }
@@ -867,6 +890,7 @@ mod test {
         responder: fidl_fuchsia_developer_ffx::TargetOpenRemoteControlResponder,
         remote_control: ServerEnd<fidl_fuchsia_developer_remotecontrol::RemoteControlMarker>,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
+        use_socket: bool,
     ) -> Option<ControlFlow<()>> {
         responder.send(&mut Ok(())).unwrap();
         let mut remote_control_stream = remote_control.into_stream().unwrap();
@@ -888,7 +912,8 @@ mod test {
             remote_control_stream.next().await
         {
             if let Some(value) =
-                handle_connect(selector, responder, service_chan, expected_responses).await
+                handle_connect(selector, responder, service_chan, expected_responses, use_socket)
+                    .await
             {
                 return value;
             }
@@ -901,6 +926,7 @@ mod test {
         responder: fidl_fuchsia_developer_remotecontrol::RemoteControlConnectResponder,
         service_chan: fidl::Channel,
         expected_responses: &Arc<Vec<FakeArchiveIteratorResponse>>,
+        use_socket: bool,
     ) -> Option<Option<ControlFlow<()>>> {
         assert_eq!(selector, parse_selector::<VerboseError>(RCS_SELECTOR).unwrap());
         responder
@@ -918,7 +944,15 @@ mod test {
             responder,
         })) = diagnostics_stream.next().await
         {
-            setup_fake_archive_iterator(iterator, expected_responses.clone(), false).unwrap();
+            setup_fake_archive_iterator(
+                iterator,
+                ArchiveIteratorParameters {
+                    legacy_format: false,
+                    responses: expected_responses.clone(),
+                    use_socket,
+                },
+            )
+            .unwrap();
             responder.send(&mut Ok(())).unwrap();
             if parameters.stream_mode == Some(fidl_fuchsia_diagnostics::StreamMode::Snapshot) {
                 return Some(Some(ControlFlow::Break(())));
@@ -1022,7 +1056,11 @@ mod test {
                 let mut writer = Vec::new();
                 exec_log_cmd(
                     LogCommandParameters::from(params.clone()),
-                    setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses)),
+                    setup_fake_diagnostics_server_direct(
+                        params,
+                        Arc::new(expected_responses),
+                        false,
+                    ),
                     &mut formatter,
                     &mut writer,
                 )
@@ -1077,7 +1115,7 @@ mod test {
             let mut writer = Vec::new();
             exec_log_cmd(
                 LogCommandParameters::from(params.clone()),
-                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses)),
+                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses), false),
                 &mut formatter,
                 &mut writer,
             )
@@ -1136,7 +1174,7 @@ mod test {
             let mut writer = Vec::new();
             exec_log_cmd(
                 LogCommandParameters::from(params.clone()),
-                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses)),
+                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses), false),
                 &mut formatter,
                 &mut writer,
             )
@@ -1185,7 +1223,7 @@ mod test {
             let mut writer = Vec::new();
             exec_log_cmd(
                 LogCommandParameters::from(params.clone()),
-                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses)),
+                setup_fake_diagnostics_server_direct(params, Arc::new(expected_responses), false),
                 &mut formatter,
                 &mut writer,
             )
@@ -1247,7 +1285,7 @@ mod test {
         let mut writer = Vec::new();
         exec_log_cmd(
             LogCommandParameters::from(params.clone()),
-            setup_fake_diagnostics_server(params, Arc::new(expected_responses)),
+            setup_fake_diagnostics_server(params, Arc::new(expected_responses), false),
             &mut formatter,
             &mut writer,
         )
@@ -1284,7 +1322,7 @@ mod test {
         let mut writer = Vec::new();
         exec_log_cmd(
             LogCommandParameters::from(params.clone()),
-            setup_fake_diagnostics_server(params, Arc::new(expected_responses)),
+            setup_fake_diagnostics_server(params, Arc::new(expected_responses), false),
             &mut formatter,
             &mut writer,
         )
@@ -1321,7 +1359,7 @@ mod test {
         let mut writer = Vec::new();
         exec_log_cmd(
             LogCommandParameters::from(params.clone()),
-            setup_fake_diagnostics_server(params, Arc::new(expected_responses)),
+            setup_fake_diagnostics_server(params, Arc::new(expected_responses), false),
             &mut formatter,
             &mut writer,
         )
@@ -1350,7 +1388,7 @@ mod test {
         let mut writer = Vec::new();
         exec_log_cmd(
             LogCommandParameters::from(params.clone()),
-            setup_fake_diagnostics_server(params, Arc::new(vec![])),
+            setup_fake_diagnostics_server(params, Arc::new(vec![]), false),
             &mut formatter,
             &mut writer,
         )
@@ -1374,7 +1412,7 @@ mod test {
         let mut writer = Vec::new();
         exec_log_cmd(
             LogCommandParameters::from(params.clone()),
-            setup_fake_diagnostics_server(params, Arc::new(vec![])),
+            setup_fake_diagnostics_server(params, Arc::new(vec![]), false),
             &mut formatter,
             &mut writer,
         )

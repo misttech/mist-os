@@ -20,6 +20,7 @@ use fidl_fuchsia_developer_remotecontrol::{
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration;
 use futures::{AsyncReadExt, StreamExt, TryFutureExt};
 use selectors::{parse_selector, VerboseError};
+use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, future::Future, rc::Weak, sync::Arc, time::SystemTime};
 use streamer::GenericDiagnosticsStreamer;
 
@@ -138,8 +139,8 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
                 .into_iter()
                 .filter_map(|r| {
                     if let Err(e) = r {
-                        // TODO(jwing): consider exiting if we see a large number of successive errors
-                        // from the diagnostics bridge.
+                        // TODO(jwing): consider exiting if we see
+                        // many successive errors from the diagnostics bridge.
                         tracing::warn!("got an error from diagnostics bridge {:?}", e);
                     }
                     r.ok()
@@ -159,9 +160,11 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
                     }
                 })
                 .map(|diagnostics_data| async {
-                    // There are two types of logs: small ones that fit inline in a message and long
+                    // There are two types of logs:
+                    // small ones that fit inline in a message and long
                     // ones that must be transported via a socket.
-                    // We deserialize the log data directly from the inline variant or we fetch the
+                    // We deserialize the log data directly from the
+                    // inline variant or we fetch the
                     // data by reading from the socket and then deserializing.
                     match diagnostics_data {
                         DiagnosticsData::Inline(inline) => {
@@ -173,15 +176,20 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
                                 Err(_) => LogData::MalformedTargetLog(inline.data),
                             };
 
-                            LogEntry { data, timestamp: ts, version: 1 }
+                            vec![LogEntry { data, timestamp: ts, version: 1 }]
                         }
                         DiagnosticsData::Socket(socket) => {
-                            // This is the long log side, we must read the data from the socket.
+                            // This is the long log side,
+                            // we must read the data from the socket.
                             let data = match read_target_log_from_socket(socket).await {
-                                Ok(data) => LogData::TargetLog(data),
-                                Err(data) => LogData::MalformedTargetLog(data),
+                                Ok(data) => {
+                                    data.into_iter().map(|data| LogData::TargetLog(data)).collect()
+                                }
+                                Err(data) => vec![LogData::MalformedTargetLog(data)],
                             };
-                            LogEntry { data, timestamp: ts, version: 1 }
+                            data.into_iter()
+                                .map(|data: LogData| LogEntry { data, timestamp: ts, version: 1 })
+                                .collect()
                         }
                     }
                 });
@@ -189,6 +197,7 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
             let log_data: Vec<LogEntry> = futures::future::join_all(log_data_futs)
                 .await
                 .into_iter()
+                .flatten()
                 .filter(|log| {
                     // TODO(jwing): use a monotonic ID instead of timestamp
                     // once fxbug.dev/61795 is resolved.
@@ -283,7 +292,25 @@ pub fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
     return Ok((server, listener_fut));
 }
 
-async fn read_target_log_from_socket(socket: fidl::Socket) -> Result<LogsData, String> {
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> From<OneOrMany<T>> for Vec<T> {
+    fn from(value: OneOrMany<T>) -> Self {
+        match value {
+            OneOrMany::One(value) => {
+                vec![value]
+            }
+            OneOrMany::Many(value) => value,
+        }
+    }
+}
+
+async fn read_target_log_from_socket(socket: fidl::Socket) -> Result<Vec<LogsData>, String> {
     let mut socket = fidl::AsyncSocket::from_socket(socket)
         .map_err(|_| "failure to create async socket".to_owned())?;
     let mut result = Vec::new();
@@ -291,8 +318,9 @@ async fn read_target_log_from_socket(socket: fidl::Socket) -> Result<LogsData, S
         .read_to_end(&mut result)
         .await
         .map_err(|_| "failure to read log from socket".to_owned())?;
-    serde_json::from_slice::<LogsData>(&result)
+    serde_json::from_slice::<OneOrMany<LogsData>>(&result)
         .map_err(|_| String::from_utf8_lossy(&result).into_owned())
+        .map(|value| Ok(Vec::from(value)))?
 }
 
 #[derive(Default)]
@@ -438,7 +466,9 @@ mod test {
     use async_channel::{Receiver, Sender};
     use async_lock::Mutex;
     use async_trait::async_trait;
-    use ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse};
+    use ffx_log_test_utils::{
+        setup_fake_archive_iterator, ArchiveIteratorParameters, FakeArchiveIteratorResponse,
+    };
     use ffx_log_utils::symbolizer::FakeSymbolizerForTest;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_developer_remotecontrol::{
@@ -599,8 +629,7 @@ mod test {
 
     fn setup_fake_archive_accessor(
         chan: fidl::Channel,
-        responses: Arc<Vec<FakeArchiveIteratorResponse>>,
-        legacy_format: bool,
+        iterator_parameters: ArchiveIteratorParameters,
     ) -> Result<()> {
         let mut stream = RemoteDiagnosticsBridgeRequestStream::from_channel(
             fidl::AsyncChannel::from_channel(chan)?,
@@ -618,8 +647,7 @@ mod test {
                             parameters.stream_mode.unwrap(),
                             fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe
                         );
-                        setup_fake_archive_iterator(iterator, responses.clone(), legacy_format)
-                            .unwrap();
+                        setup_fake_archive_iterator(iterator, iterator_parameters.clone()).unwrap();
                         responder.send(&mut Ok(())).unwrap();
                     }
                     _ => panic!("called unexpected diagnostic bridge method"),
@@ -631,8 +659,7 @@ mod test {
     }
 
     fn setup_fake_remote_control_service(
-        responses: Arc<Vec<FakeArchiveIteratorResponse>>,
-        legacy_format: bool,
+        parameters: ArchiveIteratorParameters,
     ) -> RemoteControlProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
@@ -641,8 +668,7 @@ mod test {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     RemoteControlRequest::Connect { selector: _, service_chan, responder } => {
-                        setup_fake_archive_accessor(service_chan, responses.clone(), legacy_format)
-                            .unwrap();
+                        setup_fake_archive_accessor(service_chan, parameters.clone()).unwrap();
                         responder
                             .send(&mut Ok(ServiceMatch {
                                 moniker: vec![],
@@ -720,21 +746,20 @@ mod test {
 
     async fn make_default_target_with_format(
         hoist: &Hoist,
-        expected_logs: Vec<FakeArchiveIteratorResponse>,
-        legacy_format: bool,
+        parameters: ArchiveIteratorParameters,
     ) -> Rc<Target> {
         let conn = RcsConnection::new_with_proxy(
             hoist,
-            setup_fake_remote_control_service(Arc::new(expected_logs), legacy_format),
+            setup_fake_remote_control_service(parameters),
             &NodeId { id: 1234 },
         );
         Target::from_rcs_connection(conn).await.unwrap()
     }
     async fn make_default_target(
         hoist: &Hoist,
-        expected_logs: Vec<FakeArchiveIteratorResponse>,
+        parameters: ArchiveIteratorParameters,
     ) -> Rc<Target> {
-        make_default_target_with_format(hoist, expected_logs, false).await
+        make_default_target_with_format(hoist, parameters).await
     }
 
     async fn run_logger_to_completion(logger: Logger<'_>) {
@@ -755,8 +780,15 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_disabled() -> Result<()> {
         let local_hoist = Hoist::new().unwrap();
-
-        let target = make_default_target(&local_hoist, vec![]).await;
+        let target = make_default_target(
+            &local_hoist,
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![]),
+                use_socket: false,
+            },
+        )
+        .await;
         let t = Rc::downgrade(&target);
         ();
 
@@ -770,19 +802,22 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_multiple_malformed_logs_in_series() -> Result<()> {
         let local_hoist = Hoist::new().unwrap();
-
         let target = make_default_target(
             &local_hoist,
-            vec![
-                FakeArchiveIteratorResponse::new_with_values(vec![
-                    "log1".to_string(),
-                    "log2".to_string(),
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        "log1".to_string(),
+                        "log2".to_string(),
+                    ]),
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        "log3".to_string(),
+                        "log4".to_string(),
+                    ]),
                 ]),
-                FakeArchiveIteratorResponse::new_with_values(vec![
-                    "log3".to_string(),
-                    "log4".to_string(),
-                ]),
-            ],
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -810,26 +845,86 @@ mod test {
         Ok(())
     }
 
-    async fn test_multiple_valid_logs_in_series_base_test(legacy_format: bool) -> Result<()> {
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_one_or_many_from_multi() {
+        let results = vec![1, 2, 3];
+        assert_eq!(Vec::<i32>::from(OneOrMany::Many(results.clone())), results);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_multiple_malformed_logs_in_batch() -> Result<()> {
+        let local_hoist = Hoist::new().unwrap();
+
+        let target = make_default_target(
+            &local_hoist,
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        "log1".to_string(),
+                        "log2".to_string(),
+                    ]),
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        "log3".to_string(),
+                        "log4".to_string(),
+                    ]),
+                ]),
+                use_socket: true,
+            },
+        )
+        .await;
+        let t = Rc::downgrade(&target);
+        ();
+
+        let log_buf = Arc::new(Mutex::new(vec![]));
+        let streamer = FakeDiagnosticsStreamer::new(0, log_buf.clone());
+        streamer.expect_setup(NODENAME, BOOT_TIME).await;
+        let fs = fake_symbolizer(vec![]).await;
+        let logger = Logger::new_with_streamer_and_config(t, streamer, true, fs);
+        run_logger_to_completion(logger).await;
+
+        verify_logged(
+            log_buf.clone(),
+            vec![
+                logging_started_entry(),
+                malformed_log("log1"),
+                malformed_log("log2"),
+                malformed_log("log3"),
+                malformed_log("log4"),
+                target_disconnected_entry(),
+            ],
+        )
+        .await;
+        Ok(())
+    }
+
+    async fn test_multiple_valid_logs_in_series_base_test(
+        legacy_format: bool,
+        use_socket: bool,
+    ) -> Result<()> {
         let local_hoist = Hoist::new().unwrap();
 
         let log1 = target_log(1, "log1");
         let log2 = target_log(2, "log2");
         let log3 = target_log(3, "log3");
         let log4 = target_log(4, "log4");
-        let target = make_default_target_with_format(
+        let target;
+        target = make_default_target_with_format(
             &local_hoist,
-            vec![
-                FakeArchiveIteratorResponse::new_with_values(vec![
-                    serde_json::to_string(&log1)?,
-                    serde_json::to_string(&log2)?,
+            ArchiveIteratorParameters {
+                legacy_format,
+                responses: Arc::new(vec![
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        serde_json::to_string(&log1)?,
+                        serde_json::to_string(&log2)?,
+                    ]),
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        serde_json::to_string(&log3)?,
+                        serde_json::to_string(&log4)?,
+                    ]),
                 ]),
-                FakeArchiveIteratorResponse::new_with_values(vec![
-                    serde_json::to_string(&log3)?,
-                    serde_json::to_string(&log4)?,
-                ]),
-            ],
-            legacy_format,
+                use_socket,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -861,12 +956,17 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_multiple_valid_logs_in_series() -> Result<()> {
-        test_multiple_valid_logs_in_series_base_test(false).await
+        test_multiple_valid_logs_in_series_base_test(false, false).await
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_multiple_valid_logs_in_series_with_socket() -> Result<()> {
+        test_multiple_valid_logs_in_series_base_test(false, true).await
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_multiple_valid_logs_in_series_legacy_format() -> Result<()> {
-        test_multiple_valid_logs_in_series_base_test(true).await
+        test_multiple_valid_logs_in_series_base_test(true, false).await
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -877,10 +977,14 @@ mod test {
         let log2 = target_log(2, "log2");
         let target = make_default_target(
             &local_hoist,
-            vec![
-                FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log1)?]),
-                FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log2)?]),
-            ],
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![FakeArchiveIteratorResponse::new_with_values(vec![
+                    serde_json::to_string(&log1)?,
+                    serde_json::to_string(&log2)?,
+                ])]),
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -910,11 +1014,21 @@ mod test {
         let log2 = target_log(2, "log2");
         let target = make_default_target(
             &local_hoist,
-            vec![
-                FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log1)?]),
-                FakeArchiveIteratorResponse::new_with_error(ArchiveIteratorError::DataReadFailed),
-                FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log2)?]),
-            ],
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![
+                    FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(
+                        &log1,
+                    )?]),
+                    FakeArchiveIteratorResponse::new_with_error(
+                        ArchiveIteratorError::DataReadFailed,
+                    ),
+                    FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(
+                        &log2,
+                    )?]),
+                ]),
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -949,11 +1063,19 @@ mod test {
         let log2 = target_log(2, "log2");
         let target = make_default_target(
             &local_hoist,
-            vec![
-                FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log1)?]),
-                FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log2)?]),
-                FakeArchiveIteratorResponse::new_with_fidl_error(),
-            ],
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![
+                    FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(
+                        &log1,
+                    )?]),
+                    FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(
+                        &log2,
+                    )?]),
+                    FakeArchiveIteratorResponse::new_with_fidl_error(),
+                ]),
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -986,7 +1108,11 @@ mod test {
 
         let target = make_default_target(
             &local_hoist,
-            vec![FakeArchiveIteratorResponse::new_with_fidl_error()],
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![FakeArchiveIteratorResponse::new_with_fidl_error()]),
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -1012,7 +1138,13 @@ mod test {
         let log1 = target_log(1, "{{{reset}}}");
         let target = make_default_target(
             &local_hoist,
-            vec![FakeArchiveIteratorResponse::new_with_values(vec![serde_json::to_string(&log1)?])],
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![FakeArchiveIteratorResponse::new_with_values(vec![
+                    serde_json::to_string(&log1)?,
+                ])]),
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);
@@ -1047,16 +1179,20 @@ mod test {
         let log4 = target_log(4, "{{{bt:file}}}");
         let target = make_default_target(
             &local_hoist,
-            vec![
-                FakeArchiveIteratorResponse::new_with_values(vec![
-                    serde_json::to_string(&log1)?,
-                    serde_json::to_string(&log2)?,
+            ArchiveIteratorParameters {
+                legacy_format: false,
+                responses: Arc::new(vec![
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        serde_json::to_string(&log1)?,
+                        serde_json::to_string(&log2)?,
+                    ]),
+                    FakeArchiveIteratorResponse::new_with_values(vec![
+                        serde_json::to_string(&log3)?,
+                        serde_json::to_string(&log4)?,
+                    ]),
                 ]),
-                FakeArchiveIteratorResponse::new_with_values(vec![
-                    serde_json::to_string(&log3)?,
-                    serde_json::to_string(&log4)?,
-                ]),
-            ],
+                use_socket: false,
+            },
         )
         .await;
         let t = Rc::downgrade(&target);

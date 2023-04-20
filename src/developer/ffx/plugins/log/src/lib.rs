@@ -795,7 +795,9 @@ mod test {
     use diagnostics_data::{LogsDataBuilder, LogsField, LogsProperty, Timestamp};
     use errors::ResultExt as _;
     use ffx_log_args::DumpCommand;
-    use ffx_log_test_utils::{setup_fake_archive_iterator, FakeArchiveIteratorResponse};
+    use ffx_log_test_utils::{
+        setup_fake_archive_iterator, ArchiveIteratorParameters, FakeArchiveIteratorResponse,
+    };
     use fidl_fuchsia_developer_ffx::{
         DaemonDiagnosticsStreamParameters, DiagnosticsRequest, LogSession, SessionSpec,
     };
@@ -906,7 +908,15 @@ mod test {
                 responder,
             } => {
                 assert_eq!(parameters, expected_parameters);
-                setup_fake_archive_iterator(iterator, expected_responses.clone(), false).unwrap();
+                setup_fake_archive_iterator(
+                    iterator,
+                    ArchiveIteratorParameters {
+                        legacy_format: false,
+                        responses: expected_responses.clone(),
+                        use_socket: false,
+                    },
+                )
+                .unwrap();
                 responder
                     .send(&mut Ok(LogSession {
                         target_identifier: t,
