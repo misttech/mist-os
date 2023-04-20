@@ -59,30 +59,6 @@
         },
         {
             "event_codes": [
-                8
-            ],
-            "metric_id": 1,
-            "metric_type": "Integer",
-            "selector": "core/appmgr:root/storage_usage/bytes/\\/data\\/persistent:fd81549e77f2f3b199d4dca16131c3525428140828f0843a0fd30e7c0d2e2631"
-        },
-        {
-            "event_codes": [
-                9
-            ],
-            "metric_id": 1,
-            "metric_type": "Integer",
-            "selector": "core/appmgr:root/storage_usage/bytes/\\/data\\/persistent:796fc46a1898539f901c909c1ccf61c98660692fa45dabe474afaec84be6d720"
-        },
-        {
-            "event_codes": [
-                10
-            ],
-            "metric_id": 1,
-            "metric_type": "Integer",
-            "selector": "core/appmgr:root/storage_usage/bytes/\\/data\\/persistent:de3e6f95d17b22bcc6b8bb5389301dc9fa60a16e2c5a4d35eb4a35dd9ac571c3"
-        },
-        {
-            "event_codes": [
                 11
             ],
             "metric_id": 1,
@@ -432,30 +408,6 @@
             "metric_id": 2,
             "metric_type": "Integer",
             "selector": "core/appmgr:root/storage_usage/inodes/\\/data\\/persistent:18f6b0d52208bab5e5dd65ef6021b7e47d7a6b3d09f6668dcea18f93161e9b1d"
-        },
-        {
-            "event_codes": [
-                8
-            ],
-            "metric_id": 2,
-            "metric_type": "Integer",
-            "selector": "core/appmgr:root/storage_usage/inodes/\\/data\\/persistent:fd81549e77f2f3b199d4dca16131c3525428140828f0843a0fd30e7c0d2e2631"
-        },
-        {
-            "event_codes": [
-                9
-            ],
-            "metric_id": 2,
-            "metric_type": "Integer",
-            "selector": "core/appmgr:root/storage_usage/inodes/\\/data\\/persistent:796fc46a1898539f901c909c1ccf61c98660692fa45dabe474afaec84be6d720"
-        },
-        {
-            "event_codes": [
-                10
-            ],
-            "metric_id": 2,
-            "metric_type": "Integer",
-            "selector": "core/appmgr:root/storage_usage/inodes/\\/data\\/persistent:de3e6f95d17b22bcc6b8bb5389301dc9fa60a16e2c5a4d35eb4a35dd9ac571c3"
         },
         {
             "event_codes": [
