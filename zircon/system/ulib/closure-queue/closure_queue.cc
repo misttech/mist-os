@@ -49,11 +49,6 @@ bool ClosureQueue::is_stopped() {
   return impl_->is_stopped();
 }
 
-void ClosureQueue::RunOneHere() {
-  ZX_DEBUG_ASSERT(impl_);
-  impl_->RunOneHere();
-}
-
 thrd_t ClosureQueue::dispatcher_thread() {
   ZX_DEBUG_ASSERT(impl_);
   return impl_->dispatcher_thread();
