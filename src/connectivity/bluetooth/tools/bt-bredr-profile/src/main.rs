@@ -514,10 +514,8 @@ async fn run_repl(profile_svc: ProfileProxy, state: Arc<Mutex<ProfileState>>) ->
     Ok(())
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["bt-bredr-profile"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["bt-bredr-profile"]).expect("Can't init logger");
-
     let profile_svc = connect_to_protocol::<ProfileMarker>()
         .context("failed to connect to bluetooth profile service")?;
     let rfcomm_test_svc = connect_to_protocol::<RfcommTestMarker>()

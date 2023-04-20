@@ -325,9 +325,6 @@ struct Args {
     #[argh(option)]
     /// maximum number of bytes to keep in the payload of incoming packets. Defaults to no limit.
     truncate_payload: Option<usize>,
-    #[argh(switch, short = 'v')]
-    /// enable verbose log output. Using twice will increase verbosity.
-    verbosity: u16,
 }
 
 /// Setup the main loop of execution in a Task and run it.
@@ -400,24 +397,11 @@ async fn run(
     }
 }
 
-/// Initializes syslog with tags and verbosity
-///
-/// Panics if syslog logger cannot be initialized
-fn init_logging(verbosity: u16) {
-    if verbosity > 1 {
-        fuchsia_trace_provider::trace_provider_create_with_fdio();
-        fuchsia_syslog::set_severity(fuchsia_syslog::levels::TRACE);
-    } else if verbosity > 0 {
-        fuchsia_syslog::set_severity(fuchsia_syslog::levels::DEBUG);
-    }
-    info!("Starting bt-snoop.");
-}
-
 /// Parse program arguments, call the main loop, and log any unrecoverable errors.
-#[fuchsia::main(logging_tags = ["bt-snoop"])]
+/// TODO(fxbug.dev/125788): migrate runtime config to structured config.
+#[fuchsia::main(logging_tags=["bt-snoop"])]
 async fn main() {
     let args: Args = argh::from_env();
-    init_logging(args.verbosity);
 
     let mut fs = ServiceFs::new();
 

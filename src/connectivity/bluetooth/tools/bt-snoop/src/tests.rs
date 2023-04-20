@@ -91,7 +91,6 @@ fn test_snoop_default_command_line_args() {
     assert_eq!(args.log_time_seconds, 60);
     assert_eq!(args.max_device_count, 8);
     assert_eq!(args.truncate_payload, None);
-    assert_eq!(args.verbosity, 0);
 }
 
 #[test]
@@ -100,7 +99,6 @@ fn test_snoop_command_line_args() {
     let log_time_seconds = 2;
     let max_device_count = 3;
     let truncate_payload = 4;
-    let verbosity = 2;
     let raw_args = &[
         "--log-size-soft-kib",
         &log_size_kib.to_string(),
@@ -112,8 +110,6 @@ fn test_snoop_command_line_args() {
         &max_device_count.to_string(),
         "--truncate-payload",
         &truncate_payload.to_string(),
-        "-v",
-        "-v",
     ];
     let args = Args::from_args(&["bt-snoop-v2"], raw_args).expect("Args created from args");
     assert_eq!(args.log_size_soft_kib, log_size_kib);
@@ -121,7 +117,6 @@ fn test_snoop_command_line_args() {
     assert_eq!(args.log_time_seconds, log_time_seconds);
     assert_eq!(args.max_device_count, max_device_count);
     assert_eq!(args.truncate_payload, Some(truncate_payload));
-    assert_eq!(args.verbosity, verbosity);
 }
 
 #[fasync::run_until_stalled(test)]
@@ -192,7 +187,6 @@ fn test_snoop_config_inspect() {
         log_time_seconds: 2,
         max_device_count: 3,
         truncate_payload: Some(4),
-        verbosity: 5,
     };
     let inspect = Inspector::default();
     let snoop_config_node = inspect.root().create_child("configuration");
