@@ -133,7 +133,7 @@ class MockBufferCollection : public MockBufferCollectionBase {
           [](const sysmem::wire::ImageFormatConstraints& format) {
             return format.pixel_format.type == sysmem::wire::PixelFormatType::kR8G8B8A8 &&
                    format.pixel_format.format_modifier.value ==
-                       sysmem::wire::kFormatModifierArmAfbc16X16SplitBlockSparseYuvTiledHeader;
+                       sysmem::wire::kFormatModifierArmAfbc16X16;
           });
       EXPECT_TRUE(image_constraints_contains_rgba32_and_afbc_16x16);
     }
