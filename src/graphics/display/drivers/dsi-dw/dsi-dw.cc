@@ -14,6 +14,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <cinttypes>
 #include <memory>
 #include <optional>
 
@@ -78,7 +79,7 @@ void DsiDwBase::DdkRelease() { delete this; }
 DsiDw::DsiDw(zx_device_t* parent, fdf::MmioBuffer mmio)
     : DeviceType(parent), dsi_mmio_(std::move(mmio)) {
   last_vidmode_ = DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value();
-  DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
+  zxlogf(INFO, "last_vidmode = 0x%x", last_vidmode_);
 }
 
 DsiDw::~DsiDw() = default;
@@ -198,7 +199,7 @@ zx_status_t DsiDw::DsiImplPhyWaitForReady() {
     zx_nanosleep(zx_deadline_after(ZX_USEC(kPhyDelay)));
   }
   if (timeout <= 0) {
-    DSI_ERROR("Timeout! D-PHY did not lock\n");
+    zxlogf(ERROR, "Timed out waiting for D-PHY lock");
     return ZX_ERR_TIMED_OUT;
   }
 
@@ -207,7 +208,7 @@ zx_status_t DsiDw::DsiImplPhyWaitForReady() {
     zx_nanosleep(zx_deadline_after(ZX_USEC(kPhyDelay)));
   }
   if (timeout <= 0) {
-    DSI_ERROR("Timeout! D-PHY StopStateClk not set\n");
+    zxlogf(ERROR, "Timed out waiting for D-PHY StopStateClk to be set");
     return ZX_ERR_TIMED_OUT;
   }
   return ZX_OK;
@@ -246,7 +247,7 @@ zx_status_t DsiDw::SendCommand(const fidl_dsi::wire::MipiDsiCmd& cmd,
       status = GenWriteLong(banjo_cmd);
       break;
     default:
-      DSI_ERROR("Unsupported/Invalid DSI Command Type %d\n", cmd.dsi_data_type());
+      zxlogf(ERROR, "Unsupported / invalid DSI command type: %d", cmd.dsi_data_type());
       status = ZX_ERR_NOT_SUPPORTED;
   }
   return status;
@@ -268,13 +269,13 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
   uint8_t video_mode;
   zx_status_t status = GetColorCode(dsi_config->color_coding, packed, code);
   if (status != ZX_OK) {
-    DSI_ERROR("Invalid/Unsupported Color Coding\n");
+    zxlogf(ERROR, "Refusing config with invalid or unsupported color coding");
     return status;
   }
 
   status = GetVideoMode(dsi_config->video_mode_type, video_mode);
   if (status != ZX_OK) {
-    DSI_ERROR("Invalid/Unsupported video mode\n");
+    zxlogf(ERROR, "Refusing config with invalid or unsupported video mode");
     return status;
   }
 
@@ -346,7 +347,7 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
                          .set_lp_vsa_en(1)
                          .set_vid_mode_type(video_mode);
   last_vidmode_ = vidmode_reg.reg_value();
-  DSI_INFO("last_vidmode = 0x%x", last_vidmode_);
+  zxlogf(INFO, "last_vidmode = 0x%x", last_vidmode_);
   vidmode_reg.WriteTo(&dsi_mmio_);
 
   // Define the max pkt size during Low Power mode
@@ -433,88 +434,92 @@ zx_status_t DsiDw::DsiImplConfig(const dsi_config_t* dsi_config) {
 }
 
 void DsiDw::DsiImplPrintDsiRegisters() {
-  DSI_INFO("%s: DUMPING DSI HOST REGS\n", __func__);
-  DSI_INFO("DW_DSI_VERSION = 0x%x\n", DsiDwVersionReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PWR_UP = 0x%x\n", DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_CLKMGR_CFG = 0x%x\n", DsiDwClkmgrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DPI_VCID = 0x%x\n", DsiDwDpiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DPI_COLOR_CODING = 0x%x\n",
-           DsiDwDpiColorCodingReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DPI_CFG_POL = 0x%x\n",
-           DsiDwDpiCfgPolReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DPI_LP_CMD_TIM = 0x%x\n",
-           DsiDwDpiLpCmdTimReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DBI_VCID = 0x%x\n", DsiDwDbiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DBI_CFG = 0x%x\n", DsiDwDbiCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DBI_PARTITIONING_EN = 0x%x\n",
-           DsiDwDbiPartitioningEnReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_DBI_CMDSIZE = 0x%x\n",
-           DsiDwDbiCmdsizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PCKHDL_CFG = 0x%x\n", DsiDwPckhdlCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_GEN_VCID = 0x%x\n", DsiDwGenVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_MODE_CFG = 0x%x\n", DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_MODE_CFG = 0x%x\n",
-           DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_PKT_SIZE = 0x%x\n",
-           DsiDwVidPktSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_NUM_CHUNKS = 0x%x\n",
-           DsiDwVidNumChunksReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_NULL_SIZE = 0x%x\n",
-           DsiDwVidNullSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_HSA_TIME = 0x%x\n",
-           DsiDwVidHsaTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_HBP_TIME = 0x%x\n",
-           DsiDwVidHbpTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_HLINE_TIME = 0x%x\n",
-           DsiDwVidHlineTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_VSA_LINES = 0x%x\n",
-           DsiDwVidVsaLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_VBP_LINES = 0x%x\n",
-           DsiDwVidVbpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_VFP_LINES = 0x%x\n",
-           DsiDwVidVfpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_VID_VACTIVE_LINES = 0x%x\n",
-           DsiDwVidVactiveLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_EDPI_CMD_SIZE = 0x%x\n",
-           DsiDwEdpiCmdSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_CMD_MODE_CFG = 0x%x\n",
-           DsiDwCmdModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_GEN_HDR = 0x%x\n", DsiDwGenHdrReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_GEN_PLD_DATA = 0x%x\n",
-           DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_CMD_PKT_STATUS = 0x%x\n",
-           DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_TO_CNT_CFG = 0x%x\n", DsiDwToCntCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_HS_RD_TO_CNT = 0x%x\n",
-           DsiDwHsRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_LP_RD_TO_CNT = 0x%x\n",
-           DsiDwLpRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_HS_WR_TO_CNT = 0x%x\n",
-           DsiDwHsWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_LP_WR_TO_CNT = 0x%x\n",
-           DsiDwLpWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_BTA_TO_CNT = 0x%x\n", DsiDwBtaToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_SDF_3D = 0x%x\n", DsiDwSdf3dReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_LPCLK_CTRL = 0x%x\n", DsiDwLpclkCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_TMR_LPCLK_CFG = 0x%x\n",
-           DsiDwPhyTmrLpclkCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_TMR_CFG = 0x%x\n",
-           DsiDwPhyTmrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_RSTZ = 0x%x\n", DsiDwPhyRstzReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_IF_CFG = 0x%x\n", DsiDwPhyIfCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_ULPS_CTRL = 0x%x\n",
-           DsiDwPhyUlpsCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_TX_TRIGGERS = 0x%x\n",
-           DsiDwPhyTxTriggersReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_STATUS = 0x%x\n", DsiDwPhyStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_TST_CTRL0 = 0x%x\n",
-           DsiDwPhyTstCtrl0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_PHY_TST_CTRL1 = 0x%x\n",
-           DsiDwPhyTstCtrl1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_INT_ST0 = 0x%x\n", DsiDwIntSt0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_INT_ST1 = 0x%x\n", DsiDwIntSt1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_INT_MSK0 = 0x%x\n", DsiDwIntMsk0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
-  DSI_INFO("DW_DSI_INT_MSK1 = 0x%x\n", DsiDwIntMsk1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "Dumping DW_DSI_* (DWC DSI host) registers");
+  zxlogf(INFO, "VERSION = 0x%" PRIx32, DsiDwVersionReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PWR_UP = 0x%" PRIx32, DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "CLKMGR_CFG = 0x%" PRIx32,
+         DsiDwClkmgrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DPI_VCID = 0x%" PRIx32, DsiDwDpiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DPI_COLOR_CODING = 0x%" PRIx32,
+         DsiDwDpiColorCodingReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DPI_CFG_POL = 0x%" PRIx32,
+         DsiDwDpiCfgPolReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DPI_LP_CMD_TIM = 0x%" PRIx32,
+         DsiDwDpiLpCmdTimReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DBI_VCID = 0x%" PRIx32, DsiDwDbiVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DBI_CFG = 0x%" PRIx32, DsiDwDbiCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DBI_PARTITIONING_EN = 0x%" PRIx32,
+         DsiDwDbiPartitioningEnReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "DBI_CMDSIZE = 0x%" PRIx32,
+         DsiDwDbiCmdsizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PCKHDL_CFG = 0x%" PRIx32,
+         DsiDwPckhdlCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "GEN_VCID = 0x%" PRIx32, DsiDwGenVcidReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "MODE_CFG = 0x%" PRIx32, DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_MODE_CFG = 0x%" PRIx32,
+         DsiDwVidModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_PKT_SIZE = 0x%" PRIx32,
+         DsiDwVidPktSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_NUM_CHUNKS = 0x%" PRIx32,
+         DsiDwVidNumChunksReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_NULL_SIZE = 0x%" PRIx32,
+         DsiDwVidNullSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_HSA_TIME = 0x%" PRIx32,
+         DsiDwVidHsaTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_HBP_TIME = 0x%" PRIx32,
+         DsiDwVidHbpTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_HLINE_TIME = 0x%" PRIx32,
+         DsiDwVidHlineTimeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_VSA_LINES = 0x%" PRIx32,
+         DsiDwVidVsaLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_VBP_LINES = 0x%" PRIx32,
+         DsiDwVidVbpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_VFP_LINES = 0x%" PRIx32,
+         DsiDwVidVfpLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "VID_VACTIVE_LINES = 0x%" PRIx32,
+         DsiDwVidVactiveLinesReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "EDPI_CMD_SIZE = 0x%" PRIx32,
+         DsiDwEdpiCmdSizeReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "CMD_MODE_CFG = 0x%" PRIx32,
+         DsiDwCmdModeCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "GEN_HDR = 0x%" PRIx32, DsiDwGenHdrReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "GEN_PLD_DATA = 0x%" PRIx32,
+         DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "CMD_PKT_STATUS = 0x%" PRIx32,
+         DsiDwCmdPktStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "TO_CNT_CFG = 0x%" PRIx32, DsiDwToCntCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "HS_RD_TO_CNT = 0x%" PRIx32,
+         DsiDwHsRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "LP_RD_TO_CNT = 0x%" PRIx32,
+         DsiDwLpRdToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "HS_WR_TO_CNT = 0x%" PRIx32,
+         DsiDwHsWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "LP_WR_TO_CNT = 0x%" PRIx32,
+         DsiDwLpWrToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "BTA_TO_CNT = 0x%" PRIx32, DsiDwBtaToCntReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "SDF_3D = 0x%" PRIx32, DsiDwSdf3dReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "LPCLK_CTRL = 0x%" PRIx32,
+         DsiDwLpclkCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_TMR_LPCLK_CFG = 0x%" PRIx32,
+         DsiDwPhyTmrLpclkCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_TMR_CFG = 0x%" PRIx32,
+         DsiDwPhyTmrCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_RSTZ = 0x%" PRIx32, DsiDwPhyRstzReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_IF_CFG = 0x%" PRIx32, DsiDwPhyIfCfgReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_ULPS_CTRL = 0x%" PRIx32,
+         DsiDwPhyUlpsCtrlReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_TX_TRIGGERS = 0x%" PRIx32,
+         DsiDwPhyTxTriggersReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_STATUS = 0x%" PRIx32,
+         DsiDwPhyStatusReg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_TST_CTRL0 = 0x%" PRIx32,
+         DsiDwPhyTstCtrl0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "PHY_TST_CTRL1 = 0x%" PRIx32,
+         DsiDwPhyTstCtrl1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "INT_ST0 = 0x%" PRIx32, DsiDwIntSt0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "INT_ST1 = 0x%" PRIx32, DsiDwIntSt1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "INT_MSK0 = 0x%" PRIx32, DsiDwIntMsk0Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
+  zxlogf(INFO, "INT_MSK1 = 0x%" PRIx32, DsiDwIntMsk1Reg::Get().ReadFrom(&dsi_mmio_).reg_value());
 }
 
 inline bool DsiDw::IsPldREmpty() {
@@ -582,7 +587,7 @@ void DsiDw::DumpCmd(const mipi_dsi_cmd_t& cmd) {
 zx_status_t DsiDw::GenericPayloadRead(uint32_t* data) {
   // make sure there is something valid to read from payload fifo
   if (WaitforPldRNotEmpty() != ZX_OK) {
-    DSI_ERROR("Timeout! PLD R FIFO remained empty\n");
+    zxlogf(ERROR, "Timed out waiting for data in PLD R FIFO");
     return ZX_ERR_TIMED_OUT;
   }
   *data = DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value();
@@ -592,7 +597,7 @@ zx_status_t DsiDw::GenericPayloadRead(uint32_t* data) {
 zx_status_t DsiDw::GenericHdrWrite(uint32_t data) {
   // make sure cmd fifo is not full before writing into it
   if (WaitforCmdNotFull() != ZX_OK) {
-    DSI_ERROR("Timeout! CMD FIFO remained full\n");
+    zxlogf(ERROR, "Timed out waiting for CMD FIFO to not be full");
     return ZX_ERR_TIMED_OUT;
   }
   DsiDwGenHdrReg::Get().FromValue(0).set_reg_value(data).WriteTo(&dsi_mmio_);
@@ -602,7 +607,7 @@ zx_status_t DsiDw::GenericHdrWrite(uint32_t data) {
 zx_status_t DsiDw::GenericPayloadWrite(uint32_t data) {
   // Make sure PLD_W is not full before writing into it
   if (WaitforPldWNotFull() != ZX_OK) {
-    DSI_ERROR("Timeout! PLD W FIFO remained full!\n");
+    zxlogf(ERROR, "Timed out waiting for PLD W FIFO to not be full");
     return ZX_ERR_TIMED_OUT;
   }
   DsiDwGenPldDataReg::Get().FromValue(0).set_reg_value(data).WriteTo(&dsi_mmio_);
@@ -630,7 +635,7 @@ zx_status_t DsiDw::WaitforBtaAck() {
     zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
   }
   if (retry <= 0) {
-    DSI_ERROR("Timeout waiting for read to complete!\n");
+    zxlogf(ERROR, "Timed out waiting for read completion");
     return ZX_ERR_TIMED_OUT;
   }
   return ZX_OK;
@@ -641,7 +646,7 @@ zx_status_t DsiDw::GenWriteShort(const mipi_dsi_cmd_t& cmd) {
   // Check that the payload size and command match
   if ((cmd.pld_data_count > 2) || (cmd.pld_data_count > 0 && cmd.pld_data_list == nullptr) ||
       (cmd.dsi_data_type & kMipiDsiDtGenShortWrite0) != kMipiDsiDtGenShortWrite0) {
-    DSI_ERROR("Invalid Gen short cmd sent\n");
+    zxlogf(ERROR, "Rejecting invalid generic short command");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -663,7 +668,7 @@ zx_status_t DsiDw::DcsWriteShort(const fidl_dsi::wire::MipiDsiCmd& cmd,
   // Check that the payload size and command match
   if ((txdata.count() != 1 && txdata.count() != 2) ||
       (cmd.dsi_data_type() & kMipiDsiDtDcsShortWrite0) != kMipiDsiDtDcsShortWrite0) {
-    DSI_ERROR("Invalid DCS short command\n");
+    zxlogf(ERROR, "Rejecting invalid DCS short command");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -682,7 +687,7 @@ zx_status_t DsiDw::DcsWriteShort(const mipi_dsi_cmd_t& cmd) {
   // Check that the payload size and command match
   if ((cmd.pld_data_count != 1 && cmd.pld_data_count != 2) || (cmd.pld_data_list == nullptr) ||
       (cmd.dsi_data_type & kMipiDsiDtDcsShortWrite0) != kMipiDsiDtDcsShortWrite0) {
-    DSI_ERROR("Invalid DCS short command\n");
+    zxlogf(ERROR, "Rejecting invalid DCS short command");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -707,7 +712,7 @@ zx_status_t DsiDw::GenWriteLong(const mipi_dsi_cmd_t& cmd) {
   size_t ts = cmd.pld_data_count;  // initial transfer size
 
   if (ts > 0 && cmd.pld_data_list == nullptr) {
-    DSI_ERROR("Invalid generic long write command\n");
+    zxlogf(ERROR, "Rejecting invalid generic long write command");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -716,8 +721,10 @@ zx_status_t DsiDw::GenWriteLong(const mipi_dsi_cmd_t& cmd) {
     regVal = cmd.pld_data_list[pld_data_idx + 0] << 0 | cmd.pld_data_list[pld_data_idx + 1] << 8 |
              cmd.pld_data_list[pld_data_idx + 2] << 16 | cmd.pld_data_list[pld_data_idx + 3] << 24;
     pld_data_idx += 4;
-    if ((status = GenericPayloadWrite(regVal)) != ZX_OK) {
-      DSI_ERROR("Generic Payload write failed! %d\n", status);
+
+    status = GenericPayloadWrite(regVal);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Generic Payload write failed: %s", zx_status_get_string(status));
       return status;
     }
     ts -= 4;
@@ -732,8 +739,9 @@ zx_status_t DsiDw::GenWriteLong(const mipi_dsi_cmd_t& cmd) {
     if (ts > 2) {
       regVal |= cmd.pld_data_list[pld_data_idx++] << 16;
     }
-    if ((status = GenericPayloadWrite(regVal)) != ZX_OK) {
-      DSI_ERROR("Generic Payload write failed! %d\n", status);
+    status = GenericPayloadWrite(regVal);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Generic Payload write failed: %s", zx_status_get_string(status));
       return status;
     }
   }
@@ -755,7 +763,7 @@ zx_status_t DsiDw::GenRead(const mipi_dsi_cmd_t& cmd) {
   // valid cmd packet
   if ((cmd.rsp_data_list == nullptr) || (cmd.pld_data_count > 2) ||
       (cmd.pld_data_count > 0 && cmd.pld_data_list == nullptr)) {
-    DSI_ERROR("Invalid generic read command\n");
+    zxlogf(ERROR, "Rejecting invalid generic read command");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -803,8 +811,9 @@ zx_status_t DsiDw::GenRead(const mipi_dsi_cmd_t& cmd) {
   uint32_t rsp_data_idx = 0;
   uint32_t data;
   while (ts >= 4) {
-    if ((status = GenericPayloadRead(&data)) != ZX_OK) {
-      DSI_ERROR("Something went wrong when reading data. Aborting\n");
+    status = GenericPayloadRead(&data);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to read payload data: %s", zx_status_get_string(status));
       return status;
     }
     cmd.rsp_data_list[rsp_data_idx++] = static_cast<uint8_t>((data >> 0) & 0xFF);
@@ -816,8 +825,9 @@ zx_status_t DsiDw::GenRead(const mipi_dsi_cmd_t& cmd) {
 
   // Read out remaining bytes
   if (ts > 0) {
-    if ((status = GenericPayloadRead(&data)) != ZX_OK) {
-      DSI_ERROR("Something went wrong when reading data. Aborting\n");
+    status = GenericPayloadRead(&data);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to read payload data: %s", zx_status_get_string(status));
       return status;
     }
     cmd.rsp_data_list[rsp_data_idx++] = (data >> 0) & 0xFF;
@@ -859,12 +869,12 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
       status = DcsWriteShort(cmd);
       break;
     default:
-      DSI_ERROR("Unsupported/Invalid DSI Command type %d\n", cmd.dsi_data_type);
+      zxlogf(ERROR, "Unsupported/Invalid DSI Command type: %d", cmd.dsi_data_type);
       status = ZX_ERR_INVALID_ARGS;
   }
 
   if (status != ZX_OK) {
-    DSI_ERROR("Something went wrong is sending command\n");
+    zxlogf(ERROR, "Failed to send DSI command: %s", zx_status_get_string(status));
     DumpCmd(cmd);
   }
 
@@ -914,7 +924,7 @@ zx_status_t DsiDw::Create(zx_device_t* parent) {
 
   status = dsi_dw_base->DdkAdd("dw-dsi-base", DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
   if (status != ZX_OK) {
-    DSI_ERROR("Failed to add dw-dsi-base device: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to add dw-dsi-base device: %s", zx_status_get_string(status));
     return status;
   }
   // devmgr now owns the memory for `dsi_dw_base`
