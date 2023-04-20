@@ -849,9 +849,10 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
 }
 
 impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
+    type SocketState = ();
     fn receive_frame(
-        &mut self,
-        _socket: crate::device::socket::SocketId,
+        &self,
+        _state: &Self::SocketState,
         _device: &DeviceId<Self>,
         _frame: crate::device::socket::Frame<&[u8]>,
         _raw_frame: &[u8],

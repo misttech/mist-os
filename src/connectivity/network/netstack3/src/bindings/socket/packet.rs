@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    num::NonZeroU16,
-    ops::{ControlFlow, Deref as _, DerefMut},
-    sync::Arc,
-};
+use std::{num::NonZeroU16, ops::ControlFlow, sync::Arc};
 
-use assert_matches::assert_matches;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fpsocket;
 use fidl_fuchsia_posix_socket_packet as fppacket;
@@ -20,7 +15,6 @@ use futures::TryStreamExt as _;
 use log::error;
 use net_types::ethernet::Mac;
 use netstack3_core::{
-    data_structures::id_map::{EntryKey as _, IdMap},
     device::{
         socket::{
             Frame, NonSyncContext, Protocol, SendDatagramError, SendDatagramParams, SendFrameError,
@@ -47,15 +41,9 @@ use crate::bindings::{
     BindingsNonSyncCtxImpl, Ctx,
 };
 
-#[derive(Default)]
-pub(crate) struct Sockets {
-    /// State for all sockets, indexed by their [`SocketId`]
-    sockets: IdMap<SocketState>,
-}
-
 /// State held in the non-sync context for a single socket.
 #[derive(Debug)]
-struct SocketState {
+pub(crate) struct SocketState {
     /// The received messages for the socket.
     ///
     /// This is shared with the worker that handles requests for the socket.
@@ -64,17 +52,16 @@ struct SocketState {
 }
 
 impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
+    type SocketState = SocketState;
+
     fn receive_frame(
-        &mut self,
-        socket: SocketId,
+        &self,
+        state: &Self::SocketState,
         device: &DeviceId<Self>,
         frame: Frame<&[u8]>,
         raw: &[u8],
     ) {
-        let packet_sockets = self.packet_sockets.read();
-        let Sockets { sockets } = packet_sockets.deref();
-        let SocketState { queue, kind } =
-            sockets.get(socket.get_key_index()).expect("invalid socket ID");
+        let SocketState { queue, kind } = state;
 
         let Frame::Ethernet { frame_dst, src_mac, dst_mac, protocol, body } = frame;
         let packet_type = match frame_dst {
@@ -183,7 +170,7 @@ impl BodyLen for Message {
 impl BindingData {
     fn new(
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
@@ -194,13 +181,9 @@ impl BindingData {
         }
 
         let message_queue = Arc::new(Mutex::new(MessageQueue::new(local_event)));
-        let id = netstack3_core::device::socket::create(sync_ctx);
-
-        let mut packet_sockets = non_sync_ctx.packet_sockets.write();
-        let Sockets { sockets } = packet_sockets.deref_mut();
-        assert_matches!(
-            sockets.insert(id.get_key_index(), SocketState { queue: message_queue.clone(), kind }),
-            None
+        let id = netstack3_core::device::socket::create(
+            sync_ctx,
+            SocketState { queue: message_queue.clone(), kind },
         );
 
         BindingData { message_queue, peer_event, state: State { id, kind } }
@@ -235,13 +218,10 @@ impl worker::SocketWorkerHandler for BindingData {
     fn close(
         self,
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { peer_event: _, state, message_queue: _ } = self;
         let State { id, kind: _ } = state;
-        let mut packet_sockets = non_sync_ctx.packet_sockets.write();
-        let Sockets { sockets } = packet_sockets.deref_mut();
-        assert_matches!(sockets.remove(id.get_key_index()), Some(_));
         netstack3_core::device::socket::remove(sync_ctx, id)
     }
 }

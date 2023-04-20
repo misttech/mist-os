@@ -1222,14 +1222,16 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
 impl<C: socket::NonSyncContext<DeviceId<C>> + DeviceLayerEventDispatcher>
     socket::NonSyncContext<EthernetDeviceId<C::Instant, C::EthernetDeviceState>> for C
 {
+    type SocketState = C::SocketState;
+
     fn receive_frame(
-        &mut self,
-        socket: socket::SocketId,
+        &self,
+        state: &Self::SocketState,
         device: &EthernetDeviceId<C::Instant, C::EthernetDeviceState>,
         frame: socket::Frame<&[u8]>,
         whole_frame: &[u8],
     ) {
-        self.receive_frame(socket, &device.clone().into(), frame, whole_frame)
+        self.receive_frame(state, &device.clone().into(), frame, whole_frame)
     }
 }
 
@@ -1540,10 +1542,12 @@ pub(crate) struct Devices<C: DeviceLayerEventDispatcher> {
 }
 
 /// The state associated with the device layer.
-pub(crate) struct DeviceLayerState<C: DeviceLayerEventDispatcher> {
+pub(crate) struct DeviceLayerState<
+    C: DeviceLayerEventDispatcher + socket::NonSyncContext<DeviceId<C>>,
+> {
     devices: RwLock<Devices<C>>,
     origin: OriginTracker,
-    shared_sockets: RwLock<Sockets<WeakDeviceId<C>>>,
+    shared_sockets: RwLock<Sockets<C::SocketState, WeakDeviceId<C>>>,
 }
 
 impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState>
@@ -1563,8 +1567,8 @@ impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerStat
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> RwLockFor<crate::lock_ordering::DeviceLayerState>
-    for DeviceLayerState<C>
+impl<C: DeviceLayerEventDispatcher + socket::NonSyncContext<DeviceId<C>>>
+    RwLockFor<crate::lock_ordering::DeviceLayerState> for DeviceLayerState<C>
 {
     type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<C>>
         where
@@ -1580,13 +1584,13 @@ impl<C: DeviceLayerEventDispatcher> RwLockFor<crate::lock_ordering::DeviceLayerS
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> RwLockFor<crate::lock_ordering::AnyDeviceSockets>
-    for DeviceLayerState<C>
+impl<C: DeviceLayerEventDispatcher + socket::NonSyncContext<DeviceId<C>>>
+    RwLockFor<crate::lock_ordering::AnyDeviceSockets> for DeviceLayerState<C>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Sockets<WeakDeviceId<C>>>
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Sockets<C::SocketState, WeakDeviceId<C>>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Sockets<WeakDeviceId<C>>>
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Sockets<C::SocketState, WeakDeviceId<C>>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {
@@ -1627,7 +1631,7 @@ impl OriginTracker {
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
+impl<C: DeviceLayerEventDispatcher + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState<C> {
     /// Creates a new [`DeviceLayerState`] instance.
     pub(crate) fn new() -> Self {
         Self {

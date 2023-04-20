@@ -82,7 +82,7 @@ use netstack3_core::{
         types::RawMetric,
         IpExt,
     },
-    sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
+    sync::Mutex as CoreMutex,
     transport::udp,
     NonSyncContext, SyncCtx, TimerId,
 };
@@ -149,7 +149,6 @@ pub(crate) struct BindingsNonSyncCtxImplInner {
     rng: RngImpl,
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
-    packet_sockets: CoreRwLock<crate::bindings::socket::packet::Sockets>,
     icmp_echo_sockets: IcmpEchoSockets,
     udp_sockets: UdpSockets,
     tcp_v4_listeners: CoreMutex<IdMap<crate::bindings::socket::stream::ListenerState>>,
