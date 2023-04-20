@@ -4,7 +4,9 @@
 
 #include "aml-canvas.h"
 
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <lib/fake-bti/bti.h>
 
 #include <vector>
@@ -20,17 +22,19 @@ constexpr uint32_t kMmioRegSize = sizeof(uint32_t);
 constexpr uint32_t kMmioRegCount = (aml_canvas::kDmcCavMaxRegAddr + kMmioRegSize) / kMmioRegSize;
 constexpr uint32_t kVmoTestSize = PAGE_SIZE;
 
-constexpr canvas_info_t test_canvas_info = []() {
-  canvas_info_t ci = {};
+constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasInfo test_canvas_info = []() {
+  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo ci = {};
   ci.height = 240;
   ci.stride_bytes = 16;
+  ci.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
   return ci;
 }();
 
-constexpr canvas_info_t invalid_canvas_info = []() {
-  canvas_info_t ci = {};
+constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasInfo invalid_canvas_info = []() {
+  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo ci = {};
   ci.height = 240;
   ci.stride_bytes = 15;
+  ci.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
   return ci;
 }();
 }  // namespace
@@ -42,6 +46,28 @@ ddk_mock::MockMmioReg& GetMockReg(ddk_mock::MockMmioRegRegion& registers) {
   return registers[T::Get().addr()];
 }
 
+class AmlCanvasWrap {
+ public:
+  void Init(fdf::MmioBuffer mmio, zx::bti bti) {
+    canvas_ = std::make_unique<AmlCanvas>(fake_parent_.get(), std::move(mmio), std::move(bti));
+  }
+
+  void Serve(fidl::ServerEnd<fuchsia_hardware_amlogiccanvas::Device> server_end) {
+    binding_.emplace(dispatcher_, std::move(server_end), canvas_.get(),
+                     fidl::kIgnoreBindingClosure);
+  }
+
+  zx_status_t DdkAdd(const std::string& name) { return canvas_->DdkAdd(name.c_str()); }
+
+  void release() { [[maybe_unused]] auto ptr = canvas_.release(); }
+
+ private:
+  async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
+  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  std::unique_ptr<AmlCanvas> canvas_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
+};
+
 class AmlCanvasTest : public zxtest::Test {
  public:
   AmlCanvasTest() : mock_regs_(ddk_mock::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)) {
@@ -50,38 +76,51 @@ class AmlCanvasTest : public zxtest::Test {
     zx::bti bti;
     EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    fbl::AllocChecker ac;
-    canvas_ = fbl::make_unique_checked<AmlCanvas>(&ac, fake_parent_.get(), std::move(mmio),
-                                                  std::move(bti));
-    EXPECT_TRUE(ac.check());
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
+    ASSERT_OK(endpoints);
+
+    canvas_.SyncCall(&AmlCanvasWrap::Init, std::move(mmio), std::move(bti));
+    canvas_.SyncCall(&AmlCanvasWrap::Serve, std::move(endpoints.value().server));
+
+    canvas_client_.Bind(std::move(endpoints.value().client));
   }
 
   void TestLifecycle() {
-    EXPECT_OK(canvas_->DdkAdd("aml-canvas"));
-    // TODO(fxbug.dev/79639): Removed the obsolete fake_ddk.Ok() check.
-    // To test Unbind and Release behavior, call UnbindOp and ReleaseOp directly.
-    [[maybe_unused]] auto ptr = canvas_.release();
+    std::string name = "aml-canvas";
+    EXPECT_OK(canvas_.SyncCall(&AmlCanvasWrap::DdkAdd, name));
+    canvas_.SyncCall(&AmlCanvasWrap::release);
   }
 
   zx_status_t CreateNewCanvas() {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(kVmoTestSize, 0, &vmo));
 
-    uint8_t index;
-    zx_status_t status = canvas_->AmlogicCanvasConfig(std::move(vmo), 0, &test_canvas_info, &index);
-    if (status != ZX_OK) {
-      return status;
+    fidl::WireResult result = canvas_client_->Config(std::move(vmo), 0, test_canvas_info);
+    if (!result.ok()) {
+      return result.error().status();
     }
-    canvas_indices_.push_back(index);
-    return status;
+    if (result->is_error()) {
+      return result->error_value();
+    }
+
+    canvas_indices_.push_back(result->value()->canvas_idx);
+    return ZX_OK;
   }
 
   zx_status_t CreateNewCanvasInvalid() {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(kVmoTestSize, 0, &vmo));
 
-    uint8_t index;
-    return canvas_->AmlogicCanvasConfig(std::move(vmo), 0, &invalid_canvas_info, &index);
+    fidl::WireResult result = canvas_client_->Config(std::move(vmo), 0, invalid_canvas_info);
+    if (!result.ok()) {
+      return result.error().status();
+    }
+    if (result->is_error()) {
+      return result->error_value();
+    }
+
+    // We should be returning an error since we are creating an invalid canvas.
+    return ZX_ERR_INTERNAL;
   }
 
   zx_status_t FreeCanvas(uint8_t index) {
@@ -89,20 +128,31 @@ class AmlCanvasTest : public zxtest::Test {
     if (it != canvas_indices_.end()) {
       canvas_indices_.erase(it);
     }
-    return canvas_->AmlogicCanvasFree(index);
+
+    fidl::WireResult result = canvas_client_->Free(index);
+    if (!result.ok()) {
+      return result.error().status();
+    }
+    if (result->is_error()) {
+      return result->error_value();
+    }
+
+    return ZX_OK;
   }
 
   zx_status_t FreeAllCanvases() {
-    zx_status_t status = ZX_OK;
     while (!canvas_indices_.empty()) {
       uint8_t index = canvas_indices_.back();
       canvas_indices_.pop_back();
-      status = canvas_->AmlogicCanvasFree(index);
-      if (status != ZX_OK) {
-        return status;
+      fidl::WireResult result = canvas_client_->Free(index);
+      if (!result.ok()) {
+        return result.error().status();
+      }
+      if (result->is_error()) {
+        return result->error_value();
       }
     }
-    return status;
+    return ZX_OK;
   }
 
   void SetRegisterExpectations() {
@@ -137,10 +187,14 @@ class AmlCanvasTest : public zxtest::Test {
     auto data_high = CanvasLutDataHigh::Get().FromValue(0);
     data_high.SetDmcCavWidth(test_canvas_info.stride_bytes >> 3);
     data_high.set_dmc_cav_height(test_canvas_info.height);
-    data_high.set_dmc_cav_blkmode(test_canvas_info.blkmode);
-    data_high.set_dmc_cav_xwrap(test_canvas_info.wrap & CanvasLutDataHigh::kDmcCavXwrap ? 1 : 0);
-    data_high.set_dmc_cav_ywrap(test_canvas_info.wrap & CanvasLutDataHigh::kDmcCavYwrap ? 1 : 0);
-    data_high.set_dmc_cav_endianness(test_canvas_info.endianness);
+    data_high.set_dmc_cav_blkmode(static_cast<uint32_t>(test_canvas_info.blkmode));
+    data_high.set_dmc_cav_xwrap(
+        test_canvas_info.flags & fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrapHorizontal ? 1
+                                                                                              : 0);
+    data_high.set_dmc_cav_ywrap(
+        test_canvas_info.flags & fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrapVertical ? 1
+                                                                                            : 0);
+    data_high.set_dmc_cav_endianness(static_cast<uint32_t>(test_canvas_info.endianness));
     return data_high.reg_value();
   }
 
@@ -151,11 +205,13 @@ class AmlCanvasTest : public zxtest::Test {
     return lut_addr.reg_value();
   }
 
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
-  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
+  fdf_testing::DriverRuntimeEnv env_;
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
   std::vector<uint8_t> canvas_indices_;
   ddk_mock::MockMmioRegRegion mock_regs_;
-  std::unique_ptr<AmlCanvas> canvas_;
+  async_patterns::TestDispatcherBound<AmlCanvasWrap> canvas_{dispatcher_.dispatcher(),
+                                                             std::in_place};
+  fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_client_;
 };
 
 TEST_F(AmlCanvasTest, DdkLifecyle) { TestLifecycle(); }
@@ -225,7 +281,8 @@ TEST_F(AmlCanvasTest, CanvasConfigMaxLimit) {
 }
 
 TEST_F(AmlCanvasTest, CanvasConfigUnaligned) {
-  // Try to create a canvas with unaligned canvas_info_t width, and verify that it fails.
+  // Try to create a canvas with unaligned fuchsia_hardware_amlogiccanvas::wire::CanvasInfo width,
+  // and verify that it fails.
   EXPECT_EQ(CreateNewCanvasInvalid(), ZX_ERR_INVALID_ARGS);
 }
 

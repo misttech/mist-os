@@ -41,9 +41,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
   proto->ctx = this;
 
   switch (proto_id) {
-    case ZX_PROTOCOL_AMLOGIC_CANVAS:
-      proto->ops = &amlogic_canvas_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_CODEC:
       proto->ops = &codec_protocol_ops_;
       return ZX_OK;
@@ -127,35 +124,6 @@ fail:
     }
   }
   return status;
-}
-
-zx_status_t FragmentProxy::AmlogicCanvasConfig(zx::vmo vmo, size_t offset,
-                                               const canvas_info_t* info, uint8_t* out_canvas_idx) {
-  AmlogicCanvasProxyRequest req = {};
-  AmlogicCanvasProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_AMLOGIC_CANVAS;
-  req.op = AmlogicCanvasOp::CONFIG;
-  req.offset = offset;
-  req.info = *info;
-  zx_handle_t handle = vmo.release();
-
-  auto status =
-      Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), &handle, 1, nullptr, 0, nullptr);
-  if (status != ZX_OK) {
-    return status;
-  }
-  *out_canvas_idx = resp.canvas_idx;
-  return ZX_OK;
-}
-
-zx_status_t FragmentProxy::AmlogicCanvasFree(uint8_t canvas_idx) {
-  AmlogicCanvasProxyRequest req = {};
-  AmlogicCanvasProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_AMLOGIC_CANVAS;
-  req.op = AmlogicCanvasOp::FREE;
-  req.canvas_idx = canvas_idx;
-
-  return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
 }
 
 zx_status_t FragmentProxy::CodecConnect(zx::channel chan) {

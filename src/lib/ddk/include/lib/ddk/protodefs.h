@@ -115,7 +115,7 @@ DDK_PROTOCOL_DEF(BAD_BLOCK,               96,   "bad-block", PF_NOPUB)
 DDK_PROTOCOL_DEF(MAILBOX,                 97,   "mailbox", PF_NOPUB)
 DDK_PROTOCOL_DEF(SCPI,                    98,   "scpi", PF_NOPUB)
 DDK_PROTOCOL_DEF(BACKLIGHT,               99,   "backlight", 0)
-DDK_PROTOCOL_DEF(AMLOGIC_CANVAS,          100,  "aml-canvas", PF_NOPUB)
+// 100 was AMLOGIC_CANVAS
 DDK_PROTOCOL_DEF(SKIP_BLOCK,              101,  "skip-block", 0)
 DDK_PROTOCOL_DEF(ETH_BOARD,               102,  "ethernet-board", PF_NOPUB)
 DDK_PROTOCOL_DEF(ETH_MAC,                 103,  "ethernet-mac", PF_NOPUB)

@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_INTERNAL_DRIVERS_FRAGMENT_PROXY_PROTOCOL_H_
 #define SRC_DEVICES_INTERNAL_DRIVERS_FRAGMENT_PROXY_PROTOCOL_H_
 
-#include <fuchsia/hardware/amlogiccanvas/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/pwm/c/banjo.h>
@@ -233,25 +232,6 @@ struct SysmemProxyRequest {
   ProxyRequest header;
   SysmemOp op;
   uint64_t heap;
-};
-
-// ZX_PROTOCOL_AMLOGIC_CANVAS proxy support.
-enum class AmlogicCanvasOp {
-  CONFIG,
-  FREE,
-};
-
-struct AmlogicCanvasProxyRequest {
-  ProxyRequest header;
-  AmlogicCanvasOp op;
-  size_t offset;
-  canvas_info_t info;
-  uint8_t canvas_idx;
-};
-
-struct AmlogicCanvasProxyResponse {
-  ProxyResponse header;
-  uint8_t canvas_idx;
 };
 
 // ZX_PROTOCOL_ETH_BOARD proxy support.

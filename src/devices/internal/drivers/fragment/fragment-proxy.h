@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_INTERNAL_DRIVERS_FRAGMENT_FRAGMENT_PROXY_H_
 #define SRC_DEVICES_INTERNAL_DRIVERS_FRAGMENT_FRAGMENT_PROXY_H_
 
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
@@ -30,7 +29,6 @@ class FragmentProxy;
 using FragmentProxyBase = ddk::Device<FragmentProxy, ddk::GetProtocolable>;
 
 class FragmentProxy : public FragmentProxyBase,
-                      public ddk::AmlogicCanvasProtocol<FragmentProxy>,
                       public ddk::ClockProtocol<FragmentProxy>,
                       public ddk::EthBoardProtocol<FragmentProxy>,
                       public ddk::GpioProtocol<FragmentProxy>,
@@ -61,9 +59,6 @@ class FragmentProxy : public FragmentProxyBase,
 
   void AcpiConnectServer(zx::channel server);
 
-  zx_status_t AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const canvas_info_t* info,
-                                  uint8_t* out_canvas_idx);
-  zx_status_t AmlogicCanvasFree(uint8_t canvas_idx);
   zx_status_t ClockEnable();
   zx_status_t ClockDisable();
   zx_status_t ClockIsEnabled(bool* out_enabled);

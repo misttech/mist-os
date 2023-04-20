@@ -95,41 +95,6 @@ void Fragment::DdkInit(ddk::InitTxn init_txn) {
   init_txn.Reply(ZX_OK);
 }
 
-zx_status_t Fragment::RpcCanvas(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                                uint32_t* out_resp_size, zx::handle* req_handles,
-                                uint32_t req_handle_count, zx::handle* resp_handles,
-                                uint32_t* resp_handle_count) {
-  if (!canvas_client_.proto_client().is_valid()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  auto* req = reinterpret_cast<const AmlogicCanvasProxyRequest*>(req_buf);
-  if (req_size < sizeof(*req)) {
-    zxlogf(ERROR, "%s received %u, expecting %zu", __func__, req_size, sizeof(*req));
-    return ZX_ERR_INTERNAL;
-  }
-  auto* resp = reinterpret_cast<AmlogicCanvasProxyResponse*>(resp_buf);
-  *out_resp_size = sizeof(*resp);
-
-  switch (req->op) {
-    case AmlogicCanvasOp::CONFIG:
-      if (req_handle_count != 1) {
-        zxlogf(ERROR, "%s received %u handles, expecting 1", __func__, req_handle_count);
-        return ZX_ERR_INTERNAL;
-      }
-      return canvas_client_.proto_client().Config(zx::vmo(std::move(req_handles[0])), req->offset,
-                                                  &req->info, &resp->canvas_idx);
-    case AmlogicCanvasOp::FREE:
-      if (req_handle_count != 0) {
-        zxlogf(ERROR, "%s received %u handles, expecting 0", __func__, req_handle_count);
-        return ZX_ERR_INTERNAL;
-      }
-      return canvas_client_.proto_client().Free(req->canvas_idx);
-    default:
-      zxlogf(ERROR, "%s: unknown clk op %u", __func__, static_cast<uint32_t>(req->op));
-      return ZX_ERR_INTERNAL;
-  }
-}
-
 zx_status_t Fragment::RpcClock(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                                uint32_t* out_resp_size, zx::handle* req_handles,
                                uint32_t req_handle_count, zx::handle* resp_handles,
@@ -563,10 +528,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
   uint32_t resp_len = 0;
 
   switch (req_header->proto_id) {
-    case ZX_PROTOCOL_AMLOGIC_CANVAS:
-      status = RpcCanvas(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
-                         resp_handles, &resp_handle_count);
-      break;
     case ZX_PROTOCOL_CLOCK:
       status = RpcClock(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                         resp_handles, &resp_handle_count);
@@ -632,13 +593,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
 
 zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   switch (proto_id) {
-    case ZX_PROTOCOL_AMLOGIC_CANVAS: {
-      if (!canvas_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      canvas_client_.proto_client().GetProto(static_cast<amlogic_canvas_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
     case ZX_PROTOCOL_CLOCK: {
       if (!clock_client_.proto_client().is_valid()) {
         return ZX_ERR_NOT_SUPPORTED;
