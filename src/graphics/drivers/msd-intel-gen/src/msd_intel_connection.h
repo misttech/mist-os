@@ -53,12 +53,12 @@ class MsdIntelConnection {
     sent_context_killed_ = true;
   }
 
-  void AddHandleWait(msd_connection_handle_wait_complete_t completer,
-                     msd_connection_handle_wait_start_t starter, void* wait_context,
-                     magma_handle_t handle) {
-    notifications_.AddHandleWait(completer, starter, wait_context, handle);
+  // `Callback` should be of type zx_status_t(async_dispatcher_t*). It's called while holding the
+  // notifications_ lock.
+  template <typename Callback>
+  std::optional<zx_status_t> CallWithDispatcher(Callback callback) {
+    return notifications_.CallWithDispatcher(callback);
   }
-  void CancelHandleWait(void* cancel_token) { notifications_.CancelHandleWait(cancel_token); }
 
   // Maps |page_count| pages of the given |buffer| at |page_offset| to |gpu_addr| into the
   // GPU address space belonging to this connection.
@@ -117,22 +117,12 @@ class MsdIntelConnection {
       handler_->ContextKilled();
     }
 
-    void AddHandleWait(msd_connection_handle_wait_complete_t completer,
-                       msd_connection_handle_wait_start_t starter, void* wait_context,
-                       magma_handle_t handle) {
+    template <typename Callback>
+    std::optional<zx_status_t> CallWithDispatcher(Callback callback) {
       std::lock_guard<std::mutex> lock(mutex_);
       if (!handler_)
-        return;
-
-      handler_->HandleWait(starter, completer, wait_context, zx::unowned_handle(handle));
-    }
-
-    void CancelHandleWait(void* cancel_token) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      if (!handler_)
-        return;
-
-      handler_->HandleWaitCancel(cancel_token);
+        return std::nullopt;
+      return {callback(handler_->GetAsyncDispatcher())};
     }
 
     void Set(msd::NotificationHandler* handler) {

@@ -5,6 +5,8 @@
 #ifndef MSD_INTEL_CONTEXT_H
 #define MSD_INTEL_CONTEXT_H
 
+#include <lib/async/cpp/wait.h>
+
 #include <map>
 #include <memory>
 #include <queue>
@@ -25,24 +27,27 @@ class MsdIntelConnection;
 class MsdIntelContext {
  public:
   // Context for handling a wait semaphore.
-  struct HandleWaitContext {
-    HandleWaitContext(MsdIntelContext* context, EngineCommandStreamerId id,
-                      std::shared_ptr<magma::PlatformSemaphore> semaphore) {
-      this->context = context;
-      this->id = id;
-      this->semaphore = std::move(semaphore);
-      this->completed = false;
-      this->cancel_token = nullptr;
-    }
+  class HandleWaitContext {
+   public:
+    HandleWaitContext(MsdIntelContext* context, EngineCommandStreamerId id, zx::handle object,
+                      std::shared_ptr<magma::PlatformSemaphore> semaphore);
 
-    static void Completer(void* context, magma_status_t status, magma_handle_t handle);
-    static void Starter(void* context, void* cancel_token);
+    ~HandleWaitContext() { waiter_.Cancel(); }
 
-    MsdIntelContext* context;  // set to null if the context is shutdown
-    EngineCommandStreamerId id;
-    std::shared_ptr<magma::PlatformSemaphore> semaphore;
-    bool completed;
-    void* cancel_token;
+    zx_status_t Begin(async_dispatcher_t* dispatcher) { return waiter_.Begin(dispatcher); }
+
+    EngineCommandStreamerId id() const { return id_; }
+    const std::shared_ptr<magma::PlatformSemaphore>& semaphore() const { return semaphore_; }
+
+   private:
+    void Handler(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                 const zx_packet_signal_t* signal);
+
+    MsdIntelContext* context_;
+    EngineCommandStreamerId id_;
+    zx::handle object_;
+    std::shared_ptr<magma::PlatformSemaphore> semaphore_;
+    async::WaitMethod<HandleWaitContext, &HandleWaitContext::Handler> waiter_;
   };
 
   explicit MsdIntelContext(std::shared_ptr<AddressSpace> address_space)
@@ -142,7 +147,7 @@ class MsdIntelContext {
  private:
   void AddToWaitset(EngineCommandStreamerId id, std::shared_ptr<MsdIntelConnection> connection,
                     std::shared_ptr<magma::PlatformSemaphore> semaphore);
-  void WaitComplete(std::unique_ptr<HandleWaitContext> wait_context, magma_status_t status);
+  void WaitComplete(HandleWaitContext* wait_context, zx_status_t status);
   magma::Status ProcessPresubmitQueue(EngineCommandStreamerId id);
 
   struct PerEngineState {
@@ -163,7 +168,7 @@ class MsdIntelContext {
 
   struct PerEnginePresubmit {
     // The wait set tracks pending semaphores for the head of the presubmit queue
-    std::vector<HandleWaitContext*> wait_set;
+    std::vector<std::unique_ptr<HandleWaitContext>> wait_set;
     std::queue<std::unique_ptr<MappedBatch>> queue;
   };
 

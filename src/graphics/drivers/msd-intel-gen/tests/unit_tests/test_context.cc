@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async-loop/cpp/loop.h>
+
 #include <gtest/gtest.h>
 #include <mock/fake_address_space.h>
 #include <mock/mock_bus_mapper.h>
@@ -148,24 +150,6 @@ struct Param {
   uint32_t command_buffer_count = 0;
   uint32_t semaphore_count = 0;
   uint64_t command_buffer_flags = 0;
-  magma_status_t completer_status = MAGMA_STATUS_OK;
-};
-
-struct TestNotification {
-  enum class Type {
-    kHandleWait = 1,
-    kHandleWaitCancel = 2,
-  };
-  Type type;
-  struct {
-    msd_connection_handle_wait_start_t starter;
-    msd_connection_handle_wait_complete_t completer;
-    void* wait_context;
-    magma_handle_t handle;
-  } handle_wait;
-  struct {
-    void* cancel_token;
-  } handle_wait_cancel;
 };
 
 class MsdIntelContextSubmit : public testing::TestWithParam<Param>,
@@ -201,38 +185,13 @@ class MsdIntelContextSubmit : public testing::TestWithParam<Param>,
 
   void HandleWait(msd_connection_handle_wait_start_t starter,
                   msd_connection_handle_wait_complete_t completer, void* wait_context,
-                  zx::unowned_handle handle) override {
-    // Process handle wait starter callbacks immediately so that a context shutdown
-    // early will send handle wait cancellations.
-    starter(wait_context, &cancel_token);
+                  zx::unowned_handle handle) override {}
 
-    TestNotification test_notification = {
-        .type = TestNotification::Type::kHandleWait,
-        .handle_wait =
-            {
-                .starter = starter,
-                .completer = completer,
-                .wait_context = wait_context,
-                .handle = handle->get(),
-            },
-    };
+  void HandleWaitCancel(void* cancel_token) override {}
 
-    notifications_.push_back(test_notification);
-  }
+  async_dispatcher_t* GetAsyncDispatcher() override { return loop_.dispatcher(); }
 
-  void HandleWaitCancel(void* cancel_token) override {
-    TestNotification test_notification = {.type = TestNotification::Type::kHandleWaitCancel,
-                                          .handle_wait_cancel = {
-                                              .cancel_token = cancel_token,
-                                          }};
-
-    notifications_.push_back(test_notification);
-  }
-
-  async_dispatcher_t* GetAsyncDispatcher() override { return nullptr; }
-
-  std::vector<TestNotification> notifications_;
-  int cancel_token;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 
   void SubmitCommandBuffer(bool shutdown_early = false);
 };
@@ -244,15 +203,15 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
        p.semaphore_count);
 
   std::vector<std::unique_ptr<CommandBuffer>> submitted_command_buffers;
-  auto finished_semaphore =
+  auto submitted_all_semaphore =
       std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
 
   auto owner =
-      std::make_unique<ConnectionOwner>([&submitted_command_buffers, finished_semaphore,
+      std::make_unique<ConnectionOwner>([&submitted_command_buffers, submitted_all_semaphore,
                                          p](std::unique_ptr<CommandBuffer> command_buffer) {
         submitted_command_buffers.push_back(std::move(command_buffer));
         if (submitted_command_buffers.size() == p.command_buffer_count)
-          finished_semaphore->Signal();
+          submitted_all_semaphore->Signal();
       });
 
   auto connection =
@@ -264,6 +223,8 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
   auto context = std::make_shared<MsdIntelContext>(address_space, connection);
 
   std::vector<std::unique_ptr<CommandBuffer>> command_buffers;
+
+  std::vector<std::shared_ptr<magma::PlatformSemaphore>> overall_wait_semaphores;
 
   for (uint32_t i = 0; i < p.command_buffer_count; i++) {
     // Don't need a fully initialized command buffer
@@ -284,6 +245,7 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
     for (uint32_t i = 0; i < p.semaphore_count; i++) {
       auto semaphore =
           std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+      overall_wait_semaphores.push_back(semaphore);
       wait_semaphores.push_back(semaphore);
     }
     command_buffer_desc->wait_semaphore_count = p.semaphore_count;
@@ -306,54 +268,30 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
     EXPECT_EQ(submitted_command_buffers.empty(), p.semaphore_count > 0);
   }
 
-  // It's important to have already sent handle wait starter callbacks (NotificationCallback),
-  // so the context shutdown sends handle wait cancellations.
   if (shutdown_early)
     context->Shutdown();
 
-  // Process notifications, which may generate more notifications.
-  std::vector<std::unique_ptr<magma::PlatformSemaphore>> semaphores;
-  uint32_t cancel_count = 0;
-
-  while (notifications_.size()) {
-    std::vector<TestNotification> processing_notifications;
-    notifications_.swap(processing_notifications);
-
-    for (auto& notification : processing_notifications) {
-      if (notification.type == TestNotification::Type::kHandleWaitCancel) {
-        EXPECT_EQ(notification.handle_wait_cancel.cancel_token, &cancel_token);
-        cancel_count++;
-      } else {
-        ASSERT_EQ(notification.type, TestNotification::Type::kHandleWait);
-
-        magma_handle_t handle_copy;
-        ASSERT_TRUE(
-            magma::PlatformHandle::duplicate_handle(notification.handle_wait.handle, &handle_copy));
-
-        auto semaphore = magma::PlatformSemaphore::Import(handle_copy);
-        ASSERT_TRUE(semaphore);
-        semaphore->Signal();
-
-        semaphores.push_back(std::move(semaphore));
-
-        notification.handle_wait.completer(notification.handle_wait.wait_context,
-                                           p.completer_status, notification.handle_wait.handle);
-      }
-    }
+  // Process incrementally, to help ensure processing blocks as needed.
+  for (const auto& overall_wait_semaphore : overall_wait_semaphores) {
+    loop_.RunUntilIdle();
+    overall_wait_semaphore->Signal();
   }
+  loop_.RunUntilIdle();
 
-  // Ensure wait semaphores are reset.
-  for (auto& semaphore : semaphores) {
-    EXPECT_FALSE(semaphore->Wait(0));
+  if (!shutdown_early) {
+    // Ensure wait semaphores are reset.
+    for (auto& semaphore : overall_wait_semaphores) {
+      EXPECT_FALSE(semaphore->Wait(0));
+    }
   }
 
   if (shutdown_early) {
-    EXPECT_EQ(cancel_count, p.semaphore_count);
-  } else {
-    if (p.completer_status == MAGMA_STATUS_OK) {
-      EXPECT_TRUE(finished_semaphore->Wait(5000));
-      EXPECT_EQ(submitted_command_buffers.size(), command_buffers.size());
+    if (p.semaphore_count > 0) {
+      EXPECT_FALSE(submitted_all_semaphore->Wait(0));
     }
+  } else {
+    EXPECT_TRUE(submitted_all_semaphore->Wait(5000));
+    EXPECT_EQ(submitted_command_buffers.size(), command_buffers.size());
     context->Shutdown();
   }
 }
@@ -371,15 +309,11 @@ INSTANTIATE_TEST_SUITE_P(
                     Param{.command_buffer_count = 2, .semaphore_count = 5},
                     Param{.command_buffer_count = 1,
                           .semaphore_count = 0,
-                          .command_buffer_flags = kMagmaIntelGenCommandBufferForVideo},
-                    Param{.command_buffer_count = 1,
-                          .semaphore_count = 1,
-                          .completer_status = MAGMA_STATUS_INTERNAL_ERROR}),
+                          .command_buffer_flags = kMagmaIntelGenCommandBufferForVideo}),
     [](testing::TestParamInfo<Param> info) {
       char name[128];
-      snprintf(name, sizeof(name),
-               "command_buffer_count_%u_semaphore_count_%u_flags_0x%lx_completer_status_%d",
+      snprintf(name, sizeof(name), "command_buffer_count_%u_semaphore_count_%u_flags_0x%lx",
                info.param.command_buffer_count, info.param.semaphore_count,
-               info.param.command_buffer_flags, -info.param.completer_status);
+               info.param.command_buffer_flags);
       return std::string(name);
     });

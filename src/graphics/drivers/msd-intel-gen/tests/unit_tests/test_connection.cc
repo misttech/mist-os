@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async-loop/cpp/loop.h>
+
 #include <type_traits>
 
 #include <gtest/gtest.h>
@@ -10,27 +12,11 @@
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 
-namespace {
-struct HandleWaitNotification {
-  msd_connection_handle_wait_start_t starter;
-  msd_connection_handle_wait_complete_t completer;
-  void* wait_context;
-  magma_handle_t handle;
-};
-}  // namespace
-
 class TestMsdIntelConnection : public ::testing::Test,
                                public MsdIntelConnection::Owner,
                                public msd::NotificationHandler {
  public:
-  ~TestMsdIntelConnection() {
-    // Call back completions just to prevent memory leaks
-    for (auto& n : notifications_) {
-      static int cancel_token;
-      n.starter(n.wait_context, &cancel_token);
-      n.completer(n.wait_context, MAGMA_STATUS_OK, n.handle);
-    }
-  }
+  ~TestMsdIntelConnection() { loop_.Shutdown(); }
 
   void SubmitBatch(std::unique_ptr<MappedBatch> batch) override {
     if (submit_batch_handler_)
@@ -86,21 +72,15 @@ class TestMsdIntelConnection : public ::testing::Test,
   void HandleWait(msd_connection_handle_wait_start_t starter,
                   msd_connection_handle_wait_complete_t completer, void* wait_context,
                   zx::unowned_handle handle) override {
-    handle_wait_count_ += 1;
     callback_count_ += 1;
-
-    HandleWaitNotification notification = {
-        .starter = starter,
-        .completer = completer,
-        .wait_context = wait_context,
-        .handle = handle->get(),
-    };
-    notifications_.push_back(notification);
   }
 
   void HandleWaitCancel(void* cancel_token) override { callback_count_ += 1; }
 
-  async_dispatcher_t* GetAsyncDispatcher() override { return nullptr; }
+  async_dispatcher_t* GetAsyncDispatcher() override {
+    callback_count_ += 1;
+    return loop_.dispatcher();
+  }
 
   void BufferCompletions() {
     auto connection = MsdIntelConnection::Create(this, 0);
@@ -334,7 +314,6 @@ class TestMsdIntelConnection : public ::testing::Test,
 
     EXPECT_EQ(wait_callback_count, 1u);
 
-    EXPECT_EQ(1u, handle_wait_count_);
     EXPECT_EQ(command_buffer_stuck ? 1u : 0u, context_killed_count_);
     EXPECT_EQ(command_buffer_stuck ? 0u : 1u, channel_send_count_);
 
@@ -412,10 +391,9 @@ class TestMsdIntelConnection : public ::testing::Test,
   uint64_t callback_count_ = 0;
   uint64_t channel_send_count_ = 0;
   uint64_t context_killed_count_ = 0;
-  uint64_t handle_wait_count_ = 0;
   std::function<void(std::unique_ptr<MappedBatch> batch)> submit_batch_handler_;
   // Notifications to be cleaned up to avoid leaks
-  std::vector<HandleWaitNotification> notifications_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(TestMsdIntelConnection, BufferCompletions) { BufferCompletions(); }

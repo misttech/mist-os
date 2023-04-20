@@ -4,6 +4,8 @@
 
 #include "msd_intel_context.h"
 
+#include <zircon/types.h>
+
 #include "address_space.h"
 #include "command_buffer.h"
 #include "msd_intel_connection.h"
@@ -11,32 +13,24 @@
 #include "platform_thread.h"
 #include "platform_trace.h"
 
-// static
-void MsdIntelContext::HandleWaitContext::Starter(void* context, void* cancel_token) {
-  reinterpret_cast<HandleWaitContext*>(context)->cancel_token = cancel_token;
-}
+MsdIntelContext::HandleWaitContext::HandleWaitContext(
+    MsdIntelContext* context, EngineCommandStreamerId id, zx::handle object,
+    std::shared_ptr<magma::PlatformSemaphore> semaphore)
+    : context_(context),
+      id_(id),
+      object_(std::move(object)),
+      semaphore_(std::move(semaphore)),
+      waiter_(this, object_.get(), ZX_EVENT_SIGNALED) {}
 
-// static
-void MsdIntelContext::HandleWaitContext::Completer(void* context, magma_status_t status,
-                                                   magma_handle_t handle) {
+void MsdIntelContext::HandleWaitContext::Handler(async_dispatcher_t* dispatcher,
+                                                 async::WaitBase* wait, zx_status_t status,
+                                                 const zx_packet_signal_t* signal) {
+  DASSERT(context_);
   // Ensure handle is closed.
-  auto semaphore = magma::PlatformSemaphore::Import(handle);
+  object_.reset();
+  semaphore_->Reset();
 
-  auto wait_context =
-      std::unique_ptr<HandleWaitContext>(reinterpret_cast<HandleWaitContext*>(context));
-
-  // Starter must have been called first.
-  DASSERT(wait_context->cancel_token);
-
-  // If completed already (::UpdateWaitSet()), don't reset the semaphore again.
-  if (wait_context->completed)
-    return;
-
-  semaphore->Reset();
-
-  // Complete the wait if the context is not shutdown.
-  if (wait_context->context)
-    wait_context->context->WaitComplete(std::move(wait_context), status);
+  context_->WaitComplete(this, status);
 }
 
 std::vector<std::shared_ptr<magma::PlatformSemaphore>> MsdIntelContext::GetWaitSemaphores(
@@ -49,7 +43,7 @@ std::vector<std::shared_ptr<magma::PlatformSemaphore>> MsdIntelContext::GetWaitS
 
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
   for (auto& wait_context : presubmit.wait_set) {
-    semaphores.push_back(wait_context->semaphore);
+    semaphores.push_back(wait_context->semaphore());
   }
 
   return semaphores;
@@ -146,13 +140,6 @@ void MsdIntelContext::Shutdown() {
 
   for (auto& pair : presubmit_map_) {
     // Cancel all pending wait semaphores.
-    for (auto& wait_context : pair.second.wait_set) {
-      if (connection && wait_context->cancel_token) {
-        connection->CancelHandleWait(wait_context->cancel_token);
-      }
-      wait_context->context = nullptr;
-    }
-
     pair.second.wait_set.clear();
 
     // Clear presubmit command buffers so buffer release doesn't see stuck mappings
@@ -192,11 +179,10 @@ magma::Status MsdIntelContext::SubmitBatch(std::unique_ptr<MappedBatch> batch) {
   return MAGMA_STATUS_OK;
 }
 
-void MsdIntelContext::WaitComplete(std::unique_ptr<HandleWaitContext> wait_context,
-                                   magma_status_t status) {
-  const EngineCommandStreamerId kEngineId = wait_context->id;
+void MsdIntelContext::WaitComplete(HandleWaitContext* wait_context, zx_status_t status) {
+  const EngineCommandStreamerId kEngineId = wait_context->id();
 
-  DLOG("WaitComplete semaphore %lu status %d", wait_context->semaphore->id(), status);
+  DLOG("WaitComplete semaphore %lu status %d", wait_context->semaphore()->id(), status);
 
   auto iter = presubmit_map_.find(kEngineId);
   DASSERT(iter != presubmit_map_.end());
@@ -204,9 +190,8 @@ void MsdIntelContext::WaitComplete(std::unique_ptr<HandleWaitContext> wait_conte
   PerEnginePresubmit& presubmit = iter->second;
 
   for (auto iter = presubmit.wait_set.begin(); iter != presubmit.wait_set.end(); iter++) {
-    if (wait_context.get() == *iter) {
-      wait_context->completed = true;
-
+    if (wait_context == iter->get()) {
+      // Destroy the wait.
       presubmit.wait_set.erase(iter);
 
       wait_context = nullptr;
@@ -216,7 +201,7 @@ void MsdIntelContext::WaitComplete(std::unique_ptr<HandleWaitContext> wait_conte
 
   DASSERT(wait_context == nullptr);
 
-  if (status != MAGMA_STATUS_OK) {
+  if (status != ZX_OK) {
     DMESSAGE("Wait complete failed: %d", status);
     // The connection is probably shutting down.
     return;
@@ -236,13 +221,10 @@ void MsdIntelContext::UpdateWaitSet(EngineCommandStreamerId id) {
   PerEnginePresubmit& presubmit = iter->second;
 
   for (auto iter = presubmit.wait_set.begin(); iter != presubmit.wait_set.end();) {
-    HandleWaitContext* wait_context = *iter;
+    HandleWaitContext* wait_context = iter->get();
 
-    if (wait_context->semaphore->Wait(0)) {
-      // Semaphore was reset; now mark this context to be skipped when the async completer
-      // callback happens
-      wait_context->completed = true;
-
+    if (wait_context->semaphore()->Wait(0)) {
+      // Semaphore was reset; Cancel the wait/callback.
       iter = presubmit.wait_set.erase(iter);
     } else {
       iter++;
@@ -311,19 +293,23 @@ magma::Status MsdIntelContext::ProcessPresubmitQueue(EngineCommandStreamerId id)
 void MsdIntelContext::AddToWaitset(EngineCommandStreamerId id,
                                    std::shared_ptr<MsdIntelConnection> connection,
                                    std::shared_ptr<magma::PlatformSemaphore> semaphore) {
-  magma_handle_t handle;
+  zx::handle handle;
   bool result = semaphore->duplicate_handle(&handle);
   if (!result) {
     DASSERT(false);
     return;
   }
 
-  auto wait_context = std::make_unique<HandleWaitContext>(this, id, semaphore);
+  auto wait_context = std::make_unique<HandleWaitContext>(this, id, std::move(handle), semaphore);
+  std::optional<zx_status_t> status = connection->CallWithDispatcher(
+      [&](async_dispatcher_t* dispatcher) { return wait_context->Begin(dispatcher); });
+  if (!status.has_value()) {
+    // Connection is shutting down, so ignore the wait.
+    return;
+  }
+  DASSERT(*status == ZX_OK);
 
-  presubmit_map_[id].wait_set.push_back(wait_context.get());
-
-  connection->AddHandleWait(HandleWaitContext::Completer, HandleWaitContext::Starter,
-                            wait_context.release(), handle);
+  presubmit_map_[id].wait_set.push_back(std::move(wait_context));
 }
 
 void MsdIntelContext::Kill() {
