@@ -446,6 +446,7 @@ impl View {
         test_input::TouchInputListenerReportTouchInputRequest {
             local_x: Some(local_x),
             local_y: Some(local_y),
+            phase: pointer_sample.phase,
             time_received: touch_event.timestamp,
             device_pixel_ratio: Some(self.device_pixel_ratio as f64),
             ..test_input::TouchInputListenerReportTouchInputRequest::EMPTY

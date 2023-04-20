@@ -18,6 +18,7 @@ executable("touch-validator-bin") {
   sources = [ "touch-validator.cc" ]
   output_name = "touch-validator"
   deps = [
+    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",

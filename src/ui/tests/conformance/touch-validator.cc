@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/test/conformance/cpp/fidl.h>
 #include <fuchsia/ui/test/context/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
@@ -17,7 +18,20 @@
 
 namespace ui_conformance_testing {
 
-bool CompareDouble(double f0, double f1, double epsilon) { return std::abs(f0 - f1) <= epsilon; }
+// Maximum distance between two physical pixel coordinates so that they are considered equal.
+constexpr double kEpsilon = 0.5f;
+
+// TODO(fxbug.dev/125831): Two coordinates (x/y) systems can differ in scale (size of pixels).
+void ExpectLocationAndPhase(
+    const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
+    double expected_y, fuchsia::ui::pointer::EventPhase expected_phase) {
+  auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
+  auto actual_x = pixel_scale * e.local_x();
+  auto actual_y = pixel_scale * e.local_y();
+  EXPECT_NEAR(expected_x, actual_x, kEpsilon);
+  EXPECT_NEAR(expected_y, actual_y, kEpsilon);
+  EXPECT_EQ(expected_phase, e.phase());
+}
 
 class TouchListener : public fuchsia::ui::test::input::TouchInputListener {
  public:
@@ -39,24 +53,18 @@ class TouchListener : public fuchsia::ui::test::input::TouchInputListener {
     return events_received_;
   }
 
-  bool LastEventReceivedMatches(float expected_x, float expected_y) {
+  bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase) {
     if (events_received_.empty()) {
       return false;
     }
 
     const auto& last_event = events_received_.back();
+    const auto actual_phase = last_event.phase();
 
-    auto pixel_scale = last_event.has_device_pixel_ratio() ? last_event.device_pixel_ratio() : 1;
+    FX_LOGS(INFO) << "Expecting event at phase (" << static_cast<uint32_t>(phase) << ")";
+    FX_LOGS(INFO) << "Received event at phase (" << static_cast<uint32_t>(actual_phase) << ")";
 
-    auto actual_x = pixel_scale * last_event.local_x();
-    auto actual_y = pixel_scale * last_event.local_y();
-
-    FX_LOGS(INFO) << "Expecting event at (" << expected_x << ", " << expected_y << ")";
-    FX_LOGS(INFO) << "Received event at (" << actual_x << ", " << actual_y
-                  << "), accounting for pixel scale of " << pixel_scale;
-
-    return CompareDouble(actual_x, expected_x, pixel_scale) &&
-           CompareDouble(actual_y, expected_y, pixel_scale);
+    return phase == actual_phase;
   }
 
  private:
@@ -173,14 +181,20 @@ TEST_F(SingleViewTouchConformanceTest, SimpleTap) {
   fake_touch_screen_->SimulateTap(std::move(tap_request));
 
   FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
-  RunLoopUntil([this, kTapX, kTapY]() {
-    // The puppet's view matches the display dimensions exactly, and the device
-    // pixel ratio is 1. Therefore, the puppet's logical coordinate space will
-    // match the physical coordinate space, so we expect the puppet to report
-    // the event at (kTapX, kTapY).
-    return this->puppet_->touch_listener.LastEventReceivedMatches(static_cast<float>(kTapX),
-                                                                  static_cast<float>(kTapY));
+  RunLoopUntil([this]() {
+    return this->puppet_->touch_listener.LastEventReceivedMatchesPhase(
+        fuchsia::ui::pointer::EventPhase::REMOVE);
   });
+
+  const auto& events_received = this->puppet_->touch_listener.events_received();
+  ASSERT_EQ(events_received.size(), 2u);
+  // The puppet's view matches the display dimensions exactly, and the device
+  // pixel ratio is 1. Therefore, the puppet's logical coordinate space will
+  // match the physical coordinate space, so we expect the puppet to report
+  // the event at (kTapX, kTapY).
+  ExpectLocationAndPhase(events_received[0], kTapX, kTapY, fuchsia::ui::pointer::EventPhase::ADD);
+  ExpectLocationAndPhase(events_received[1], kTapX, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE);
 }
 
 class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
@@ -240,13 +254,24 @@ TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   fake_touch_screen_->SimulateTap(std::move(tap_request));
 
   FX_LOGS(INFO) << "Waiting for child touch event listener to receive response";
+
   RunLoopUntil([this]() {
-    // The child view's origin is in the center of the screen, so the center of
-    // the bottom-right quadrant is at (display_width_ / 4, display_height_ / 4)
-    // in the child's local coordinate space.
-    return this->child_puppet_->touch_listener.LastEventReceivedMatches(
-        static_cast<float>(display_width_) / 4.f, static_cast<float>(display_height_) / 4.f);
+    return this->child_puppet_->touch_listener.LastEventReceivedMatchesPhase(
+        fuchsia::ui::pointer::EventPhase::REMOVE);
   });
+
+  auto& events_received = this->child_puppet_->touch_listener.events_received();
+  ASSERT_EQ(events_received.size(), 2u);
+
+  // The child view's origin is in the center of the screen, so the center of
+  // the bottom-right quadrant is at (display_width_ / 4, display_height_ / 4)
+  // in the child's local coordinate space.
+  const double quarter_display_width = static_cast<double>(display_width_) / 4.f;
+  const double quarter_display_height = static_cast<double>(display_height_) / 4.f;
+  ExpectLocationAndPhase(events_received[0], quarter_display_width, quarter_display_height,
+                         fuchsia::ui::pointer::EventPhase::ADD);
+  ExpectLocationAndPhase(events_received[1], quarter_display_width, quarter_display_height,
+                         fuchsia::ui::pointer::EventPhase::REMOVE);
 
   // The parent should not have received any pointer events.
   EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());
