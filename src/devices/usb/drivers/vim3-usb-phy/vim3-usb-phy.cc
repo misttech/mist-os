@@ -53,32 +53,43 @@ void Vim3UsbPhy::InitPll(fdf::MmioBuffer* mmio) {
       .set_reset(0)
       .WriteTo(mmio);
 
-  // Phy tuning for G12B
+  // PLL
+
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
+
   PLL_REGISTER::Get(0x50).FromValue(pll_settings_[3]).WriteTo(mmio);
 
-  PLL_REGISTER::Get(0x54).FromValue(0x2a).WriteTo(mmio);
+  PLL_REGISTER::Get(0x10).FromValue(pll_settings_[4]).WriteTo(mmio);
 
-  PLL_REGISTER::Get(0x34).FromValue(0x70000).WriteTo(mmio);
+  // Recovery state
+  PLL_REGISTER::Get(0x38).FromValue(0).WriteTo(mmio);
+
+  PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
 
   // Disconnect threshold
-  PLL_REGISTER::Get(0xc).FromValue(0x34).WriteTo(mmio);
+  PLL_REGISTER::Get(0xc).FromValue(0x3c).WriteTo(mmio);
+
+  // Tuning
+
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
+
+  PLL_REGISTER::Get(0x38).FromValue(pll_settings_[6]).WriteTo(mmio);
+
+  PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
+
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
 }
 
 zx_status_t Vim3UsbPhy::InitPhy() {
   auto* usbctrl_mmio = &*usbctrl_mmio_;
 
   // first reset USB
-  int portnum = USB2PHY_PORTCOUNT;
-  uint32_t reset_level = 0;
-  while (portnum) {
-    portnum--;
-    reset_level = reset_level | (1 << (16 + portnum));
-  }
-
+  // The bits being manipulated here are not documented.
   auto level_result =
-      reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, reset_level, reset_level);
+      reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_MASK,
+                                       aml_registers::USB_RESET1_LEVEL_MASK);
   if ((level_result.status() != ZX_OK) || level_result->is_error()) {
-    zxlogf(ERROR, "Reset Level Write failed\n");
+    zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
     return ZX_ERR_INTERNAL;
   }
 
@@ -87,56 +98,43 @@ zx_status_t Vim3UsbPhy::InitPhy() {
       RESET1_REGISTER_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK,
       aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK);
   if ((register_result1.status() != ZX_OK) || register_result1->is_error()) {
-    zxlogf(ERROR, "Reset Register Write on 1 << 2 failed\n");
+    zxlogf(ERROR, "%s: Reset Register Write on 1 << 2 failed\n", __func__);
     return ZX_ERR_INTERNAL;
   }
-
+  // FIXME(voydanoff) this delay is very long, but it is what the Amlogic Linux kernel is doing.
   zx::nanosleep(zx::deadline_after(zx::usec(500)));
 
   // amlogic_new_usb2_init()
-  for (uint32_t i = 0; i < USB2PHY_PORTCOUNT; i++) {
-    auto u2p_ro_v2 = U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_por(1);
-    u2p_ro_v2.set_host_device(1);
+  for (int i = 0; i < 2; i++) {
+    U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_por(1).WriteTo(usbctrl_mmio);
     if (i == 1) {
-      u2p_ro_v2.set_idpullup0(1).set_drvvbus0(1);
+      U2P_R0_V2::Get(i)
+          .ReadFrom(usbctrl_mmio)
+          .set_idpullup0(1)
+          .set_drvvbus0(1)
+          .set_host_device((dr_mode_ == USB_MODE_PERIPHERAL) ? 0 : 1)
+          .WriteTo(usbctrl_mmio);
+    } else {
+      U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_host_device(1).WriteTo(usbctrl_mmio);
+    }
+    U2P_R0_V2::Get(i).ReadFrom(usbctrl_mmio).set_por(0).WriteTo(usbctrl_mmio);
+
+    zx::nanosleep(zx::deadline_after(zx::usec(10)));
+
+    // amlogic_new_usbphy_reset_phycfg_v2()
+    // The bit being manipulated here is not documented.
+    auto register_result2 = reset_register_->WriteRegister32(
+        RESET1_REGISTER_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+        aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK);
+    if ((register_result2.status() != ZX_OK) || register_result2->is_error()) {
+      zxlogf(ERROR, "%s: Reset Register Write on 1 << 16 failed\n", __func__);
+      return ZX_ERR_INTERNAL;
     }
 
-    u2p_ro_v2.WriteTo(usbctrl_mmio);
-  }
-
-  zx::nanosleep(zx::deadline_after(zx::usec(10)));
-
-  // amlogic_new_usbphy_reset_phycfg_v2()
-  auto register_result2 =
-      reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, reset_level, ~reset_level);
-  if ((register_result2.status() != ZX_OK) || register_result2->is_error()) {
-    zxlogf(ERROR, "Reset Register Write on 1 << 16 failed\n");
-    return ZX_ERR_INTERNAL;
-  }
-
-  zx::nanosleep(zx::deadline_after(zx::usec(100)));
-
-  auto register_result3 =
-      reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_MASK,
-                                       aml_registers::USB_RESET1_LEVEL_MASK);
-  if ((register_result3.status() != ZX_OK) || register_result3->is_error()) {
-    zxlogf(ERROR, "Reset Register Write on 1 << 16 failed\n");
-    return ZX_ERR_INTERNAL;
-  }
-
-  zx::nanosleep(zx::deadline_after(zx::usec(50)));
-
-  for (uint32_t i = 0; i < USB2PHY_PORTCOUNT; i++) {
-    fdf::MmioBuffer* mmio;
-    if (i == 0) {
-      mmio = &*usbphy20_mmio_;
-    }
-    if (i == 1) {
-      mmio = &*usbphy20_mmio_;
-    }
-    USB_PHY_REG21::Get().ReadFrom(mmio).set_usb2_otg_aca_en(0).WriteTo(mmio);
+    zx::nanosleep(zx::deadline_after(zx::usec(50)));
 
     auto u2p_r1 = U2P_R1_V2::Get(i);
+
     int count = 0;
     while (!u2p_r1.ReadFrom(usbctrl_mmio).phy_rdy()) {
       // wait phy ready max 5ms, common is 100us
@@ -149,10 +147,6 @@ zx_status_t Vim3UsbPhy::InitPhy() {
       zx::nanosleep(zx::deadline_after(zx::usec(5)));
     }
   }
-
-  // One time PLL initialization
-  InitPll(&*usbphy20_mmio_);
-  InitPll(&*usbphy21_mmio_);
 
   return ZX_OK;
 }
@@ -207,7 +201,11 @@ void Vim3UsbPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
   auto old_mode = phy_mode_;
   phy_mode_ = mode;
 
-  if (old_mode != UsbMode::UNKNOWN) {
+  if (old_mode == UsbMode::UNKNOWN) {
+    // One time PLL initialization
+    InitPll(&*usbphy20_mmio_);
+    InitPll(&*usbphy21_mmio_);
+  } else {
     auto* phy_mmio = &*usbphy21_mmio_;
 
     PLL_REGISTER::Get(0x38)
@@ -405,8 +403,14 @@ zx_status_t Vim3UsbPhy::Init() {
     zxlogf(ERROR, "Vim3UsbPhy::Init could not get metadata for PLL settings");
     return ZX_ERR_INTERNAL;
   }
-
-  dr_mode_ = USB_MODE_HOST;
+  status = DdkGetMetadata(DEVICE_METADATA_USB_MODE, &dr_mode_, sizeof(dr_mode_), &actual);
+  if (status == ZX_OK && actual != sizeof(dr_mode_)) {
+    zxlogf(ERROR, "Vim3UsbPhy::Init could not get metadata for USB Mode");
+    return ZX_ERR_INTERNAL;
+  }
+  if (status != ZX_OK) {
+    dr_mode_ = USB_MODE_OTG;
+  }
 
   status = pdev_.MapMmio(0, &usbctrl_mmio_);
   if (status != ZX_OK) {
