@@ -4,6 +4,7 @@
 
 use crate::test_topology;
 use anyhow::Error;
+use component_debug::dirs;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
@@ -35,19 +36,22 @@ async fn verify_out(moniker: &str) -> Result<(), Error> {
     // archivist but unfortunately snapshot is the only supported mode at the moment.
     let realm_query =
         fuchsia_component::client::connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let moniker = moniker.try_into()?;
     let out_dir = loop {
-        if let Ok(Some(resolved)) = realm_query.get_instance_directories(moniker).await.unwrap() {
-            if let Some(execution) = resolved.execution_dirs {
-                let out_dir = execution.out_dir.unwrap().into_proxy().unwrap();
-                if let Ok(mut result) = read_entries(&out_dir).await {
-                    let mut expected = vec!["diagnostics".to_string(), "svc".to_string()];
-                    result.sort();
-                    expected.sort();
-                    if result == expected {
-                        break out_dir;
-                    }
-                };
-            }
+        if let Ok(out_dir) = dirs::open_instance_dir_root_readable(
+            &moniker,
+            dirs::OpenDirType::Outgoing,
+            &realm_query,
+        )
+        .await
+        {
+            if let Ok(mut result) = read_entries(&out_dir).await {
+                let expected = vec!["diagnostics".to_string(), "svc".to_string()];
+                result.sort();
+                if result == expected {
+                    break out_dir;
+                }
+            };
         }
         fasync::Timer::new(fasync::Time::after(100.millis())).await;
     };

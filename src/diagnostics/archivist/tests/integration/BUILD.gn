@@ -38,6 +38,7 @@ rustc_test("integration_tests_bin") {
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/component-events",
+    "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:futures",
