@@ -860,6 +860,89 @@
         "strictness": "strict"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.composition/Screenshot.Take",
+        "ordinal": "5851323354752823248",
+        "type": "(fuchsia.ui.composition/ScreenshotTakeRequest payload) -> (fuchsia.ui.composition/ScreenshotTakeResponse payload)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.composition/Screenshot.TakeFile",
+        "ordinal": "5119166300187470083",
+        "type": "(fuchsia.ui.composition/ScreenshotTakeFileRequest payload) -> (fuchsia.ui.composition/ScreenshotTakeFileResponse payload)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.composition/Screenshot"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.composition/ScreenshotFormat.BGRA_RAW",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.ui.composition/ScreenshotFormat",
+        "strictness": "flexible",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.composition/ScreenshotTakeFileRequest.format",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ScreenshotFormat"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.composition/ScreenshotTakeFileRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.composition/ScreenshotTakeFileResponse.file",
+        "ordinal": "1",
+        "type": "fuchsia.io/File"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.composition/ScreenshotTakeFileResponse.size",
+        "ordinal": "2",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.composition/ScreenshotTakeFileResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.composition/ScreenshotTakeRequest.format",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/ScreenshotFormat"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.composition/ScreenshotTakeRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.composition/ScreenshotTakeResponse.size",
+        "ordinal": "2",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.composition/ScreenshotTakeResponse.vmo",
+        "ordinal": "1",
+        "type": "zx/handle:VMO"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.composition/ScreenshotTakeResponse",
+        "resourceness": "resource"
+    },
+    {
         "kind": "struct/member",
         "name": "fuchsia.ui.composition/TransformId.value",
         "ordinal": "1",

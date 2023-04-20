@@ -8,7 +8,7 @@ using fuchsia.math;
 using zx;
 
 /// The different formats of Screenshot that can be requested.
-@available(added=HEAD)
+@available(added=12)
 type ScreenshotFormat = flexible enum : uint8 {
     /// The default format, requesting a tightly packed pixel data with 32 bit BGRA pixels.
     BGRA_RAW = 0;
@@ -16,7 +16,7 @@ type ScreenshotFormat = flexible enum : uint8 {
 };
 
 /// Collects the current graphical content of a display.
-@available(added=HEAD)
+@available(added=12)
 @discoverable
 protocol Screenshot {
     /// Collects the current graphical content of a display in a specified buffer `format` in the
