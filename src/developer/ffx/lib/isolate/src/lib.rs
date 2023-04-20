@@ -22,29 +22,26 @@ use tempfile::TempDir;
 /// build root to find things in either the host tool or test data targets.
 #[derive(Debug, Clone)]
 pub enum SearchContext {
-    Runtime { ffx_path: PathBuf, sdk_root: Option<SdkRoot> },
+    Runtime { ffx_path: PathBuf, sdk_root: Option<SdkRoot>, subtool_search_paths: Vec<PathBuf> },
     Build { build_root: PathBuf },
 }
 
 fn env_search_paths(search: &SearchContext) -> Vec<Cow<'_, Path>> {
     use SearchContext::*;
     match search {
-        Runtime { ffx_path, .. } => {
-            if let Some(parent) = ffx_path.parent() {
-                return vec![Cow::from(parent)];
-            }
+        Runtime { subtool_search_paths, .. } => {
+            subtool_search_paths.iter().map(|p| Cow::Borrowed(p.as_ref())).collect()
         }
         Build { build_root } => {
             // The build passes these search paths in so that when this is run from
             // a unit test we can find the path that ffx subtools exist at from
             // the build root.
-            return vec![
+            vec![
                 Cow::Owned(build_root.join(std::env!("SUBTOOL_SEARCH_TEST_DATA"))),
                 Cow::Owned(build_root.join(std::env!("SUBTOOL_SEARCH_HOST_TOOLS"))),
-            ];
+            ]
         }
     }
-    vec![]
 }
 
 fn find_ffx(search: &SearchContext, search_paths: &[Cow<'_, Path>]) -> Result<PathBuf> {
@@ -218,7 +215,9 @@ impl Isolate {
     /// have is the path to ffx. You should prefer to use [`Isolate::new_with_sdk`] or
     /// [`Isolate::new_in_test`] if you can.
     pub async fn new(name: &str, ffx_path: PathBuf, ssh_key: PathBuf) -> Result<Self> {
-        let search = SearchContext::Runtime { ffx_path, sdk_root: None };
+        // assume subtools are in the same directory as the ffx that ran this
+        let subtool_search_paths = ffx_path.parent().map_or_else(|| vec![], |p| vec![p.to_owned()]);
+        let search = SearchContext::Runtime { ffx_path, sdk_root: None, subtool_search_paths };
         let env_context = global_env_context().context("No global context")?;
         Self::new_with_search(name, search, ssh_key, &env_context).await
     }
@@ -235,9 +234,16 @@ impl Isolate {
             std::fs::canonicalize(ffx_path).context("could not canonicalize own path")?;
 
         let sdk_root = context.get_sdk_root().await.ok();
+        let subtool_search_paths =
+            context.query("ffx.subtool-search-paths").get().await.unwrap_or_default();
 
-        Self::new_with_search(name, SearchContext::Runtime { ffx_path, sdk_root }, ssh_key, context)
-            .await
+        Self::new_with_search(
+            name,
+            SearchContext::Runtime { ffx_path, sdk_root, subtool_search_paths },
+            ssh_key,
+            context,
+        )
+        .await
     }
 
     /// Use this when building an isolation environment from within a unit test
