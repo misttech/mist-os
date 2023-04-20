@@ -109,7 +109,7 @@ pub(crate) fn parameter_sets_for_codec(
                 parameter_set: Some(set),
                 ..params_with_data_path(SCO_PARAMS_FALLBACK.clone(), in_band_sco)
             };
-            vec![params_fn(CvsdS4), params_fn(CvsdS1)]
+            vec![params_fn(CvsdS4), params_fn(CvsdS1), params_fn(CvsdD1)]
         }
     }
 }
@@ -163,7 +163,6 @@ impl ScoConnector {
             .into_iter()
             .map(|id| parameter_sets_for_codec(id, self.in_band_sco))
             .flatten()
-            .chain([params_with_data_path(SCO_PARAMS_FALLBACK.clone(), self.in_band_sco)])
             .collect()
     }
 

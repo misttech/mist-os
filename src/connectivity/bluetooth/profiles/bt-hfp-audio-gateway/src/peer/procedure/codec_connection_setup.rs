@@ -70,20 +70,22 @@ impl Procedure for CodecConnectionSetupProcedure {
                 if requested == confirmed =>
             {
                 *self = Self::SynchronousConnectionRequestReply { codec_changed: true };
-                slc_state.selected_codec = Some(codec);
+                slc_state.selected_codec = Some(requested);
                 setup_request()
             }
             (state, update) => {
-                warn!("Got unexpected update for {:?}: {:?}", state, update);
+                warn!(?state, ?update, "CodecConnectionSetup: unexpected HF");
                 slc_state.codec_connection_setup_in_progress = false;
                 ProcedureRequest::Error(ProcedureError::UnexpectedHf(update))
             }
         }
     }
 
-    fn ag_update(&mut self, update: AgUpdate, slc_state: &mut SlcState) -> ProcedureRequest {
+    fn ag_update(&mut self, mut update: AgUpdate, slc_state: &mut SlcState) -> ProcedureRequest {
         let state = mem::replace(self, Self::Terminated(Err(())));
-        let selected = select_codec(slc_state.codecs_supported());
+        if let AgUpdate::CodecSetup(None) = update {
+            update = AgUpdate::CodecSetup(Some(select_codec(slc_state.codecs_supported())));
+        }
 
         if state == Self::Start {
             slc_state.codec_connection_setup_in_progress = true;
@@ -92,10 +94,11 @@ impl Procedure for CodecConnectionSetupProcedure {
         match (state, update) {
             // Allow this procedure to be restarted at any point.
             // We shouldn't have a codec selected on startup of this.
-            (_, AgUpdate::CodecSetup(None)) => {
-                if slc_state.codec_negotiation() && Some(selected) != slc_state.selected_codec {
-                    *self = Self::RequestCodec { codec: selected };
-                    AgUpdate::CodecSetup(Some(selected)).into()
+            (_, AgUpdate::CodecSetup(Some(requested))) => {
+                if slc_state.codec_negotiation() && Some(requested) != slc_state.selected_codec {
+                    slc_state.codec_connection_setup_in_progress = true;
+                    *self = Self::RequestCodec { codec: requested };
+                    AgUpdate::CodecSetup(Some(requested)).into()
                 } else {
                     // The HF doesn't support Codec Negotiation or we don't need to change the selected codec
                     // Just try to setup the connection
@@ -117,7 +120,7 @@ impl Procedure for CodecConnectionSetupProcedure {
                 ProcedureRequest::None
             }
             (state, update) => {
-                warn!("Got unexpected update for {:?}: {:?}", state, update);
+                warn!(?state, ?update, "CodecConnectionSetup: unexpected AG");
                 slc_state.codec_connection_setup_in_progress = false;
                 ProcedureRequest::Error(ProcedureError::UnexpectedAg(update))
             }
@@ -176,6 +179,22 @@ mod tests {
     fn codec_negotiation_chooses_best_supported() {
         expect_codec_negotiation_codec(vec![CodecId::MSBC, CodecId::CVSD], CodecId::MSBC);
         expect_codec_negotiation_codec(vec![CodecId::CVSD, 0xf0.into()], CodecId::CVSD);
+    }
+
+    #[test]
+    fn codec_negotiation_chooses_selected() {
+        let mut slc_state = SlcState {
+            ag_features: AgFeatures::CODEC_NEGOTIATION,
+            hf_features: HfFeatures::CODEC_NEGOTIATION,
+            hf_supported_codecs: Some(vec![CodecId::MSBC, CodecId::CVSD, 0xf0.into()]),
+            ..SlcState::default()
+        };
+
+        let mut procedure = CodecConnectionSetupProcedure::new();
+        let request =
+            procedure.ag_update(AgUpdate::CodecSetup(Some(CodecId::CVSD)), &mut slc_state);
+        let expected_messages = vec![at::success(at::Success::Bcs { codec: CodecId::CVSD.into() })];
+        assert_matches!(request, ProcedureRequest::SendMessages(m) if m == expected_messages);
     }
 
     #[test]

@@ -480,15 +480,23 @@ impl PeerTask {
                     self.sco_state.iset(ScoState::SettingUp);
                 }
                 // TODO(fxbug.dev/72681): Because we may need to send an OK response to the HF
-                // just before  setting up the synchronous connection, we send it here by routing
+                // just before setting up the synchronous connection, we send it here by routing
                 // through the procedure.
                 self.connection.receive_ag_request(marker, AgUpdate::Ok).await;
 
                 let codecs = self.get_codecs();
-                let setup_result = self.sco_connector.connect(self.id.clone(), codecs).await;
+                let setup_result =
+                    self.sco_connector.connect(self.id.clone(), codecs.clone()).await;
                 let finish_result = match setup_result {
                     Ok(conn) => self.finish_sco_connection(conn).await,
-                    Err(err) => Err(err.into()),
+                    Err(err) => {
+                        if !codecs.contains(&CodecId::CVSD) {
+                            // Try again with selecting CVSD
+                            return self.initiate_codec_negotiation(Some(CodecId::CVSD)).await;
+                        } else {
+                            Err(err.into())
+                        }
+                    }
                 };
                 let result =
                     finish_result.map_err(|e| warn!(?e, "Error setting up audio connection"));
@@ -497,7 +505,7 @@ impl PeerTask {
             SlcRequest::RestartCodecConnectionSetup { response } => {
                 self.connection.receive_ag_request(marker, response()).await;
                 // Start CodecConnectionSetup running again.
-                self.initiate_codec_negotiation().await;
+                self.initiate_codec_negotiation(None).await;
             }
         };
     }
@@ -666,13 +674,17 @@ impl PeerTask {
 
     /// Start the Codec Connection procedure if no sco connection exists.
     /// This procedure will negotiate a codec and eventually call
-    /// `sco_connector.connect`.
-    async fn initiate_codec_negotiation(&mut self) {
+    /// `sco_connector.connect`. If `force_codec` is set, select that codec specifically instead of
+    /// the preferred one.
+    async fn initiate_codec_negotiation(&mut self, force_codec: Option<CodecId>) {
         if self.sco_state.is_active() {
             return;
         }
         self.connection
-            .receive_ag_request(ProcedureMarker::CodecConnectionSetup, AgUpdate::CodecSetup(None))
+            .receive_ag_request(
+                ProcedureMarker::CodecConnectionSetup,
+                AgUpdate::CodecSetup(force_codec),
+            )
             .await;
     }
 
@@ -703,7 +715,7 @@ impl PeerTask {
                 // A call was just transferred to the HF, so set up SCO.
                 | ScoState::AwaitingRemote(_)
                 => {
-                    self.initiate_codec_negotiation().await;
+                    self.initiate_codec_negotiation(None).await;
                     self.sco_state.iset(ScoState::SettingUp);
                 },
                 // We are negotiating codecs; wait for that to finish before starting the SCO
@@ -1347,33 +1359,25 @@ mod tests {
     #[fuchsia::test]
     fn transfers_change_sco_state() {
         // Set up the executor, peer, and background call manager task
-        info!("transfers_change_sco_state: Creating executer.");
         let mut exec = fasync::TestExecutor::new();
 
         // Setup the peer task.
-        info!("transfers_change_sco_state: Creating SLC.");
         let (connection, _remote) = create_and_initialize_slc(SlcState::default());
-        info!("transfers_change_sco_state: Creating peer task.");
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
-        info!("transfers_change_sco_state: Creating peer handler proxy.");
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
 
         // Pass in the client end connected to the call manager
-        info!("transfers_change_sco_state: Sending peer handler proxy.");
         let result = exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy)));
         assert!(result.is_ok());
 
         let run_fut = peer.run(receiver);
         pin_mut!(run_fut);
-        info!("transfers_change_sco_state: Receiving peer handler stream.");
         let (mut stream, run_fut) = run_while(&mut exec, run_fut, wait_for_call_stream(stream));
 
         // Send the incoming call
-        info!("transfers_change_sco_state: Getting call stream responder.");
         let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
-        info!("transfers_change_sco_state: Creating call stream.");
         let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
         let next_call = NextCall {
             call: Some(client_end),
@@ -1382,39 +1386,29 @@ mod tests {
             direction: Some(CallDirection::MobileTerminated),
             ..NextCall::EMPTY
         };
-        info!("transfers_change_sco_state: Sending next call.");
         responder.unwrap().send(next_call).expect("Successfully send call information");
 
         // Answer call.
-        info!("transfers_change_sco_state: Awaiting watch state to answer call.");
         let (request, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
         let state_responder = match request {
             Some(Ok(CallRequest::WatchState { responder })) => responder,
             req => panic!("Expected WatchState, got {:?}", req),
         };
-        info!("transfers_change_sco_state: Sending OngoingActive to initially answer call.");
         state_responder.send(CallState::OngoingActive).expect("Sent OngoingActive.");
-        info!("transfers_change_sco_state: Setting up SCO connection.");
         let (sco, mut run_fut) =
             run_while(&mut exec, run_fut, expect_sco_connection(&mut profile, true, Ok(())));
-        info!("transfers_change_sco_state: Setting up SCO connection--pausing audio.");
         while let None = exec.run_one_step(&mut run_fut) {}
         let mut sco = sco.unwrap();
 
         // Call is transferred to AG by AG and SCO is torn down.
-        info!("transfers_change_sco_state: Getting WatchState for transferring call to AG by AG part 1.");
         let (request, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
         let state_responder = match request {
             Some(Ok(CallRequest::WatchState { responder })) => responder,
             req => panic!("Expected WatchState, got {:?}", req),
         };
-        info!("transfers_change_sco_state: Sending TransferedToAg.");
         state_responder.send(CallState::TransferredToAg).expect("Sent TransferredToAg.");
-        info!("transfers_change_sco_state: Transferring call to AG by AG.");
         let (request, mut run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
-        info!("transfers_change_sco_state: Transferring call to AG by AG--unpausing audio.");
         while let None = exec.run_one_step(&mut run_fut) {}
-        info!("transfers_change_sco_state: Checking if SCO is closed.");
         let (sco_result, run_fut) = run_while(&mut exec, run_fut, &mut sco.next());
         assert_matches!(sco_result, None);
 
@@ -1423,54 +1417,39 @@ mod tests {
             Some(Ok(CallRequest::WatchState { responder })) => responder,
             req => panic!("Expected WatchState, got {:?}", req),
         };
-        info!("transfers_change_sco_state: Sending OngoingActive.");
         state_responder.send(CallState::OngoingActive).expect("Sent OngoingActive.");
         // Don't send a SCO connection until they are trying to connect.
-        info!("transfers_change_sco_state: Transferring call to HF by AG.");
         let (sco, mut run_fut) =
             run_while(&mut exec, run_fut, expect_sco_connection(&mut profile, true, Ok(())));
-        info!("transfers_change_sco_state: Transferring call to HF by AG--pausing audio.");
         let _ = exec.run_one_step(&mut run_fut);
         let sco = sco.expect("SCO Connection.");
         // Run until the connection is handled by the task.  This avoids a race where the
         // the incoming SCO connection is closed before it's received, in which case a call
         // is never set to active.
-        info!("transfers_change_sco_state: Finishing transferring call to HF by AG.");
         let _ = exec.run_one_step(&mut run_fut);
 
         // SCO is torn down by HF and call is transferred to AG
-        info!("transfers_change_sco_state: Dropping SCO.");
         drop(sco);
-        info!("transfers_change_sco_state: Getting WatchState for transferring to AG.");
         let (watch_state_req, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
-        info!("transfers_change_sco_state: Getting RequestTransferAudio.");
         let (req, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
         assert_matches!(req, Some(Ok(CallRequest::RequestTransferAudio { .. })));
         let state_responder = match watch_state_req {
             Some(Ok(CallRequest::WatchState { responder })) => responder,
             req => panic!("Expected WatchState, got {:?}", req),
         };
-        info!("transfers_change_sco_state: Sending TransferredToAg.");
         state_responder.send(CallState::TransferredToAg).expect("Sent TransferredToAg");
 
         // SCO is set up by HF and call is transferred to HF
-        info!("transfers_change_sco_state: Expecting SCO set up by HF.");
         let (_sco, mut run_fut) =
             run_while(&mut exec, run_fut, expect_sco_connection(&mut profile, false, Ok(())));
-        info!("transfers_change_sco_state: Expected SCO set up by HF--pausing audio.");
         while let None = exec.run_one_step(&mut run_fut) {}
-        info!("transfers_change_sco_state: Getting WatchState.");
         let (_watch_state_req, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
-        info!("transfers_change_sco_state: Getting RequestActive.");
         let (req, mut run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
         assert_matches!(req, Some(Ok(CallRequest::RequestActive { .. })));
 
         // Drop the peer task sender to force the PeerTask's run future to complete
-        info!("transfers_change_sco_state: Dropping sender.");
         drop(sender);
-        info!("transfers_change_sco_state: Finishing.");
         while let None = exec.run_one_step(&mut run_fut) {}
-        info!("transfers_change_sco_state: Finished.");
     }
 
     #[fuchsia::test]
@@ -1616,7 +1595,12 @@ mod tests {
         ag_features.set(AgFeatures::THREE_WAY_CALLING, true);
         let mut hf_features = HfFeatures::default();
         hf_features.set(HfFeatures::THREE_WAY_CALLING, true);
-        let state = SlcState { ag_features, hf_features, ..SlcState::default() };
+        let state = SlcState {
+            ag_features,
+            hf_features,
+            selected_codec: Some(CodecId::MSBC),
+            ..SlcState::default()
+        };
         let (connection, remote) = create_and_initialize_slc(state);
         let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
 
@@ -1843,41 +1827,59 @@ mod tests {
         expected_initiator: bool,
         result: Result<(), ScoErrorCode>,
     ) -> Option<bredr::ScoConnectionRequestStream> {
+        // All parameter sets accepted
+        use bredr::HfpParameterSet::*;
+        let accept_parameter_sets = vec![MsbcT2, MsbcT1, CvsdS4, CvsdS1, CvsdD1, CvsdD0];
+        expect_sco_connection_with_parameters(
+            profile_requests,
+            expected_initiator,
+            &accept_parameter_sets,
+            result,
+        )
+        .await
+    }
+
+    async fn expect_sco_connection_with_parameters(
+        profile_requests: &mut ProfileRequestStream,
+        expected_initiator: bool,
+        accept_parameter_sets: &Vec<bredr::HfpParameterSet>,
+        result: Result<(), ScoErrorCode>,
+    ) -> Option<bredr::ScoConnectionRequestStream> {
         // Sometimes dropping the SCO connection accept future doesn't cancel the
         // existing request before we want to connect a new one.  In this case, we
         // may get *two* requests for a SCO connection, and we want the second one,
         // which has the expected direction.
         loop {
-            let proxy = match profile_requests.next().await.expect("request").unwrap() {
+            tracing::info!("Waiting for a SCO connection");
+            let (proxy, params) = match profile_requests.next().await.expect("request").unwrap() {
                 bredr::ProfileRequest::ConnectSco { receiver, params, initiator, .. } => {
                     if initiator != expected_initiator {
+                        tracing::warn!("Skipping because we expect {initiator} to match expected {expected_initiator}");
                         continue;
                     };
                     assert!(params.len() >= 1);
-                    receiver.into_proxy().unwrap()
+                    (receiver.into_proxy().unwrap(), params)
                 }
                 x => panic!("Unexpected request to profile stream: {:?}", x),
             };
+            tracing::info!("Got a SCO connection: {params:?}");
             match result {
                 Ok(()) => {
                     let (client, request_stream) =
                         fidl::endpoints::create_request_stream::<bredr::ScoConnectionMarker>()
                             .expect("request stream");
-                    let default_params = bredr::ScoConnectionParameters {
-                        parameter_set: Some(bredr::HfpParameterSet::CvsdD1),
-                        air_coding_format: Some(bredr::CodingFormat::Cvsd),
-                        air_frame_size: Some(60),
-                        io_bandwidth: Some(16000),
-                        io_coding_format: Some(bredr::CodingFormat::LinearPcm),
-                        io_frame_size: Some(16),
-                        io_pcm_data_format: Some(
-                            fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned,
-                        ),
-                        path: Some(bredr::DataPath::Offload),
-                        ..bredr::ScoConnectionParameters::EMPTY
-                    };
-                    proxy.connected(client, default_params).unwrap();
-                    return Some(request_stream);
+                    let accepted_params = params.into_iter().find(|p| {
+                        p.parameter_set
+                            .map(|set| accept_parameter_sets.contains(&set))
+                            .unwrap_or(false)
+                    });
+                    if let Some(connect_params) = accepted_params {
+                        proxy.connected(client, connect_params).unwrap();
+                        return Some(request_stream);
+                    } else {
+                        proxy.error(bredr::ScoErrorCode::ParametersRejected).unwrap();
+                        return None;
+                    }
                 }
                 Err(code) => {
                     proxy.error(code).unwrap();
@@ -1896,10 +1898,7 @@ mod tests {
         peer: &mut PeerTask,
         profile_requests: &mut ProfileRequestStream,
     ) -> bredr::ScoConnectionRequestStream {
-        let codecs = peer
-            .connection
-            .get_selected_codec()
-            .map_or(vec![CodecId::MSBC, CodecId::CVSD], |c| vec![c]);
+        let codecs = peer.get_codecs();
         let sco_connector = peer.sco_connector.clone();
         let audio_connection_fut = sco_connector.connect(peer.id.clone(), codecs).fuse();
         pin_mut!(audio_connection_fut);
@@ -1951,6 +1950,100 @@ mod tests {
                 .start(PeerId(0), connection, CodecId::CVSD)
                 .expect_err("shouldn't be able to start, already started");
         }
+    }
+
+    #[fuchsia::test]
+    fn renegotiaties_when_hq_sco_fails_to_connect() {
+        // Set up the executor.
+        let mut exec = fasync::TestExecutor::new();
+
+        // Setup the peer task with the specified SlcState to enable codec negotiation and WBS
+        let mut ag_features = AgFeatures::default();
+        ag_features.set(AgFeatures::CODEC_NEGOTIATION, true);
+        let mut hf_features = HfFeatures::default();
+        hf_features.set(HfFeatures::CODEC_NEGOTIATION, true);
+        let state = SlcState {
+            ag_features,
+            hf_features,
+            hf_supported_codecs: Some(vec![CodecId::CVSD, CodecId::MSBC]),
+            ..SlcState::default()
+        };
+        let (connection, mut remote) = create_and_initialize_slc(state);
+        let (peer, mut sender, receiver, mut profile) = setup_peer_task(Some(connection));
+
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<PeerHandlerMarker>().unwrap();
+
+        let run_fut = peer.run(receiver);
+        pin_mut!(run_fut);
+
+        // Pass in the client end connected to the call manager
+        exec.run_singlethreaded(sender.send(PeerRequest::Handle(proxy))).expect("Connecting peer");
+
+        let (mut stream, run_fut) = run_while(&mut exec, run_fut, wait_for_call_stream(stream));
+
+        // Send the incoming waiting call.
+        let (responder, run_fut) = run_while(&mut exec, run_fut, stream.next());
+        let (client_end, mut call_stream) = fidl::endpoints::create_request_stream().unwrap();
+        let next_call = NextCall {
+            call: Some(client_end),
+            remote: Some("1234567".to_string()),
+            state: Some(CallState::IncomingWaiting),
+            direction: Some(CallDirection::MobileTerminated),
+            ..NextCall::EMPTY
+        };
+        responder.unwrap().send(next_call).expect("Successfully send call information");
+
+        // Answer call to initiate audio connection.
+        let (request, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
+        let state_responder = match request {
+            Some(Ok(CallRequest::WatchState { responder })) => responder,
+            req => panic!("Expected WatchState, got {:?}", req),
+        };
+        state_responder.send(CallState::OngoingActive).expect("Sent OngoingActive.");
+
+        // We expect to choose MSBC first.
+        let choose_msbc = vec![at::success(at::Success::Bcs { codec: CodecId::MSBC.into() })];
+        let ((), run_fut) =
+            run_while(&mut exec, run_fut, expect_data_received_by_peer(&mut remote, choose_msbc));
+
+        let codec_confirm_cmd = at::Command::Bcs { codec: CodecId::MSBC.into() };
+        let mut buf = Vec::new();
+        at::Command::serialize(&mut buf, &vec![codec_confirm_cmd]).expect("serialization is ok");
+        let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
+
+        // First SCO connections fail (T2 and T1), causing a re-negotiation of the codec state.
+        let accepted_paramset = vec![bredr::HfpParameterSet::CvsdS4];
+        let (sco, run_fut) = run_while(
+            &mut exec,
+            run_fut,
+            expect_sco_connection_with_parameters(&mut profile, true, &accepted_paramset, Ok(())),
+        );
+        assert!(sco.is_none(), "expected sco to fail");
+
+        // Now, we re-negotiate with CVSD.
+        // "OK" is from previous choice (+BCS=2, AT+BCS=2, OK)
+        let choose_cvsd =
+            vec![at::Response::Ok, at::success(at::Success::Bcs { codec: CodecId::CVSD.into() })];
+        let ((), run_fut) =
+            run_while(&mut exec, run_fut, expect_data_received_by_peer(&mut remote, choose_cvsd));
+
+        let codec_confirm_cmd = at::Command::Bcs { codec: CodecId::CVSD.into() };
+        let mut buf = Vec::new();
+        at::Command::serialize(&mut buf, &vec![codec_confirm_cmd]).expect("serialization is ok");
+        let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
+
+        // Expect a connection with the CVSD params.
+        let (sco, mut run_fut) = run_while(
+            &mut exec,
+            run_fut,
+            expect_sco_connection_with_parameters(&mut profile, true, &accepted_paramset, Ok(())),
+        );
+        assert!(sco.is_some(), "expected sco to succeed with CVSD");
+
+        // Drop the peer task sender to force the PeerTask's run future to complete
+        drop(sender);
+        while let None = exec.run_one_step(&mut run_fut) {}
     }
 
     #[fuchsia::test]
