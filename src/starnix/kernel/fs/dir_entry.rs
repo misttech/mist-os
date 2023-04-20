@@ -304,10 +304,22 @@ impl DirEntry {
         self: &DirEntryHandle,
         current_task: &CurrentTask,
         name: &FsStr,
-        mode: FileMode,
+        mut mode: FileMode,
         dev: DeviceType,
-        owner: FsCred,
+        mut owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
+        // The setgid bit on a directory causes the gid to be inherited by new children and the
+        // setgid bit to be inherited by new child directories. See SetgidDirTest in gvisor.
+        {
+            let self_info = self.node.info();
+            if self_info.mode.contains(FileMode::ISGID) {
+                owner.gid = self_info.gid;
+                if mode.is_dir() {
+                    mode |= FileMode::ISGID;
+                }
+            }
+        }
+
         if mode.is_dir() {
             self.node.mkdir(current_task, name, mode, owner)
         } else {

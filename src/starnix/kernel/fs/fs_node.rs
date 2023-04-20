@@ -840,6 +840,17 @@ impl FsNode {
         if let Some(group) = group {
             info.gid = group;
         }
+        // Clear the setuid and setgid bits if the file is executable and a regular file.
+        if info.mode.is_reg() {
+            if info.mode.intersects(FileMode::IXUSR | FileMode::IXGRP | FileMode::IXOTH) {
+                info.mode &= !FileMode::ISUID;
+            }
+            // If the group execute bit is not set, the setgid bit actually indicates mandatory
+            // locking and should not be cleared.
+            if info.mode.intersects(FileMode::IXGRP) {
+                info.mode &= !FileMode::ISGID;
+            }
+        }
     }
 
     /// Whether this node is a regular file.

@@ -61,6 +61,10 @@ impl FileMode {
         self.0
     }
 
+    pub fn contains(&self, other: FileMode) -> bool {
+        *self & other == other
+    }
+
     pub fn intersects(&self, other: FileMode) -> bool {
         *self & other != FileMode::EMPTY
     }
@@ -121,6 +125,12 @@ impl ops::BitAnd for FileMode {
 impl ops::BitOrAssign for FileMode {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
+    }
+}
+
+impl ops::BitAndAssign for FileMode {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
     }
 }
 

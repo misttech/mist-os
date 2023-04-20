@@ -754,11 +754,6 @@
                 "FileModes/FileModeTest.WriteToFile/2",
                 "FileModes/FileModeTest.WriteToFile/3",
                 "FileModes/FileModeTest.WriteToFile/5",
-                "SetgidDirTest.CreateFile",
-                "SetgidDirTest.CreateDir",
-                "SetgidDirTest.NoGroupExec",
-                "SetgidDirTest.ChownFileClears",
-                "SetgidDirTest.ChownNoExecFileDoesNotClear",
 
                 // sigaltstack_test - https://fxbug.dev/79359
                 "SigaltstackTest.ResetByExecve",
