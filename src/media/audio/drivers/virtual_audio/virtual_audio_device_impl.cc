@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
 
 namespace virtual_audio {
@@ -36,9 +37,20 @@ VirtualAudioDeviceImpl::Create(const Config& cfg,
         }
       });
 
-  // Need a shared pointer to initialize this field.
-  device->driver_ = std::make_unique<VirtualAudioStreamWrapper>(cfg, device, dev_node);
-
+  switch (cfg.device_type) {
+    case fuchsia_virtualaudio::DeviceType::kStreamConfig:
+      device->driver_ = std::make_unique<VirtualAudioStreamWrapper>(cfg, device, dev_node);
+      break;
+    case fuchsia_virtualaudio::DeviceType::kDai:
+      device->driver_ = std::make_unique<VirtualAudioDai>(cfg, device, dev_node);
+      break;
+    case fuchsia_virtualaudio::DeviceType::kCodec:
+      [[fallthrough]];
+    default:
+      zxlogf(ERROR, "Device type creation not supported");
+      return fit::error(fuchsia_virtualaudio::Error::kInternal);
+      break;
+  }
   // Ensure the driver was created successfully.
   if (!device->driver_) {
     zxlogf(ERROR, "Device creation failed with unspecified internal error");

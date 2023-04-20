@@ -51,7 +51,12 @@ class VirtualAudioDriver {
 
   // Execute the given task on a dispatcher.
   // Typically callbacks should acquire domain_token() before calling any methods.
-  virtual void PostToDispatcher(fit::closure task_to_post) = 0;
+  virtual void PostToDispatcher(fit::closure task_to_post) {
+    async::PostTask(dispatcher(), std::move(task_to_post));
+  }
+
+  // Dispatcher used by PostToDispatcher().
+  virtual async_dispatcher_t* dispatcher() = 0;
 
   // Used to mark that the task is executed in a given dispatcher context.
   const Token& domain_token() const __TA_RETURN_CAPABILITY(domain_token_) { return domain_token_; }

@@ -20,10 +20,6 @@ fbl::RefPtr<VirtualAudioStream> VirtualAudioStream::Create(
   return audio::SimpleAudioStream::Create<VirtualAudioStream>(cfg, owner, devnode);
 }
 
-void VirtualAudioStream::PostToDispatcher(fit::closure task_to_post) {
-  async::PostTask(dispatcher(), std::move(task_to_post));
-}
-
 zx::time VirtualAudioStream::MonoTimeFromRefTime(const zx::clock& clock, zx::time ref_time) {
   zx_clock_details_v1_t clock_details;
   zx_status_t status = clock.get_details(&clock_details);

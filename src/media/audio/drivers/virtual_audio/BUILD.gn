@@ -30,6 +30,8 @@ fuchsia_driver("virtual_audio_driver-driver") {
     "virtual_audio_bus.cc",
     "virtual_audio_control_impl.cc",
     "virtual_audio_control_impl.h",
+    "virtual_audio_dai.cc",
+    "virtual_audio_dai.h",
     "virtual_audio_device_impl.cc",
     "virtual_audio_device_impl.h",
     "virtual_audio_stream.cc",

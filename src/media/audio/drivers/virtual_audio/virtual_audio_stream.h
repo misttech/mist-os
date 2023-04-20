@@ -32,9 +32,7 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   // Expose so that PostToDispatcher callers can use this.
   using audio::SimpleAudioStream::domain_token;
 
-  // Execute the given task on our dispatcher.
-  // Typically callbacks should acquire domain_token() before calling any methods.
-  void PostToDispatcher(fit::closure task_to_post);
+  async_dispatcher_t* dispatcher() { return audio::SimpleAudioStream::dispatcher(); }
 
   //
   // The following methods implement getters and setters for fuchsia.virtualaudio.Device.
@@ -164,9 +162,7 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
     stream_ = VirtualAudioStream::Create(cfg, std::move(owner), dev_node);
   }
 
-  void PostToDispatcher(fit::closure task_to_post) override {
-    stream_->PostToDispatcher(std::move(task_to_post));
-  }
+  async_dispatcher_t* dispatcher() override { return stream_->dispatcher(); }
   fit::result<ErrorT, CurrentFormat> GetFormatForVA() override {
     audio::ScopedToken t(stream_->domain_token());
     return stream_->GetFormatForVA();
