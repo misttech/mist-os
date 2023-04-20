@@ -55,9 +55,8 @@ pub async fn run_tool(
         ..fdp::StdioParams::EMPTY
     };
 
-    let mut args = cmd.args.iter().map(|arg| arg.as_str());
     let run_result = tool_runner_proxy
-        .run_tool(cmd.tool.as_str(), Some(&mut args), params, controller_server_end)
+        .run_tool(cmd.tool.as_str(), Some(&cmd.args), params, controller_server_end)
         .await
         .with_context(|| format!("Error calling RunTool"))?;
 

@@ -318,7 +318,7 @@ mod test {
 
     #[fasync::run_until_stalled(test)]
     async fn balloon_stats_valid_input_returns_valid_string() {
-        let mut test_stats = [
+        let test_stats = [
             MemStat { tag: VIRTIO_BALLOON_S_SWAP_IN, val: 2 },
             MemStat { tag: VIRTIO_BALLOON_S_SWAP_OUT, val: 3 },
             MemStat { tag: VIRTIO_BALLOON_S_MAJFLT, val: 4 },
@@ -354,7 +354,7 @@ mod test {
                 .into_get_mem_stats()
                 .expect("Unexpected call to Balloon Controller");
             get_mem_stats_responder
-                .send(0, Some(&mut test_stats.iter_mut()))
+                .send(0, Some(&test_stats))
                 .expect("Failed to send request to proxy");
         });
 

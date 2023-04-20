@@ -4,9 +4,7 @@
 
 use {
     anyhow::Error,
-    fidl_fuchsia_bluetooth_bredr::{
-        ProtocolDescriptor, SearchResultsProxy, ServiceClassProfileIdentifier,
-    },
+    fidl_fuchsia_bluetooth_bredr::{SearchResultsProxy, ServiceClassProfileIdentifier},
     slab::Slab,
     std::collections::{HashMap, HashSet},
     tracing::info,
@@ -62,14 +60,10 @@ impl SearchInfo {
 
         // Convert the record into the FIDL ServiceFound response.
         let mut response = record.to_service_found_response()?;
-        let mut protocol = response.protocol.as_mut().map(|v| v.iter_mut());
-        let protocol = protocol
-            .as_mut()
-            .map(|v| -> &mut dyn ExactSizeIterator<Item = &mut ProtocolDescriptor> { v });
 
         let _ = self.proxy.service_found(
             &mut response.id.into(),
-            protocol,
+            response.protocol.as_deref(),
             &mut response.attributes.iter_mut(),
         );
 

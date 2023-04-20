@@ -594,17 +594,13 @@ async fn fwd_observer_callbacks(
                 mut attributes,
                 responder,
             } => {
-                let mut proto = match protocol {
+                let proto = match protocol {
                     Some(desc) => desc,
                     None => vec![],
                 };
 
                 observer
-                    .service_found(
-                        &mut peer_id,
-                        Some(&mut proto.iter_mut()),
-                        &mut attributes.iter_mut(),
-                    )
+                    .service_found(&mut peer_id, Some(&proto), &mut attributes.iter_mut())
                     .await
                     .or_else(|e| {
                         handle_fidl_err(

@@ -85,13 +85,9 @@ impl MockPeer {
     /// Notifies the `observer` with the ServiceFound update from the ServiceRecord.
     fn relay_service_found(observer: &bredr::PeerObserverProxy, record: ServiceRecord) {
         let mut response = record.to_service_found_response().unwrap();
-        let mut protocol = response.protocol.as_mut().map(|v| v.iter_mut());
-        let protocol = protocol
-            .as_mut()
-            .map(|v| -> &mut dyn ExactSizeIterator<Item = &mut bredr::ProtocolDescriptor> { v });
         let _ = observer.service_found(
             &mut response.id.into(),
-            protocol,
+            response.protocol.as_deref(),
             &mut response.attributes.iter_mut(),
         );
     }

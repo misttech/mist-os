@@ -665,7 +665,7 @@ mod tests {
     ) -> Result<LocalProfileTestServer, anyhow::Error> {
         server.complete_registration().await;
         // Random RFCOMM protocol.
-        let mut proto: Vec<bredr::ProtocolDescriptor> =
+        let proto: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(ServerChannel::try_from(10).unwrap())
                 .iter()
                 .map(Into::into)
@@ -676,11 +676,7 @@ mod tests {
             .results
             .as_ref()
             .unwrap()
-            .service_found(
-                &mut bt::PeerId { value: 1 },
-                Some(&mut proto.iter_mut()),
-                &mut vec![].iter_mut(),
-            )
+            .service_found(&mut bt::PeerId { value: 1 }, Some(&proto), &mut vec![].iter_mut())
             .await?;
 
         match server.stream.next().await {

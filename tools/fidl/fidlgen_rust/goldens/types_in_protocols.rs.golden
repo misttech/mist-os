@@ -1567,9 +1567,9 @@ pub trait ProtocolProxyInterface: Send + Sync {
     fn r#one_way_vector_optional(
         &self,
         opt_vector_uint8: Option<&[u8]>,
-        opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        opt_vector_string: Option<&[String]>,
+        opt_vector_struct: Option<&[Struct]>,
+        opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error>;
     type TwoWayVectorOptionalResponseFut: std::future::Future<
             Output = Result<
@@ -1585,9 +1585,9 @@ pub trait ProtocolProxyInterface: Send + Sync {
     fn r#two_way_vector_optional(
         &self,
         opt_vector_uint8: Option<&[u8]>,
-        opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        opt_vector_string: Option<&[String]>,
+        opt_vector_struct: Option<&[Struct]>,
+        opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Self::TwoWayVectorOptionalResponseFut;
     fn r#one_way_array_vector_nested(
         &self,
@@ -2148,17 +2148,12 @@ impl ProtocolSynchronousProxy {
     pub fn r#one_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorOptional, false>(
-            (
-                opt_vector_uint8,
-                opt_vector_string.map(fidl::encoding::Iterator),
-                opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct.map(fidl::encoding::Iterator),
-            ),
+            (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0x153c6b333c21c52f,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -2166,9 +2161,9 @@ impl ProtocolSynchronousProxy {
     pub fn r#two_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
         ___deadline: zx::Time,
     ) -> Result<
         (
@@ -2180,12 +2175,7 @@ impl ProtocolSynchronousProxy {
         fidl::Error,
     > {
         let _response = self.client.send_query::<VectorOptional, VectorOptional, false, true>(
-            (
-                opt_vector_uint8,
-                opt_vector_string.map(fidl::encoding::Iterator),
-                opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct.map(fidl::encoding::Iterator),
-            ),
+            (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0xe4b620aaafd73f3,
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
@@ -2786,9 +2776,9 @@ impl ProtocolProxy {
     pub fn r#one_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_vector_optional(
             self,
@@ -2801,9 +2791,9 @@ impl ProtocolProxy {
     pub fn r#two_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> fidl::client::QueryResponseFut<(
         Option<Vec<u8>>,
         Option<Vec<String>>,
@@ -3554,17 +3544,12 @@ impl ProtocolProxyInterface for ProtocolProxy {
     fn r#one_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorOptional, false>(
-            (
-                opt_vector_uint8,
-                opt_vector_string.map(fidl::encoding::Iterator),
-                opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct.map(fidl::encoding::Iterator),
-            ),
+            (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0x153c6b333c21c52f,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -3578,9 +3563,9 @@ impl ProtocolProxyInterface for ProtocolProxy {
     fn r#two_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Self::TwoWayVectorOptionalResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -3607,12 +3592,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Option<Vec<Struct>>,
             Option<Vec<Option<Box<Struct>>>>,
         ), false>(
-            (
-                opt_vector_uint8,
-                opt_vector_string.map(fidl::encoding::Iterator),
-                opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct.map(fidl::encoding::Iterator),
-            ),
+            (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0xe4b620aaafd73f3,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -6432,17 +6412,12 @@ impl ProtocolControlHandle {
     pub fn send_event_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<VectorOptional, false>(
-            (
-                opt_vector_uint8,
-                opt_vector_string.map(fidl::encoding::Iterator),
-                opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct.map(fidl::encoding::Iterator),
-            ),
+            (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
             0,
             0x17617b54dfa8d85d,
             fidl::encoding::DynamicFlags::empty(),
@@ -7345,9 +7320,9 @@ impl ProtocolTwoWayVectorOptionalResponder {
     pub fn send(
         self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
             opt_vector_uint8,
@@ -7367,9 +7342,9 @@ impl ProtocolTwoWayVectorOptionalResponder {
     pub fn send_no_shutdown_on_err(
         self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
             opt_vector_uint8,
@@ -7384,9 +7359,9 @@ impl ProtocolTwoWayVectorOptionalResponder {
     fn send_raw(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
-        mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
-        mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
+        mut opt_vector_string: Option<&[String]>,
+        mut opt_vector_struct: Option<&[Struct]>,
+        mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -7394,12 +7369,7 @@ impl ProtocolTwoWayVectorOptionalResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (
-                opt_vector_uint8,
-                opt_vector_string.map(fidl::encoding::Iterator),
-                opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct.map(fidl::encoding::Iterator),
-            ),
+            body: (opt_vector_uint8, opt_vector_string, opt_vector_struct, opt_vector_opt_struct),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

@@ -805,14 +805,16 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Fidl = fmt.Sprintf("fidl::encoding::Vector<%s, %d>", el.Fidl, *val.ElementCount)
 		}
 		t.Owned = fmt.Sprintf("Vec<%s>", el.Owned)
-		switch val.ElementType.Kind {
-		case fidlgen.PrimitiveType, fidlgen.ArrayType, fidlgen.VectorType:
+		if val.ElementType.Kind == fidlgen.PrimitiveType ||
+			val.ElementType.Kind == fidlgen.ArrayType ||
+			val.ElementType.Kind == fidlgen.VectorType ||
+			val.Nullable {
 			if el.IsResourceType() {
 				t.Param = fmt.Sprintf("Vec<%s>", el.Owned)
 			} else {
 				t.Param = fmt.Sprintf("&[%s]", el.Owned)
 			}
-		default:
+		} else {
 			// TODO(fxbug.dev/54368): This is the old type. Remove once the migration is done.
 			t.Param = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", el.Param)
 		}
@@ -938,13 +940,15 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		}
 		return v
 	case fidlgen.VectorType:
-		switch t.ElementType.Kind {
-		case fidlgen.PrimitiveType, fidlgen.ArrayType, fidlgen.VectorType:
+		if t.ElementType.Kind == fidlgen.PrimitiveType ||
+			t.ElementType.Kind == fidlgen.ArrayType ||
+			t.ElementType.Kind == fidlgen.VectorType ||
+			t.Nullable {
 			return v
 		}
 		var inner string
-		// Arrays and tables should be encoded by &/&mut, but encoding.rs also
-		// allows encoding by value specifically for when they occur in vectors.
+		// Tables should be encoded by &/&mut, but encoding.rs also allows
+		// encoding by value specifically for when they occur in vectors.
 		// (Converting from Item=T to Item=&T requires a lending iterator.)
 		if t.ElementType.Kind == fidlgen.IdentifierType && t.ElementType.DeclType == fidlgen.TableDeclType {
 			inner = "x"
@@ -952,13 +956,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 			inner = convertParamToEncodeExpr("x", *t.ElementType)
 		}
 		if inner == "x" {
-			if t.Nullable {
-				return fmt.Sprintf("%s.map(fidl::encoding::Iterator)", v)
-			}
 			return fmt.Sprintf("fidl::encoding::Iterator(%s)", v)
-		}
-		if t.Nullable {
-			return fmt.Sprintf("%s.map(|x| x.map(|x| %s)).map(fidl::encoding::Iterator)", v, inner)
 		}
 		return fmt.Sprintf("fidl::encoding::Iterator(%s.map(|x| %s))", v, inner)
 	case fidlgen.IdentifierType:

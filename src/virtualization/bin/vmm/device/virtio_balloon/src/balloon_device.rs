@@ -243,8 +243,8 @@ impl<B: BalloonBackend> BalloonDevice<B> {
                 // Fetch the memory stats which driver prepared for us
                 let mut stat_chain =
                     ReadableChain::new(stats_stream.next().await.unwrap(), guest_mem);
-                let mut mem_stats = Self::process_stats_chain(&mut stat_chain);
-                responder.send(zx::sys::ZX_OK, Some(&mut mem_stats.iter_mut()))?;
+                let mem_stats = Self::process_stats_chain(&mut stat_chain);
+                responder.send(zx::sys::ZX_OK, Some(&mem_stats))?;
                 // Retain memory stats, so we can drop it on the next request to signal the driver
                 // to get the new mem stats
                 prev_stat_chain = Some(stat_chain);
