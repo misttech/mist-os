@@ -5,5 +5,7 @@
     include: [ "//src/proc/tests/android/gvisor/meta/gvisor_with_expectations.shard.cml" ],
     program: {
         binary: "data/tests/setgid_test",
+        capabilities: [ "SETGID" ],
+        environ: [ "TEST_ON_GVISOR=1" ],
     },
 }

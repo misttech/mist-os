@@ -120,7 +120,16 @@ pub async fn start_component(
         .map_err(|e| anyhow!("Failed to set cwd to package directory: {:?}", e))?;
 
     let uid = get_program_string(&start_info, "uid").unwrap_or("42").parse()?;
-    let credentials = Credentials::with_ids(uid, uid);
+    let mut credentials = Credentials::with_ids(uid, uid);
+    if let Some(caps) = get_program_strvec(&start_info, "capabilities") {
+        let mut capabilities = Capabilities::empty();
+        for cap in caps {
+            capabilities |= cap.parse()?;
+        }
+        credentials.cap_permitted = capabilities;
+        credentials.cap_effective = capabilities;
+        credentials.cap_inheritable = capabilities;
+    }
     current_task.set_creds(credentials);
 
     if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {

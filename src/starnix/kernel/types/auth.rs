@@ -112,6 +112,56 @@ impl std::fmt::Debug for Capabilities {
     }
 }
 
+impl std::str::FromStr for Capabilities {
+    type Err = Errno;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "CHOWN" => CAP_CHOWN,
+            "DAC_OVERRIDE" => CAP_DAC_OVERRIDE,
+            "DAC_READ_SEARCH" => CAP_DAC_READ_SEARCH,
+            "FOWNER" => CAP_FOWNER,
+            "FSETID" => CAP_FSETID,
+            "KILL" => CAP_KILL,
+            "SETGID" => CAP_SETGID,
+            "SETUID" => CAP_SETUID,
+            "SETPCAP" => CAP_SETPCAP,
+            "LINUX_IMMUTABLE" => CAP_LINUX_IMMUTABLE,
+            "NET_BIND_SERVICE" => CAP_NET_BIND_SERVICE,
+            "NET_BROADCAST" => CAP_NET_BROADCAST,
+            "NET_ADMIN" => CAP_NET_ADMIN,
+            "NET_RAW" => CAP_NET_RAW,
+            "IPC_LOCK" => CAP_IPC_LOCK,
+            "IPC_OWNER" => CAP_IPC_OWNER,
+            "SYS_MODULE" => CAP_SYS_MODULE,
+            "SYS_RAWIO" => CAP_SYS_RAWIO,
+            "SYS_CHROOT" => CAP_SYS_CHROOT,
+            "SYS_PTRACE" => CAP_SYS_PTRACE,
+            "SYS_PACCT" => CAP_SYS_PACCT,
+            "SYS_ADMIN" => CAP_SYS_ADMIN,
+            "SYS_BOOT" => CAP_SYS_BOOT,
+            "SYS_NICE" => CAP_SYS_NICE,
+            "SYS_RESOURCE" => CAP_SYS_RESOURCE,
+            "SYS_TIME" => CAP_SYS_TIME,
+            "SYS_TTY_CONFIG" => CAP_SYS_TTY_CONFIG,
+            "MKNOD" => CAP_MKNOD,
+            "LEASE" => CAP_LEASE,
+            "AUDIT_WRITE" => CAP_AUDIT_WRITE,
+            "AUDIT_CONTROL" => CAP_AUDIT_CONTROL,
+            "SETFCAP" => CAP_SETFCAP,
+            "MAC_OVERRIDE" => CAP_MAC_OVERRIDE,
+            "MAC_ADMIN" => CAP_MAC_ADMIN,
+            "SYSLOG" => CAP_SYSLOG,
+            "WAKE_ALARM" => CAP_WAKE_ALARM,
+            "BLOCK_SUSPEND" => CAP_BLOCK_SUSPEND,
+            "AUDIT_READ" => CAP_AUDIT_READ,
+            "PERFMON" => CAP_PERFMON,
+            "BPF" => CAP_BPF,
+            "CHECKPOINT_RESTORE" => CAP_CHECKPOINT_RESTORE,
+            _ => return error!(EINVAL),
+        })
+    }
+}
+
 pub const CAP_CHOWN: Capabilities = Capabilities { mask: 1u64 << uapi::CAP_CHOWN };
 pub const CAP_DAC_OVERRIDE: Capabilities = Capabilities { mask: 1u64 << uapi::CAP_DAC_OVERRIDE };
 pub const CAP_DAC_READ_SEARCH: Capabilities =
