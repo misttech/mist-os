@@ -794,7 +794,7 @@ pub fn sys_renameat2(
     new_user_path: UserCString,
     flags: u32,
 ) -> Result<(), Errno> {
-    if flags != 0 {
+    if flags & !RENAME_NOREPLACE != 0 {
         not_implemented!(current_task, "renameat flags {:?}", flags);
         return error!(EINVAL);
     }
@@ -816,7 +816,8 @@ pub fn sys_renameat2(
         return error!(EXDEV);
     }
 
-    DirEntry::rename(current_task, &old_parent, &old_basename, &new_parent, &new_basename)?;
+    let flags = RenameFlags::from_bits_truncate(flags);
+    DirEntry::rename(current_task, &old_parent, &old_basename, &new_parent, &new_basename, flags)?;
     Ok(())
 }
 
@@ -2233,5 +2234,39 @@ mod tests {
 
         // Success with AT_REMOVEDIR.
         sys_unlinkat(&current_task, FdNumber::AT_FDCWD, slash_user_path, AT_REMOVEDIR).unwrap();
+    }
+
+    #[::fuchsia::test]
+    fn test_rename_noreplace() {
+        let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
+
+        // Create the file that will be renamed.
+        let old_user_path = b"data/testfile.txt";
+        let _old_file_handle = current_task.open_file(old_user_path, OpenFlags::RDONLY).unwrap();
+
+        // Write the path to user memory.
+        let old_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        current_task.mm.write_memory(old_path_addr, old_user_path).expect("failed to clear struct");
+
+        // Create a second file that we will attempt to rename to.
+        let new_user_path = b"data/testfile2.txt";
+        let _new_file_handle = current_task.open_file(new_user_path, OpenFlags::RDONLY).unwrap();
+
+        // Write the path to user memory.
+        let new_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        current_task.mm.write_memory(new_path_addr, new_user_path).expect("failed to clear struct");
+
+        // Try to rename first file to second file's name with RENAME_NOREPLACE flag.
+        // This should fail with EEXIST.
+        let error = sys_renameat2(
+            &current_task,
+            FdNumber::AT_FDCWD,
+            UserCString::new(old_path_addr),
+            FdNumber::AT_FDCWD,
+            UserCString::new(new_path_addr),
+            RenameFlags::NOREPLACE.bits(),
+        )
+        .unwrap_err();
+        assert_eq!(error, errno!(EEXIST));
     }
 }

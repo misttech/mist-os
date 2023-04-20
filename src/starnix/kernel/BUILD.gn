@@ -348,8 +348,11 @@ fuchsia_structured_config_rust_lib("starnix_kernel_config") {
 }
 
 resource("starnix-test-files") {
-  sources = [ "data/testfile.txt" ]
-  outputs = [ "data/testfile.txt" ]
+  sources = [
+    "data/testfile.txt",
+    "data/testfile2.txt",
+  ]
+  outputs = [ "data/{{source_file_part}}" ]
 }
 
 fuchsia_unittest_package("starnix-tests") {

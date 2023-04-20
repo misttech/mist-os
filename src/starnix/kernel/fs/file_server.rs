@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
+use crate::fs::RenameFlags;
 use crate::fs::{
     DirEntry, DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
     SeekOrigin, UnlinkKind,
@@ -362,7 +363,14 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
             src_dir.into_any().downcast::<StarnixNodeConnection>().map_err(|_| errno!(EXDEV))?;
         let (src_node, src_name) = src_dir.lookup_parent(src_name.as_bytes())?;
         let (dst_node, dst_name) = self.lookup_parent(dst_name.as_bytes())?;
-        DirEntry::rename(&self.task, &src_node, src_name, &dst_node, dst_name)?;
+        DirEntry::rename(
+            &self.task,
+            &src_node,
+            src_name,
+            &dst_node,
+            dst_name,
+            RenameFlags::empty(),
+        )?;
         Ok(())
     }
 }

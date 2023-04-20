@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bitflags::bitflags;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -13,6 +14,13 @@ use crate::fs::*;
 use crate::lock::{RwLock, RwLockWriteGuard};
 use crate::task::CurrentTask;
 use crate::types::*;
+
+bitflags! {
+    pub struct RenameFlags: u32 {
+        // Don't overwrite an existing DirEntry.
+        const NOREPLACE = RENAME_NOREPLACE;
+    }
+}
 
 struct DirEntryState {
     /// The parent DirEntry.
@@ -469,10 +477,14 @@ impl DirEntry {
         old_basename: &FsStr,
         new_parent_name: &NamespaceNode,
         new_basename: &FsStr,
+        flags: RenameFlags,
     ) -> Result<(), Errno> {
         // If either the old_basename or the new_basename is a reserved name
         // (e.g., "." or ".."), then we cannot do the rename.
         if DirEntry::is_reserved_name(old_basename) || DirEntry::is_reserved_name(new_basename) {
+            if flags.contains(RenameFlags::NOREPLACE) {
+                return error!(EEXIST);
+            }
             return error!(EBUSY);
         }
 
@@ -550,6 +562,10 @@ impl DirEntry {
             let maybe_replaced =
                 match state.new_parent().component_lookup(current_task, new_basename) {
                     Ok(replaced) => {
+                        if flags.contains(RenameFlags::NOREPLACE) {
+                            return error!(EEXIST);
+                        }
+
                         // Sayeth https://man7.org/linux/man-pages/man2/rename.2.html:
                         //
                         // "If oldpath and newpath are existing hard links referring to the
