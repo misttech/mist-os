@@ -16,17 +16,29 @@
 namespace pci {
 
 void UpstreamNode::ConfigureDownstreamDevices() {
-  for (auto& device : downstream_) {
-    // Some capabilities can only be configured after device BARs have been
-    // configured, and device BARs cannot be configured when a Device is object
-    // is created since bridge windows still need to be allocated.
-    if (auto result = device.AllocateBars(); result.is_error()) {
-      device.Disable();
+  // A helper function to split device and bridge configuration into separate
+  // passes. Since bridges are added to the topology as they are found in a DFS
+  // manner, this ensures we will fulfill the windows in the proper order.
+  auto configure_downstream_devices = [this](bool configuring_bridges) {
+    for (auto& device : downstream_) {
+      if (device.is_bridge() == configuring_bridges) {
+        // Some capabilities can only be configured after device BARs have been
+        // configured, and device BARs cannot be configured when a Device is object
+        // is created since bridge windows still need to be allocated.
+        if (auto result = device.AllocateBars(); result.is_error()) {
+          device.Disable();
+        }
+        if (auto result = device.ConfigureCapabilities(); result.is_error()) {
+          device.Disable();
+        }
+      }
     }
-    if (auto result = device.ConfigureCapabilities(); result.is_error()) {
-      device.Disable();
-    }
-  }
+  };
+
+  // Configure bridges first so they can set up their IO windows.
+  configure_downstream_devices(/*configuring_bridges=*/true);
+  // Now configure device BARs and capabilities with the bridges configured ahead of time.
+  configure_downstream_devices(/*configuring_bridges=*/false);
 }
 
 void UpstreamNode::DisableDownstream() {
