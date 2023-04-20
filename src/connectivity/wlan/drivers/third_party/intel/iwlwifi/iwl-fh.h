@@ -730,14 +730,14 @@ struct iwlagn_scd_bc_tbl {
 } __packed;
 
 /**
- * struct iwl_gen3_bc_tbl scheduler byte count table gen3
- * For 22560 and on:
+ * struct iwl_gen3_bc_tbl_entry scheduler byte count table entry gen3
+ * For AX210 and on:
  * @tfd_offset: 0-12 - tx command byte count
  *      12-13 - number of 64 byte chunks
  *      14-16 - reserved
  */
-struct iwl_gen3_bc_tbl {
-  __le16 tfd_offset[TFD_QUEUE_BC_SIZE_GEN3];
+struct iwl_gen3_bc_tbl_entry {
+	__le16 tfd_offset;
 } __packed;
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_IWL_FH_H_
