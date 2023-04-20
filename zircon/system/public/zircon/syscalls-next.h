@@ -33,6 +33,7 @@ __END_CDECLS
 
 #include <stdint.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/exception.h>
 
 // ====== Pager writeback support ====== //
 //
@@ -84,7 +85,18 @@ typedef struct zx_pager_vmo_stats {
 // Declared here in the next syscall header since it is not published
 // in the SDK.
 
+typedef uint64_t zx_restricted_reason_t;
+
+// Reason codes provided to normal mode when a restricted process traps
+// back to normal mode.
+#define ZX_RESTRICTED_REASON_SYSCALL ((zx_restricted_reason_t)0)
+#define ZX_RESTRICTED_REASON_EXCEPTION ((zx_restricted_reason_t)1)
+
 // Structure to read and write restricted mode state
+//
+// When exiting restricted mode for certain reasons, additional information
+// may be provided by zircon. However, regardless of the reason code this
+// will always be the first structure inside the restricted mode state VMO.
 typedef struct zx_restricted_state {
 #if __aarch64__
   uint64_t x[31];
@@ -106,6 +118,21 @@ typedef struct zx_restricted_state {
   uint32_t reserved;
 #endif
 } zx_restricted_state_t;
+
+// Structure populated by zircon when exiting restricted mode with the
+// reason code `ZX_RESTRICTED_REASON_SYSCALL`.
+typedef struct zx_restricted_syscall {
+  // Must be first.
+  zx_restricted_state_t state;
+} zx_restricted_syscall_t;
+
+// Structure populated by zircon when exiting restricted mode with the
+// reason code `ZX_RESTRICTED_REASON_EXCEPTION`.
+typedef struct zx_restricted_exception {
+  // Must be first.
+  zx_restricted_state_t state;
+  zx_exception_report_t exception;
+} zx_restricted_exception_t;
 
 // ====== End of restricted mode support ====== //
 

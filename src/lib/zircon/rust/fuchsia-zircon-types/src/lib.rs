@@ -39,6 +39,7 @@ pub type zx_vaddr_t = usize;
 pub type zx_vm_option_t = u32;
 pub type zx_thread_state_topic_t = u32;
 pub type zx_vcpu_state_topic_t = u32;
+pub type zx_restricted_reason_t = u64;
 
 // TODO: magically coerce this to &`static str somehow?
 #[repr(C)]
@@ -1165,6 +1166,10 @@ impl From<&zx_restricted_state_t> for zx_thread_state_general_regs_t {
         }
     }
 }
+multiconst!(zx_restricted_reason_t, [
+    ZX_RESTRICTED_REASON_SYSCALL = 0;
+    ZX_RESTRICTED_REASON_EXCEPTION = 1;
+]);
 
 #[cfg(target_arch = "x86_64")]
 #[repr(C)]
@@ -1277,6 +1282,21 @@ impl From<&zx_thread_state_general_regs_t> for zx_restricted_state_t {
             padding1: [0, 0, 0, 0],
         }
     }
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+pub struct zx_restricted_syscall_t {
+    pub state: zx_restricted_state_t,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+pub struct zx_restricted_exception {
+    pub state: zx_restricted_state_t,
+    pub exception: zx_exception_report_t,
 }
 
 #[cfg(target_arch = "x86_64")]

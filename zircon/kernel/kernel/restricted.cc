@@ -23,6 +23,10 @@
 
 #define LOCAL_TRACE 0
 
+// `state` must be the first member of these structures.
+static_assert(offsetof(zx_restricted_syscall_t, state) == 0);
+static_assert(offsetof(zx_restricted_exception_t, state) == 0);
+
 // Kernel implementation of restricted mode. Most of these routines are more or less directly
 // called from a corresponding syscall. The rest are up called from architecturally specific
 // hardware traps, such as an exception or syscall when the cpu is in restricted mode.
@@ -49,6 +53,7 @@ extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs)
   // save the restricted state
   zx_restricted_state_t* state = rs->state_ptr();
   DEBUG_ASSERT(state);
+  static_assert(internal::is_copy_allowed<std::remove_reference_t<decltype((*state))>>::value);
   RestrictedState::ArchSaveRestrictedSyscallState(*state, *regs);
 
   LTRACEF("returning to normal mode at vector %#lx, context %#lx\n", rs->vector_ptr(),
@@ -58,7 +63,8 @@ extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs)
   vmm_set_active_aspace(up->normal_aspace_ptr());
 
   // bounce into normal mode
-  RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(), 0);
+  RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(),
+                                 ZX_RESTRICTED_REASON_SYSCALL);
 
   __UNREACHABLE;
 }
@@ -95,6 +101,7 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   // before using the copy to avoid a ToCToU vulnerability.  Use an atomic_signal_fence as a
   // compiler barrier to ensure the copy actually happens.
   zx_restricted_state_t state;
+  static_assert(internal::is_copy_allowed<decltype(state)>::value);
   state = *state_buffer;
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
 

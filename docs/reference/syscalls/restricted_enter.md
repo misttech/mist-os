@@ -39,13 +39,14 @@ mode when returning from restricted mode.
 
 Arguments to the function at *vector_table_ptr* are architecturally specific:
 
-On x64, *context* is placed in *rdi* and an exception code is placed in *rsi*.
+On x64, *context* is placed in *rdi* and a reason code is placed in *rsi*.
 All other registers are currently undefined, including the stack pointer.
 
-On arm64, *context* is placed in *x0* and an exception code is placed in *x1*.
+On arm64, *context* is placed in *x0* and a reason code is placed in *x1*.
 All other registers are currently undefined, including the stack pointer.
 
-Currently, the *exception code* passed back to normal mode is always 0.
+The *reason code* specifies the reason that normal mode execution has resumed.
+Currently, the only implemented *reason code* is `ZX_RESTRICTED_REASON_SYSCALL`.
 
 ### Shared process
 
