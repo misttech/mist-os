@@ -60,7 +60,7 @@ constexpr bool IsAliasCaseCheckExempt(std::string_view library_name, std::string
          (declname == "status" || declname == "time" || declname == "duration" ||
           declname == "ticks" || declname == "koid" || declname == "vaddr" || declname == "paddr" ||
           declname == "paddr32" || declname == "gpaddr" || declname == "off" ||
-          declname == "procarg" || declname == "signals");
+          declname == "signals");
 }
 
 // Convert the SourceElement (start- and end-tokens within the SourceFile)

@@ -63,11 +63,6 @@ alias gpaddr = uint64;
 // TODO(fxbug.dev/109734): Off.
 alias off = uint64;
 
-// See zircon/processargs.h.
-//
-// TODO(fxbug.dev/109734): Procarg.
-alias procarg = uint32;
-
 // zx_signals_t.
 //
 // TODO(fxbug.dev/109734): Signals.

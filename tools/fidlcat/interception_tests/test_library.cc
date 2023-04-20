@@ -108,9 +108,6 @@ std::string echo_service = R"({
         "zx/off": {
           "kind": "alias"
         },
-        "zx/procarg": {
-          "kind": "alias"
-        },
         "zx/signals": {
           "kind": "alias"
         }
