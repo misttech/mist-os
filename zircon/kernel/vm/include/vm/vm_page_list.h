@@ -1046,6 +1046,11 @@ class VmPageList final {
   // Returns true if the specified offset falls in a sparse zero interval.
   bool IsOffsetInZeroInterval(uint64_t offset) const;
 
+  // Replace an existing page at offset with a zero interval, and return the released page. The
+  // caller takes ownership of the released page and is responsible for freeing it.
+  vm_page_t* ReplacePageWithZeroInterval(uint64_t offset,
+                                         VmPageOrMarker::IntervalDirtyState dirty_state);
+
  private:
   // Returns true if the specified offset falls in a sparse page interval.
   bool IsOffsetInInterval(uint64_t offset) const;
@@ -1061,9 +1066,12 @@ class VmPageList final {
                                 const VmPageOrMarker** interval_out = nullptr) const;
 
   // Internal helper for AddZeroInterval.
+  // |replace_existing_slot| can optionally be set to true if a zero interval spanning a single page
+  // is being added, and the slot at that offset is already populated (but Empty) and can be reused.
   zx_status_t AddZeroIntervalInternal(uint64_t start_offset, uint64_t end_offset,
                                       VmPageOrMarker::IntervalDirtyState dirty_state,
-                                      uint64_t awaiting_clean_len);
+                                      uint64_t awaiting_clean_len,
+                                      bool replace_existing_slot = false);
 
   // Internal helper for LookupOrAllocate.
   VmPageOrMarker* LookupOrAllocateInternal(uint64_t offset);

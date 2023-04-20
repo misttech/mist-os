@@ -3712,12 +3712,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         uint64_t start;
         uint64_t end;
         bool replace_page;
-        VmPageOrMarker* page_to_replace;
-      } state = {.add_zero_interval = false,
-                 .start = 0,
-                 .end = 0,
-                 .replace_page = false,
-                 .page_to_replace = nullptr};
+      } state = {.add_zero_interval = false, .start = 0, .end = 0, .replace_page = false};
 
       zx_status_t status = page_list_.RemovePagesAndIterateGaps(
           [&](VmPageOrMarker* p, uint64_t off) {
@@ -3749,8 +3744,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
               state = {.add_zero_interval = true,
                        .start = off,
                        .end = off + PAGE_SIZE,
-                       .replace_page = true,
-                       .page_to_replace = p};
+                       .replace_page = true};
               return ZX_ERR_STOP;
             }
 
@@ -3780,8 +3774,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
             state = {.add_zero_interval = true,
                      .start = gap_start,
                      .end = gap_end,
-                     .replace_page = false,
-                     .page_to_replace = nullptr};
+                     .replace_page = false};
             return ZX_ERR_STOP;
           },
           next_start_offset, end);
@@ -3793,25 +3786,20 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       // Add any new zero interval.
       if (state.add_zero_interval) {
         if (state.replace_page) {
-          DEBUG_ASSERT(state.page_to_replace);
           DEBUG_ASSERT(state.start + PAGE_SIZE == state.end);
-          vm_page_t* page = state.page_to_replace->ReleasePage();
+          vm_page_t* page = page_list_.ReplacePageWithZeroInterval(
+              state.start, VmPageOrMarker::IntervalDirtyState::Dirty);
           DEBUG_ASSERT(page->object.pin_count == 0);
           PQRemoveLocked(page);
           DEBUG_ASSERT(!list_in_list(&page->queue_node));
           list_add_tail(&freed_list, &page->queue_node);
-          // TODO(fxbug.dev/122842): Consider not returning this empty node and instead reusing it
-          // for the zero interval. Currently AddZeroInterval does not expect to find any empty
-          // nodes, so it can fail if we don't return this slot first. For now just assert that we
-          // do not fail to add the zero interval, so that we do not lose the page contents.
-          page_list_.ReturnEmptySlot(state.start);
-        }
-        status = page_list_.AddZeroInterval(state.start, state.end,
-                                            VmPageOrMarker::IntervalDirtyState::Dirty);
-        DEBUG_ASSERT(!state.replace_page || status == ZX_OK);
-        if (status != ZX_OK) {
-          DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-          return status;
+        } else {
+          status = page_list_.AddZeroInterval(state.start, state.end,
+                                              VmPageOrMarker::IntervalDirtyState::Dirty);
+          if (status != ZX_OK) {
+            DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+            return status;
+          }
         }
         *zeroed_len_out += (state.end - state.start);
         next_start_offset = state.end;

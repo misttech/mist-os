@@ -534,13 +534,14 @@ void VmPageList::ReturnIntervalSlot(uint64_t offset) {
   DEBUG_ASSERT(slot->IsIntervalZero());
   auto dirty_state = slot->GetZeroIntervalDirtyState();
   auto awaiting_clean_len = slot->GetZeroIntervalAwaitingCleanLength();
-  // Temporarily free up the slot and then add a zero interval back in at the same spot using
+  // Temporarily empty the slot and then add a zero interval back in at the same spot using
   // AddZeroInterval, which will ensure that the slot is merged to the left and/or right as
-  // applicable.
+  // applicable. We don't need to return the empty slot here because we're asking
+  // AddZeroIntervalInternal to reuse the existing slot.
   *slot = VmPageOrMarker::Empty();
-  ReturnEmptySlot(offset);
   [[maybe_unused]] zx_status_t status =
-      AddZeroIntervalInternal(offset, offset + PAGE_SIZE, dirty_state, awaiting_clean_len);
+      AddZeroIntervalInternal(offset, offset + PAGE_SIZE, dirty_state, awaiting_clean_len, true);
+  // We are reusing an existing slot, so we cannot fail with ZX_ERR_NO_MEMORY.
   DEBUG_ASSERT(status == ZX_OK);
 }
 
@@ -821,11 +822,17 @@ bool VmPageList::IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode&
 
 zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t end_offset,
                                                 VmPageOrMarker::IntervalDirtyState dirty_state,
-                                                uint64_t awaiting_clean_len) {
+                                                uint64_t awaiting_clean_len,
+                                                bool replace_existing_slot) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
   DEBUG_ASSERT(start_offset < end_offset);
-  DEBUG_ASSERT(!AnyPagesOrIntervalsInRange(start_offset, end_offset));
+  DEBUG_ASSERT(!replace_existing_slot || end_offset == start_offset + PAGE_SIZE);
+  // If replace_existing_slot is true, then we might have the slot in an empty node, which is not
+  // expected by any kind of page list traversal. So we cannot safely walk the specified range.
+  // Instead, we will assert later that the slot being replaced is indeed empty. If we don't end up
+  // using the slot, we will return the empty node.
+  DEBUG_ASSERT(replace_existing_slot || !AnyPagesOrIntervalsInRange(start_offset, end_offset));
   DEBUG_ASSERT(awaiting_clean_len == 0 || dirty_state == VmPageOrMarker::IntervalDirtyState::Dirty);
 
   const uint64_t interval_start = start_offset;
@@ -896,6 +903,7 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
   if (!merge_with_prev) {
     new_start = LookupOrAllocateInternal(interval_start);
     if (!new_start) {
+      DEBUG_ASSERT(!replace_existing_slot);
       return ZX_ERR_NO_MEMORY;
     }
     DEBUG_ASSERT(new_start->IsEmpty());
@@ -904,6 +912,7 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
   if (!merge_with_next) {
     new_end = LookupOrAllocateInternal(interval_end);
     if (!new_end) {
+      DEBUG_ASSERT(!replace_existing_slot);
       // Clean up any slot we allocated for new_start before returning.
       if (new_start) {
         DEBUG_ASSERT(new_start->IsEmpty());
@@ -912,6 +921,15 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
       return ZX_ERR_NO_MEMORY;
     }
     DEBUG_ASSERT(new_end->IsEmpty());
+  }
+  // If we were replacing an existing slot, but are able to merge both to the left and the right, we
+  // won't need the slot anymore. So return it. Note that this is not strictly needed but we want to
+  // be explicit for clarity. We know that the existing slot is in the same node as the previous or
+  // the next slot (or both). We will either end up freeing one or both of those slots, or retaining
+  // one or both of them. So the node the existing slot shares with those slots will either be
+  // freed, or won't need freeing.
+  if (replace_existing_slot && merge_with_prev && merge_with_next) {
+    ReturnEmptySlot(interval_start);
   }
 
   // Now that we've checked for all error conditions perform the actual update.
@@ -1014,6 +1032,23 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
   }
 
   return ZX_OK;
+}
+
+vm_page_t* VmPageList::ReplacePageWithZeroInterval(uint64_t offset,
+                                                   VmPageOrMarker::IntervalDirtyState dirty_state) {
+  // We are guaranteed to find the slot as we're replacing an existing page.
+  VmPageOrMarker* slot = LookupOrAllocateInternal(offset);
+  DEBUG_ASSERT(slot);
+  // Release the page at the offset, but hold on to the empty slot so it can be reused by
+  // AddZeroIntervalInternal.
+  vm_page_t* page = slot->ReleasePage();
+  [[maybe_unused]] zx_status_t status =
+      AddZeroIntervalInternal(offset, offset + PAGE_SIZE, dirty_state, 0, true);
+  // The only error AddZeroIntervalInternal can encounter is ZX_ERR_NO_MEMORY, but we know that
+  // cannot happen because we are reusing an existing slot, so we don't need to allocate a new node.
+  DEBUG_ASSERT(status == ZX_OK);
+  // Return the page we released.
+  return page;
 }
 
 zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len) {
