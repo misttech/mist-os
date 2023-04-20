@@ -9,6 +9,9 @@
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/epitaph.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
+
+#include <cinttypes>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
@@ -40,7 +43,7 @@ void AmlHdmiDevice::WriteReg(uint32_t reg, uint32_t val) {
   }
 
 #ifdef LOG_HDMITX
-  DISP_INFO("%s wr[0x%x] 0x%x\n", offset ? "DWC" : "TOP", reg, val);
+  zxlogf(INFO, "%s wr[0x%x] 0x%x\n", offset ? "DWC" : "TOP", reg, val);
 #endif
 }
 
@@ -59,14 +62,14 @@ uint32_t AmlHdmiDevice::ReadReg(uint32_t reg) {
 
 zx_status_t AmlHdmiDevice::Bind() {
   if (!pdev_.is_valid()) {
-    DISP_ERROR("HdmiDw: Could not get ZX_PROTOCOL_PDEV protocol\n");
+    zxlogf(ERROR, "Could not get ZX_PROTOCOL_PDEV protocol");
     return ZX_ERR_NO_RESOURCES;
   }
 
   // Map registers
   auto status = pdev_.MapMmio(MMIO_HDMI, &hdmitx_mmio_);
   if (status != ZX_OK) {
-    DISP_ERROR("Could not map HDMITX mmio\n");
+    zxlogf(ERROR, "Could not map MMIO registers: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -82,15 +85,15 @@ zx_status_t AmlHdmiDevice::Bind() {
   fuchsia_hardware_hdmi::Service::InstanceHandler handler({
       .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
   });
-  auto result = outgoing_->AddService<fuchsia_hardware_hdmi::Service>(std::move(handler));
+  zx::result<> result = outgoing_->AddService<fuchsia_hardware_hdmi::Service>(std::move(handler));
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    zxlogf(ERROR, "Failed to add service to the outgoing directory: %s", result.status_string());
     return result.status_value();
   }
 
   result = outgoing_->Serve(std::move(endpoints->server));
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    zxlogf(ERROR, "Failed to add service to the outgoing directory: %s", result.status_string());
     return result.status_value();
   }
 
@@ -102,7 +105,7 @@ zx_status_t AmlHdmiDevice::Bind() {
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
-    DISP_ERROR("Could not add device\n");
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -292,28 +295,27 @@ void AmlHdmiDevice::EdidTransfer(EdidTransferRequestView request,
   }
 }
 
-#define PRINT_REG(name) PrintReg(#name, (name))
-void AmlHdmiDevice::PrintReg(std::string name, uint8_t reg) {
-  zxlogf(INFO, "%s (0x%4x): %u", &name[0], reg, ReadReg(reg));
+void AmlHdmiDevice::PrintRegister(const char* register_name, uint32_t register_address) {
+  zxlogf(INFO, "%s (0x%04" PRIx32 "): %" PRIu32, register_name, register_address,
+         ReadReg(register_address));
 }
 
 void AmlHdmiDevice::PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) {
   zxlogf(INFO, "------------Top Registers------------");
-  PRINT_REG(HDMITX_TOP_SW_RESET);
-  PRINT_REG(HDMITX_TOP_CLK_CNTL);
-  PRINT_REG(HDMITX_TOP_INTR_MASKN);
-  PRINT_REG(HDMITX_TOP_INTR_STAT_CLR);
-  PRINT_REG(HDMITX_TOP_BIST_CNTL);
-  PRINT_REG(HDMITX_TOP_TMDS_CLK_PTTN_01);
-  PRINT_REG(HDMITX_TOP_TMDS_CLK_PTTN_23);
-  PRINT_REG(HDMITX_TOP_TMDS_CLK_PTTN_CNTL);
+  PrintRegister("HDMITX_TOP_SW_RESET", HDMITX_TOP_SW_RESET);
+  PrintRegister("HDMITX_TOP_CLK_CNTL", HDMITX_TOP_CLK_CNTL);
+  PrintRegister("HDMITX_TOP_INTR_MASKN", HDMITX_TOP_INTR_MASKN);
+  PrintRegister("HDMITX_TOP_INTR_STAT_CLR", HDMITX_TOP_INTR_STAT_CLR);
+  PrintRegister("HDMITX_TOP_BIST_CNTL", HDMITX_TOP_BIST_CNTL);
+  PrintRegister("HDMITX_TOP_TMDS_CLK_PTTN_01", HDMITX_TOP_TMDS_CLK_PTTN_01);
+  PrintRegister("HDMITX_TOP_TMDS_CLK_PTTN_23", HDMITX_TOP_TMDS_CLK_PTTN_23);
+  PrintRegister("HDMITX_TOP_TMDS_CLK_PTTN_CNTL", HDMITX_TOP_TMDS_CLK_PTTN_CNTL);
 
   fbl::AutoLock lock(&dw_lock_);
   hdmi_dw_->PrintRegisters();
 
   completer.Reply();
 }
-#undef PRINT_REG
 
 // static
 zx_status_t AmlHdmiDevice::Create(zx_device_t* parent) {

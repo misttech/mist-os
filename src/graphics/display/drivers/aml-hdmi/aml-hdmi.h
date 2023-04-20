@@ -17,6 +17,7 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <string.h>
 
+#include <cstdint>
 #include <optional>
 
 #include <ddktl/device.h>
@@ -41,11 +42,6 @@
 
 #define WRITE32_REG(x, a, v) WRITE32_##x##_REG(a, v)
 #define READ32_REG(x, a) READ32_##x##_REG(a)
-
-#define DISP_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define DISP_INFO(fmt, ...) zxlogf(INFO, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define DISP_SPEW(fmt, ...) zxlogf(TRACE, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define DISP_TRACE zxlogf(INFO, "[%s %d]", __func__, __LINE__)
 
 namespace aml_hdmi {
 
@@ -131,7 +127,7 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   void WriteReg(uint32_t reg, uint32_t val);
   uint32_t ReadReg(uint32_t reg);
 
-  void PrintReg(std::string name, uint8_t reg);
+  void PrintRegister(const char* register_name, uint32_t register_address);
 
   ddk::PDevFidl pdev_;
   fbl::Mutex dw_lock_;
