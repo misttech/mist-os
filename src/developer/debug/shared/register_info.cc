@@ -21,9 +21,6 @@ const RegisterInfo kRegisterInfo[] = {
     // ---------------------------------------------------------------------------------------------
 
     // General purpose.
-    // NOTE: The DWARF ID for TPIDR_EL0 is newly added to the draft spec by ARM
-    // in https://github.com/ARM-software/abi-aa/pull/53 but has not yet been
-    // formally published.
 
     {.id = RegisterID::kARMv8_x0,  .name = "x0",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x0,  .bits = 64, .dwarf_id = 0},
     {.id = RegisterID::kARMv8_x1,  .name = "x1",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x1,  .bits = 64, .dwarf_id = 1},
@@ -55,10 +52,10 @@ const RegisterInfo kRegisterInfo[] = {
     {.id = RegisterID::kARMv8_x27, .name = "x27", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x27, .bits = 64, .dwarf_id = 27},
     {.id = RegisterID::kARMv8_x28, .name = "x28", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x28, .bits = 64, .dwarf_id = 28},
     {.id = RegisterID::kARMv8_x29, .name = "x29", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_x29, .bits = 64, .dwarf_id = 29},
-    {.id = RegisterID::kARMv8_lr,  .name = "lr",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_lr,  .bits = 64, .dwarf_id = 30, .format = RegisterFormat::kWordAddress},
-    {.id = RegisterID::kARMv8_tpidr,  .name = "tpidr",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_tpidr,  .bits = 64, .dwarf_id = 36},
+    {.id = RegisterID::kARMv8_lr,  .name = "lr",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_lr,  .bits = 64, .dwarf_id = 30, .format = RegisterFormat::kVoidAddress},
     {.id = RegisterID::kARMv8_sp,  .name = "sp",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_sp,  .bits = 64, .dwarf_id = 31, .format = RegisterFormat::kWordAddress},
-    {.id = RegisterID::kARMv8_pc,  .name = "pc",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_pc,  .bits = 64, .format = RegisterFormat::kWordAddress},
+    {.id = RegisterID::kARMv8_pc,  .name = "pc",  .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_pc,  .bits = 64, .dwarf_id = 32, .format = RegisterFormat::kVoidAddress},
+    {.id = RegisterID::kARMv8_tpidr, .name = "tpidr", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_tpidr, .bits = 64, .dwarf_id = 36},
 
     {.id = RegisterID::kARMv8_cpsr, .name = "cpsr", .arch = Arch::kArm64, .canonical_id = RegisterID::kARMv8_cpsr, .bits = 64, .format = RegisterFormat::kSpecial},
 
@@ -494,11 +491,10 @@ const RegisterInfo kRegisterInfo[] = {
 //
 // References
 //
-//   X64: https://software.intel.com/sites/default/files/article/402129/mpx-linux64-abi.pdf
-//        Page 62
+//   X64: https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf Page 57
+//
 //   ARM:
-//   http://infocenter.arm.com/help/topic/com.arm.doc.ecm0665627/abi_sve_aadwarf_100985_0000_00_en.pdf
-//        Page 6
+//   https://github.com/ARM-software/abi-aa/blob/main/aadwarf64/aadwarf64.rst#41dwarf-register-names
 //
 // On segment registers, we don't define any accessors for the cs, ds, es, and ss segment registers
 // which must all be 0 on x64. We don't define anything for fs or gs either, these are magic

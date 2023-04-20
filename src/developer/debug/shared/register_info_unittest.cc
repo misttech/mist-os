@@ -15,9 +15,7 @@ TEST(RegisterDesc, DWARFToRegisterInfo_Arm) {
   EXPECT_EQ(RegisterID::kARMv8_x29, DWARFToRegisterInfo(Arch::kArm64, 29)->id);
   EXPECT_EQ(RegisterID::kARMv8_lr, DWARFToRegisterInfo(Arch::kArm64, 30)->id);
   EXPECT_EQ(RegisterID::kARMv8_sp, DWARFToRegisterInfo(Arch::kArm64, 31)->id);
-
-  // DWARF ID 32 is "reserved".
-  EXPECT_FALSE(DWARFToRegisterInfo(Arch::kArm64, 32));
+  EXPECT_EQ(RegisterID::kARMv8_pc, DWARFToRegisterInfo(Arch::kArm64, 32)->id);
 }
 
 TEST(RegisterDesc, DWARFToRegisterInfo_x64) {
