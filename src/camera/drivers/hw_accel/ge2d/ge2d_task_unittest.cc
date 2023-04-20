@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/debug.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/image-format/image_format.h>
@@ -51,17 +54,32 @@ static uint8_t GenFakeCanvasId(zx_handle_t vmo) {
   return out_id;
 }
 
-zx_status_t FakeCanvasConfig(void* ctx, zx_handle_t vmo, size_t offset, const canvas_info_t* info,
-                             uint8_t* out_canvas_idx) {
-  *out_canvas_idx = GenFakeCanvasId(vmo);
-  zx_handle_close(vmo);
-  return ZX_OK;
-}
+class FakeCanvasProtocol : public fidl::WireServer<fuchsia_hardware_amlogiccanvas::Device> {
+ public:
+  explicit FakeCanvasProtocol(async_dispatcher_t* dispatcher = nullptr)
+      : dispatcher_(dispatcher ? dispatcher : async_get_default_dispatcher()) {}
 
-zx_status_t FakeCanvasFree(void* ctx, uint8_t canvas_idx) { return ZX_OK; }
+  void OnFidlClosed(fidl::UnbindInfo info) {}
 
-amlogic_canvas_protocol_ops_t fake_canvas_ops = {FakeCanvasConfig, FakeCanvasFree};
-amlogic_canvas_protocol_t fake_canvas = {&fake_canvas_ops, NULL};
+  void Serve(fidl::ServerEnd<fuchsia_hardware_amlogiccanvas::Device> server_end) {
+    binding_.emplace(dispatcher_, std::move(server_end), this,
+                     std::mem_fn(&FakeCanvasProtocol::OnFidlClosed));
+  }
+
+  void Config(ConfigRequestView request, ConfigCompleter::Sync& completer) override {
+    uint8_t id = GenFakeCanvasId(request->vmo.get());
+    request->vmo.reset();
+    completer.ReplySuccess(id);
+  }
+
+  void Free(FreeRequestView request, FreeCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+
+ private:
+  async_dispatcher_t* dispatcher_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
+};
 
 template <typename T>
 ddk_mock::MockMmioReg& GetMockReg(ddk_mock::MockMmioRegRegion& registers) {
@@ -235,7 +253,7 @@ class TaskTest : public zxtest::Test {
     ge2d_device_ = std::make_unique<Ge2dDevice>(
         nullptr, fdf::MmioBuffer(fake_regs.GetMmioBuffer()), std::move(irq), std::move(bti_handle_),
         std::move(port), std::move(watermark_input_contiguous_vmos_),
-        std::move(watermark_blended_contiguous_vmo_), fake_canvas);
+        std::move(watermark_blended_contiguous_vmo_), take_fake_canvas());
 
     uint32_t task_id;
     zx::vmo watermark_vmo;
@@ -259,6 +277,23 @@ class TaskTest : public zxtest::Test {
     EXPECT_OK(ge2d_device_->StartThread());
 
     return ZX_OK;
+  }
+
+  void SetUp() override {
+    loop_.StartThread("canvas-handler-loop");
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
+    ASSERT_OK(endpoints);
+    canvas_.SyncCall(&FakeCanvasProtocol::Serve, std::move(endpoints.value().server));
+    fake_canvas_ = std::move(endpoints.value().client);
+    borrowed_fake_canvas_ = fake_canvas_.borrow();
+  }
+
+  fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device> take_fake_canvas() {
+    return std::move(fake_canvas_);
+  }
+
+  fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> fake_canvas() {
+    return borrowed_fake_canvas_.value();
   }
 
   void TearDown() override {
@@ -300,6 +335,12 @@ class TaskTest : public zxtest::Test {
   bool frame_ready_;
   std::mutex lock_;
   std::condition_variable_any event_;
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<FakeCanvasProtocol> canvas_{loop_.dispatcher(),
+                                                                  std::in_place};
+  fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device> fake_canvas_;
+  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device>>
+      borrowed_fake_canvas_;
 };
 
 TEST_F(TaskTest, BasicCreationTest) {
@@ -310,13 +351,13 @@ TEST_F(TaskTest, BasicCreationTest) {
   status = resize_task->InitResize(
       &input_buffer_collection_, &output_buffer_collection_, &resize_info_,
       &output_image_format_table_[0], output_image_format_table_, kImageFormatTableSize, 0,
-      &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas);
+      &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas());
   EXPECT_OK(status);
   status = watermark_task->InitWatermark(
       &input_buffer_collection_, &output_buffer_collection_, duplicated_watermark_info_.data(),
       output_image_format_table_, kImageFormatTableSize, 0, watermark_input_contiguous_vmos_,
       watermark_blended_contiguous_vmo_, &frame_callback_, &res_callback_, &remove_task_callback_,
-      bti_handle_, fake_canvas);
+      bti_handle_, fake_canvas());
   EXPECT_OK(status);
 }
 
@@ -329,7 +370,7 @@ TEST_F(TaskTest, CanvasIdTest) {
   status = task->InitResize(&input_buffer_collection_, &output_buffer_collection_, &resize_info_,
                             &output_image_format_table_[0], output_image_format_table_,
                             kImageFormatTableSize, 0, &frame_callback_, &res_callback_,
-                            &remove_task_callback_, bti_handle_, fake_canvas);
+                            &remove_task_callback_, bti_handle_, fake_canvas());
   EXPECT_OK(status);
   for (uint32_t i = 0; i < input_buffer_collection_.buffer_count; i++) {
     zx_handle_t vmo_handle = input_buffer_collection_.buffers[i].vmo;
@@ -361,11 +402,11 @@ TEST_F(TaskTest, WatermarkResTest) {
   SetUpBufferCollections(kNumberOfBuffers);
   auto wm_task = std::make_unique<Ge2dTask>();
   zx_status_t status;
-  status = wm_task->InitWatermark(&input_buffer_collection_, &output_buffer_collection_,
-                                  duplicated_watermark_info_.data(), output_image_format_table_,
-                                  kImageFormatTableSize, 0, watermark_input_contiguous_vmos_,
-                                  watermark_blended_contiguous_vmo_, &frame_callback_,
-                                  &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas);
+  status = wm_task->InitWatermark(
+      &input_buffer_collection_, &output_buffer_collection_, duplicated_watermark_info_.data(),
+      output_image_format_table_, kImageFormatTableSize, 0, watermark_input_contiguous_vmos_,
+      watermark_blended_contiguous_vmo_, &frame_callback_, &res_callback_, &remove_task_callback_,
+      bti_handle_, fake_canvas());
   EXPECT_OK(status);
   image_format_2_t format = wm_task->WatermarkFormat();
   EXPECT_EQ(format.display_width, kWidth / 4);
@@ -379,7 +420,7 @@ TEST_F(TaskTest, InitOutputResTest) {
   status = resize_task->InitResize(
       &input_buffer_collection_, &output_buffer_collection_, &resize_info_,
       &output_image_format_table_[2], output_image_format_table_, kImageFormatTableSize, 2,
-      &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas);
+      &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas());
   EXPECT_OK(status);
   image_format_2_t format = resize_task->output_format();
   EXPECT_EQ(format.display_width, kWidth / 4);
@@ -393,7 +434,7 @@ TEST_F(TaskTest, InitInputResTest) {
   status = resize_task->InitResize(
       &input_buffer_collection_, &output_buffer_collection_, &resize_info_,
       &output_image_format_table_[2], output_image_format_table_, kImageFormatTableSize, 2,
-      &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas);
+      &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_, fake_canvas());
   EXPECT_OK(status);
   image_format_2_t format = resize_task->input_format();
   EXPECT_EQ(format.display_width, kWidth / 4);
@@ -411,7 +452,7 @@ TEST_F(TaskTest, InvalidFormatTest) {
             task->InitResize(&input_buffer_collection_, &output_buffer_collection_, &resize_info_,
                              &format, output_image_format_table_, kImageFormatTableSize, 0,
                              &frame_callback_, &res_callback_, &remove_task_callback_, bti_handle_,
-                             fake_canvas));
+                             fake_canvas()));
 }
 
 TEST_F(TaskTest, InvalidVmoTest) {
@@ -421,7 +462,7 @@ TEST_F(TaskTest, InvalidVmoTest) {
   status = task->InitResize(&input_buffer_collection_, &output_buffer_collection_, &resize_info_,
                             &output_image_format_table_[0], output_image_format_table_,
                             kImageFormatTableSize, 0, &frame_callback_, &res_callback_,
-                            &remove_task_callback_, bti_handle_, fake_canvas);
+                            &remove_task_callback_, bti_handle_, fake_canvas());
   // Expecting Task setup to be returning an error when there are
   // no VMOs in the buffer collection. At the moment VmoPool library
   // doesn't return an error.
@@ -746,7 +787,7 @@ TEST_F(TaskTest, DropFrameTest) {
   ASSERT_OK(ge2d_device_->StopThread());
 }
 
-TEST(TaskTest, NonContigVmoTest) {
+TEST_F(TaskTest, NonContigVmoTest) {
   zx::bti bti_handle;
   hw_accel_frame_callback_t frame_callback;
   hw_accel_res_change_callback_t res_callback;
@@ -796,7 +837,7 @@ TEST(TaskTest, NonContigVmoTest) {
                                duplicated_watermark_info.data(), image_format_table,
                                kImageFormatTableSize, 0, watermark_input_contiguous_vmos,
                                watermark_blended_contiguous_vmo, &frame_callback, &res_callback,
-                               &remove_task_callback, bti_handle, fake_canvas);
+                               &remove_task_callback, bti_handle, fake_canvas());
   // Expecting Task setup to be returning an error when watermark vmo is not
   // contig.
   EXPECT_NE(ZX_OK, status);
@@ -806,7 +847,7 @@ TEST(TaskTest, NonContigVmoTest) {
   EXPECT_OK(camera::DestroyContiguousBufferCollection(output_buffer_collection));
 }
 
-TEST(TaskTest, InvalidBufferCollectionTest) {
+TEST_F(TaskTest, InvalidBufferCollectionTest) {
   zx::bti bti_handle;
   hw_accel_frame_callback_t frame_callback;
   hw_accel_res_change_callback_t res_callback;
@@ -845,7 +886,7 @@ TEST(TaskTest, InvalidBufferCollectionTest) {
   status = task->InitWatermark(
       nullptr, nullptr, duplicated_watermark_info.data(), image_format_table, kImageFormatTableSize,
       0, watermark_input_contiguous_vmos, watermark_blended_contiguous_vmo, &frame_callback,
-      &res_callback, &remove_task_callback, bti_handle, fake_canvas);
+      &res_callback, &remove_task_callback, bti_handle, fake_canvas());
   EXPECT_NE(ZX_OK, status);
 }
 
@@ -857,7 +898,7 @@ TEST_F(TaskTest, ReuseWatermarkContiguousVmoTest) {
       &input_buffer_collection_, &output_buffer_collection_, duplicated_watermark_info_.data(),
       output_image_format_table_, kImageFormatTableSize, 0, watermark_input_contiguous_vmos_,
       watermark_blended_contiguous_vmo_, &frame_callback_, &res_callback_, &remove_task_callback_,
-      bti_handle_, fake_canvas);
+      bti_handle_, fake_canvas());
   EXPECT_OK(status);
 
   EXPECT_EQ(fsl::GetKoid(watermark_blended_contiguous_vmo_.get()),
@@ -880,7 +921,7 @@ TEST_F(TaskTest, CreateWatermarkContiguousVmoTest) {
       &input_buffer_collection_, &output_buffer_collection_, duplicated_watermark_info_.data(),
       output_image_format_table_, kImageFormatTableSize, 0, watermark_input_contiguous_vmos_,
       watermark_blended_contiguous_vmo_, &frame_callback_, &res_callback_, &remove_task_callback_,
-      bti_handle_, fake_canvas);
+      bti_handle_, fake_canvas());
   EXPECT_OK(status);
 
   // The InitWatermark task should detect that the original watermark_blended_contiguous_vmo_ is too

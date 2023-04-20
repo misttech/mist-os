@@ -10,7 +10,7 @@
 #define _ALL_SOURCE  // Enables thrd_create_with_name in <threads.h>.
 #include <threads.h>
 #endif
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -55,7 +55,8 @@ class Ge2dDevice : public Ge2dDeviceType, public ddk::Ge2dProtocol<Ge2dDevice, d
   explicit Ge2dDevice(zx_device_t* parent, fdf::MmioBuffer ge2d_mmio, zx::interrupt ge2d_irq,
                       zx::bti bti, zx::port port,
                       std::vector<zx::vmo> watermark_input_contiguous_vmos,
-                      zx::vmo watermark_blended_contiguous_vmo, amlogic_canvas_protocol_t canvas)
+                      zx::vmo watermark_blended_contiguous_vmo,
+                      fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas)
       : Ge2dDeviceType(parent),
         port_(std::move(port)),
         ge2d_mmio_(std::move(ge2d_mmio)),
@@ -63,7 +64,7 @@ class Ge2dDevice : public Ge2dDeviceType, public ddk::Ge2dProtocol<Ge2dDevice, d
         bti_(std::move(bti)),
         watermark_input_contiguous_vmos_(std::move(watermark_input_contiguous_vmos)),
         watermark_blended_contiguous_vmo_(std::move(watermark_blended_contiguous_vmo)),
-        canvas_(canvas) {}
+        canvas_(std::move(canvas)) {}
 
   // Setup() is used to create an instance of Ge2dDevice.
   static zx_status_t Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* out);
@@ -124,7 +125,9 @@ class Ge2dDevice : public Ge2dDeviceType, public ddk::Ge2dProtocol<Ge2dDevice, d
   zx_status_t StartThread();
   zx_status_t StopThread();
   const zx::bti& bti() const { return bti_; }
-  amlogic_canvas_protocol_t canvas() const { return canvas_; }
+  fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas() const {
+    return canvas_.borrow();
+  }
 
  protected:
   enum Ge2dOp {
@@ -202,7 +205,7 @@ class Ge2dDevice : public Ge2dDeviceType, public ddk::Ge2dProtocol<Ge2dDevice, d
   thrd_t processing_thread_;
   fbl::ConditionVariable frame_processing_signal_ __TA_GUARDED(lock_);
   bool shutdown_ __TA_GUARDED(lock_) = false;
-  amlogic_canvas_protocol_t canvas_ = {};
+  fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas_ = {};
 };
 }  // namespace ge2d
 

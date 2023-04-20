@@ -5,7 +5,7 @@
 #ifndef SRC_CAMERA_DRIVERS_HW_ACCEL_GE2D_GE2D_TASK_H_
 #define SRC_CAMERA_DRIVERS_HW_ACCEL_GE2D_GE2D_TASK_H_
 
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fuchsia/hardware/ge2d/cpp/banjo.h>
 
 #include <deque>
@@ -21,7 +21,8 @@ namespace ge2d {
 class ScopedCanvasId {
  public:
   ScopedCanvasId() = default;
-  ScopedCanvasId(const amlogic_canvas_protocol_t* canvas, uint8_t id) : canvas_(canvas), id_(id) {}
+  ScopedCanvasId(fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas, uint8_t id)
+      : canvas_(canvas), id_(id) {}
   ScopedCanvasId(ScopedCanvasId&& other);
   ScopedCanvasId(const ScopedCanvasId&) = delete;
 
@@ -30,12 +31,16 @@ class ScopedCanvasId {
 
   ~ScopedCanvasId() { Reset(); }
 
+  void set_canvas(fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas) {
+    canvas_ = canvas;
+  }
+
   void Reset();
   uint8_t id() const { return id_; }
   bool valid() const { return static_cast<bool>(canvas_); }
 
  private:
-  const amlogic_canvas_protocol_t* canvas_ = nullptr;
+  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas_;
   uint8_t id_ = 0;
 };
 
@@ -80,7 +85,8 @@ class Ge2dTask : public generictask::GenericTask {
                          const hw_accel_frame_callback_t* frame_callback,
                          const hw_accel_res_change_callback_t* res_callback,
                          const hw_accel_remove_task_callback_t* remove_task_callback,
-                         const zx::bti& bti, amlogic_canvas_protocol_t canvas);
+                         const zx::bti& bti,
+                         fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas);
 
   // We use the same image format list (and image format index) for both input and output
   // for watermark tasks.
@@ -94,20 +100,19 @@ class Ge2dTask : public generictask::GenericTask {
                             const hw_accel_frame_callback_t* frame_callback,
                             const hw_accel_res_change_callback_t* res_callback,
                             const hw_accel_remove_task_callback_t* remove_task_callback,
-                            const zx::bti& bti, amlogic_canvas_protocol_t canvas);
+                            const zx::bti& bti,
+                            fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas);
 
   // We use the same image format list (and image format index) for both input and output
   // for watermark tasks.
-  zx_status_t InitInPlaceWatermark(const buffer_collection_info_2_t* input_buffer_collection,
-                                   const water_mark_info_t* info_list,
-                                   const image_format_2_t* image_format_table_list,
-                                   size_t image_format_table_count, uint32_t image_format_index,
-                                   std::vector<zx::vmo>& watermark_input_contiguous_vmos,
-                                   zx::vmo& watermark_blended_contiguous_vmo,
-                                   const hw_accel_frame_callback_t* frame_callback,
-                                   const hw_accel_res_change_callback_t* res_callback,
-                                   const hw_accel_remove_task_callback_t* remove_task_callback,
-                                   const zx::bti& bti, amlogic_canvas_protocol_t canvas);
+  zx_status_t InitInPlaceWatermark(
+      const buffer_collection_info_2_t* input_buffer_collection, const water_mark_info_t* info_list,
+      const image_format_2_t* image_format_table_list, size_t image_format_table_count,
+      uint32_t image_format_index, std::vector<zx::vmo>& watermark_input_contiguous_vmos,
+      zx::vmo& watermark_blended_contiguous_vmo, const hw_accel_frame_callback_t* frame_callback,
+      const hw_accel_res_change_callback_t* res_callback,
+      const hw_accel_remove_task_callback_t* remove_task_callback, const zx::bti& bti,
+      fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas);
 
   const image_canvas_id_t& GetOutputCanvasIds(zx_handle_t vmo) {
     auto entry = buffer_map_.find(vmo);
@@ -155,11 +160,11 @@ class Ge2dTask : public generictask::GenericTask {
                    const hw_accel_frame_callback_t* frame_callback,
                    const hw_accel_res_change_callback_t* res_callback,
                    const hw_accel_remove_task_callback_t* remove_task_callback, const zx::bti& bti);
-  zx_status_t InitializeWatermarkImages(const water_mark_info_t* wm_info,
-                                        size_t image_format_table_count, const zx::bti& bti,
-                                        std::vector<zx::vmo>& watermark_input_contiguous_vmos,
-                                        zx::vmo& watermark_blended_contiguous_vmo,
-                                        amlogic_canvas_protocol_t canvas);
+  zx_status_t InitializeWatermarkImages(
+      const water_mark_info_t* wm_info, size_t image_format_table_count, const zx::bti& bti,
+      std::vector<zx::vmo>& watermark_input_contiguous_vmos,
+      zx::vmo& watermark_blended_contiguous_vmo,
+      fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas);
   // Allocates canvas ids for every frame in the input and output buffer collections
   // (amlogic). One canvas id is allocated per plane of the image frame. Internally,
   // canvas id allocation pins the vmos (zx_bit_pin()).
@@ -168,7 +173,8 @@ class Ge2dTask : public generictask::GenericTask {
                              const image_format_2_t* input_image_format,
                              const image_format_2_t* output_image_format);
   zx_status_t AllocCanvasId(const image_format_2_t* image_format, zx_handle_t vmo_in,
-                            image_canvas_id_t& canvas_ids, uint32_t alloc_flag);
+                            image_canvas_id_t& canvas_ids,
+                            fuchsia_hardware_amlogiccanvas::CanvasFlags alloc_flag);
   // Called from AllocCanvasIds() to allocate canvas ids for input and output buffer
   // collections.
   zx_status_t AllocInputCanvasIds(const buffer_collection_info_2_t* input_buffer_collection,
@@ -183,7 +189,7 @@ class Ge2dTask : public generictask::GenericTask {
                                                 zx::vmo& result);
 
   enum Ge2dTaskType task_type_;
-  amlogic_canvas_protocol_t canvas_ = {};
+  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas_;
   std::unique_ptr<image_format_2_t[]> output_image_format_list_;
   struct watermark_info {
     uint32_t loc_x;

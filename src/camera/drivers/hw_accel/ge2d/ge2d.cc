@@ -4,7 +4,6 @@
 
 #include "src/camera/drivers/hw_accel/ge2d/ge2d.h"
 
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
@@ -981,13 +980,13 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
     return status;
   }
 
-  ddk::AmlogicCanvasProtocolClient canvas(parent, "canvas");
-  if (!canvas.is_valid()) {
+  zx::result canvas_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_amlogiccanvas::Service::Device>(parent,
+                                                                                      "canvas");
+  if (canvas_result.is_error()) {
     FX_LOGST(ERROR, kTag) << "Could not get Amlogic Canvas protocol";
     return ZX_ERR_NO_RESOURCES;
   }
-  amlogic_canvas_protocol_t c;
-  canvas.GetProto(&c);
 
   // TODO(fxbug.dev/43822): Initialize clock.
   GenCtrl1::Get().FromValue(0).set_soft_reset(1).WriteTo(&*ge2d_mmio);
@@ -1014,7 +1013,8 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
 
   auto ge2d_device = std::make_unique<Ge2dDevice>(
       parent, std::move(*ge2d_mmio), std::move(ge2d_irq), std::move(bti), std::move(port),
-      std::move(watermark_input_contiguous_vmos), std::move(watermark_blended_contiguous_vmo), c);
+      std::move(watermark_input_contiguous_vmos), std::move(watermark_blended_contiguous_vmo),
+      std::move(canvas_result.value()));
 
   status = ge2d_device->StartThread();
   *out = std::move(ge2d_device);

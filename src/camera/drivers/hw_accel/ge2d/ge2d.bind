@@ -4,6 +4,7 @@
 
 composite ge2d;
 
+using fuchsia.hardware.amlogiccanvas;
 using fuchsia.amlogic.platform;
 using fuchsia.camerasensor2;
 using fuchsia.platform;
@@ -13,7 +14,7 @@ primary node "camera-sensor" {
 }
 
 node "canvas" {
-  fuchsia.BIND_PROTOCOL == fuchsia.amlogic.platform.BIND_PROTOCOL.CANVAS;
+  fuchsia.hardware.amlogiccanvas.Service == fuchsia.hardware.amlogiccanvas.Service.ZirconTransport;
 }
 
 node "pdev" {

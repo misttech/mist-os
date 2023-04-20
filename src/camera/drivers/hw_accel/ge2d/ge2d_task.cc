@@ -23,55 +23,72 @@ namespace ge2d {
 ScopedCanvasId::ScopedCanvasId(ScopedCanvasId&& other) {
   canvas_ = other.canvas_;
   id_ = other.id_;
-  other.canvas_ = nullptr;
+  other.canvas_ = std::nullopt;
 }
 ScopedCanvasId& ScopedCanvasId::operator=(ScopedCanvasId&& other) {
   Reset();
   canvas_ = other.canvas_;
   id_ = other.id_;
-  other.canvas_ = nullptr;
+  other.canvas_ = std::nullopt;
   return *this;
 }
 
 void ScopedCanvasId::Reset() {
-  if (canvas_) {
-    amlogic_canvas_free(canvas_, id_);
+  if (canvas_.has_value()) {
+    fidl::WireResult result = fidl::WireCall(canvas_.value())->Free(id_);
+    if (!result.ok()) {
+      FX_LOGST(WARNING, kTag) << "Failed to call Canvas Free: "
+                              << result.error().FormatDescription().c_str();
+    } else if (result->is_error()) {
+      FX_LOGST(WARNING, kTag) << "Canvas Free failed: "
+                              << zx_status_get_string(result->error_value());
+    }
   }
-  canvas_ = nullptr;
+  canvas_ = std::nullopt;
   id_ = 0;
 }
 
-static zx_status_t CanvasConfig(const amlogic_canvas_protocol_t* canvas, zx_handle_t vmo,
-                                uint32_t offset, const canvas_info_t* info,
-                                ScopedCanvasId* canvas_id_out) {
-  uint8_t id;
+zx_status_t CanvasConfig(fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas,
+                         zx_handle_t vmo, uint32_t offset,
+                         fuchsia_hardware_amlogiccanvas::wire::CanvasInfo info,
+                         ScopedCanvasId* canvas_id_out) {
   zx_handle_t vmo_dup;
   zx_status_t status = zx_handle_duplicate(vmo, ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
   if (status != ZX_OK) {
     return status;
   }
-  status = amlogic_canvas_config(canvas, vmo_dup, offset, info, &id);
-  if (status != ZX_OK) {
-    return status;
+
+  fidl::WireResult result = fidl::WireCall(canvas)->Config(zx::vmo(vmo_dup), offset, info);
+  if (!result.ok()) {
+    FX_LOGST(WARNING, kTag) << "Failed to call Canvas Config: "
+                            << result.error().FormatDescription().c_str();
+    return result.error().status();
   }
-  *canvas_id_out = ScopedCanvasId(canvas, id);
+
+  if (result->is_error()) {
+    FX_LOGST(WARNING, kTag) << "Canvas Config failed: "
+                            << zx_status_get_string(result->error_value());
+    return result->error_value();
+  }
+
+  *canvas_id_out = ScopedCanvasId(canvas, result->value()->canvas_idx);
   return ZX_OK;
 }
 
 zx_status_t Ge2dTask::AllocCanvasId(const image_format_2_t* image_format, zx_handle_t vmo_in,
-                                    image_canvas_id_t& canvas_ids, uint32_t alloc_flag) {
-  canvas_info_t info;
+                                    image_canvas_id_t& canvas_ids,
+                                    fuchsia_hardware_amlogiccanvas::CanvasFlags alloc_flag) {
+  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo info;
   info.height = image_format->display_height;
   info.stride_bytes = image_format->bytes_per_row;
-  info.wrap = 0;
-  info.blkmode = 0;
+  info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
   // Do 64-bit endianness conversion.
-  info.endianness = kEndianness;
+  info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness(kEndianness);
   info.flags = alloc_flag;
   zx_status_t status;
 
-  status = CanvasConfig(&canvas_, vmo_in, 0,  // offset of plane 0 is at 0.
-                        &info, &canvas_ids.canvas_idx[kYComponent]);
+  status = CanvasConfig(canvas_.value(), vmo_in, 0,  // offset of plane 0 is at 0.
+                        info, &canvas_ids.canvas_idx[kYComponent]);
   if (status != ZX_OK) {
     return status;
   }
@@ -83,9 +100,9 @@ zx_status_t Ge2dTask::AllocCanvasId(const image_format_2_t* image_format, zx_han
   }
 
   info.height /= 2;  // For NV12, second plane height is 1/2 first.
-  status =
-      CanvasConfig(&canvas_, vmo_in, image_format->display_height * image_format->bytes_per_row,
-                   &info, &canvas_ids.canvas_idx[kUVComponent]);
+  status = CanvasConfig(canvas_.value(), vmo_in,
+                        image_format->display_height * image_format->bytes_per_row, info,
+                        &canvas_ids.canvas_idx[kUVComponent]);
   if (status != ZX_OK) {
     return ZX_ERR_NO_RESOURCES;
   }
@@ -109,9 +126,10 @@ zx_status_t Ge2dTask::AllocInputCanvasIds(const buffer_collection_info_2_t* inpu
   auto input_image_canvas_ids =
       std::make_unique<input_image_canvas_id_t[]>(input_buffer_collection->buffer_count);
   for (uint32_t i = 0; i < input_buffer_collection->buffer_count; i++) {
-    uint32_t flags = CANVAS_FLAGS_READ;
+    fuchsia_hardware_amlogiccanvas::CanvasFlags flags =
+        fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead;
     if (enable_write)
-      flags |= CANVAS_FLAGS_WRITE;
+      flags |= fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite;
     zx_status_t status = AllocCanvasId(input_image_format, input_buffer_collection->buffers[i].vmo,
                                        input_image_canvas_ids[i].canvas_ids, flags);
     if (status != ZX_OK) {
@@ -164,7 +182,8 @@ zx_status_t Ge2dTask::AllocOutputCanvasIds(
     zx_handle_t vmo_handle = buf_canvas_ids[i].output_buffer.vmo_handle();
     zx_status_t status =
         AllocCanvasId(output_image_format, vmo_handle, buf_canvas_ids[i].canvas_ids,
-                      CANVAS_FLAGS_READ | CANVAS_FLAGS_WRITE);
+                      fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+                          fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite);
     if (status != ZX_OK) {
       for (uint32_t j = 0; j < i; j++) {
         ReleaseOutputBuffer(std::move(buf_canvas_ids[j].output_buffer));
@@ -218,8 +237,9 @@ void Ge2dTask::Ge2dChangeOutputRes(uint32_t new_output_buffer_index) {
   image_format_2_t format = output_format();
   for (auto& it : buffer_map_) {
     image_canvas_id_t canvas_ids;
-    zx_status_t status =
-        AllocCanvasId(&format, it.first, canvas_ids, CANVAS_FLAGS_READ | CANVAS_FLAGS_WRITE);
+    zx_status_t status = AllocCanvasId(&format, it.first, canvas_ids,
+                                       fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+                                           fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite);
     ZX_ASSERT(status == ZX_OK);
     it.second = std::move(canvas_ids);
   }
@@ -233,12 +253,13 @@ void Ge2dTask::AllocateWatermarkCanvasIds() {
     auto& wm = wm_[input_format_index()];
     image_canvas_id_t canvas_ids;
     zx_status_t status = AllocCanvasId(&wm.image_format, wm.watermark_input_vmo.get(), canvas_ids,
-                                       CANVAS_FLAGS_READ);
+                                       fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead);
     ZX_ASSERT(status == ZX_OK);
     wm.input_canvas_id = std::move(canvas_ids);
 
     status = AllocCanvasId(&wm.image_format, watermark_blended_vmo_.get(), canvas_ids,
-                           CANVAS_FLAGS_READ | CANVAS_FLAGS_WRITE);
+                           fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+                               fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite);
     ZX_ASSERT(status == ZX_OK);
     wm_blended_canvas_id_ = std::move(canvas_ids);
   }
@@ -251,7 +272,8 @@ void Ge2dTask::Ge2dChangeInputRes(uint32_t new_input_buffer_index) {
   for (uint32_t j = 0; j < num_input_canvas_ids_; j++) {
     image_canvas_id_t canvas_ids;
     zx_status_t status = AllocCanvasId(&format, input_image_canvas_ids_[j].vmo.get(), canvas_ids,
-                                       CANVAS_FLAGS_READ | CANVAS_FLAGS_WRITE);
+                                       fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+                                           fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite);
     ZX_ASSERT(status == ZX_OK);
     input_image_canvas_ids_[j].canvas_ids = std::move(canvas_ids);
   }
@@ -301,17 +323,15 @@ zx_status_t Ge2dTask::Init(const buffer_collection_info_2_t* input_buffer_collec
   return status;
 }
 
-zx_status_t Ge2dTask::InitResize(const buffer_collection_info_2_t* input_buffer_collection,
-                                 const buffer_collection_info_2_t* output_buffer_collection,
-                                 const resize_info_t* info,
-                                 const image_format_2_t* input_image_format,
-                                 const image_format_2_t* output_image_format_table_list,
-                                 size_t output_image_format_table_count,
-                                 uint32_t output_image_format_index,
-                                 const hw_accel_frame_callback_t* frame_callback,
-                                 const hw_accel_res_change_callback_t* res_callback,
-                                 const hw_accel_remove_task_callback_t* remove_task_callback,
-                                 const zx::bti& bti, amlogic_canvas_protocol_t canvas) {
+zx_status_t Ge2dTask::InitResize(
+    const buffer_collection_info_2_t* input_buffer_collection,
+    const buffer_collection_info_2_t* output_buffer_collection, const resize_info_t* info,
+    const image_format_2_t* input_image_format,
+    const image_format_2_t* output_image_format_table_list, size_t output_image_format_table_count,
+    uint32_t output_image_format_index, const hw_accel_frame_callback_t* frame_callback,
+    const hw_accel_res_change_callback_t* res_callback,
+    const hw_accel_remove_task_callback_t* remove_task_callback, const zx::bti& bti,
+    fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas) {
   canvas_ = canvas;
 
   zx_status_t status =
@@ -334,7 +354,8 @@ zx_status_t Ge2dTask::InitResize(const buffer_collection_info_2_t* input_buffer_
 zx_status_t Ge2dTask::InitializeWatermarkImages(
     const water_mark_info_t* wm_info, size_t image_format_table_count, const zx::bti& bti,
     std::vector<zx::vmo>& watermark_input_contiguous_vmos,
-    zx::vmo& watermark_blended_contiguous_vmo, amlogic_canvas_protocol_t canvas) {
+    zx::vmo& watermark_blended_contiguous_vmo,
+    fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas) {
   size_t max_size = 0;
   zx_status_t status;
 
@@ -471,17 +492,15 @@ zx_status_t Ge2dTask::InitContiguousWatermarkVmo(zx::vmo& contiguous_watermark_v
   return ZX_OK;
 }
 
-zx_status_t Ge2dTask::InitWatermark(const buffer_collection_info_2_t* input_buffer_collection,
-                                    const buffer_collection_info_2_t* output_buffer_collection,
-                                    const water_mark_info_t* wm_info,
-                                    const image_format_2_t* image_format_table_list,
-                                    size_t image_format_table_count, uint32_t image_format_index,
-                                    std::vector<zx::vmo>& watermark_input_contiguous_vmos,
-                                    zx::vmo& watermark_blended_contiguous_vmo,
-                                    const hw_accel_frame_callback_t* frame_callback,
-                                    const hw_accel_res_change_callback_t* res_callback,
-                                    const hw_accel_remove_task_callback_t* remove_task_callback,
-                                    const zx::bti& bti, amlogic_canvas_protocol_t canvas) {
+zx_status_t Ge2dTask::InitWatermark(
+    const buffer_collection_info_2_t* input_buffer_collection,
+    const buffer_collection_info_2_t* output_buffer_collection, const water_mark_info_t* wm_info,
+    const image_format_2_t* image_format_table_list, size_t image_format_table_count,
+    uint32_t image_format_index, std::vector<zx::vmo>& watermark_input_contiguous_vmos,
+    zx::vmo& watermark_blended_contiguous_vmo, const hw_accel_frame_callback_t* frame_callback,
+    const hw_accel_res_change_callback_t* res_callback,
+    const hw_accel_remove_task_callback_t* remove_task_callback, const zx::bti& bti,
+    fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas) {
   canvas_ = canvas;
 
   zx_status_t status = Init(input_buffer_collection, output_buffer_collection,
@@ -506,7 +525,7 @@ zx_status_t Ge2dTask::InitInPlaceWatermark(
     zx::vmo& watermark_blended_contiguous_vmo, const hw_accel_frame_callback_t* frame_callback,
     const hw_accel_res_change_callback_t* res_callback,
     const hw_accel_remove_task_callback_t* remove_task_callback, const zx::bti& bti,
-    amlogic_canvas_protocol_t canvas) {
+    fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas) {
   canvas_ = canvas;
 
   zx_status_t status =

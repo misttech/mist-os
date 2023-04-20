@@ -23,6 +23,7 @@
 #include <bind/fuchsia/gdc/cpp/bind.h>
 #include <bind/fuchsia/ge2d/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
 #include <bind/fuchsia/mipicsi/cpp/bind.h>
@@ -414,13 +415,13 @@ zx_status_t Sherlock::CameraInit() {
   auto ge2d_canvas_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                                      bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+              fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                                bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 

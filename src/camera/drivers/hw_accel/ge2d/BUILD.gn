@@ -23,6 +23,7 @@ driver_bind_rules("ge2d_bind") {
   # fragments for composite bind rules.
   disable_fragment_gen = true
   deps = [
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.camerasensor2",
     "//src/devices/bind/fuchsia.platform",
@@ -38,9 +39,9 @@ source_set("lib") {
     "ge2d_task.h",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ge2d:fuchsia.hardware.ge2d_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/lib/syslog/cpp",
     "//src/camera/drivers/hw_accel/task:camera-task",
@@ -106,10 +107,10 @@ executable("ge2d_task_unittest_bin") {
   sources = [ "ge2d_task_unittest.cc" ]
   deps = [
     ":lib",
-    "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ge2d:fuchsia.hardware.ge2d_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//src/camera/drivers/test_utils",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -119,6 +120,7 @@ executable("ge2d_task_unittest_bin") {
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/fsl",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
