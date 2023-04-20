@@ -167,7 +167,6 @@ std::ostream& operator<<(std::ostream& os, const AVCodecContext* value) {
   os << fostr::NewLine << "int sample_rate: " << value->sample_rate;
   os << fostr::NewLine << "AVSampleFormat sample_fmt: " << value->sample_fmt;
   os << fostr::NewLine << "int frame_size: " << value->frame_size;
-  os << fostr::NewLine << "int frame_number: " << value->frame_number;
   os << fostr::NewLine << "int block_align: " << value->block_align;
   os << fostr::NewLine << "int cutoff: " << value->cutoff;
   os << fostr::NewLine << "AVAudioServiceType audio_service_type: " << value->audio_service_type;
@@ -375,7 +374,7 @@ std::ostream& operator<<(std::ostream& os, const AVFrame* value) {
     }
     os << fostr::Outdent;
   }
-  os << fostr::NewLine << "int pkt_size: " << value->pkt_size;
+
   return os << fostr::Outdent;
 }
 
