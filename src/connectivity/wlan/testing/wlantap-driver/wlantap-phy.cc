@@ -60,7 +60,7 @@ wlan_tap::SetKeyArgs ToSetKeyArgs(const wlan_softmac::WlanKeyConfiguration& conf
 wlan_tap::TxArgs ToTxArgs(const wlan_softmac::WlanTxPacket pkt) {
   if (pkt.info.phy < wlan_common::WlanPhyType::kDsss ||
       pkt.info.phy > wlan_common::WlanPhyType::kHe) {
-    ZX_PANIC("Unknown PHY in wlan_tx_packet_t: %u.", static_cast<uint8_t>(pkt.info.phy));
+    ZX_PANIC("Unknown PHY in wlan_tx_packet_t: %u.", static_cast<uint32_t>(pkt.info.phy));
   }
   wlan_tap::WlanTxInfo tap_info = {
       .tx_flags = pkt.info.tx_flags,

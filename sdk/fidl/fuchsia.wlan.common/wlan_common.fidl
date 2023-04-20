@@ -18,7 +18,8 @@ type RequestStatus = strict enum {
 
 /// PHY types supporting different MCS and payload data rates.
 /// Based off of dot11PHYType from IEEE 802.11-2016/2020 Annex C + Amendments
-type WlanPhyType = strict enum {
+@available(added=13)
+type WlanPhyType = flexible enum {
     /// IEEE 802.11-2016 Clause 15:
     ///     Direct Sequence Spread Spectrum
     /// Supports 1, 2 Mbps.
@@ -76,6 +77,7 @@ type WlanPhyType = strict enum {
     /// Supports rates of up to 9.6 Gbps (whew!)
     HE = 12;
 };
+
 
 /// This constant defines fixed length for arrays containing PHY types supported by
 /// PHY entities.

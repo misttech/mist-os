@@ -596,6 +596,9 @@ fn validate_radio_cfg(
         | fidl_common::WlanPhyType::He => {
             return Err(StartResult::InvalidArguments(format!("Unsupported PHY type: {:?}", phy)))
         }
+        fidl_common::WlanPhyTypeUnknown!() => {
+            return Err(StartResult::InvalidArguments(format!("Unknown PHY type: {:?}", phy)))
+        }
     }
 
     Ok(OpRadioConfig { phy, channel })
@@ -958,6 +961,7 @@ mod tests {
     #[test_case(false, None, fidl_common::WlanPhyType::Ht, 36, Cbw::Cbw80; "invalid HT width")]
     #[test_case(false, None, fidl_common::WlanPhyType::Erp, 1, Cbw::Cbw40; "non-HT greater than 20 MHz")]
     #[test_case(false, None, fidl_common::WlanPhyType::Ht, 36, Cbw::Cbw80; "HT greater than 40 MHz")]
+    #[test_case(false, None, fidl_common::WlanPhyType::unknown(), 36, Cbw::Cbw40; "Unknown PHY type")]
     #[test_case(false, Some(fake_5ghz_band_capability_ht_cbw(ChanWidthSet::TWENTY_ONLY)),
                 fidl_common::WlanPhyType::Ht, 44, Cbw::Cbw40; "HT 20 MHz only")]
     #[test_case(false, Some(fidl_mlme::BandCapability {
