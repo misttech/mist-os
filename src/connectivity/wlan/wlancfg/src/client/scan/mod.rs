@@ -26,8 +26,8 @@ use {
         stream::{FuturesUnordered, StreamExt},
     },
     itertools::Itertools,
-    log::{debug, error, info, warn},
     std::{collections::HashMap, convert::TryFrom, sync::Arc},
+    tracing::{debug, error, info, warn},
     wlan_common,
 };
 

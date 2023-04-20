@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     futures::channel::oneshot,
     lazy_static::lazy_static,
-    log::warn,
+    tracing::warn,
 };
 
 lazy_static! {

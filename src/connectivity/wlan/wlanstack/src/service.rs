@@ -10,8 +10,8 @@ use fuchsia_async as fasync;
 use fuchsia_inspect_contrib::{auto_persist, inspect_log};
 use fuchsia_zircon as zx;
 use futures::{future::BoxFuture, prelude::*};
-use log::{error, info};
 use std::sync::{atomic::Ordering, Arc};
+use tracing::{error, info};
 
 use crate::device::{self, IfaceMap};
 use crate::inspect;

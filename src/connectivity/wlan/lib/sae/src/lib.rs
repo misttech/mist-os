@@ -19,9 +19,9 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     hmac_utils::{HmacUtils, HmacUtilsImpl},
     ieee80211::{MacAddr, Ssid},
-    log::warn,
     mundane::hash::Sha256,
     num::FromPrimitive,
+    tracing::warn,
     wlan_common::ie::rsn::akm::{self, Akm, AKM_PSK, AKM_SAE},
 };
 

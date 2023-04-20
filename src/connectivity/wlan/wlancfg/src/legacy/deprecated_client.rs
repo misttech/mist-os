@@ -6,7 +6,7 @@ use {
     fidl, fidl_fuchsia_wlan_product_deprecatedclient as deprecated,
     fidl_fuchsia_wlan_sme as fidl_sme,
     futures::prelude::*,
-    log::{debug, error},
+    tracing::{debug, error},
 };
 
 const MAX_CONCURRENT_WLAN_REQUESTS: usize = 1000;

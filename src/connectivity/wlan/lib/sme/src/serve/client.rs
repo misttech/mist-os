@@ -17,9 +17,9 @@ use fuchsia_inspect_contrib::auto_persist;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::{prelude::*, select};
-use log::error;
 use pin_utils::pin_mut;
 use std::sync::{Arc, Mutex};
+use tracing::error;
 use wlan_common::hasher::WlanHasher;
 use wlan_inspect;
 

@@ -9,8 +9,8 @@ use {
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_zircon as zx,
     futures::stream::TryStreamExt,
-    log::{debug, info},
     measure_tape_for_scan_result::Measurable as _,
+    tracing::{debug, info},
 };
 
 // TODO(fxbug.dev/80422): Remove this.

@@ -12,7 +12,7 @@ use {
         SaeUpdate, SaeUpdateSink, Timeout,
     },
     anyhow::{bail, format_err, Error},
-    log::{error, warn},
+    tracing::{error, warn},
     wlan_statemachine::*,
 };
 

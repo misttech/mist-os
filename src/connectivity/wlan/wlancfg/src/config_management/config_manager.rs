@@ -21,7 +21,6 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync,
     futures::lock::Mutex,
-    log::{error, info},
     rand::Rng,
     std::{
         clone::Clone,
@@ -29,6 +28,7 @@ use {
         fs,
         path::Path,
     },
+    tracing::{error, info},
     wlan_metrics_registry::{
         SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations,
         SavedNetworksMigratedMetricDimensionSavedNetworks,

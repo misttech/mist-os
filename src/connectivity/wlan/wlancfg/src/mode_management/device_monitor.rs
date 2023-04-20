@@ -14,8 +14,8 @@ use {
     fidl_fuchsia_wlan_device_service::{DeviceMonitorProxy, DeviceWatcherEvent},
     fuchsia_zircon as zx,
     futures::lock::Mutex,
-    log::{error, info},
     std::sync::Arc,
+    tracing::{error, info},
 };
 
 pub struct Listener {

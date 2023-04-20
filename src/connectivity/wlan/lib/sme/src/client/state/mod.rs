@@ -24,7 +24,7 @@ use {
     fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
     link_state::LinkState,
-    log::{error, info, warn},
+    tracing::{error, info, warn},
     wlan_common::{
         bss::BssDescription,
         format::MacFmt as _,

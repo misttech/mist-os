@@ -17,8 +17,8 @@ use {
     banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     ieee80211::{MacAddr, Ssid},
-    log::error,
     std::collections::{HashMap, VecDeque},
+    tracing::error,
     wlan_common::{
         ie,
         mac::{self, is_multicast, CapabilityInfo, EthernetIIHdr},

@@ -29,11 +29,11 @@ use {
     fuchsia_zircon as zx,
     futures::channel::{mpsc, oneshot},
     ieee80211::{Bssid, Ssid},
-    log::{error, info, warn},
     std::{
         convert::{TryFrom, TryInto},
         sync::Arc,
     },
+    tracing::{error, info, warn},
     wlan_common::{
         self,
         bss::{BssDescription, Protection as BssProtection},

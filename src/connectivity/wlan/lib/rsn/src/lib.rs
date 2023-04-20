@@ -34,8 +34,8 @@ use {
     eapol,
     fidl_fuchsia_wlan_mlme::{EapolResultCode, SaeFrame},
     ieee80211::Ssid,
-    log::warn,
     std::sync::{Arc, Mutex},
+    tracing::warn,
     wlan_common::ie::{
         rsn::{
             cipher::Cipher,

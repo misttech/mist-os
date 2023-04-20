@@ -25,9 +25,9 @@ use {
         select,
         stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt},
     },
-    log::{info, warn},
     parking_lot::Mutex,
     std::{convert::Infallible, sync::Arc},
+    tracing::{info, warn},
     wlan_common::{
         channel::{Cbw, Channel},
         RadioConfig,

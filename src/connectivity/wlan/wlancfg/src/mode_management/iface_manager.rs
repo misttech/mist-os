@@ -35,8 +35,8 @@ use {
         stream::FuturesUnordered,
         FutureExt, StreamExt,
     },
-    log::{debug, error, info, warn},
     std::{convert::Infallible, fmt::Debug, sync::Arc, unimplemented},
+    tracing::{debug, error, info, warn},
     wlan_common::hasher::WlanHasher,
 };
 

@@ -7,8 +7,8 @@ use {
     eui48::MacAddress,
     fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated,
     futures::{lock::Mutex, select, StreamExt},
-    log::{error, info},
     std::sync::Arc,
+    tracing::{error, info},
 };
 
 #[derive(Clone)]

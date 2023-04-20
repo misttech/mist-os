@@ -16,7 +16,7 @@ use crate::rsna::{
 };
 use crate::Error;
 use anyhow::{ensure, format_err};
-use log::{error, warn};
+use tracing::{error, warn};
 use zerocopy::ByteSlice;
 
 #[derive(Debug, PartialEq)]

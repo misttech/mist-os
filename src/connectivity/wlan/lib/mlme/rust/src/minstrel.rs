@@ -7,12 +7,12 @@ use {
     crate::probe_sequence::{ProbeEntry, ProbeSequence},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fuchsia_zircon as zx,
-    log::{debug, error},
     static_assertions::const_assert_eq,
     std::{
         collections::{hash_map, HashMap, HashSet},
         time::Duration,
     },
+    tracing::{debug, error},
     wlan_common::{
         ie::{HtCapabilities, RxMcsBitmask, SupportedRate},
         mac::FrameControl,

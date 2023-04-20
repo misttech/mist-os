@@ -20,7 +20,7 @@ use crate::ProtectionInfo;
 use anyhow::{ensure, format_err};
 use eapol;
 use eapol::KeyFrameBuf;
-use log::error;
+use tracing::error;
 use zerocopy::ByteSlice;
 
 // IEEE Std 802.11-2016, 12.7.6.2

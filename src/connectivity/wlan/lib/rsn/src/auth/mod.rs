@@ -13,7 +13,7 @@ use {
     anyhow,
     fidl_fuchsia_wlan_mlme::SaeFrame,
     ieee80211::{MacAddr, Ssid},
-    log::warn,
+    tracing::warn,
     wlan_common::ie::rsn::akm::AKM_SAE,
     wlan_sae as sae,
     zerocopy::ByteSlice,

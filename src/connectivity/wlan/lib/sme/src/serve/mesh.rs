@@ -13,13 +13,13 @@ use {
         select,
         stream::{self, FuturesUnordered},
     },
-    log::error,
     pin_utils::pin_mut,
     std::{
         convert::Infallible,
         sync::{Arc, Mutex},
         task::Poll,
     },
+    tracing::error,
     wlan_common::timer::TimeEntry,
 };
 

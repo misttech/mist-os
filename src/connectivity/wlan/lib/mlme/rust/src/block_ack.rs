@@ -17,7 +17,7 @@
 use {
     crate::error::Error,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx,
-    log::error,
+    tracing::error,
     wlan_common::{
         appendable::Appendable, buffer_reader::BufferReader, buffer_writer::BufferWriter,
         frame_len, mac,

@@ -7,7 +7,7 @@ use {
         client::types as client_types, config_management::network_config::PastConnectionList,
         util::pseudo_energy::*,
     },
-    log::error,
+    tracing::error,
 };
 
 // Number of previous RSSI measurements to exponentially weigh into average.

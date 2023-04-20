@@ -8,13 +8,13 @@ use {
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_inspect::NumericProperty,
     ieee80211::{Bssid, Ssid},
-    log::warn,
     std::{
         collections::{hash_map, HashMap, HashSet},
         convert::TryInto,
         mem,
         sync::Arc,
     },
+    tracing::warn,
     wlan_common::{
         bss::BssDescription,
         channel::{Cbw, Channel},

@@ -6,8 +6,8 @@ use {
     crate::{mode_management::phy_manager::PhyManagerApi, telemetry},
     fidl_fuchsia_power_clientlevel as fidl_power, fidl_fuchsia_wlan_common as fidl_common,
     futures::lock::Mutex,
-    log::{info, warn},
     std::sync::Arc,
+    tracing::{info, warn},
 };
 
 fn power_level_to_mode(level: u64) -> fidl_common::PowerSaveType {

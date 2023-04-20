@@ -30,11 +30,11 @@ use {
         select,
         stream::{self, StreamExt, TryStreamExt},
     },
-    log::{debug, error, info, warn},
     std::{
         convert::{Infallible, TryFrom},
         sync::Arc,
     },
+    tracing::{debug, error, info, warn},
     wlan_common::{
         bss::BssDescription, energy::DecibelMilliWatt, sequestered::Sequestered,
         stats::SignalStrengthAverage,

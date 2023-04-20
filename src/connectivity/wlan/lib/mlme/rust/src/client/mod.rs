@@ -28,10 +28,10 @@ use {
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
-    log::{error, warn},
     scanner::Scanner,
     state::States,
     std::convert::TryInto,
+    tracing::{error, warn},
     wlan_common::{
         appendable::Appendable,
         bss::BssDescription,

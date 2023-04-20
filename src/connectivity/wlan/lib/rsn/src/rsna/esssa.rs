@@ -23,8 +23,8 @@ use {
     },
     eapol,
     fidl_fuchsia_wlan_mlme::EapolResultCode,
-    log::{error, info},
     std::collections::HashSet,
+    tracing::{error, info},
     wlan_statemachine::StateMachine,
     zerocopy::ByteSlice,
 };

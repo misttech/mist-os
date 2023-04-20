@@ -14,8 +14,8 @@ use {
     fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest},
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     futures::{channel::mpsc, select, stream::FuturesUnordered, StreamExt, TryStreamExt},
-    log::{error, info},
     std::sync::{atomic::Ordering, Arc},
+    tracing::{error, info},
 };
 
 /// Thread-safe counter for spawned ifaces.

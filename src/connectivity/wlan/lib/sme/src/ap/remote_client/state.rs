@@ -11,8 +11,8 @@ use {
     fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon::{self as zx, DurationNum},
     ieee80211::MacAddr,
-    log::error,
     std::sync::{Arc, Mutex},
+    tracing::error,
     wlan_common::{
         ie::{intersect, rsn::rsne, SupportedRate},
         mac::{Aid, CapabilityInfo},

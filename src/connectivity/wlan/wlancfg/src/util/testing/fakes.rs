@@ -18,13 +18,13 @@ use {
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc, lock::Mutex},
-    log::{info, warn},
     rand::Rng,
     std::{
         collections::{HashMap, VecDeque},
         convert::TryInto,
         sync::Arc,
     },
+    tracing::{info, warn},
     wlan_common::hasher::WlanHasher,
 };
 

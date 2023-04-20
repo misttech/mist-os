@@ -35,7 +35,6 @@ use {
     },
     hex,
     lazy_static::lazy_static,
-    log::{debug, info, trace},
     pin_utils::pin_mut,
     std::{
         convert::{Infallible, TryFrom},
@@ -43,6 +42,7 @@ use {
         sync::Arc,
     },
     test_case::test_case,
+    tracing::{debug, info, trace},
     wlan_common::{assert_variant, random_fidl_bss_description},
 };
 

@@ -10,8 +10,8 @@ use {
         future::TryFutureExt as _,
         stream::{Stream, TryStreamExt as _},
     },
-    log::error,
     std::hash::{Hash as _, Hasher as _},
+    tracing::error,
 };
 
 pub struct NewPhyDevice {

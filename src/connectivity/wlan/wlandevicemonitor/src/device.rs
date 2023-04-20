@@ -11,8 +11,8 @@ use {
         pin_mut, select,
         stream::{FuturesUnordered, StreamExt, TryStreamExt},
     },
-    log::{error, info},
     std::{convert::Infallible, sync::Arc},
+    tracing::{error, info},
 };
 
 use crate::{device_watch, inspect, watchable_map::WatchableMap};

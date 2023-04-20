@@ -18,8 +18,8 @@ use {
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
-    log::{error, info, log, warn},
     std::fmt,
+    tracing::{debug, error, info, trace, warn},
     wlan_common::{
         mac::{self, CapabilityInfo},
         timer::{EventId, Timer},
@@ -70,11 +70,20 @@ pub enum Rejection {
 }
 
 impl Rejection {
-    fn log_level(&self) -> log::Level {
+    fn log_level(&self) -> tracing::Level {
         match self {
-            Self::NoSrcAddr | Self::FrameMalformed => log::Level::Error,
+            Self::NoSrcAddr | Self::FrameMalformed => tracing::Level::ERROR,
             Self::Client(_, e) => e.log_level(),
-            _ => log::Level::Trace,
+            _ => tracing::Level::TRACE,
+        }
+    }
+    fn log(&self, msg: &str) {
+        match self.log_level() {
+            tracing::Level::TRACE => trace!("{}: {}", msg, self),
+            tracing::Level::DEBUG => debug!("{}: {}", msg, self),
+            tracing::Level::INFO => info!("{}: {}", msg, self),
+            tracing::Level::WARN => warn!("{}: {}", msg, self),
+            tracing::Level::ERROR => error!("{}: {}", msg, self),
         }
     }
 }
@@ -389,7 +398,7 @@ impl Ap {
             };
 
         if let Err(e) = bss.handle_eth_frame(&mut self.ctx, *hdr, body) {
-            log!(e.log_level(), "failed to handle Ethernet frame: {}", e)
+            e.log("failed to handle Ethernet frame")
         }
     }
 
@@ -443,7 +452,7 @@ impl Ap {
                 return;
             }
         } {
-            log!(e.log_level(), "failed to handle MAC frame: {}", e)
+            e.log("failed to handle MAC frame")
         }
     }
 }

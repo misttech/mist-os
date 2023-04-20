@@ -11,8 +11,8 @@ use {
     },
     anyhow::{bail, Error},
     ieee80211::MacAddr,
-    log::warn,
     num::{integer::Integer, ToPrimitive},
+    tracing::warn,
 };
 
 /// An elliptic curve group to be used as the finite cyclic group for SAE.

@@ -17,8 +17,8 @@ use {
         stream::{FuturesUnordered, StreamExt, TryStreamExt},
         FutureExt, TryFutureExt,
     },
-    log::{error, info, warn},
     std::sync::Arc,
+    tracing::{error, info, warn},
     wlan_common::{channel::Cbw, RadioConfig},
 };
 

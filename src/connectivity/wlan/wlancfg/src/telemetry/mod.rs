@@ -31,7 +31,6 @@ use {
         future::BoxFuture,
         select, Future, FutureExt, StreamExt, TryFutureExt,
     },
-    log::{error, info, warn},
     num_traits::SaturatingAdd,
     parking_lot::Mutex,
     static_assertions::const_assert_eq,
@@ -44,6 +43,7 @@ use {
             Arc,
         },
     },
+    tracing::{error, info, warn},
     wlan_common::{format::MacFmt, hasher::WlanHasher},
     wlan_metrics_registry as metrics,
 };

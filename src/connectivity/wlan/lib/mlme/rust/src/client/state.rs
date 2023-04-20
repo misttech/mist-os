@@ -23,9 +23,9 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     ieee80211::MacAddr,
-    log::{debug, error, info, trace, warn},
     static_assertions::assert_eq_size,
     std::convert::TryInto,
+    tracing::{debug, error, info, trace, warn},
     wlan_common::{
         buffer_reader::BufferReader,
         capabilities::{intersect_with_ap_as_client, ApCapabilities, StaCapabilities},

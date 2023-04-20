@@ -8,7 +8,7 @@ use {
         integrity::Algorithm,
         Error,
     },
-    log::error,
+    tracing::error,
 };
 
 /// The AES CMAC-128 algorithm is used for integrity checks on AKMS 00-0F-AC:3 through 00-0F-AC:9.

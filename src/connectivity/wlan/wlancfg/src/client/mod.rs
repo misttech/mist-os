@@ -23,8 +23,8 @@ use {
         select,
         stream::FuturesUnordered,
     },
-    log::{error, info, warn},
     std::{convert::TryFrom, sync::Arc},
+    tracing::{error, info, warn},
 };
 
 pub mod bss_selection;

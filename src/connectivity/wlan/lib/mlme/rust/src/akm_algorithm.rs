@@ -6,7 +6,7 @@ use {
     crate::auth,
     anyhow::{bail, Error},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    log::error,
+    tracing::error,
     wlan_common::mac,
 };
 

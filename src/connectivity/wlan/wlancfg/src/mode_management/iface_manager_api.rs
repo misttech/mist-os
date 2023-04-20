@@ -14,7 +14,7 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_wlan_sme as fidl_sme,
     futures::channel::{mpsc, oneshot},
-    log::warn,
+    tracing::warn,
 };
 
 #[async_trait]

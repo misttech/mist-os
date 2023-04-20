@@ -15,12 +15,12 @@ use {
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_zircon as zx,
     futures::{channel::mpsc, future::FutureObj, prelude::*, select, stream::FuturesUnordered},
-    log::{error, info, warn},
     std::{
         convert::Infallible,
         marker::Unpin,
         sync::{Arc, Mutex},
     },
+    tracing::{error, info, warn},
     wlan_common::{
         hasher::WlanHasher,
         timer::{self, TimeEntry},

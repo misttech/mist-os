@@ -27,10 +27,10 @@ use {
         prelude::*,
         select, TryFutureExt,
     },
-    log::{error, info, warn},
     pin_utils::pin_mut,
     rand::Rng,
     std::{convert::Infallible, sync::Arc},
+    tracing::{error, info, warn},
     wlan_common::hasher::WlanHasher,
     wlan_trace as wtrace,
     wlancfg_lib::{

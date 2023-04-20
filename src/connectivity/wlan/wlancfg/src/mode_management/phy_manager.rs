@@ -16,9 +16,9 @@ use {
     fuchsia_inspect::{self as inspect, NumericProperty},
     fuchsia_zircon,
     ieee80211::{MacAddr, NULL_MAC_ADDR},
-    log::{error, info, warn},
     std::collections::{HashMap, HashSet},
     thiserror::Error,
+    tracing::{error, info, warn},
 };
 
 // Number of seconds that recoverable event histories should be stored.  Since thresholds have not

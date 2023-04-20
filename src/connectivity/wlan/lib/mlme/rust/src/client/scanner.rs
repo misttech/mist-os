@@ -14,8 +14,8 @@ use {
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr},
-    log::{error, warn},
     thiserror::Error,
+    tracing::{error, warn},
     wlan_common::{
         mac::{self, CapabilityInfo},
         mgmt_writer,

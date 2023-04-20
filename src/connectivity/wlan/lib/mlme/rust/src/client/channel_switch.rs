@@ -6,8 +6,8 @@ use {
     crate::client::{scanner::Scanner, Context, TimedEvent},
     anyhow::{self, bail},
     banjo_fuchsia_wlan_common as banjo_common, fuchsia_async as fasync, fuchsia_zircon as zx,
-    log::error,
     thiserror,
+    tracing::error,
     wlan_common::{ie, mac::BeaconHdr, timer::EventId, TimeUnit},
     zerocopy::ByteSlice,
 };
@@ -118,11 +118,15 @@ impl<'a, T: ChannelActions> BoundChannelState<'a, T> {
         let result = self.actions.switch_channel(new_main_channel);
         match result {
             Ok(()) => {
-                log::info!("Switched to new main channel {:?}", new_main_channel);
+                tracing::info!("Switched to new main channel {:?}", new_main_channel);
                 self.channel_state.main_channel.replace(new_main_channel);
             }
             Err(e) => {
-                log::error!("Failed to switch to new main channel {:?}: {}", new_main_channel, e);
+                tracing::error!(
+                    "Failed to switch to new main channel {:?}: {}",
+                    new_main_channel,
+                    e
+                );
             }
         }
         self.actions.enable_scanning();

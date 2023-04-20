@@ -16,8 +16,8 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     ieee80211::{MacAddr, Ssid},
-    log::warn,
     std::collections::VecDeque,
+    tracing::warn,
     wlan_common::{
         appendable::Appendable,
         buffer_writer::BufferWriter,
@@ -136,14 +136,14 @@ pub enum ClientRejection {
 }
 
 impl ClientRejection {
-    pub fn log_level(&self) -> log::Level {
+    pub fn log_level(&self) -> tracing::Level {
         match self {
             Self::ParseFailed
             | Self::SmeSendError(..)
             | Self::WlanSendError(..)
-            | Self::EthSendError(..) => log::Level::Error,
-            Self::ControlledPortClosed | Self::Unsupported => log::Level::Warn,
-            _ => log::Level::Trace,
+            | Self::EthSendError(..) => tracing::Level::ERROR,
+            Self::ControlledPortClosed | Self::Unsupported => tracing::Level::WARN,
+            _ => tracing::Level::TRACE,
         }
     }
 }
@@ -326,7 +326,7 @@ impl RemoteClient {
         result_code: fidl_mlme::AuthenticateResultCode,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
-        log::info!("enter handle_mlme_auth_resp");
+        tracing::info!("enter handle_mlme_auth_resp");
         self.change_state(
             ctx,
             if result_code == fidl_mlme::AuthenticateResultCode::Success {
@@ -337,7 +337,7 @@ impl RemoteClient {
         )?;
 
         // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
-        log::info!("creating auth frame");
+        tracing::info!("creating auth frame");
 
         // We only support open system auth in the SME.
         // IEEE Std 802.11-2016, 12.3.3.2.3 & Table 9-36: Sequence number 2 indicates the response
@@ -368,7 +368,7 @@ impl RemoteClient {
             },
         )?;
         // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
-        log::info!("Sending auth frame to driver: {} bytes", bytes_written);
+        tracing::info!("Sending auth frame to driver: {} bytes", bytes_written);
         self.send_wlan_frame(ctx, in_buf, bytes_written, 0)
             .map_err(|s| Error::Status(format!("error sending auth frame"), s))
     }

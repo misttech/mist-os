@@ -7,8 +7,8 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme::{self as fidl_mlme, DeviceInfo, MlmeEvent},
     futures::channel::{mpsc, oneshot},
-    log::error,
     std::mem,
+    tracing::error,
     wlan_common::{
         capabilities::get_device_band_cap,
         channel::{Cbw, Channel},

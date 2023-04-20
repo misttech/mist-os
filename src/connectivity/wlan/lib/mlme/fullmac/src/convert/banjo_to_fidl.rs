@@ -9,8 +9,8 @@ use {
     banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
     banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_stats as fidl_stats, log::warn,
-    std::slice,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_stats as fidl_stats, std::slice,
+    tracing::warn,
 };
 
 fn unsafe_slice_to_vec<T: Clone>(data: *const T, len: usize) -> Vec<T> {

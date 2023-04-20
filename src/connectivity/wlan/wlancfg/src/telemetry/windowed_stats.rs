@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use log::error;
 use num_traits::SaturatingAdd;
 use std::collections::VecDeque;
 use std::default::Default;
+use tracing::error;
 
 pub struct WindowedStats<T> {
     stats: VecDeque<T>,

@@ -37,10 +37,10 @@ use {
         channel::{mpsc, oneshot},
         select, StreamExt,
     },
-    log::{error, info},
     parking_lot::Mutex,
     std::sync::Arc,
     std::time::Duration,
+    tracing::{error, info},
     wlan_sme,
 };
 

@@ -11,11 +11,11 @@ use fidl_fuchsia_wlan_device_service::{
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::prelude::*;
 use futures::try_join;
-use log::error;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
+use tracing::error;
 
 use crate::watchable_map::{MapEvent, WatchableMap};
 

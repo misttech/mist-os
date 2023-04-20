@@ -4,7 +4,7 @@
 
 use {
     fuchsia_zircon as zx,
-    log::error,
+    tracing::error,
     wlan_fullmac_mlme::{device::FullmacDeviceInterface, FullmacMlme, FullmacMlmeHandle},
 };
 

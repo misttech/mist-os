@@ -17,7 +17,7 @@ use {
     fuchsia_inspect_contrib::{inspect_log, log::InspectBytes},
     fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, WILDCARD_BSSID},
-    log::{error, warn},
+    tracing::{error, warn},
     wlan_common::{bss::BssDescription, timer::EventId},
     wlan_rsn::{
         key::{exchange::Key, Tk},

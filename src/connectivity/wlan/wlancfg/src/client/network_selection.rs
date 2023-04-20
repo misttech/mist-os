@@ -27,11 +27,11 @@ use {
     },
     fuchsia_zircon as zx,
     futures::lock::Mutex,
-    log::{debug, error, info, trace, warn},
     std::{
         collections::{HashMap, HashSet},
         sync::Arc,
     },
+    tracing::{debug, error, info, trace, warn},
     wlan_common::{
         self, hasher::WlanHasher, security::SecurityAuthenticator, sequestered::Sequestered,
     },

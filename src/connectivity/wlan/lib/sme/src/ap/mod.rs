@@ -20,8 +20,8 @@ use {
     fidl_fuchsia_wlan_sme as fidl_sme,
     futures::channel::{mpsc, oneshot},
     ieee80211::{MacAddr, Ssid},
-    log::{debug, error, info, warn},
     std::collections::HashMap,
+    tracing::{debug, error, info, warn},
     wlan_common::{
         capabilities::get_device_band_cap,
         channel::{Cbw, Channel},

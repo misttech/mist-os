@@ -22,12 +22,11 @@ use {
         future::{try_join4, BoxFuture},
         StreamExt, TryFutureExt,
     },
-    log::{error, info},
     std::sync::Arc,
+    tracing::{error, info},
     wlandevicemonitor_config,
 };
 
-const MAX_LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 const PHY_PATH: &'static str = "/dev/class/wlanphy";
 
 async fn serve_fidl(
@@ -75,7 +74,6 @@ async fn main() -> Result<(), Error> {
         metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
         ..Default::default()
     });
-    log::set_max_level(MAX_LOG_LEVEL);
     info!("Starting");
 
     let (phys, phy_events) = device::PhyMap::new();

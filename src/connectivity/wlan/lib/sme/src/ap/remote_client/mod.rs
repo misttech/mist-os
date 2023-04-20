@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     ieee80211::MacAddr,
-    log::error,
+    tracing::error,
     wlan_common::{
         ie::SupportedRate,
         mac::{Aid, CapabilityInfo},
@@ -109,7 +109,7 @@ impl RemoteClient {
         result_code: fidl_mlme::AuthenticateResultCode,
     ) {
         // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
-        log::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
+        tracing::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
         ctx.mlme_sink.send(MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
             peer_sta_address: self.addr.clone(),
             result_code,

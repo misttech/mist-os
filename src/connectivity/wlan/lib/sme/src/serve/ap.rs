@@ -10,9 +10,9 @@ use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
 use ieee80211::Ssid;
-use log::error;
 use pin_utils::pin_mut;
 use std::sync::{Arc, Mutex};
+use tracing::error;
 use wlan_common::RadioConfig;
 
 pub type Endpoint = fidl::endpoints::ServerEnd<fidl_sme::ApSmeMarker>;
