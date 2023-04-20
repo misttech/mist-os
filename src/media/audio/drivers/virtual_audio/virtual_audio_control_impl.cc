@@ -159,8 +159,9 @@ VirtualAudioDeviceImpl::Config DefaultConfig(bool is_input) {
 }
 
 zx::result<VirtualAudioDeviceImpl::Config> ConfigFromFIDL(
-    const fuchsia_virtualaudio::wire::Configuration& fidl, bool is_input) {
-  auto config = DefaultConfig(is_input);
+    const fuchsia_virtualaudio::wire::Configuration& fidl) {
+  // If is_input is not specified the direction is not known, here we default to output.
+  auto config = DefaultConfig(fidl.has_is_input() ? fidl.is_input() : false);
 
   if (fidl.has_device_type()) {
     config.device_type = fidl.device_type();
@@ -240,14 +241,14 @@ zx::result<VirtualAudioDeviceImpl::Config> ConfigFromFIDL(
 }
 }  // namespace
 
-void VirtualAudioControlImpl::AddInput(AddInputRequestView request,
-                                       AddInputCompleter::Sync& completer) {
+void VirtualAudioControlImpl::AddDevice(AddDeviceRequestView request,
+                                        AddDeviceCompleter::Sync& completer) {
   // TODO(fxbug.dev/124865): Return INVALID_ARGS if config is not valid its device_type.
-  auto cfg = ConfigFromFIDL(request->config, true);
+  auto cfg = ConfigFromFIDL(request->config);
   auto result = VirtualAudioDeviceImpl::Create(cfg.value(), std::move(request->server), dev_node_,
                                                dispatcher_);
   if (!result.is_ok()) {
-    zxlogf(ERROR, "Input device creation failed with status %d",
+    zxlogf(ERROR, "Device creation failed with status %d",
            fidl::ToUnderlying(result.error_value()));
     completer.ReplyError(result.error_value());
     return;
@@ -256,23 +257,6 @@ void VirtualAudioControlImpl::AddInput(AddInputRequestView request,
   completer.ReplySuccess();
 }
 
-void VirtualAudioControlImpl::AddOutput(AddOutputRequestView request,
-                                        AddOutputCompleter::Sync& completer) {
-  // TODO(fxbug.dev/124865): Return INVALID_ARGS if config is not valid its device_type.
-  auto cfg = ConfigFromFIDL(request->config, false);
-  auto result = VirtualAudioDeviceImpl::Create(cfg.value(), std::move(request->server), dev_node_,
-                                               dispatcher_);
-  if (!result.is_ok()) {
-    zxlogf(ERROR, "Output device creation failed with status %d",
-           fidl::ToUnderlying(result.error_value()));
-    completer.ReplyError(result.error_value());
-    return;
-  }
-  devices_.insert(result.value());
-  completer.ReplySuccess();
-}
-
-// TODO(fxbug.dev/124865): Consider adding per-driver type info here.
 void VirtualAudioControlImpl::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;

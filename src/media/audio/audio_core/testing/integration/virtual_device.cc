@@ -24,6 +24,7 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
   // Setup the device's configuration.
   fuchsia::virtualaudio::Configuration config;
   config.set_device_type(fuchsia::virtualaudio::DeviceType::STREAM_CONFIG);
+  config.set_is_input(is_input);
   std::copy(std::begin(device_id.data), std::end(device_id.data),
             std::begin(*config.mutable_unique_id()));
 
@@ -70,9 +71,9 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
   }
 
   if (is_input) {
-    fuchsia::virtualaudio::Control_AddInput_Result result;
+    fuchsia::virtualaudio::Control_AddDevice_Result result;
     auto status =
-        realm->virtual_audio_control()->AddInput(std::move(config), fidl_.NewRequest(), &result);
+        realm->virtual_audio_control()->AddDevice(std::move(config), fidl_.NewRequest(), &result);
     if (status != ZX_OK) {
       ADD_FAILURE() << "Failed to call fuchsia.virtualaudio/Control.AddInput, status="
                     << result.err();
@@ -81,9 +82,9 @@ VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bo
     }
     fixture->AddErrorHandler(fidl_, "VirtualAudioDevice (input)");
   } else {
-    fuchsia::virtualaudio::Control_AddOutput_Result result;
+    fuchsia::virtualaudio::Control_AddDevice_Result result;
     auto status =
-        realm->virtual_audio_control()->AddOutput(std::move(config), fidl_.NewRequest(), &result);
+        realm->virtual_audio_control()->AddDevice(std::move(config), fidl_.NewRequest(), &result);
     if (status != ZX_OK) {
       ADD_FAILURE() << "Failed to call fuchsia.virtualaudio/Control.AddOutput, status="
                     << result.err();

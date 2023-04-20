@@ -357,6 +357,7 @@ impl VirtualOutput {
 
         let config = fidl_fuchsia_virtualaudio::Configuration {
             device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+            is_input: Some(false),
             unique_id: Some(AUDIO_OUTPUT_ID),
             fifo_depth_bytes: Some(0),
             external_delay: Some(0),
@@ -380,8 +381,8 @@ impl VirtualOutput {
         let (va_output_client, va_output_server) =
             create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>();
         vad_control
-            .add_output(config, va_output_server, zx::Time::INFINITE)?
-            .map_err(|status| anyhow!("AddOutput returned error {:?}", status))?;
+            .add_device(config, va_output_server, zx::Time::INFINITE)?
+            .map_err(|status| anyhow!("AddDevice returned error {:?}", status))?;
 
         // Create a channel for handling requests.
         let (tx, rx) = mpsc::channel(512);
@@ -750,6 +751,7 @@ impl VirtualInput {
 
         let config = fidl_fuchsia_virtualaudio::Configuration {
             device_type: Some(fidl_fuchsia_virtualaudio::DeviceType::StreamConfig),
+            is_input: Some(true),
             fifo_depth_bytes: Some(0),
             external_delay: Some(0),
             supported_formats: Some(vec![fidl_fuchsia_virtualaudio::FormatRange {
@@ -772,8 +774,8 @@ impl VirtualInput {
         let (va_input_client, va_input_server) =
             create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>();
         vad_control
-            .add_input(config, va_input_server, zx::Time::INFINITE)?
-            .map_err(|status| anyhow!("AddInput returned error {:?}", status))?;
+            .add_device(config, va_input_server, zx::Time::INFINITE)?
+            .map_err(|status| anyhow!("AddDevice returned error {:?}", status))?;
 
         // Create a channel for handling requests.
         let (tx, rx) = mpsc::channel(512);

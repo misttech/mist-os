@@ -14,21 +14,15 @@ const CONTROL_NODE_NAME string = "sys/platform/00:00:2f/virtual_audio";
 /// devices. This protocol is made available through the device tree via
 /// `CONTROL_NODE_NAME`.
 protocol Control {
-    /// Adds an input device to the device tree.
+    /// Adds a device to the device tree.
     /// The device lives until the `Device` FIDL channel is closed.
-    AddInput(resource struct {
-        config Configuration;
-        server server_end:Device;
-    }) -> () error Error;
-
-    /// Adds an output device to the device tree.
-    /// The device lives until the `Device` FIDL channel is closed.
-    AddOutput(resource struct {
+    AddDevice(resource struct {
         config Configuration;
         server server_end:Device;
     }) -> () error Error;
 
     /// Returns the number of active input and output virtual devices.
+    // TODO(fxbug.dev/124865): Consider adding per-driver type info here.
     GetNumDevices() -> (struct {
         num_input_devices uint32;
         num_output_devices uint32;
@@ -117,6 +111,11 @@ type Configuration = table {
     /// Device type.
     /// If not specified, StreamConfig.
    13: device_type DeviceType;
+
+    /// Is the direction input or output.
+    /// If true the direction is input, if false the direction is output.
+    /// If not specified, the device may be used for both input and output.
+   14: is_input bool;
 };
 
 type FormatRange = struct {
