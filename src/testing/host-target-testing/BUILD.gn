@@ -10,10 +10,11 @@ test_packages = [
   "artifacts",
   "avb",
   "device",
-  "packages",
-  "paver",
+  "ffx",
   "flasher",
   "omaha_tool",
+  "packages",
+  "paver",
   "util",
   "zbi",
 ]

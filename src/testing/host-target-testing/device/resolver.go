@@ -6,12 +6,10 @@ package device
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os/exec"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -147,15 +145,15 @@ func (r *DeviceFinderResolver) WaitToFindDeviceInNetboot(ctx context.Context) (s
 
 // FfxResolver uses `ffx target list` to resolve a nodename into a hostname.
 type FfxResolver struct {
-	ffxPath     string
+	ffx         *ffx.FFXTool
 	nodeName    string
 	oldNodeName string
 }
 
 // NewFffResolver constructs a new `FfxResolver` for the specific nodename.
-func NewFfxResolver(ctx context.Context, ffxPath string, nodeName string) (*FfxResolver, error) {
+func NewFfxResolver(ctx context.Context, ffx *ffx.FFXTool, nodeName string) (*FfxResolver, error) {
 	if nodeName == "" {
-		entries, err := ffxTargetList(ctx, ffxPath)
+		entries, err := ffx.TargetList(ctx)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to list devices: %w", err)
@@ -184,64 +182,10 @@ func NewFfxResolver(ctx context.Context, ffxPath string, nodeName string) (*FfxR
 	}
 
 	return &FfxResolver{
-		ffxPath:     ffxPath,
+		ffx:         ffx,
 		nodeName:    nodeName,
 		oldNodeName: oldNodeName,
 	}, nil
-}
-
-type targetEntry struct {
-	NodeName    string   `json:"nodename"`
-	Addresses   []string `json:"addresses"`
-	TargetState string   `json:"target_state"`
-}
-
-func ffxTargetList(ctx context.Context, ffxPath string) ([]targetEntry, error) {
-	args := []string{
-		"--machine",
-		"json",
-		"target",
-		"list",
-	}
-
-	stdout, stderr, err := util.RunCommand(ctx, ffxPath, args...)
-	if err != nil {
-		return []targetEntry{}, fmt.Errorf("ffx target list failed: %w: %s", err, string(stderr))
-	}
-
-	if len(stdout) == 0 {
-		return []targetEntry{}, nil
-	}
-
-	var entries []targetEntry
-	if err := json.Unmarshal(stdout, &entries); err != nil {
-		return []targetEntry{}, err
-	}
-
-	return entries, nil
-}
-
-func ffxTargetListForNode(ctx context.Context, ffxPath string, nodeNames []string) ([]targetEntry, error) {
-	entries, err := ffxTargetList(ctx, ffxPath)
-	if err != nil {
-		return []targetEntry{}, err
-	}
-
-	if len(nodeNames) == 0 {
-		return entries, nil
-	}
-
-	var matchingTargets []targetEntry
-
-	for _, target := range entries {
-		for _, nodeName := range nodeNames {
-			if target.NodeName == nodeName {
-				matchingTargets = append(matchingTargets, target)
-			}
-		}
-	}
-
-	return matchingTargets, nil
 }
 
 func (r *FfxResolver) NodeNames() []string {
@@ -252,7 +196,7 @@ func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 	nodeNames := r.NodeNames()
 	logger.Infof(ctx, "resolving the nodenames %v", nodeNames)
 
-	targets, err := ffxTargetListForNode(ctx, r.ffxPath, nodeNames)
+	targets, err := r.ffx.TargetListForNode(ctx, nodeNames)
 	if err != nil {
 		return "", err
 	}
@@ -270,37 +214,9 @@ func (r *FfxResolver) ResolveName(ctx context.Context) (string, error) {
 	return targets[0].Addresses[0], nil
 }
 
-func (r *FfxResolver) ffxSupportsZedbootDiscovery(ctx context.Context) (bool, error) {
-	// Check if ffx is configured to resolve devices in zedboot.
-	args := []string{
-		"config",
-		"get",
-		"discovery.zedboot.enabled",
-	}
-
-	stdout, stderr, err := util.RunCommand(ctx, r.ffxPath, args...)
-	if err != nil {
-		// `ffx config get` exits with 2 if variable is undefined.
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			if exiterr.ExitCode() == 2 {
-				return false, nil
-			}
-		}
-
-		return false, fmt.Errorf("ffx config get failed: %w: %s", err, string(stderr))
-	}
-
-	// FIXME(fxbug.dev/109280): Unfortunately we need to parse the raw string to see if it's true.
-	if string(stdout) == "true\n" {
-		return true, nil
-	}
-
-	return false, nil
-}
-
 func (r *FfxResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, error) {
 	// Exit early if ffx is not configured to listen for devices in zedboot.
-	supportsZedbootDiscovery, err := r.ffxSupportsZedbootDiscovery(ctx)
+	supportsZedbootDiscovery, err := r.ffx.SupportsZedbootDiscovery(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -319,7 +235,7 @@ func (r *FfxResolver) WaitToFindDeviceInNetboot(ctx context.Context) (string, er
 	for {
 		attempt += 1
 
-		if entries, err := ffxTargetListForNode(ctx, r.ffxPath, nodeNames); err == nil {
+		if entries, err := r.ffx.TargetListForNode(ctx, nodeNames); err == nil {
 			for _, entry := range entries {
 				logger.Infof(ctx, "device is in %v", entry.TargetState)
 				if entry.TargetState == "Zedboot (R)" {

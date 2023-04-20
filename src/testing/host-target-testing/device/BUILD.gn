@@ -10,6 +10,7 @@ if (is_host) {
     testonly = true
     deps = [
       "../artifacts",
+      "../ffx",
       "../packages",
       "../paver",
       "../sl4f",

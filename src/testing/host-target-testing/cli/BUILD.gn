@@ -13,6 +13,7 @@ if (is_host) {
       "../avb",
       "../device",
       "../device",
+      "../ffx",
       "../omaha_tool",
       "../packages",
       "../updater",

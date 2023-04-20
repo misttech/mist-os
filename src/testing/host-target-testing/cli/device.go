@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 )
@@ -33,6 +34,7 @@ type DeviceConfig struct {
 	sshKeyFile               string
 	deviceFinderPath         string
 	ffxPath                  string
+	ffx                      *ffx.FFXTool
 	deviceName               string
 	deviceHostname           string
 	deviceResolverMode       DeviceResolverMode
@@ -62,6 +64,8 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	if c.SerialSocketPath == "" && environmentSerialPath != "" {
 		c.SerialSocketPath = environmentSerialPath
 	}
+
+	c.ffx = ffx.NewFFXTool(c.ffxPath)
 
 	return c
 }
@@ -99,7 +103,7 @@ func (c *DeviceConfig) DeviceResolver(ctx context.Context) (device.DeviceResolve
 			return nil, fmt.Errorf("error accessing %v: %w", c.ffxPath, err)
 		}
 
-		return device.NewFfxResolver(ctx, c.ffxPath, c.deviceName)
+		return device.NewFfxResolver(ctx, c.ffx, c.deviceName)
 
 	default:
 		return nil, fmt.Errorf("Invalid device-resolver mode %v", c.deviceResolverMode)
