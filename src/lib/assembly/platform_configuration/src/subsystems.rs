@@ -31,6 +31,7 @@ mod example;
 mod graphics;
 mod identity;
 mod input;
+mod radar;
 mod session;
 mod starnix;
 mod storage;
@@ -202,6 +203,9 @@ fn configure_subsystems(
 
     input::InputSubsystemConfig::define_configuration(context, &config.platform.input, builder)
         .context("Configuring the 'input' subsystem")?;
+
+    radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
+        .context("Configuring the 'radar' subsystem")?;
 
     session::SessionConfig::define_configuration(
         context,

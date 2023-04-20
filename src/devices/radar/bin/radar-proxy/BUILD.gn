@@ -65,10 +65,7 @@ fuchsia_component("radar-proxy-component") {
 }
 
 fuchsia_package("radar-proxy") {
-  deps = [
-    ":disable-burst-reader-proxying-config",
-    ":radar-proxy-component",
-  ]
+  deps = [ ":radar-proxy-component" ]
 }
 
 core_shard("radar-proxy-shard") {
