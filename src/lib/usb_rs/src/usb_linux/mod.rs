@@ -22,9 +22,115 @@ use std::thread;
 use zerocopy::LayoutVerified;
 
 use crate::{
-    DeviceDescriptor, EndpointDescriptor, EndpointDirection, EndpointType, Error,
+    DeviceDescriptor, Endpoint, EndpointDescriptor, EndpointDirection, EndpointType, Error,
     InterfaceDescriptor, Result,
 };
+
+#[derive(Debug)]
+pub struct DeviceHandleInner(String);
+
+impl DeviceHandleInner {
+    pub(crate) fn new(hdl: String) -> DeviceHandleInner {
+        DeviceHandleInner(hdl)
+    }
+
+    pub fn debug_name(&self) -> String {
+        self.0.clone()
+    }
+
+    pub fn scan_interfaces(
+        &self,
+        f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
+    ) -> Result<Interface> {
+        // The endpoint descriptor comes in two lengths. We only have the struct for the larger one, and
+        // the assumption from C land is we'd just let the end of it hang off the end of the buffer and
+        // not touch the extra fields when we don't have them. To make this vibe with Rust we'll just
+        // make the buffer a touch longer so this is always safe. For the scorekeepers, this should be
+        // == 2.
+        const OVERRUN: usize = (USB_DT_ENDPOINT_AUDIO_SIZE - USB_DT_ENDPOINT_SIZE) as usize;
+
+        let mut file = match OpenOptions::new().read(true).write(true).open(&self.0) {
+            Ok(file) => file,
+            Err(err) => {
+                if err.kind() != std::io::ErrorKind::PermissionDenied {
+                    return Err(err.into());
+                }
+                OpenOptions::new().read(true).open(&self.0)?
+            }
+        };
+
+        let mut descriptor_buf = [0u8; 4096 + OVERRUN];
+        // The usbdevfs API suggests that one read will always return the whole descriptor.
+        let descriptor_length = file.read(&mut descriptor_buf[..4096])?;
+        let mut descriptor_buf = &descriptor_buf[..descriptor_length + OVERRUN];
+
+        let mut iface = Option::<InterfaceDescriptor>::None;
+        let mut device = Option::<DeviceDescriptor>::None;
+
+        while descriptor_buf.len() >= std::mem::size_of::<usb_descriptor_header>() + OVERRUN {
+            let (header, _) =
+                LayoutVerified::<_, usb_descriptor_header>::new_from_prefix(descriptor_buf)
+                    .ok_or(Error::MalformedDescriptor)?;
+            let length = header.bLength as usize;
+            if length > descriptor_buf.len() {
+                return Err(Error::MalformedDescriptor);
+            }
+
+            if device.is_none() {
+                if header.bDescriptorType == USB_DT_DEVICE as u8 {
+                    let (descriptor, _) =
+                        LayoutVerified::<_, usb_device_descriptor>::new_from_prefix(descriptor_buf)
+                            .ok_or(Error::MalformedDescriptor)?;
+
+                    device = Some(DeviceDescriptor {
+                        vendor: u16::from_le(descriptor.idVendor),
+                        product: u16::from_le(descriptor.idProduct),
+                        class: descriptor.bDeviceClass,
+                        subclass: descriptor.bDeviceSubClass,
+                        protocol: descriptor.bDeviceProtocol,
+                    });
+                }
+            } else if header.bDescriptorType == USB_DT_DEVICE as u8 {
+                return Err(Error::MalformedDescriptor);
+            }
+
+            let device = device.as_ref().ok_or(Error::MalformedDescriptor)?;
+
+            if header.bDescriptorType == USB_DT_ENDPOINT as u8 {
+                let Some(iface) = iface.as_mut() else {
+                    return Err(Error::MalformedDescriptor);
+                };
+
+                let (descriptor, _) =
+                    LayoutVerified::<_, usb_endpoint_descriptor>::new_from_prefix(descriptor_buf)
+                        .ok_or(Error::MalformedDescriptor)?;
+
+                iface.add_endpoint(&*descriptor);
+            } else if header.bDescriptorType == USB_DT_INTERFACE as u8 {
+                let (descriptor, _) =
+                    LayoutVerified::<_, usb_interface_descriptor>::new_from_prefix(descriptor_buf)
+                        .ok_or(Error::MalformedDescriptor)?;
+
+                if let Some(iface) = iface.replace(InterfaceDescriptor::from_ch9(&*descriptor)) {
+                    if f(&device, &iface) {
+                        return Interface::new(file, iface, None);
+                    }
+                }
+            }
+
+            descriptor_buf = &descriptor_buf[length..];
+        }
+
+        if let Some(iface) = iface {
+            let device = device.as_ref().ok_or(Error::MalformedDescriptor)?;
+            if f(&device, &iface) {
+                return Interface::new(file, iface, None);
+            }
+        }
+
+        Err(Error::InterfaceNotFound)
+    }
+}
 
 /// Wrapper around the Linux URB, which is a structure used to communicate about a transaction to
 /// the kernel.
@@ -399,15 +505,6 @@ impl Interface {
     }
 }
 
-/// A USB endpoint. Wraps the four types of endpoint for easy carry.
-pub enum Endpoint {
-    BulkIn(BulkInEndpoint),
-    BulkOut(BulkOutEndpoint),
-    Isochronous(IsochronousEndpoint),
-    Interrupt(InterruptEndpoint),
-    Control(ControlEndpoint),
-}
-
 /// A bulk USB in endpoint. This is a live endpoint that can be read from.
 pub struct BulkInEndpoint {
     /// Internal interface state.
@@ -513,102 +610,6 @@ impl InterfaceDescriptor {
 
         self.endpoints.push(EndpointDescriptor { ty, address })
     }
-}
-
-/// Given a path to a USB device, scan each interface available on the device. Each interface's
-/// descriptor is passed to the given callback, and the first descriptor for which the call back
-/// returns `true` will be opened and returned.
-pub fn scan_interfaces_for_device(
-    device: String,
-    f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
-) -> Result<Interface> {
-    // The endpoint descriptor comes in two lengths. We only have the struct for the larger one, and
-    // the assumption from C land is we'd just let the end of it hang off the end of the buffer and
-    // not touch the extra fields when we don't have them. To make this vibe with Rust we'll just
-    // make the buffer a touch longer so this is always safe. For the scorekeepers, this should be
-    // == 2.
-    const OVERRUN: usize = (USB_DT_ENDPOINT_AUDIO_SIZE - USB_DT_ENDPOINT_SIZE) as usize;
-
-    let mut file = match OpenOptions::new().read(true).write(true).open(&device) {
-        Ok(file) => file,
-        Err(err) => {
-            if err.kind() != std::io::ErrorKind::PermissionDenied {
-                return Err(err.into());
-            }
-            OpenOptions::new().read(true).open(&device)?
-        }
-    };
-
-    let mut descriptor_buf = [0u8; 4096 + OVERRUN];
-    // The usbdevfs API suggests that one read will always return the whole descriptor.
-    let descriptor_length = file.read(&mut descriptor_buf[..4096])?;
-    let mut descriptor_buf = &descriptor_buf[..descriptor_length + OVERRUN];
-
-    let mut iface = Option::<InterfaceDescriptor>::None;
-    let mut device = Option::<DeviceDescriptor>::None;
-
-    while descriptor_buf.len() >= std::mem::size_of::<usb_descriptor_header>() + OVERRUN {
-        let (header, _) =
-            LayoutVerified::<_, usb_descriptor_header>::new_from_prefix(descriptor_buf)
-                .ok_or(Error::MalformedDescriptor)?;
-        let length = header.bLength as usize;
-        if length > descriptor_buf.len() {
-            return Err(Error::MalformedDescriptor);
-        }
-
-        if device.is_none() {
-            if header.bDescriptorType == USB_DT_DEVICE as u8 {
-                let (descriptor, _) =
-                    LayoutVerified::<_, usb_device_descriptor>::new_from_prefix(descriptor_buf)
-                        .ok_or(Error::MalformedDescriptor)?;
-
-                device = Some(DeviceDescriptor {
-                    vendor: u16::from_le(descriptor.idVendor),
-                    product: u16::from_le(descriptor.idProduct),
-                    class: descriptor.bDeviceClass,
-                    subclass: descriptor.bDeviceSubClass,
-                    protocol: descriptor.bDeviceProtocol,
-                });
-            }
-        } else if header.bDescriptorType == USB_DT_DEVICE as u8 {
-            return Err(Error::MalformedDescriptor);
-        }
-
-        let device = device.as_ref().ok_or(Error::MalformedDescriptor)?;
-
-        if header.bDescriptorType == USB_DT_ENDPOINT as u8 {
-            let Some(iface) = iface.as_mut() else {
-                return Err(Error::MalformedDescriptor);
-            };
-
-            let (descriptor, _) =
-                LayoutVerified::<_, usb_endpoint_descriptor>::new_from_prefix(descriptor_buf)
-                    .ok_or(Error::MalformedDescriptor)?;
-
-            iface.add_endpoint(&*descriptor);
-        } else if header.bDescriptorType == USB_DT_INTERFACE as u8 {
-            let (descriptor, _) =
-                LayoutVerified::<_, usb_interface_descriptor>::new_from_prefix(descriptor_buf)
-                    .ok_or(Error::MalformedDescriptor)?;
-
-            if let Some(iface) = iface.replace(InterfaceDescriptor::from_ch9(&*descriptor)) {
-                if f(&device, &iface) {
-                    return Interface::new(file, iface, None);
-                }
-            }
-        }
-
-        descriptor_buf = &descriptor_buf[length..];
-    }
-
-    if let Some(iface) = iface {
-        let device = device.as_ref().ok_or(Error::MalformedDescriptor)?;
-        if f(&device, &iface) {
-            return Interface::new(file, iface, None);
-        }
-    }
-
-    Err(Error::InterfaceNotFound)
 }
 
 #[cfg(test)]

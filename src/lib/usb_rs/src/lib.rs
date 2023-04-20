@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use futures::stream::Stream;
 use thiserror::Error;
 
 mod usb_linux;
@@ -9,13 +10,44 @@ mod usb_linux;
 /// Selects the bit in USB endpoint addresses that tells us whether it is an in or and out endpoint.
 pub(crate) const USB_ENDPOINT_DIR_MASK: u8 = 0x80;
 
+pub struct DeviceHandle(usb_linux::DeviceHandleInner);
+
+impl From<usb_linux::DeviceHandleInner> for DeviceHandle {
+    fn from(inner: usb_linux::DeviceHandleInner) -> DeviceHandle {
+        DeviceHandle(inner)
+    }
+}
+
+impl DeviceHandle {
+    /// A printable name for this device.
+    pub fn debug_name(&self) -> String {
+        self.0.debug_name()
+    }
+
+    /// Given a path to a USB device, scan each interface available on the device. Each interface's
+    /// descriptor is passed to the given callback, and the first descriptor for which the callback
+    /// returns `true` will be opened and returned.
+    pub fn scan_interfaces(
+        &self,
+        f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
+    ) -> Result<Interface> {
+        self.0.scan_interfaces(f)
+    }
+}
+
+impl std::fmt::Debug for DeviceHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_tuple("DeviceHandle").field(&self.debug_name()).finish()
+    }
+}
+
 /// Device discovery events. See `wait_for_devices`.
 #[derive(Debug)]
 pub enum DeviceEvent {
     /// Indicates a new USB device has been plugged in.
-    Added(String),
+    Added(DeviceHandle),
     /// Indicates a USB device has been unplugged.
-    Removed(String),
+    Removed(DeviceHandle),
 }
 
 /// Errors emitted by USB operations.
@@ -89,9 +121,26 @@ impl EndpointDescriptor {
     }
 }
 
+/// A USB endpoint. Wraps the four types of endpoint for easy carry.
+pub enum Endpoint {
+    BulkIn(BulkInEndpoint),
+    BulkOut(BulkOutEndpoint),
+    Isochronous(IsochronousEndpoint),
+    Interrupt(InterruptEndpoint),
+    Control(ControlEndpoint),
+}
+
+/// Waits for USB devices to appear on the bus.
+pub fn wait_for_devices(
+    notify_added: bool,
+    notify_removed: bool,
+) -> Result<impl Stream<Item = Result<DeviceEvent>>> {
+    usb_linux::wait_for_devices(notify_added, notify_removed)
+}
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub use usb_linux::{
-    scan_interfaces_for_device, wait_for_devices, BulkInEndpoint, BulkOutEndpoint, ControlEndpoint,
-    Endpoint, Interface, InterruptEndpoint, IsochronousEndpoint,
+    BulkInEndpoint, BulkOutEndpoint, ControlEndpoint, Interface, InterruptEndpoint,
+    IsochronousEndpoint,
 };

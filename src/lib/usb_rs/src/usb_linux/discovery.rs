@@ -10,6 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
+use crate::usb_linux::DeviceHandleInner;
 use crate::{DeviceEvent, Error, Result};
 
 /// Root of the Linux devfs
@@ -176,7 +177,9 @@ impl Stream for DeviceStream {
                                     Error::BadDeviceName(path.to_string_lossy().to_string())
                                 })?
                                 .to_owned();
-                            return Poll::Ready(Some(Ok(DeviceEvent::Added(path))));
+                            return Poll::Ready(Some(Ok(DeviceEvent::Added(
+                                DeviceHandleInner::new(path).into(),
+                            ))));
                         } else {
                             self.waiting_readable.push(full_path.clone());
                             continue;
@@ -193,7 +196,9 @@ impl Stream for DeviceStream {
                                 Error::BadDeviceName(path.to_string_lossy().to_string())
                             })?
                             .to_owned();
-                        return Poll::Ready(Some(Ok(DeviceEvent::Removed(path))));
+                        return Poll::Ready(Some(Ok(DeviceEvent::Removed(
+                            DeviceHandleInner::new(path).into(),
+                        ))));
                     }
                 }
             }
