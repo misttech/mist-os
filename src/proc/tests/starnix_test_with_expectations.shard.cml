@@ -2,8 +2,5 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/lib/testing/expectation/meta/client.shard.cml",
-        "//src/proc/tests/starnix_test_common.shard.cml",
-    ],
+    include: [ "//src/starnix/tests/starnix_test_with_expectations.shard.cml" ],
 }

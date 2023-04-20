@@ -1,0 +1,391 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/zip_resource.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/starnix/kernel/starnix.gni")
+
+group("tests") {
+  testonly = true
+  if (target_cpu == "x64" && !is_asan) {
+    deps = [ ":starnix_gvisor_tests" ]
+  }
+}
+
+gvisor_tests = [
+  "32bit_test",
+  "accept_bind_stream_test",
+  "accept_bind_test",
+  "access_test",
+  "affinity_test",
+  "aio_test",
+  "bad_test",
+  "bind_test",
+  "brk_test",
+  "chdir_test",
+  "chmod_test",
+  "chown_test",
+  "chroot_test",
+  "clock_getres_test",
+  "clock_gettime_test",
+  "clock_nanosleep_test",
+  "close_range_test",
+  "concurrency_test",
+  "creat_test",
+  "dev_test",
+  "dup_test",
+  "epoll_test",
+  "eventfd_test",
+  "exceptions_test",
+  "exec_binary_test",
+  "exec_test",
+  "exit_test",
+  "fadvise64_test",
+  "fallocate_test",
+  "fault_test",
+  "fchdir_test",
+  "fcntl_test",
+  "fifo_test",
+  "flock_test",
+  "fork_test",
+  "fpsig_fork_test",
+  "fpsig_nested_test",
+  "fsync_test",
+  "futex_test",
+  "getcpu_host_test",
+  "getcpu_test",
+  "getdents_test",
+  "getrandom_test",
+  "getrusage_test",
+  "inotify_test",
+  "ioctl_test",
+  "ip6tables_test",
+  "iptables_test",
+  "itimer_test",
+  "kcov_test",
+  "kill_test",
+  "link_test",
+  "lseek_test",
+  "madvise_test",
+  "membarrier_test",
+  "memfd_test",
+  "memory_accounting_test",
+  "mempolicy_test",
+  "mincore_test",
+  "mkdir_test",
+  "mknod_test",
+  "mlock_test",
+  "mmap_test",
+  "mount_test",
+  "mremap_test",
+  "msgqueue_test",
+  "msync_test",
+  "munmap_test",
+  "network_namespace_test",
+  "open_create_test",
+  "open_test",
+  "packet_socket_dgram_test",
+  "packet_socket_raw_test",
+  "packet_socket_test",
+  "partial_bad_buffer_test",
+  "pause_test",
+  "ping_socket_test",
+  "pipe_test",
+  "pivot_root_test",
+  "poll_test",
+  "ppoll_test",
+  "prctl_setuid_test",
+  "prctl_test",
+  "pread64_test",
+  "preadv2_test",
+  "preadv_test",
+  "priority_test",
+  "processes_test",
+  "proc_isolated_test",
+  "proc_net_tcp_test",
+  "proc_net_test",
+  "proc_net_udp_test",
+  "proc_net_unix_test",
+  "proc_pid_oomscore_test",
+  "proc_pid_smaps_test",
+  "proc_pid_uid_gid_map_test",
+  "proc_test",
+  "pselect_test",
+  "pty_root_test",
+  "pty_test",
+  "pwrite64_test",
+  "pwritev2_test",
+  "raw_socket_icmp_test",
+  "raw_socket_test",
+  "readahead_test",
+  "read_test",
+  "readv_socket_test",
+  "readv_test",
+  "rename_test",
+  "rlimits_test",
+  "rtsignal_test",
+  "sched_test",
+  "sched_yield_test",
+  "seccomp_test",
+  "select_test",
+  "semaphore_test",
+  "sendfile_test",
+  "sendfile_socket_test",
+  "setgid_test",
+  "sigaction_test",
+  "sigaltstack_test",
+  "signalfd_test",
+  "sigprocmask_test",
+  "sigstop_test",
+  "sigtimedwait_test",
+  "socket_abstract_non_blocking_test",
+  "socket_abstract_test",
+  "socket_bind_to_device_distribution_test",
+  "socket_bind_to_device_sequence_test",
+  "socket_bind_to_device_test",
+  "socket_blocking_ip_test",
+  "socket_blocking_local_test",
+  "socket_capability_test",
+  "socket_domain_non_blocking_test",
+  "socket_domain_test",
+  "socket_filesystem_non_blocking_test",
+  "socket_filesystem_test",
+  "socket_inet_loopback_isolated_test",
+  "socket_inet_loopback_nogotsan_test",
+  "socket_ip_tcp_loopback_non_blocking_test",
+  "socket_ip_tcp_loopback_test",
+  "socket_ip_tcp_udp_generic_loopback_test",
+  "socket_ip_udp_loopback_non_blocking_test",
+  "socket_ip_udp_loopback_test",
+  "socket_ip_unbound_netlink_test",
+  "socket_ip_unbound_test",
+  "socket_ipv4_datagram_based_socket_unbound_loopback_test",
+  "socket_ipv4_udp_unbound_external_networking_test",
+  "socket_ipv4_udp_unbound_loopback_netlink_test",
+  "socket_ipv4_udp_unbound_loopback_nogotsan_test",
+  "socket_ipv4_udp_unbound_loopback_test",
+  "socket_ipv6_udp_unbound_external_networking_test",
+  "socket_ipv6_udp_unbound_loopback_netlink_test",
+  "socket_ipv6_udp_unbound_loopback_test",
+  "socket_ipv6_unbound_test",
+  "socket_netdevice_test",
+  "socket_netlink_route_test",
+  "socket_netlink_test",
+  "socket_netlink_uevent_test",
+  "socket_non_stream_blocking_local_test",
+  "socket_non_stream_blocking_udp_test",
+  "socket_stream_blocking_local_test",
+  "socket_stream_blocking_tcp_test",
+  "socket_stream_local_test",
+  "socket_stream_nonblock_local_test",
+  "socket_stress_test",
+  "socket_test",
+  "socket_unix_dgram_local_test",
+  "socket_unix_dgram_non_blocking_test",
+  "socket_unix_pair_test",
+  "socket_unix_seqpacket_local_test",
+  "socket_unix_stream_test",
+  "socket_unix_unbound_abstract_test",
+  "socket_unix_unbound_dgram_test",
+  "socket_unix_unbound_filesystem_test",
+  "socket_unix_unbound_seqpacket_test",
+  "socket_unix_unbound_stream_test",
+  "splice_test",
+  "statfs_test",
+  "stat_test",
+  "stat_times_test",
+  "sticky_test",
+  "symlink_test",
+  "sync_file_range_test",
+  "sync_test",
+  "sysinfo_test",
+  "syslog_test",
+  "sysret_test",
+  "tcp_socket_test",
+  "tgkill_test",
+  "timerfd_test",
+  "timers_test",
+  "time_test",
+  "tkill_test",
+  "truncate_test",
+  "tuntap_hostinet_test",
+  "tuntap_test",
+  "udp_bind_test",
+  "uidgid_test",
+  "uname_test",
+  "unlink_test",
+  "unshare_test",
+  "utimes_test",
+  "vdso_clock_gettime_test",
+  "vdso_test",
+  "vfork_test",
+  "vsyscall_test",
+  "wait_test",
+  "write_test",
+  "xattr_test",
+]
+
+gvisor_benchmarks = [
+  "clock_getres_benchmark",
+  "clock_gettime_benchmark",
+  "death_benchmark",
+  "dup_benchmark",
+  "epoll_benchmark",
+  "fork_benchmark",
+  "futex_benchmark",
+  "getdents_benchmark",
+  "getpid_benchmark",
+  "gettid_benchmark",
+  "mapping_benchmark",
+  "open_benchmark",
+  "open_read_close_benchmark",
+  "pipe_benchmark",
+  "randread_benchmark",
+  "read_benchmark",
+  "sched_yield_benchmark",
+  "send_recv_benchmark",
+  "seqwrite_benchmark",
+  "signal_benchmark",
+  "sleep_benchmark",
+  "stat_benchmark",
+  "unlink_benchmark",
+  "write_benchmark",
+]
+
+expect_includes("gvisor_test") {
+  includes = [
+    "meta/gvisor.shard.cml",
+    "meta/gvisor_container.shard.cml",
+  ]
+}
+
+expect_includes("gvisor_test_with_expectations") {
+  includes = [
+    "meta/gvisor_with_expectations.shard.cml",
+    "meta/gvisor_container.shard.cml",
+  ]
+}
+
+zip_resource("gvisor_runfiles") {
+  file = "${gvisor_prebuilt_directory}/gvisor_runfiles"
+  dest_prefix = "data/tests"
+}
+
+group("container_resources") {
+  deps = [ "//src/starnix/containers:default_init" ]
+
+  if (target_cpu == "x64") {
+    deps += [
+      ":gvisor_runfiles",
+      "//src/connectivity/network/netstack:component",
+      "//src/starnix/containers:data_tmp_target",
+      "//src/starnix/containers/bionic:system_image",
+      "//src/starnix/containers/bionic:testcases_image",
+    ]
+  }
+}
+
+template("gvisor_test_component") {
+  test_name = target_name
+
+  resource("${test_name}_bin") {
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
+    outputs = [ "data/tests/${test_name}" ]
+  }
+
+  _storage_shard = "meta/gvisor_use_tmp_storage.shard.cml"
+  if (defined(invoker.use_persistent_storage) &&
+      invoker.use_persistent_storage) {
+    _storage_shard = "meta/gvisor_use_persistent_storage.shard.cml"
+  }
+  _manifest_label = "${test_name}.cml"
+  cmc_merge(_manifest_label) {
+    sources = [
+      "meta/${test_name}.cml",
+      _storage_shard,
+    ]
+  }
+  _outputs = get_target_outputs(":${_manifest_label}")
+  _manifest_file = _outputs[0]
+
+  fuchsia_test_component(target_name) {
+    forward_variables_from(invoker, "*")
+
+    testonly = true
+    check_references = false
+
+    manifest = _manifest_file
+
+    use_expectations = false
+    if (defined(invoker.use_expectations)) {
+      use_expectations = invoker.use_expectations
+    }
+
+    if (use_expectations) {
+      deps = [ ":gvisor_test_with_expectations" ]
+    } else {
+      deps = [ ":gvisor_test" ]
+    }
+
+    deps += [
+      ":${_manifest_label}",
+      ":${test_name}_bin",
+    ]
+  }
+}
+
+foreach(test_name, gvisor_tests) {
+  gvisor_test_component(test_name) {
+    use_expectations = true
+    use_persistent_storage = false
+  }
+}
+
+foreach(benchmark_name, gvisor_benchmarks) {
+  gvisor_test_component(benchmark_name) {
+  }
+}
+
+fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
+  deps = [ ":container_resources" ]
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  }
+
+  test_components = []
+
+  foreach(test_name, gvisor_tests) {
+    test_components += [ ":${test_name}" ]
+  }
+
+  expectations = "expectations/default.json5"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_package("starnix_gvisor_benchmarks") {
+  deps = [ ":container_resources" ]
+
+  test_components = []
+
+  foreach(benchmark_name, gvisor_benchmarks) {
+    test_components += [ ":${benchmark_name}" ]
+  }
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  }
+
+  # Set environments to none so infra doesn't run these benchmarks.
+  # These benchmarks are run as a part of:
+  # //src/tests/end_to_end/perf/test/starnix_gvisor_benchmarks_test.dart
+  test_specs = {
+    environments = []
+  }
+}

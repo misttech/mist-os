@@ -30,7 +30,7 @@ To create a new Starnix test component, first add the following include to the
 test `.cml`:
 
 ```
-include: [ "//src/proc/tests/starnix_test.shard.cml" ]
+include: [ "//src/starnix/tests/starnix_test.shard.cml" ]
 ```
 
 This shard sets the `runner` of the component to `starnix_test_runner` and

@@ -33,7 +33,7 @@ fuchsia_package_with_single_component("start_driver_test_realm_and_hang") {
 if (is_host && current_cpu == "x64") {
   # This ensures that ffx is available to the host test.
   #
-  # Based on similar code at src/proc/tests/android/BUILD.gn;l=121-127
+  # Based on similar code at src/starnix/tests/android/BUILD.gn;l=121-127
   host_test_data("test_tools") {
     sources = [ "$root_out_dir/ffx" ]
   }

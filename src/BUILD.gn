@@ -52,7 +52,6 @@ group("tests_no_e2e") {
     "modular:tests",
     "performance:tests",
     "power:tests",
-    "proc:tests",
     "recovery:tests_no_e2e",
     "security:tests",
     "session:tests",

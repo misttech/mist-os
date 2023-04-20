@@ -143,7 +143,7 @@ If you set the log level to `TRACE` (e.g.,  `ffx log --severity TRACE --select "
 [629.604][starnix][I] exit_group: pid=3 exit_code=1
 ```
 
-For GUnit tests (such as the syscall tests in //src/starnix/tests/android/gvisor),
+For GUnit tests (such as the syscall tests in //src/starnix/tests/gvisor),
 you can run specific tests with the `--test-filter` flag. For example,
 
 ```sh

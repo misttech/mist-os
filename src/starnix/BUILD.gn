@@ -17,5 +17,6 @@ group("tests") {
     "containers:tests",
     "examples:tests",
     "kernel:tests",
+    "tests",
   ]
 }

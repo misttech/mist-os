@@ -4,17 +4,6 @@
 
 import("//tools/cmc/build/expect_includes.gni")
 
-group("tests") {
-  testonly = true
-
-  deps = [
-    "android:tests",
-    "chromiumos:tests",
-    "syscalls:tests",
-  ]
-}
-
-# Tests that use starnix_test_runner should depend on one of these.
 expect_includes("starnix_test") {
   includes = [ "starnix_test.shard.cml" ]
 }

@@ -290,7 +290,7 @@ group("package_deps") {
   if (target_cpu == "x64" && !is_asan) {
     public_deps += [
       # This is used by starnix benchmarks.
-      "//src/proc/tests/android/gvisor:starnix_gvisor_benchmarks",
+      "//src/starnix/tests/gvisor:starnix_gvisor_benchmarks",
     ]
     if (host_os == "linux") {
       public_deps +=
