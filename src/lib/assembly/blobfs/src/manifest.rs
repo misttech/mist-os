@@ -73,7 +73,8 @@ impl BlobManifest {
             .as_ref()
             .parent()
             .ok_or(anyhow!("Failed to get parent path of the output blob manifest"))?;
-        let mut out = File::create(&path)?;
+        let mut out = File::create(&path)
+            .context(format!("Failed to create file: {}", path.as_ref().display(),))?;
         for (merkle, blob_path) in self.packages.iter() {
             let blob_path = path_relative_to_dir(&blob_path, &manifest_parent).context(format!(
                 "Failed to get relative path for blob: {}",
@@ -82,7 +83,8 @@ impl BlobManifest {
             let blob_path = blob_path
                 .to_str()
                 .context(format!("File path is not valid UTF-8: {}", blob_path.display()))?;
-            writeln!(out, "{}={}", merkle, blob_path)?;
+            writeln!(out, "{}={}", merkle, blob_path)
+                .context(format!("Failed to write blob: {}\nmerkle: {}", blob_path, merkle,))?;
         }
         Ok(())
     }

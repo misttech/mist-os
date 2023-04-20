@@ -91,7 +91,8 @@ struct BlobSizeAndCount {
 struct BlobInstance {
     // Hash of the blob merkle root.
     hash: Hash,
-    package: Utf8PathBuf,
+    package_path: Utf8PathBuf,
+    package_name: String,
     path: String,
 }
 
@@ -260,10 +261,12 @@ fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result
 
         for package in budget.packages.iter() {
             let manifest = PackageManifest::try_load_from(package)?;
+            let package_name = manifest.name().clone();
             for manifest_blob in manifest.into_blobs().drain(..) {
                 budget_blob.blobs.push(BlobInstance {
                     hash: manifest_blob.merkle,
-                    package: package.clone(),
+                    package_path: package.clone(),
+                    package_name: package_name.to_string(),
                     path: manifest_blob.path,
                 });
             }
@@ -340,7 +343,7 @@ fn count_blobs(
         .iter()
         .flat_map(|budget| &budget.blobs)
         .filter(|blob| !blob_count_by_hash.contains_key(&blob.hash))
-        .map(|blob| blob.package.as_path())
+        .map(|blob| blob.package_path.as_path())
         .collect::<HashSet<&Utf8Path>>()
         .drain()
         .collect();
@@ -348,7 +351,7 @@ fn count_blobs(
     // If a builder is provided, attempts to build blobfs and complete the blobs database.
     if !incomplete_packages.is_empty() {
         let blobs = blobfs_builder.build(&incomplete_packages).unwrap_or_else(|e| {
-            tracing::warn!("Failed to build the blobfs: {}", e);
+            tracing::warn!("Failed to build the blobfs: {:?}", e);
             Vec::default()
         });
         index_blobs_by_hash(&blobs, &mut blob_count_by_hash)?;
@@ -365,7 +368,7 @@ fn count_blobs(
                     return Err(anyhow!(
                         "ERROR: Blob not found for budget '{}' package '{}' path '{}' hash '{}'",
                         budget_usage.budget.name,
-                        blob.package,
+                        blob.package_path,
                         blob.path,
                         blob.hash
                     ))
@@ -442,11 +445,15 @@ fn compute_budget_results(
         let mut package_breakdown = HashMap::new();
         for blob in filtered_blobs {
             let count = blob_count_by_hash.get(&blob.hash).ok_or_else(|| {
-                format_err!("Can't find blob {} from package {:?} in map", blob.hash, blob.package)
+                format_err!(
+                    "Can't find blob {} from package {:?} in map",
+                    blob.hash,
+                    blob.package_path
+                )
             })?;
             let package_result =
-                package_breakdown.entry(blob.package.clone()).or_insert(PackageSizeInfo {
-                    name: "".to_string(),
+                package_breakdown.entry(blob.package_path.clone()).or_insert(PackageSizeInfo {
+                    name: blob.package_name.clone(),
                     proportional_size: 0,
                     used_space_in_blobfs: 0,
                     blobs: vec![],
@@ -458,7 +465,7 @@ fn compute_budget_results(
                 used_space_in_blobfs: count.size,
                 share_count: count.share_count,
                 absolute_share_count: count.share_count,
-                path_in_package: "".to_string(),
+                path_in_package: blob.path.clone(),
             });
         }
 
@@ -1031,7 +1038,7 @@ mod tests {
                 },
                 "blobs" : [{
                     "source_path": "first_blob",
-                    "path": "ignored",
+                    "path": "path/in/pkg-cache",
                     "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
                     "size": 4i32
                 }]
@@ -1043,12 +1050,12 @@ mod tests {
                 "version": "1",
                 "repository": "testrepository.com",
                 "package": {
-                    "name": "pkg-cache",
+                    "name": "pkgfs",
                     "version": "0"
                 },
                 "blobs" : [{
                     "source_path": "first_blob",
-                    "path": "ignored",
+                    "path": "path/in/pkgfs",
                     "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
                     "size": 8i32
                 }]
@@ -1060,12 +1067,12 @@ mod tests {
                 "version": "1",
                 "repository": "testrepository.com",
                 "package": {
-                    "name": "pkg-cache",
+                    "name": "bt-gap",
                     "version": "0"
                 },
                 "blobs" : [{
                     "source_path": "first_blob",
-                    "path": "ignored",
+                    "path": "path/in/bt-gap",
                     "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
                     "size": 16i32
                 }]
@@ -1116,11 +1123,11 @@ mod tests {
                     test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json").to_string(): {
                       "proportional_size": 53,
                       "used_space_in_blobfs": 159,
-                      "name": "",
+                      "name": "pkg-cache",
                       "blobs": [
                         {
                             "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                            "path_in_package": "",
+                            "path_in_package": "path/in/pkg-cache",
                             "used_space_in_blobfs": 159,
                             "share_count": 3,
                             "absolute_share_count": 3,
@@ -1130,11 +1137,11 @@ mod tests {
                     test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json").to_string(): {
                       "proportional_size": 53,
                       "used_space_in_blobfs": 159,
-                      "name": "",
+                      "name": "pkgfs",
                       "blobs": [
                         {
                             "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                            "path_in_package": "",
+                            "path_in_package": "path/in/pkgfs",
                             "used_space_in_blobfs": 159,
                             "share_count": 3,
                             "absolute_share_count": 3,
@@ -1152,11 +1159,11 @@ mod tests {
                     test_fs.path("obj/src/connectivity/bluetooth/core/bt-gap/bt-gap/package_manifest.json").to_string(): {
                       "proportional_size": 53,
                       "used_space_in_blobfs": 159,
-                      "name": "",
+                      "name": "bt-gap",
                       "blobs": [
                         {
                             "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                            "path_in_package": "",
+                            "path_in_package": "path/in/bt-gap",
                             "used_space_in_blobfs": 159,
                             "share_count": 3,
                             "absolute_share_count": 3,
@@ -1425,22 +1432,26 @@ mod tests {
                 blobs: vec![
                     BlobInstance {
                         hash: blob1_hash,
-                        package: package1_path.clone(),
+                        package_path: package1_path.clone(),
+                        package_name: "package1".into(),
                         path: blob1_path.to_string(),
                     },
                     BlobInstance {
                         hash: blob3_hash,
-                        package: package1_path.clone(),
+                        package_path: package1_path.clone(),
+                        package_name: "package1".into(),
                         path: blob3_path.to_string(),
                     },
                     BlobInstance {
                         hash: blob2_hash,
-                        package: package2_path.clone(),
+                        package_path: package2_path.clone(),
+                        package_name: "package2".into(),
                         path: blob2_path.to_string(),
                     },
                     BlobInstance {
                         hash: blob1_hash,
-                        package: package2_path.clone(),
+                        package_path: package2_path.clone(),
+                        package_name: "package2".into(),
                         path: blob1_path.to_string(),
                     },
                 ],
@@ -1455,7 +1466,8 @@ mod tests {
                 },
                 blobs: vec![BlobInstance {
                     hash: blob2_hash,
-                    package: package3_path.clone(),
+                    package_path: package3_path.clone(),
+                    package_name: "package3".into(),
                     path: blob2_path.to_string(),
                 }],
             },
@@ -1478,7 +1490,7 @@ mod tests {
                     (
                         package2_path,
                         PackageSizeInfo {
-                            name: "".to_string(),
+                            name: "package2".into(),
                             proportional_size: 70, /* 90/2 + 50/2 */
                             used_space_in_blobfs: 140,
                             blobs: vec![
@@ -1487,11 +1499,11 @@ mod tests {
                                     used_space_in_blobfs: 50,
                                     share_count: 2,
                                     absolute_share_count: 2,
-                                    path_in_package: "".to_string(),
+                                    path_in_package: blob2_path.to_string(),
                                 },
                                 PackageBlobSizeInfo {
                                     merkle: blob1_hash,
-                                    path_in_package: "".to_string(),
+                                    path_in_package: blob1_path.to_string(),
                                     used_space_in_blobfs: 90,
                                     share_count: 2,
                                     absolute_share_count: 2,
@@ -1502,12 +1514,12 @@ mod tests {
                     (
                         package1_path,
                         PackageSizeInfo {
-                            name: "".to_string(),
+                            name: "package1".into(),
                             proportional_size: 45, /* 90/2 */
                             used_space_in_blobfs: 90,
                             blobs: vec![PackageBlobSizeInfo {
                                 merkle: blob1_hash,
-                                path_in_package: "".to_string(),
+                                path_in_package: blob1_path.to_string(),
                                 used_space_in_blobfs: 90,
                                 share_count: 2,
                                 absolute_share_count: 2,
@@ -1524,12 +1536,12 @@ mod tests {
                 package_breakdown: HashMap::from([(
                     package3_path,
                     PackageSizeInfo {
-                        name: "".to_string(),
+                        name: "package3".into(),
                         proportional_size: 25, /* 50/2 */
                         used_space_in_blobfs: 50,
                         blobs: vec![PackageBlobSizeInfo {
                             merkle: blob2_hash,
-                            path_in_package: "".to_string(),
+                            path_in_package: blob2_path.to_string(),
                             used_space_in_blobfs: 50,
                             share_count: 2,
                             absolute_share_count: 2,
