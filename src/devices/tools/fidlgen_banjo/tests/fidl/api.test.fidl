@@ -91,12 +91,6 @@ closed protocol Api {
     }) -> (struct {
         status zx.status;
     });
-    strict signals(resource struct {
-        handle zx.handle;
-        data zx.signals;
-    }) -> (struct {
-        status zx.status;
-    });
     strict time(resource struct {
         handle zx.handle;
         data zx.time;
@@ -193,12 +187,6 @@ closed protocol Api {
     }) -> (struct {
         status zx.status;
         result zx.paddr;
-    });
-    strict output_signals(resource struct {
-        handle zx.handle;
-    }) -> (struct {
-        status zx.status;
-        result zx.signals;
     });
     strict output_time(resource struct {
         handle zx.handle;

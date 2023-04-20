@@ -25,7 +25,6 @@ pub struct zx_types {
     pub paddr32: zircon_types::zx_paddr32_t,
     pub gpaddr: zircon_types::zx_gpaddr_t,
     pub offset: zircon_types::zx_off_t,
-    pub signals: zircon_types::zx_signals_t,
 }
 
 #[repr(C)]

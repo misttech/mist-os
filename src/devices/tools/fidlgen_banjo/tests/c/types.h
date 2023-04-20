@@ -63,7 +63,6 @@ struct zx_types {
     zx_paddr32_t paddr32;
     zx_gpaddr_t gpaddr;
     zx_off_t offset;
-    zx_signals_t signals;
 };
 
 struct vectors {

@@ -54,9 +54,6 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_koid, Apiko
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_paddr, Apipaddr,
         zx_status_t (C::*)(zx::handle handle, zx_paddr_t data));
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_signals, Apisignals,
-        zx_status_t (C::*)(zx::handle handle, zx_signals_t data));
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_time, Apitime,
         zx_status_t (C::*)(zx::handle handle, zx_time_t data));
 
@@ -104,9 +101,6 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_output_koid
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_output_paddr, Apioutput_paddr,
         zx_status_t (C::*)(zx::handle handle, zx_paddr_t* out_result));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_output_signals, Apioutput_signals,
-        zx_status_t (C::*)(zx::handle handle, zx_signals_t* out_result));
 
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_api_protocol_output_time, Apioutput_time,
         zx_status_t (C::*)(zx::handle handle, zx_time_t* out_result));
@@ -191,10 +185,6 @@ constexpr void CheckApiProtocolSubclass() {
         "ApiProtocol subclasses must implement "
         "zx_status_t Apipaddr(zx::handle handle, zx_paddr_t data);");
 
-    static_assert(internal::has_api_protocol_signals<D>::value,
-        "ApiProtocol subclasses must implement "
-        "zx_status_t Apisignals(zx::handle handle, zx_signals_t data);");
-
     static_assert(internal::has_api_protocol_time<D>::value,
         "ApiProtocol subclasses must implement "
         "zx_status_t Apitime(zx::handle handle, zx_time_t data);");
@@ -258,10 +248,6 @@ constexpr void CheckApiProtocolSubclass() {
     static_assert(internal::has_api_protocol_output_paddr<D>::value,
         "ApiProtocol subclasses must implement "
         "zx_status_t Apioutput_paddr(zx::handle handle, zx_paddr_t* out_result);");
-
-    static_assert(internal::has_api_protocol_output_signals<D>::value,
-        "ApiProtocol subclasses must implement "
-        "zx_status_t Apioutput_signals(zx::handle handle, zx_signals_t* out_result);");
 
     static_assert(internal::has_api_protocol_output_time<D>::value,
         "ApiProtocol subclasses must implement "

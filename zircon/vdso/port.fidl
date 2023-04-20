@@ -13,8 +13,8 @@ type PacketUser = strict union {
 
 // port_packet_t::type ZX_PKT_TYPE_SIGNAL_ONE.
 type PacketSignal = struct {
-    trigger signals;
-    observed signals;
+    trigger Signals;
+    observed Signals;
     count uint64;
     reserved0 uint64;
     reserved1 uint64;

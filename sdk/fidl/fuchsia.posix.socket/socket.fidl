@@ -10,23 +10,23 @@ using fuchsia.posix;
 using fuchsia.unknown;
 using zx;
 
-// TODO(https://fxbug.dev/109734): remove once zircon signal values are defined
+// TODO(https://fxbug.dev/110021): remove once zircon signal values are defined
 // in the zx FIDL library.
-const USER_SIGNAL_0 zx.signals = 0x01000000;
-const USER_SIGNAL_1 zx.signals = 0x02000000;
-const USER_SIGNAL_2 zx.signals = 0x04000000;
-const USER_SIGNAL_3 zx.signals = 0x08000000;
-const USER_SIGNAL_4 zx.signals = 0x10000000;
-const USER_SIGNAL_5 zx.signals = 0x20000000;
+const USER_SIGNAL_0 uint32 = 0x01000000;
+const USER_SIGNAL_1 uint32 = 0x02000000;
+const USER_SIGNAL_2 uint32 = 0x04000000;
+const USER_SIGNAL_3 uint32 = 0x08000000;
+const USER_SIGNAL_4 uint32 = 0x10000000;
+const USER_SIGNAL_5 uint32 = 0x20000000;
 
-const SIGNAL_DATAGRAM_INCOMING zx.signals = USER_SIGNAL_0;
-const SIGNAL_DATAGRAM_OUTGOING zx.signals = USER_SIGNAL_1;
-const SIGNAL_DATAGRAM_ERROR zx.signals = USER_SIGNAL_2;
-const SIGNAL_DATAGRAM_SHUTDOWN_READ zx.signals = USER_SIGNAL_4;
-const SIGNAL_DATAGRAM_SHUTDOWN_WRITE zx.signals = USER_SIGNAL_5;
+const SIGNAL_DATAGRAM_INCOMING uint32 = USER_SIGNAL_0;
+const SIGNAL_DATAGRAM_OUTGOING uint32 = USER_SIGNAL_1;
+const SIGNAL_DATAGRAM_ERROR uint32 = USER_SIGNAL_2;
+const SIGNAL_DATAGRAM_SHUTDOWN_READ uint32 = USER_SIGNAL_4;
+const SIGNAL_DATAGRAM_SHUTDOWN_WRITE uint32 = USER_SIGNAL_5;
 
-const SIGNAL_STREAM_INCOMING zx.signals = USER_SIGNAL_0;
-const SIGNAL_STREAM_CONNECTED zx.signals = USER_SIGNAL_3;
+const SIGNAL_STREAM_INCOMING uint32 = USER_SIGNAL_0;
+const SIGNAL_STREAM_CONNECTED uint32 = USER_SIGNAL_3;
 
 /// Socket shutdown mode.
 type ShutdownMode = strict bits : uint16 {

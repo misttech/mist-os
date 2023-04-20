@@ -3,12 +3,16 @@
 // found in the LICENSE file.
 library zx;
 
+// TODO(fxbug.dev/110021): This should be modeled as a `bits`, but more thought
+// needs to be given to the public/private split of the current C definition.
+alias Signals = uint32;
+
 // TODO(scottmg): Apply rights spec from WaitMany on |items| to |handle| here,
 // somehow.
 type WaitItem = resource struct {
     handle handle;
-    waitfor signals;
-    pending signals;
+    waitfor Signals;
+    pending Signals;
 };
 
 @transport("Syscall")
@@ -103,10 +107,10 @@ protocol Object {
     @blocking
     WaitOne(resource struct {
         handle handle;
-        signals signals;
+        signals Signals;
         deadline time;
     }) -> (struct {
-        observed signals;
+        observed Signals;
     }) error status;
 
     /// ## Summary
@@ -366,7 +370,7 @@ protocol Object {
         handle handle;
         port handle:PORT;
         key uint64;
-        signals signals;
+        signals Signals;
         options uint32;
     }) -> () error status;
 
