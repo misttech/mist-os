@@ -336,8 +336,6 @@ impl MouseBinding {
             buttons_from_optional_report(&previous_report.as_ref());
         let current_buttons: HashSet<MouseButton> = buttons_from_report(&report);
 
-        let event_time: zx::Time = input_device::event_time_or_now(report.event_time);
-
         // Send a Down event with:
         // * affected_buttons: the buttons that were pressed since the previous report,
         //   i.e. that are in the current report, but were not in the previous report.
@@ -351,7 +349,6 @@ impl MouseBinding {
             current_buttons.difference(&previous_buttons).cloned().collect(),
             current_buttons.clone(),
             device_descriptor,
-            event_time,
             input_event_sender,
         );
 
@@ -390,7 +387,6 @@ impl MouseBinding {
             current_buttons.union(&previous_buttons).cloned().collect(),
             current_buttons.union(&previous_buttons).cloned().collect(),
             device_descriptor,
-            event_time,
             input_event_sender,
         );
 
@@ -417,7 +413,6 @@ impl MouseBinding {
             current_buttons.union(&previous_buttons).cloned().collect(),
             current_buttons.union(&previous_buttons).cloned().collect(),
             device_descriptor,
-            event_time,
             input_event_sender,
         );
 
@@ -434,7 +429,6 @@ impl MouseBinding {
             previous_buttons.difference(&current_buttons).cloned().collect(),
             current_buttons.clone(),
             device_descriptor,
-            event_time,
             input_event_sender,
         );
 
@@ -454,7 +448,6 @@ impl MouseBinding {
 /// - `phase`: The phase of the [`buttons`] associated with the input event.
 /// - `buttons`: The buttons relevant to the event.
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
-/// - `event_time`: The time in nanoseconds when the event was first recorded.
 /// - `sender`: The stream to send the MouseEvent to.
 fn send_mouse_event(
     location: MouseLocation,
@@ -464,7 +457,6 @@ fn send_mouse_event(
     affected_buttons: HashSet<MouseButton>,
     pressed_buttons: HashSet<MouseButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    event_time: zx::Time,
     sender: &mut Sender<input_device::InputEvent>,
 ) {
     // Only send Down/Up events when there are buttons affected.
@@ -497,7 +489,7 @@ fn send_mouse_event(
             },
         )),
         device_descriptor: device_descriptor.clone(),
-        event_time,
+        event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     }) {

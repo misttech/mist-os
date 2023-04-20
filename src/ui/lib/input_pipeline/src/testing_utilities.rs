@@ -705,7 +705,7 @@ macro_rules! assert_input_report_sequence_generates_events {
             );
         }
 
-        for expected_event in $expected_events {
+        for mut expected_event in $expected_events {
             let input_event = event_receiver.next().await;
             match input_event {
                 Some(mut received_event) => {
@@ -714,6 +714,9 @@ macro_rules! assert_input_report_sequence_generates_events {
                     // allow comparing against an expected event, but we ensure trace_id is set
                     // properly with another test.
                     received_event.trace_id = None;
+                    // Overwrite the expected_event's event_time, because an InputEvent's event_time
+                    // is set at the time InputReports are processed into InputEvents.
+                    expected_event.event_time = received_event.event_time;
                     pretty_assertions::assert_eq!(expected_event, received_event)
                 }
                 _ => assert!(false),

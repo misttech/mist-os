@@ -502,8 +502,6 @@ fn process_touch_screen_reports(
             .filter(|contact| !current_contacts.contains_key(&contact.id)),
     );
 
-    let event_time: zx::Time = input_device::event_time_or_now(report.event_time);
-
     let trace_id = fuchsia_trace::Id::new();
     fuchsia_trace::flow_begin!("input", "report-to-event", trace_id);
     send_touch_screen_event(
@@ -520,7 +518,6 @@ fn process_touch_screen_reports(
             pointerinjector::EventPhase::Remove => removed_contacts,
         },
         device_descriptor,
-        event_time,
         input_event_sender,
         trace_id,
     );
@@ -558,18 +555,9 @@ fn process_touchpad_reports(
         None => HashSet::new(),
     };
 
-    let event_time: zx::Time = input_device::event_time_or_now(report.event_time);
-
     let trace_id = fuchsia_trace::Id::new();
     fuchsia_trace::flow_begin!("input", "report-to-event", trace_id);
-    send_touchpad_event(
-        current_contacts,
-        buttons,
-        device_descriptor,
-        event_time,
-        input_event_sender,
-        trace_id,
-    );
+    send_touchpad_event(current_contacts, buttons, device_descriptor, input_event_sender, trace_id);
 
     Some(report)
 }
@@ -597,13 +585,11 @@ fn touch_contacts_from_touch_report(
 /// - `injector_contacts`: The contact points relevant to the new TouchScreenEvent, used to send
 ///                        pointer events into Scenic.
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
-/// - `event_time`: The time in nanoseconds when the event was first recorded.
 /// - `input_event_sender`: The sender for the device binding's input event stream.
 fn send_touch_screen_event(
     contacts: HashMap<fidl_ui_input::PointerEventPhase, Vec<TouchContact>>,
     injector_contacts: HashMap<pointerinjector::EventPhase, Vec<TouchContact>>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    event_time: zx::Time,
     input_event_sender: &mut Sender<input_device::InputEvent>,
     trace_id: fuchsia_trace::Id,
 ) {
@@ -613,7 +599,7 @@ fn send_touch_screen_event(
             injector_contacts,
         }),
         device_descriptor: device_descriptor.clone(),
-        event_time,
+        event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: Some(trace_id),
     }) {
@@ -628,13 +614,11 @@ fn send_touch_screen_event(
 /// - `injector_contacts`: The contact points relevant to the new TouchpadEvent.
 /// - `pressed_buttons`: The pressing button of the new TouchpadEvent.
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
-/// - `event_time`: The time in nanoseconds when the event was first recorded.
 /// - `input_event_sender`: The sender for the device binding's input event stream.
 fn send_touchpad_event(
     injector_contacts: Vec<TouchContact>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    event_time: zx::Time,
     input_event_sender: &mut Sender<input_device::InputEvent>,
     trace_id: fuchsia_trace::Id,
 ) {
@@ -644,7 +628,7 @@ fn send_touchpad_event(
             pressed_buttons,
         }),
         device_descriptor: device_descriptor.clone(),
-        event_time,
+        event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: Some(trace_id),
     }) {

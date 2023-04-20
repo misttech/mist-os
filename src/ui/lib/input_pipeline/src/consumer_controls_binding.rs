@@ -203,14 +203,7 @@ impl ConsumerControlsBinding {
                 None => return previous_report,
             };
 
-        let event_time: zx::Time = input_device::event_time_or_now(report.event_time);
-
-        send_consumer_controls_event(
-            pressed_buttons,
-            device_descriptor,
-            event_time,
-            input_event_sender,
-        );
+        send_consumer_controls_event(pressed_buttons, device_descriptor, input_event_sender);
 
         Some(report)
     }
@@ -221,12 +214,10 @@ impl ConsumerControlsBinding {
 /// # Parameters
 /// - `pressed_buttons`: The buttons relevant to the event.
 /// - `device_descriptor`: The descriptor for the input device generating the input reports.
-/// - `event_time`: The time in nanoseconds when the event was first recorded.
 /// - `sender`: The stream to send the InputEvent to.
 fn send_consumer_controls_event(
     pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    event_time: zx::Time,
     sender: &mut Sender<input_device::InputEvent>,
 ) {
     if let Err(e) = sender.try_send(input_device::InputEvent {
@@ -234,7 +225,7 @@ fn send_consumer_controls_event(
             pressed_buttons,
         )),
         device_descriptor: device_descriptor.clone(),
-        event_time,
+        event_time: zx::Time::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     }) {

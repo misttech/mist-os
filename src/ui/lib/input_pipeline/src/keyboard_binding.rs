@@ -456,13 +456,11 @@ impl KeyboardBinding {
             .and_then(|unwrapped_report| KeyboardBinding::parse_pressed_keys(&unwrapped_report))
             .unwrap_or_default();
 
-        let event_time: zx::Time = input_device::event_time_or_now(report.event_time);
-
         KeyboardBinding::send_key_events(
             &new_keys,
             &previous_keys,
             device_descriptor.clone(),
-            event_time,
+            zx::Time::get_monotonic(),
             input_event_sender.clone(),
         );
 

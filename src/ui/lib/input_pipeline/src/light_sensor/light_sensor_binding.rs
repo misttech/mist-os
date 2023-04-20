@@ -283,8 +283,6 @@ impl LightSensorBinding {
             Some(values) => values,
         };
 
-        let event_time: zx::Time = input_device::event_time_or_now(report.event_time);
-
         if let Err(e) = input_event_sender.try_send(input_device::InputEvent {
             device_event: input_device::InputDeviceEvent::LightSensor(LightSensorEvent {
                 device_proxy,
@@ -296,7 +294,7 @@ impl LightSensorBinding {
                 },
             }),
             device_descriptor: device_descriptor.clone(),
-            event_time,
+            event_time: zx::Time::get_monotonic(),
             handled: Handled::No,
             trace_id: None,
         }) {
