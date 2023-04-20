@@ -6,6 +6,7 @@
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/metadata.h>
 
 #include <cstdlib>
 #include <memory>
@@ -58,7 +59,8 @@ zx_status_t TestPwmDevice::Create(zx_device_t* parent) {
 
   zxlogf(INFO, "TestPwmDevice::Create: %s ", DRIVER_NAME);
 
-  status = dev->DdkAdd("test-pwm");
+  status =
+      dev->DdkAdd(ddk::DeviceAddArgs("test-pwm").forward_metadata(parent, DEVICE_METADATA_PWM_IDS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
     return status;

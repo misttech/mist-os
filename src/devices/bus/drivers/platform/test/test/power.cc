@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/metadata.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -71,7 +72,9 @@ zx_status_t TestPowerDevice::Create(zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd("test-power", DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
+  status = dev->DdkAdd(ddk::DeviceAddArgs("test-power")
+                           .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                           .forward_metadata(parent, DEVICE_METADATA_POWER_DOMAINS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
     return status;

@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/metadata.h>
 
 #include <memory>
 
@@ -107,7 +108,8 @@ zx_status_t TestGpioDevice::Create(zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd("test-gpio");
+  status = dev->DdkAdd(
+      ddk::DeviceAddArgs("test-gpio").forward_metadata(parent, DEVICE_METADATA_GPIO_PINS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
     return status;

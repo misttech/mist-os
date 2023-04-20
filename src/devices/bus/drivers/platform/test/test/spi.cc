@@ -37,7 +37,8 @@ class TestSpiDevice : public DeviceType,
       return status;
     }
 
-    status = dev->DdkAdd("test-spi");
+    status = dev->DdkAdd(
+        ddk::DeviceAddArgs("test-spi").forward_metadata(parent, DEVICE_METADATA_SPI_CHANNELS));
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
       return status;

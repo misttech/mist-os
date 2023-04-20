@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdf/cpp/arena.h>
 
@@ -95,7 +96,8 @@ zx_status_t TestClockDevice::Create(zx_device_t* parent) {
     return status;
   }
 
-  status = dev->DdkAdd("test-clock");
+  status = dev->DdkAdd(
+      ddk::DeviceAddArgs("test-clock").forward_metadata(parent, DEVICE_METADATA_CLOCK_IDS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
     return status;

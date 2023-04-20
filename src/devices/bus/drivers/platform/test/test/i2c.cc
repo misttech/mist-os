@@ -6,6 +6,7 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/ddk/metadata.h>
 
 #include <memory>
 
@@ -56,7 +57,8 @@ zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
 
   zxlogf(INFO, "TestI2cDevice::Create: %s ", DRIVER_NAME);
 
-  status = dev->DdkAdd("test-i2c");
+  status = dev->DdkAdd(
+      ddk::DeviceAddArgs("test-i2c").forward_metadata(parent, DEVICE_METADATA_I2C_CHANNELS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
     return status;
