@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
@@ -54,7 +55,8 @@ class Bti final : public fake_object::Object {
     return true;
   }
 
-  zx_status_t PinVmo(const zx::unowned_vmo& vmo, uint64_t size, uint64_t offset) {
+  zx_status_t PinVmo(const zx::unowned_vmo& vmo, uint64_t size, uint64_t offset,
+                     cpp20::span<const zx_paddr_t> paddrs) {
     zx_info_handle_basic_t info;
     zx_status_t status = vmo->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
     if (status != ZX_OK) {
@@ -68,7 +70,7 @@ class Bti final : public fake_object::Object {
     }
 
     fbl::AutoLock lock(&lock_);
-    pinned_vmos_.push_back({std::move(vmo_dup), size, offset, info.koid});
+    pinned_vmos_.push_back({std::move(vmo_dup), size, offset, info.koid, std::move(paddrs)});
     return ZX_OK;
   }
 
@@ -100,8 +102,12 @@ class Bti final : public fake_object::Object {
     uint64_t size;
     uint64_t offset;
     uint64_t koid;
-    PinnedVmoInfo(zx::vmo vmo_in, uint64_t size_in, uint64_t offset_in, uint64_t koid_in)
-        : vmo(std::move(vmo_in)), size(size_in), offset(offset_in), koid(koid_in) {}
+    std::vector<zx_paddr_t> paddrs;
+    PinnedVmoInfo(zx::vmo vmo_in, uint64_t size_in, uint64_t offset_in, uint64_t koid_in,
+                  cpp20::span<const zx_paddr_t> paddrs_in)
+        : vmo(std::move(vmo_in)), size(size_in), offset(offset_in), koid(koid_in) {
+      paddrs.assign(paddrs_in.begin(), paddrs_in.end());
+    }
   };
 
   fbl::Mutex lock_;
@@ -237,6 +243,42 @@ zx_status_t fake_bti_get_pinned_vmos(zx_handle_t bti, fake_bti_pinned_vmo_info_t
   return ZX_OK;
 }
 
+zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_vmo_info_t vmo_info,
+                                              zx_paddr_t* out_paddrs, size_t out_num_paddrs,
+                                              size_t* actual_num_paddrs) {
+  if (actual_num_paddrs == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // Make sure this is a valid fake bti:
+  zx::result get_status = fake_object::FakeHandleTable().Get(bti);
+  ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
+                "fake_bti_get_phys_from_pinned_vmo: Bad handle %u\n", bti);
+  fbl::RefPtr<Bti> bti_obj = fbl::RefPtr<Bti>::Downcast(std::move(get_status.value()));
+
+  zx_info_handle_basic_t target_info;
+  if (zx_status_t status = zx_object_get_info(vmo_info.vmo, ZX_INFO_HANDLE_BASIC, &target_info,
+                                              sizeof(target_info), nullptr, nullptr);
+      status != ZX_OK) {
+    return status;
+  }
+
+  const auto& vmos = bti_obj->pinned_vmos();
+  for (const auto& pinned_vmo : vmos) {
+    if (pinned_vmo.size == vmo_info.size && pinned_vmo.offset == vmo_info.offset &&
+        pinned_vmo.koid == target_info.koid) {
+      *actual_num_paddrs = pinned_vmo.paddrs.size();
+
+      if (out_paddrs != nullptr) {
+        size_t num_copy = std::min(out_num_paddrs, pinned_vmo.paddrs.size());
+        std::memcpy(out_paddrs, pinned_vmo.paddrs.data(), num_copy * sizeof(zx_paddr_t));
+      }
+      return ZX_OK;
+    }
+  }
+  return ZX_ERR_NOT_FOUND;
+}
+
 // Fake syscall implementations
 __EXPORT
 zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo, uint64_t offset,
@@ -339,7 +381,7 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
     return add_status.status_value();
   }
 
-  return bti_obj->PinVmo(zx::unowned_vmo(vmo), size, offset);
+  return bti_obj->PinVmo(zx::unowned_vmo(vmo), size, offset, cpp20::span(addrs, addrs_count));
 }
 
 __EXPORT

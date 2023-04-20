@@ -47,6 +47,15 @@ typedef struct {
 zx_status_t fake_bti_get_pinned_vmos(zx_handle_t bti, fake_bti_pinned_vmo_info_t* out_vmo_info,
                                      size_t out_num_vmos, size_t* actual_num_vmos);
 
+// Fake BTI stores all the fake physical addresses that is returned by |zx_bti_pin|.
+// Tests can call this method to get the fake physical addresses corresponding to |vmo_info|.
+// |out_paddrs| points to a buffer containing |out_num_paddrs| physical address elements.
+// The method writes no more than |out_num_paddrs| elements to the buffer, and will write the actual
+// number of physical addresses to |actual_num_paddrs| if the argument is not null.
+zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_vmo_info_t vmo_info,
+                                              zx_paddr_t* out_paddrs, size_t out_num_paddrs,
+                                              size_t* actual_num_paddrs);
+
 __END_CDECLS
 
 #endif  // SRC_DEVICES_TESTING_FAKE_BTI_INCLUDE_LIB_FAKE_BTI_BTI_H_
