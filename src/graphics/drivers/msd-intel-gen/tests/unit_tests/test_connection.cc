@@ -69,14 +69,6 @@ class TestMsdIntelConnection : public ::testing::Test,
     callback_count_ += 1;
   }
 
-  void HandleWait(msd_connection_handle_wait_start_t starter,
-                  msd_connection_handle_wait_complete_t completer, void* wait_context,
-                  zx::unowned_handle handle) override {
-    callback_count_ += 1;
-  }
-
-  void HandleWaitCancel(void* cancel_token) override { callback_count_ += 1; }
-
   async_dispatcher_t* GetAsyncDispatcher() override {
     callback_count_ += 1;
     return loop_.dispatcher();

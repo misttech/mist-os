@@ -259,17 +259,6 @@ void MagmaSystemConnection::PerformanceCounterReadCompleted(const msd::PerfCount
       result.result_flags);
 }
 
-void MagmaSystemConnection::HandleWait(msd_connection_handle_wait_start_t starter,
-                                       msd_connection_handle_wait_complete_t completer,
-                                       void* wait_context, zx::unowned_handle handle) {
-  MAGMA_DASSERT(notification_handler_);
-  notification_handler_->HandleWait(starter, completer, wait_context, std::move(handle));
-}
-void MagmaSystemConnection::HandleWaitCancel(void* cancel_token) {
-  MAGMA_DASSERT(notification_handler_);
-  notification_handler_->HandleWaitCancel(cancel_token);
-}
-
 async_dispatcher_t* MagmaSystemConnection::GetAsyncDispatcher() {
   MAGMA_DASSERT(notification_handler_);
   return notification_handler_->GetAsyncDispatcher();

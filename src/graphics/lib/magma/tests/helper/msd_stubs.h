@@ -17,12 +17,6 @@ class StubNotificationHandler : public NotificationHandler {
   void NotificationChannelSend(cpp20::span<uint8_t> data) override { assert(false); }
   void ContextKilled() override { assert(false); }
   void PerformanceCounterReadCompleted(const PerfCounterResult& result) override { assert(false); }
-  void HandleWait(msd_connection_handle_wait_start_t starter,
-                  msd_connection_handle_wait_complete_t completer, void* wait_context,
-                  zx::unowned_handle handle) override {
-    assert(false);
-  }
-  void HandleWaitCancel(void* cancel_token) override { assert(false); }
   async_dispatcher_t* GetAsyncDispatcher() override {
     assert(false);
     return nullptr;

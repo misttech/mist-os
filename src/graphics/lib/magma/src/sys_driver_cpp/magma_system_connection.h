@@ -66,10 +66,6 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   void NotificationChannelSend(cpp20::span<uint8_t> data) override;
   void ContextKilled() override;
   void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override;
-  void HandleWait(msd_connection_handle_wait_start_t starter,
-                  msd_connection_handle_wait_complete_t completer, void* wait_context,
-                  zx::unowned_handle handle) override;
-  void HandleWaitCancel(void* cancel_token) override;
   async_dispatcher_t* GetAsyncDispatcher() override;
 
   // Create a buffer from the handle and add it to the map,

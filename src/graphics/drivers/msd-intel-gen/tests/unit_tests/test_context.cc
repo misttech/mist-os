@@ -183,12 +183,6 @@ class MsdIntelContextSubmit : public testing::TestWithParam<Param>,
   void ContextKilled() override {}
   void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override {}
 
-  void HandleWait(msd_connection_handle_wait_start_t starter,
-                  msd_connection_handle_wait_complete_t completer, void* wait_context,
-                  zx::unowned_handle handle) override {}
-
-  void HandleWaitCancel(void* cancel_token) override {}
-
   async_dispatcher_t* GetAsyncDispatcher() override { return loop_.dispatcher(); }
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};

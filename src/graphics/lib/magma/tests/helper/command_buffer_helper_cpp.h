@@ -121,27 +121,6 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   void NotificationChannelSend(cpp20::span<uint8_t> data) override {}
   void ContextKilled() override {}
   void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override {}
-  void HandleWait(msd_connection_handle_wait_start_t starter,
-                  msd_connection_handle_wait_complete_t completer, void* wait_context,
-                  zx::unowned_handle handle) override {
-    async::PostTask(loop_.dispatcher(),
-                    [this, starter, completer, wait_context, handle = handle->get()]() {
-                      starter(wait_context, &cancel_token_);
-
-                      magma_handle_t handle_copy;
-                      ASSERT_TRUE(magma::PlatformHandle::duplicate_handle(handle, &handle_copy));
-
-                      auto semaphore = magma::PlatformSemaphore::Import(handle_copy);
-                      ASSERT_TRUE(semaphore);
-                      semaphore->Signal();
-
-                      completer(wait_context, MAGMA_STATUS_OK, handle);
-                    });
-  }
-  void HandleWaitCancel(void* cancel_token) override {
-    async::PostTask(loop_.dispatcher(),
-                    [this, cancel_token]() { EXPECT_EQ(cancel_token, &cancel_token_); });
-  }
   async_dispatcher_t* GetAsyncDispatcher() override { return loop_.dispatcher(); }
 
  private:
@@ -269,5 +248,4 @@ class CommandBufferHelper final : public msd::NotificationHandler {
   std::vector<msd::Semaphore*> msd_wait_semaphores_;
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> signal_semaphores_;
   std::vector<msd::Semaphore*> msd_signal_semaphores_;
-  int cancel_token_ = 0;
 };

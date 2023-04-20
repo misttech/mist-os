@@ -96,10 +96,6 @@ class NotificationHandler {
   virtual void NotificationChannelSend(cpp20::span<uint8_t> data) = 0;
   virtual void ContextKilled() = 0;
   virtual void PerformanceCounterReadCompleted(const PerfCounterResult& result) = 0;
-  virtual void HandleWait(msd_connection_handle_wait_start_t starter,
-                          msd_connection_handle_wait_complete_t completer, void* wait_context,
-                          zx::unowned_handle handle) = 0;
-  virtual void HandleWaitCancel(void* cancel_token) = 0;
   // Returns an async_dispatcher_t that runs commands serialized with this
   // Connection. This dispatcher will be shut down before the Connection is
   // destroyed.

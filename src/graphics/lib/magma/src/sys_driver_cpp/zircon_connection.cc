@@ -127,31 +127,6 @@ bool ZirconConnection::HandleRequest() {
   return true;
 }
 
-struct AsyncHandleWait : public async_wait {
-  AsyncHandleWait(msd_connection_handle_wait_complete_t completer, void* completer_context,
-                  zx_handle_t object) {
-    this->state = ASYNC_STATE_INIT;
-    this->handler = Handler;
-    this->object = object;
-    this->trigger = ZX_EVENT_SIGNALED;
-    this->options = 0;
-    this->completer = completer;
-    this->completer_context = completer_context;
-  }
-
-  static void Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait, zx_status_t status,
-                      const zx_packet_signal_t* signal) {
-    auto wait = static_cast<AsyncHandleWait*>(async_wait);
-
-    wait->completer(wait->completer_context, magma::FromZxStatus(status).get(), wait->object);
-
-    delete wait;
-  }
-
-  msd_connection_handle_wait_complete_t completer;
-  void* completer_context;
-};
-
 void ZirconConnection::NotificationChannelSend(cpp20::span<uint8_t> data) {
   zx_status_t status = server_notification_endpoint_.write(
       0, data.data(), static_cast<uint32_t>(data.size()), nullptr, 0);
@@ -165,41 +140,6 @@ void ZirconConnection::ContextKilled() {
 
 void ZirconConnection::PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) {
   MAGMA_DASSERT(false);
-}
-
-void ZirconConnection::HandleWait(msd_connection_handle_wait_start_t starter,
-                                  msd_connection_handle_wait_complete_t completer,
-                                  void* wait_context, zx::unowned_handle handle) {
-  async::PostTask(async_loop_.dispatcher(), [this, starter, completer, wait_context,
-                                             handle = handle->get()]() mutable {
-    MAGMA_DASSERT(handle != ZX_HANDLE_INVALID);
-
-    auto wait_ptr = std::make_unique<AsyncHandleWait>(completer, wait_context, handle);
-
-    zx_status_t status = async_begin_wait(async_loop()->dispatcher(), wait_ptr.get());
-    if (status != ZX_OK) {
-      MAGMA_DLOG("async_begin_wait failed: %s", zx_status_get_string(status));
-      return;
-    }
-
-    starter(wait_context, wait_ptr.release());
-  });
-}
-
-void ZirconConnection::HandleWaitCancel(void* cancel_token) {
-  async::PostTask(async_loop_.dispatcher(), [this, cancel_token]() {
-    auto wait_ptr = reinterpret_cast<AsyncHandleWait*>(cancel_token);
-    MAGMA_DASSERT(wait_ptr);
-
-    zx_status_t status = async_cancel_wait(async_loop()->dispatcher(), wait_ptr);
-    if (status != ZX_OK) {
-      MAGMA_DLOG("async_cancel_wait failed: %s", zx_status_get_string(status));
-      return;
-    }
-
-    // Call back to ensure cleanup
-    AsyncHandleWait::Handler(async_loop()->dispatcher(), wait_ptr, ZX_ERR_CANCELED, nullptr);
-  });
 }
 
 void ZirconConnection::EnableFlowControl(EnableFlowControlCompleter::Sync& completer) {
