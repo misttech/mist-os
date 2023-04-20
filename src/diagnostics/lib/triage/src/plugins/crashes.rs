@@ -75,10 +75,10 @@ mod tests {
 
         let mut inputs = FileDataFetcher::new(&empty_diagnostics_vec);
         inputs.klog = &fetcher;
-        assert_eq!(CrashesPlugin {}.run(&inputs).get_errors(), &expected_errors);
+        assert_eq!(CrashesPlugin {}.run(&inputs).errors, expected_errors);
 
         let mut inputs = FileDataFetcher::new(&empty_diagnostics_vec);
         inputs.syslog = &fetcher;
-        assert_eq!(CrashesPlugin {}.run(&inputs).get_errors(), &expected_errors);
+        assert_eq!(CrashesPlugin {}.run(&inputs).errors, expected_errors);
     }
 }

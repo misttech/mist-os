@@ -128,7 +128,7 @@ mod tests {
         let mut inputs = FileDataFetcher::new(&empty_diagnostics_vec);
         inputs.inspect = &fetcher;
         let result = MemoryPlugin {}.run(&inputs);
-        assert_eq!(result.get_gauges(), &expected_gauges);
-        assert_eq!(result.get_errors(), &expected_errors);
+        assert_eq!(result.gauges, expected_gauges);
+        assert_eq!(result.errors, expected_errors);
     }
 }

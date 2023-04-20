@@ -6,6 +6,7 @@ use {
     crate::error::{ComponentError, EvaluationError},
     crate::spec::TestCase,
     fuchsia_triage,
+    itertools::Itertools,
     maplit::hashmap,
     std::collections::HashMap,
     std::convert::TryFrom,
@@ -65,16 +66,11 @@ impl EvaluationContext {
 
         let result = fuchsia_triage::analyze(&data_vec, &self.config_parse_result)
             .map_err(|e| EvaluationError::InternalFailure(e.to_string()))?;
-        match [
-            result.get_infos().as_slice(),
-            result.get_warnings().as_slice(),
-            result.get_errors().as_slice(),
-        ]
-        .concat()
-        {
-            list if list.len() == 0 => Ok(()),
-            warnings => Err(EvaluationError::Failure {
-                reasons: warnings.join("\n"),
+        let mut issues = result.all_issues().peekable();
+        match issues.peek() {
+            None => Ok(()),
+            Some(_) => Err(EvaluationError::Failure {
+                reasons: Itertools::intersperse(issues, "\n").collect(),
                 data: json.to_string(),
                 config: self.config_text.to_string(),
             }),

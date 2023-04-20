@@ -92,8 +92,7 @@ impl RunResult {
 
     /// Returns true if at least one ActionResults has a warning or errorF.
     fn has_problems(&self) -> bool {
-        !(self.action_results.get_warnings().is_empty()
-            && self.action_results.get_errors().is_empty())
+        !(self.action_results.warnings.is_empty() && self.action_results.errors.is_empty())
     }
 
     /// Writes the contents of the run to the provided writer.
@@ -158,12 +157,12 @@ mod tests {
     #[fuchsia::test]
     fn test_output_text_with_alerts() -> Result<(), Error> {
         let mut action_results = ActionResults::new();
-        action_results.add_info("hmmm".to_string());
-        action_results.add_warning("oops".to_string());
-        action_results.add_error("fail".to_string());
+        action_results.infos.push("hmmm".to_string());
+        action_results.warnings.push("oops".to_string());
+        action_results.errors.push("fail".to_string());
 
         let readable_run_result = RunResult::new(OutputFormat::Text, action_results.clone());
-        action_results.set_verbose(true);
+        action_results.verbose = true;
         let verbose_run_result = RunResult::new(OutputFormat::VerboseText, action_results.clone());
 
         let mut readable_dest = vec![];
@@ -185,7 +184,7 @@ mod tests {
     #[fuchsia::test]
     fn test_output_text_with_gauges() -> Result<(), Error> {
         let mut action_results = ActionResults::new();
-        action_results.add_gauge("gauge".to_string());
+        action_results.gauges.push("gauge".to_string());
         let run_result = RunResult::new(OutputFormat::Text, action_results);
 
         let mut dest = vec![];

@@ -41,7 +41,7 @@ impl<'a> ActionResultFormatter<'a> {
             sections.push(plugins);
             problem = problem || plugin_problem
         }
-        if self.action_results.verbose() {
+        if self.action_results.verbose {
             if let Some(gauges) = self.to_broken_gauges() {
                 sections.push(gauges);
             }
@@ -53,7 +53,7 @@ impl<'a> ActionResultFormatter<'a> {
     }
 
     fn to_infos(&self) -> Option<String> {
-        if self.action_results.get_infos().is_empty() {
+        if self.action_results.infos.is_empty() {
             return None;
         }
 
@@ -61,12 +61,12 @@ impl<'a> ActionResultFormatter<'a> {
         Some(format!(
             "{}{}\n",
             header,
-            self.action_results.get_infos().into_iter().sorted().join("\n")
+            (&self.action_results.infos).into_iter().sorted().join("\n")
         ))
     }
 
     fn to_warnings(&self) -> Option<String> {
-        if self.action_results.get_warnings().is_empty() {
+        if self.action_results.warnings.is_empty() {
             return None;
         }
 
@@ -74,12 +74,12 @@ impl<'a> ActionResultFormatter<'a> {
         Some(format!(
             "{}{}\n",
             header,
-            self.action_results.get_warnings().into_iter().sorted().join("\n")
+            (&self.action_results.warnings).into_iter().sorted().join("\n")
         ))
     }
 
     fn to_errors(&self) -> Option<String> {
-        if self.action_results.get_errors().is_empty() {
+        if self.action_results.errors.is_empty() {
             return None;
         }
 
@@ -87,18 +87,18 @@ impl<'a> ActionResultFormatter<'a> {
         Some(format!(
             "{}{}\n",
             header,
-            self.action_results.get_errors().into_iter().sorted().join("\n")
+            (&self.action_results.errors).into_iter().sorted().join("\n")
         ))
     }
 
     fn to_gauges(&self) -> Option<String> {
-        if self.action_results.get_gauges().is_empty() {
+        if self.action_results.gauges.is_empty() {
             return None;
         }
 
         let header = Self::make_underline("Featured Values");
-        let lines = &mut self.action_results.get_gauges().iter().cloned();
-        let lines: Vec<String> = match self.action_results.sort_gauges() {
+        let lines = &mut self.action_results.gauges.iter().cloned();
+        let lines: Vec<String> = match self.action_results.sort_gauges {
             true => lines.sorted().collect(),
             false => lines.collect(),
         };
@@ -107,7 +107,7 @@ impl<'a> ActionResultFormatter<'a> {
     }
 
     fn to_broken_gauges(&self) -> Option<String> {
-        if self.action_results.get_broken_gauges().is_empty() {
+        if self.action_results.broken_gauges.is_empty() {
             return None;
         }
 
@@ -115,7 +115,7 @@ impl<'a> ActionResultFormatter<'a> {
         Some(format!(
             "{}{}\n",
             header,
-            self.action_results.get_broken_gauges().into_iter().sorted().join("\n")
+            (&self.action_results.broken_gauges).into_iter().sorted().join("\n")
         ))
     }
 
@@ -123,7 +123,7 @@ impl<'a> ActionResultFormatter<'a> {
         let mut warning = false;
         let results = self
             .action_results
-            .get_sub_results()
+            .sub_results
             .iter()
             .map(|(name, v)| {
                 let fmt = ActionResultFormatter::new(&v);
@@ -175,8 +175,8 @@ mod test {
         );
 
         let mut action_results = ActionResults::new();
-        action_results.add_warning(String::from("w1"));
-        action_results.add_warning(String::from("w2"));
+        action_results.warnings.push(String::from("w1"));
+        action_results.warnings.push(String::from("w2"));
 
         let formatter = ActionResultFormatter::new(&action_results);
 
@@ -198,9 +198,9 @@ mod test {
         );
 
         let mut action_results = ActionResults::new();
-        action_results.add_warning(String::from("w1"));
-        action_results.add_warning(String::from("w2"));
-        action_results.add_gauge(String::from("g1"));
+        action_results.warnings.push(String::from("w1"));
+        action_results.warnings.push(String::from("w2"));
+        action_results.gauges.push(String::from("g1"));
 
         let formatter = ActionResultFormatter::new(&action_results);
 
@@ -235,26 +235,22 @@ mod test {
 
         {
             let mut action_results = ActionResults::new();
-            action_results.add_warning(String::from("w1"));
-            action_results.add_warning(String::from("w2"));
-            action_results.add_gauge(String::from("g1"));
-            action_results.add_gauge(String::from("g2"));
+            action_results.warnings.push(String::from("w1"));
+            action_results.warnings.push(String::from("w2"));
+            action_results.gauges.push(String::from("g1"));
+            action_results.gauges.push(String::from("g2"));
             let mut warnings_plugin = ActionResults::new();
-            warnings_plugin.add_warning(String::from("w1"));
-            warnings_plugin.add_warning(String::from("w2"));
+            warnings_plugin.warnings.push(String::from("w1"));
+            warnings_plugin.warnings.push(String::from("w2"));
             let mut gauges_plugin = ActionResults::new();
-            gauges_plugin.add_gauge(String::from("g2"));
-            gauges_plugin.add_gauge(String::from("g1"));
-            gauges_plugin.set_sort_gauges(false);
+            gauges_plugin.gauges.push(String::from("g2"));
+            gauges_plugin.gauges.push(String::from("g1"));
+            gauges_plugin.sort_gauges = false;
             action_results
-                .get_sub_results_mut()
+                .sub_results
                 .push(("Crashes".to_string(), Box::new(ActionResults::new())));
-            action_results
-                .get_sub_results_mut()
-                .push(("Warning".to_string(), Box::new(warnings_plugin)));
-            action_results
-                .get_sub_results_mut()
-                .push(("Gauges".to_string(), Box::new(gauges_plugin)));
+            action_results.sub_results.push(("Warning".to_string(), Box::new(warnings_plugin)));
+            action_results.sub_results.push(("Gauges".to_string(), Box::new(gauges_plugin)));
 
             let formatter = ActionResultFormatter::new(&action_results);
 
@@ -264,26 +260,22 @@ mod test {
         // Same as before, but reversed to test sorting.
         {
             let mut action_results = ActionResults::new();
-            action_results.add_warning(String::from("w2"));
-            action_results.add_warning(String::from("w1"));
-            action_results.add_gauge(String::from("g2"));
-            action_results.add_gauge(String::from("g1"));
+            action_results.warnings.push(String::from("w2"));
+            action_results.warnings.push(String::from("w1"));
+            action_results.gauges.push(String::from("g2"));
+            action_results.gauges.push(String::from("g1"));
             let mut warnings_plugin = ActionResults::new();
-            warnings_plugin.add_warning(String::from("w2"));
-            warnings_plugin.add_warning(String::from("w1"));
+            warnings_plugin.warnings.push(String::from("w2"));
+            warnings_plugin.warnings.push(String::from("w1"));
             let mut gauges_plugin = ActionResults::new();
-            gauges_plugin.add_gauge(String::from("g2"));
-            gauges_plugin.add_gauge(String::from("g1"));
-            gauges_plugin.set_sort_gauges(false);
+            gauges_plugin.gauges.push(String::from("g2"));
+            gauges_plugin.gauges.push(String::from("g1"));
+            gauges_plugin.sort_gauges = false;
             action_results
-                .get_sub_results_mut()
+                .sub_results
                 .push(("Crashes".to_string(), Box::new(ActionResults::new())));
-            action_results
-                .get_sub_results_mut()
-                .push(("Warning".to_string(), Box::new(warnings_plugin)));
-            action_results
-                .get_sub_results_mut()
-                .push(("Gauges".to_string(), Box::new(gauges_plugin)));
+            action_results.sub_results.push(("Warning".to_string(), Box::new(warnings_plugin)));
+            action_results.sub_results.push(("Gauges".to_string(), Box::new(gauges_plugin)));
 
             let formatter = ActionResultFormatter::new(&action_results);
 
@@ -318,12 +310,12 @@ mod test {
             "
         );
         let mut action_results = ActionResults::new();
-        action_results.add_warning(String::from("w1"));
-        action_results.add_gauge(String::from("g1: 42"));
-        action_results.add_info(String::from("i1"));
-        action_results.add_broken_gauge(String::from("g2: N/A"));
+        action_results.warnings.push(String::from("w1"));
+        action_results.gauges.push(String::from("g1: 42"));
+        action_results.infos.push(String::from("i1"));
+        action_results.broken_gauges.push(String::from("g2: N/A"));
         let mut verbose_action_results = action_results.clone();
-        verbose_action_results.set_verbose(true);
+        verbose_action_results.verbose = true;
         assert_eq!(readable_warnings, ActionResultFormatter::new(&action_results).to_text());
         assert_eq!(verbose_warnings, ActionResultFormatter::new(&verbose_action_results).to_text());
     }

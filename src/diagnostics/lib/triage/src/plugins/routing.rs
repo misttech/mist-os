@@ -99,7 +99,7 @@ mod tests {
         let diagnostics_data = Vec::new();
         let mut plugin_input = FileDataFetcher::new(&diagnostics_data);
         plugin_input.syslog = &fetcher;
-        assert_eq!(RoutingErrorsPlugin {}.run(&plugin_input).get_warnings(), &expected_output);
+        assert_eq!(RoutingErrorsPlugin {}.run(&plugin_input).warnings, expected_output);
     }
 
     #[fuchsia::test]
@@ -113,6 +113,6 @@ mod tests {
         let diagnostics_data = Vec::new();
         let mut plugin_input = FileDataFetcher::new(&diagnostics_data);
         plugin_input.syslog = &fetcher;
-        assert_eq!(RoutingErrorsPlugin {}.run(&plugin_input).get_warnings(), &expected_output);
+        assert_eq!(RoutingErrorsPlugin {}.run(&plugin_input).warnings, expected_output);
     }
 }

@@ -80,10 +80,10 @@ mod tests {
 
         let mut inputs = FileDataFetcher::new(&empty_diagnostics_vec);
         inputs.klog = &fetcher;
-        assert_eq!(SandboxErrorsPlugin {}.run(&inputs).get_warnings(), &expected_warnings);
+        assert_eq!(SandboxErrorsPlugin {}.run(&inputs).warnings, expected_warnings);
 
         let mut inputs = FileDataFetcher::new(&empty_diagnostics_vec);
         inputs.syslog = &fetcher;
-        assert_eq!(SandboxErrorsPlugin {}.run(&inputs).get_warnings(), &expected_warnings);
+        assert_eq!(SandboxErrorsPlugin {}.run(&inputs).warnings, expected_warnings);
     }
 }

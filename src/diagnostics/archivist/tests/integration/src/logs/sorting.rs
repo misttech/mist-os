@@ -67,8 +67,8 @@ async fn timestamp_sorting_for_batches() {
         log_sink.connect(recv_tort).unwrap();
         let tort_expected = messages[tort_times.0].clone();
         let mut expected_dump = vec![tort_expected.clone()];
-        assert_eq!(&early_listener.next().await.unwrap(), &tort_expected);
-        assert_eq!(&dump_from_archivist(&instance).await, &expected_dump);
+        assert_eq!(early_listener.next().await.unwrap(), tort_expected);
+        assert_eq!(dump_from_archivist(&instance).await, expected_dump);
 
         // connect hare's socket
         log_sink.connect(recv_hare).unwrap();
@@ -76,13 +76,13 @@ async fn timestamp_sorting_for_batches() {
         expected_dump.push(hare_expected.clone());
         expected_dump.sort_by_key(|m| m.time);
 
-        assert_eq!(&early_listener.next().await.unwrap(), &hare_expected);
-        assert_eq!(&dump_from_archivist(&instance).await, &expected_dump);
+        assert_eq!(early_listener.next().await.unwrap(), hare_expected);
+        assert_eq!(dump_from_archivist(&instance).await, expected_dump);
 
         // start a new listener and make sure it gets backlog reversed from early listener
         let mut middle_listener = listen_to_archivist(&instance);
-        assert_eq!(&middle_listener.next().await.unwrap(), &hare_expected);
-        assert_eq!(&middle_listener.next().await.unwrap(), &tort_expected);
+        assert_eq!(middle_listener.next().await.unwrap(), hare_expected);
+        assert_eq!(middle_listener.next().await.unwrap(), tort_expected);
 
         // send the second tortoise message and assert it's seen
         send_tort.write(packets[tort_times.1].as_bytes()).unwrap();
@@ -90,9 +90,9 @@ async fn timestamp_sorting_for_batches() {
         expected_dump.push(tort_expected2.clone());
         expected_dump.sort_by_key(|m| m.time);
 
-        assert_eq!(&early_listener.next().await.unwrap(), &tort_expected2);
-        assert_eq!(&middle_listener.next().await.unwrap(), &tort_expected2);
-        assert_eq!(&dump_from_archivist(&instance).await, &expected_dump);
+        assert_eq!(early_listener.next().await.unwrap(), tort_expected2);
+        assert_eq!(middle_listener.next().await.unwrap(), tort_expected2);
+        assert_eq!(dump_from_archivist(&instance).await, expected_dump);
 
         // send the second hare message and assert it's seen
         send_tort.write(packets[hare_times.1].as_bytes()).unwrap();
@@ -100,16 +100,16 @@ async fn timestamp_sorting_for_batches() {
         expected_dump.push(hare_expected2.clone());
         expected_dump.sort_by_key(|m| m.time);
 
-        assert_eq!(&early_listener.next().await.unwrap(), &hare_expected2);
-        assert_eq!(&middle_listener.next().await.unwrap(), &hare_expected2);
-        assert_eq!(&dump_from_archivist(&instance).await, &expected_dump);
+        assert_eq!(early_listener.next().await.unwrap(), hare_expected2);
+        assert_eq!(middle_listener.next().await.unwrap(), hare_expected2);
+        assert_eq!(dump_from_archivist(&instance).await, expected_dump);
 
         // listening after all messages were seen by archivist-for-embedding should be time-ordered
         let mut final_listener = listen_to_archivist(&instance);
-        assert_eq!(&final_listener.next().await.unwrap(), &hare_expected);
-        assert_eq!(&final_listener.next().await.unwrap(), &tort_expected);
-        assert_eq!(&final_listener.next().await.unwrap(), &hare_expected2);
-        assert_eq!(&final_listener.next().await.unwrap(), &tort_expected2);
+        assert_eq!(final_listener.next().await.unwrap(), hare_expected);
+        assert_eq!(final_listener.next().await.unwrap(), tort_expected);
+        assert_eq!(final_listener.next().await.unwrap(), hare_expected2);
+        assert_eq!(final_listener.next().await.unwrap(), tort_expected2);
     }
 }
 

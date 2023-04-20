@@ -27,20 +27,20 @@ pub trait Plugin {
     /// Run the plugin on the given inputs to produce results.
     fn run(&self, inputs: &FileDataFetcher<'_>) -> ActionResults {
         let mut results = ActionResults::new();
-        results.set_sort_gauges(false);
+        results.sort_gauges = false;
         let structured_results = self.run_structured(inputs);
         for action in structured_results {
             match action {
                 Action::Alert(alert) => match alert.severity {
-                    Severity::Info => results.add_info(alert.print),
-                    Severity::Warning => results.add_warning(alert.print),
-                    Severity::Error => results.add_error(alert.print),
+                    Severity::Info => results.infos.push(alert.print),
+                    Severity::Warning => results.warnings.push(alert.print),
+                    Severity::Error => results.errors.push(alert.print),
                 },
                 Action::Gauge(gauge) => {
                     if let Some(metric_value) = gauge.value.cached_value.into_inner() {
                         if let MetricValue::String(raw_value) = metric_value {
                             if let Some(tag) = gauge.tag {
-                                results.add_gauge(format!("{}: {}", tag, raw_value));
+                                results.gauges.push(format!("{}: {}", tag, raw_value));
                             }
                         }
                     }

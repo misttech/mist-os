@@ -42,7 +42,7 @@ impl<'a> ActionContext<'a> {
         let fetcher = FileDataFetcher::new(diagnostic_data);
         let mut action_results = ActionResults::new();
         fetcher.errors().iter().for_each(|e| {
-            action_results.add_error(format!("[DEBUG: BAD DATA] {}", e));
+            action_results.errors.push(format!("[DEBUG: BAD DATA] {}", e));
         });
         ActionContext {
             actions,
@@ -57,15 +57,15 @@ impl<'a> ActionContext<'a> {
 /// the [warnings] and [gauges] that are generated.
 #[derive(Clone, Debug)]
 pub struct ActionResults {
-    infos: Vec<String>,
-    warnings: Vec<String>,
-    errors: Vec<String>,
-    gauges: Vec<String>,
-    broken_gauges: Vec<String>,
-    snapshots: Vec<SnapshotTrigger>,
-    sort_gauges: bool,
-    verbose: bool,
-    sub_results: Vec<(String, Box<ActionResults>)>,
+    pub infos: Vec<String>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+    pub gauges: Vec<String>,
+    pub broken_gauges: Vec<String>,
+    pub snapshots: Vec<SnapshotTrigger>,
+    pub sort_gauges: bool,
+    pub verbose: bool,
+    pub sub_results: Vec<(String, Box<ActionResults>)>,
 }
 
 impl ActionResults {
@@ -83,72 +83,8 @@ impl ActionResults {
         }
     }
 
-    pub fn add_info(&mut self, info: String) {
-        self.infos.push(info);
-    }
-
-    pub fn add_warning(&mut self, warning: String) {
-        self.warnings.push(warning);
-    }
-
-    pub fn add_error(&mut self, error: String) {
-        self.errors.push(error);
-    }
-
-    pub fn add_gauge(&mut self, gauge: String) {
-        self.gauges.push(gauge);
-    }
-
-    pub fn add_broken_gauge(&mut self, gauge: String) {
-        self.broken_gauges.push(gauge);
-    }
-
-    pub fn add_snapshot(&mut self, snapshot: SnapshotTrigger) {
-        self.snapshots.push(snapshot);
-    }
-
-    pub fn set_verbose(&mut self, v: bool) {
-        self.verbose = v;
-    }
-
-    pub fn verbose(&self) -> bool {
-        self.verbose
-    }
-
-    pub fn set_sort_gauges(&mut self, v: bool) {
-        self.sort_gauges = v;
-    }
-
-    pub fn sort_gauges(&self) -> bool {
-        self.sort_gauges
-    }
-
-    pub fn get_infos(&self) -> &Vec<String> {
-        &self.infos
-    }
-
-    pub fn get_warnings(&self) -> &Vec<String> {
-        &self.warnings
-    }
-
-    pub fn get_errors(&self) -> &Vec<String> {
-        &self.errors
-    }
-
-    pub fn get_gauges(&self) -> &Vec<String> {
-        &self.gauges
-    }
-
-    pub fn get_broken_gauges(&self) -> &Vec<String> {
-        &self.broken_gauges
-    }
-
-    pub fn get_sub_results_mut(&mut self) -> &mut Vec<(String, Box<ActionResults>)> {
-        &mut self.sub_results
-    }
-
-    pub fn get_sub_results(&self) -> &Vec<(String, Box<ActionResults>)> {
-        &self.sub_results
+    pub fn all_issues(&self) -> impl Iterator<Item = &str> {
+        self.infos.iter().chain(self.warnings.iter()).chain(self.errors.iter()).map(|s| s.as_ref())
     }
 }
 
@@ -438,7 +374,7 @@ impl ActionContext<'_> {
     }
 
     pub(crate) fn set_verbose(&mut self, verbose: bool) {
-        self.action_results.set_verbose(verbose);
+        self.action_results.verbose = verbose;
     }
 
     /// Evaluate and return snapshots. Consume self.
@@ -462,27 +398,29 @@ impl ActionContext<'_> {
         match self.metric_state.eval_action_metric(namespace, &action.trigger) {
             MetricValue::Bool(true) => {
                 if let Some(file_bug) = &action.file_bug {
-                    self.action_results.add_error(format!("[BUG:{}] {}.", file_bug, action.print));
+                    self.action_results
+                        .errors
+                        .push(format!("[BUG:{}] {}.", file_bug, action.print));
                 } else {
-                    self.action_results.add_warning(format!("[WARNING] {}.", action.print));
+                    self.action_results.warnings.push(format!("[WARNING] {}.", action.print));
                 }
             }
             MetricValue::Bool(false) => (),
             MetricValue::Problem(Problem::Ignore(_)) => (),
             MetricValue::Problem(Problem::Missing(reason)) => {
-                self.action_results.add_info(format!(
+                self.action_results.infos.push(format!(
                     "[MISSING] In config '{}::{}': (need boolean trigger) {:?}",
                     namespace, name, reason,
                 ));
             }
             MetricValue::Problem(problem) => {
-                self.action_results.add_error(format!(
+                self.action_results.errors.push(format!(
                     "[ERROR] In config '{}::{}': (need boolean trigger): {:?}",
                     namespace, name, problem,
                 ));
             }
             other => {
-                self.action_results.add_error(format!(
+                self.action_results.errors.push(format!(
                     "[DEBUG: BAD CONFIG] Unexpected value type in config '{}::{}' (need boolean trigger): {}",
                     namespace,
                     name,
@@ -502,10 +440,10 @@ impl ActionContext<'_> {
                     Ok(interval) => {
                         let signature = action.signature.clone();
                         let output = SnapshotTrigger { interval, signature };
-                        self.action_results.add_snapshot(output);
+                        self.action_results.snapshots.push(output);
                     }
                     Err(ref bad_type) => {
-                        self.action_results.add_error(format!(
+                        self.action_results.errors.push(format!(
                             "Bad interval in config '{}::{}': {:?}",
                             namespace, name, bad_type,
                         ));
@@ -522,10 +460,9 @@ impl ActionContext<'_> {
                     "Snapshot trigger was not boolean in config '{}::{}': {:?}",
                     namespace, name, reason,
                 );
-                self.action_results.add_info(format!(
-                    "[MISSING] In config '{}::{}': {:?}",
-                    namespace, name, reason,
-                ));
+                self.action_results
+                    .infos
+                    .push(format!("[MISSING] In config '{}::{}': {:?}", namespace, name, reason,));
             }
             other => {
                 #[cfg(target_os = "fuchsia")]
@@ -535,7 +472,7 @@ impl ActionContext<'_> {
                     name,
                     other,
                 );
-                self.action_results.add_error(format!(
+                self.action_results.errors.push(format!(
                     "[DEBUG: BAD CONFIG] Unexpected value type in config '{}::{}' (need boolean): {}",
                     namespace,
                     name,
@@ -550,13 +487,13 @@ impl ActionContext<'_> {
         let value = self.metric_state.eval_action_metric(namespace, &action.value);
         match value {
             MetricValue::Problem(Problem::Ignore(_)) => {
-                self.action_results.add_broken_gauge(format!("{}: N/A", name));
+                self.action_results.broken_gauges.push(format!("{}: N/A", name));
             }
             MetricValue::Problem(problem) => {
-                self.action_results.add_broken_gauge(format!("{}: {:?}", name, problem));
+                self.action_results.broken_gauges.push(format!("{}: {:?}", name, problem));
             }
             value => {
-                self.action_results.add_gauge(format!(
+                self.action_results.gauges.push(format!(
                     "{}: {}",
                     name,
                     action.get_formatted_value(value)
@@ -660,11 +597,11 @@ mod test {
         let no_data = Vec::new();
         let mut context = ActionContext::new(&metrics, &actions, &no_data, None);
         let results = context.process();
-        assert!(includes(results.get_errors(), "[BUG:Some>Monorail>Component] True was fired."));
-        assert!(includes(results.get_warnings(), "[WARNING] Inequality triggered."));
-        assert!(includes(results.get_warnings(), "[WARNING] True array was fired"));
-        assert!(!includes(results.get_warnings(), "False was fired"));
-        assert!(!includes(results.get_warnings(), "False array was fired"));
+        assert!(includes(&results.errors, "[BUG:Some>Monorail>Component] True was fired."));
+        assert!(includes(&results.warnings, "[WARNING] Inequality triggered."));
+        assert!(includes(&results.warnings, "[WARNING] True array was fired"));
+        assert!(!includes(&results.warnings, "False was fired"));
+        assert!(!includes(&results.warnings, "False array was fired"));
     }
 
     #[fuchsia::test]
@@ -714,15 +651,15 @@ mod test {
 
         let results = context.process();
 
-        assert!(includes(results.get_gauges(), "gauge_f1: 0.4"));
-        assert!(includes(results.get_gauges(), "gauge_f2: 80.00%"));
-        assert!(includes(results.get_gauges(), "gauge_f3: 1.2"));
-        assert!(includes(results.get_gauges(), "gauge_i4: 4"));
-        assert!(includes(results.get_gauges(), "gauge_i5: 500%"));
-        assert!(includes(results.get_gauges(), "gauge_i6: 6"));
-        assert!(includes(results.get_gauges(), "gauge_b7: Bool(true)"));
-        assert!(includes(results.get_gauges(), "gauge_b8: Bool(false)"));
-        assert!(includes(results.get_gauges(), "gauge_s9: String(\"foo\")"));
+        assert!(includes(&results.gauges, "gauge_f1: 0.4"));
+        assert!(includes(&results.gauges, "gauge_f2: 80.00%"));
+        assert!(includes(&results.gauges, "gauge_f3: 1.2"));
+        assert!(includes(&results.gauges, "gauge_i4: 4"));
+        assert!(includes(&results.gauges, "gauge_i5: 500%"));
+        assert!(includes(&results.gauges, "gauge_i6: 6"));
+        assert!(includes(&results.gauges, "gauge_b7: Bool(true)"));
+        assert!(includes(&results.gauges, "gauge_b8: Bool(false)"));
+        assert!(includes(&results.gauges, "gauge_s9: String(\"foo\")"));
     }
 
     #[fuchsia::test]
@@ -755,9 +692,9 @@ mod test {
         // Caution - test footgun! This error will show up without calling process() but
         // most get_warnings() results will not.
         assert_eq!(
-            &vec!["[DEBUG: BAD DATA] Unable to deserialize Inspect contents for abcd2 to node hierarchy"
+            vec!["[DEBUG: BAD DATA] Unable to deserialize Inspect contents for abcd2 to node hierarchy"
                 .to_string()],
-            action_context.action_results.get_errors()
+            action_context.action_results.errors
         );
     }
 
@@ -796,11 +733,11 @@ mod test {
         let mut context_missing = ActionContext::new(&metrics, &actions_missing, &data, None);
         let results_no_time = context_missing.process();
 
-        assert_eq!(&vec!["[WARNING] 1234.".to_string()], results_1234.get_warnings());
+        assert_eq!(vec!["[WARNING] 1234.".to_string()], results_1234.warnings);
         assert!(results_no_time
-            .get_infos()
+            .infos
             .contains(&"[MISSING] In config \'file::time_1234\': (need boolean trigger) \"No valid time available\"".to_string()));
-        assert!(results_no_time.get_warnings().contains(&"[WARNING] missing.".to_string()));
+        assert!(results_no_time.warnings.contains(&"[WARNING] missing.".to_string()));
     }
 
     #[fuchsia::test]
