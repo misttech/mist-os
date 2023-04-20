@@ -1,0 +1,302 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_REGISTERS_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_UFS_REGISTERS_H_
+
+#include <hwreg/bitfields.h>
+
+#include "uic/uic_commands.h"
+
+namespace ufs {
+
+// UFSHCI Specification Version 3.0, section 5.1 "Register Map".
+enum RegisterMap {
+  // Host Capabilities
+  kCAP = 0x00,
+  kVER = 0x08,
+  kHCDDID = 0x10,
+  kHCPMID = 0x14,
+  kAHIT = 0x18,
+  // Operation and Runtime
+  kIS = 0x20,
+  kIE = 0x24,
+  kHCS = 0x30,
+  kHCE = 0x34,
+  kUECPA = 0x38,
+  kUECDL = 0x3C,
+  kUECN = 0x40,
+  kUECT = 0x44,
+  kUECDME = 0x48,
+  kUTRIACR = 0x4C,
+  // UTP Task Management
+  kUTRLBA = 0x50,
+  kUTRLBAU = 0x54,
+  kUTRLDBR = 0x58,
+  kUTRLCLR = 0x5c,
+  kUTRLRSR = 0x60,
+  kUTRLCNR = 0x64,
+  // UTP Task Management
+  kUTMRLBA = 0x70,
+  kUTMRLBAU = 0x74,
+  kUTMRLDBR = 0x78,
+  kUTMRLCLR = 0x7c,
+  kUTMRLRSR = 0x80,
+  // UIC Command
+  kUICCMD = 0x90,
+  kUICCMDARG1 = 0x94,
+  kUICCMDARG2 = 0x98,
+  kUICCMDARG3 = 0x9c,
+  // Crypto
+  kCCAP = 0x100,
+
+  kRegisterSize = 0x104,
+};
+
+// UFSHCI Specification Version 3.0, section 5.2.1
+// "Offset 00h: CAP – Controller Capabilities".
+class CapabilityReg : public hwreg::RegisterBase<CapabilityReg, uint32_t> {
+ public:
+  DEF_BIT(28, crtpto_support);
+  DEF_BIT(26, uic_dme_test_mode_command_suppoort);
+  DEF_BIT(25, out_of_order_data_delivery_supported);
+  DEF_BIT(24, _64_bit_addressing_supported);
+  DEF_BIT(23, auto_hibernation_support);
+  DEF_FIELD(18, 16, number_of_utp_task_management_request_slots);
+  DEF_FIELD(15, 8, number_of_outstanding_rtt_requests_supported);
+  DEF_FIELD(4, 0, number_of_utp_transfer_request_slots);
+
+  static auto Get() { return hwreg::RegisterAddr<CapabilityReg>(RegisterMap::kCAP); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.2.2
+// "Offset 08h: VER – UFS Version".
+class VersionReg : public hwreg::RegisterBase<VersionReg, uint32_t> {
+ public:
+  DEF_FIELD(15, 8, major_version_number);
+  DEF_FIELD(7, 4, minor_version_number);
+  DEF_FIELD(3, 0, version_suffix);
+
+  static auto Get() { return hwreg::RegisterAddr<VersionReg>(RegisterMap::kVER); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.1
+// "Offset 20h: IS – Interrupt Status".
+class InterruptStatusReg : public hwreg::RegisterBase<InterruptStatusReg, uint32_t> {
+ public:
+  DEF_BIT(18, crypto_engine_fatal_error_status);
+  DEF_BIT(17, system_bus_fatal_error_status);
+  DEF_BIT(16, host_controller_fatal_error_status);
+  DEF_BIT(12, utp_error_status);
+  DEF_BIT(11, device_fatal_error_status);
+  DEF_BIT(10, uic_command_completion_status);
+  DEF_BIT(9, utp_task_management_request_completion_status);
+  DEF_BIT(8, uic_link_startup_status);
+  DEF_BIT(7, uic_link_lost_status);
+  DEF_BIT(6, uic_hibernate_enter_status);
+  DEF_BIT(5, uic_hibernate_exit_status);
+  DEF_BIT(4, uic_power_mode_status);
+  DEF_BIT(3, uic_test_mode_status);
+  DEF_BIT(2, uic_error);
+  DEF_BIT(1, uic_dme_endpointreset_indication);
+  DEF_BIT(0, utp_transfer_request_completion_status);
+
+  static auto Get() { return hwreg::RegisterAddr<InterruptStatusReg>(RegisterMap::kIS); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.2
+// "Offset 24h: IE – Interrupt Enable".
+class InterruptEnableReg : public hwreg::RegisterBase<InterruptEnableReg, uint32_t> {
+ public:
+  DEF_BIT(18, crypto_engine_fatal_error_enable);
+  DEF_BIT(17, system_bus_fatal_error_enable);
+  DEF_BIT(16, host_controller_fatal_error_enable);
+  DEF_BIT(12, utp_error_enable);
+  DEF_BIT(11, device_fatal_error_enable);
+  DEF_BIT(10, uic_command_completion_enable);
+  DEF_BIT(9, utp_task_management_request_completion_enable);
+  DEF_BIT(8, uic_link_startup_status_enable);
+  DEF_BIT(7, uic_link_lost_status_enable);
+  DEF_BIT(6, uic_hibernate_enter_status_enable);
+  DEF_BIT(5, uic_hibernate_exit_status_enable);
+  DEF_BIT(4, uic_power_mode_status_enable);
+  DEF_BIT(3, uic_test_mode_status_enable);
+  DEF_BIT(2, uic_error_enable);
+  DEF_BIT(1, uic_dme_endpointreset);
+  DEF_BIT(0, utp_transfer_request_completion_enable);
+
+  static auto Get() { return hwreg::RegisterAddr<InterruptEnableReg>(RegisterMap::kIE); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.3
+// "Offset 30h: HCS – Host Controller Status".
+class HostControllerStatusReg : public hwreg::RegisterBase<HostControllerStatusReg, uint32_t> {
+ public:
+  enum ErrorCode {
+    kRejectUpiuHasInvalidTaskTagOrLun = 0,
+    kInvalidUpiuType,
+    kTrUpiuHasInvalidTaskTagOrLun,
+    kTmrUpiuHasInvalidTaskTagOrLun,
+  };
+  enum PowerModeStatus {
+    kPowerOk = 0,
+    kPowerLocal,
+    kPowerRemote,
+    kPowerBusy,
+    kPowerErrorCap,
+    kPowerFatalError,
+  };
+  DEF_FIELD(31, 24, target_lun_of_utp_error);
+  DEF_FIELD(23, 16, task_tag_of_utp_error);
+  DEF_ENUM_FIELD(ErrorCode, 15, 12, utp_error_code);
+  DEF_ENUM_FIELD(PowerModeStatus, 10, 8, uic_power_mode_change_request_status);
+  DEF_BIT(3, uic_command_ready);
+  DEF_BIT(2, utp_task_management_request_list_ready);
+  DEF_BIT(1, utp_transfer_request_list_ready);
+  DEF_BIT(0, device_present);
+
+  static auto Get() { return hwreg::RegisterAddr<HostControllerStatusReg>(RegisterMap::kHCS); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.3.4
+// "Offset 34h: HCE – Host Controller Enable".
+class HostControllerEnableReg : public hwreg::RegisterBase<HostControllerEnableReg, uint32_t> {
+ public:
+  DEF_BIT(1, crypto_general_enable);
+  DEF_BIT(0, host_controller_enable);
+
+  static auto Get() { return hwreg::RegisterAddr<HostControllerEnableReg>(RegisterMap::kHCE); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.4.1
+// "Offset 50h: UTRLBA – UTP Transfer Request List Base Address".
+class UtrListBaseAddressReg : public hwreg::RegisterBase<UtrListBaseAddressReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, address);
+
+  static auto Get() { return hwreg::RegisterAddr<UtrListBaseAddressReg>(RegisterMap::kUTRLBA); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.4.2
+// "Offset 54h: UTRLBAU – UTP Transfer Request List Base Address Upper 32-bits".
+class UtrListBaseAddressUpperReg
+    : public hwreg::RegisterBase<UtrListBaseAddressUpperReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, address_upper);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<UtrListBaseAddressUpperReg>(RegisterMap::kUTRLBAU);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.4.3
+// "Offset 58h: UTRLDBR – UTP Transfer Request List Door Bell Register".
+class UtrListDoorBellReg : public hwreg::RegisterBase<UtrListDoorBellReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, door_bell);
+
+  static auto Get() { return hwreg::RegisterAddr<UtrListDoorBellReg>(RegisterMap::kUTRLDBR); }
+};
+// UFSHCI Specification Version 3.0, section 5.4.5
+// "Offset 60h: UTRLRSR – UTP Transfer Request List Run Stop Register".
+class UtrListRunStopReg : public hwreg::RegisterBase<UtrListRunStopReg, uint32_t> {
+ public:
+  DEF_BIT(0, value);
+
+  static auto Get() { return hwreg::RegisterAddr<UtrListRunStopReg>(RegisterMap::kUTRLRSR); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.5.1
+// "Offset 70h: UTMRLBA – UTP Task Management Request List Base Address".
+class UtmrListBaseAddressReg : public hwreg::RegisterBase<UtmrListBaseAddressReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, address);
+
+  static auto Get() { return hwreg::RegisterAddr<UtmrListBaseAddressReg>(RegisterMap::kUTMRLBA); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.5.2
+// "Offset 74h: UTMRLBAU – UTP Task Management Request List Base Address Upper 32-bits".
+class UtmrListBaseAddressUpperReg
+    : public hwreg::RegisterBase<UtmrListBaseAddressUpperReg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, address_upper);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<UtmrListBaseAddressUpperReg>(RegisterMap::kUTMRLBAU);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.5.3
+// "Offset 78h: UTMRLDBR – UTP Task Management Request List Door Bell Register".
+class UtmrListDoorBellReg : public hwreg::RegisterBase<UtmrListDoorBellReg, uint32_t> {
+ public:
+  DEF_FIELD(7, 0, door_bell);
+
+  static auto Get() { return hwreg::RegisterAddr<UtmrListDoorBellReg>(RegisterMap::kUTMRLDBR); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.5.5
+// "Offset 80h: UTMRLRSR – UTP Task Management Request List Run Stop Register".
+class UtmrListRunStopReg : public hwreg::RegisterBase<UtmrListRunStopReg, uint32_t> {
+ public:
+  DEF_BIT(0, value);
+
+  static auto Get() { return hwreg::RegisterAddr<UtmrListRunStopReg>(RegisterMap::kUTMRLRSR); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.6.1
+// "Offset 90h: UICCMD – UIC Command".
+class UicCommandReg : public hwreg::RegisterBase<UicCommandReg, uint32_t> {
+ public:
+  DEF_ENUM_FIELD(UicCommandOpcode, 7, 0, command_opcode);
+
+  static auto Get() { return hwreg::RegisterAddr<UicCommandReg>(RegisterMap::kUICCMD); }
+};
+
+// UFSHCI Specification Version 3.0, section 5.6.2
+// "Offset 94h: UICCMDARG1 – UIC Command Argument 1".
+class UicCommandArgument1Reg : public hwreg::RegisterBase<UicCommandArgument1Reg, uint32_t> {
+ public:
+  DEF_FIELD(31, 24, mib_attribute);
+  DEF_FIELD(15, 0, gen_selector_index);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<UicCommandArgument1Reg>(RegisterMap::kUICCMDARG1);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.6.3
+// "Offset 98h: UICCMDARG2 – UIC Command Argument 2".
+class UicCommandArgument2Reg : public hwreg::RegisterBase<UicCommandArgument2Reg, uint32_t> {
+ public:
+  enum GenericErrorCode {
+    kSuccess = 0,
+    kFailure = 1,
+  };
+
+  DEF_FIELD(23, 16, attr_set_type);
+  // Bits 7 to 1 are reserved. |result_code| is also used as a ConfigResultCode, but currently has
+  // no use, so we only use it as a GenericErrorCode.
+  DEF_ENUM_FIELD(GenericErrorCode, 7, 0, result_code);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<UicCommandArgument2Reg>(RegisterMap::kUICCMDARG2);
+  }
+};
+
+// UFSHCI Specification Version 3.0, section 5.6.4
+// "Offset 9Ch: UICCMDARG3 – UIC Command Argument 3".
+class UicCommandArgument3Reg : public hwreg::RegisterBase<UicCommandArgument3Reg, uint32_t> {
+ public:
+  DEF_FIELD(31, 0, value);
+
+  static auto Get() {
+    return hwreg::RegisterAddr<UicCommandArgument3Reg>(RegisterMap::kUICCMDARG3);
+  }
+};
+
+}  // namespace ufs
+
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_UFS_REGISTERS_H_

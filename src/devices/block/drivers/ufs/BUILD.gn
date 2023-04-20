@@ -25,8 +25,16 @@ group("tests") {
 
 source_set("shared") {
   sources = [
+    "registers.h",
     "ufs.cc",
     "ufs.h",
+    "uic/uic_commands.h",
+    "upiu/attributes.h",
+    "upiu/descriptors.h",
+    "upiu/flags.h",
+    "upiu/query_request.h",
+    "upiu/scsi_commands.h",
+    "upiu/upiu_transactions.h",
   ]
   configs += [ "//build/config:all_source" ]
   deps = [

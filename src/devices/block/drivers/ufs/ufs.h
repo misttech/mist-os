@@ -15,7 +15,14 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/string_printf.h>
 
+#include "registers.h"
+#include "upiu/attributes.h"
+#include "upiu/descriptors.h"
+#include "upiu/flags.h"
+
 namespace ufs {
+
+constexpr uint32_t kMaxLun = 8;
 
 enum NotifyEvent {
   kInit = 0,
