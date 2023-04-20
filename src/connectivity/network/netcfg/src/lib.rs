@@ -1329,19 +1329,21 @@ impl<'a> NetCfg<'a> {
                         control,
                         device_class: _,
                     }) => {
-                        Self::handle_dhcpv4_client_update(
-                            *id,
-                            name,
-                            *online,
-                            dhcpv4_client,
-                            dhcpv4_client_provider.as_ref(),
-                            dhcpv4_configuration_streams,
-                            dns_servers,
-                            control,
-                            stack,
-                            lookup_admin,
-                        )
-                        .await;
+                        if previous_online.is_some() {
+                            Self::handle_dhcpv4_client_update(
+                                *id,
+                                name,
+                                *online,
+                                dhcpv4_client,
+                                dhcpv4_client_provider.as_ref(),
+                                dhcpv4_configuration_streams,
+                                dns_servers,
+                                control,
+                                stack,
+                                lookup_admin,
+                            )
+                            .await;
+                        }
 
                         let dhcpv6_client_provider =
                             if let Some(dhcpv6_client_provider) = dhcpv6_client_provider {
@@ -2698,7 +2700,9 @@ mod tests {
     use assert_matches::assert_matches;
     use futures::future::{self, FutureExt as _};
     use futures::stream::{FusedStream as _, TryStreamExt as _};
-    use net_declare::{fidl_ip, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
+    use net_declare::{
+        fidl_ip, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_subnet,
+    };
     use test_case::test_case;
 
     use super::*;
@@ -3047,6 +3051,39 @@ mod tests {
         )
     }
 
+    async fn handle_update(
+        netcfg: &mut NetCfg<'_>,
+        online: Option<bool>,
+        addresses: Option<Vec<fnet_interfaces::Address>>,
+        dns_watchers: &mut DnsServerWatchers<'_>,
+    ) {
+        netcfg
+            .handle_interface_watcher_event(
+                fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+                    id: Some(INTERFACE_ID),
+                    online,
+                    addresses,
+                    ..fnet_interfaces::Properties::EMPTY
+                }),
+                dns_watchers,
+                &mut virtualization::Stub,
+            )
+            .await
+            .expect("error handling interface change event with interface online")
+    }
+    const DHCP_ADDRESS: fnet::Ipv4AddressWithPrefix = fidl_ip_v4_with_prefix!("192.0.2.254/24");
+    const DHCP_ADDRESS_PARAMETERS: fnet_interfaces_admin::AddressParameters =
+        fnet_interfaces_admin::AddressParameters {
+            initial_properties: Some(fnet_interfaces_admin::AddressProperties {
+                preferred_lifetime_info: None,
+                valid_lifetime_end: Some(zx::Time::INFINITE.into_nanos()),
+                ..fnet_interfaces_admin::AddressProperties::EMPTY
+            }),
+            temporary: Some(true),
+            add_subnet_route: Some(false),
+            ..fnet_interfaces_admin::AddressParameters::EMPTY
+        };
+
     #[test_case(true, true; "added online and removed interface")]
     #[test_case(false, true; "added offline and removed interface")]
     #[test_case(true, false; "added online and disabled interface")]
@@ -3079,25 +3116,6 @@ mod tests {
         );
         let mut control = control_server_end.into_stream().expect("control request stream");
 
-        async fn handle_update(
-            netcfg: &mut NetCfg<'_>,
-            online: bool,
-            dns_watchers: &mut DnsServerWatchers<'_>,
-        ) {
-            netcfg
-                .handle_interface_watcher_event(
-                    fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
-                        id: Some(INTERFACE_ID),
-                        online: Some(online),
-                        ..fnet_interfaces::Properties::EMPTY
-                    }),
-                    dns_watchers,
-                    &mut virtualization::Stub,
-                )
-                .await
-                .expect("error handling interface change event with interface online")
-        }
-
         // Make sure the DHCPv4 client is created on interface up.
         let (mut client_stream, responder) = {
             netcfg
@@ -3125,7 +3143,13 @@ mod tests {
                     dhcpv4_client_provider.try_next().now_or_never(),
                     None
                 );
-                handle_update(&mut netcfg, true /* online */, &mut dns_watchers).await;
+                handle_update(
+                    &mut netcfg,
+                    Some(true), /* online */
+                    None,       /* addresses */
+                    &mut dns_watchers,
+                )
+                .await;
             }
 
             let mut client_req_stream = match dhcpv4_client_provider
@@ -3159,18 +3183,6 @@ mod tests {
                 assert!(routers.insert(*next_hop.expect("specified next hop")))
             };
 
-        const ADDRESS: fnet::Ipv4AddressWithPrefix = fidl_ip_v4_with_prefix!("192.0.2.254/24");
-        const ADDRESS_PARAMETERS: fnet_interfaces_admin::AddressParameters =
-            fnet_interfaces_admin::AddressParameters {
-                initial_properties: Some(fnet_interfaces_admin::AddressProperties {
-                    preferred_lifetime_info: None,
-                    valid_lifetime_end: Some(zx::Time::INFINITE.into_nanos()),
-                    ..fnet_interfaces_admin::AddressProperties::EMPTY
-                }),
-                temporary: Some(true),
-                add_subnet_route: Some(false),
-                ..fnet_interfaces_admin::AddressParameters::EMPTY
-            };
         let (expected_routers, stack) = {
             let dns_servers = vec![fidl_ip_v4!("192.0.2.1"), fidl_ip_v4!("192.0.2.2")];
             let routers = vec![fidl_ip_v4!("192.0.2.3"), fidl_ip_v4!("192.0.2.4")];
@@ -3180,8 +3192,8 @@ mod tests {
             responder
                 .send(fnet_dhcp::ClientWatchConfigurationResponse {
                     address: Some(fnet_dhcp::Address {
-                        address: Some(ADDRESS),
-                        address_parameters: Some(ADDRESS_PARAMETERS),
+                        address: Some(DHCP_ADDRESS),
+                        address_parameters: Some(DHCP_ADDRESS_PARAMETERS),
                         address_state_provider: Some(asp_server),
                         ..fnet_dhcp::Address::EMPTY
                     }),
@@ -3232,8 +3244,8 @@ mod tests {
                         address_state_provider: _,
                         control_handle: _,
                     })  => {
-                        assert_eq!(address, fnet::Subnet::from_ext(ADDRESS));
-                        assert_eq!(parameters, ADDRESS_PARAMETERS);
+                        assert_eq!(address, fnet::Subnet::from_ext(DHCP_ADDRESS));
+                        assert_eq!(parameters, DHCP_ADDRESS_PARAMETERS);
                     }
                 );
             };
@@ -3284,7 +3296,13 @@ mod tests {
                         .await
                         .expect("error handling interface removed event")
                 } else {
-                    handle_update(&mut netcfg, false /* online */, &mut dns_watchers).await
+                    handle_update(
+                        &mut netcfg,
+                        Some(false), /* online */
+                        None,        /* addresses */
+                        &mut dns_watchers,
+                    )
+                    .await
                 }
             },
             async {
@@ -3318,6 +3336,118 @@ mod tests {
         } else {
             assert_matches!(control_next, None);
         }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_dhcpv4_ignores_address_change() {
+        let (
+            mut netcfg,
+            ServerEnds {
+                stack: _,
+                lookup_admin: _,
+                mut dhcpv4_client_provider,
+                dhcpv6_client_provider: _,
+            },
+        ) = test_netcfg(true /* with_dhcpv4_client_provider */)
+            .expect("error creating test netcfg");
+        let mut dns_watchers = DnsServerWatchers::empty();
+
+        // Mock a new interface being discovered by NetCfg (we only need to make NetCfg aware of a
+        // NIC with ID `INTERFACE_ID` to test DHCPv4).
+        let (control, control_server_end) =
+            fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                .expect("create endpoints");
+        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        assert_matches::assert_matches!(
+            netcfg
+                .interface_states
+                .insert(INTERFACE_ID, InterfaceState::new_host(control, device_class.into(), None)),
+            None
+        );
+        let _control = control_server_end.into_stream().expect("control request stream");
+
+        // Make sure the DHCPv4 client is created on interface up.
+        netcfg
+            .handle_interface_watcher_event(
+                fnet_interfaces::Event::Added(fnet_interfaces::Properties {
+                    id: Some(INTERFACE_ID),
+                    name: Some("testif01".to_string()),
+                    device_class: Some(fnet_interfaces::DeviceClass::Device(
+                        fidl_fuchsia_hardware_network::DeviceClass::Virtual,
+                    )),
+                    online: Some(true),
+                    addresses: Some(Vec::new()),
+                    has_default_ipv4_route: Some(false),
+                    has_default_ipv6_route: Some(false),
+                    ..fnet_interfaces::Properties::EMPTY
+                }),
+                &mut dns_watchers,
+                &mut virtualization::Stub,
+            )
+            .await
+            .expect("error handling interface added event");
+
+        let mut client_req_stream = match dhcpv4_client_provider
+            .try_next()
+            .await
+            .expect("get next dhcpv4 client provider event")
+            .expect("dhcpv4 client provider request")
+        {
+            fnet_dhcp::ClientProviderRequest::NewClient {
+                interface_id,
+                params,
+                request,
+                control_handle: _,
+            } => {
+                assert_eq!(interface_id, INTERFACE_ID);
+                assert_eq!(params, dhcpv4::NEW_CLIENT_PARAMS,);
+                request.into_stream().expect("error converting client server end to stream")
+            }
+        };
+
+        let responder = expect_watch_dhcpv4_configuration(&mut client_req_stream);
+        let (_asp_client, asp_server) = fidl::endpoints::create_proxy().expect("create proxy");
+        responder
+            .send(fnet_dhcp::ClientWatchConfigurationResponse {
+                address: Some(fnet_dhcp::Address {
+                    address: Some(DHCP_ADDRESS),
+                    address_parameters: Some(DHCP_ADDRESS_PARAMETERS),
+                    address_state_provider: Some(asp_server),
+                    ..fnet_dhcp::Address::EMPTY
+                }),
+                ..fnet_dhcp::ClientWatchConfigurationResponse::EMPTY
+            })
+            .expect("send configuration update");
+
+        // A DHCP client should only be started or stopped when the interface is
+        // enabled or disabled. If we change the addresses seen on the
+        // interface, we shouldn't see requests to create a new DHCP client, and
+        // the existing one should remain alive (netcfg shouldn't have sent a
+        // shutdown request for it).
+        for addresses in [
+            vec![fidl_subnet!("192.2.2.2/28")],
+            vec![],
+            vec![fidl_subnet!("192.2.2.2/28"), fidl_subnet!("fe80::1234/64")],
+        ] {
+            handle_update(
+                &mut netcfg,
+                None,
+                Some(
+                    addresses
+                        .into_iter()
+                        .map(|address| fnet_interfaces::Address {
+                            addr: Some(address),
+                            valid_until: Some(fuchsia_zircon::sys::ZX_TIME_INFINITE),
+                            ..fnet_interfaces::Address::EMPTY
+                        })
+                        .collect(),
+                ),
+                &mut dns_watchers,
+            )
+            .await;
+        }
+        assert_matches!(dhcpv4_client_provider.next().now_or_never(), None);
+        assert_matches!(client_req_stream.next().now_or_never(), None);
     }
 
     /// Waits for a `SetDnsServers` request with the specified servers.
