@@ -4,7 +4,10 @@
 
 // Takes care of capability routing for "sample-app"
 {
-    include: [ "//src/testing/system-validation/web/tests/meta/web_system_validation_base.cml" ],
+    include: [
+        "//src/testing/system-validation/web/tests/meta/web_system_validation_base.cml",
+        "syslog/client.shard.cml",
+    ],
     program: {
         // Args for ui_app_instrumentor
         args: [
@@ -39,21 +42,17 @@
             to: "#sample-app",
         },
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.posix.socket.Provider",
-            ],
+            protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "parent",
             to: "#file-server",
         },
         {
             protocol: [
-                //  web_engine_base.shard
+                //  context_provider_create_base.shard.cml
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",
-                "fuchsia.logger.LogSink",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
@@ -63,7 +62,7 @@
         },
         {
             protocol: [
-                //  web_engine_feature_audio.shard
+                //  context_provider_create_with_audio.shard.cml
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.media.SessionAudioConsumerFactory",
@@ -73,7 +72,7 @@
         },
         {
             protocol: [
-                //  web_engine_feature_vulkan.shard
+                //  context_provider_create_with_vulkan.shard.cml
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
@@ -81,7 +80,7 @@
         },
         {
             protocol: [
-                //  web_engine_feature_network.shard
+                //  context_provider_create_with_network.shard.cml
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
@@ -91,7 +90,7 @@
         },
         {
             protocol: [
-                //  web_engine_view.shard
+                //  context_provider_create_with_view.shard.cml
                 "fuchsia.accessibility.semantics.SemanticsManager",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.ui.composition.Allocator",

@@ -6,48 +6,48 @@ import("//tools/cmc/build/expect_includes.gni")
 
 # `fuchsia.web.ContextProvider.Create` may be used.
 # Does not apply to launching a `fuchsia.web.ContextProvider` implementation.
-expect_includes("web_engine_base") {
-  includes = [ "web_engine_base.shard.cml" ]
+expect_includes("context_provider_create_base") {
+  includes = [ "context_provider_create_base.shard.cml" ]
 }
 
 # `fuchsia::web::ContextFeatureFlags::AUDIO` may be specified.
-expect_includes("web_engine_feature_audio") {
-  deps = [ ":web_engine_base" ]
-  includes = [ "web_engine_feature_audio.shard.cml" ]
+expect_includes("context_provider_create_with_audio") {
+  deps = [ ":context_provider_create_base" ]
+  includes = [ "context_provider_create_with_audio.shard.cml" ]
 }
 
 # `fuchsia::web::ContextFeatureFlags::HARDWARE_VIDEO_DECODER` may be specified.
-expect_includes("web_engine_feature_hardware_video_decoder") {
-  deps = [ ":web_engine_feature_vulkan" ]
-  includes = [ "web_engine_feature_hardware_video_decoder.shard.cml" ]
+expect_includes("context_provider_create_with_hardware_video_decoder") {
+  deps = [ ":context_provider_create_with_vulkan" ]
+  includes = [ "context_provider_create_with_hardware_video_decoder.shard.cml" ]
 }
 
 # `fuchsia::web::ContextFeatureFlags::KEYBOARD` may be specified.
-expect_includes("web_engine_feature_keyboard") {
-  deps = [ ":web_engine_base" ]
-  includes = [ "web_engine_feature_keyboard.shard.cml" ]
+expect_includes("context_provider_create_with_keyboard") {
+  deps = [ ":context_provider_create_base" ]
+  includes = [ "context_provider_create_with_keyboard.shard.cml" ]
 }
 
 # `fuchsia::web::ContextFeatureFlags::NETWORK` may be specified.
-expect_includes("web_engine_feature_network") {
-  deps = [ ":web_engine_base" ]
-  includes = [ "web_engine_feature_network.shard.cml" ]
+expect_includes("context_provider_create_with_network") {
+  deps = [ ":context_provider_create_base" ]
+  includes = [ "context_provider_create_with_network.shard.cml" ]
 }
 
 # `fuchsia::web::ContextFeatureFlags::VIRTUAL_KEYBOARD` may be specified.
-expect_includes("web_engine_feature_virtual_keyboard") {
-  deps = [ ":web_engine_base" ]
-  includes = [ "web_engine_feature_virtual_keyboard.shard.cml" ]
+expect_includes("context_provider_create_with_virtual_keyboard") {
+  deps = [ ":context_provider_create_base" ]
+  includes = [ "context_provider_create_with_virtual_keyboard.shard.cml" ]
 }
 
 # `fuchsia::web::ContextFeatureFlags::VULKAN` may be specified.
-expect_includes("web_engine_feature_vulkan") {
-  deps = [ ":web_engine_base" ]
-  includes = [ "web_engine_feature_vulkan.shard.cml" ]
+expect_includes("context_provider_create_with_vulkan") {
+  deps = [ ":context_provider_create_base" ]
+  includes = [ "context_provider_create_with_vulkan.shard.cml" ]
 }
 
 # `fuchsia.web.Frame.CreateView*()` may be called.
-expect_includes("web_engine_view") {
-  deps = [ ":web_engine_base" ]
-  includes = [ "web_engine_view.shard.cml" ]
+expect_includes("context_provider_create_with_view") {
+  deps = [ ":context_provider_create_base" ]
+  includes = [ "context_provider_create_with_view.shard.cml" ]
 }
