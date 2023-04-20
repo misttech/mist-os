@@ -248,10 +248,10 @@ void Driver::Start(fdf::StartCompleter completer) {
     std::scoped_lock lock(kDriverGlobalsLock);
     if (!kRootResource.is_valid()) {
       zx::result resource = GetRootResource(*context().incoming());
-      if (resource.is_error()) {
-        FDF_LOG(WARNING, "Failed to get root resource: %s", resource.status_string());
-        FDF_LOG(WARNING, "Assuming test environment and continuing");
-      } else {
+      // We don't log on error here because every compat driver will try and access this,
+      // but most aren't expected to have it available.
+      if (resource.is_ok()) {
+        FDF_LOG(INFO, "Successfully got root resource");
         kRootResource = std::move(resource.value());
       }
     }
