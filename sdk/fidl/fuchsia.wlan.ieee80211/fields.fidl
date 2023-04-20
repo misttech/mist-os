@@ -51,3 +51,12 @@ type VhtCapabilities = struct {
 type VhtOperation = struct {
     bytes array<uint8, VHT_OP_LEN>;
 };
+
+/// IEEE Std 802.11-2020 9.4.2.173
+@available(added=13)
+type WlanAccessCategory = strict enum {
+    BACKGROUND = 1;
+    BEST_EFFORT = 2;
+    VIDEO = 3;
+    VOICE = 4;
+};

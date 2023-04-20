@@ -12,15 +12,6 @@ type WlanKeyType = strict enum : uint8 {
 };
 // LINT.ThenChange(//src/connectivity/wlan/lib/mlme/rust/src/key.rs)
 
-/// Access category
-/// WFA WMM v1.2, 2.2.2 Table 6
-type WlanAccessCategory = strict enum {
-    BACKGROUND = 1;
-    BEST_EFFORT = 2;
-    VIDEO = 3;
-    VOICE = 4;
-};
-
 type WlanWmmParameters = struct {
     apsd bool;
     ac_be_params WlanWmmAcParams;
