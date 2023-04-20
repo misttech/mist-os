@@ -4,29 +4,27 @@
 
 // This shard contains the minimum set of capabilities required to create a
 // `fuchsia.web.Context`(aka `web_instance`) via `fuchsia.web.ContextProvider`.
+// per https://fuchsia.dev/reference/fidl/fuchsia.web#CreateContextParams.
+// It includes `use` declarations for all capabilities whose `use` is required
+// in Chromium's `web_instance.cml` as well as optional but recommended
+// capabilities for which use is not explicitly controlled.
 //
 // Include this shard when `fuchsia.web.ContextProvider.Create` may be used.
 // Capabilities only required by ContextProvider are not included.
 //
 {
+    include: [ "syslog/client.shard.cml" ],
     use: [
         {
             protocol: [
-                // Required protocols.
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.fonts.Provider",
                 "fuchsia.hwinfo.Product",
                 "fuchsia.intl.PropertyProvider",
+                "fuchsia.kernel.VmexResource", // Assuming JavaScript desired.
 
-                // Assuming all clients want JavaScript support (default).
-                "fuchsia.kernel.VmexResource",
-
-                // More required protocols.
-                "fuchsia.logger.LogSink",
-
-                // TODO(crbug.com/1224707): Migrate to `fuchsia.scheduler`.
-                "fuchsia.media.ProfileProvider",
+                // "fuchsia.logger/LogSink", is included by the shard above.
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
@@ -34,6 +32,9 @@
         },
         {
             protocol: [
+                // TODO(crbug.com/1224707): Migrate to `fuchsia.scheduler`.
+                "fuchsia.media.ProfileProvider",
+
                 // Included to suppress "proper `use` declaration "warnings.
                 "fuchsia.tracing.perfetto.ProducerConnector",
             ],
