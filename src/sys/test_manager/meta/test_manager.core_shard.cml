@@ -35,6 +35,7 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.HypervisorResource",

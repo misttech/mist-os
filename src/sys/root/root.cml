@@ -28,16 +28,21 @@
             to: "#startup",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "#bootstrap",
             to: "#startup",
         },
 
-        // We route LogSink from void to bootstrap to satisfy the requirement
-        // that LogSink is routed everywhere. Bootstrap is exposing LogSink,
-        // so it doesn't need to have a LogSink routed to it.
+        // We route these from void to bootstrap to satisfy the requirement
+        // that the protocols routed everywhere. Bootstrap is exposing them itself.
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.diagnostics.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "void",
             to: "#bootstrap",
             availability: "optional",
@@ -150,6 +155,7 @@
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.driver.development.DriverDevelopment",
