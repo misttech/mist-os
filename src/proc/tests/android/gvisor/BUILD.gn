@@ -365,17 +365,6 @@ fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
       max_severity = "ERROR"
     }
   }
-
-  # TODO(fxbug.dev/114774): Flaky test disabled on coverage.
-  # Please fix the flake and remove the condition below.
-  if (is_coverage) {
-    test_specs.environments = [
-      {
-        dimensions = qemu_env.dimensions
-        tags = [ "disabled" ]
-      },
-    ]
-  }
 }
 
 fuchsia_test_package("starnix_gvisor_benchmarks") {
