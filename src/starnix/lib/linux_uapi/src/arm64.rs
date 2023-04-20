@@ -89,8 +89,8 @@ where
         }
     }
 }
-#[repr(C)]
-#[derive(Default, FromBytes)]
+#[repr(transparent)]
+#[derive(Default, AsBytes, FromBytes)]
 pub struct __IncompleteArrayField<T>(::std::marker::PhantomData<T>, [T; 0]);
 impl<T> __IncompleteArrayField<T> {
     #[inline]
@@ -9702,7 +9702,7 @@ pub struct statx {
     pub __spare3: [__u64; 12usize],
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+#[derive(Debug, Default, AsBytes)]
 pub struct sysinfo {
     pub uptime: __kernel_long_t,
     pub loads: [__kernel_ulong_t; 3usize],
@@ -9718,6 +9718,7 @@ pub struct sysinfo {
     pub totalhigh: __kernel_ulong_t,
     pub freehigh: __kernel_ulong_t,
     pub mem_unit: __u32,
+    pub _f: __IncompleteArrayField<crate::arm64_types::c_char>,
     pub __bindgen_padding_1: [u8; 4usize],
 }
 pub type cc_t = crate::arm64_types::c_uchar;

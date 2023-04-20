@@ -23,55 +23,61 @@ OPAQUE_TYPES = [
     'sigevent',
 ]
 
-# Adds a derive for 'FromBytes' for each type name matching these regexps.
-AUTO_DERIVE_FROM_BYTES_FOR = [
-    re.compile(r) for r in [
-        'binder_transaction_data.*',
-        'flat_binder_object.*',
-        'bpf_attr.*',
-        '__IncompleteArrayField',
-        'ipt_get_entries',
-        'ipt_replace',
-        'ipt_entry',
-        'ip6t_ip6',
-        'in6_addr',
-        'xt_counters_info',
-        'ip6t_get_entries',
-        'ip6t_entry',
-        'ip6t_replace',
+
+# Additional traits that should be added to types matching the regexps.
+AUTO_DERIVE_TRAITS = [
+    (re.compile(x[0]), x[1]) for x in [
+        (r'__IncompleteArrayField', ['AsBytes, FromBytes']),
+        (r'binder_transaction_data.*', ['FromBytes']),
+        (r'bpf_attr.*', ['FromBytes']),
+        (r'flat_binder_object.*', ['FromBytes']),
+        (r'ip6?t_entry', ['FromBytes']),
+        (r'ip6?t_get_entries', ['FromBytes']),
+        (r'ip6?t_replace', ['FromBytes']),
+        (r'in6_addr', ['FromBytes']),
+        (r'ip6t_ip6', ['FromBytes']),
+        (r'sysinfo', ['AsBytes']),
+        (r'xt_counters_info', ['FromBytes']),
     ]
-]
+];
+
 
 # General replacements to apply to the contents of the file. These are tuples of
 # compiled regular expressions + the thing to replace matches with.
 GENERAL_REPLACEMENTS = [
-    # Replace xt_counters pointers with u64.
-    (re.compile('\*(const|mut) xt_counters'), 'u64'),
+    (re.compile(x[0]), x[1]) for x in [
+        # Replace xt_counters pointers with u64.
+        (r'\*(const|mut) xt_counters', 'u64'),
 
-    # Use CStr to represent constant C strings. The inputs look like:
-    #   pub const FS_KEY_DESC_PREFIX: &[u8; 9usize] = b"fscrypt:\0";
-    (
-        re.compile(': &\[u8; [0-9]+(usize)?\] = (b".*)\\\\0";\n'),
-        """: &'static std::ffi::CStr = unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2\\\\0") };\n"""
-    ),
+        # Use CStr to represent constant C strings. The inputs look like:
+        #   pub const FS_KEY_DESC_PREFIX: &[u8; 9usize] = b"fscrypt:\0";
+        (
+            r': &\[u8; [0-9]+(usize)?\] = (b".*\\0");\n',
+            ": &'static std::ffi::CStr = "
+            "unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2) };\n"
+        ),
 
-   # Remove redundant `_f` field from `struct sysinfo`. Derive Copy and Clone.
-   (
-        re.compile("#\[derive\(Debug, Default\)\]\n"
-                   "pub struct sysinfo {((\n"
-                   " +pub [_a-z0-9]+: [_a-z0-9 ;\[\]]+,)+)\n"
-                   " +pub _f: __IncompleteArrayField<crate::[a-z0-9_]+_types::c_char>,"),
-        "#[derive(Debug, Default, Copy, Clone)]\n"
-        "pub struct sysinfo {\\1"
-   ),
+        # Change `__IncompleteArrayField` representation to `transparent`, which is necessary to
+        # allow it to derive `AsBytes`.
+        # TODO(https://github.com/google/zerocopy/issues/10): Remove this once zerocopy is updated
+        # to allow `AsBytes` for generic structs with `repr(C)`.
+        (
+            r'#\[repr\(C\)\]\n'
+            r'#\[derive\((([A-Za-z]+, )*[A-Za-z]+)\)\]\n'
+            r'pub struct __IncompleteArrayField',
+            '#[repr(transparent)]\n'
+            '#[derive(\\1)]\n'
+            'pub struct __IncompleteArrayField'
+        ),
 
-    # Add AsBytes/FromBytes to every copyable struct regardless of name.
-    # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
-    # Remove in favor of bindgen support for custom derives.
-    (
-        re.compile("\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n"),
-        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"
-    )
+        # Add AsBytes/FromBytes to every copyable struct regardless of name.
+        # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
+        # Remove in favor of bindgen support for custom derives.
+        (
+            r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
+            "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"
+        )
+    ]
 ]
 
 
@@ -165,22 +171,22 @@ def run_bindgen(type_prefix, raw_line, output_file, clang_target, include_dirs):
     subprocess.check_call(args, env=env)
 
 
-def is_from_bytes_matching_type_decl_line(line):
+def get_auto_derive_traits(line):
     """Returns true if the given line defines a Rust structure with a name
     matching any of the types we need to add FromBytes."""
     if not (line.startswith("pub struct ") or line.startswith("pub union ")):
-        return False
+        return None
 
     # The third word (after the "pub struct") is the type name.
     split = re.split('[ <\(]', line)
     if len(split) < 3:
-        return False
+        return None
     type_name = split[2]
 
-    for t in AUTO_DERIVE_FROM_BYTES_FOR:
+    for (t, traits) in AUTO_DERIVE_TRAITS:
         if t.match(type_name):
-            return True
-    return False
+            return traits
+    return None
 
 
 def post_process_rust_file(rust_file_name):
@@ -188,18 +194,17 @@ def post_process_rust_file(rust_file_name):
         input_lines = source_file.readlines()
         output_lines = []
         for line in input_lines:
-            if is_from_bytes_matching_type_decl_line(line):
-                # Add "FromBytes" to every matching type.
-                if len(output_lines) > 0 and output_lines[-1].startswith(
-                        '#[derive('):
-                    if not "FromBytes" in output_lines[-1]:
-                        # Insert annotation into previous derive line (note last char is a newline).
-                        output_lines[
-                            -1] = output_lines[-1][:-3] + ", FromBytes)]\n"
+            extra_traits = get_auto_derive_traits(line)
+            if extra_traits:
+                # Parse existing traits, if any.
+                if len(output_lines) > 0 and output_lines[-1].startswith('#[derive('):
+                    traits = output_lines[-1][9:-3].split(', ')
+                    traits.extend(x for x in extra_traits if x not in traits)
+                    output_lines.pop();
                 else:
-                    # No derive line, insert a new one.
-                    output_lines += ["#[derive(FromBytes)]\n"]
-            output_lines += [line]
+                    traits = extra_traits
+                output_lines.append("#[derive(" + ", ".join(traits) + ")]\n")
+            output_lines.append(line)
 
         text = "".join(output_lines)
         for (regexp, replacement) in GENERAL_REPLACEMENTS:
