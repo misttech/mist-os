@@ -25,7 +25,7 @@ TBD
 Include the `camera-gym` package and disable flatland:
 
 ```
-> fx set <product>.<arch> --with //src/camera/bin/camera-gym --args=use_flatland_by_default=false --args=use_scene_manager_as_scene_owner=false
+> fx set <product>.<arch> --with //src/camera/bin/camera-gym --args=use_flatland_by_default=false
 ```
 
 ### How to Run in Automatic Mode

@@ -107,9 +107,6 @@ core_realm_shards += [
 # user data protection.
 include_account_in_fvm = true
 
-# Use scene_manager as the default scene owner for UI.
-use_scene_manager_as_scene_owner = true
-
 # Use Flatland as the default graphics protocol in Scenic.
 use_flatland_by_default = true
 

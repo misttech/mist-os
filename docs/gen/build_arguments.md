@@ -8450,15 +8450,6 @@ git clone https://chromium.googlesource.com/chromium/third_party/ffmpeg third_pa
 
 From //src/media/lib/ffmpeg/BUILD.gn:33
 
-### use_scene_manager_as_scene_owner
-
-If true, use scene_manager as the scene owner component (via ui.cml).
-Otherwise use root_presenter (via ui_with_root_presenter.cml).
-
-**Current value (from the default):** `true`
-
-From //src/ui/build_args.gni:8
-
 ### use_spinel_for_carnelian_examples
 
 Include a config in the example packages to attempt to use Spinel

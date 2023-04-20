@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//src/sys/core/build/core_shard.gni")
-import("build_args.gni")
 
 group("ui") {
   testonly = true
@@ -39,19 +38,11 @@ group("tests") {
 }
 
 core_shard("ui_core_shard") {
-  if (use_scene_manager_as_scene_owner) {
-    shard_file = "meta/ui.core_shard.cml"
-  } else {
-    shard_file = "meta/ui_with_root_presenter.core_shard.cml"
-  }
+  shard_file = "meta/ui.core_shard.cml"
 }
 
 core_shard("ui_minimal_core_shard") {
-  if (use_scene_manager_as_scene_owner) {
-    shard_file = "meta/ui_minimal.core_shard.cml"
-  } else {
-    shard_file = "meta/ui_with_root_presenter.core_shard.cml"
-  }
+  shard_file = "meta/ui_minimal.core_shard.cml"
 }
 
 core_shard("ui_with_root_presenter_core_shard") {
@@ -59,23 +50,13 @@ core_shard("ui_with_root_presenter_core_shard") {
 }
 
 fuchsia_component("ui_component") {
-  if (use_scene_manager_as_scene_owner) {
-    component_name = "ui"
-    manifest = "meta/ui.cml"
-  } else {
-    component_name = "ui_with_root_presenter"
-    manifest = "meta/ui_with_root_presenter.cml"
-  }
+  component_name = "ui"
+  manifest = "meta/ui.cml"
 }
 
 fuchsia_component("ui_minimal_component") {
-  if (use_scene_manager_as_scene_owner) {
-    component_name = "ui_minimal"
-    manifest = "meta/ui_minimal.cml"
-  } else {
-    component_name = "ui_with_root_presenter"
-    manifest = "meta/ui_with_root_presenter.cml"
-  }
+  component_name = "ui_minimal"
+  manifest = "meta/ui_minimal.cml"
 }
 
 fuchsia_component("ui_with_root_presenter_component") {
@@ -113,39 +94,18 @@ group("ui_packages") {
   deps = [
     ":ui_package",
     ":ui_packages_base",
+    "bin/root_presenter:virtual_keyboard_manager",
+    "bin/scene_manager",
   ]
-
-  if (use_scene_manager_as_scene_owner) {
-    deps += [
-      "bin/root_presenter:virtual_keyboard_manager",
-      "bin/scene_manager",
-    ]
-  } else {
-    deps += [
-      "bin/input-pipeline:pkg",
-      "bin/root_presenter",
-      "bin/text:text_manager",
-    ]
-  }
 }
 
 group("ui_minimal_packages") {
   deps = [
     ":ui_minimal_package",
     ":ui_packages_base",
+    "bin/root_presenter:virtual_keyboard_manager",
+    "bin/scene_manager",
   ]
-
-  if (use_scene_manager_as_scene_owner) {
-    deps += [
-      "bin/root_presenter:virtual_keyboard_manager",
-      "bin/scene_manager",
-    ]
-  } else {
-    deps += [
-      "bin/input-pipeline:pkg",
-      "bin/root_presenter",
-    ]
-  }
 }
 
 group("ui_with_root_presenter_packages") {

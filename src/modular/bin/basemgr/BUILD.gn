@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/ui/build_args.gni")
 
 group("legacy_tests") {
   testonly = true
@@ -14,9 +13,7 @@ executable("basemgr_bin") {
   output_name = "basemgr"
   sources = [ "main.cc" ]
 
-  if (use_scene_manager_as_scene_owner) {
-    defines = [ "USE_SCENE_MANAGER" ]
-  }
+  defines = [ "USE_SCENE_MANAGER" ]
 
   deps = [
     ":basemgr_impl",
