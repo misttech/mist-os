@@ -102,6 +102,7 @@ driver_bind_rules("sherlock-video-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
     "//src/devices/bind/fuchsia.hardware.tee",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
@@ -117,6 +118,7 @@ driver_bind_rules("sherlock-video-enc-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
   ]

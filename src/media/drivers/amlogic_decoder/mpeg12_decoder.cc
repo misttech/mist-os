@@ -221,9 +221,16 @@ zx_status_t Mpeg12Decoder::InitializeVideoBuffers() {
     frame->index = i;
     io_buffer_cache_flush(&frame->buffer, 0, buffer_size);
 
-    auto y_canvas = owner_->ConfigureCanvas(&frame->buffer, 0, frame->stride, kMaxHeight, 0, 0);
-    auto uv_canvas = owner_->ConfigureCanvas(&frame->buffer, frame->uv_plane_offset, frame->stride,
-                                             kMaxHeight / 2, 0, 0);
+    auto y_canvas =
+        owner_->ConfigureCanvas(&frame->buffer, 0, frame->stride, kMaxHeight,
+                                fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+                                    fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite,
+                                fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear);
+    auto uv_canvas = owner_->ConfigureCanvas(
+        &frame->buffer, frame->uv_plane_offset, frame->stride, kMaxHeight / 2,
+        fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+            fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite,
+        fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear);
     if (!y_canvas || !uv_canvas) {
       DECODE_ERROR("Failed to allocate canvases");
       return ZX_ERR_NO_MEMORY;

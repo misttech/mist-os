@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_VIDEO_DECODER_H_
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_VIDEO_DECODER_H_
 
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/common_types.h>
 #include <fuchsia/mediacodec/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -103,8 +104,9 @@ class VideoDecoder {
                                                        uint32_t max_after_size,
                                                        uint32_t* after_size) = 0;
     virtual __WARN_UNUSED_RESULT std::unique_ptr<CanvasEntry> ConfigureCanvas(
-        io_buffer_t* io_buffer, uint32_t offset, uint32_t width, uint32_t height, uint32_t wrap,
-        uint32_t blockmode) = 0;
+        io_buffer_t* io_buffer, uint32_t offset, uint32_t width, uint32_t height,
+        fuchsia_hardware_amlogiccanvas::CanvasFlags flags,
+        fuchsia_hardware_amlogiccanvas::CanvasBlockMode blockmode) = 0;
     virtual __WARN_UNUSED_RESULT DecoderCore* core() = 0;
     [[nodiscard]] virtual DecoderCore* hevc_core() const = 0;
     [[nodiscard]] virtual DecoderCore* vdec1_core() const = 0;

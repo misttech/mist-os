@@ -5,9 +5,9 @@
 #ifndef SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/tee/cpp/fidl.h>
@@ -83,10 +83,10 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   [[nodiscard]] zx_status_t TeeVp9AddHeaders(zx_paddr_t page_phys_base, uint32_t before_size,
                                              uint32_t max_after_size,
                                              uint32_t* after_size) override;
-  [[nodiscard]] std::unique_ptr<CanvasEntry> ConfigureCanvas(io_buffer_t* io_buffer,
-                                                             uint32_t offset, uint32_t width,
-                                                             uint32_t height, uint32_t wrap,
-                                                             uint32_t blockmode) override;
+  [[nodiscard]] std::unique_ptr<CanvasEntry> ConfigureCanvas(
+      io_buffer_t* io_buffer, uint32_t offset, uint32_t width, uint32_t height,
+      fuchsia_hardware_amlogiccanvas::CanvasFlags flags,
+      fuchsia_hardware_amlogiccanvas::CanvasBlockMode blockmode) override;
 
   [[nodiscard]] DecoderCore* core() override { return core_; }
   [[nodiscard]] zx_status_t AllocateIoBuffer(io_buffer_t* buffer, size_t size,
@@ -224,7 +224,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   zx_device_t* parent_ = nullptr;
   ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
-  ddk::AmlogicCanvasProtocolClient canvas_;
+  fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
 
   ddk::ClockProtocolClient clocks_[static_cast<int>(ClockType::kMax)];
 

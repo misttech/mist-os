@@ -30,6 +30,8 @@
 #include "util.h"
 #include "watchdog.h"
 
+namespace fh_amlcanvas = fuchsia_hardware_amlogiccanvas;
+
 namespace amlogic_decoder {
 
 #if 0
@@ -2479,10 +2481,14 @@ void H264MultiDecoder::InitializedFrames(std::vector<CodecFrame> frames, uint32_
 
     // The ConfigureCanvas() calls validate that the VMO is physically
     // contiguous, regardless of how the VMO was created.
-    auto y_canvas =
-        owner_->ConfigureCanvas(&frame->buffer, 0, frame->stride, frame->coded_height, 0, 0);
-    auto uv_canvas = owner_->ConfigureCanvas(&frame->buffer, frame->uv_plane_offset, frame->stride,
-                                             frame->coded_height / 2, 0, 0);
+    auto y_canvas = owner_->ConfigureCanvas(
+        &frame->buffer, 0, frame->stride, frame->coded_height,
+        fh_amlcanvas::CanvasFlags::kRead | fh_amlcanvas::CanvasFlags::kWrite,
+        fh_amlcanvas::CanvasBlockMode::kLinear);
+    auto uv_canvas = owner_->ConfigureCanvas(
+        &frame->buffer, frame->uv_plane_offset, frame->stride, frame->coded_height / 2,
+        fh_amlcanvas::CanvasFlags::kRead | fh_amlcanvas::CanvasFlags::kWrite,
+        fh_amlcanvas::CanvasBlockMode::kLinear);
     if (!y_canvas || !uv_canvas) {
       LogEvent(media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_AllocationError);
       LOG(ERROR, "ConfigureCanvas() failed - y: %d uv: %d", !!y_canvas, !!uv_canvas);

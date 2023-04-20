@@ -336,26 +336,23 @@ zx_status_t AmlogicVideo::InitializeStreamBuffer(bool use_parser, uint32_t size,
   return ZX_OK;
 }
 
-std::unique_ptr<CanvasEntry> AmlogicVideo::ConfigureCanvas(io_buffer_t* io_buffer, uint32_t offset,
-                                                           uint32_t width, uint32_t height,
-                                                           uint32_t wrap, uint32_t blockmode) {
+std::unique_ptr<CanvasEntry> AmlogicVideo::ConfigureCanvas(
+    io_buffer_t* io_buffer, uint32_t offset, uint32_t width, uint32_t height,
+    fuchsia_hardware_amlogiccanvas::CanvasFlags flags,
+    fuchsia_hardware_amlogiccanvas::CanvasBlockMode blockmode) {
   TRACE_DURATION("media", "AmlogicVideo::ConfigureCanvas");
   assert(width % 8 == 0);
   assert(offset % 8 == 0);
-  canvas_info_t info;
+  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo info;
   info.height = height;
   info.stride_bytes = width;
-  info.wrap = wrap;
+  info.flags = flags;
   info.blkmode = blockmode;
-  enum {
-    kSwapBytes = 1,
-    kSwapWords = 2,
-    kSwapDoublewords = 4,
-    kSwapQuadwords = 8,
-  };
-  info.endianness =
-      kSwapBytes | kSwapWords | kSwapDoublewords;  // 64-bit big-endian to little-endian conversion.
-  info.flags = CANVAS_FLAGS_READ | CANVAS_FLAGS_WRITE;
+
+  // 64-bit big-endian to little-endian conversion.
+  info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap8Bits |
+                    fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap16Bits |
+                    fuchsia_hardware_amlogiccanvas::CanvasEndianness::kSwap32Bits;
 
   zx::unowned_vmo vmo(io_buffer->vmo_handle);
   zx::vmo dup_vmo;
@@ -364,20 +361,34 @@ std::unique_ptr<CanvasEntry> AmlogicVideo::ConfigureCanvas(io_buffer_t* io_buffe
     DECODE_ERROR("Failed to duplicate handle, status: %d", status);
     return nullptr;
   }
-  uint8_t idx;
-  status = canvas_.Config(std::move(dup_vmo), offset, &info, &idx);
-  if (status != ZX_OK) {
-    DECODE_ERROR("Failed to configure canvas, status: %d", status);
+
+  fidl::WireResult result = canvas_->Config(std::move(dup_vmo), offset, info);
+  if (!result.ok()) {
+    DECODE_ERROR("Failed to call configure on canvas, status: %s", result.error().status_string());
     return nullptr;
   }
 
-  return std::make_unique<CanvasEntry>(this, idx);
+  if (result->is_error()) {
+    DECODE_ERROR("Failed to configure canvas, status: %s",
+                 zx_status_get_string(result->error_value()));
+    return nullptr;
+  }
+
+  return std::make_unique<CanvasEntry>(this, result->value()->canvas_idx);
 }
 
 void AmlogicVideo::FreeCanvas(CanvasEntry* canvas) {
   TRACE_DURATION("media", "AmlogicVideo::FreeCanvas");
   ZX_DEBUG_ASSERT(canvas->index() <= std::numeric_limits<uint8_t>::max());
-  canvas_.Free(static_cast<uint8_t>(canvas->index()));
+  fidl::WireResult result = canvas_->Free(static_cast<uint8_t>(canvas->index()));
+  if (!result.ok()) {
+    DECODE_ERROR("Failed to call free on canvas, status: %s", result.error().status_string());
+    return;
+  }
+
+  if (result->is_error()) {
+    DECODE_ERROR("Failed to free canvas, status: %s", zx_status_get_string(result->error_value()));
+  }
 }
 
 void AmlogicVideo::SetThreadProfile(zx::unowned_thread thread, ThreadRole role) const {
@@ -832,11 +843,14 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   sysmem_.Bind(std::move(*sysmem_client));
 
-  canvas_ = ddk::AmlogicCanvasProtocolClient(parent_, "canvas");
-  if (!canvas_.is_valid()) {
-    DECODE_ERROR("Could not get video CANVAS protocol");
+  zx::result canvas_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_amlogiccanvas::Service::Device>(parent_, "canvas");
+  if (canvas_result.is_error()) {
+    zxlogf(ERROR, "Could not obtain aml canvas protocol %s\n", canvas_result.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
+
+  canvas_.Bind(std::move(canvas_result.value()));
 
   clocks_[static_cast<int>(ClockType::kGclkVdec)] =
       ddk::ClockProtocolClient(parent_, "clock-dos-vdec");

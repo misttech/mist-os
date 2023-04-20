@@ -34,7 +34,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": " fuchsia.amlogic.platform.BIND_PROTOCOL.CANVAS"
+                    "fuchsia.BIND_FIDL_PROTOCOL": " fuchsia.hardware.amlogiccanvas.BIND_FIDL_PROTOCOL.SERVICE"
                 }
             }
         ]

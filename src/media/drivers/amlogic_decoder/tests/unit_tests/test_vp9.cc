@@ -72,9 +72,10 @@ class FakeOwner : public VideoDecoder::Owner {
                                              uint32_t* after_size) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  std::unique_ptr<CanvasEntry> ConfigureCanvas(io_buffer_t* io_buffer, uint32_t offset,
-                                               uint32_t width, uint32_t height, uint32_t wrap,
-                                               uint32_t blockmode) override {
+  std::unique_ptr<CanvasEntry> ConfigureCanvas(
+      io_buffer_t* io_buffer, uint32_t offset, uint32_t width, uint32_t height,
+      fuchsia_hardware_amlogiccanvas::CanvasFlags flags,
+      fuchsia_hardware_amlogiccanvas::CanvasBlockMode blockmode) override {
     return nullptr;
   }
   DecoderCore* core() override { return &core_; }
