@@ -7,6 +7,8 @@
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/pixelformat.h>
@@ -282,24 +284,34 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-class FakeCanvasProtocol : ddk::AmlogicCanvasProtocol<FakeCanvasProtocol> {
+class FakeCanvasProtocol : public fidl::WireServer<fuchsia_hardware_amlogiccanvas::Device> {
  public:
-  zx_status_t AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const canvas_info_t* info,
-                                  uint8_t* canvas_idx) {
+  explicit FakeCanvasProtocol(async_dispatcher_t* dispatcher = nullptr)
+      : dispatcher_(dispatcher ? dispatcher : async_get_default_dispatcher()) {}
+
+  void Serve(fidl::ServerEnd<fuchsia_hardware_amlogiccanvas::Device> server_end) {
+    binding_.emplace(dispatcher_, std::move(server_end), this,
+                     std::mem_fn(&FakeCanvasProtocol::OnFidlClosed));
+  }
+
+  void OnFidlClosed(fidl::UnbindInfo info) {}
+
+  void Config(ConfigRequestView request, ConfigCompleter::Sync& completer) override {
     for (size_t i = 0; i < std::size(in_use_); i++) {
       ZX_DEBUG_ASSERT_MSG(i <= std::numeric_limits<uint8_t>::max(), "%zu", i);
       if (!in_use_[i]) {
         in_use_[i] = true;
-        *canvas_idx = static_cast<uint8_t>(i);
-        return ZX_OK;
+        completer.ReplySuccess(static_cast<uint8_t>(i));
+        return;
       }
     }
-    return ZX_ERR_NO_MEMORY;
+    completer.ReplyError(ZX_ERR_NO_MEMORY);
   }
-  zx_status_t AmlogicCanvasFree(uint8_t canvas_idx) {
-    EXPECT_TRUE(in_use_[canvas_idx]);
-    in_use_[canvas_idx] = false;
-    return ZX_OK;
+
+  void Free(FreeRequestView request, FreeCompleter::Sync& completer) override {
+    EXPECT_TRUE(in_use_[request->canvas_idx]);
+    in_use_[request->canvas_idx] = false;
+    completer.ReplySuccess();
   }
 
   void CheckThatNoEntriesInUse() {
@@ -308,22 +320,26 @@ class FakeCanvasProtocol : ddk::AmlogicCanvasProtocol<FakeCanvasProtocol> {
     }
   }
 
-  const amlogic_canvas_protocol_t& get_protocol() { return protocol_; }
-
  private:
+  async_dispatcher_t* dispatcher_;
   static constexpr uint32_t kCanvasEntries = 256;
   bool in_use_[kCanvasEntries] = {};
-  amlogic_canvas_protocol_t protocol_ = {.ops = &amlogic_canvas_protocol_ops_, .ctx = this};
+  std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
 };
 
 class FakeSysmemTest : public zxtest::Test {
  public:
-  FakeSysmemTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  FakeSysmemTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
+    loop_.StartThread("sysmem-handler-loop");
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
+    ASSERT_OK(endpoints);
+    canvas_.SyncCall(&FakeCanvasProtocol::Serve, std::move(endpoints.value().server));
+
     display_ = std::make_unique<AmlogicDisplay>(/*parent=*/nullptr);
     display_->SetFormatSupportCheck([](auto) { return true; });
-    display_->SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient(&canvas_.get_protocol()));
+    display_->SetCanvasForTesting(std::move(endpoints.value().client));
 
     auto vout = std::make_unique<Vout>();
     vout->InitDsiForTesting(/*panel_type=*/PANEL_TV070WSM_FT, /*width=*/1024, /*height=*/600);
@@ -343,8 +359,6 @@ class FakeSysmemTest : public zxtest::Test {
       fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), allocator_.get());
       display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints->client)));
     }
-
-    loop_.StartThread("sysmem-handler-loop");
   }
 
   void TearDown() override {
@@ -359,7 +373,8 @@ class FakeSysmemTest : public zxtest::Test {
 
   std::unique_ptr<AmlogicDisplay> display_;
   std::unique_ptr<MockAllocator> allocator_;
-  FakeCanvasProtocol canvas_;
+  async_patterns::TestDispatcherBound<FakeCanvasProtocol> canvas_{loop_.dispatcher(),
+                                                                  std::in_place};
 };
 
 template <typename Lambda>
@@ -673,7 +688,7 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
                                                                  &capture_handle));
   EXPECT_OK(display_->DisplayControllerImplReleaseCapture(capture_handle));
 
-  canvas_.CheckThatNoEntriesInUse();
+  canvas_.SyncCall(&FakeCanvasProtocol::CheckThatNoEntriesInUse);
 }
 
 }  // namespace

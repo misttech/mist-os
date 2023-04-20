@@ -270,6 +270,7 @@ fuchsia_driver("astro-driver") {
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",

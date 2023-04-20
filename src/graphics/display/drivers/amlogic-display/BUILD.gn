@@ -18,6 +18,7 @@ driver_bind_rules("amlogic_display_bind") {
   disable_fragment_gen = true
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.hardware.dsi",
@@ -45,12 +46,12 @@ source_set("common_srcs") {
     "vpu.cc",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.clamprgb:fuchsia.hardware.display.clamprgb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
     "//src/devices/bus/lib/device-protocol-pdev",
@@ -115,6 +116,7 @@ test("amlogic-display-test") {
   public_deps = [
     ":amlogic_display_driver_src",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

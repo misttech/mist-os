@@ -4,6 +4,7 @@
 
 composite display;
 
+using fuchsia.hardware.amlogiccanvas;
 using fuchsia.hardware.dsi;
 using fuchsia.hardware.hdmi;
 using fuchsia.gpio;
@@ -48,7 +49,7 @@ node "sysmem-fidl" {
 }
 
 node "canvas" {
-  fuchsia.BIND_PROTOCOL == fuchsia.amlogic.platform.BIND_PROTOCOL.CANVAS;
+  fuchsia.hardware.amlogiccanvas.Service == fuchsia.hardware.amlogiccanvas.Service.ZirconTransport;
 }
 
 optional node "hdmi" {

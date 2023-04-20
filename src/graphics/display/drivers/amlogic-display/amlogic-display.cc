@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
@@ -278,24 +277,28 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uin
         DISP_ERROR("Invalid image width %d for collection\n", image->width);
         return ZX_ERR_INVALID_ARGS;
       }
-      canvas_info_t canvas_info;
+
+      fuchsia_hardware_amlogiccanvas::wire::CanvasInfo canvas_info;
       canvas_info.height = image->height;
       canvas_info.stride_bytes = minimum_row_bytes;
-      canvas_info.wrap = 0;
-      canvas_info.blkmode = 0;
-      canvas_info.endianness = 0;
-      canvas_info.flags = CANVAS_FLAGS_READ;
+      canvas_info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
+      canvas_info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness();
+      canvas_info.flags = fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead;
 
-      uint8_t local_canvas_idx;
-      status = canvas_.Config(std::move(collection_info.buffers[index].vmo),
-                              collection_info.buffers[index].vmo_usable_start, &canvas_info,
-                              &local_canvas_idx);
-      if (status != ZX_OK) {
-        DISP_ERROR("Could not configure canvas: %d\n", status);
+      fidl::WireResult result =
+          canvas_->Config(std::move(collection_info.buffers[index].vmo),
+                          collection_info.buffers[index].vmo_usable_start, canvas_info);
+      if (!result.ok()) {
+        DISP_ERROR("Could not configure canvas: %s\n", result.error().FormatDescription().c_str());
         return ZX_ERR_NO_RESOURCES;
       }
-      import_info->canvas = canvas_;
-      import_info->canvas_idx = local_canvas_idx;
+      if (result->is_error()) {
+        DISP_ERROR("Could not configure canvas: %s\n", zx_status_get_string(result->error_value()));
+        return ZX_ERR_NO_RESOURCES;
+      }
+
+      import_info->canvas = canvas_.client_end();
+      import_info->canvas_idx = result->value()->canvas_idx;
       import_info->image_height = image->height;
       import_info->image_width = image->width;
       import_info->is_afbc = false;
@@ -481,8 +484,8 @@ void AmlogicDisplay::DdkSuspend(ddk::SuspendTxn txn) {
     if (i.pmt) {
       i.pmt.unpin();
     }
-    if (i.canvas.is_valid() && i.canvas_idx > 0) {
-      i.canvas.Free(i.canvas_idx);
+    if (i.canvas.has_value() && i.canvas_idx > 0) {
+      fidl::WireResult result = fidl::WireCall(i.canvas.value())->Free(i.canvas_idx);
     }
   }
   txn.Reply(ZX_OK, txn.requested_state());
@@ -709,26 +712,31 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
                   fuchsia_sysmem::wire::PixelFormatType::kBgr24);
 
   // Allocate a canvas for the capture image
-  canvas_info_t canvas_info = {};
+  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo canvas_info;
   canvas_info.height = collection_info.settings.image_format_constraints.min_coded_height;
   canvas_info.stride_bytes = collection_info.settings.image_format_constraints.min_bytes_per_row;
-  canvas_info.wrap = 0;
-  canvas_info.blkmode = 0;
-  canvas_info.endianness = kCanvasLittleEndian64Bit;
-  canvas_info.flags = CANVAS_FLAGS_READ | CANVAS_FLAGS_WRITE;
-  uint8_t canvas_idx;
-  zx_status_t status =
-      canvas_.Config(std::move(collection_info.buffers[index].vmo),
-                     collection_info.buffers[index].vmo_usable_start, &canvas_info, &canvas_idx);
-  if (status != ZX_OK) {
-    DISP_ERROR("Could not configure canvas %d\n", status);
-    return status;
+  canvas_info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
+  canvas_info.endianness =
+      fuchsia_hardware_amlogiccanvas::CanvasEndianness(kCanvasLittleEndian64Bit);
+  canvas_info.flags = fuchsia_hardware_amlogiccanvas::CanvasFlags::kRead |
+                      fuchsia_hardware_amlogiccanvas::CanvasFlags::kWrite;
+
+  fidl::WireResult result =
+      canvas_->Config(std::move(collection_info.buffers[index].vmo),
+                      collection_info.buffers[index].vmo_usable_start, canvas_info);
+  if (!result.ok()) {
+    DISP_ERROR("Could not configure canvas: %s\n", result.error().FormatDescription().c_str());
+    return ZX_ERR_NO_RESOURCES;
+  }
+  if (result->is_error()) {
+    DISP_ERROR("Could not configure canvas: %s\n", zx_status_get_string(result->error_value()));
+    return ZX_ERR_NO_RESOURCES;
   }
 
   // At this point, we have setup a canvas with the BufferCollection-based VMO. Store the
   // capture information
-  import_capture->canvas_idx = canvas_idx;
-  import_capture->canvas = canvas_;
+  import_capture->canvas_idx = result->value()->canvas_idx;
+  import_capture->canvas = canvas_.client_end();
   import_capture->image_height = collection_info.settings.image_format_constraints.min_coded_height;
   import_capture->image_width = collection_info.settings.image_format_constraints.min_coded_width;
   *out_capture_handle = reinterpret_cast<uint64_t>(import_capture.get());
@@ -1030,12 +1038,15 @@ zx_status_t AmlogicDisplay::Bind() {
   }
   sysmem_.Bind(std::move(*sysmem_client));
 
-  if (zx_status_t status =
-          ddk::AmlogicCanvasProtocolClient::CreateFromDevice(parent_, "canvas", &canvas_);
-      status != ZX_OK) {
-    DISP_ERROR("Could not obtain CANVAS protocol %d\n", status);
-    return status;
+  zx::result result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_amlogiccanvas::Service::Device>(parent_,
+                                                                                      "canvas");
+  if (result.is_error()) {
+    DISP_ERROR("Could not obtain CANVAS protocol %s\n", result.status_string());
+    return result.status_value();
   }
+
+  canvas_.Bind(std::move(result.value()));
 
   if (zx_status_t status = pdev_.GetBti(0, &bti_); status != ZX_OK) {
     DISP_ERROR("Could not get BTI handle %d\n", status);

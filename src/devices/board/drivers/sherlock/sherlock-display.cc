@@ -18,6 +18,7 @@
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/dsi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
@@ -159,13 +160,13 @@ zx_status_t Sherlock::DisplayInit() {
   };
 
   std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                              bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> canvas_properties{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                        bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
+      fdf::MakeProperty(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
+                        bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
   };
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {

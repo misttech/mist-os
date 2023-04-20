@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
+#include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
@@ -41,14 +41,20 @@ namespace amlogic_display {
 struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> {
   ~ImageInfo() {
     zxlogf(INFO, "Destroying image on canvas %d", canvas_idx);
-    if (canvas.is_valid()) {
-      canvas.Free(canvas_idx);
+    if (canvas.has_value()) {
+      fidl::WireResult result = fidl::WireCall(canvas.value())->Free(canvas_idx);
+      if (!result.ok()) {
+        zxlogf(WARNING, "Failed to call Canvas Free: %s",
+               result.error().FormatDescription().c_str());
+      } else if (result->is_error()) {
+        zxlogf(WARNING, "Canvas Free failed: %s", zx_status_get_string(result->error_value()));
+      }
     }
     if (pmt) {
       pmt.unpin();
     }
   }
-  ddk::AmlogicCanvasProtocolClient canvas;
+  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas;
   uint8_t canvas_idx;
   uint32_t image_height;
   uint32_t image_width;
@@ -136,7 +142,10 @@ class AmlogicDisplay
     format_support_check_ = std::move(fn);
   }
 
-  void SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient canvas) { canvas_ = canvas; }
+  void SetCanvasForTesting(fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device> canvas) {
+    canvas_.Bind(std::move(canvas));
+  }
+
   void SetVoutForTesting(std::unique_ptr<Vout> vout) { vout_ = std::move(vout); }
 
   void SetSysmemAllocatorForTesting(
@@ -176,7 +185,7 @@ class AmlogicDisplay
 
   // Protocol handles used in by this driver
   ddk::PDevFidl pdev_;
-  ddk::AmlogicCanvasProtocolClient canvas_;
+  fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
 
   // Board Info
