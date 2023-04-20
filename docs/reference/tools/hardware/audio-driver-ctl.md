@@ -8,6 +8,13 @@
 
 Play, record, and configure audio streams.
 
+## Important
+`audio-driver-ctl` is deprecated. Please use `ffx audio device` tool instead. For more information,
+run `ffx audio device --help` from your host machine and see
+README for `ffx audio`: [`//src/developer/ffx/plugins/audio/README.md`][src]
+
+[src]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/plugins/audio/README.md
+
 ## Usage {#usage}
 
 ```none
