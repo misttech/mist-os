@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{Context as _, Error};
+use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 
@@ -122,13 +123,11 @@ async fn get_netstack_proxy<P: fidl::endpoints::DiscoverableProtocolMarker>(
 ) -> Result<P::Proxy, Error> {
     let query =
         fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_sys2::RealmQueryMarker>()?;
-    let resolved_dirs = query
-        .get_instance_directories("./core/network/netstack")
-        .await?
-        .map_err(|s| format_err!("could not get netstack directories: {:?}", s))?
-        .ok_or(format_err!("netstack component is not resolved"))?;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy().unwrap();
-    fuchsia_component::client::connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+    let moniker = "./core/network/netstack".try_into()?;
+    let proxy =
+        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, &query)
+            .await?;
+    Ok(proxy)
 }
 
 impl NetstackFacade {
