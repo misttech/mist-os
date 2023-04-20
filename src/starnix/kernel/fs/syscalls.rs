@@ -1122,7 +1122,7 @@ pub fn sys_getcwd(
     let cwd = current_task.fs().cwd();
     let root = current_task.fs().root();
 
-    let mut user_cwd = cwd.path_from_root(&root);
+    let mut user_cwd = cwd.path_from_root(Some(&root));
     user_cwd.push(b'\0');
     if user_cwd.len() > size {
         return error!(ERANGE);

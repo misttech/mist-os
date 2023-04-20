@@ -969,43 +969,37 @@ impl NamespaceNode {
 
     /// The path from the root of the namespace to this node.
     pub fn path(&self) -> FsString {
-        if self.mount.is_none() {
-            return self.entry.local_name().to_vec();
-        }
-        let mut components = vec![];
-        let mut current = self.escape_mount();
-        while let Some(parent) = current.parent() {
-            components.push(current.entry.local_name().to_vec());
-            current = parent.escape_mount();
-        }
-        if components.is_empty() {
-            return b"/".to_vec();
-        }
-        components.push(vec![]);
-        components.reverse();
-        components.join(&b'/')
+        self.path_from_root(None)
     }
 
-    /// Returns the path accounting for a different root.
-    /// This is called by `getcwd` and matters when a task changes its root using `chroot`.
-    pub fn path_from_root(&self, root: &NamespaceNode) -> FsString {
+    /// Returns the path to this node, accounting for a custom root.
+    /// A task may have a custom root set by `chroot`.
+    pub fn path_from_root(&self, root: Option<&NamespaceNode>) -> FsString {
         if self.mount.is_none() {
             return self.entry.local_name().to_vec();
         }
         let mut components = vec![];
         let mut current = self.escape_mount();
 
-        // The current node is expected to intersect with the root as we travel up the tree.
-        while &current != root {
-            if let Some(parent) = current.parent() {
+        if let Some(root) = root {
+            // The current node is expected to intersect with the custom root as we travel up the tree.
+            while &current != root {
+                if let Some(parent) = current.parent() {
+                    components.push(current.entry.local_name().to_vec());
+                    current = parent.escape_mount();
+                } else {
+                    // This node hasn't intersected with the custom root and has reached the namespace root.
+                    // Append (unreachable) and return.
+                    components.push(b"(unreachable)".to_vec());
+                    components.reverse();
+                    return components.join(&b'/');
+                }
+            }
+        } else {
+            // No custom root, so travel up the tree to the namespace root.
+            while let Some(parent) = current.parent() {
                 components.push(current.entry.local_name().to_vec());
                 current = parent.escape_mount();
-            } else {
-                // This node hasn't intersected with the given root and has reached the namespace root.
-                // Append (unreachable) and return.
-                components.push(b"(unreachable)".to_vec());
-                components.reverse();
-                return components.join(&b'/');
             }
         }
 
