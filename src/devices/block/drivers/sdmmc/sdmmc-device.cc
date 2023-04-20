@@ -104,12 +104,12 @@ zx_status_t SdmmcDevice::SdmmcSendStatus(uint32_t* status) {
 
 zx_status_t SdmmcDevice::SdmmcStopTransmission(uint32_t* status) {
   zx_status_t st;
-  for (uint32_t i = 0; i < kRetryAttempts; i++) {
+  for (uint32_t i = 0; i < kTryAttempts; i++) {
     sdmmc_req_t req = {};
     req.cmd_idx = SDMMC_STOP_TRANSMISSION;
     req.arg = 0;
     req.cmd_flags = SDMMC_STOP_TRANSMISSION_FLAGS;
-    req.suppress_error_messages = i < (kRetryAttempts - 1);
+    req.suppress_error_messages = i < (kTryAttempts - 1);
     uint32_t response[4];
     if ((st = Request(req, response)) == ZX_OK) {
       if (status) {
@@ -122,12 +122,12 @@ zx_status_t SdmmcDevice::SdmmcStopTransmission(uint32_t* status) {
 }
 
 zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
-  for (uint32_t i = 0; i < kRetryAttempts; i++) {
+  for (uint32_t i = 0; i < kTryAttempts; i++) {
     sdmmc_req_t req = {};
     req.cmd_idx = SDMMC_SEND_STATUS;
     req.arg = RcaArg();
     req.cmd_flags = SDMMC_SEND_STATUS_FLAGS;
-    req.suppress_error_messages = i < (kRetryAttempts - 1);
+    req.suppress_error_messages = i < (kTryAttempts - 1);
     uint32_t response[4];
     zx_status_t st = Request(req, response);
     if (st == ZX_OK && MMC_STATUS_CURRENT_STATE(response[0]) == state) {
@@ -139,16 +139,18 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
 
 zx_status_t SdmmcDevice::SdmmcIoRequestWithRetries(const sdmmc_req_t& request, uint32_t* retries) {
   zx_status_t st;
-  for (uint32_t i = 0; i < kRetryAttempts; i++) {
+  for (uint32_t i = 0; i < kTryAttempts; i++) {
+    if (i > 0) {
+      (*retries)++;
+    }
+
     sdmmc_req_t req = request;
-    req.suppress_error_messages = i < (kRetryAttempts - 1);
+    req.suppress_error_messages = i < (kTryAttempts - 1);
 
     uint32_t unused_response[4];
     if ((st = Request(req, unused_response)) == ZX_OK) {
       break;
     }
-
-    (*retries)++;
 
     // Wait for the card to go idle (TRAN state) before retrying. SdmmcStopTransmission waits for
     // the busy signal on dat0, so the card should be back in TRAN immediately after.

@@ -1738,7 +1738,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   io_retries = root->node().get_property<inspect::UintPropertyValue>("io_retries");
   ASSERT_NOT_NULL(io_retries);
-  EXPECT_EQ(io_retries->value(), 10);
+  EXPECT_EQ(io_retries->value(), 9);
 }
 
 TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {

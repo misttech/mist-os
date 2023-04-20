@@ -74,7 +74,7 @@ class SdmmcDevice {
   zx_status_t MmcSwitch(uint8_t index, uint8_t value);
 
  private:
-  static constexpr uint32_t kRetryAttempts = 10;
+  static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.
 
   // Retry each request retries_ times (with wait_time delay in between) by default. Requests are
   // always tried at least once.
