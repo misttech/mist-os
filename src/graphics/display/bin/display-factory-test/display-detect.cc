@@ -6,91 +6,101 @@
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <cstdio>
+#include <string>
 #include <string_view>
 
 namespace sysinfo = fuchsia_sysinfo;
 namespace gpio = fuchsia_hardware_gpio;
 
-enum Boards {
-  SHERLOCK,
-  LUIS,
-  UNKNOWN_BOARD,
-  BOARD_COUNT,
+enum class Board {
+  kSherlock,
+  kUnknown,
 };
 
-Boards board = UNKNOWN_BOARD;
-
-Boards GetBoard() {
-  zx::result channel = component::Connect<sysinfo::SysInfo>();
-  if (channel.is_error()) {
-    return UNKNOWN_BOARD;
+Board GetBoard() {
+  zx::result<fidl::ClientEnd<sysinfo::SysInfo>> channel_result =
+      component::Connect<sysinfo::SysInfo>();
+  if (channel_result.is_error()) {
+    return Board::kUnknown;
   }
+  fidl::ClientEnd<sysinfo::SysInfo> channel = std::move(channel_result).value();
 
-  const fidl::WireResult result = fidl::WireCall(channel.value())->GetBoardName();
-  if (!result.ok()) {
-    return UNKNOWN_BOARD;
+  const fidl::WireResult<fuchsia_sysinfo::SysInfo::GetBoardName> board_name_result =
+      fidl::WireCall(channel)->GetBoardName();
+  if (!board_name_result.ok()) {
+    std::printf("SysInfo::GetBoardName() failed: %s\n", board_name_result.status_string());
+    return Board::kUnknown;
   }
-  const fidl::WireResponse response = result.value();
-  if (response.status != ZX_OK) {
-    return UNKNOWN_BOARD;
+  const fidl::WireResponse<fuchsia_sysinfo::SysInfo::GetBoardName> board_name_response =
+      board_name_result.value();
+  if (board_name_response.status != ZX_OK) {
+    std::printf("SysInfo::GetBoardName() returned error: %s\n",
+                zx_status_get_string(board_name_response.status));
+    return Board::kUnknown;
   };
 
-  if (response.name.get().find("sherlock") != std::string_view::npos) {
-    return SHERLOCK;
+  const std::string board_name(board_name_response.name.get());
+  std::printf("Board name: %s\n", board_name.c_str());
+  if (board_name.find("sherlock") != std::string_view::npos) {
+    return Board::kSherlock;
   }
-  if (response.name.get().find("luis") != std::string_view::npos) {
-    return LUIS;
-  }
-  return UNKNOWN_BOARD;
+  return Board::kUnknown;
 }
 
 zx::result<uint8_t> GetGpioValue(const char* gpio_path) {
-  zx::result client_end = component::Connect<gpio::Device>(gpio_path);
-  if (client_end.is_error()) {
-    return client_end.take_error();
+  zx::result<fidl::ClientEnd<gpio::Device>> client_end_result =
+      component::Connect<gpio::Device>(gpio_path);
+  if (client_end_result.is_error()) {
+    return client_end_result.take_error();
   }
-  zx::result endpoints = fidl::CreateEndpoints<gpio::Gpio>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
+  fidl::ClientEnd<gpio::Device> client_end = std::move(client_end_result).value();
+
+  zx::result<fidl::Endpoints<gpio::Gpio>> endpoints_result = fidl::CreateEndpoints<gpio::Gpio>();
+  if (endpoints_result.is_error()) {
+    return endpoints_result.take_error();
   }
-  auto& [client, server] = endpoints.value();
-  const fidl::Status status = fidl::WireCall(client_end.value())->OpenSession(std::move(server));
-  if (!status.ok()) {
-    return zx::error(status.status());
+  auto& [client, server] = endpoints_result.value();
+
+  const fidl::Status open_status = fidl::WireCall(client_end)->OpenSession(std::move(server));
+  if (!open_status.ok()) {
+    return zx::error(open_status.status());
   }
-  const fidl::WireResult result = fidl::WireCall(client)->Read();
-  if (!result.ok()) {
-    return zx::error(result.status());
+
+  const fidl::WireResult<gpio::Gpio::Read> read_result = fidl::WireCall(client)->Read();
+  if (!read_result.ok()) {
+    return zx::error(read_result.status());
   }
-  fit::result response = result.value();
-  if (response.is_error()) {
-    return response.take_error();
+  fit::result<int, gpio::wire::GpioReadResponse*> read_response = std::move(read_result).value();
+
+  if (read_response.is_error()) {
+    return read_response.take_error();
   }
-  return zx::ok(response.value()->value);
+  const uint8_t read_value = read_response.value()->value;
+
+  return zx::ok(read_value);
 }
 
 int main(int argc, const char* argv[]) {
-  if (GetBoard() == SHERLOCK) {
-    const auto* path = "/dev/sys/platform/05:04:1/aml-axg-gpio/gpio-76";
-    zx::result val = GetGpioValue(path);
-    if (val.is_error()) {
-      printf("MIPI device detect failed: %s\n", val.status_string());
+  const Board board = GetBoard();
+
+  if (board == Board::kSherlock) {
+    static constexpr char kSherlockGpioPath[] = "/dev/sys/platform/05:04:1/aml-gpio/gpio-76";
+    zx::result<uint8_t> gpio_value_result = GetGpioValue(kSherlockGpioPath);
+    if (gpio_value_result.is_error()) {
+      std::printf("MIPI device detect failed: %s\n", gpio_value_result.status_string());
       return -1;
     }
-    printf("MIPI device detect type: %s\n", val.value() ? "Innolux" : "BOE");
-  } else if (GetBoard() == LUIS) {
-    printf("MIPI device detect type: BOE\n");
-  } else {
-    printf("Unknown board\n");
+    const uint8_t gpio_value = gpio_value_result.value();
+    std::printf("MIPI device detect type: %s\n", gpio_value ? "Innolux" : "BOE");
+    return 0;
   }
+
+  std::printf("Unsupported board\n");
   return 0;
 }
