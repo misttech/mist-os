@@ -7,13 +7,10 @@
 #include <bind/fuchsia/lifecycle/cpp/bind.h>
 #define ZX_PROTOCOL_PARENT bind_fuchsia_lifecycle::BIND_PROTOCOL_PARENT
 
-#include <fidl/fuchsia.device.fs/cpp/fidl.h>
-#include <fidl/fuchsia.driver.compat/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.lifecycle.test/cpp/wire.h>
 #include <fuchsia/lifecycle/test/cpp/banjo.h>
 #include <lib/driver/compat/cpp/context.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -30,7 +27,7 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
  public:
   LifecycleDriver(fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("lifeycle-driver", std::move(start_args), std::move(driver_dispatcher)),
+      : DriverBase("lifecycle-driver", std::move(start_args), std::move(driver_dispatcher)),
         devfs_connector_(fit::bind_member<&LifecycleDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
@@ -38,6 +35,10 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
 
     // Get our parent banjo symbol.
     auto parent_symbol = fdf::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
+    if (!parent_symbol) {
+      FDF_LOG(ERROR, "Failed to find parent symbol");
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
     if (parent_symbol->proto_ops.id != ZX_PROTOCOL_PARENT) {
       FDF_LOG(ERROR, "Didn't find PARENT banjo protocol, found protocol id: %d",
               parent_symbol->proto_ops.id);
@@ -53,63 +54,7 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    // Serve our Service.
-    ft::Service::InstanceHandler handler({
-        .device = fit::bind_member<&LifecycleDriver::Serve>(this),
-    });
-
-    auto result = context().outgoing()->AddService<ft::Service>(std::move(handler));
-    if (result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to add Demo service", KV("status", result.status_string()));
-      return result.take_error();
-    }
-
-    // Create our compat context, and serve our device when it's created.
-    compat::Context::ConnectAndCreate(
-        &context(), dispatcher(), [this](zx::result<std::shared_ptr<compat::Context>> context) {
-          if (!context.is_ok()) {
-            FDF_LOG(ERROR, "Call to Context::ConnectAndCreate failed: %s", context.status_string());
-            node().reset();
-            return;
-          }
-          const auto kDeviceName = "lifecycle-device";
-
-          // Export to devfs.
-          zx::result connection =
-              this->context().incoming()->Connect<fuchsia_device_fs::Exporter>();
-          if (connection.is_error()) {
-            FDF_SLOG(ERROR, "Failed to connect to fuchsia_device_fs::Exporter",
-                     KV("status", connection.status_string()));
-            node().reset();
-            return;
-          }
-          fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
-
-          zx::result connector = devfs_connector_.Bind(dispatcher());
-          if (connector.is_error()) {
-            FDF_SLOG(ERROR, "Failed to bind devfs_connector: %s",
-                     KV("status", connector.status_string()));
-            node().reset();
-            return;
-          }
-          fidl::WireResult export_result = devfs_exporter->Export(
-              std::move(connector.value()),
-              fidl::StringView::FromExternal(context.value()->TopologicalPath(kDeviceName)),
-              fidl::StringView());
-          if (!export_result.ok()) {
-            FDF_SLOG(ERROR, "Failed to export to devfs: %s",
-                     KV("status", export_result.status_string()));
-            node().reset();
-            return;
-          }
-          if (export_result.value().is_error()) {
-            FDF_SLOG(ERROR, "Failed to export to devfs: %s",
-                     KV("status", zx_status_get_string(export_result.value().error_value())));
-            node().reset();
-            return;
-          }
-        });
-    return zx::ok();
+    return ExportToDevfs();
   }
 
   // fidl::WireServer<ft::Device>
@@ -139,6 +84,41 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
   void Stop() override { stop_called_ = true; }
 
  private:
+  zx::result<> ExportToDevfs() {
+    // Create a node for devfs.
+    fidl::Arena arena;
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
+    }
+
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
+        std::move(connector.value()));
+
+    auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                    .name(arena, "lifecycle-device")
+                    .devfs_args(devfs.Build())
+                    .Build();
+
+    // Create endpoints of the `NodeController` for the node.
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+
+    zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+    ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+
+    fidl::WireResult result = fidl::WireCall(node())->AddChild(
+        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+    if (!result.ok()) {
+      FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
+      return zx::error(result.status());
+    }
+    controller_.Bind(std::move(controller_endpoints->client));
+    node_.Bind(std::move(node_endpoints->client));
+    return zx::ok();
+  }
+
   void Serve(fidl::ServerEnd<ft::Device> device) {
     fidl::BindServer(dispatcher(), std::move(device), this);
   }
@@ -149,6 +129,9 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
   bool stop_called_ = false;
 
   ddk::ParentProtocolClient parent_client_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 };
 
 }  // namespace

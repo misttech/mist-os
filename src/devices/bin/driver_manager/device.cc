@@ -1088,6 +1088,10 @@ zx::result<std::shared_ptr<dfv2::Node>> Device::CreateDFv2Device() {
   }
   dfv2_bound_device_ = std::move(*dfv2_device);
   flags |= DEV_CTX_BOUND;
+  DevfsDevice& node_devfs = dfv2_bound_device_->node()->devfs_device();
+  // TODO(https://fxbug.dev/125288): Rework the topology to not need this dfv2 devfs node.
+  devfs.topological_node()->add_child("dfv2", std::nullopt, Devnode::NoRemote{}, node_devfs);
+  node_devfs.publish();
 
   return zx::ok(dfv2_bound_device_->node());
 }

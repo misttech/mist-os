@@ -201,6 +201,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties() const;
   const Collection& collection() const { return collection_; }
   std::optional<Devnode>& topological_devnode() { return devfs_device_.topological_node(); }
+  DevfsDevice& devfs_device() { return devfs_device_; }
 
   void set_collection(Collection collection);
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {

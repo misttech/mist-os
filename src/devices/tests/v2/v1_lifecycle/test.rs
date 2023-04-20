@@ -23,7 +23,7 @@ async fn test_devfs_exporter() -> Result<()> {
     let dev = instance.driver_test_realm_connect_to_dev()?;
     let device = device_watcher::recursive_wait_and_open::<ft::DeviceMarker>(
         &dev,
-        "sys/test/root/lifecycle-device",
+        "sys/test/root/dfv2/lifecycle-device",
     )
     .await?;
     device.ping().await?;

@@ -16,10 +16,6 @@ closed protocol Device {
     strict Stop() -> ();
 };
 
-service Service {
-    device client_end:Device;
-};
-
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 closed protocol Parent {
