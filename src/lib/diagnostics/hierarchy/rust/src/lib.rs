@@ -1315,6 +1315,8 @@ mod tests {
     }
 
     #[fuchsia::test]
+    // TODO(fxbug.dev/88496): delete the below
+    #[cfg_attr(feature = "variant_asan", ignore)]
     #[should_panic]
     // Empty paths are meaningless on insertion and break the method invariant.
     fn no_empty_paths_allowed() {
