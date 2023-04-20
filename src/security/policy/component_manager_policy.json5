@@ -770,9 +770,6 @@
                     "/core/sshd-host",
                     "/core/termina-guest-manager",
 
-                    // TODO(fxbug.dev/121700): Is Chromium still using this?
-                    "/core/test_manager/chromium-system-tests:**",
-                    "/core/test_manager/chromium-tests:**",
                     "/core/test_manager/devices-tests:**",
                     "/core/test_manager/drm-tests:**",
                     "/core/test_manager/google-tests:**",
