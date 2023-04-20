@@ -124,8 +124,7 @@ zx_status_t VirtualAudioStream::AdjustClockRate() {
   return ZX_OK;
 }
 
-fit::result<VirtualAudioStream::ErrorT, VirtualAudioStream::CurrentFormat>
-VirtualAudioStream::GetFormatForVA() {
+fit::result<VirtualAudioStream::ErrorT, CurrentFormat> VirtualAudioStream::GetFormatForVA() {
   if (!frame_rate_) {
     zxlogf(WARNING, "%s: %p ring buffer not initialized yet", __func__, this);
     return fit::error(ErrorT::kNoRingBuffer);
@@ -139,16 +138,15 @@ VirtualAudioStream::GetFormatForVA() {
   });
 }
 
-VirtualAudioStream::CurrentGain VirtualAudioStream::GetGainForVA() {
-  return {
+fit::result<VirtualAudioStream::ErrorT, CurrentGain> VirtualAudioStream::GetGainForVA() {
+  return fit::ok(CurrentGain{
       .mute = cur_gain_state_.cur_mute,
       .agc = cur_gain_state_.cur_agc,
       .gain_db = cur_gain_state_.cur_gain,
-  };
+  });
 }
 
-fit::result<VirtualAudioStream::ErrorT, VirtualAudioStream::CurrentBuffer>
-VirtualAudioStream::GetBufferForVA() {
+fit::result<VirtualAudioStream::ErrorT, CurrentBuffer> VirtualAudioStream::GetBufferForVA() {
   if (!ring_buffer_vmo_.is_valid()) {
     zxlogf(WARNING, "%s: %p ring buffer not initialized yet", __func__, this);
     return fit::error(ErrorT::kNoRingBuffer);
@@ -169,8 +167,7 @@ VirtualAudioStream::GetBufferForVA() {
   });
 }
 
-fit::result<VirtualAudioStream::ErrorT, VirtualAudioStream::CurrentPosition>
-VirtualAudioStream::GetPositionForVA() {
+fit::result<VirtualAudioStream::ErrorT, CurrentPosition> VirtualAudioStream::GetPositionForVA() {
   if (!ref_start_time_.get()) {
     zxlogf(WARNING, "%s: %p stream is not started yet", __func__, this);
     return fit::error(ErrorT::kNotStarted);
@@ -194,7 +191,8 @@ VirtualAudioStream::GetPositionForVA() {
   });
 }
 
-void VirtualAudioStream::SetNotificationFrequencyFromVA(uint32_t notifications_per_ring) {
+fit::result<VirtualAudioStream::ErrorT> VirtualAudioStream::SetNotificationFrequencyFromVA(
+    uint32_t notifications_per_ring) {
   va_client_notifications_per_ring_ = notifications_per_ring;
 
   // If our client requested the same notification cadence that AudioCore did, then just use the
@@ -215,13 +213,19 @@ void VirtualAudioStream::SetNotificationFrequencyFromVA(uint32_t notifications_p
     target_va_client_mono_notification_time_ = zx::time(0);
     va_client_notify_timer_.Cancel();
   }
+  return fit::ok();
 }
 
-void VirtualAudioStream::ChangePlugStateFromVA(bool plugged) { SetPlugState(plugged); }
+fit::result<VirtualAudioStream::ErrorT> VirtualAudioStream::ChangePlugStateFromVA(bool plugged) {
+  SetPlugState(plugged);
+  return fit::ok();
+}
 
-void VirtualAudioStream::AdjustClockRateFromVA(int32_t ppm_from_monotonic) {
+fit::result<VirtualAudioStream::ErrorT> VirtualAudioStream::AdjustClockRateFromVA(
+    int32_t ppm_from_monotonic) {
   clock_rate_adjustment_ = ppm_from_monotonic;
   ZX_ASSERT_MSG(AdjustClockRate() == ZX_OK, "AdjustClockRate failed in %s", __func__);
+  return fit::ok();
 }
 
 void VirtualAudioStream::PostForNotify() {
@@ -519,7 +523,7 @@ zx_status_t VirtualAudioStream::Stop() {
 void VirtualAudioStream::ShutdownHook() {
   auto parent = parent_.lock();
   ZX_ASSERT(parent);
-  parent->PostToDispatcher([parent]() { parent->StreamIsShuttingDown(); });
+  parent->PostToDispatcher([parent]() { parent->DriverIsShuttingDown(); });
 }
 
 }  // namespace virtual_audio

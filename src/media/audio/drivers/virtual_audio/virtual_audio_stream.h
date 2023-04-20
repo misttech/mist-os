@@ -17,6 +17,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_driver.h"
 
 namespace virtual_audio {
 
@@ -38,39 +39,16 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   //
   // The following methods implement getters and setters for fuchsia.virtualaudio.Device.
   //
-
-  struct CurrentFormat {
-    uint32_t frames_per_second;
-    uint32_t sample_format;
-    uint32_t num_channels;
-    zx::duration external_delay;
-  };
   fit::result<ErrorT, CurrentFormat> GetFormatForVA() __TA_REQUIRES(domain_token());
-
-  struct CurrentGain {
-    bool mute;
-    bool agc;
-    float gain_db;
-  };
-  CurrentGain GetGainForVA() __TA_REQUIRES(domain_token());
-
-  struct CurrentBuffer {
-    zx::vmo vmo;
-    uint32_t num_frames;
-    uint32_t notifications_per_ring;
-  };
+  fit::result<ErrorT, CurrentGain> GetGainForVA() __TA_REQUIRES(domain_token());
   fit::result<ErrorT, CurrentBuffer> GetBufferForVA() __TA_REQUIRES(domain_token());
-
-  struct CurrentPosition {
-    zx::time monotonic_time;
-    uint32_t ring_position;
-  };
   fit::result<ErrorT, CurrentPosition> GetPositionForVA() __TA_REQUIRES(domain_token());
 
-  void SetNotificationFrequencyFromVA(uint32_t notifications_per_ring)
+  fit::result<ErrorT> SetNotificationFrequencyFromVA(uint32_t notifications_per_ring)
       __TA_REQUIRES(domain_token());
-  void ChangePlugStateFromVA(bool plugged) __TA_REQUIRES(domain_token());
-  void AdjustClockRateFromVA(int32_t ppm_from_monotonic) __TA_REQUIRES(domain_token());
+  fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) __TA_REQUIRES(domain_token());
+  fit::result<ErrorT> AdjustClockRateFromVA(int32_t ppm_from_monotonic)
+      __TA_REQUIRES(domain_token());
 
  private:
   friend class audio::SimpleAudioStream;
@@ -170,6 +148,62 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
 
   zx::clock reference_clock_ __TA_GUARDED(domain_token());
   int32_t clock_rate_adjustment_ __TA_GUARDED(domain_token());
+};
+
+// This class composes a VirtualAudioStream. This allows using the functionality of a
+// VirtualAudioStream without the need to be a fbl::RefPtr, this allows us to derive from
+// VirtualAudioDriver without making VirtualAudioDriver fbl::RefCounted as VirtualAudioDriver
+// (VirtualAudioDriver is fbl::RefCounted because it derives from SimpleAudioStream which is
+// fbl::RefCounted)
+class VirtualAudioStreamWrapper : public VirtualAudioDriver {
+ public:
+  using ErrorT = fuchsia_virtualaudio::Error;
+
+  VirtualAudioStreamWrapper(const VirtualAudioDeviceImpl::Config& cfg,
+                            std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* dev_node) {
+    stream_ = VirtualAudioStream::Create(cfg, std::move(owner), dev_node);
+  }
+
+  void PostToDispatcher(fit::closure task_to_post) override {
+    stream_->PostToDispatcher(std::move(task_to_post));
+  }
+  fit::result<ErrorT, CurrentFormat> GetFormatForVA() override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->GetFormatForVA();
+  }
+  fit::result<ErrorT, CurrentGain> GetGainForVA() override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->GetGainForVA();
+  }
+  fit::result<ErrorT, CurrentBuffer> GetBufferForVA() override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->GetBufferForVA();
+  }
+  fit::result<ErrorT, CurrentPosition> GetPositionForVA() override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->GetPositionForVA();
+  }
+
+  fit::result<ErrorT> SetNotificationFrequencyFromVA(uint32_t notifications_per_ring) override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->SetNotificationFrequencyFromVA(notifications_per_ring);
+  }
+  fit::result<ErrorT> ChangePlugStateFromVA(bool plugged) override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->ChangePlugStateFromVA(plugged);
+  }
+  fit::result<ErrorT> AdjustClockRateFromVA(int32_t ppm_from_monotonic) override {
+    audio::ScopedToken t(stream_->domain_token());
+    return stream_->AdjustClockRateFromVA(ppm_from_monotonic);
+  }
+
+  void ShutdownAndRemove() override {
+    stream_->Shutdown();
+    stream_->DdkAsyncRemove();
+  }
+
+ private:
+  fbl::RefPtr<VirtualAudioStream> stream_;
 };
 
 }  // namespace virtual_audio

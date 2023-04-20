@@ -18,19 +18,19 @@
 
 namespace virtual_audio {
 
-class VirtualAudioStream;
+class VirtualAudioDriver;
 
-// Controller for a `VirtualAudioStream`.
+// Controller for a `VirtualAudioDriver`.
 //
 // Each instance of this class represents a two objects:
 //
-// 1. A virtual audio device in the device tree, represented by a `VirtualAudioStream` object.
+// 1. A virtual audio device in the device tree, represented by a `VirtualAudioDriver` object.
 //    This device appears under `/dev/class/audio-{input,output}`.
 //
 // 2. A FIDL channel (`fuchsia.virtualaudio.Device`) which controls and monitors the device.
 //
 // The device lives until the controlling FIDL channel is closed or the device host process decides
-// to remove the `VirtualAudioStream`.
+// to remove the `VirtualAudioDriver`.
 class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Device>,
                                public std::enable_shared_from_this<VirtualAudioDeviceImpl> {
  public:
@@ -70,9 +70,9 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
   // Must be called from the PostToDispatcher thread.
   void ShutdownAsync(fit::closure cb);
 
-  // `VirtualAudioStream` uses this to tell us that the stream has been shut down by an external
+  // `VirtualAudioDriver` uses this to tell us that the driver has been shut down by an external
   // entity (such as the device host process). Must be called from a PostToDispatcher closure.
-  void StreamIsShuttingDown();
+  void DriverIsShuttingDown();
 
   //
   // Implementation of virtualaudio.Device.
@@ -118,9 +118,9 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
   std::optional<fidl::ServerBindingRef<fuchsia_virtualaudio::Device>> binding_;
   bool is_bound_ = true;  // starts bound after Create
 
-  // This may be nullptr if the underlying stream device is removed before the
+  // This may be nullptr if the underlying driver is removed before the
   // fuchsia.virtualaudio.Device FIDL channel is closed.
-  fbl::RefPtr<VirtualAudioStream> stream_;
+  std::unique_ptr<VirtualAudioDriver> driver_;
 
   // Callbacks to run on destroy.
   std::vector<fit::closure> on_destroy_callbacks_;

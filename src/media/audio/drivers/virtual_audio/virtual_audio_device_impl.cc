@@ -25,12 +25,10 @@ VirtualAudioDeviceImpl::Create(const Config& cfg,
       [device](auto* server, fidl::UnbindInfo info, auto server_end) {
         zxlogf(INFO, "Device closed with reason '%s'", info.FormatDescription().c_str());
         device->is_bound_ = false;
-        if (device->stream_) {
-          // Shutdown the stream and request that it be unbound from the device tree.
-          device->stream_->Shutdown();
-          device->stream_->DdkAsyncRemove();
-          // Drop our stream reference.
-          device->stream_ = nullptr;
+        if (device->driver_) {
+          device->driver_->ShutdownAndRemove();
+          // Drop our driver reference.
+          device->driver_ = nullptr;
         }
         // Run destroy callbacks.
         for (auto& cb : device->on_destroy_callbacks_) {
@@ -39,10 +37,10 @@ VirtualAudioDeviceImpl::Create(const Config& cfg,
       });
 
   // Need a shared pointer to initialize this field.
-  device->stream_ = VirtualAudioStream::Create(cfg, device, dev_node);
+  device->driver_ = std::make_unique<VirtualAudioStreamWrapper>(cfg, device, dev_node);
 
-  // Ensure the stream was created successfully.
-  if (!device->stream_) {
+  // Ensure the driver was created successfully.
+  if (!device->driver_) {
     zxlogf(ERROR, "Device creation failed with unspecified internal error");
     return fit::error(fuchsia_virtualaudio::Error::kInternal);
   }
@@ -54,8 +52,8 @@ VirtualAudioDeviceImpl::VirtualAudioDeviceImpl(bool is_input, async_dispatcher_t
     : is_input_(is_input), fidl_dispatcher_(fidl_dispatcher) {}
 
 VirtualAudioDeviceImpl::~VirtualAudioDeviceImpl() {
-  // The stream should have been unbound by our on_unbound handler.
-  ZX_ASSERT(stream_ == nullptr);
+  // The driver should have been unbound by our on_unbound handler.
+  ZX_ASSERT(driver_ == nullptr);
 }
 
 // Post the given task with automatic cancellation if the device is cancelled before the task fires.
@@ -77,24 +75,24 @@ void VirtualAudioDeviceImpl::ShutdownAsync(fit::closure cb) {
   }
 }
 
-// This is called when the stream is destroyed by an external entity (perhaps the device host
-// process is removing our stream driver). When this happens, drop the stream so we stop making
-// requests to the stream.
-void VirtualAudioDeviceImpl::StreamIsShuttingDown() { binding_->Unbind(); }
+// This is called when the driver is destroyed by an external entity (perhaps the device host
+// process is removing our driver driver). When this happens, drop the driver so we stop making
+// requests to the driver.
+void VirtualAudioDeviceImpl::DriverIsShuttingDown() { binding_->Unbind(); }
 
 //
 // virtualaudio::Device implementation
 //
 
 void VirtualAudioDeviceImpl::GetFormat(GetFormatCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream for this request", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(), completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    auto result = stream->GetFormatForVA();
+  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->GetFormatForVA();
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -124,14 +122,19 @@ void VirtualAudioDeviceImpl::NotifySetFormat(uint32_t frames_per_second, uint32_
 }
 
 void VirtualAudioDeviceImpl::GetGain(GetGainCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream for this request", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(), completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    auto v = stream->GetGainForVA();
+  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->GetGainForVA();
+    if (!result.is_ok()) {
+      completer.ReplyError(result.error_value());
+      return;
+    }
+    auto& v = result.value();
     completer.ReplySuccess(v.mute, v.agc, v.gain_db);
   });
 }
@@ -152,14 +155,14 @@ void VirtualAudioDeviceImpl::NotifySetGain(bool current_mute, bool current_agc,
 }
 
 void VirtualAudioDeviceImpl::GetBuffer(GetBufferCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream for this request", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(), completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    auto result = stream->GetBufferForVA();
+  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->GetBufferForVA();
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -190,17 +193,20 @@ void VirtualAudioDeviceImpl::NotifyBufferCreated(zx::vmo ring_buffer_vmo,
 void VirtualAudioDeviceImpl::SetNotificationFrequency(
     SetNotificationFrequencyRequestView request,
     SetNotificationFrequencyCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream for this request", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(),
+  driver_->PostToDispatcher([driver = driver_.get(),
                              notifications_per_ring = request->notifications_per_ring,
                              completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    // This method has no return value.
-    stream->SetNotificationFrequencyFromVA(notifications_per_ring);
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->SetNotificationFrequencyFromVA(notifications_per_ring);
+    if (!result.is_ok()) {
+      completer.ReplyError(result.error_value());
+      return;
+    }
     completer.ReplySuccess();
   });
 }
@@ -233,14 +239,14 @@ void VirtualAudioDeviceImpl::NotifyStop(zx_time_t stop_time, uint32_t ring_buffe
 }
 
 void VirtualAudioDeviceImpl::GetPosition(GetPositionCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream for this request", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(), completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    auto result = stream->GetPositionForVA();
+  driver_->PostToDispatcher([driver = driver_.get(), completer = completer.ToAsync()]() mutable {
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->GetPositionForVA();
     if (!result.is_ok()) {
       completer.ReplyError(result.error_value());
       return;
@@ -267,33 +273,39 @@ void VirtualAudioDeviceImpl::NotifyPosition(zx_time_t monotonic_time,
 
 void VirtualAudioDeviceImpl::ChangePlugState(ChangePlugStateRequestView request,
                                              ChangePlugStateCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream; cannot change dynamic plug state", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver; cannot change dynamic plug state", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(), plugged = request->plugged,
+  driver_->PostToDispatcher([driver = driver_.get(), plugged = request->plugged,
                              completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    // This method has no return value.
-    stream->ChangePlugStateFromVA(plugged);
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->ChangePlugStateFromVA(plugged);
+    if (!result.is_ok()) {
+      completer.ReplyError(result.error_value());
+      return;
+    }
     completer.ReplySuccess();
   });
 }
 
 void VirtualAudioDeviceImpl::AdjustClockRate(AdjustClockRateRequestView request,
                                              AdjustClockRateCompleter::Sync& completer) {
-  if (!stream_) {
-    zxlogf(WARNING, "%s: %p has no stream; cannot change clock rate", __func__, this);
+  if (!driver_) {
+    zxlogf(WARNING, "%s: %p has no driver; cannot change clock rate", __func__, this);
     return;
   }
 
-  stream_->PostToDispatcher([stream = stream_.get(),
+  driver_->PostToDispatcher([driver = driver_.get(),
                              ppm_from_monotonic = request->ppm_from_monotonic,
                              completer = completer.ToAsync()]() mutable {
-    audio::ScopedToken t(stream->domain_token());
-    // This method has no return value.
-    stream->AdjustClockRateFromVA(ppm_from_monotonic);
+    VirtualAudioDriver::ScopedToken t(driver->domain_token());
+    auto result = driver->AdjustClockRateFromVA(ppm_from_monotonic);
+    if (!result.is_ok()) {
+      completer.ReplyError(result.error_value());
+      return;
+    }
     completer.ReplySuccess();
   });
 }
