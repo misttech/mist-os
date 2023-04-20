@@ -403,23 +403,34 @@ zx_status_t mac_join_bss(struct iwl_mvm_vif* mvmvif,
                          const fuchsia_wlan_internal::wire::JoinBssRequest* config) {
   zx_status_t ret = ZX_OK;
 
-  IWL_INFO(mvmvif, "mac_join_bss(bssid=" FMT_SSID ", type=%d, remote=%d, beacon_period=%u)\n",
-           FMT_SSID_BYTES(config->bssid.data(), sizeof(config->bssid)),
-           static_cast<uint32_t>(config->bss_type), config->remote, config->beacon_period);
+  // Ensure all table fields being accessed are available before proceeding.
+  if (!(config->has_bssid() && config->has_bss_type() && config->has_remote() &&
+        config->has_beacon_period())) {
+    IWL_ERR(
+        mvmvif,
+        "not all required fields are available - bssid: %d, bss_type: %d, remote: %d, beacon_period: %d\n",
+        config->has_bssid(), config->has_bss_type(), config->has_remote(),
+        config->has_beacon_period());
+    return ZX_ERR_INVALID_ARGS;
+  }
 
-  if (config->bss_type != fuchsia_wlan_internal::BssType::kInfrastructure) {
-    IWL_ERR(mvmvif, "invalid bss_type requested: %d\n", static_cast<uint32_t>(config->bss_type));
+  IWL_INFO(mvmvif, "mac_join_bss(bssid=" FMT_SSID ", type=%d, remote=%d, beacon_period=%u)\n",
+           FMT_SSID_BYTES(config->bssid().data(), sizeof(config->bssid())),
+           static_cast<uint32_t>(config->bss_type()), config->remote(), config->beacon_period());
+
+  if (config->bss_type() != fuchsia_wlan_internal::BssType::kInfrastructure) {
+    IWL_ERR(mvmvif, "invalid bss_type requested: %d\n", static_cast<uint32_t>(config->bss_type()));
     return ZX_ERR_INVALID_ARGS;
   }
 
   {
     // Copy the BSSID info.
     auto lock = std::lock_guard(mvmvif->mvm->mutex);
-    memcpy(mvmvif->bss_conf.bssid, config->bssid.data(), ETH_ALEN);
-    memcpy(mvmvif->bssid, config->bssid.data(), ETH_ALEN);
+    memcpy(mvmvif->bss_conf.bssid, config->bssid().data(), ETH_ALEN);
+    memcpy(mvmvif->bssid, config->bssid().data(), ETH_ALEN);
 
     // beacon_period is checked by driver later on
-    mvmvif->bss_conf.beacon_int = config->beacon_period;
+    mvmvif->bss_conf.beacon_int = config->beacon_period();
 
     // Simulates the behavior of iwl_mvm_bss_info_changed_station().
     ret = iwl_mvm_mac_ctxt_changed(mvmvif, false, mvmvif->bssid);

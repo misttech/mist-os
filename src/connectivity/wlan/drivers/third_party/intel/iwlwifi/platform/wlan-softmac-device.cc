@@ -245,6 +245,12 @@ void WlanSoftmacDevice::JoinBss(JoinBssRequestView request, fdf::Arena& arena,
   zx_status_t status = ZX_OK;
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
 
+  // Ensure the request has the necessary fields
+  if (!request->join_request.has_bssid()) {
+    IWL_ERR(this, "bssid info not available in join request\n");
+    return;
+  }
+
   // Unassoc if it was assocated.
   if (ap_mvm_sta_ != nullptr) {
     IWL_INFO(this, "AP sta already exist.  Unassociate it first.\n");
@@ -266,7 +272,7 @@ void WlanSoftmacDevice::JoinBss(JoinBssRequestView request, fdf::Arena& arena,
 
   ZX_DEBUG_ASSERT(mvmvif_->mac_role == WLAN_MAC_ROLE_CLIENT);
   std::unique_ptr<MvmSta> ap_mvm_sta;
-  if ((status = MvmSta::Create(mvmvif_, request->join_request.bssid.begin(), &ap_mvm_sta)) !=
+  if ((status = MvmSta::Create(mvmvif_, request->join_request.bssid().begin(), &ap_mvm_sta)) !=
       ZX_OK) {
     IWL_ERR(this, "failed creating MvmSta: %s\n", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);

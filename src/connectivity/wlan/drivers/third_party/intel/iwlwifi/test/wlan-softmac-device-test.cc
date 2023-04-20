@@ -23,6 +23,7 @@
 #include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
+#include "lib/fidl/cpp/wire/array.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/common.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/ieee80211.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/banjo/softmac.h"
@@ -48,6 +49,8 @@ constexpr wlan_band_t kInvalidBandId = 0xa5;
 constexpr zx_handle_t kDummyMlmeChannel = 73939133;  // An arbitrary value not ZX_HANDLE_INVALID
 constexpr size_t kDefaultBeaconPeriod = 100;
 constexpr size_t kNonDefaultBeaconPeriod = 123;
+constexpr fuchsia_wlan_internal::BssType kDefaultBssType =
+    fuchsia_wlan_internal::wire::BssType::kInfrastructure;
 
 class WlanSoftmacDeviceTest : public SingleApTest,
                               public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
@@ -545,8 +548,15 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t JoinBss(const fuchsia_wlan_internal::wire::JoinBssRequest* config) {
-    auto result = client_.buffer(test_arena_)->JoinBss(*config);
+  zx_status_t JoinBssRequest(uint16_t beacon_period = kDefaultBeaconPeriod,
+                             fuchsia_wlan_internal::BssType bss_type = kDefaultBssType) {
+    fidl::Arena fidl_arena;
+    auto builder = fuchsia_wlan_internal::wire::JoinBssRequest::Builder(fidl_arena);
+    builder.bssid(kBssid);
+    builder.bss_type(bss_type);
+    builder.remote(true);
+    builder.beacon_period(beacon_period);
+    auto result = client_.buffer(test_arena_)->JoinBss(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       EXPECT_NE(ZX_OK, result->error_value());
@@ -766,6 +776,9 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
                                WIDE_ID(dev_cmd->hdr.group_id, dev_cmd->hdr.cmd), txq_id);
   }
 
+  static constexpr fidl::Array<uint8_t, 6> kBssid = {
+      .data_ = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+  };
   static constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
   static constexpr fidl::Array<uint8_t, 32> kFakeKey = {
       .data_ = {1, 2, 3, 4, 5, 6, 7, 8, 0, 9, 8, 7, 6, 5, 4, 3},
@@ -784,16 +797,6 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
 
   static constexpr fuchsia_wlan_common::wire::WlanChannel kChannel2 = {
       .primary = 161, .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw80};
-
-  static constexpr fuchsia_wlan_internal::wire::JoinBssRequest kJoinBssRequest = {
-      .bssid =
-          {
-              .data_ = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-          },
-      .bss_type = fuchsia_wlan_internal::wire::BssType::kInfrastructure,
-      .remote = true,
-      .beacon_period = kDefaultBeaconPeriod,
-  };
 
   static constexpr uint16_t kChannelSize = 4;
 };
@@ -885,7 +888,7 @@ TEST_F(MacInterfaceTest, TestSetChannelWithUnsupportedRole) {
 // Call SetChannel() twice to simulate a channel switch announcement.
 TEST_F(MacInterfaceTest, DuplicateSetChannel) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
   struct iwl_mvm_phy_ctxt* phy_ctxt = mvmvif_->phy_ctxt;
   ASSERT_NE(nullptr, phy_ctxt);
@@ -916,14 +919,11 @@ TEST_F(MacInterfaceTest, TestJoinBss) {
       MockCommand(WIDE_ID(LONG_GROUP, ADD_STA)),
   }));
 
-  // Change the beacon period so we can see change in mvmvif_->bss_conf
-  auto cfg = kJoinBssRequest;
-  cfg.beacon_period = kNonDefaultBeaconPeriod;
-
-  ASSERT_OK(JoinBss(&cfg));
+  // Send with a different beacon period so that we see change in mvmvif_->bss_conf
+  ASSERT_OK(JoinBssRequest(kNonDefaultBeaconPeriod));
   // Ensure the BSSID was copied into mvmvif
-  ASSERT_EQ(memcmp(mvmvif_->bss_conf.bssid, kJoinBssRequest.bssid.data(), ETH_ALEN), 0);
-  ASSERT_EQ(memcmp(mvmvif_->bssid, kJoinBssRequest.bssid.data(), ETH_ALEN), 0);
+  ASSERT_EQ(memcmp(mvmvif_->bss_conf.bssid, kBssid.data(), ETH_ALEN), 0);
+  ASSERT_EQ(memcmp(mvmvif_->bssid, kBssid.data(), ETH_ALEN), 0);
   ASSERT_EQ(mvmvif_->bss_conf.beacon_int, kNonDefaultBeaconPeriod);
 }
 
@@ -931,7 +931,7 @@ TEST_F(MacInterfaceTest, TestJoinBss) {
 //
 TEST_F(MacInterfaceTest, DuplicateJoinBss) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
 
   // The second configuration will unconfigure the previous one first.
   ExpectSendCmd(expected_cmd_id_list({
@@ -950,35 +950,21 @@ TEST_F(MacInterfaceTest, DuplicateJoinBss) {
       MockCommand(WIDE_ID(LONG_GROUP, SCD_QUEUE_CFG)),
       MockCommand(WIDE_ID(LONG_GROUP, ADD_STA)),
   }));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
 }
 
 // Test unsupported bss_type.
 //
 TEST_F(MacInterfaceTest, UnsupportedBssType) {
-  static constexpr fuchsia_wlan_internal::wire::JoinBssRequest kUnsupportedJoinBssRequest = {
-      .bssid =
-          {
-              .data_ = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-          },
-      .bss_type = fuchsia_wlan_internal::wire::BssType::kIndependent,
-      .remote = true,
-      .beacon_period = kDefaultBeaconPeriod,
-  };
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, JoinBss(&kUnsupportedJoinBssRequest));
+  ASSERT_EQ(
+      ZX_ERR_INVALID_ARGS,
+      JoinBssRequest(kDefaultBeaconPeriod, fuchsia_wlan_internal::wire::BssType::kIndependent));
 }
 
 TEST_F(MacInterfaceTest, UnsupportedBeaconPeriod) {
-  static constexpr fuchsia_wlan_internal::wire::JoinBssRequest kUnsupportedJoinBssRequest = {
-      .bssid =
-          {
-              .data_ = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-          },
-      .bss_type = fuchsia_wlan_internal::wire::BssType::kIndependent,
-      .remote = true,
-      .beacon_period = IWL_MIN_BEACON_PERIOD_TU - 1,
-  };
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, JoinBss(&kUnsupportedJoinBssRequest));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            JoinBssRequest(IWL_MIN_BEACON_PERIOD_TU - 1,
+                           fuchsia_wlan_internal::wire::BssType::kIndependent));
 }
 
 // Test failed ADD_STA command.
@@ -991,14 +977,14 @@ TEST_F(MacInterfaceTest, TestFailedAddSta) {
                   ZX_ERR_BUFFER_TOO_SMALL /* an arbitrary error */),
   }));
 
-  ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL, JoinBss(&kJoinBssRequest));
+  ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL, JoinBssRequest());
 }
 
 // Test whether the AUX sta (for active scan) is added.
 //
 TEST_F(MacInterfaceTest, TestAuxSta) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
 
   auto aux_sta = &mvmvif_->mvm->aux_sta;
   EXPECT_EQ(IWL_STA_AUX_ACTIVITY, aux_sta->type);
@@ -1016,7 +1002,7 @@ TEST_F(MacInterfaceTest, TestExceptionHandling) {
   // Test the phy_ctxt checking.
   auto backup_phy_ctxt = mvmvif_->phy_ctxt;
   mvmvif_->phy_ctxt = nullptr;
-  EXPECT_EQ(ZX_ERR_BAD_STATE, JoinBss(&kJoinBssRequest));
+  EXPECT_EQ(ZX_ERR_BAD_STATE, JoinBssRequest());
   mvmvif_->phy_ctxt = backup_phy_ctxt;
 
   iwl_mvm_sta sta;
@@ -1027,14 +1013,14 @@ TEST_F(MacInterfaceTest, TestExceptionHandling) {
   }
 
   // Request fails because we run out of all slots in fw_id_to_mac_id[].
-  EXPECT_EQ(ZX_ERR_NO_RESOURCES, JoinBss(&kJoinBssRequest));
+  EXPECT_EQ(ZX_ERR_NO_RESOURCES, JoinBssRequest());
 
   // Clean up all the station slots.
   for (uint16_t i = 0; i < IWL_MVM_STATION_COUNT; i++) {
     mvmvif_->mvm->fw_id_to_mac_id[i] = nullptr;
   }
 
-  EXPECT_EQ(ZX_OK, JoinBss(&kJoinBssRequest));
+  EXPECT_EQ(ZX_OK, JoinBssRequest());
   // iwl_mvm_add_sta(), called by JoinBss(), has an assumption that each interface has only one
   // AP sta (for WLAN_MAC_ROLE_CLIENT). However, in this case, we break the assumption so that the
   // ap_sta_id was populated with the last successful STA ID. Thus, we reset the mvmvif_->ap_sta_id
@@ -1047,7 +1033,7 @@ TEST_F(MacInterfaceTest, TestExceptionHandling) {
 //
 TEST_F(MacInterfaceTest, AssociateToOpenNetwork) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
   ASSERT_EQ(IWL_STA_NONE, mvm_sta->sta_state);
   struct iwl_mvm* mvm = mvmvif_->mvm;
@@ -1068,7 +1054,7 @@ TEST_F(MacInterfaceTest, AssociateToOpenNetwork) {
 // Check if calling iwl_mvm_mac_sta_state() sets the state correctly.
 TEST_F(MacInterfaceTest, CheckStaState) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
   ASSERT_EQ(IWL_STA_NONE, mvm_sta->sta_state);
   struct iwl_mvm* mvm = mvmvif_->mvm;
@@ -1094,7 +1080,7 @@ TEST_F(MacInterfaceTest, ClearAssociationAfterClearAssociation) {
 // ClearAssociation() should cleanup when called without Assoc
 TEST_F(MacInterfaceTest, ClearAssociationAfterNoAssoc) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
   ASSERT_EQ(IWL_STA_NONE, mvm_sta->sta_state);
   struct iwl_mvm* mvm = mvmvif_->mvm;
@@ -1112,7 +1098,7 @@ TEST_F(MacInterfaceTest, ClearAssociationAfterNoAssoc) {
 // ClearAssociation() should cleanup when called after a failed Assoc
 TEST_F(MacInterfaceTest, ClearAssociationAfterFailedAssoc) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
 
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
@@ -1136,7 +1122,7 @@ TEST_F(MacInterfaceTest, ClearAssociationAfterFailedAssoc) {
 // can successfully trigger LQ_CMD with correct data.
 TEST_F(MacInterfaceTest, AssocWithHtConfig) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
 
   ExpectSendCmd(expected_cmd_id_list({
       MockCommand(WIDE_ID(LONG_GROUP, LQ_CMD)),
@@ -1284,7 +1270,7 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
 // for now use open network
 TEST_F(MacInterfaceTest, InstallKeysTest) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
   ASSERT_EQ(IWL_STA_NONE, mvm_sta->sta_state);
   struct iwl_mvm* mvm = mvmvif_->mvm;
@@ -1343,7 +1329,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
 // Check that we can sucessfully set some key configurations required for supported functionality.
 TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   ASSERT_OK(NotifyAssociationComplete());
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
 
@@ -1389,7 +1375,7 @@ TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
 TEST_F(MacInterfaceTest, InstallKeysTKIP) {
   constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
   ASSERT_OK(SetChannel(&kChannel));
-  ASSERT_OK(JoinBss(&kJoinBssRequest));
+  ASSERT_OK(JoinBssRequest());
   ASSERT_OK(NotifyAssociationComplete());
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
 
@@ -1431,7 +1417,7 @@ TEST_F(MacInterfaceTest, InstallKeysTKIP) {
 
 TEST_F(MacInterfaceTest, TxPktTooLong) {
   SetChannel(&kChannel);
-  JoinBss(&kJoinBssRequest);
+  JoinBssRequest();
   BIND_TEST(sim_trans_.iwl_trans());
 
   bindTx(tx_wrapper);
@@ -1453,7 +1439,7 @@ TEST_F(MacInterfaceTest, TxPktTooLong) {
 
 TEST_F(MacInterfaceTest, TxPktNotSupportedRole) {
   SetChannel(&kChannel);
-  JoinBss(&kJoinBssRequest);
+  JoinBssRequest();
   BIND_TEST(sim_trans_.iwl_trans());
 
   // Set to an unsupported role.
@@ -1474,7 +1460,7 @@ TEST_F(MacInterfaceTest, TxPktNotSupportedRole) {
 // To test if a packet can be sent out.
 TEST_F(MacInterfaceTest, TxPkt) {
   SetChannel(&kChannel);
-  JoinBss(&kJoinBssRequest);
+  JoinBssRequest();
   BIND_TEST(sim_trans_.iwl_trans());
 
   bindTx(tx_wrapper);

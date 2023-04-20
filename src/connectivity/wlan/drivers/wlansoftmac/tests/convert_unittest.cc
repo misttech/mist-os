@@ -433,19 +433,20 @@ TEST_F(ConvertTest, ToFidlJoinBssRequest) {
 
   // Conduct conversion
   wlan_internal::JoinBssRequest out;
-  EXPECT_EQ(ZX_OK, ConvertJoinBssRequest(in, &out));
+  fidl::Arena fidl_arena;
+  EXPECT_EQ(ZX_OK, ConvertJoinBssRequest(in, &out, fidl_arena));
 
   // Verify outputs
   for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    EXPECT_EQ(kFakeMacAddr[i], out.bssid.data()[i]);
+    EXPECT_EQ(kFakeMacAddr[i], out.bssid().data()[i]);
   }
-  EXPECT_EQ(kFakeFidlBssType, out.bss_type);
-  EXPECT_EQ(kPopulaterBool, out.remote);
-  EXPECT_EQ(kRandomPopulaterUint16, out.beacon_period);
+  EXPECT_EQ(kFakeFidlBssType, out.bss_type());
+  EXPECT_EQ(kPopulaterBool, out.remote());
+  EXPECT_EQ(kRandomPopulaterUint16, out.beacon_period());
 
   // Assign an invalid value to cbw, and the conversion will fail.
   in.bss_type = kRandomPopulaterUint32;
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertJoinBssRequest(in, &out));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertJoinBssRequest(in, &out, fidl_arena));
 }
 
 TEST_F(ConvertTest, ToFidlBcn) {

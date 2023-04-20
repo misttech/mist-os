@@ -20,11 +20,11 @@ type BssType = flexible enum : uint32 {
     PERSONAL = 4;
 };
 
-type JoinBssRequest = struct {
-    bssid ieee80211.MacAddr;
-    bss_type BssType;
-    remote bool;
-    beacon_period uint16; // in TU
+type JoinBssRequest = table {
+    1: bssid ieee80211.MacAddr;
+    2: bss_type BssType;
+    3: remote bool;
+    4: beacon_period uint16; // in TU
 };
 
 // IEEE Std 802.11-2016, 9.4.1.4

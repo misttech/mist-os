@@ -153,7 +153,7 @@ struct WlantapMacImpl : WlantapMac,
   void JoinBss(JoinBssRequestView request, fdf::Arena& arena,
                JoinBssCompleter::Sync& completer) override {
     bool expected_remote = role_ == wlan_common::WlanMacRole::kClient;
-    if (request->join_request.remote != expected_remote) {
+    if (request->join_request.remote() != expected_remote) {
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }

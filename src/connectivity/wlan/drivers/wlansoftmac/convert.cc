@@ -10,6 +10,9 @@
 
 #include <wlan/drivers/log.h>
 
+#include "fidl/fuchsia.wlan.internal/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/array.h"
+
 namespace wlan {
 
 // FIDL to banjo conversions.
@@ -395,31 +398,37 @@ zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::
 }
 
 zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
-                                  fuchsia_wlan_internal::wire::JoinBssRequest* out) {
-  out->remote = in.remote;
-  memcpy(out->bssid.data(), in.bssid, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
+                                  fuchsia_wlan_internal::wire::JoinBssRequest* out,
+                                  fidl::AnyArena& arena) {
+  auto builder = fuchsia_wlan_internal::wire::JoinBssRequest::Builder(arena);
+  builder.remote(in.remote);
+  fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> bssid;
+  memcpy(bssid.begin(), in.bssid, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
+  builder.bssid(bssid);
+  builder.beacon_period(in.beacon_period);
+
   switch (in.bss_type) {
     case BSS_TYPE_UNKNOWN:
-      out->bss_type = fuchsia_wlan_internal::wire::BssType::kUnknown;
+      builder.bss_type(fuchsia_wlan_internal::wire::BssType::kUnknown);
       break;
     case BSS_TYPE_INFRASTRUCTURE:
-      out->bss_type = fuchsia_wlan_internal::wire::BssType::kInfrastructure;
+      builder.bss_type(fuchsia_wlan_internal::wire::BssType::kInfrastructure);
       break;
     case BSS_TYPE_INDEPENDENT:
-      out->bss_type = fuchsia_wlan_internal::wire::BssType::kIndependent;
+      builder.bss_type(fuchsia_wlan_internal::wire::BssType::kIndependent);
       break;
     case BSS_TYPE_MESH:
-      out->bss_type = fuchsia_wlan_internal::wire::BssType::kMesh;
+      builder.bss_type(fuchsia_wlan_internal::wire::BssType::kMesh);
       break;
     case BSS_TYPE_PERSONAL:
-      out->bss_type = fuchsia_wlan_internal::wire::BssType::kPersonal;
+      builder.bss_type(fuchsia_wlan_internal::wire::BssType::kPersonal);
       break;
     default:
       lerror("BssType is not supported: %u", in.bss_type);
       return ZX_ERR_INVALID_ARGS;
   }
 
-  out->beacon_period = in.beacon_period;
+  *out = builder.Build();
   return ZX_OK;
 }
 
