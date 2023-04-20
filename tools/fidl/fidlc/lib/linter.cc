@@ -59,7 +59,7 @@ constexpr bool IsAliasCaseCheckExempt(std::string_view library_name, std::string
   return library_name == kZirconLibraryZx &&
          (declname == "status" || declname == "time" || declname == "duration" ||
           declname == "ticks" || declname == "koid" || declname == "vaddr" || declname == "paddr" ||
-          declname == "paddr32" || declname == "gpaddr" || declname == "off");
+          declname == "paddr32" || declname == "gpaddr");
 }
 
 // Convert the SourceElement (start- and end-tokens within the SourceFile)

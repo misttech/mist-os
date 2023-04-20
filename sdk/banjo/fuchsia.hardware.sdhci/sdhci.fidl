@@ -45,7 +45,7 @@ protocol Sdhci {
     GetMmio() -> (resource struct {
         s zx.status;
         mmio zx.handle:VMO;
-        offset zx.off;
+        offset zx.Off;
     });
     /// Gets a handle to the bus transaction initiator for the device. The caller
     /// receives ownership of the handle.

@@ -57,10 +57,10 @@ closed protocol SynchronousBase {
         gpaddr_2 zx.gpaddr;
     });
     strict Off(struct {
-        off zx.off;
+        off zx.Off;
     }) -> (struct {
-        off zx.off;
-        off_2 zx.off;
+        off zx.Off;
+        off_2 zx.Off;
     });
 };
 
@@ -125,10 +125,10 @@ closed protocol AsyncBase {
     });
     @async
     strict Off(struct {
-        off zx.off;
+        off zx.Off;
     }) -> (struct {
-        off zx.off;
-        off_2 zx.off;
+        off zx.Off;
+        off_2 zx.Off;
     });
 };
 
@@ -182,10 +182,10 @@ closed protocol WrongTransport {
         gpaddr_2 zx.gpaddr;
     });
     strict Off(struct {
-        off zx.off;
+        off zx.Off;
     }) -> (struct {
-        off zx.off;
-        off_2 zx.off;
+        off zx.Off;
+        off_2 zx.Off;
     });
 };
 

@@ -31,7 +31,7 @@ type BoardInfo = table {
 
 type Mmio = resource table {
     /// Offset from beginning of VMO where the mmio region begins.
-    1: offset zx.off;
+    1: offset zx.Off;
     /// Size of mmio region.
     2: size uint64;
     3: vmo zx.handle:VMO;

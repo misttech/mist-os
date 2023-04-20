@@ -16,7 +16,7 @@ type UsbHeader = struct {
     /// bEndpointAddress from endpoint descriptor.
     ep_address uint8;
     /// Number of bytes to transfer.
-    length zx.off;
+    length zx.Off;
     /// Send zero length packet if length is multiple of max packet size.
     send_zlp bool;
 };
@@ -39,7 +39,7 @@ type UsbResponse = struct {
     /// ZX_ERR_IO_INVALID indicates that the device stalled the transfer.
     status zx.status;
     /// Number of bytes actually transferred (on success).
-    actual zx.off;
+    actual zx.Off;
     /// Number of consecutive requests that were silently completed immediately prior to this
     /// request.
     /// This only needs to be checked if the client has set |cb_on_error_only| on any requests,
@@ -57,7 +57,7 @@ type UsbRequest = resource struct {
     vmo_handle zx.handle:VMO;
     size uint64;
     /// Offset of the start of data from first page address of the vmo.
-    offset zx.off;
+    offset zx.Off;
     /// Mapped address of the first page of the vmo.
     /// Add offset to get actual data.
     virt uint64;

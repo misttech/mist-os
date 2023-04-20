@@ -32,7 +32,7 @@ type PdevBoardInfo = struct {
 
 type PdevMmio = resource struct {
     /// Offset from beginning of VMO where the mmio region begins.
-    offset zx.off;
+    offset zx.Off;
     /// Size of mmio region.
     size uint64;
     vmo zx.handle:VMO;

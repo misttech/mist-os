@@ -54,7 +54,7 @@ type zx_types = struct {
     paddr zx.paddr;
     paddr32 zx.paddr32;
     gpaddr zx.gpaddr;
-    offset zx.off;
+    offset zx.Off;
 };
 
 type default_values = struct {

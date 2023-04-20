@@ -50,6 +50,9 @@
         "zx/handle": {
           "kind": "experimental_resource"
         },
+        "zx/Off": {
+          "kind": "alias"
+        },
         "zx/duration": {
           "kind": "alias"
         },
@@ -57,9 +60,6 @@
           "kind": "alias"
         },
         "zx/koid": {
-          "kind": "alias"
-        },
-        "zx/off": {
           "kind": "alias"
         },
         "zx/paddr": {

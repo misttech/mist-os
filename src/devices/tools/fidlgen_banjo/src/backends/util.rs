@@ -424,7 +424,7 @@ pub fn protocol_to_ops_cpp_str(id: &CompoundIdentifier, ir: &FidlIr) -> Result<S
 pub fn get_base_type_from_alias(alias: &Option<&String>) -> Option<String> {
     if let Some(name) = alias {
         if name.starts_with("zx/") {
-            return Some(format!("zx_{}_t", &name[3..]));
+            return Some(format!("zx_{}_t", to_c_name(&name[3..])));
         }
     }
     None

@@ -94,7 +94,7 @@ protocol Stream {
     Create(resource struct {
         options uint32;
         vmo handle:VMO;
-        seek off;
+        seek Off;
     }) -> (resource struct {
         out_stream handle:STREAM;
     }) error status;
@@ -281,7 +281,7 @@ protocol Stream {
     WritevAt(resource struct {
         handle handle:STREAM;
         options uint32;
-        offset off;
+        offset Off;
         vectors vector<Iovec>;
     }) -> (struct {
         actual usize;
@@ -447,7 +447,7 @@ protocol Stream {
     ReadvAt(resource struct {
         handle handle:STREAM;
         options uint32;
-        offset off;
+        offset Off;
     }) -> (struct {
         vectors vector<Iovec>;
         actual usize;
@@ -531,6 +531,6 @@ protocol Stream {
         whence StreamSeekOrigin;
         offset int64;
     }) -> (struct {
-        out_seek off;
+        out_seek Off;
     }) error status;
 };

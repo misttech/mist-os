@@ -36,7 +36,7 @@ type ConfigurationStatus = strict enum {
 
 type ReadInfo = struct {
     /// Offset into VMO where read data starts.
-    offset zx.off;
+    offset zx.Off;
     /// Size of read data.
     size uint64;
 };
