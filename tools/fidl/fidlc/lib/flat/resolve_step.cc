@@ -6,10 +6,80 @@
 
 #include <zircon/assert.h>
 
+#include <string>
+#include <string_view>
+#include <utility>
+
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
+#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
 namespace fidl::flat {
+
+namespace {
+
+using DeclMapIterator = std::multimap<std::string_view, Decl*>::const_iterator;
+
+// TODO(fxbug.dev/109734): Replace with
+// `library->declarations.all.equal_range(name)` when associated zx naming
+// migration is complete.
+std::pair<DeclMapIterator, DeclMapIterator> LookupDeclsByName(const ExperimentalFlags& flags,
+                                                              const Library* library,
+                                                              std::string_view name) {
+  using namespace std::string_view_literals;
+
+  ZX_DEBUG_ASSERT(library);
+  bool is_zx = !library->name.empty() && library->name.front() == "zx"sv;
+
+  // As mixed-case references to select zx declarations may be permitted, this
+  // function tries toggling the case in the event the name with the initial
+  // case was not found.
+  auto toggle_zx_case = [is_zx](std::string_view name) -> std::string_view {
+    ZX_DEBUG_ASSERT(is_zx);
+
+    if (name == "status"sv) {
+      return "Status"sv;
+    }
+    if (name == "Status"sv) {
+      return "status"sv;
+    }
+    if (name == "handle"sv) {
+      return "Handle"sv;
+    }
+    if (name == "Handle"sv) {
+      return "handle"sv;
+    }
+    if (name == "time"sv) {
+      return "Time"sv;
+    }
+    if (name == "Time"sv) {
+      return "time"sv;
+    }
+    if (name == "duration"sv) {
+      return "Duration"sv;
+    }
+    if (name == "Duration"sv) {
+      return "duration"sv;
+    }
+    return name;
+  };
+
+  auto [begin, end] = library->declarations.all.equal_range(name);
+  if (begin == end && is_zx &&
+      !flags.IsFlagEnabled(ExperimentalFlags::Flag::kZxSelectCaseSensitivity)) {
+    if (std::string_view toggled = toggle_zx_case(name); toggled != name) {
+      return library->declarations.all.equal_range(toggled);
+    }
+  }
+  return std::make_pair(begin, end);
+}
+
+std::pair<DeclMapIterator, DeclMapIterator> LookupDeclsByKey(const ExperimentalFlags& flags,
+                                                             const Reference::Key& key) {
+  return LookupDeclsByName(flags, key.library, key.decl_name);
+}
+
+}  // namespace
 
 void ResolveStep::RunImpl() {
   // In a single pass:
@@ -322,7 +392,7 @@ class ResolveStep::Lookup final : ReporterMixin {
   }
 
   std::optional<Reference::Key> TryDecl(const Library* library, std::string_view name) {
-    auto [begin, end] = library->declarations.all.equal_range(name);
+    auto [begin, end] = LookupDeclsByName(step_->experimental_flags(), library, name);
     if (begin == end) {
       return std::nullopt;
     }
@@ -547,7 +617,7 @@ void ResolveStep::InsertReferenceEdges(const Reference& ref, Context context) {
   // Note: key.library may is not necessarily library(), thus
   // key.library->declarations could be pre-decomposition or post-decomposition.
   // Although no branching is needed here, this is important to keep in mind.
-  auto [begin, end] = key.library->declarations.all.equal_range(key.decl_name);
+  auto [begin, end] = LookupDeclsByKey(experimental_flags(), key);
   for (auto it = begin; it != end; ++it) {
     Element* target = it->second;
     Element* enclosing = context.enclosing;
@@ -621,7 +691,7 @@ void ResolveStep::ResolveKeyReference(Reference& ref, Context context) {
 
 Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   auto key = ref.key();
-  auto [begin, end] = key.library->declarations.all.equal_range(key.decl_name);
+  auto [begin, end] = LookupDeclsByKey(experimental_flags(), key);
   ZX_ASSERT_MSG(begin != end, "key must exist");
   auto platform = key.library->platform.value();
   // Case #1: source and target libraries are versioned in the same platform.
