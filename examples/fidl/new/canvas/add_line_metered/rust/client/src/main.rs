@@ -65,19 +65,19 @@ async fn main() -> Result<(), Error> {
             .collect::<Vec<Point>>();
 
         // Assemble a line from the two points.
-        let from = &mut points.pop().ok_or(format_err!("line requires 2 points, but has 0"))?;
-        let to = &mut points.pop().ok_or(format_err!("line requires 2 points, but has 1"))?;
-        let mut line: [&mut Point; 2] = [from, to];
+        let from = points.pop().ok_or(format_err!("line requires 2 points, but has 0"))?;
+        let to = points.pop().ok_or(format_err!("line requires 2 points, but has 1"))?;
+        let line = [from, to];
 
         // Draw a line to the canvas by calling the server, using the two points we just parsed
         // above as arguments.
-        println!("AddLine request sent: {:?}", &mut line);
+        println!("AddLine request sent: {:?}", line);
 
         // [START diff_1]
         // By awaiting on the reply, we prevent the client from sending another request before the
         // server is ready to handle, thereby syncing the flow rate between the two parties over
         // this method.
-        instance.add_line(&mut line).await.context("Error sending request")?;
+        instance.add_line(&line).await.context("Error sending request")?;
         println!("AddLine response received");
         // [END diff_1]
     }

@@ -144,11 +144,10 @@ mod tests {
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(VolumeRequest::QuerySlices { responder, start_slices }) => {
-                        let mut slices = vec![VsliceRange { allocated: false, count: 0 }; 16];
+                        let mut slices = [VsliceRange { allocated: false, count: 0 }; 16];
                         slices[0] = VsliceRange { allocated: true, count: RANGE_ALLOCATED };
-                        let mut arr = slices.iter_mut().collect::<Vec<_>>().try_into().unwrap();
                         let count = if start_slices[0] == 1 { 1 } else { 0 };
-                        responder.send(zx::sys::ZX_OK, &mut arr, count).unwrap();
+                        responder.send(zx::sys::ZX_OK, &slices, count).unwrap();
                     }
                     Ok(VolumeRequest::Shrink { responder, start_slice, slice_count }) => {
                         assert_eq!(start_slice, 1);

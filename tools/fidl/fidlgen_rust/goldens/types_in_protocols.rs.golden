@@ -1412,16 +1412,16 @@ pub trait ProtocolProxyInterface: Send + Sync {
     ) -> Self::TwoWayCompoundResponseFut;
     fn r#one_way_array_basic(
         &self,
-        array_uint8: &mut [u8; 5],
-        array_uint16: &mut [u16; 5],
-        array_uint32: &mut [u32; 5],
-        array_uint64: &mut [u64; 5],
-        array_int8: &mut [i8; 5],
-        array_int16: &mut [i16; 5],
-        array_int32: &mut [i32; 5],
-        array_int64: &mut [i64; 5],
-        array_float32: &mut [f32; 5],
-        array_float64: &mut [f64; 5],
+        array_uint8: &[u8; 5],
+        array_uint16: &[u16; 5],
+        array_uint32: &[u32; 5],
+        array_uint64: &[u64; 5],
+        array_int8: &[i8; 5],
+        array_int16: &[i16; 5],
+        array_int32: &[i32; 5],
+        array_int64: &[i64; 5],
+        array_float32: &[f32; 5],
+        array_float64: &[f64; 5],
         array_string: &[String; 5],
         array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error>;
@@ -1446,26 +1446,26 @@ pub trait ProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#two_way_array_basic(
         &self,
-        array_uint8: &mut [u8; 5],
-        array_uint16: &mut [u16; 5],
-        array_uint32: &mut [u32; 5],
-        array_uint64: &mut [u64; 5],
-        array_int8: &mut [i8; 5],
-        array_int16: &mut [i16; 5],
-        array_int32: &mut [i32; 5],
-        array_int64: &mut [i64; 5],
-        array_float32: &mut [f32; 5],
-        array_float64: &mut [f64; 5],
+        array_uint8: &[u8; 5],
+        array_uint16: &[u16; 5],
+        array_uint32: &[u32; 5],
+        array_uint64: &[u64; 5],
+        array_int8: &[i8; 5],
+        array_int16: &[i16; 5],
+        array_int32: &[i32; 5],
+        array_int64: &[i64; 5],
+        array_float32: &[f32; 5],
+        array_float64: &[f64; 5],
         array_string: &[String; 5],
         array_opt_string: &[Option<String>; 5],
     ) -> Self::TwoWayArrayBasicResponseFut;
     fn r#one_way_array_compound(
         &self,
-        array_bits: &mut [Bits; 5],
-        array_enum: &mut [Enum; 5],
-        array_struct: &mut [&mut Struct; 5],
-        array_table: &mut [Table; 5],
-        array_union: &mut [&mut Union; 5],
+        array_bits: &[Bits; 5],
+        array_enum: &[Enum; 5],
+        array_struct: &[Struct; 5],
+        array_table: &[Table; 5],
+        array_union: &[Union; 5],
     ) -> Result<(), fidl::Error>;
     type TwoWayArrayCompoundResponseFut: std::future::Future<
             Output = Result<
@@ -1475,11 +1475,11 @@ pub trait ProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#two_way_array_compound(
         &self,
-        array_bits: &mut [Bits; 5],
-        array_enum: &mut [Enum; 5],
-        array_struct: &mut [&mut Struct; 5],
-        array_table: &mut [Table; 5],
-        array_union: &mut [&mut Union; 5],
+        array_bits: &[Bits; 5],
+        array_enum: &[Enum; 5],
+        array_struct: &[Struct; 5],
+        array_table: &[Table; 5],
+        array_union: &[Union; 5],
     ) -> Self::TwoWayArrayCompoundResponseFut;
     fn r#one_way_vector_basic(
         &self,
@@ -1618,11 +1618,11 @@ pub trait ProtocolProxyInterface: Send + Sync {
         opt_union: Option<&mut ResourceUnion>,
         array_handle: [fidl::Handle; 5],
         array_vmo: [fidl::Vmo; 5],
-        array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        array_struct: &mut [&mut ResourceStruct; 5],
-        array_table: &mut [ResourceTable; 5],
-        array_union: &mut [&mut ResourceUnion; 5],
+        array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        array_struct: [ResourceStruct; 5],
+        array_table: [ResourceTable; 5],
+        array_union: [ResourceUnion; 5],
         vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         vector_client_end: &mut dyn ExactSizeIterator<
@@ -1686,11 +1686,11 @@ pub trait ProtocolProxyInterface: Send + Sync {
         opt_union: Option<&mut ResourceUnion>,
         array_handle: [fidl::Handle; 5],
         array_vmo: [fidl::Vmo; 5],
-        array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        array_struct: &mut [&mut ResourceStruct; 5],
-        array_table: &mut [ResourceTable; 5],
-        array_union: &mut [&mut ResourceUnion; 5],
+        array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        array_struct: [ResourceStruct; 5],
+        array_table: [ResourceTable; 5],
+        array_union: [ResourceUnion; 5],
         vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         vector_client_end: &mut dyn ExactSizeIterator<
@@ -1840,31 +1840,31 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#one_way_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayBasic, false>(
             (
-                &*array_uint8,
-                &*array_uint16,
-                &*array_uint32,
-                &*array_uint64,
-                &*array_int8,
-                &*array_int16,
-                &*array_int32,
-                &*array_int64,
-                &*array_float32,
-                &*array_float64,
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
                 array_string,
                 array_opt_string,
             ),
@@ -1874,16 +1874,16 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#two_way_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
         ___deadline: zx::Time,
@@ -1906,16 +1906,16 @@ impl ProtocolSynchronousProxy {
     > {
         let _response = self.client.send_query::<ArrayBasic, ArrayBasic, false, true>(
             (
-                &*array_uint8,
-                &*array_uint16,
-                &*array_uint32,
-                &*array_uint64,
-                &*array_int8,
-                &*array_int16,
-                &*array_int32,
-                &*array_int64,
-                &*array_float32,
-                &*array_float64,
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
                 array_string,
                 array_opt_string,
             ),
@@ -1940,65 +1940,29 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#one_way_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayCompound, false>(
-            (
-                &*array_bits,
-                &*array_enum,
-                &{
-                    let mut temp: [Struct; 5] = fidl::new_empty!(fidl::encoding::Array<Struct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-                &*array_table,
-                &{
-                    let mut temp: [Union; 5] = fidl::new_empty!(fidl::encoding::Array<Union, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-            ),
+            (array_bits, array_enum, array_struct, array_table, array_union),
             0x464948bae1bda09d,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     pub fn r#two_way_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
         ___deadline: zx::Time,
     ) -> Result<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]), fidl::Error> {
         let _response = self.client.send_query::<ArrayCompound, ArrayCompound, false, true>(
-            (
-                &*array_bits,
-                &*array_enum,
-                &{
-                    let mut temp: [Struct; 5] = fidl::new_empty!(fidl::encoding::Array<Struct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-                &*array_table,
-                &{
-                    let mut temp: [Union; 5] = fidl::new_empty!(fidl::encoding::Array<Union, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-            ),
+            (array_bits, array_enum, array_struct, array_table, array_union),
             0xbcae616f8e1ea7b,
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
@@ -2276,11 +2240,11 @@ impl ProtocolSynchronousProxy {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -2310,25 +2274,11 @@ impl ProtocolSynchronousProxy {
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
-                &mut *array_client_end,
-                &mut *array_server_end,
-                &mut {
-                    let mut temp: [ResourceStruct; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceStruct));
-                    }
-                    temp
-                },
-                &mut *array_table,
-                &mut {
-                    let mut temp: [ResourceUnion; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceUnion));
-                    }
-                    temp
-                },
+                &mut array_client_end,
+                &mut array_server_end,
+                &mut array_struct,
+                &mut array_table,
+                &mut array_union,
                 fidl::encoding::Iterator(vector_handle),
                 fidl::encoding::Iterator(vector_vmo),
                 fidl::encoding::Iterator(vector_client_end),
@@ -2358,11 +2308,11 @@ impl ProtocolSynchronousProxy {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -2424,25 +2374,11 @@ impl ProtocolSynchronousProxy {
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
-                &mut *array_client_end,
-                &mut *array_server_end,
-                &mut {
-                    let mut temp: [ResourceStruct; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceStruct));
-                    }
-                    temp
-                },
-                &mut *array_table,
-                &mut {
-                    let mut temp: [ResourceUnion; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceUnion));
-                    }
-                    temp
-                },
+                &mut array_client_end,
+                &mut array_server_end,
+                &mut array_struct,
+                &mut array_table,
+                &mut array_union,
                 fidl::encoding::Iterator(vector_handle),
                 fidl::encoding::Iterator(vector_vmo),
                 fidl::encoding::Iterator(vector_client_end),
@@ -2614,16 +2550,16 @@ impl ProtocolProxy {
     }
     pub fn r#one_way_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
@@ -2645,16 +2581,16 @@ impl ProtocolProxy {
     }
     pub fn r#two_way_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> fidl::client::QueryResponseFut<(
@@ -2689,11 +2625,11 @@ impl ProtocolProxy {
     }
     pub fn r#one_way_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_array_compound(
             self,
@@ -2706,11 +2642,11 @@ impl ProtocolProxy {
     }
     pub fn r#two_way_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> fidl::client::QueryResponseFut<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5])>
     {
         ProtocolProxyInterface::r#two_way_array_compound(
@@ -2921,11 +2857,11 @@ impl ProtocolProxy {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -2986,11 +2922,11 @@ impl ProtocolProxy {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -3216,31 +3152,31 @@ impl ProtocolProxyInterface for ProtocolProxy {
     }
     fn r#one_way_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayBasic, false>(
             (
-                &*array_uint8,
-                &*array_uint16,
-                &*array_uint32,
-                &*array_uint64,
-                &*array_int8,
-                &*array_int16,
-                &*array_int32,
-                &*array_int64,
-                &*array_float32,
-                &*array_float64,
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
                 array_string,
                 array_opt_string,
             ),
@@ -3264,16 +3200,16 @@ impl ProtocolProxyInterface for ProtocolProxy {
     )>;
     fn r#two_way_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Self::TwoWayArrayBasicResponseFut {
@@ -3327,16 +3263,16 @@ impl ProtocolProxyInterface for ProtocolProxy {
             [Option<String>; 5],
         ), false>(
             (
-                &*array_uint8,
-                &*array_uint16,
-                &*array_uint32,
-                &*array_uint64,
-                &*array_int8,
-                &*array_int16,
-                &*array_int32,
-                &*array_int64,
-                &*array_float32,
-                &*array_float64,
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
                 array_string,
                 array_opt_string,
             ),
@@ -3347,32 +3283,14 @@ impl ProtocolProxyInterface for ProtocolProxy {
     }
     fn r#one_way_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayCompound, false>(
-            (
-                &*array_bits,
-                &*array_enum,
-                &{
-                    let mut temp: [Struct; 5] = fidl::new_empty!(fidl::encoding::Array<Struct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-                &*array_table,
-                &{
-                    let mut temp: [Union; 5] = fidl::new_empty!(fidl::encoding::Array<Union, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-            ),
+            (array_bits, array_enum, array_struct, array_table, array_union),
             0x464948bae1bda09d,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -3381,11 +3299,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
         fidl::client::QueryResponseFut<([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5])>;
     fn r#two_way_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Self::TwoWayArrayCompoundResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -3405,19 +3323,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ([Bits; 5], [Enum; 5], [Struct; 5], [Table; 5], [Union; 5]),
             false,
         >(
-            (&*array_bits, &*array_enum, &{
-	let mut temp: [Struct; 5] = fidl::new_empty!(fidl::encoding::Array<Struct, 5>);
-	for (i, x) in array_struct.iter_mut().enumerate() {
-		temp[i] = x.clone();
-	}
-	temp
-}, &*array_table, &{
-	let mut temp: [Union; 5] = fidl::new_empty!(fidl::encoding::Array<Union, 5>);
-	for (i, x) in array_union.iter_mut().enumerate() {
-		temp[i] = x.clone();
-	}
-	temp
-},),
+            (array_bits, array_enum, array_struct, array_table, array_union,),
             0xbcae616f8e1ea7b,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -3761,11 +3667,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -3795,25 +3701,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
-                &mut *array_client_end,
-                &mut *array_server_end,
-                &mut {
-                    let mut temp: [ResourceStruct; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceStruct));
-                    }
-                    temp
-                },
-                &mut *array_table,
-                &mut {
-                    let mut temp: [ResourceUnion; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceUnion));
-                    }
-                    temp
-                },
+                &mut array_client_end,
+                &mut array_server_end,
+                &mut array_struct,
+                &mut array_table,
+                &mut array_union,
                 fidl::encoding::Iterator(vector_handle),
                 fidl::encoding::Iterator(vector_vmo),
                 fidl::encoding::Iterator(vector_client_end),
@@ -3872,11 +3764,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -3999,25 +3891,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
-                &mut *array_client_end,
-                &mut *array_server_end,
-                &mut {
-                    let mut temp: [ResourceStruct; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceStruct));
-                    }
-                    temp
-                },
-                &mut *array_table,
-                &mut {
-                    let mut temp: [ResourceUnion; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceUnion));
-                    }
-                    temp
-                },
+                &mut array_client_end,
+                &mut array_server_end,
+                &mut array_struct,
+                &mut array_table,
+                &mut array_union,
                 fidl::encoding::Iterator(vector_handle),
                 fidl::encoding::Iterator(vector_vmo),
                 fidl::encoding::Iterator(vector_client_end),
@@ -6443,31 +6321,31 @@ impl ProtocolControlHandle {
     }
     pub fn send_event_array_basic(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
         self.inner.send::<ArrayBasic, false>(
             (
-                &*array_uint8,
-                &*array_uint16,
-                &*array_uint32,
-                &*array_uint64,
-                &*array_int8,
-                &*array_int16,
-                &*array_int32,
-                &*array_int64,
-                &*array_float32,
-                &*array_float64,
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
                 array_string,
                 array_opt_string,
             ),
@@ -6478,32 +6356,14 @@ impl ProtocolControlHandle {
     }
     pub fn send_event_array_compound(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         self.inner.send::<ArrayCompound, false>(
-            (
-                &*array_bits,
-                &*array_enum,
-                &{
-                    let mut temp: [Struct; 5] = fidl::new_empty!(fidl::encoding::Array<Struct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-                &*array_table,
-                &{
-                    let mut temp: [Union; 5] = fidl::new_empty!(fidl::encoding::Array<Union, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-            ),
+            (array_bits, array_enum, array_struct, array_table, array_union),
             0,
             0x1e63a00079aa7415,
             fidl::encoding::DynamicFlags::empty(),
@@ -6617,11 +6477,11 @@ impl ProtocolControlHandle {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -6651,25 +6511,11 @@ impl ProtocolControlHandle {
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
-                &mut *array_client_end,
-                &mut *array_server_end,
-                &mut {
-                    let mut temp: [ResourceStruct; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceStruct));
-                    }
-                    temp
-                },
-                &mut *array_table,
-                &mut {
-                    let mut temp: [ResourceUnion; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceUnion));
-                    }
-                    temp
-                },
+                &mut array_client_end,
+                &mut array_server_end,
+                &mut array_struct,
+                &mut array_table,
+                &mut array_union,
                 fidl::encoding::Iterator(vector_handle),
                 fidl::encoding::Iterator(vector_vmo),
                 fidl::encoding::Iterator(vector_client_end),
@@ -6956,16 +6802,16 @@ impl ProtocolTwoWayArrayBasicResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
@@ -6994,16 +6840,16 @@ impl ProtocolTwoWayArrayBasicResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
@@ -7027,16 +6873,16 @@ impl ProtocolTwoWayArrayBasicResponder {
 
     fn send_raw(
         &self,
-        mut array_uint8: &mut [u8; 5],
-        mut array_uint16: &mut [u16; 5],
-        mut array_uint32: &mut [u32; 5],
-        mut array_uint64: &mut [u64; 5],
-        mut array_int8: &mut [i8; 5],
-        mut array_int16: &mut [i16; 5],
-        mut array_int32: &mut [i32; 5],
-        mut array_int64: &mut [i64; 5],
-        mut array_float32: &mut [f32; 5],
-        mut array_float64: &mut [f64; 5],
+        mut array_uint8: &[u8; 5],
+        mut array_uint16: &[u16; 5],
+        mut array_uint32: &[u32; 5],
+        mut array_uint64: &[u64; 5],
+        mut array_int8: &[i8; 5],
+        mut array_int16: &[i16; 5],
+        mut array_int32: &[i32; 5],
+        mut array_int64: &[i64; 5],
+        mut array_float32: &[f32; 5],
+        mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
     ) -> Result<(), fidl::Error> {
@@ -7047,16 +6893,16 @@ impl ProtocolTwoWayArrayBasicResponder {
                 fidl::encoding::DynamicFlags::empty(),
             ),
             body: (
-                &*array_uint8,
-                &*array_uint16,
-                &*array_uint32,
-                &*array_uint64,
-                &*array_int8,
-                &*array_int16,
-                &*array_int32,
-                &*array_int64,
-                &*array_float32,
-                &*array_float64,
+                array_uint8,
+                array_uint16,
+                array_uint32,
+                array_uint64,
+                array_int8,
+                array_int16,
+                array_int32,
+                array_int64,
+                array_float32,
+                array_float64,
                 array_string,
                 array_opt_string,
             ),
@@ -7114,11 +6960,11 @@ impl ProtocolTwoWayArrayCompoundResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(array_bits, array_enum, array_struct, array_table, array_union);
         if r.is_err() {
@@ -7132,11 +6978,11 @@ impl ProtocolTwoWayArrayCompoundResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(array_bits, array_enum, array_struct, array_table, array_union);
         self.drop_without_shutdown();
@@ -7145,11 +6991,11 @@ impl ProtocolTwoWayArrayCompoundResponder {
 
     fn send_raw(
         &self,
-        mut array_bits: &mut [Bits; 5],
-        mut array_enum: &mut [Enum; 5],
-        mut array_struct: &mut [&mut Struct; 5],
-        mut array_table: &mut [Table; 5],
-        mut array_union: &mut [&mut Union; 5],
+        mut array_bits: &[Bits; 5],
+        mut array_enum: &[Enum; 5],
+        mut array_struct: &[Struct; 5],
+        mut array_table: &[Table; 5],
+        mut array_union: &[Union; 5],
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -7157,25 +7003,7 @@ impl ProtocolTwoWayArrayCompoundResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (
-                &*array_bits,
-                &*array_enum,
-                &{
-                    let mut temp: [Struct; 5] = fidl::new_empty!(fidl::encoding::Array<Struct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-                &*array_table,
-                &{
-                    let mut temp: [Union; 5] = fidl::new_empty!(fidl::encoding::Array<Union, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = x.clone();
-                    }
-                    temp
-                },
-            ),
+            body: (array_bits, array_enum, array_struct, array_table, array_union),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -7730,11 +7558,11 @@ impl ProtocolTwoWayResourceResponder {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -7802,11 +7630,11 @@ impl ProtocolTwoWayResourceResponder {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -7869,11 +7697,11 @@ impl ProtocolTwoWayResourceResponder {
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
-        mut array_client_end: &mut [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        mut array_server_end: &mut [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        mut array_struct: &mut [&mut ResourceStruct; 5],
-        mut array_table: &mut [ResourceTable; 5],
-        mut array_union: &mut [&mut ResourceUnion; 5],
+        mut array_client_end: [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+        mut array_server_end: [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+        mut array_struct: [ResourceStruct; 5],
+        mut array_table: [ResourceTable; 5],
+        mut array_union: [ResourceUnion; 5],
         mut vector_handle: &mut dyn ExactSizeIterator<Item = fidl::Handle>,
         mut vector_vmo: &mut dyn ExactSizeIterator<Item = fidl::Vmo>,
         mut vector_client_end: &mut dyn ExactSizeIterator<
@@ -7908,25 +7736,11 @@ impl ProtocolTwoWayResourceResponder {
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
-                &mut *array_client_end,
-                &mut *array_server_end,
-                &mut {
-                    let mut temp: [ResourceStruct; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceStruct, 5>);
-                    for (i, x) in array_struct.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceStruct));
-                    }
-                    temp
-                },
-                &mut *array_table,
-                &mut {
-                    let mut temp: [ResourceUnion; 5] =
-                        fidl::new_empty!(fidl::encoding::Array<ResourceUnion, 5>);
-                    for (i, x) in array_union.iter_mut().enumerate() {
-                        temp[i] = std::mem::replace(x, fidl::new_empty!(ResourceUnion));
-                    }
-                    temp
-                },
+                &mut array_client_end,
+                &mut array_server_end,
+                &mut array_struct,
+                &mut array_table,
+                &mut array_union,
                 fidl::encoding::Iterator(vector_handle),
                 fidl::encoding::Iterator(vector_vmo),
                 fidl::encoding::Iterator(vector_client_end),

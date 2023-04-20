@@ -20,7 +20,6 @@ use {
     remote_block_device::{BlockFifoRequest, BlockFifoResponse},
     std::{
         collections::{BTreeMap, HashMap},
-        convert::TryInto,
         hash::{Hash, Hasher},
         option::Option,
         sync::Mutex,
@@ -371,12 +370,9 @@ impl BlockServer {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
             VolumeAndNodeRequest::QuerySlices { start_slices, responder } => {
-                // Initialise slices with default value. `slices` will be converted to an array
-                // of size volume::MAX_SLICE_REQUESTS
-                let mut slices = vec![
-                    volume::VsliceRange { allocated: false, count: 0 };
-                    volume::MAX_SLICE_REQUESTS as usize
-                ];
+                // Initialise slices with default value.
+                let default = volume::VsliceRange { allocated: false, count: 0 };
+                let mut slices = [default; volume::MAX_SLICE_REQUESTS as usize];
 
                 let mut status = zx::sys::ZX_OK;
                 let mut response_count = 0;
@@ -393,11 +389,7 @@ impl BlockServer {
                         }
                     }
                 }
-
-                // Create a vector with the mutable reference to each element in the vector
-                // `slices`, then convert this vector into an array to send to the responder
-                let mut response = slices.iter_mut().collect::<Vec<_>>().try_into().unwrap();
-                responder.send(status, &mut response, response_count)?;
+                responder.send(status, &slices, response_count)?;
             }
             // TODO(fxbug.dev/89873): need to check if this returns the right information.
             VolumeAndNodeRequest::GetVolumeInfo { responder } => {

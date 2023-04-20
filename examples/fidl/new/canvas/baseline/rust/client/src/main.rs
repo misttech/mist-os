@@ -65,14 +65,14 @@ async fn main() -> Result<(), Error> {
             .collect::<Vec<Point>>();
 
         // Assemble a line from the two points.
-        let from = &mut points.pop().ok_or(format_err!("line requires 2 points, but has 0"))?;
-        let to = &mut points.pop().ok_or(format_err!("line requires 2 points, but has 1"))?;
-        let mut line: [&mut Point; 2] = [from, to];
+        let from = points.pop().ok_or(format_err!("line requires 2 points, but has 0"))?;
+        let to = points.pop().ok_or(format_err!("line requires 2 points, but has 1"))?;
+        let line = [from, to];
 
         // Draw a line to the canvas by calling the server, using the two points we just parsed
         // above as arguments.
-        instance.add_line(&mut line)?;
-        println!("AddLine request sent: {:?}", &mut line);
+        instance.add_line(&line)?;
+        println!("AddLine request sent: {:?}", line);
     }
 
     // TODO(fxbug.dev/76579): We need to sleep here to make sure all logs get drained. Once the

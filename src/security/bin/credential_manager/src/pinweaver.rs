@@ -230,7 +230,7 @@ impl<D: Diagnostics> PinWeaverProtocol for PinWeaver<D> {
         &self,
         root_hash: &Hash,
     ) -> Result<Vec<fcr50::LogEntry>, PinWeaverProtocolError> {
-        let response = self.proxy.get_log(&mut root_hash.clone()).await?;
+        let response = self.proxy.get_log(root_hash).await?;
         self.diagnostics.pinweaver_outcome(
             PinweaverMethod::GetLog,
             response.as_ref().map(|_| ()).map_err(|e| *e),

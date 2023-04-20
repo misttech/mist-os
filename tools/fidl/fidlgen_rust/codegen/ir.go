@@ -791,16 +791,10 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		t.ElementType = &el
 		t.Fidl = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.Fidl, *val.ElementCount)
 		t.Owned = fmt.Sprintf("[%s; %d]", el.Owned, *val.ElementCount)
-		switch val.ElementType.Kind {
-		case fidlgen.StringType, fidlgen.HandleType, fidlgen.ArrayType, fidlgen.VectorType:
-			if el.IsResourceType() {
-				t.Param = t.Owned
-			} else {
-				t.Param = "&" + t.Owned
-			}
-		default:
-			// TODO(fxbug.dev/54368): This is the old type. Remove once the migration is done.
-			t.Param = fmt.Sprintf("&mut [%s; %d]", el.Param, *val.ElementCount)
+		if el.IsResourceType() {
+			t.Param = t.Owned
+		} else {
+			t.Param = "&" + t.Owned
 		}
 	case fidlgen.VectorType:
 		el := c.compileType(*val.ElementType)
@@ -939,20 +933,10 @@ func convertParamToEncodeExpr(v string, t Type) string {
 	case fidlgen.PrimitiveType, fidlgen.StringType, fidlgen.HandleType, fidlgen.RequestType:
 		return v
 	case fidlgen.ArrayType:
-		switch t.ElementType.Kind {
-		case fidlgen.StringType, fidlgen.HandleType, fidlgen.ArrayType, fidlgen.VectorType:
-			if t.IsResourceType() {
-				return "&mut " + v
-			}
-			return v
-		default:
-			// TODO(fxbug.dev/54368): This is for the old type. Remove once the migration is done.
-			owned := convertMutRefParamToOwned(v, t)
-			if t.IsResourceType() {
-				return "&mut " + owned
-			}
-			return "&" + owned
+		if t.IsResourceType() {
+			return "&mut " + v
 		}
+		return v
 	case fidlgen.VectorType:
 		switch t.ElementType.Kind {
 		case fidlgen.PrimitiveType, fidlgen.ArrayType, fidlgen.VectorType:
@@ -964,8 +948,6 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		// (Converting from Item=T to Item=&T requires a lending iterator.)
 		if t.ElementType.Kind == fidlgen.IdentifierType && t.ElementType.DeclType == fidlgen.TableDeclType {
 			inner = "x"
-		} else if t.ElementType.Kind == fidlgen.ArrayType {
-			inner = convertMutRefParamToOwned("x", *t.ElementType)
 		} else {
 			inner = convertParamToEncodeExpr("x", *t.ElementType)
 		}
@@ -1010,63 +992,6 @@ func convertParamToEncodeExpr(v string, t Type) string {
 				return v + ".as_ref()"
 			}
 			return "&" + v
-		default:
-			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
-		}
-	default:
-		panic(fmt.Sprintf("unknown type kind: %v", t.Kind))
-	}
-}
-
-// convertMutRefParamToOwned returns an expression that converts a variable v
-// from &mut t.Param to t.Owned. It assumes that the t.Param value can be moved
-// from, i.e. it returns *v if t.Param and t.Owned are the same.
-//
-// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
-// complete. This is only needed for arrays in convertParamToEncodeExpr.
-func convertMutRefParamToOwned(v string, t Type) string {
-	switch t.Kind {
-	case fidlgen.PrimitiveType, fidlgen.HandleType, fidlgen.RequestType:
-		return "*" + v
-	case fidlgen.StringType:
-		if t.Nullable {
-			return v + ".map(str::to_string)"
-		}
-		return v + ".to_string()"
-	case fidlgen.ArrayType:
-		inner := convertMutRefParamToOwned("x", *t.ElementType)
-		if inner == "*x" {
-			return "*" + v
-		}
-		return fmt.Sprintf(`{
-	let mut temp: %s = fidl::new_empty!(%s);
-	for (i, x) in %s.iter_mut().enumerate() {
-		temp[i] = %s;
-	}
-	temp
-}`,
-			t.Owned, t.Fidl, v, inner)
-	case fidlgen.VectorType:
-		inner := convertMutRefParamToOwned("x", *t.ElementType)
-		if t.Nullable {
-			return fmt.Sprintf("%s.map(|x| x.map(|ref mut x| %s).collect::<Vec<_>>())", v, inner)
-		}
-		return fmt.Sprintf("%s.map(|ref mut x| %s).collect::<Vec<_>>()", v, inner)
-	case fidlgen.IdentifierType:
-		switch t.DeclType {
-		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType, fidlgen.TableDeclType:
-			return "*" + v
-		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
-			if t.Nullable {
-				if t.IsResourceType() {
-					return fmt.Sprintf("%s.map(|x| Box::new(std::mem::replace(x, fidl::new_empty!(%s))))", v, t.Fidl)
-				}
-				return fmt.Sprintf("%s.map(|x| Box::new(x.clone()))", v)
-			}
-			if t.IsResourceType() {
-				return fmt.Sprintf("std::mem::replace(%s, fidl::new_empty!(%s))", v, t.Fidl)
-			}
-			return v + ".clone()"
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
 		}

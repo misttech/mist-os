@@ -16,7 +16,7 @@ use {
         ClosedTargetControllerRequestStream, ClosedTargetRequest, ClosedTargetRequestStream,
         ClosedTargetServerPair, ClosedTargetTwoWayResultRequest,
         ClosedTargetTwoWayTablePayloadResponse, ClosedTargetTwoWayUnionPayloadRequest,
-        ClosedTargetTwoWayUnionPayloadResponse, Elements, Empty, EncodingFailureKind,
+        ClosedTargetTwoWayUnionPayloadResponse, Empty, EncodingFailureKind,
         LargeMessageTargetControlHandle, LargeMessageTargetControllerControlHandle,
         LargeMessageTargetControllerRequestStream, LargeMessageTargetOneWayMethod,
         LargeMessageTargetRequest, LargeMessageTargetRequestStream, LargeMessageTargetServerPair,
@@ -424,28 +424,17 @@ async fn run_large_message_target_server(
             }
             LargeMessageTargetRequest::EncodeUnboundedMaybeLargeResource {
                 populate_unset_handles,
-                mut data,
+                data,
                 responder,
             } => {
-                let mut elements = TryInto::<[&mut Elements; 64]>::try_into(
-                    data.elements
-                        .iter_mut()
-                        .map(|element| {
-                            if populate_unset_handles {
-                                match element.handle {
-                                    None => {
-                                        element.handle = Some(Event::create().into());
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            element
-                        })
-                        .collect::<Vec<&mut Elements>>(),
-                )
-                .unwrap();
+                let mut elements = data.elements;
+                if populate_unset_handles {
+                    for element in elements.iter_mut() {
+                        element.handle.get_or_insert_with(|| Event::create().into());
+                    }
+                }
 
-                if let Err(err) = responder.send(&mut elements) {
+                if let Err(err) = responder.send(elements) {
                     match err {
                         fidl::Error::LargeMessage64Handles => ctl_handle
                             .send_reply_encoding_failed(EncodingFailureKind::LargeMessage64Handles)
