@@ -57,7 +57,7 @@ class DeviceInterface {
   virtual zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) = 0;
 
   virtual zx_status_t SetChannel(wlan_channel_t channel) = 0;
-  virtual zx_status_t SetStatus(uint32_t status) = 0;
+  virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
   virtual zx_status_t JoinBss(join_bss_request_t* cfg) = 0;
   virtual zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) = 0;
   virtual zx_status_t DisableBeaconing() = 0;

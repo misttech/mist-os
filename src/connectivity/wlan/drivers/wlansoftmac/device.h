@@ -87,7 +87,7 @@ class Device : public DeviceInterface,
       __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) final;
   zx_status_t SetChannel(wlan_channel_t channel) final;
-  zx_status_t SetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
+  zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) final;
   zx_status_t DisableBeaconing() final;

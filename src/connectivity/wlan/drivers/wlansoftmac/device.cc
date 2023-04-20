@@ -128,7 +128,9 @@ zx_status_t WlanSoftmacHandle::Init() {
         auto pkt = FromRustOutBuf(buf);
         return DEVICE(device)->QueueTx(std::move(pkt), tx_info);
       },
-      .set_eth_status = [](void* device, uint32_t status) { DEVICE(device)->SetStatus(status); },
+      .set_ethernet_status = [](void* device, uint32_t status) -> zx_status_t {
+        return DEVICE(device)->SetEthernetStatus(status);
+      },
       .get_wlan_channel = [](void* device) -> wlan_channel_t {
         return DEVICE(device)->GetState()->channel();
       },
@@ -183,8 +185,6 @@ zx_status_t WlanSoftmacHandle::Init() {
       .disable_beaconing = [](void* device) -> zx_status_t {
         return DEVICE(device)->DisableBeaconing();
       },
-      .set_link_status = [](void* device,
-                            uint8_t status) { return DEVICE(device)->SetStatus(status); },
       .notify_association_complete = [](void* device, wlan_association_config_t* assoc_cfg)
           -> zx_status_t { return DEVICE(device)->NotifyAssociationComplete(assoc_cfg); },
       .clear_association = [](void* device, const uint8_t(*addr)[6]) -> zx_status_t {
@@ -728,7 +728,7 @@ zx_status_t Device::SetChannel(wlan_channel_t channel) __TA_NO_THREAD_SAFETY_ANA
   return ZX_OK;
 }
 
-zx_status_t Device::SetStatus(uint32_t status) {
+zx_status_t Device::SetEthernetStatus(uint32_t status) {
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {
     ethernet_proxy_.Status(status);

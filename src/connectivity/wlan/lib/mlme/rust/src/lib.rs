@@ -97,8 +97,6 @@ pub enum DriverEvent {
     ScanComplete { status: zx::Status, scan_id: u64 },
     // Reports the result of an attempted frame transmission.
     TxStatusReport { tx_status: banjo_common::WlanTxStatus },
-    // Reports the current status of the vendor driver.
-    Status { status: u32 },
 }
 
 fn should_enable_minstrel(mac_sublayer: &banjo_common::MacSublayerSupport) -> bool {
@@ -215,9 +213,6 @@ async fn main_loop_impl<T: MlmeImpl>(
                         if let Some(minstrel) = minstrel.as_ref() {
                             minstrel.lock().handle_tx_status_report(&tx_status)
                         }
-                    }
-                    DriverEvent::Status { status } => {
-                        mlme_impl.access_device().set_eth_status(status)
                     }
                 },
                 None => bail!("Driver event stream terminated unexpectedly."),

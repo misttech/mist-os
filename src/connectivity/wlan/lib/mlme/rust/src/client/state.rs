@@ -352,7 +352,7 @@ impl Associating {
         sta.send_connect_conf_success(assoc_resp_hdr.aid, &elements[..]);
         let controlled_port_open = !sta.sta.eapol_required();
         if controlled_port_open {
-            if let Err(e) = sta.ctx.device.set_eth_link_up() {
+            if let Err(e) = sta.ctx.device.set_ethernet_up() {
                 // TODO(fxbug.dev/94009) - Consider returning an Err here.
                 error!("Cannot set ethernet to UP. Status: {}", e);
             }
@@ -770,7 +770,7 @@ impl Associated {
             return;
         }
         self.0.controlled_port_open = should_open_controlled_port;
-        if let Err(e) = sta.ctx.device.set_eth_link(req.state.into()) {
+        if let Err(e) = sta.ctx.device.set_ethernet_status(req.state.into()) {
             error!(
                 "Error setting Ethernet port to {}: {}",
                 if should_open_controlled_port { "OPEN" } else { "CLOSED" },
@@ -804,7 +804,7 @@ impl Associated {
     fn pre_leaving_associated_state(&mut self, sta: &mut BoundClient<'_>) {
         self.0.status_check_timeout.next_id.take();
         self.0.controlled_port_open = false;
-        if let Err(e) = sta.ctx.device.set_eth_link_down() {
+        if let Err(e) = sta.ctx.device.set_ethernet_down() {
             error!("Error disabling ethernet device offline: {}", e);
         }
     }
@@ -1936,7 +1936,7 @@ mod tests {
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device.assocs.len());
 
-        sta.ctx.device.set_eth_link_up().expect("should succeed");
+        sta.ctx.device.set_ethernet_up().expect("should succeed");
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::UP);
 
         let _joined = state.on_deauth_frame(
@@ -1980,7 +1980,7 @@ mod tests {
             .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device.assocs.len());
 
-        sta.ctx.device.set_eth_link_up().expect("should succeed");
+        sta.ctx.device.set_ethernet_up().expect("should succeed");
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::UP);
 
         let _authenticated = state.on_disassoc_frame(
@@ -3269,7 +3269,7 @@ mod tests {
         assert_eq!(1, m.fake_device.assocs.len());
 
         assert!(m.fake_device.join_bss_request.is_some());
-        sta.ctx.device.set_eth_link_up().expect("should succeed");
+        sta.ctx.device.set_ethernet_up().expect("should succeed");
         assert_eq!(crate::device::LinkStatus::UP, m.fake_device.link_status);
 
         let state = state.handle_mlme_req(&mut sta, fake_deauth_req());

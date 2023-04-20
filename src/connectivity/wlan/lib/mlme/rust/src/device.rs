@@ -24,7 +24,7 @@ use {
 pub use test_utils::*;
 
 #[derive(Debug, PartialEq)]
-pub struct LinkStatus(u8);
+pub struct LinkStatus(u32);
 impl LinkStatus {
     pub const DOWN: Self = Self(0);
     pub const UP: Self = Self(1);
@@ -109,8 +109,16 @@ impl Device {
         self.raw_device.queue_tx(0, buf, tx_info)
     }
 
-    pub fn set_eth_status(&self, status: u32) {
-        self.raw_device.set_eth_status(status);
+    pub fn set_ethernet_status(&self, status: LinkStatus) -> Result<(), zx::Status> {
+        self.raw_device.set_ethernet_status(status)
+    }
+
+    pub fn set_ethernet_up(&self) -> Result<(), zx::Status> {
+        self.set_ethernet_status(LinkStatus::UP)
+    }
+
+    pub fn set_ethernet_down(&self) -> Result<(), zx::Status> {
+        self.set_ethernet_status(LinkStatus::DOWN)
     }
 
     pub fn set_channel(&self, channel: banjo_common::WlanChannel) -> Result<(), zx::Status> {
@@ -177,18 +185,6 @@ impl Device {
         self.raw_device.disable_beaconing()
     }
 
-    pub fn set_eth_link(&self, status: LinkStatus) -> Result<(), zx::Status> {
-        self.raw_device.set_eth_link(status)
-    }
-
-    pub fn set_eth_link_up(&self) -> Result<(), zx::Status> {
-        self.raw_device.set_eth_link(LinkStatus::UP)
-    }
-
-    pub fn set_eth_link_down(&self) -> Result<(), zx::Status> {
-        self.raw_device.set_eth_link(LinkStatus::DOWN)
-    }
-
     pub fn notify_association_complete(
         &self,
         assoc_cfg: WlanAssociationConfig,
@@ -219,7 +215,6 @@ pub struct WlanSoftmacIfcProtocol<'a> {
 
 #[repr(C)]
 pub struct WlanSoftmacIfcProtocolOps {
-    status: extern "C" fn(ctx: &mut crate::DriverEventSink, status: u32),
     recv: extern "C" fn(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket),
     complete_tx: extern "C" fn(
         ctx: &'static mut crate::DriverEventSink,
@@ -231,10 +226,6 @@ pub struct WlanSoftmacIfcProtocolOps {
     scan_complete: extern "C" fn(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64),
 }
 
-#[no_mangle]
-extern "C" fn handle_status(ctx: &mut crate::DriverEventSink, status: u32) {
-    let _ = ctx.0.unbounded_send(crate::DriverEvent::Status { status });
-}
 #[no_mangle]
 extern "C" fn handle_recv(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket) {
     // TODO(fxbug.dev/29063): C++ uses a buffer allocator for this, determine if we need one.
@@ -272,7 +263,6 @@ extern "C" fn handle_scan_complete(ctx: &mut crate::DriverEventSink, status: i32
 }
 
 const PROTOCOL_OPS: WlanSoftmacIfcProtocolOps = WlanSoftmacIfcProtocolOps {
-    status: handle_status,
     recv: handle_recv,
     complete_tx: handle_complete_tx,
     report_tx_status: handle_report_tx_status,
@@ -386,7 +376,7 @@ pub struct DeviceInterface {
         tx_info: banjo_wlan_softmac::WlanTxInfo,
     ) -> i32,
     /// Reports the current status to the ethernet driver.
-    set_eth_status: extern "C" fn(device: *mut c_void, status: u32),
+    set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
     /// Returns the currently set WLAN channel.
     get_wlan_channel: extern "C" fn(device: *mut c_void) -> banjo_common::WlanChannel,
     /// Request the PHY to change its channel. If successful, get_wlan_channel will return the
@@ -436,8 +426,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Disable beaconing on the device.
     disable_beaconing: extern "C" fn(device: *mut c_void) -> i32,
-    /// Sets the link status to be UP or DOWN.
-    set_link_status: extern "C" fn(device: *mut c_void, status: u8) -> i32,
     /// Configure the association context.
     /// |assoc_cfg| is mutable because the underlying API does not take a const wlan_association_config_t.
     notify_association_complete:
@@ -469,8 +457,9 @@ impl DeviceInterface {
         zx::ok(status)
     }
 
-    fn set_eth_status(&self, status: u32) {
-        (self.set_eth_status)(self.device, status);
+    fn set_ethernet_status(&self, status: LinkStatus) -> Result<(), zx::Status> {
+        let status = (self.set_ethernet_status)(self.device, status.0);
+        zx::ok(status)
     }
 
     fn set_channel(&self, channel: banjo_common::WlanChannel) -> Result<(), zx::Status> {
@@ -575,11 +564,6 @@ impl DeviceInterface {
 
     fn disable_beaconing(&self) -> Result<(), zx::Status> {
         let status = (self.disable_beaconing)(self.device);
-        zx::ok(status)
-    }
-
-    fn set_eth_link(&self, status: LinkStatus) -> Result<(), zx::Status> {
-        let status = (self.set_link_status)(self.device, status.0);
         zx::ok(status)
     }
 
@@ -876,9 +860,7 @@ pub mod test_utils {
             zx::sys::ZX_OK
         }
 
-        pub extern "C" fn set_eth_status(_device: *mut c_void, _status: u32) {}
-
-        pub extern "C" fn set_link_status(device: *mut c_void, status: u8) -> i32 {
+        pub extern "C" fn set_ethernet_status(device: *mut c_void, status: u32) -> i32 {
             assert!(!device.is_null());
             // safe here because device_ptr always points to Self
             unsafe {
@@ -1084,7 +1066,7 @@ pub mod test_utils {
                 start: Self::start,
                 deliver_eth_frame: Self::deliver_eth_frame,
                 queue_tx: Self::queue_tx,
-                set_eth_status: Self::set_eth_status,
+                set_ethernet_status: Self::set_ethernet_status,
                 get_wlan_channel: Self::get_wlan_channel,
                 set_wlan_channel: Self::set_wlan_channel,
                 set_key: Self::set_key,
@@ -1099,7 +1081,6 @@ pub mod test_utils {
                 join_bss: Self::join_bss,
                 enable_beaconing: Self::enable_beaconing,
                 disable_beaconing: Self::disable_beaconing,
-                set_link_status: Self::set_link_status,
                 notify_association_complete: Self::notify_association_complete,
                 clear_association: Self::clear_association,
             }
@@ -1541,15 +1522,15 @@ mod tests {
     }
 
     #[test]
-    fn set_link_status() {
+    fn set_ethernet_status() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
-        dev.set_eth_link_up().expect("failed setting status");
+        dev.set_ethernet_up().expect("failed setting status");
         assert_eq!(fake_device.link_status, LinkStatus::UP);
 
-        dev.set_eth_link_down().expect("failed setting status");
+        dev.set_ethernet_down().expect("failed setting status");
         assert_eq!(fake_device.link_status, LinkStatus::DOWN);
     }
 

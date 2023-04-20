@@ -21,7 +21,6 @@
 typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 
 typedef struct {
-  void (*status)(void *ctx, uint32_t status);
   void (*recv)(void *ctx, const wlan_rx_packet_t *packet);
   void (*complete_tx)(void *ctx, const wlan_tx_packet_t *packet, int32_t status);
   void (*report_tx_status)(void *ctx, const wlan_tx_status_t *tx_status);
@@ -77,7 +76,7 @@ typedef struct {
   /**
    * Reports the current status to the ethernet driver.
    */
-  void (*set_eth_status)(void *device, uint32_t status);
+  int32_t (*set_ethernet_status)(void *device, uint32_t status);
   /**
    * Returns the currently set WLAN channel.
    */
@@ -143,9 +142,7 @@ typedef struct {
    */
   int32_t (*disable_beaconing)(void *device);
   /**
-   * Sets the link status to be UP or DOWN.
    */
-  int32_t (*set_link_status)(void *device, uint8_t status);
   /**
    * Notify about association completion.
    * |assoc_cfg| is mutable because the underlying API does not take a const
