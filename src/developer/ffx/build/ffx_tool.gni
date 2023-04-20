@@ -168,12 +168,11 @@ template("ffx_tool") {
           type = "ffx_tool"
           name = output_name
           root = "tools"
-          files = [
-            file_base,
-            file_base_metadata,
-          ]
-          executable = file_base
-          executable_metadata = file_base_metadata
+          files = {
+            executable = file_base
+            executable_metadata = file_base_metadata
+            support = []
+          }
         }
       }
 

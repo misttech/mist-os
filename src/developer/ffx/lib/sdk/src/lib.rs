@@ -231,7 +231,7 @@ impl Sdk {
     pub fn get_ffx_tool(&self, name: &str) -> Option<FfxToolFiles> {
         self.get_all_ffx_tools()
             .filter(|tool| tool.name == name)
-            .min_by_key(|tool| tool.executable.len())
+            .min_by_key(|tool| tool.files.executable.len()) // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
             .and_then(|tool| FfxToolFiles::from_metadata(self, tool).ok())
     }
 
@@ -333,8 +333,8 @@ pub fn in_tree_sdk_version() -> String {
 
 impl FfxToolFiles {
     fn from_metadata(sdk: &Sdk, tool: FfxTool) -> Result<Self> {
-        let executable = sdk.path_prefix.join(&sdk.get_real_path(&tool.executable)?);
-        let metadata = sdk.path_prefix.join(&sdk.get_real_path(&tool.executable_metadata)?);
+        let executable = sdk.path_prefix.join(&sdk.get_real_path(&tool.files.executable)?);
+        let metadata = sdk.path_prefix.join(&sdk.get_real_path(&tool.files.executable_metadata)?);
         Ok(Self { executable, metadata })
     }
 }
@@ -395,7 +395,7 @@ mod test {
     fn sdk_test_data_root() -> TempDir {
         let r = tempfile::tempdir().unwrap();
         put_file!(r, "../test_data/release-sdk-root", "fidl/fuchsia.data/meta.json");
-        put_file!(r, "../test_data/release-sdk-root", "ffx_tools/x64/ffx-assembly-meta.json");
+        put_file!(r, "../test_data/release-sdk-root", "tools/ffx_tools/ffx-assembly-meta.json");
         put_file!(r, "../test_data/release-sdk-root", "meta/manifest.json");
         put_file!(r, "../test_data/release-sdk-root", "tools/zxdb-meta.json");
         r
@@ -432,11 +432,11 @@ mod test {
             "//src/developer/ffx/plugins/assembly:sdk(//build/toolchain:host_x64)",
             atoms[3].gn_label
         );
-        assert_eq!("sdk://ffx_tools/x64/ffx-assembly", atoms[3].id);
+        assert_eq!("sdk://tools/ffx_tools/ffx-assembly", atoms[3].id);
         assert_eq!(ElementType::FfxTool, atoms[3].kind);
         assert_eq!(3, atoms[3].files.len());
         assert_eq!("host_x64/ffx-assembly", atoms[3].files[0].source);
-        assert_eq!("ffx_tools/x64/ffx-assembly", atoms[3].files[0].destination);
+        assert_eq!("tools/ffx_tools/ffx-assembly", atoms[3].files[0].destination);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -559,8 +559,8 @@ mod test {
         };
         let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
 
-        assert_eq!(sdk_root.join("ffx_tools/x64/ffx-assembly"), ffx_assembly.executable);
-        assert_eq!(sdk_root.join("ffx_tools/x64/ffx-assembly.json"), ffx_assembly.metadata);
+        assert_eq!(sdk_root.join("tools/ffx_tools/ffx-assembly"), ffx_assembly.executable);
+        assert_eq!(sdk_root.join("tools/ffx_tools/ffx-assembly.json"), ffx_assembly.metadata);
     }
 
     #[test]

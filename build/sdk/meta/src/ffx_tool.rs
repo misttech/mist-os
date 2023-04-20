@@ -30,10 +30,7 @@ pub struct FfxTool {
     pub root: File,
     #[serde(rename = "type")]
     pub kind: ElementType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub files: Option<Vec<String>>,
-    pub executable: File,
-    pub executable_metadata: File,
+    pub files: FfxToolFiles,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_files: Option<HashMap<CpuArchitecture, Vec<String>>>,
 }
@@ -45,6 +42,12 @@ impl JsonObject for FfxTool {
     fn get_referenced_schemata() -> &'static [&'static str] {
         &[crate::json::schema::COMMON, include_str!("../host_tool.json")]
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FfxToolFiles {
+    pub executable: File,
+    pub executable_metadata: File,
 }
 
 #[cfg(test)]
@@ -59,12 +62,14 @@ mod tests {
             "name": "foobar",
             "type": "ffx_tool",
             "root": "ffx_tools/foobar",
-            "files": [
-                "ffx_tools/foobar/one",
-                "ffx_tools/foobar/one.json"
-            ],
-            "executable": "ffx_tools/foobar/one",
-            "executable_metadata": "ffx_tools/foobar/one.json",
+            "files": {
+                "executable": "ffx_tools/foobar/one",
+                "executable_metadata": "ffx_tools/foobar/one.json",
+                "support": [
+                    "ffx_tools/foobar/one",
+                    "ffx_tools/foobar/one.json"
+                ]
+            },
             "target_files": {
                 "x64": [
                     "ffx_tools/foobar/foobar_x64"
@@ -83,12 +88,14 @@ mod tests {
             "name": "foobar",
             "type": "cc_prebuilt_library",
             "root": "tools/foobar",
-            "files": [
-                "tools/foobar/one",
-                "tools/foobar/two"
-            ],
-            "executable": "ffx_tools/foobar/one",
-            "executable_metadata": "ffx_tools/foobar/one.json",
+            "files": {
+                "executable": "ffx_tools/foobar/one",
+                "executable_metadata": "ffx_tools/foobar/one.json",
+                "support": [
+                    "tools/foobar/one",
+                    "tools/foobar/two"
+                ]
+            },
             "target_files": {
                 "x64": [
                     "tools/foobar/foobar_x64"

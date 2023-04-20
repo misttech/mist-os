@@ -7,21 +7,9 @@
         {
             "additionalProperties": false,
             "properties": {
-                "files": {
-                    "$ref": "host_tool.json#/definitions/fileGroup",
-                    "description": "The list of files pertaining to the element"
-                },
                 "name": {
                     "description": "Name of the ffx subtool",
                     "type": "string"
-                },
-                "executable": {
-                    "$ref": "common.json#/definitions/file",
-                    "description": "The path of the file that ffx should run to invoke the tool, must be listed in 'files'"
-                },
-                "executable_metadata": {
-                    "$ref": "common.json#/definitions/file",
-                    "description": "The path of the file that contains versioning information for ffx, must be listed in 'files'"
                 },
                 "root": {
                     "$ref": "common.json#/definitions/file",
@@ -44,6 +32,28 @@
                     },
                     "type": "object"
                 },
+                "files": {
+                    "description": "The files pertaining to the element",
+                    "properties": {
+                        "executable": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "The path of the file that ffx should run to invoke the tool."
+                        },
+                        "executable_metadata": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "The path of the file that contains versioning information for ffx."
+                        }
+                    },
+                    "required": [
+                        "executable",
+                        "executable_metadata"
+                    ],
+                    "additionalProperties": {
+                        "$ref": "host_tool.json#/definitions/fileGroup",
+                        "description": "Additional groups of files that may be used by this subtool. Must be lists of files."
+                    },
+                    "type": "object"
+                },
                 "type": {
                     "allOf": [
                         {
@@ -60,9 +70,7 @@
             "required": [
                 "root",
                 "name",
-                "type",
-                "executable",
-                "executable_metadata"
+                "type"
             ]
         }
     ],

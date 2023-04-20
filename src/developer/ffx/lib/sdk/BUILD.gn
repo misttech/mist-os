@@ -36,8 +36,8 @@ rustc_library("lib") {
     "test_data/core-sdk-root/host_x64/gen/tools/symbol-index/symbol_index_sdk_legacy.meta.json",
     "test_data/core-sdk-root/host_x64/gen/tools/symbol-index/symbol_index_sdk.meta.json",
     "test_data/release-sdk-root/fidl/fuchsia.data/meta.json",
-    "test_data/release-sdk-root/ffx_tools/x64/ffx-assembly-meta.json",
     "test_data/release-sdk-root/meta/manifest.json",
+    "test_data/release-sdk-root/tools/ffx_tools/ffx-assembly-meta.json",
     "test_data/release-sdk-root/tools/zxdb-meta.json",
   ]
 }

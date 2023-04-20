@@ -17,7 +17,7 @@
             "type": "host_tool"
         },
         {
-            "meta": "ffx_tools/x64/ffx-assembly-meta.json",
+            "meta": "tools/ffx_tools/ffx-assembly-meta.json",
             "type": "ffx_tool"
         }
     ],

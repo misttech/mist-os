@@ -59,22 +59,21 @@
         "deps": [],
         "files": [
             {
-            "destination": "ffx_tools/x64/ffx-assembly",
+            "destination": "tools/ffx_tools/ffx-assembly",
             "source": "host_x64/ffx-assembly"
             },
             {
-            "destination": "ffx_tools/x64/ffx-assembly.json",
+            "destination": "tools/ffx_tools/ffx-assembly.json",
             "source": "host_x64/ffx-assembly.json"
             },
             {
-            "destination": "ffx_tools/x64/ffx-assembly-meta.json",
+            "destination": "tools/ffx_tools/ffx-assembly-meta.json",
             "source": "host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json"
             }
         ],
         "gn-label": "//src/developer/ffx/plugins/assembly:sdk(//build/toolchain:host_x64)",
-        "id": "sdk://ffx_tools/x64/ffx-assembly",
-        "meta": "ffx_tools/x64/ffx-assembly-meta.json",
-        "plasa": [],
+        "id": "sdk://tools/ffx_tools/ffx-assembly",
+        "meta": "tools/ffx_tools/ffx-assembly-meta.json",
         "type": "ffx_tool"
         }
     ],
