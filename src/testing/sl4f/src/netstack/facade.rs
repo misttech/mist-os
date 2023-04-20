@@ -213,18 +213,22 @@ impl NetstackFacade {
                 .await?;
         let response = response.into_values().map(|properties| async {
             let fidl_fuchsia_net_interfaces_ext::Properties { id, .. } = &properties;
-            let mac = debug_interfaces.get_mac(*id).await?;
-            let mac = mac.map_err(|e| match e {
-                fidl_fuchsia_net_debug::InterfacesGetMacError::NotFound => {
-                    anyhow::anyhow!("interface with id={} not found", id)
+            match debug_interfaces.get_mac(*id).await? {
+                Ok(mac) => {
+                    let mac = mac.map(|boxed_mac| *boxed_mac);
+                    let view: Properties = (properties, mac).into();
+                    Ok::<_, Error>(Some(view))
                 }
-            })?;
-            let mac = mac.map(|box_| *box_);
-            let view = (properties, mac).into();
-            Ok::<_, Error>(view)
+                Err(fidl_fuchsia_net_debug::InterfacesGetMacError::NotFound) => {
+                    // Interface with given id not found; this occurs when state
+                    // is reported for an interface that has since been removed.
+                    Ok::<_, Error>(None)
+                }
+            }
         });
-        let mut response = futures::future::try_join_all(response).await?;
-        let () = response.sort_by_key(|Properties { id, .. }| *id);
+        let mut response: Vec<Properties> =
+            futures::future::try_join_all(response).await?.into_iter().filter_map(|r| r).collect();
+        let () = response.sort_by_key(|&Properties { id, .. }| id);
         Ok(response)
     }
 
