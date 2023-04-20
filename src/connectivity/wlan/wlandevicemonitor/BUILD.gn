@@ -162,6 +162,11 @@ fuchsia_component("wlandevicemonitor-test-component") {
 
 fuchsia_test_package("wlandevicemonitor-tests") {
   test_components = [ ":wlandevicemonitor-test-component" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 core_shard("wlandevicemonitor-core-shard") {
