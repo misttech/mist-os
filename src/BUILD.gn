@@ -57,6 +57,7 @@ group("tests_no_e2e") {
     "security:tests",
     "session:tests",
     "settings:tests",
+    "starnix:tests",
     "storage:tests",
     "sys:tests",
     "testing:tests",
