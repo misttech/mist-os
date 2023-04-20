@@ -27,16 +27,19 @@ const std::unique_ptr<BlobInfo> kTestBlobs[] = {
     GenerateRealisticBlob("", 1ul << 16),             // Realistic 64k blob
 };
 
-// TODO(fxbug.dev/62177): These tests require the decompressor sandbox mount option to be set.
-// TODO(fxbug.dev/115972): We need to add the ability to enable delivery blobs and streaming writes
-// at runtime in order for these tests to function properly.
+TestFilesystemOptions BlobfsWithOfflineCompression() {
+  TestFilesystemOptions blobfs_with_offline_compression = TestFilesystemOptions::DefaultBlobfs();
+  blobfs_with_offline_compression.allow_delivery_blobs = true;
+  return blobfs_with_offline_compression;
+}
+
 class DeliveryBlobIntegrationTest : public BaseBlobfsTest {
  protected:
-  DeliveryBlobIntegrationTest() : BaseBlobfsTest(TestFilesystemOptions::DefaultBlobfs()) {}
+  DeliveryBlobIntegrationTest() : BaseBlobfsTest(BlobfsWithOfflineCompression()) {}
 };
 
 // Verify we can write uncompressed delivery blobs.
-TEST_F(DeliveryBlobIntegrationTest, DISABLED_WriteUncompressed) {
+TEST_F(DeliveryBlobIntegrationTest, WriteUncompressed) {
   for (const std::unique_ptr<BlobInfo>& blob_info : kTestBlobs) {
     const auto blob_path = std::filesystem::path(fs().mount_path()) / blob_info->path;
     const auto delivery_path = GetDeliveryBlobPath(blob_path.c_str());
@@ -66,7 +69,7 @@ TEST_F(DeliveryBlobIntegrationTest, DISABLED_WriteUncompressed) {
 }
 
 // Verify we can write uncompressed delivery blobs.
-TEST_F(DeliveryBlobIntegrationTest, DISABLED_WriteCompressed) {
+TEST_F(DeliveryBlobIntegrationTest, WriteCompressed) {
   for (const std::unique_ptr<BlobInfo>& blob_info : kTestBlobs) {
     const auto blob_path = std::filesystem::path(fs().mount_path()) / blob_info->path;
     const auto delivery_path = GetDeliveryBlobPath(blob_path.c_str());
@@ -96,7 +99,7 @@ TEST_F(DeliveryBlobIntegrationTest, DISABLED_WriteCompressed) {
 }
 
 // Test opening of delivery blobs using different paths once written.
-TEST_F(DeliveryBlobIntegrationTest, DISABLED_PathHandling) {
+TEST_F(DeliveryBlobIntegrationTest, PathHandling) {
   const auto blob_path = std::filesystem::path(fs().mount_path()) / kNullBlobRoot;
   const auto delivery_path = GetDeliveryBlobPath(blob_path.c_str());
 

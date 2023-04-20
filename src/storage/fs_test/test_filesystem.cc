@@ -19,10 +19,14 @@ namespace fs_test {
 
 fs_management::MountOptions TestFilesystem::DefaultMountOptions() const {
   fs_management::MountOptions options;
+  // Blobfs-specific options:
   if (options_.blob_compression_algorithm) {
     options.write_compression_algorithm =
         blobfs::CompressionAlgorithmToString(*options_.blob_compression_algorithm);
   }
+  options.allow_delivery_blobs = options_.allow_delivery_blobs;
+
+  // Other filesystem options:
   if (GetTraits().uses_crypt)
     options.crypt_client = [] { return *GetCryptService(); };
   return options;

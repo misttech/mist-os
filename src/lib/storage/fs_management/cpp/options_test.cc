@@ -53,6 +53,7 @@ TEST(MountOptionsTest, AllOptionsSet) {
       .write_compression_level = 10,
       .cache_eviction_policy = "NEVER_EVICT",
       .fsck_after_every_transaction = true,
+      .allow_delivery_blobs = true,
   };
   std::vector<std::string> expected_argv = {kTestBinary,
                                             "--verbose",
@@ -64,7 +65,8 @@ TEST(MountOptionsTest, AllOptionsSet) {
                                             "10",
                                             "--eviction_policy",
                                             "NEVER_EVICT",
-                                            "--fsck_after_every_transaction"};
+                                            "--fsck_after_every_transaction",
+                                            "--allow_delivery_blobs"};
   fuchsia_fs_startup::wire::StartOptions expected_start_options{
       .read_only = true,
       .verbose = true,
@@ -72,6 +74,7 @@ TEST(MountOptionsTest, AllOptionsSet) {
       .write_compression_level = 10,
       .cache_eviction_policy_override =
           fuchsia_fs_startup::wire::EvictionPolicyOverride::kNeverEvict,
+      .allow_delivery_blobs = true,
   };
 
   ASSERT_EQ(options.as_argv(kTestBinary.c_str()), expected_argv);

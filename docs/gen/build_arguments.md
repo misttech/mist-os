@@ -421,17 +421,6 @@ From //boards/x64.gni:17
 
 From //build/images/filesystem_limits.gni:15
 
-### blobfs_enable_streaming_writes
-
-Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
-by setting the `streaming_writes` option when mounting Blobfs (e.g. for unit tests).
-
-Streaming writes are only supported when writing delivery blobs or when compression is disabled.
-
-**Current value (from the default):** `false`
-
-From //src/storage/blobfs/BUILD.gn:14
-
 ### blobfs_maximum_runtime_bytes
 
 blobfs_maximum_runtime_bytes is an upper bound on the partition size on the device. Partitions
@@ -460,7 +449,7 @@ metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:19
+From //src/storage/blobfs/BUILD.gn:17
 
 ### blobfs_product_maximum_bytes
 
