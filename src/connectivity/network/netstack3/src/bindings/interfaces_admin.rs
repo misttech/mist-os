@@ -1045,6 +1045,7 @@ fn add_address(
         let worker = fasync::Task::spawn(run_address_state_provider(
             ctx.clone(),
             addr_subnet_either,
+            params.add_subnet_route.unwrap_or(false),
             id,
             control_handle,
             req_stream,
@@ -1066,6 +1067,7 @@ fn add_address(
 async fn run_address_state_provider(
     ctx: Ctx,
     addr_subnet_either: AddrSubnetEither,
+    add_subnet_route: bool,
     id: BindingId,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
     req_stream: fnet_interfaces_admin::AddressStateProviderRequestStream,
@@ -1076,7 +1078,12 @@ async fn run_address_state_provider(
         fnet_interfaces_admin::AddressRemovalReason,
     >,
 ) {
-    let address = addr_subnet_either.addr();
+    let (address, subnet) = addr_subnet_either.addr_subnet();
+    struct StateInCore {
+        address: bool,
+        subnet_route: bool,
+    }
+
     // Add the address to Core. Note that even though we verified the address
     // was absent from `ctx` before spawning this worker, it's still possible
     // for the address to exist in core (e.g. auto-configured addresses such as
@@ -1087,7 +1094,7 @@ async fn run_address_state_provider(
         let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
         netstack3_core::add_ip_addr_subnet(sync_ctx, non_sync_ctx, &device_id, addr_subnet_either)
     };
-    let should_remove_from_core = match add_to_core_result {
+    let state_to_remove_from_core = match add_to_core_result {
         Err(netstack3_core::error::ExistsError) => {
             close_address_state_provider(
                 *address,
@@ -1097,9 +1104,35 @@ async fn run_address_state_provider(
             );
             // The address already existed, so don't attempt to remove it.
             // Otherwise we would accidentally remove an address we didn't add!
-            false
+            StateInCore { address: false, subnet_route: false }
         }
         Ok(()) => {
+            let state_to_remove = if add_subnet_route {
+                let mut ctx = ctx.clone();
+                let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+                let core_id = non_sync_ctx
+                    .devices
+                    .get_core_id(id)
+                    .expect("missing device info for interface");
+                match netstack3_core::add_route(
+                    sync_ctx,
+                    non_sync_ctx,
+                    netstack3_core::ip::types::AddableEntryEither::without_gateway(
+                        subnet,
+                        core_id,
+                        netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                    ),
+                ) {
+                    Ok(()) => StateInCore { address: true, subnet_route: true },
+                    Err(e) => {
+                        log::warn!("failed to add subnet route {}: {}", addr_subnet_either, e);
+                        StateInCore { address: true, subnet_route: false }
+                    }
+                }
+            } else {
+                StateInCore { address: true, subnet_route: false }
+            };
+
             // Receive the initial assignment state from Core. The message
             // must already be in the channel, so don't await.
             let initial_assignment_state = assignment_state_receiver
@@ -1107,6 +1140,7 @@ async fn run_address_state_provider(
                 .now_or_never()
                 .expect("receiver unexpectedly empty")
                 .expect("sender unexpectedly closed");
+
             // Run the `AddressStateProvider` main loop.
             // Pass in the `assignment_state_receiver` and `stop_receiver` by
             // ref so that they don't get dropped after the main loop exits
@@ -1122,8 +1156,10 @@ async fn run_address_state_provider(
             )
             .await
             {
-                AddressNeedsExplicitRemovalFromCore::Yes => true,
-                AddressNeedsExplicitRemovalFromCore::No => false,
+                AddressNeedsExplicitRemovalFromCore::Yes => state_to_remove,
+                AddressNeedsExplicitRemovalFromCore::No => {
+                    StateInCore { address: false, ..state_to_remove }
+                }
             }
         }
     };
@@ -1143,8 +1179,29 @@ async fn run_address_state_provider(
                 panic!("`AddressInfo` unexpectedly missing for {:?}", address)
             }
         };
-    if should_remove_from_core {
-        let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
+
+    let StateInCore { address: remove_address, subnet_route: remove_subnet_route } =
+        state_to_remove_from_core;
+    let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
+    if remove_subnet_route {
+        // TODO(https://fxbug.dev/123319): Migrate away from the
+        // `add_subnet_route` flag and only remove the route when the
+        // last handle for it is gone.
+        //
+        // The `add_subnet_route` flag is deprecated and is only being
+        // used to support the DHCP client. Once the new routes admin
+        // API is implemented, the flag will be removed and its usages
+        // will be migrated. Until then, provide best-effort support
+        // without complex reference counting.
+        netstack3_core::del_route(sync_ctx, non_sync_ctx, subnet).unwrap_or_else(|e| {
+            log::warn!(
+                "failed to remove route for {} added via add_subnet_route: {}",
+                addr_subnet_either,
+                e
+            )
+        })
+    }
+    if remove_address {
         assert_matches!(
             netstack3_core::del_ip_addr(sync_ctx, non_sync_ctx, &device_id, address),
             Ok(())

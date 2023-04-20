@@ -488,9 +488,16 @@ async fn duplicate_watch_address_assignment_state<N: Netstack>(name: &str, detac
     );
 }
 
-#[netstack_test]
-async fn add_address_success<N: Netstack>(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("new sandbox");
+/// Creates a realm in the provided sandbox and an interface in that realm.
+async fn create_realm_and_interface<'a, N: Netstack>(
+    name: &'a str,
+    sandbox: &'a netemul::TestSandbox,
+) -> (
+    netemul::TestRealm<'a>,
+    fidl_fuchsia_net_interfaces::StateProxy,
+    u64,
+    fidl_fuchsia_net_interfaces_ext::admin::Control,
+) {
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
     let interface_state = realm
@@ -505,7 +512,7 @@ async fn add_address_success<N: Netstack>(name: &str) {
     .await
     .expect("initial");
     assert_eq!(interfaces.len(), 1);
-    let id = interfaces
+    let id = *interfaces
         .keys()
         .next()
         .expect("interface properties map unexpectedly does not include loopback");
@@ -516,138 +523,210 @@ async fn add_address_success<N: Netstack>(name: &str) {
 
     let (control, server) = fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
         .expect("create Control proxy");
-    let () = debug_control.get_admin(*id, server).expect("get admin");
+    debug_control.get_admin(id, server).expect("get admin");
 
-    const VALID_ADDRESS_PARAMETERS: fidl_fuchsia_net_interfaces_admin::AddressParameters =
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY;
+    (realm, interface_state, id, control)
+}
+
+async fn ipv4_routing_table(
+    realm: &netemul::TestRealm<'_>,
+) -> Vec<fnet_routes_ext::InstalledRoute<Ipv4>> {
+    let state_v4 =
+        realm.connect_to_protocol::<fnet_routes::StateV4Marker>().expect("connect to protocol");
+    let stream = fnet_routes_ext::event_stream_from_state::<Ipv4>(&state_v4)
+        .expect("failed to connect to watcher");
+    futures::pin_mut!(stream);
+    fnet_routes_ext::collect_routes_until_idle::<_, Vec<_>>(stream)
+        .await
+        .expect("failed to get routing table")
+}
+
+enum AddressRemoval {
+    DropHandle,
+    CallRemove,
+}
+use AddressRemoval::*;
+
+#[netstack_test]
+#[test_case(None, false, CallRemove; "default add_subnet_route explicit remove")]
+#[test_case(None, false, DropHandle; "default add_subnet_route implicit remove")]
+#[test_case(Some(false), false, CallRemove; "add_subnet_route is false explicit remove")]
+#[test_case(Some(false), false, DropHandle; "add_subnet_route is false implicit remove")]
+#[test_case(Some(true), true, CallRemove; "add_subnet_route is true explicit remove")]
+#[test_case(Some(true), true, DropHandle; "add_subnet_route is true implicit remove")]
+async fn add_address_and_remove<N: Netstack>(
+    name: &str,
+    add_subnet_route: Option<bool>,
+    expect_subnet_route: bool,
+    remove_address: AddressRemoval,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("new sandbox");
+    let (realm, interface_state, id, control) =
+        create_realm_and_interface::<N>(name, &sandbox).await;
 
     // Adding a valid address succeeds.
-    {
-        let subnet = fidl_subnet!("1.1.1.1/32");
-        let address_state_provider =
-            interfaces::add_address_wait_assigned(&control, subnet, VALID_ADDRESS_PARAMETERS)
-                .await
-                .expect("add address failed unexpectedly");
+    let subnet = fidl_subnet!("1.1.1.1/32");
+    let address_state_provider = interfaces::add_address_wait_assigned(
+        &control,
+        subnet,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route,
+            ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
+        },
+    )
+    .await
+    .expect("add address failed unexpectedly");
 
-        let ipv4_routing_table = {
-            let state_v4 = realm
-                .connect_to_protocol::<fnet_routes::StateV4Marker>()
-                .expect("connect to protocol");
-            let stream = fnet_routes_ext::event_stream_from_state::<Ipv4>(&state_v4)
-                .expect("failed to connect to watcher");
-            futures::pin_mut!(stream);
-            fnet_routes_ext::collect_routes_until_idle::<_, Vec<_>>(stream)
-                .await
-                .expect("failed to get routing table")
-        };
-        // Ensure that no route to the subnet was added as a result of adding
-        // the address.
-        let subnet_route_is_missing = ipv4_routing_table.iter().all(|route| {
-            <net_types::ip::Subnet<net_types::ip::Ipv4Addr> as IntoExt<fnet::Subnet>>::into_ext(
-                route.route.destination,
-            ) != subnet
-        });
-        assert!(subnet_route_is_missing);
+    // Ensure that a subnet route was added if requested.
+    let subnet_route_is_present = ipv4_routing_table(&realm).await.iter().any(|route| {
+        <net_types::ip::Subnet<net_types::ip::Ipv4Addr> as IntoExt<fnet::Subnet>>::into_ext(
+            route.route.destination,
+        ) == subnet
+    });
+    assert_eq!(subnet_route_is_present, expect_subnet_route);
 
-        let event_stream =
-            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-                .expect("event stream from state");
-        futures::pin_mut!(event_stream);
-        let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(*id);
-        let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-            event_stream.by_ref(),
-            &mut properties,
-            |fidl_fuchsia_net_interfaces_ext::Properties {
-                 id: _,
-                 name: _,
-                 device_class: _,
-                 online: _,
-                 addresses,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-             }| {
-                addresses
-                    .iter()
-                    .any(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                        addr == subnet
-                    })
-                    .then(|| ())
-            },
-        )
-        .await
-        .expect("wait for address presence");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
+        .expect("event stream from state");
+    futures::pin_mut!(event_stream);
+    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id);
+    let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        event_stream.by_ref(),
+        &mut properties,
+        |fidl_fuchsia_net_interfaces_ext::Properties {
+             id: _,
+             name: _,
+             device_class: _,
+             online: _,
+             addresses,
+             has_default_ipv4_route: _,
+             has_default_ipv6_route: _,
+         }| {
+            addresses
+                .iter()
+                .any(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                    addr == subnet
+                })
+                .then(|| ())
+        },
+    )
+    .await
+    .expect("wait for address presence");
 
-        // Explicitly drop the AddressStateProvider channel to cause address deletion.
-        std::mem::drop(address_state_provider);
+    match remove_address {
+        AddressRemoval::DropHandle => {
+            // Explicitly drop the AddressStateProvider channel to cause address deletion.
+            std::mem::drop(address_state_provider);
 
-        let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-            event_stream.by_ref(),
-            &mut properties,
-            |fidl_fuchsia_net_interfaces_ext::Properties {
-                 id: _,
-                 name: _,
-                 device_class: _,
-                 online: _,
-                 addresses,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-             }| {
-                addresses
-                    .iter()
-                    .all(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                        addr != subnet
-                    })
-                    .then(|| ())
-            },
-        )
-        .await
-        .expect("wait for address absence");
+            let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+                event_stream.by_ref(),
+                &mut properties,
+                |fidl_fuchsia_net_interfaces_ext::Properties {
+                     id: _,
+                     name: _,
+                     device_class: _,
+                     online: _,
+                     addresses,
+                     has_default_ipv4_route: _,
+                     has_default_ipv6_route: _,
+                 }| {
+                    addresses
+                        .iter()
+                        .all(
+                            |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                                addr != subnet
+                            },
+                        )
+                        .then(|| ())
+                },
+            )
+            .await
+            .expect("wait for address absence");
+        }
+        AddressRemoval::CallRemove => {
+            assert_eq!(
+                control.remove_address(&mut subnet.clone()).await.expect("fidl success"),
+                Ok(true)
+            )
+        }
     }
 
-    // Adding a valid address and detaching does not cause the address to be
-    // removed.
-    {
-        let subnet = fidl_subnet!("2.2.2.2/32");
-        let address_state_provider =
-            interfaces::add_address_wait_assigned(&control, subnet, VALID_ADDRESS_PARAMETERS)
-                .await
-                .expect("add address failed unexpectedly");
+    // In either case, there should be no route for the subnet after the
+    // address is removed.
+    let routes = ipv4_routing_table(&realm).await;
+    let subnet_route_is_present = routes.iter().any(|route| {
+        <net_types::ip::Subnet<net_types::ip::Ipv4Addr> as IntoExt<fnet::Subnet>>::into_ext(
+            route.route.destination,
+        ) == subnet
+    });
+    assert_eq!(subnet_route_is_present, false, "found subnet route in {:?}", routes);
+}
 
-        let () = address_state_provider
-            .detach()
-            .expect("FIDL error calling fuchsia.net.interfaces.admin/Control.Detach");
+#[netstack_test]
+#[test_case(None, false; "default add_subnet_route")]
+#[test_case(Some(false), false; "add_subnet_route is false")]
+#[test_case(Some(true), true; "add_subnet_route is true")]
+async fn add_address_and_detach<N: Netstack>(
+    name: &str,
+    add_subnet_route: Option<bool>,
+    expect_subnet_route: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("new sandbox");
+    let (realm, interface_state, id, control) =
+        create_realm_and_interface::<N>(name, &sandbox).await;
 
-        std::mem::drop(address_state_provider);
+    // Adding a valid address and detaching does not cause the address (or the
+    // subnet, if one was requested) to be removed.
+    let subnet = fidl_subnet!("2.2.2.2/32");
+    let address_state_provider = interfaces::add_address_wait_assigned(
+        &control,
+        subnet,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route,
+            ..fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY
+        },
+    )
+    .await
+    .expect("add address failed unexpectedly");
 
-        let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(*id);
-        let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-            fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
-                .expect("get interface event stream"),
-            &mut properties,
-            |fidl_fuchsia_net_interfaces_ext::Properties {
-                 id: _,
-                 name: _,
-                 device_class: _,
-                 online: _,
-                 addresses,
-                 has_default_ipv4_route: _,
-                 has_default_ipv6_route: _,
-             }| {
-                addresses
-                    .iter()
-                    .all(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
-                        addr != subnet
-                    })
-                    .then(|| ())
-            },
-        )
-        .map_ok(|()| panic!("address deleted after detaching and closing channel"))
-        .on_timeout(fuchsia_async::Time::after(fuchsia_zircon::Duration::from_millis(100)), || {
-            Ok(())
-        })
-        .await
-        .expect("wait for address to not be removed");
-    }
+    let () = address_state_provider
+        .detach()
+        .expect("FIDL error calling fuchsia.net.interfaces.admin/Control.Detach");
+
+    std::mem::drop(address_state_provider);
+
+    let mut properties = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(id);
+    let () = fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
+            .expect("get interface event stream"),
+        &mut properties,
+        |fidl_fuchsia_net_interfaces_ext::Properties {
+             id: _,
+             name: _,
+             device_class: _,
+             online: _,
+             addresses,
+             has_default_ipv4_route: _,
+             has_default_ipv6_route: _,
+         }| {
+            addresses
+                .iter()
+                .all(|&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until: _ }| {
+                    addr != subnet
+                })
+                .then(|| ())
+        },
+    )
+    .map_ok(|()| panic!("address deleted after detaching and closing channel"))
+    .on_timeout(fuchsia_async::Time::after(fuchsia_zircon::Duration::from_millis(100)), || Ok(()))
+    .await
+    .expect("wait for address to not be removed");
+
+    let subnet_route_is_still_present = ipv4_routing_table(&realm).await.iter().any(|route| {
+        <net_types::ip::Subnet<net_types::ip::Ipv4Addr> as IntoExt<fnet::Subnet>>::into_ext(
+            route.route.destination,
+        ) == subnet
+    });
+    assert_eq!(subnet_route_is_still_present, expect_subnet_route);
 }
 
 #[netstack_test]
