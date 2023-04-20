@@ -1154,6 +1154,8 @@ void Dispatcher::DispatchCallbacks(std::unique_ptr<EventWaiter> event_waiter,
     IdleCheckLocked();
   });
 
+  uint32_t num_callbacks_dispatched = 0;
+
   fbl::DoublyLinkedList<std::unique_ptr<CallbackRequest>> to_call;
   {
     fbl::AutoLock lock(&callback_lock_);
@@ -1170,27 +1172,8 @@ void Dispatcher::DispatchCallbacks(std::unique_ptr<EventWaiter> event_waiter,
     }
     dispatching_sync_ = true;
 
-    // For synchronized dispatchers, cancellation of ChannelReads are guaranteed to succeed.
-    // Since cancellation may be called from the ChannelRead, or from another async operation
-    // (like a task), we need to make sure that if we are calling an async operation
-    // that is the only callback request pulled from the callback queue.
-    // This will guarantee that cancellation will always succeed without having to lock
-    // |to_call|.
-    bool has_async_op = false;
-    uint32_t n = 0;
-    while ((n < kBatchSize) && !callback_queue_.is_empty() && !has_async_op) {
-      std::unique_ptr<CallbackRequest> callback_request = callback_queue_.pop_front();
-      ZX_ASSERT(callback_request);
-      has_async_op = !unsynchronized_ && callback_request->has_async_operation();
-      // For synchronized dispatchers, an async operation should be the only member in
-      // |to_call|.
-      if (has_async_op && n > 0) {
-        callback_queue_.push_front(std::move(callback_request));
-        break;
-      }
-      to_call.push_back(std::move(callback_request));
-      n++;
-    }
+    num_callbacks_dispatched += TakeNextCallbacks(&to_call);
+
     // Check if there are callbacks left to process and we should wake up an additional
     // thread. For synchronized dispatchers, parallel callbacks are disallowed.
     if (unsynchronized_ && !callback_queue_.is_empty()) {
@@ -1201,26 +1184,64 @@ void Dispatcher::DispatchCallbacks(std::unique_ptr<EventWaiter> event_waiter,
     }
   }
 
-  // Call the callbacks outside of the lock.
-  while (!to_call.is_empty()) {
-    auto callback_request = to_call.pop_front();
-    ZX_ASSERT(callback_request);
-    DispatchCallback(std::move(callback_request));
-  }
+  while (true) {
+    // Call the callbacks outside of the lock.
+    while (!to_call.is_empty()) {
+      auto callback_request = to_call.pop_front();
+      ZX_ASSERT(callback_request);
+      DispatchCallback(std::move(callback_request));
+    }
 
-  {
-    fbl::AutoLock lock(&callback_lock_);
-    // If we woke up an additional thread, that thread will update the
-    // event waiter signals as necessary.
-    if (!event_waiter) {
+    {
+      fbl::AutoLock lock(&callback_lock_);
+      // Check if there are any more callbacks to dispatch. This may be the case
+      // if we were dispatching an async operation, or if the user queued more
+      // operations during the last callback.
+      if (!callback_queue_.is_empty() && (num_callbacks_dispatched < kBatchSize)) {
+        num_callbacks_dispatched += TakeNextCallbacks(&to_call);
+        // Time to dispatch more callbacks.
+        continue;
+      }
+
+      // If we woke up an additional thread, that thread will update the
+      // event waiter signals as necessary.
+      if (!event_waiter) {
+        return;
+      }
+      dispatching_sync_ = false;
+      ResetTimerLocked();
+      if (callback_queue_.is_empty() && event_waiter->signaled()) {
+        event_waiter->designal();
+      }
       return;
     }
-    dispatching_sync_ = false;
-    ResetTimerLocked();
-    if (callback_queue_.is_empty() && event_waiter->signaled()) {
-      event_waiter->designal();
-    }
   }
+}
+
+uint32_t Dispatcher::TakeNextCallbacks(
+    fbl::DoublyLinkedList<std::unique_ptr<CallbackRequest>>* out_callbacks) {
+  // For synchronized dispatchers, cancellation of ChannelReads are guaranteed to succeed.
+  // Since cancellation may be called from the ChannelRead, or from another async operation
+  // (like a task), we need to make sure that if we are calling an async operation
+  // that is the only callback request pulled from the callback queue.
+  // This will guarantee that cancellation will always succeed without having to lock
+  // |to_call|.
+  bool has_async_op = false;
+  uint32_t n = 0;
+  while ((n < kBatchSize) && !callback_queue_.is_empty() && !has_async_op) {
+    std::unique_ptr<CallbackRequest> callback_request = callback_queue_.pop_front();
+    ZX_ASSERT(callback_request);
+    has_async_op = !unsynchronized_ && callback_request->has_async_operation();
+    // For synchronized dispatchers, an async operation should be the only member in
+    // |to_call|.
+    if (has_async_op && n > 0) {
+      callback_queue_.push_front(std::move(callback_request));
+      break;
+    }
+    out_callbacks->push_back(std::move(callback_request));
+    n++;
+  }
+  return n;
 }
 
 zx::result<zx::event> Dispatcher::RegisterForCompleteShutdownEvent() {

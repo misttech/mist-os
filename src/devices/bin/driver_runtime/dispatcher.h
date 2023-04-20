@@ -619,6 +619,10 @@ class Dispatcher : public async_dispatcher_t,
   // Calls the callbacks in |callback_queue_|.
   void DispatchCallbacks(std::unique_ptr<EventWaiter> event_waiter,
                          fbl::RefPtr<Dispatcher> dispatcher_ref);
+  // Moves the next callbacks to dispatch from |callback_queue_| to |out_callbacks|.
+  // Returns the number of callbacks in |out_callbacks|.
+  uint32_t TakeNextCallbacks(fbl::DoublyLinkedList<std::unique_ptr<CallbackRequest>>* out_callbacks)
+      __TA_REQUIRES(&callback_lock_);
 
   // Cancels the callbacks in |shutdown_queue_|.
   void CompleteShutdown();

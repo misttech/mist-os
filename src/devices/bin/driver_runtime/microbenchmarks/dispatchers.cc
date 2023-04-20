@@ -139,16 +139,22 @@ std::unique_ptr<AsyncDispatcher> CreateAsyncDispatcher(AsyncDispatcher::Type typ
   }
 }
 
-// Measure the time taken for a task to be posted and completed.
+// Measure the time taken for a batch of tasks to be posted and completed.
 bool DispatcherTaskTest(perftest::RepeatState* state, AsyncDispatcher::Type dispatcher_type,
-                        bool use_threads) {
+                        bool use_threads, uint32_t batch_size) {
   auto dispatcher = CreateAsyncDispatcher(dispatcher_type, use_threads, false /* enable_irqs */);
   FX_CHECK(dispatcher);
 
   while (state->KeepRunning()) {
     libsync::Completion task_completion;
-    ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(),
-                              [&task_completion] { task_completion.Signal(); }));
+    for (uint32_t i = 0; i < batch_size; i++) {
+      bool complete = (i == batch_size - 1);
+      ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(), [complete, &task_completion] {
+        if (complete) {
+          task_completion.Signal();
+        }
+      }));
+    }
     ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
     task_completion.Wait();
   }
@@ -286,11 +292,20 @@ void RegisterTests() {
       {false, "NoThreads"},
   };
 
+  static const unsigned kTaskBatchSize[] = {
+      1,
+      10,
+      100,
+  };
+
   for (auto const& [type, dispatcher_name] : kDispatcherTypes) {
     for (auto const& [use_threads, use_threads_desc] : kUseThreads) {
-      auto task_name = fbl::StringPrintf("Dispatcher/%s/Task/%s", dispatcher_name.c_str(),
-                                         use_threads_desc.c_str());
-      perftest::RegisterTest(task_name.c_str(), DispatcherTaskTest, type, use_threads);
+      for (auto batch_size : kTaskBatchSize) {
+        auto task_name = fbl::StringPrintf("Dispatcher/%s/Task/%s/%utasks", dispatcher_name.c_str(),
+                                           use_threads_desc.c_str(), batch_size);
+        perftest::RegisterTest(task_name.c_str(), DispatcherTaskTest, type, use_threads,
+                               batch_size);
+      }
 
       auto wait_name = fbl::StringPrintf("Dispatcher/%s/Wait/%s", dispatcher_name.c_str(),
                                          use_threads_desc.c_str());
