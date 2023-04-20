@@ -55,5 +55,4 @@ third_party_rust_crate_log_visibility = [
   "//src/connectivity/wlan/wlancfg:*",
   "//src/connectivity/wlan/wlandevicemonitor:*",
   "//src/connectivity/wlan/wlanstack:*",
-  "//src/lib/syslog/rust:*",
 ]

@@ -2,93 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_test.gni")
-
-rust_fuchsia_syslog_visibility_allowlist = [
-  #  ________  _________  ________  ________
-  # |\   ____\|\___   ___\\   __  \|\   __  \
-  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
-  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
-  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
-  #     ____\_\  \   \ \__\ \ \_______\ \__\
-  #    |\_________\   \|__|  \|_______|\|__|
-  #    \|_________|
-  #
-  # This is an allowlist of targets that use the deprecated `fuchsia_syslog` Rust library.
-  # Rust libraries should now be using `diagnostics_log` either directly or through the `fuchsia`
-  # crate.
-  #
-  # Developers are encouraged to migrate to use the `diagnostics_log` and `tracing` libraries
-  # instead which bring structured logging support.
-  #
-  # The policy at this time is:
-  # 1. Pre-existing use of fuchsia_syslog in fuchsia.git is allowlisted.
-  # 2. Use of fuchsia_syslog in new libraries and binaries is strongly discouraged and only allowed
-  #    under special circumstances under which the new library isn't covering the needs.
-  #
-  # To add items to the allowlist, please send a change to one of the OWNERS of
-  # this file to add an element to the visibility list below.
-  # Please allowlist entire directories rather than individual targets as it
-  # requires less allowlist churn over time.
-  #
-  # To regenerate:
-  # fx gn refs $(fx get-build-dir) //src/lib/syslog/rust:syslog //src/lib/syslog/rust:rust | grep -v "//src/lib/syslog/rust" | sed 's|\(.*:\).*|"\1*",|' | sort | uniq
-  "//src/connectivity/bluetooth/core/bt-init:*",
-  "//src/connectivity/bluetooth/examples/bt-device-id-client:*",
-  "//src/connectivity/bluetooth/profiles/bt-device-id:*",
-  "//src/connectivity/bluetooth/tools/bt-bredr-profile:*",
-  "//src/connectivity/bluetooth/tools/bt-snoop:*",
-]
-
-group("rust") {
-  deps = [ ":syslog" ]
-  visibility =
-      rust_fuchsia_syslog_visibility_allowlist + [ "//src/lib/syslog:*" ]
-}
-
-rustc_library("syslog") {
-  assert(is_fuchsia)
-  name = "fuchsia_syslog"
-  version = "0.1.0"
-  edition = "2021"
-  deps = [
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:log",
-  ]
-  non_rust_deps = [ "//zircon/system/ulib/syslog" ]
-  visibility = rust_fuchsia_syslog_visibility_allowlist + [
-                 ":*",
-                 "tests:*",
-               ]
-
-  sources = [
-    "src/lib.rs",
-    "src/syslog.rs",
-  ]
-}
-
-rustc_test("syslog-tests") {
-  edition = "2021"
-  version = "0.1.0"
-  name = "fuchsia_syslog_lib_test"
-  deps = [
-    "//src/lib/diagnostics/data/rust:lib",
-    "//src/lib/diagnostics/log/message/rust",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:log",
-  ]
-  non_rust_deps = [ "//zircon/system/ulib/syslog" ]
-
-  source_root = "src/lib.rs"
-  sources = [
-    "src/lib.rs",
-    "src/syslog.rs",
-  ]
-}
 
 rustc_library("syslog-listener") {
   name = "fuchsia_syslog_listener"
@@ -105,17 +19,4 @@ rustc_library("syslog-listener") {
   ]
 
   sources = [ "syslog-listener/src/lib.rs" ]
-}
-
-fuchsia_unittest_package("fuchsia-syslog-tests") {
-  deps = [ ":syslog-tests" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":fuchsia-syslog-tests",
-    ":syslog-tests",
-    "tests",
-  ]
 }

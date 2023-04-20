@@ -49,7 +49,6 @@ group("lib") {
     "storage",
     "structured_ui($host_toolchain)",
     "symbolizer-markup",
-    "syslog",
     "tcp-stream-ext",
     "testing",
     "timekeeper",
