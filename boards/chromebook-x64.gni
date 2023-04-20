@@ -46,9 +46,6 @@ _common_bootfs_deps = [
 # TODO(fxbug.dev/93333) : Add dynamic binding and remove these.
 _common_bootfs_deps += [ "//src/ui/input/drivers/i2c-hid:i2c-hid-dfv2" ]
 
-# Include driver_host2 for testing.
-_common_bootfs_deps += [ "//src/devices/bin/driver_host2" ]
-
 board_bootfs_labels += _common_bootfs_deps
 
 board_zedboot_bootfs_labels += _common_bootfs_deps

@@ -2,11 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/dist/component_manifest_resources.gni")
 import("//build/drivers.gni")
 import("//build/fidl/fidl.gni")
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":driver_host2" ]
+}
 
 group("driver_host2") {
   deps = [ ":component" ]

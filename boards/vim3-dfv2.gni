@@ -6,21 +6,3 @@ import("vim3.gni")
 
 # BoardInformation for Product Assembly
 board_information_for_assembly = "//boards/vim3/dfv2_board_information.json5"
-
-board_bootfs_labels += [
-  # For DFv2. TODO(fxbug.dev/125843): Use assembly input bundle instead in
-  # order to include driver_host2.
-  "//src/devices/bin/driver_host2",
-]
-
-board_recovery_bootfs_labels += [
-  # For DFv2. TODO(fxbug.dev/125843): Use assembly input bundle instead in
-  # order to include driver_host2.
-  "//src/devices/bin/driver_host2",
-]
-
-board_zedboot_bootfs_labels += [
-  # For DFv2. TODO(fxbug.dev/125843): Use assembly input bundle instead in
-  # order to include driver_host2.
-  "//src/devices/bin/driver_host2",
-]

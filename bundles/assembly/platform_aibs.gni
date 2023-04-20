@@ -70,6 +70,9 @@ user_platform_aib_names = [
   "intl_services.icu_default_${icu_git_info.default}",
   "intl_services.icu_latest_${icu_git_info.latest}",
   "intl_services.icu_stable_${icu_git_info.stable}",
+
+  # Driver Framework
+  "driver_framework_v2",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

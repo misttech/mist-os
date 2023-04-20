@@ -20,6 +20,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             // TODO(http://fxbug.dev/102096): Remove this once DFv2 is enabled by default and there
             // exists only one da7219 driver.
             disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
+            builder.platform_bundle("driver_framework_v2");
         }
 
         let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
