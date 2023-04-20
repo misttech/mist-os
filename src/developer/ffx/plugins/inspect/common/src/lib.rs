@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use diagnostics_data::Data;
 use errors::ffx_error;
-use ffx_writer::Writer;
+use fho::{MachineWriter, ToolIO};
 use fidl::{self, endpoints::create_proxy, AsyncSocket};
 use fidl_fuchsia_developer_remotecontrol::{
     ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, RemoteControlProxy,
@@ -19,33 +19,76 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_sys2 as fsys2;
 use futures::AsyncReadExt as _;
 use iquery::{
-    commands::{get_accessor_selectors, list_files, DiagnosticsProvider, ListFilesResultItem},
+    commands::{
+        get_accessor_selectors, list_files, Command, DiagnosticsProvider, ListFilesResultItem,
+        ListResponseItem, ShowCommandResultItem,
+    },
     types::{Error, ToText},
 };
 use lazy_static::lazy_static;
 use selectors;
+use serde::Serialize;
 use std::io::Write;
 
 lazy_static! {
     static ref READDIR_TIMEOUT_SECONDS: u64 = 15;
 }
 
-pub async fn run_command(
+macro_rules! impl_inspect_output {
+    ($(($variant:ident, $type:ty)),*) => {
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        pub enum InspectOutput {
+            $($variant( $type ),)*
+        }
+
+        $(
+            impl From<$type> for InspectOutput {
+                fn from(item: $type) -> Self {
+                    Self::$variant(item)
+                }
+            }
+        )*
+
+        impl ToText for InspectOutput {
+            fn to_text(self) -> String {
+                match self {
+                    $(
+                        Self::$variant(value) => value.to_text(),
+                    )*
+                }
+            }
+        }
+    };
+}
+
+impl_inspect_output!(
+    (MultipleStrings, Vec<String>),
+    (SingleString, String),
+    (ListResult, Vec<ListResponseItem>),
+    (ListFilesResult, Vec<ListFilesResultItem>),
+    (ShowResult, Vec<ShowCommandResultItem>)
+);
+
+pub async fn run_command<C, O>(
     rcs_proxy: RemoteControlProxy,
     diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-    cmd: impl iquery::commands::Command,
-    mut writer: Writer,
-) -> anyhow::Result<()> {
+    cmd: C,
+    writer: &mut MachineWriter<InspectOutput>,
+) -> anyhow::Result<()>
+where
+    C: Command<Result = O>,
+    InspectOutput: From<O>,
+{
     let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
     let result = cmd.execute(&provider).await.map_err(|e| anyhow!(ffx_error!("{}", e)))?;
+    let result = InspectOutput::from(result);
     if writer.is_machine() {
-        writer.machine(&result).context("Unable to write structured output to destination.")
+        writer.machine(&result)?;
     } else {
-        // Ensure trailing newline.
-        writer
-            .write_fmt(format_args!("{}\n", result.to_text()))
-            .context("Unable to write to destination.")
+        writeln!(writer, "{}", result.to_text())?;
     }
+    Ok(())
 }
 
 pub struct DiagnosticsBridgeProvider {

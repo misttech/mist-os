@@ -2,38 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
-use ffx_inspect_common::run_command;
-use ffx_inspect_list_args::ListCommand;
-use ffx_writer::Writer;
-use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
-use iquery::commands as iq;
-
-#[ffx_plugin(
-    RemoteDiagnosticsBridgeProxy = "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge"
-)]
-pub async fn list(
-    rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-    #[ffx(machine = Vec<iq::ListResponseItem>)] writer: Writer,
-    cmd: ListCommand,
-) -> Result<()> {
-    run_command(rcs_proxy, diagnostics_proxy, iq::ListCommand::from(cmd), writer).await
-}
-
 #[cfg(test)]
 mod test {
-    use super::*;
     use errors::ResultExt as _;
+    use ffx_inspect_common::run_command;
     use ffx_inspect_test_utils::{
         make_inspects_for_lifecycle, setup_fake_diagnostics_bridge, setup_fake_rcs,
         FakeArchiveIteratorResponse, FakeBridgeData,
     };
-    use ffx_writer::Format;
+    use ffx_writer::{Format, MachineWriter, TestBuffers};
     use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, BridgeStreamParameters};
     use fidl_fuchsia_diagnostics::{ClientSelectorConfiguration, DataType, StreamMode};
-    use selectors;
+    use iquery::commands::ListCommand;
     use std::sync::Arc;
 
     #[fuchsia::test]
@@ -45,7 +25,8 @@ mod test {
             ..BridgeStreamParameters::EMPTY
         };
         let expected_responses = Arc::new(vec![]);
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
         run_command(
             setup_fake_rcs(),
@@ -53,13 +34,13 @@ mod test {
                 params,
                 expected_responses.clone(),
             )]),
-            iq::ListCommand::from(cmd),
-            writer.clone(),
+            ListCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
 
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), String::from("[]"));
     }
 
@@ -72,7 +53,8 @@ mod test {
             ..BridgeStreamParameters::EMPTY
         };
         let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_fidl_error()]);
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
 
         assert!(run_command(
@@ -81,8 +63,8 @@ mod test {
                 params,
                 expected_responses.clone()
             )]),
-            iq::ListCommand::from(cmd),
-            writer
+            ListCommand::from(cmd),
+            &mut writer
         )
         .await
         .unwrap_err()
@@ -102,7 +84,8 @@ mod test {
             Arc::new(vec![FakeArchiveIteratorResponse::new_with_iterator_error(
                 ArchiveIteratorError::GenericError,
             )]);
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
 
         assert!(run_command(
@@ -111,8 +94,8 @@ mod test {
                 params,
                 expected_responses.clone()
             )]),
-            iq::ListCommand::from(cmd),
-            writer
+            ListCommand::from(cmd),
+            &mut writer
         )
         .await
         .unwrap_err()
@@ -131,7 +114,8 @@ mod test {
         let lifecycles = make_inspects_for_lifecycle();
         let value = serde_json::to_string(&lifecycles).unwrap();
         let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
         run_command(
             setup_fake_rcs(),
@@ -139,8 +123,8 @@ mod test {
                 params,
                 expected_responses.clone(),
             )]),
-            iq::ListCommand::from(cmd),
-            writer.clone(),
+            ListCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -150,7 +134,7 @@ mod test {
             String::from("test/moniker3"),
         ])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 
@@ -165,7 +149,8 @@ mod test {
         let lifecycles = make_inspects_for_lifecycle();
         let value = serde_json::to_string(&lifecycles).unwrap();
         let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListCommand { manifest: None, with_url: true, accessor: None };
         run_command(
             setup_fake_rcs(),
@@ -173,8 +158,8 @@ mod test {
                 params,
                 expected_responses.clone(),
             )]),
-            iq::ListCommand::from(cmd),
-            writer.clone(),
+            ListCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -190,7 +175,7 @@ mod test {
             },
         ])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 
@@ -210,7 +195,8 @@ mod test {
         let lifecycles = make_inspects_for_lifecycle();
         let value = serde_json::to_string(&lifecycles).unwrap();
         let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListCommand {
             manifest: Some(String::from("moniker1")),
             with_url: true,
@@ -224,8 +210,8 @@ mod test {
                 params,
                 expected_responses.clone(),
             )]),
-            iq::ListCommand::from(cmd),
-            writer.clone(),
+            ListCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -235,7 +221,7 @@ mod test {
             component_url: String::from("fake-url://test/moniker1"),
         }])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 }

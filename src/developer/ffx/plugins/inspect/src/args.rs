@@ -4,7 +4,10 @@
 
 use argh::FromArgs;
 use ffx_core::ffx_command;
-use ffx_inspect_sub_command::SubCommand;
+use iquery::commands::{
+    ListAccessorsCommand, ListCommand, ListFilesCommand, SelectorsCommand, ShowCommand,
+};
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
@@ -21,5 +24,45 @@ use ffx_inspect_sub_command::SubCommand;
 )]
 pub struct InspectCommand {
     #[argh(subcommand)]
-    pub subcommand: SubCommand,
+    pub sub_command: InspectSubCommand,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum InspectSubCommand {
+    ApplySelectors(ApplySelectorsCommand),
+    List(ListCommand),
+    ListAccessors(ListAccessorsCommand),
+    ListFiles(ListFilesCommand),
+    Selectors(SelectorsCommand),
+    Show(ShowCommand),
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "apply-selectors",
+    description = "Apply selectors from a file interactively."
+)]
+pub struct ApplySelectorsCommand {
+    #[argh(positional)]
+    /// path to the selector file to apply to the snapshot.
+    pub selector_file: PathBuf,
+
+    #[argh(option)]
+    /// path to the inspect json file to read
+    /// this file contains inspect.json data from snapshot.zip.
+    /// If not provided, DiagnosticsProvider will be used to get inspect data.
+    pub snapshot_file: Option<PathBuf>,
+
+    #[argh(option)]
+    /// moniker of the component to apply the command.
+    pub moniker: Option<String>,
+
+    #[argh(option)]
+    /// the path from where to get the ArchiveAccessor connection. If the given path is a
+    /// directory, the command will look for a `fuchsia.diagnostics.ArchiveAccessor` service file.
+    /// If the given path is a service file, the command will attempt to connect to it as an
+    /// ArchiveAccessor.
+    pub accessor_path: Option<String>,
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{screen::Line, terminal::Terminal};
+use crate::commands::apply_selectors::{screen::Line, terminal::Terminal};
 use std::{
     cmp::min,
     io::Write,

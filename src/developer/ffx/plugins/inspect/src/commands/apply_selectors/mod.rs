@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
+use crate::commands::apply_selectors::{
     filter::filter_data_to_lines,
     screen::{Line, Screen},
     terminal::{Terminal, Termion},
 };
 use anyhow::{Context, Result};
 use diagnostics_data::{Inspect, InspectData};
-use ffx_core::ffx_plugin;
-use ffx_inspect_apply_selectors_args::ApplySelectorsCommand;
+use ffx_inspect_args::ApplySelectorsCommand;
 use ffx_inspect_common::DiagnosticsBridgeProvider;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
 use iquery::commands::DiagnosticsProvider;
@@ -26,18 +25,15 @@ use termion::{
 };
 
 mod filter;
-mod screen;
-mod terminal;
+pub(crate) mod screen;
+pub(crate) mod terminal;
 
 #[cfg(test)]
 mod test_utils;
 
-#[ffx_plugin(
-    RemoteDiagnosticsBridgeProxy = "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge"
-)]
-pub async fn apply_selectors(
-    rcs_proxy: Result<RemoteControlProxy>,
-    diagnostics_proxy: Result<RemoteDiagnosticsBridgeProxy>,
+pub async fn execute(
+    rcs_proxy: RemoteControlProxy,
+    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
     cmd: ApplySelectorsCommand,
 ) -> Result<()> {
     // Get full inspect data
@@ -50,7 +46,7 @@ pub async fn apply_selectors(
         )
         .context(format!("Unable to deserialize {}.", snapshot_file.display()))?
     } else {
-        let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy?, rcs_proxy?);
+        let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
         provider.snapshot::<Inspect>(&cmd.accessor_path, &[]).await?
     };
 
@@ -111,7 +107,7 @@ fn interactive_apply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::FakeTerminal;
+    use crate::commands::apply_selectors::test_utils::FakeTerminal;
     use ffx_inspect_test_utils::get_v1_json_dump;
     use std::io::Write;
     use tempfile::NamedTempFile;

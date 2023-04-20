@@ -2,43 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
-use ffx_inspect_common::run_command;
-use ffx_inspect_list_accessors_args::ListAccessorsCommand;
-use ffx_writer::Writer;
-use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
-use iquery::commands as iq;
-
-#[ffx_plugin(
-    RemoteDiagnosticsBridgeProxy = "core/remote-diagnostics-bridge:expose:fuchsia.developer.remotecontrol.RemoteDiagnosticsBridge"
-)]
-pub async fn list_accessors(
-    rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-    #[ffx(machine = Vec<String>)] writer: Writer,
-    cmd: ListAccessorsCommand,
-) -> Result<()> {
-    run_command(rcs_proxy, diagnostics_proxy, iq::ListAccessorsCommand::from(cmd), writer).await
-}
-
 /// Test for `ffx inspect list-accessors`.
 /// The test fixtures lives in `//src/diagnostics/iquery/test_support`.
 #[cfg(test)]
 mod test {
-    use super::*;
+
+    use ffx_inspect_common::run_command;
     use ffx_inspect_test_utils::{setup_fake_diagnostics_bridge, setup_fake_rcs};
-    use ffx_writer::Format;
+    use ffx_writer::{Format, MachineWriter, TestBuffers};
+    use iquery::commands::ListAccessorsCommand;
 
     #[fuchsia::test]
     async fn test_list_accessors_no_parameters() {
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListAccessorsCommand { paths: vec![] };
         run_command(
             setup_fake_rcs(),
             setup_fake_diagnostics_bridge(vec![]),
-            iq::ListAccessorsCommand::from(cmd),
-            writer.clone(),
+            ListAccessorsCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -50,19 +33,20 @@ mod test {
             String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
         ])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
     async fn test_list_accessors_subcomponent() {
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListAccessorsCommand { paths: vec!["foo".into()] };
         run_command(
             setup_fake_rcs(),
             setup_fake_diagnostics_bridge(vec![]),
-            iq::ListAccessorsCommand::from(cmd),
-            writer.clone(),
+            ListAccessorsCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -72,19 +56,20 @@ mod test {
             String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
         ])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
     async fn test_list_accessors_deeper_subdirectory() {
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListAccessorsCommand { paths: vec!["foo/bar".into()] };
         run_command(
             setup_fake_rcs(),
             setup_fake_diagnostics_bridge(vec![]),
-            iq::ListAccessorsCommand::from(cmd),
-            writer.clone(),
+            ListAccessorsCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -93,19 +78,20 @@ mod test {
             "foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor",
         )])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
     async fn test_list_accessors_multiple_paths() {
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListAccessorsCommand { paths: vec!["example".into(), "foo/bar/".into()] };
         run_command(
             setup_fake_rcs(),
             setup_fake_diagnostics_bridge(vec![]),
-            iq::ListAccessorsCommand::from(cmd),
-            writer.clone(),
+            ListAccessorsCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
@@ -115,25 +101,26 @@ mod test {
             String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
         ])
         .unwrap();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 
     #[fuchsia::test]
     async fn test_list_accessors_path_with_no_accessors() {
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
         let cmd = ListAccessorsCommand { paths: vec!["this/is/bad".into()] };
         run_command(
             setup_fake_rcs(),
             setup_fake_diagnostics_bridge(vec![]),
-            iq::ListAccessorsCommand::from(cmd),
-            writer.clone(),
+            ListAccessorsCommand::from(cmd),
+            &mut writer,
         )
         .await
         .unwrap();
 
         let expected = "[]".to_owned();
-        let output = writer.test_output().expect("unable to get test output.");
+        let output = test_buffers.into_stdout_str();
         assert_eq!(output.trim_end(), expected);
     }
 }
