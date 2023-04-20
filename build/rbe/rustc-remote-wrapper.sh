@@ -13,6 +13,24 @@ script="$0"
 script_dir="$(dirname "$script")"
 
 source "$script_dir"/common-setup.sh
+
+######################## DEPRECATION NOTICE ###################################
+python_rel="$(relpath . "$python")"
+script_dir_rel="$(relpath . "$script_dir")"
+replacement_script="$script_dir_rel/rustc_remote_wrapper.py"
+equivalent_command=(
+  "$python_rel" -S "$replacement_script" "${@:1}"
+)
+cat <<EOF
+NOTICE: $0 is deprecated and will be removed.
+Instead, use $replacement_script with the same args:
+  ${equivalent_command[@]}
+EOF
+# one could just do this here:
+# exec "${equivalent_command[@]}"
+##################### end of DEPRECATION NOTICE ###############################
+
+
 readonly HOST_OS="$_FUCHSIA_RBE_CACHE_VAR_host_os"
 
 readonly remote_action_wrapper="$script_dir"/fuchsia-rbe-action.sh
@@ -21,13 +39,6 @@ readonly remote_action_wrapper="$script_dir"/fuchsia-rbe-action.sh
 # This assumed constant is only needed for a few workarounds elsewhere
 # in this script.
 readonly remote_project_root="/b/f/w"
-
-# Some support tools/steps use Python.
-# Point to our prebuilt host-platform python3.
-python="$(ls "$default_project_root"/prebuilt/third_party/python3/*/bin/python3)" || {
-  echo "*** Python interpreter not found under $default_project_root/prebuilt/third_party/python3."
-  exit 1
-}
 
 # Script to check (local) determinism.
 check_determinism_command=(

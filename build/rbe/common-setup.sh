@@ -13,6 +13,7 @@
 #   msg (function)
 #   relpath (function)
 #   timetrace (function)
+#   python (variable): path to prebuilt python interpreter for the host
 
 # This script caches some computed values in environment variables
 # to avoid repetitive work in related scripts.
@@ -72,6 +73,9 @@ readonly default_project_root="$(readlink -f "$script_dir"/../..)"
 # This points to the host platform subdir of our prebuilt tools.
 readonly HOST_PLATFORM="${_FUCHSIA_RBE_CACHE_VAR_host_os}-${_FUCHSIA_RBE_CACHE_VAR_host_arch}"
 
+# Point to our prebuilt python3.
+python="$default_project_root"/prebuilt/third_party/python3/"$HOST_PLATFORM"/bin/python3
+
 function _check_realpath_works_for_relative_paths() {
   if which realpath
   then
@@ -93,8 +97,6 @@ function _check_realpath_works_for_relative_paths() {
   then
     export _FUCHSIA_RBE_CACHE_VAR_relpath_uses=realpath
   else
-    # Point to our prebuilt python3.
-    python="$default_project_root"/prebuilt/third_party/python3/"$HOST_PLATFORM"/bin/python3
     test -x "$python" || {
       echo "*** Python interpreter not found at expected location: $python."
       exit 1

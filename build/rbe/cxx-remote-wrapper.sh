@@ -10,6 +10,25 @@ script_basename="$(basename "$script")"
 script_dir="$(dirname "$script")"
 
 source "$script_dir"/common-setup.sh
+
+
+######################## DEPRECATION NOTICE ###################################
+python_rel="$(relpath . "$python")"
+script_dir_rel="$(relpath . "$script_dir")"
+replacement_script="$script_dir_rel/cxx_remote_wrapper.py"
+equivalent_command=(
+  "$python_rel" -S "$replacement_script" "${@:1}"
+)
+cat <<EOF
+NOTICE: $0 is deprecated and will be removed.
+Instead, use $replacement_script with the same args:
+  ${equivalent_command[@]}
+EOF
+# one could just do this here:
+# exec "${equivalent_command[@]}"
+##################### end of DEPRECATION NOTICE ###############################
+
+
 readonly HOST_OS="$_FUCHSIA_RBE_CACHE_VAR_host_os"
 readonly HOST_ARCH="$_FUCHSIA_RBE_CACHE_VAR_host_arch"
 

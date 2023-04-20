@@ -11,6 +11,25 @@ script="$0"
 script_dir="$(dirname "$script")"
 
 source "$script_dir"/common-setup.sh
+
+
+######################## DEPRECATION NOTICE ###################################
+python_rel="$(relpath . "$python")"
+script_dir_rel="$(relpath . "$script_dir")"
+replacement_script="$script_dir_rel/output_leak_scanner.py"
+equivalent_command=(
+  "$python_rel" -S "$replacement_script" "${@:1}"
+)
+cat <<EOF
+NOTICE: $0 is deprecated and will be removed.
+Instead, use $replacement_script with the same args:
+  ${equivalent_command[@]}
+EOF
+# one could just do this here:
+# exec "${equivalent_command[@]}"
+##################### end of DEPRECATION NOTICE ###############################
+
+
 project_root="$default_project_root"
 
 build_subdir="$(relpath "$project_root" . )"
