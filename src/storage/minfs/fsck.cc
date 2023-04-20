@@ -150,6 +150,9 @@ class MinfsChecker {
   zx::result<> CheckDirectory(Inode* inode, ino_t ino, ino_t parent, uint32_t flags);
   std::optional<std::string> CheckDataBlock(blk_t bno, BlockInfo block_info);
   zx::result<> CheckFile(Inode* inode, ino_t ino);
+  // Checks just one inode without recursing.  inode_stack_ will contain any child inodes (if the
+  // inode happens to be a directory).
+  zx::result<> CheckOneInode(ino_t ino, ino_t parent, bool dot_or_dotdot);
 
   const FsckOptions fsck_options_;
 
@@ -178,6 +181,9 @@ class MinfsChecker {
   uint8_t indirect_cache_[kMinfsBlockSize];
   uint32_t indirect_blocks_ = 0;
   uint32_t directory_blocks_ = 0;
+
+  // A stack of inodes to check.
+  std::vector<std::tuple</*ino=*/ino_t, /*parent=*/ino_t, /*dot_or_dotdot=*/bool>> inode_stack_;
 };
 
 zx::result<Inode> MinfsChecker::GetInode(ino_t ino, bool check_magic) const {
@@ -292,10 +298,12 @@ zx::result<> MinfsChecker::CheckDirectory(Inode* inode, ino_t ino, ino_t parent,
   VnodeMinfs::Recreate(&fs_, ino, &vn);
 
   size_t off = 0;
-  while (true) {
-    DirentBuffer dirent_buffer;
+  bool is_last = false;
+  auto dirent_buffer = std::make_unique<DirentBuffer<kMinfsMaxDirentSize>>();
+  Dirent* de = &dirent_buffer->dirent;
+  do {
     size_t actual;
-    status = vn->ReadInternal(nullptr, &dirent_buffer.dirent, kMinfsDirentSize, off, &actual);
+    status = vn->ReadInternal(nullptr, de, kMinfsDirentSize, off, &actual);
     if (status.is_ok() && actual == 0 && inode->link_count == 0 && parent == 0) {
       // This is OK as it's an unlinked directory.
       break;
@@ -311,10 +319,9 @@ zx::result<> MinfsChecker::CheckDirectory(Inode* inode, ino_t ino, ino_t parent,
       return status.is_error() ? status.take_error() : zx::error(ZX_ERR_IO);
     }
 
-    Dirent* de = &dirent_buffer.dirent;
-    uint32_t rlen = static_cast<uint32_t>(DirentReservedSize(de, off));
-    uint32_t dlen = DirentSize(de->namelen);
-    bool is_last = de->reclen & kMinfsReclenLast;
+    const uint32_t rlen = static_cast<uint32_t>(DirentReservedSize(de, off));
+    const uint32_t dlen = DirentSize(de->namelen);
+    is_last = de->reclen & kMinfsReclenLast;
     if (!is_last && ((rlen < kMinfsDirentSize) || (dlen > rlen) || (dlen > kMinfsMaxDirentSize) ||
                      (rlen & kMinfsDirentAlignmentMask))) {
       FX_LOGS(ERROR) << "check: ino#" << ino << ": de[" << eno << "]: bad dirent reclen (" << rlen
@@ -328,15 +335,12 @@ zx::result<> MinfsChecker::CheckDirectory(Inode* inode, ino_t ino, ino_t parent,
       }
     } else {
       // Re-read the dirent to acquire the full name
-      uint32_t record_full[DirentSize(NAME_MAX)];
-      status = vn->ReadInternal(nullptr, record_full, DirentSize(de->namelen), off, &actual);
-      if (status.is_error() || actual != DirentSize(de->namelen)) {
-        FX_LOGS(ERROR) << "check: Error reading dirent of size: " << DirentSize(de->namelen);
+      status = vn->ReadInternal(nullptr, de, dlen, off, &actual);
+      if (status.is_error() || actual != dlen) {
+        FX_LOGS(ERROR) << "check: Error reading dirent of size: " << dlen;
         return zx::error(ZX_ERR_IO);
       }
-      de = reinterpret_cast<Dirent*>(record_full);
       bool dot_or_dotdot = false;
-
       if ((de->namelen == 0) || (de->namelen > (rlen - kMinfsDirentSize))) {
         FX_LOGS(ERROR) << "check: ino#" << ino << ": de[" << eno << "]: invalid namelen "
                        << de->namelen;
@@ -373,21 +377,14 @@ zx::result<> MinfsChecker::CheckDirectory(Inode* inode, ino_t ino, ino_t parent,
                        << " type=" << de->type << " '" << std::string_view(de->name, de->namelen)
                        << "' " << (is_last ? "[last]" : "");
       }
-
       if (flags & CD_RECURSE) {
-        if (auto status = CheckInode(de->ino, ino, dot_or_dotdot); status.is_error()) {
-          return status.take_error();
-        }
+        inode_stack_.push_back(std::make_tuple(de->ino, ino, dot_or_dotdot));
       }
       dirent_count++;
     }
-    if (is_last) {
-      break;
-    } else {
-      off += rlen;
-    }
+    off += rlen;
     eno++;
-  }
+  } while (!is_last);
   if (inode->link_count == 0 && inode->dirent_count != 0) {
     FX_LOGS(ERROR) << "check: dirent_count (" << inode->dirent_count
                    << ") for unlinked directory != 0";
@@ -570,6 +567,22 @@ void MinfsChecker::CheckReserved() {
 }
 
 zx::result<> MinfsChecker::CheckInode(ino_t ino, ino_t parent, bool dot_or_dotdot) {
+  for (;;) {
+    if (zx::result result = CheckOneInode(ino, parent, dot_or_dotdot); result.is_error())
+      return result.take_error();
+
+    if (inode_stack_.empty())
+      return zx::ok();
+
+    auto [next_ino, next_parent, next_dot_or_dotdot] = inode_stack_.back();
+    inode_stack_.pop_back();
+    ino = next_ino;
+    parent = next_parent;
+    dot_or_dotdot = next_dot_or_dotdot;
+  }
+}
+
+zx::result<> MinfsChecker::CheckOneInode(ino_t ino, ino_t parent, bool dot_or_dotdot) {
   auto inode_or = GetInode(ino);
   if (inode_or.is_error()) {
     FX_LOGS(ERROR) << "check: ino#" << ino << ": not readable: " << inode_or.error_value();

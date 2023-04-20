@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <iostream>
 #include <string>
 
 #include <fbl/string.h>
@@ -415,6 +416,21 @@ TEST_P(DirectoryTest, RmdirOnlyAllowsDirectories) {
   std::string baz = GetPath("baz");
   EXPECT_EQ(mkdir(baz.c_str(), 0777), 0);
   EXPECT_EQ(rmdir(baz.c_str()), 0);
+}
+
+TEST_P(DirectoryTest, Deep) {
+  // TODO(fxbug.dev/125828): Fix stack overflow in f2fs fsck
+  if (fs().GetTraits().name == "f2fs") {
+    std::cout << "Skipped test" << std::endl;
+    return;
+  }
+
+  // Make sure it's possible to create a directory that's 200 levels deep.
+  std::string path = GetPath("a");
+  for (int i = 0; i < 200; ++i) {
+    ASSERT_EQ(mkdir(path.c_str(), 0755), 0);
+    path += "/a";
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(/*no prefix*/, DirectoryTest, testing::ValuesIn(AllTestFilesystems()),
