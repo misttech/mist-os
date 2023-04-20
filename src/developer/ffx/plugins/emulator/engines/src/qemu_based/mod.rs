@@ -7,7 +7,6 @@
 
 use crate::{
     arg_templates::process_flag_template,
-    finalize_port_mapping,
     qemu_based::comms::{spawn_pipe_thread, QemuSocket},
     show_output,
 };
@@ -16,7 +15,7 @@ use async_trait::async_trait;
 use cfg_if::cfg_if;
 use emulator_instance::{
     AccelerationMode, ConsoleType, DiskImage, EmulatorConfiguration, EngineState, GuestConfig,
-    HostConfig, NetworkingMode,
+    NetworkingMode,
 };
 use errors::ffx_bail;
 use ffx_config::SshKeyFiles;
@@ -30,13 +29,14 @@ use ffx_emulator_common::{
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
-use serde::Serialize;
+use serde_json::{json, Deserializer, Value};
 use shared_child::SharedChild;
 use std::{
     env,
     fs::{self, File},
     io::{stderr, Write},
-    net::{IpAddr, Ipv4Addr, Shutdown},
+    net::Shutdown,
+    os::unix::net::UnixStream,
     path::{Path, PathBuf},
     process::Command,
     str,
@@ -96,7 +96,7 @@ cfg_if! {
     if #[cfg(test)] {
         pub(crate) use self::mock_modules::get_host_tool;
     } else {
-        pub(crate) use self::modules::get_host_tool;
+pub(crate) use self::modules::get_host_tool;
     }
 }
 
@@ -108,49 +108,11 @@ const COMMAND_CONSOLE: &str = "./monitor";
 const MACHINE_CONSOLE: &str = "./qmp";
 const SERIAL_CONSOLE: &str = "./serial";
 
-/// MDNSInfo is the configuration data used by Fuchsia's mdns service.
-/// When using user mode networking, an instance of this configuration
-/// is added to the boot data so that the local address and port mappings
-/// are shared via mdns.
-#[derive(Serialize, Debug)]
-pub(crate) struct MDNSInfo {
-    publications: Vec<MDNSServiceInfo>,
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) struct PortPair {
+    pub guest: u16,
+    pub host: u16,
 }
-
-#[derive(Serialize, Debug)]
-pub(crate) struct MDNSServiceInfo {
-    media: String,
-    perform_probe: bool,
-    port: u16,
-    service: String,
-    text: Vec<String>,
-}
-
-impl MDNSInfo {
-    fn new(host: &HostConfig, local_addr: &IpAddr) -> Self {
-        let mut info = MDNSInfo {
-            publications: vec![MDNSServiceInfo {
-                media: "wired".to_string(),
-                perform_probe: false,
-                port: 22,
-                service: "_fuchsia._udp.".to_string(),
-                text: vec![format!("host:{}", local_addr)],
-            }],
-        };
-
-        for (name, mapping) in &host.port_map {
-            if let Some(port) = mapping.host {
-                info.publications[0].text.push(format!("{}:{}", name, port));
-                if name == "ssh" {
-                    info.publications[0].port = port;
-                }
-            }
-        }
-
-        info
-    }
-}
-
 /// QemuBasedEngine collects the interface for
 /// emulator engine implementations that use
 /// QEMU as the emulator.
@@ -186,7 +148,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     async fn stage_image_files(
         instance_name: &str,
         emu_config: &EmulatorConfiguration,
-        mdns_info: &Option<MDNSInfo>,
         reuse: bool,
     ) -> Result<GuestConfig> {
         let mut updated_guest = emu_config.guest.clone();
@@ -225,7 +186,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         } else {
             // Add the authorized public keys to the zbi image to enable SSH access to
             // the guest.
-            Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path, mdns_info)
+            Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path)
                 .await
                 .context("cannot embed boot data")?;
         }
@@ -319,11 +280,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     /// embed_boot_data adds authorized_keys for ssh access to the zbi boot image file.
     /// If mdns_info is Some(), it is also added. This mdns configuration is
     /// read by Fuchsia mdns service and used instead of the default configuration.
-    async fn embed_boot_data(
-        src: &PathBuf,
-        dest: &PathBuf,
-        mdns_info: &Option<MDNSInfo>,
-    ) -> Result<()> {
+    async fn embed_boot_data(src: &PathBuf, dest: &PathBuf) -> Result<()> {
         let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL).await.context("ZBI tool is missing")?;
         let ssh_keys = SshKeyFiles::load().await.context("finding ssh authorized_keys file.")?;
         ssh_keys.create_keys_if_needed().context("create ssh keys if needed")?;
@@ -339,19 +296,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         let mut zbi_command = Command::new(zbi_tool);
         zbi_command.arg("-o").arg(dest).arg("--replace").arg(src).arg("-e").arg(replace_str);
-
-        if let Some(info) = mdns_info {
-            // Save the mdns info to a file.
-            let parent = dest.parent().expect("parent dir of zbi should exist.");
-            let mdns_config = parent.join("fuchsia_udp.config");
-            let mut f = File::create(&mdns_config).context("getting zbi parent directory")?;
-            f.write_all(serde_json::to_string(info)?.as_bytes())?;
-
-            // Add it to the zbi command line.
-            let emu_svc_str = format!("data/mdns/emu.config={}", mdns_config.display());
-
-            zbi_command.arg("-e").arg(emu_svc_str);
-        }
 
         // added last.
         zbi_command.arg("--type=entropy:64").arg("/dev/urandom");
@@ -407,20 +351,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let name = emu_config.runtime.name.clone();
         let reuse = emu_config.runtime.reuse;
 
-        // Configure any port mappings before staging files so the
-        // port map can be shared with the zbi file.
-        let mut mdns_service_info: Option<MDNSInfo> = None;
-        if emu_config.host.networking == NetworkingMode::User {
-            finalize_port_mapping(emu_config).context("Problem with port mapping")?;
-
-            // For user mode networking always use 127.0.0.1. This avoids any firewall
-            // configurations that could interfere and use IPv4 since there is issues with
-            // QEMU and IPv6.
-            let local_v4_interface = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-            mdns_service_info = Some(MDNSInfo::new(&emu_config.host, &local_v4_interface));
-        }
-
-        emu_config.guest = Self::stage_image_files(&name, emu_config, &mdns_service_info, reuse)
+        emu_config.guest = Self::stage_image_files(&name, emu_config, reuse)
             .await
             .context("could not stage image files")?;
 
@@ -476,9 +407,17 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         self.set_pid(child_arc.id());
         self.set_engine_state(EngineState::Running);
 
-        self.save_to_disk()
-            .await
-            .context("Failed to write the emulation configuration file to disk.")?;
+        if self.emu_config().host.networking == NetworkingMode::User {
+            // Capture the port mappings for user mode networking.
+            let now = fuchsia_async::Time::now();
+            self.read_port_mappings().await?;
+            let elapsed_ms = now.elapsed().as_millis();
+            tracing::debug!("reading port mappings took {elapsed_ms}ms");
+        } else {
+            self.save_to_disk()
+                .await
+                .context("Failed to write the emulation configuration file to disk.")?;
+        }
 
         if self.emu_config().runtime.debugger {
             println!("The emulator will wait for a debugger to attach before starting up.");
@@ -684,18 +623,207 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             EngineConsoleType::None => panic!("No path exists for EngineConsoleType::None"),
         })
     }
+
+    /// Connect to the qmp socket for the emulator instance and read the port mappings.
+    /// User mode networking needs to map guest TCP ports to host ports. This can be done by
+    /// specifying the guest port and either a preassigned port from the command line, or
+    /// leaving the host port unassigned, and a port is assigned by the emulator at startup.
+    ///
+    /// This method waits for the QMP socket to be open, then reads the user mode networking status
+    /// to retrieve the port mappings.
+    ///
+    /// The method returns if all the port mappings are made, or if there is an error communicating
+    /// with QEMU. If emu_config().runtime.startup_timeout is positive, an error is returned if
+    /// the mappings are not available within this time.
+    async fn read_port_mappings(&mut self) -> Result<()> {
+        // Check if there are any ports not already mapped.
+        if !self.emu_config().host.port_map.values().any(|m| m.host.is_none()) {
+            tracing::debug!("No unmapped ports found.");
+            return Ok(());
+        }
+
+        let max_elapsed = if self.emu_config().runtime.startup_timeout.is_zero() {
+            // if there is no timeout, we should technically return immediately, but it does
+            // not make sense with unmapped ports, so give it a few seconds to try.
+            Duration::from_secs(10)
+        } else {
+            self.emu_config().runtime.startup_timeout
+        };
+
+        // Open machine socket
+        let instance_dir = &self.emu_config().runtime.instance_directory;
+        let console_path = self.get_path_for_console_type(instance_dir, EngineConsoleType::Machine);
+        let mut socket = QemuSocket::new(&console_path);
+
+        // Start the timeout tracking here so it includes opening the socket,
+        // which may have to wait for qemu to create the socket.
+        let start = Instant::now();
+        let mut qmp_stream = self.open_socket(&mut socket, &max_elapsed).await?;
+        let mut response_iter =
+            Deserializer::from_reader(qmp_stream.try_clone()?).into_iter::<Value>();
+
+        // Loop reading the responses on the socket, and send the request to get the
+        // user network information.
+        loop {
+            if start.elapsed() > max_elapsed {
+                bail!("Reading port mappings timed out");
+            }
+
+            match response_iter.next() {
+                Some(Ok(data)) => {
+                    if let Some(return_string) = data.get("return") {
+                        let port_pairs = Self::parse_return_string(
+                            return_string.as_str().unwrap_or_else(|| ""),
+                        )?;
+                        let mut modified = false;
+                        // Iterate over the parsed port pairs, then find the matching entry in
+                        // the port map.
+                        // There are a small number of ports that need to be mapped, so the
+                        // nested loop should not be a performance concern.
+                        for pair in port_pairs {
+                            for v in self.emu_config_mut().host.port_map.values_mut() {
+                                if v.guest == pair.guest {
+                                    if v.host != Some(pair.host) {
+                                        v.host = Some(pair.host);
+                                        modified = true;
+                                        tracing::info!("port mapped {pair:?}");
+                                    }
+                                }
+                            }
+                        }
+
+                        // If the mapping was updated and there are no more unmapped ports,
+                        // save and return.
+                        if modified
+                            && !self.emu_config().host.port_map.values().any(|m| m.host.is_none())
+                        {
+                            tracing::debug!("Writing updated mappings");
+                            self.save_to_disk().await.context(
+                                "Failed to write the emulation configuration file to disk.",
+                            )?;
+                            return Ok(());
+                        }
+                    } else {
+                        tracing::debug!("Ignoring non return object {:?}", data);
+                    }
+                }
+                Some(Err(e)) => {
+                    tracing::debug!("Error reading qmp stream {e:?}")
+                }
+                None => {
+                    tracing::debug!("None returned from qmp iterator");
+                    // Pause a moment to allow qemu to make progress.
+                    Timer::new(Duration::from_millis(100)).await;
+                    continue;
+                }
+            };
+
+            // Pause a moment to allow qemu to make progress.
+            Timer::new(Duration::from_millis(100)).await;
+            // Send { "execute": "human-monitor-command", "arguments": { "command-line": "info usernet" } }
+            tracing::debug!("writing info usernet command");
+            qmp_stream.write_fmt(format_args!(
+                "{}\n",
+                json!({
+                    "execute": "human-monitor-command",
+                    "arguments": { "command-line": "info usernet"}
+                })
+                .to_string()
+            ))?;
+        }
+    }
+
+    /// Parse the user network return string.
+    /// The user network info is only available as text, so we need to parse the lines.
+    /// This has been tested with AEMU and QEMU up to 7.0, but it is possible
+    /// the format may change.
+    fn parse_return_string(input: &str) -> Result<Vec<PortPair>> {
+        let mut pairs: Vec<PortPair> = vec![];
+        tracing::debug!("parsing_return_string return {input}");
+        let mut saw_heading = false;
+        for l in input.lines() {
+            let parts: Vec<&str> = l.split_whitespace().map(|ele| ele.trim()).collect();
+
+            // The heading has columns with multiple words, so the field count is more than the
+            // data row.
+            //Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ
+            //TCP[ESTABLISHED]   63       10.0.2.15 56727  74.125.199.113   443     0     0
+            match parts[..] {
+                ["Protocol[State]", "FD", "Source", "Address", "Port", "Dest.", "Address", "Port", "RecvQ", "SendQ"] =>
+                {
+                    saw_heading = true;
+                }
+                [protocol_state, _, _, host_port, _, guest_port, _, _] => {
+                    if protocol_state == "TCP[HOST_FORWARD]" {
+                        let guest: u16 = guest_port.parse()?;
+                        let host: u16 = host_port.parse()?;
+                        pairs.push(PortPair { guest, host });
+                    } else {
+                        tracing::debug!("Skipping non host-forward row: {l}");
+                    }
+                }
+                [] => tracing::debug!("Skipping empty line"),
+                _ => tracing::debug!("Skipping unknown part collecton {parts:?}"),
+            }
+        }
+        // Check that the heading column names have not changed. This could be a name change or schema change,
+        // it could also be that the command did not return the header because the network objects are not available
+        // yet, so log an error, but don't return an error.
+        if !saw_heading {
+            tracing::error!("Did not see expected header in {input}");
+        }
+        return Ok(pairs);
+    }
+
+    /// Opens the given socket waiting up to max_elapsed for the socket to be created and opened.
+    async fn open_socket(
+        &mut self,
+        socket: &mut QemuSocket,
+        max_elapsed: &Duration,
+    ) -> Result<UnixStream> {
+        let start = Instant::now();
+        loop {
+            if start.elapsed() > *max_elapsed {
+                bail!("Reading port mappings timed out");
+            }
+            if !self.is_running().await {
+                bail!("Emulator instance is not running.");
+            }
+            // Wait for being able to connect to the socket.
+            match socket.connect().context("Connecting to console.") {
+                Ok(()) => {
+                    match socket.stream() {
+                        Some(mut qmp_stream) => {
+                            // Send the qmp_capabilities command to initialize the conversation.
+                            qmp_stream.write_all(b"{ \"execute\": \"qmp_capabilities\" }\n")?;
+                            return Ok(qmp_stream);
+                        }
+                        None => {
+                            tracing::debug!("Could not open machine socket");
+                        }
+                    };
+                }
+                Err(e) => {
+                    tracing::debug!("Could not open machine socket: {e:?}");
+                }
+            };
+
+            Timer::new(Duration::from_millis(100)).await;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-
     use super::*;
     use async_trait::async_trait;
-    use emulator_instance::{DataAmount, DataUnits, DiskImage, EngineType};
+    use emulator_instance::{
+        DataAmount, DataUnits, DiskImage, EmulatorInstanceData, EmulatorInstanceInfo, EngineType,
+        PortMapping,
+    };
     use ffx_config::{query, ConfigLevel};
-    use serde::Serialize;
-    use serde_json::json;
+    use serde::{Deserialize, Serialize};
+    use std::{io::Read, os::unix::net::UnixListener};
     use tempfile::{tempdir, TempDir};
 
     #[derive(Default, Serialize)]
@@ -825,13 +953,9 @@ mod tests {
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .context("cannot write original value to disk image file")?;
 
-        let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
-            instance_name,
-            &emu_config,
-            &None,
-            false,
-        )
-        .await;
+        let updated =
+            <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
+                .await;
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
@@ -851,13 +975,9 @@ mod tests {
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
             .context("cannot write updated value to disk image file")?;
 
-        let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
-            instance_name,
-            &emu_config,
-            &None,
-            false,
-        )
-        .await;
+        let updated =
+            <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
+                .await;
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
@@ -930,13 +1050,9 @@ mod tests {
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .context("cannot write original value to disk image file")?;
 
-        let updated: Result<GuestConfig> = <TestEngine as QemuBasedEngine>::stage_image_files(
-            instance_name,
-            &emu_config,
-            &None,
-            true,
-        )
-        .await;
+        let updated: Result<GuestConfig> =
+            <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, true)
+                .await;
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
@@ -957,13 +1073,9 @@ mod tests {
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
             .context("cannot write updated value to disk image file")?;
 
-        let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
-            instance_name,
-            &emu_config,
-            &None,
-            true,
-        )
-        .await;
+        let updated =
+            <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, true)
+                .await;
 
         assert!(updated.is_ok(), "expected OK got {:?}", updated.unwrap_err());
 
@@ -1036,14 +1148,10 @@ mod tests {
 
         emu_config.device.storage = DataAmount { units: DataUnits::Kilobytes, quantity: 4 };
 
-        let config = <TestEngine as QemuBasedEngine>::stage_image_files(
-            instance_name,
-            &emu_config,
-            &None,
-            false,
-        )
-        .await
-        .context("Failed to get guest config")?;
+        let config =
+            <TestEngine as QemuBasedEngine>::stage_image_files(instance_name, &emu_config, false)
+                .await
+                .context("Failed to get guest config")?;
 
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
@@ -1079,17 +1187,8 @@ mod tests {
 
         let src = emu_config.guest.zbi_image;
         let dest = root.join("dest.zbi");
-        let mdns_info = MDNSInfo {
-            publications: vec![MDNSServiceInfo {
-                media: "wired".to_string(),
-                perform_probe: false,
-                port: 12345,
-                service: "_test._udp.".to_string(),
-                text: vec!["host:123.11.22.333".to_string(), "ssh:12345".to_string()],
-            }],
-        };
 
-        <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest, &Some(mdns_info)).await?;
+        <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest).await?;
 
         Ok(())
     }
@@ -1128,5 +1227,241 @@ mod tests {
         assert!(result.is_err());
 
         Ok(())
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct Arguments {
+        #[serde(alias = "command-line")]
+        pub command_line: String,
+    }
+    #[derive(Deserialize, Debug)]
+    struct QMPCommand {
+        pub execute: String,
+        pub arguments: Option<Arguments>,
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_read_port_mappings() -> Result<()> {
+        let _env = ffx_config::test_init().await?;
+        let temp = tempdir().context("cannot get tempdir")?;
+        let mut data: EmulatorInstanceData =
+            EmulatorInstanceData::new_with_state("test-instance", EngineState::New);
+        let root =
+            setup(&mut data.get_emulator_configuration_mut().guest, &temp, DiskImageFormat::Fvm)
+                .await?;
+        data.set_instance_directory(&root.join("test-instance").to_string_lossy());
+        fs::create_dir_all(&data.get_emulator_configuration().runtime.instance_directory)?;
+
+        data.get_emulator_configuration_mut()
+            .host
+            .port_map
+            .insert("ssh".into(), PortMapping { guest: 22, host: None });
+        data.get_emulator_configuration_mut()
+            .host
+            .port_map
+            .insert("http".into(), PortMapping { guest: 80, host: None });
+        data.get_emulator_configuration_mut()
+            .host
+            .port_map
+            .insert("premapped".into(), PortMapping { guest: 11, host: Some(1111) });
+
+        // use the current pid for the emulator instance
+
+        let mut engine = crate::FemuEngine::new(data);
+        engine.set_pid(std::process::id());
+        engine.set_engine_state(EngineState::Running);
+
+        // Change the working directory to handle long path names to the socket while opening it,
+        // then change back.
+        let cwd = env::current_dir()?;
+        // Set up a socket that behaves like QMP
+        env::set_current_dir(engine.emu_config().runtime.instance_directory.clone())?;
+        let listener = UnixListener::bind(MACHINE_CONSOLE)?;
+        env::set_current_dir(&cwd)?;
+
+        // Helper function for this test to be the QEMU side of the QMP socket.
+        fn do_qmp(mut stream: UnixStream) -> Result<()> {
+            let mut request_iter =
+                Deserializer::from_reader(stream.try_clone()?).into_iter::<Value>();
+
+            // Responses to the `info usernet` request. The last response should end the interaction
+            // because if fulfills all the port mappings which are being looked for.
+            let responses = vec![
+                json!({}),
+                json!({"return" :
+                 "VLAN -1 (net0):\r\nProtocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ\r\n"
+                }),
+                json!({"return": r#"VLAN -1 (net0):
+                Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ
+                TCP[HOST_FORWARD]  24               * 36167       10.0.2.15    22     0     0
+                UDP[236 sec]       49               * 33338         0.0.0.0 33337     0     0
+                "#}),
+                json!({"return": r#"VLAN -1 (net0):
+                Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ
+                TCP[ESTABLISHED]   45       127.0.0.1 36167       10.0.2.15    22     0     0
+                TCP[HOST_FORWARD]  25               * 36975       10.0.2.15    80     0     0
+                TCP[HOST_FORWARD]  24               * 36167       10.0.2.15    22     0     0
+                UDP[236 sec]       49               * 33338         0.0.0.0 33337     0     0
+                "#}),
+            ];
+
+            let mut index = 0;
+            loop {
+                match request_iter.next() {
+                    Some(Ok(data)) => {
+                        if let Ok(cmd) = serde_json::from_value::<QMPCommand>(data.clone()) {
+                            match cmd.execute.as_str() {
+                                "human-monitor-command" => {
+                                    if let Some(arguments) = cmd.arguments {
+                                        assert_eq!(arguments.command_line, "info usernet");
+                                    }
+                                    stream.write_fmt(format_args!(
+                                        "{}\n",
+                                        responses[index].to_string()
+                                    ))?;
+                                    index += 1;
+                                }
+                                "qmp_capabilities" => {
+                                    stream.write_all(
+                                        json!(
+                                        {
+                                        "QMP": {
+                                            "version": {
+                                                "qemu": {
+                                                    "micro": 0,
+                                                    "minor": 12,
+                                                    "major": 2
+                                                },
+                                                "package": "(gradle_1.3.0-beta4-78860-g2764d93fd1)"
+                                                },
+                                                "capabilities": []
+                                                }
+                                            }
+                                        )
+                                        .to_string()
+                                        .as_bytes(),
+                                    )?;
+                                }
+                                _ => bail!("unknown request is here! {cmd:?}"),
+                            }
+                        } else {
+                            bail!("Unknown message {data:?}");
+                        }
+                    }
+                    Some(Err(e)) => bail!("Error reading QMP request: {e:?}"),
+                    None => (),
+                }
+            }
+        }
+
+        // Set up a side thread that will accept an incoming connection and then exit.
+        let _listener_thread = std::thread::spawn(move || -> Result<()> {
+            // accept connections and process them, spawning a new thread for each one
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        /* connection succeeded */
+                        std::thread::spawn(|| match do_qmp(stream) {
+                            Ok(_) => (),
+                            Err(e) => panic!("do_qmp failed: {e:?}"),
+                        });
+                    }
+                    Err(err) => {
+                        /* connection failed */
+                        bail!("{err:?}");
+                    }
+                }
+            }
+            Ok(())
+        });
+
+        <crate::FemuEngine as QemuBasedEngine>::read_port_mappings(&mut engine).await?;
+
+        for (name, mapping) in &engine.emu_config().host.port_map {
+            match name.as_str() {
+                "http" => assert_eq!(
+                    mapping.host,
+                    Some(36975),
+                    "mismatch for {:?}",
+                    &engine.emu_config().host.port_map
+                ),
+                "ssh" => assert_eq!(
+                    mapping.host,
+                    Some(36167),
+                    "mismatch for {:?}",
+                    &engine.emu_config().host.port_map
+                ),
+                "premapped" => assert_eq!(
+                    mapping.host,
+                    Some(1111),
+                    "mismatch for {:?}",
+                    &engine.emu_config().host.port_map
+                ),
+                _ => bail!("Unexpected port mapping: {name} {mapping:?}"),
+            };
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_return_string() -> Result<()> {
+        let normal_expected = r#"VLAN -1 (net0):\r
+          Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ\r
+          TCP[HOST_FORWARD]  81               * 43265       10.0.2.15  2345     0     0\r
+          TCP[HOST_FORWARD]  80               * 38989       10.0.2.15  5353     0     0\r
+          TCP[HOST_FORWARD]  79               * 43751       10.0.2.15    22     0     0\r"#;
+        let condensed_expected = r#"VLAN -1 (net0):
+          Protocol[State] FD Source Address Port  Dest. Address Port RecvQ SendQ
+          TCP[HOST_FORWARD] 81    * 43265  10.0.2.15    2345 0 0
+          TCP[HOST_FORWARD] 80 * 38989       10.0.2.15  5353     0     0\r
+          TCP[HOST_FORWARD] 79   * 43751 10.0.2.15 22     0     0"#;
+        let broken_expected = r#"VLAN -1 (net0):\r
+          Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ\r
+          TCP[HOST_FORWARD]  81               * 43265       10.0.2.15  2345     0     0\r
+          TCP[HOST_FORWARD]  80               \r"#;
+        let missing_fd_expected = r#"VLAN -1 (net0):\r
+          Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ\r
+          TCP[HOST_FORWARD]  81               * 43265       10.0.2.15  2345     0     0\r
+          TCP[CLOSED]                         * 38989       10.0.2.15  5353     0     0\r
+          TCP[SYN_SYNC]      80               * 43751       10.0.2.15    22     0     0\r"#;
+        let established_expected = r#"VLAN -1 (net0):\r
+          Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ\r
+          TCP[ESTABLISHED]  81               * 42265       10.0.2.15  2345     0     0\r
+          TCP[HOST_FORWARD]  83               * 43265       10.0.2.15  2345     0     0\r
+          TCP[HOST_FORWARD]  80               * 38989       10.0.2.15  5353     0     0\r
+          TCP[HOST_FORWARD]  79               * 43751       10.0.2.15    22     0     0\r"#;
+
+        let testdata: Vec<(&str, Result<Vec<PortPair>>)> = vec![
+            ("", Ok(vec![])),
+            ("VLAN -1 (net0):\r\n  Protocol[State]    FD  Source Address  Port   Dest. Address  Port RecvQ SendQ\r\n", Ok(vec![])),
+            (normal_expected, Ok(vec![
+                PortPair{guest:2345, host:43265},
+                PortPair{guest:5353, host:38989},
+                PortPair{guest:22, host:43751}])),
+            (condensed_expected, Ok(vec![
+                    PortPair{guest:2345, host:43265},
+                    PortPair{guest:5353, host:38989},
+                    PortPair{guest:22, host:43751}])),
+            (broken_expected, Ok(vec![
+                        PortPair{guest:2345, host:43265}])),
+            (missing_fd_expected, Ok(vec![
+                            PortPair{guest:2345, host:43265}])),
+            (established_expected, Ok(vec![
+                PortPair{guest:2345, host:43265},
+                PortPair{guest:5353, host:38989},
+                PortPair{guest:22, host:43751}])),
+        ];
+
+        for (input, result) in testdata {
+            let actual = <TestEngine as QemuBasedEngine>::parse_return_string(input);
+            match actual {
+                Ok(port_list) => assert_eq!(port_list, result.ok().unwrap()),
+                Err(e) => assert_eq!(e.to_string(), result.err().unwrap().to_string()),
+            };
+        }
+        Ok(())
+
+        // TCP with other state.
     }
 }
