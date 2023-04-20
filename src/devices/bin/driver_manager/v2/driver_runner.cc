@@ -457,7 +457,7 @@ void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& complet
 
 void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) {
   if (bind_orphan_ongoing_) {
-    pending_bind_requests_.push_back(BindRequest{
+    pending_bind_requests_.push(BindRequest{
         .node = node.weak_from_this(),
         .tracker = result_tracker,
     });
@@ -682,7 +682,9 @@ void DriverRunner::ProcessPendingBindRequests() {
       std::make_shared<BindResultTracker>(bind_tracker_size, std::move(next_attempt));
 
   // Go through all the pending bind requests.
-  for (auto& request : pending_bind_requests_) {
+  while (!pending_bind_requests_.empty()) {
+    auto request = std::move(pending_bind_requests_.front());
+    pending_bind_requests_.pop();
     if (auto locked_node = request.node.lock()) {
       auto match_complete_callback = [tracker]() mutable {
         // The bind status doesn't matter for this tracker.
@@ -698,7 +700,6 @@ void DriverRunner::ProcessPendingBindRequests() {
     }
     tracker->ReportNoBind();
   }
-  pending_bind_requests_.clear();
 
   // If there are any pending callbacks for TryBindAllOrphans(), begin a new attempt.
   if (have_bind_all_orphans_request) {
