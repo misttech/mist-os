@@ -1391,7 +1391,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         struct_: &mut Struct,
         table: Table,
         union: &mut Union,
-        opt_struct: Option<&mut Struct>,
+        opt_struct: Option<&Struct>,
         opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error>;
     type TwoWayCompoundResponseFut: std::future::Future<
@@ -1407,7 +1407,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         struct_: &mut Struct,
         table: Table,
         union: &mut Union,
-        opt_struct: Option<&mut Struct>,
+        opt_struct: Option<&Struct>,
         opt_union: Option<&mut Union>,
     ) -> Self::TwoWayCompoundResponseFut;
     fn r#one_way_array_basic(
@@ -1537,7 +1537,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error>;
     type TwoWayVectorCompoundResponseFut: std::future::Future<
@@ -1561,7 +1561,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Self::TwoWayVectorCompoundResponseFut;
     fn r#one_way_vector_optional(
@@ -1569,7 +1569,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         opt_vector_uint8: Option<&[u8]>,
         opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error>;
     type TwoWayVectorOptionalResponseFut: std::future::Future<
             Output = Result<
@@ -1587,7 +1587,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         opt_vector_uint8: Option<&[u8]>,
         opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Self::TwoWayVectorOptionalResponseFut;
     fn r#one_way_array_vector_nested(
         &self,
@@ -1614,7 +1614,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         opt_vmo: Option<fidl::Vmo>,
         opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        opt_struct: Option<&mut ResourceStruct>,
+        opt_struct: Option<ResourceStruct>,
         opt_union: Option<&mut ResourceUnion>,
         array_handle: [fidl::Handle; 5],
         array_vmo: [fidl::Vmo; 5],
@@ -1682,7 +1682,7 @@ pub trait ProtocolProxyInterface: Send + Sync {
         opt_vmo: Option<fidl::Vmo>,
         opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        opt_struct: Option<&mut ResourceStruct>,
+        opt_struct: Option<ResourceStruct>,
         opt_union: Option<&mut ResourceUnion>,
         array_handle: [fidl::Handle; 5],
         array_vmo: [fidl::Vmo; 5],
@@ -1799,19 +1799,11 @@ impl ProtocolSynchronousProxy {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<Compound, false>(
-            (
-                bits,
-                enum_,
-                &*struct_,
-                &table,
-                &*union,
-                opt_struct.map(|x| &*x),
-                opt_union.map(|x| &*x),
-            ),
+            (bits, enum_, &*struct_, &table, &*union, opt_struct, opt_union.map(|x| &*x)),
             0x2bc2bc3a9237c6cc,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -1823,7 +1815,7 @@ impl ProtocolSynchronousProxy {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
         ___deadline: zx::Time,
     ) -> Result<
@@ -1831,15 +1823,7 @@ impl ProtocolSynchronousProxy {
         fidl::Error,
     > {
         let _response = self.client.send_query::<Compound, Compound, false, true>(
-            (
-                bits,
-                enum_,
-                &*struct_,
-                &table,
-                &*union,
-                opt_struct.map(|x| &*x),
-                opt_union.map(|x| &*x),
-            ),
+            (bits, enum_, &*struct_, &table, &*union, opt_struct, opt_union.map(|x| &*x)),
             0x79f279c7201da131,
             fidl::encoding::DynamicFlags::empty(),
             ___deadline,
@@ -2134,7 +2118,7 @@ impl ProtocolSynchronousProxy {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorCompound, false>(
@@ -2144,7 +2128,7 @@ impl ProtocolSynchronousProxy {
                 fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
                 fidl::encoding::Iterator(vector_table),
                 fidl::encoding::Iterator(vector_union.map(|x| &*x)),
-                fidl::encoding::Iterator(vector_opt_struct.map(|x| x.map(|x| &*x))),
+                fidl::encoding::Iterator(vector_opt_struct),
                 fidl::encoding::Iterator(vector_opt_union.map(|x| x.map(|x| &*x))),
             ),
             0x19baae42829dbe90,
@@ -2158,7 +2142,7 @@ impl ProtocolSynchronousProxy {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
         ___deadline: zx::Time,
     ) -> Result<
@@ -2180,7 +2164,7 @@ impl ProtocolSynchronousProxy {
                 fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
                 fidl::encoding::Iterator(vector_table),
                 fidl::encoding::Iterator(vector_union.map(|x| &*x)),
-                fidl::encoding::Iterator(vector_opt_struct.map(|x| x.map(|x| &*x))),
+                fidl::encoding::Iterator(vector_opt_struct),
                 fidl::encoding::Iterator(vector_opt_union.map(|x| x.map(|x| &*x))),
             ),
             0x371140db701b23b4,
@@ -2202,16 +2186,14 @@ impl ProtocolSynchronousProxy {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorOptional, false>(
             (
                 opt_vector_uint8,
                 opt_vector_string.map(fidl::encoding::Iterator),
                 opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct
-                    .map(|x| x.map(|x| x.map(|x| &*x)))
-                    .map(fidl::encoding::Iterator),
+                opt_vector_opt_struct.map(fidl::encoding::Iterator),
             ),
             0x153c6b333c21c52f,
             fidl::encoding::DynamicFlags::empty(),
@@ -2222,7 +2204,7 @@ impl ProtocolSynchronousProxy {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
         ___deadline: zx::Time,
     ) -> Result<
         (
@@ -2238,9 +2220,7 @@ impl ProtocolSynchronousProxy {
                 opt_vector_uint8,
                 opt_vector_string.map(fidl::encoding::Iterator),
                 opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct
-                    .map(|x| x.map(|x| x.map(|x| &*x)))
-                    .map(fidl::encoding::Iterator),
+                opt_vector_opt_struct.map(fidl::encoding::Iterator),
             ),
             0xe4b620aaafd73f3,
             fidl::encoding::DynamicFlags::empty(),
@@ -2292,7 +2272,7 @@ impl ProtocolSynchronousProxy {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -2326,7 +2306,7 @@ impl ProtocolSynchronousProxy {
                 opt_vmo,
                 opt_client_end,
                 opt_server_end,
-                opt_struct,
+                opt_struct.as_mut(),
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
@@ -2374,7 +2354,7 @@ impl ProtocolSynchronousProxy {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -2440,7 +2420,7 @@ impl ProtocolSynchronousProxy {
                 opt_vmo,
                 opt_client_end,
                 opt_server_end,
-                opt_struct,
+                opt_struct.as_mut(),
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
@@ -2603,7 +2583,7 @@ impl ProtocolProxy {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_compound(
@@ -2617,7 +2597,7 @@ impl ProtocolProxy {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> fidl::client::QueryResponseFut<(
         Bits,
@@ -2824,7 +2804,7 @@ impl ProtocolProxy {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_vector_compound(
@@ -2845,7 +2825,7 @@ impl ProtocolProxy {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> fidl::client::QueryResponseFut<(
         Vec<Bits>,
@@ -2872,7 +2852,7 @@ impl ProtocolProxy {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_vector_optional(
             self,
@@ -2887,7 +2867,7 @@ impl ProtocolProxy {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> fidl::client::QueryResponseFut<(
         Option<Vec<u8>>,
         Option<Vec<String>>,
@@ -2937,7 +2917,7 @@ impl ProtocolProxy {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -3002,7 +2982,7 @@ impl ProtocolProxy {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -3178,19 +3158,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<Compound, false>(
-            (
-                bits,
-                enum_,
-                &*struct_,
-                &table,
-                &*union,
-                opt_struct.map(|x| &*x),
-                opt_union.map(|x| &*x),
-            ),
+            (bits, enum_, &*struct_, &table, &*union, opt_struct, opt_union.map(|x| &*x)),
             0x2bc2bc3a9237c6cc,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -3211,7 +3183,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Self::TwoWayCompoundResponseFut {
         fn _decode(
@@ -3236,7 +3208,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
             false,
         >(
-            (bits, enum_, &*struct_, &table, &*union, opt_struct.map(|x| &*x), opt_union.map(|x| &*x),),
+            (bits, enum_, &*struct_, &table, &*union, opt_struct, opt_union.map(|x| &*x),),
             0x79f279c7201da131,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -3589,7 +3561,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorCompound, false>(
@@ -3599,7 +3571,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
                 fidl::encoding::Iterator(vector_table),
                 fidl::encoding::Iterator(vector_union.map(|x| &*x)),
-                fidl::encoding::Iterator(vector_opt_struct.map(|x| x.map(|x| &*x))),
+                fidl::encoding::Iterator(vector_opt_struct),
                 fidl::encoding::Iterator(vector_opt_union.map(|x| x.map(|x| &*x))),
             ),
             0x19baae42829dbe90,
@@ -3622,7 +3594,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Self::TwoWayVectorCompoundResponseFut {
         fn _decode(
@@ -3665,7 +3637,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
                 fidl::encoding::Iterator(vector_table),
                 fidl::encoding::Iterator(vector_union.map(|x| &*x)),
-                fidl::encoding::Iterator(vector_opt_struct.map(|x| x.map(|x| &*x))),
+                fidl::encoding::Iterator(vector_opt_struct),
                 fidl::encoding::Iterator(vector_opt_union.map(|x| x.map(|x| &*x))),
             ),
             0x371140db701b23b4,
@@ -3678,16 +3650,14 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorOptional, false>(
             (
                 opt_vector_uint8,
                 opt_vector_string.map(fidl::encoding::Iterator),
                 opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct
-                    .map(|x| x.map(|x| x.map(|x| &*x)))
-                    .map(fidl::encoding::Iterator),
+                opt_vector_opt_struct.map(fidl::encoding::Iterator),
             ),
             0x153c6b333c21c52f,
             fidl::encoding::DynamicFlags::empty(),
@@ -3704,7 +3674,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Self::TwoWayVectorOptionalResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -3735,9 +3705,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 opt_vector_uint8,
                 opt_vector_string.map(fidl::encoding::Iterator),
                 opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct
-                    .map(|x| x.map(|x| x.map(|x| &*x)))
-                    .map(fidl::encoding::Iterator),
+                opt_vector_opt_struct.map(fidl::encoding::Iterator),
             ),
             0xe4b620aaafd73f3,
             fidl::encoding::DynamicFlags::empty(),
@@ -3789,7 +3757,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -3823,7 +3791,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 opt_vmo,
                 opt_client_end,
                 opt_server_end,
-                opt_struct,
+                opt_struct.as_mut(),
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
@@ -3900,7 +3868,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -4027,7 +3995,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 opt_vmo,
                 opt_client_end,
                 opt_server_end,
-                opt_struct,
+                opt_struct.as_mut(),
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
@@ -6463,19 +6431,11 @@ impl ProtocolControlHandle {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<Compound, false>(
-            (
-                bits,
-                enum_,
-                &*struct_,
-                &table,
-                &*union,
-                opt_struct.map(|x| &*x),
-                opt_union.map(|x| &*x),
-            ),
+            (bits, enum_, &*struct_, &table, &*union, opt_struct, opt_union.map(|x| &*x)),
             0,
             0x617c5410858734d5,
             fidl::encoding::DynamicFlags::empty(),
@@ -6591,7 +6551,7 @@ impl ProtocolControlHandle {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<VectorCompound, false>(
@@ -6601,7 +6561,7 @@ impl ProtocolControlHandle {
                 fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
                 fidl::encoding::Iterator(vector_table),
                 fidl::encoding::Iterator(vector_union.map(|x| &*x)),
-                fidl::encoding::Iterator(vector_opt_struct.map(|x| x.map(|x| &*x))),
+                fidl::encoding::Iterator(vector_opt_struct),
                 fidl::encoding::Iterator(vector_opt_union.map(|x| x.map(|x| &*x))),
             ),
             0,
@@ -6614,16 +6574,14 @@ impl ProtocolControlHandle {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         self.inner.send::<VectorOptional, false>(
             (
                 opt_vector_uint8,
                 opt_vector_string.map(fidl::encoding::Iterator),
                 opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct
-                    .map(|x| x.map(|x| x.map(|x| &*x)))
-                    .map(fidl::encoding::Iterator),
+                opt_vector_opt_struct.map(fidl::encoding::Iterator),
             ),
             0,
             0x17617b54dfa8d85d,
@@ -6655,7 +6613,7 @@ impl ProtocolControlHandle {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -6689,7 +6647,7 @@ impl ProtocolControlHandle {
                 opt_vmo,
                 opt_client_end,
                 opt_server_end,
-                opt_struct,
+                opt_struct.as_mut(),
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,
@@ -6899,7 +6857,7 @@ impl ProtocolTwoWayCompoundResponder {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(bits, enum_, struct_, table, union, opt_struct, opt_union);
@@ -6919,7 +6877,7 @@ impl ProtocolTwoWayCompoundResponder {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(bits, enum_, struct_, table, union, opt_struct, opt_union);
@@ -6934,7 +6892,7 @@ impl ProtocolTwoWayCompoundResponder {
         mut struct_: &mut Struct,
         mut table: Table,
         mut union: &mut Union,
-        mut opt_struct: Option<&mut Struct>,
+        mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&mut Union>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
@@ -6943,15 +6901,7 @@ impl ProtocolTwoWayCompoundResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (
-                bits,
-                enum_,
-                &*struct_,
-                &table,
-                &*union,
-                opt_struct.map(|x| &*x),
-                opt_union.map(|x| &*x),
-            ),
+            body: (bits, enum_, &*struct_, &table, &*union, opt_struct, opt_union.map(|x| &*x)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
@@ -7443,7 +7393,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
@@ -7471,7 +7421,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
@@ -7494,7 +7444,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
         mut vector_struct: &mut dyn ExactSizeIterator<Item = &mut Struct>,
         mut vector_table: &mut dyn ExactSizeIterator<Item = Table>,
         mut vector_union: &mut dyn ExactSizeIterator<Item = &mut Union>,
-        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&mut Struct>>,
+        mut vector_opt_struct: &mut dyn ExactSizeIterator<Item = Option<&Struct>>,
         mut vector_opt_union: &mut dyn ExactSizeIterator<Item = Option<&mut Union>>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
@@ -7509,7 +7459,7 @@ impl ProtocolTwoWayVectorCompoundResponder {
                 fidl::encoding::Iterator(vector_struct.map(|x| &*x)),
                 fidl::encoding::Iterator(vector_table),
                 fidl::encoding::Iterator(vector_union.map(|x| &*x)),
-                fidl::encoding::Iterator(vector_opt_struct.map(|x| x.map(|x| &*x))),
+                fidl::encoding::Iterator(vector_opt_struct),
                 fidl::encoding::Iterator(vector_opt_union.map(|x| x.map(|x| &*x))),
             ),
         };
@@ -7569,7 +7519,7 @@ impl ProtocolTwoWayVectorOptionalResponder {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
             opt_vector_uint8,
@@ -7591,7 +7541,7 @@ impl ProtocolTwoWayVectorOptionalResponder {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
             opt_vector_uint8,
@@ -7608,7 +7558,7 @@ impl ProtocolTwoWayVectorOptionalResponder {
         mut opt_vector_uint8: Option<&[u8]>,
         mut opt_vector_string: Option<&mut dyn ExactSizeIterator<Item = &str>>,
         mut opt_vector_struct: Option<&mut dyn ExactSizeIterator<Item = &mut Struct>>,
-        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&mut Struct>>>,
+        mut opt_vector_opt_struct: Option<&mut dyn ExactSizeIterator<Item = Option<&Struct>>>,
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -7620,9 +7570,7 @@ impl ProtocolTwoWayVectorOptionalResponder {
                 opt_vector_uint8,
                 opt_vector_string.map(fidl::encoding::Iterator),
                 opt_vector_struct.map(|x| x.map(|x| &*x)).map(fidl::encoding::Iterator),
-                opt_vector_opt_struct
-                    .map(|x| x.map(|x| x.map(|x| &*x)))
-                    .map(fidl::encoding::Iterator),
+                opt_vector_opt_struct.map(fidl::encoding::Iterator),
             ),
         };
 
@@ -7778,7 +7726,7 @@ impl ProtocolTwoWayResourceResponder {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -7850,7 +7798,7 @@ impl ProtocolTwoWayResourceResponder {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -7917,7 +7865,7 @@ impl ProtocolTwoWayResourceResponder {
         mut opt_vmo: Option<fidl::Vmo>,
         mut opt_client_end: Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
         mut opt_server_end: Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        mut opt_struct: Option<&mut ResourceStruct>,
+        mut opt_struct: Option<ResourceStruct>,
         mut opt_union: Option<&mut ResourceUnion>,
         mut array_handle: [fidl::Handle; 5],
         mut array_vmo: [fidl::Vmo; 5],
@@ -7956,7 +7904,7 @@ impl ProtocolTwoWayResourceResponder {
                 opt_vmo,
                 opt_client_end,
                 opt_server_end,
-                opt_struct,
+                opt_struct.as_mut(),
                 opt_union,
                 &mut array_handle,
                 &mut array_vmo,

@@ -235,8 +235,8 @@ impl ClientStates {
     /// Gets the `ClientConfig` for `ClientType` and passes it to the provided `get_fn` closure.
     ///
     /// The `get_fn` closure approach is used to help with ownership ergonomics.
-    fn get_config(&self, client_type: ClientType, get_fn: impl FnOnce(Option<&mut ClientConfig>)) {
-        get_fn(self.states.borrow_mut().get_mut(&client_type).map(|state| &mut state.config))
+    fn get_config(&self, client_type: ClientType, get_fn: impl FnOnce(Option<&ClientConfig>)) {
+        get_fn(self.states.borrow().get(&client_type).map(|state| &state.config))
     }
 
     /// Updates the `ClientConfig` for `ClientType` then reevalutes their power level.

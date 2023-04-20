@@ -83,14 +83,14 @@ impl RamdiskClientBuilder {
             )
             .await
             .with_context(|| format!("waiting for {}", RAMCTL_PATH))?;
-        let mut type_guid = guid.map(|guid| Guid { value: guid });
+        let type_guid = guid.map(|guid| Guid { value: guid });
         let name = match ramdisk_source {
             RamdiskSource::Vmo { vmo } => ramdisk_controller
-                .create_from_vmo_with_params(vmo, block_size, type_guid.as_mut())
+                .create_from_vmo_with_params(vmo, block_size, type_guid.as_ref())
                 .await?
                 .map_err(zx::Status::from_raw)?,
             RamdiskSource::Size { block_count } => ramdisk_controller
-                .create(block_size, block_count, type_guid.as_mut())
+                .create(block_size, block_count, type_guid.as_ref())
                 .await?
                 .map_err(zx::Status::from_raw)?,
         };

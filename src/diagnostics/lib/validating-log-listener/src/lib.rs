@@ -72,12 +72,12 @@ impl ValidatingListener {
     async fn run(
         mut self,
         proxy: LogProxy,
-        mut filter_options: Option<LogFilterOptions>,
+        filter_options: Option<LogFilterOptions>,
         dump_logs: bool,
     ) {
         let (client_end, stream) =
             fidl::endpoints::create_request_stream::<LogListenerSafeMarker>().unwrap();
-        let filter_options = filter_options.as_mut();
+        let filter_options = filter_options.as_ref();
 
         if dump_logs {
             proxy.dump_logs_safe(client_end, filter_options).expect("failed to register listener");

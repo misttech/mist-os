@@ -577,7 +577,7 @@ pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceive
     let log_proxy = connect_to_protocol_at_dir_svc::<LogMarker>(directory)
         .expect("cannot connect to log proxy");
     let (send_logs, recv_logs) = mpsc::unbounded();
-    let mut options = LogFilterOptions {
+    let options = LogFilterOptions {
         filter_by_pid: false,
         pid: 0,
         min_severity: LogLevelFilter::None,
@@ -588,7 +588,7 @@ pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceive
     };
     let l = Listener { send_logs };
     fasync::Task::spawn(async move {
-        run_log_listener_with_proxy(&log_proxy, l, Some(&mut options), false, None).await.unwrap();
+        run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await.unwrap();
     })
     .detach();
 

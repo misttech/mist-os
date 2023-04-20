@@ -241,7 +241,7 @@ pub async fn serve_hermetic_loader(
     while let Some(fv1sys::LoaderRequest::LoadUrl { url, responder }) =
         stream.try_next().await.expect("failed to serve loader")
     {
-        let mut result = hermetic_loader(
+        let result = hermetic_loader(
             &url,
             &hermetic_test_package_name,
             &other_allowed_packages,
@@ -250,7 +250,7 @@ pub async fn serve_hermetic_loader(
         .await
         .map(|p| *p);
 
-        if let Err(e) = responder.send(result.as_mut()) {
+        if let Err(e) = responder.send(result) {
             warn!("Failed sending load response for {}: {}", url, e);
         }
     }
@@ -311,7 +311,7 @@ mod tests {
                     | "fuchsia-pkg://fuchsia.com/package-three#meta/comp.cm"
                     | "fuchsia-pkg://fuchsia.com/package-four#meta/comp.cm"
                     | "fuchsia-pkg://fuchsia.com/package-five#meta/comp.cm" => {
-                        responder.send(Some(&mut fv1sys::Package {
+                        responder.send(Some(fv1sys::Package {
                             data: None,
                             directory: None,
                             resolved_url: url,

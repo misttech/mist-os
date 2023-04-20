@@ -468,14 +468,14 @@ where
             // TODO(fxbug.dev/8903): Remove when all clients have migrated to GetTypeface
             GetFont { request, responder } => {
                 let request = request.into_typeface_request();
-                let mut response = self.match_request(request).await?.into_font_response();
-                Ok(responder.send(response.as_mut())?)
+                let response = self.match_request(request).await?.into_font_response();
+                Ok(responder.send(response)?)
             }
             // TODO(fxbug.dev/8903): Remove when all clients have migrated to GetFontFamilyInfo
             GetFamilyInfo { family, responder } => {
-                let mut font_info =
+                let font_info =
                     self.get_family_info(fonts::FamilyName { name: family }).into_family_info();
-                Ok(responder.send(font_info.as_mut())?)
+                Ok(responder.send(font_info.as_ref())?)
             }
             GetTypeface { request, responder } => {
                 let response = self.match_request(request).await?;

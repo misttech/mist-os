@@ -55,7 +55,7 @@ async fn log_listener(
 pub async fn run_log_listener_with_proxy<'a>(
     logger: &LogProxy,
     processor: impl LogProcessor + 'a,
-    options: Option<&'a mut LogFilterOptions>,
+    options: Option<&'a LogFilterOptions>,
     dump_logs: bool,
     selectors: Option<&'a mut Vec<LogInterestSelector>>,
 ) -> Result<(), Error> {
@@ -83,7 +83,7 @@ pub async fn run_log_listener_with_proxy<'a>(
 /// register listener or log dumper based on the parameters passed.
 pub async fn run_log_listener<'a>(
     processor: impl LogProcessor + 'a,
-    options: Option<&'a mut LogFilterOptions>,
+    options: Option<&'a LogFilterOptions>,
     dump_logs: bool,
     selectors: Option<&'a mut Vec<LogInterestSelector>>,
 ) -> Result<(), Error> {

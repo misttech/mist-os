@@ -123,7 +123,7 @@ impl EnclosingEnvironment {
             fs.collect::<()>().await;
         });
 
-        let mut service_list = fv1sys::ServiceList {
+        let service_list = fv1sys::ServiceList {
             names: vec![
                 fv1sys::LoaderMarker::PROTOCOL_NAME.to_string(),
                 fdebugdata::PublisherMarker::PROTOCOL_NAME.to_string(),
@@ -150,7 +150,7 @@ impl EnclosingEnvironment {
                 env_server_end,
                 env_controller_server_end,
                 &name,
-                Some(&mut service_list),
+                Some(service_list),
                 &mut opts,
             )
             .context("Cannot create nested env")?;
@@ -215,19 +215,15 @@ impl EnclosingEnvironment {
                     environment,
                     controller,
                     label,
-                    mut additional_services,
+                    additional_services,
                     mut options,
                     control_handle,
                 } => {
-                    let services = match &mut additional_services {
-                        Some(s) => s.as_mut().into(),
-                        None => None,
-                    };
                     if let Err(e) = self.env_proxy.create_nested_environment(
                         environment,
                         controller,
                         &label,
-                        services,
+                        additional_services.map(|x| *x),
                         &mut options,
                     ) {
                         warn!("CreateNestedEnvironment failed: {}", e);

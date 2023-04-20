@@ -46,7 +46,7 @@ pub async fn serve_device_requests(
         // forever.
         match req {
             DeviceServiceRequest::AddIface { req, responder } => {
-                let mut add_iface_result = add_iface(
+                let add_iface_result = add_iface(
                     req,
                     &cfg,
                     &ifaces,
@@ -55,7 +55,7 @@ pub async fn serve_device_requests(
                     persistence_req_sender.clone(),
                 )
                 .await;
-                responder.send(add_iface_result.status, add_iface_result.iface_id.as_mut())?;
+                responder.send(add_iface_result.status, add_iface_result.iface_id.as_ref())?;
                 let serve_sme_fut = add_iface_result.result?;
                 fasync::Task::spawn(serve_sme_fut).detach();
             }

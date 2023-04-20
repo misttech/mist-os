@@ -555,7 +555,7 @@ pub mod test {
                         // fuchsia.hardware.block.partition.Partition methods
                         VolumeAndNodeRequest::GetTypeGuid { responder } => {
                             match &self.guid {
-                                Ok(guid) => responder.send(0, Some(&mut guid.clone())),
+                                Ok(guid) => responder.send(0, Some(guid)),
                                 Err(raw_status) => responder.send(*raw_status, None),
                             }
                             .expect("failed to send Partition.GetTypeGuid response");

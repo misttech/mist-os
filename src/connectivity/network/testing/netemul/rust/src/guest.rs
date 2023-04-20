@@ -36,7 +36,7 @@ impl Controller {
     pub async fn new(
         name: impl Into<String>,
         network: &TestNetwork<'_>,
-        mut mac: Option<fnet::MacAddress>,
+        mac: Option<fnet::MacAddress>,
     ) -> Result<Controller> {
         let name = name.into();
         let controller_proxy =
@@ -48,7 +48,7 @@ impl Controller {
         let network_client =
             network.get_client_end_clone().await.context("failed to get network client end")?;
         let guest = controller_proxy
-            .create_guest(&name, network_client, mac.as_mut())
+            .create_guest(&name, network_client, mac.as_ref())
             .await
             .with_context(|| format!("create_guest FIDL error for guest {}", name))?
             .map_err(|err| {

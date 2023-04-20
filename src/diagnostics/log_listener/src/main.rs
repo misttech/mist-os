@@ -1005,7 +1005,7 @@ fn run_log_listener(options: Option<&mut LogListenerOptions>) -> Result<(), Erro
     let mut executor = fasync::LocalExecutor::new();
     let (filter_options, local_options, selectors) = options.map_or_else(
         || (None, LocalOptions::default(), None),
-        |o| (Some(&mut o.filter), o.local.clone(), Some(&mut o.selectors)),
+        |o| (Some(&o.filter), o.local.clone(), Some(&mut o.selectors)),
     );
     let dump_logs = local_options.dump_logs;
     let l = new_listener(local_options)?;

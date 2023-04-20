@@ -92,7 +92,7 @@ pub(crate) async fn serve_monitor_requests(
                         );
 
                         let resp = fidl_svc::CreateIfaceResponse { iface_id: new_iface.id };
-                        responder.send(zx::sys::ZX_OK, Some(resp).as_mut())
+                        responder.send(zx::sys::ZX_OK, Some(&resp))
                     }
                     Err(status) => responder.send(status.into_raw(), None),
                 }
@@ -1645,12 +1645,12 @@ mod tests {
                 assert_eq!(req.phy_id, 10);
                 assert_eq!(req.assigned_iface_id, 123);
 
-                let (status, mut response) = if add_iface_fails {
+                let (status, response) = if add_iface_fails {
                     (zx::Status::NOT_SUPPORTED.into_raw(), None)
                 } else {
                     (zx::Status::OK.into_raw(), Some(fidl_svc::AddIfaceResponse { iface_id: 5 }))
                 };
-                responder.send(status, response.as_mut()).expect("failed to send AddIface response");
+                responder.send(status, response.as_ref()).expect("failed to send AddIface response");
             }
         );
 

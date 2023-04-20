@@ -64,7 +64,7 @@ fn listen_to_logs(
     let reader = ArchiveReader::new();
 
     let log_proxy = fuchsia_component::client::connect_to_protocol::<LogMarker>().unwrap();
-    let mut options = LogFilterOptions {
+    let options = LogFilterOptions {
         filter_by_pid: false,
         pid: 0,
         min_severity: LogLevelFilter::None,
@@ -75,7 +75,7 @@ fn listen_to_logs(
     };
     let (send_logs, recv_logs) = mpsc::unbounded();
     let _old_listener = Task::spawn(async move {
-        run_log_listener_with_proxy(&log_proxy, send_logs, Some(&mut options), false, None)
+        run_log_listener_with_proxy(&log_proxy, send_logs, Some(&options), false, None)
             .await
             .unwrap();
     });

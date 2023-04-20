@@ -292,9 +292,9 @@ mod tests {
         id: Option<PeerId>,
     ) -> (QueryResponseFut<()>, StreamSuspenderProxy) {
         let (c, s) = create_proxy::<StreamSuspenderMarker>().unwrap();
-        let mut peer_id: Option<fidl_fuchsia_bluetooth::PeerId> = id.map(|id| id.into());
+        let peer_id: Option<fidl_fuchsia_bluetooth::PeerId> = id.map(|id| id.into());
         let fidl_req = controller_svc
-            .suspend(peer_id.as_mut(), s)
+            .suspend(peer_id.as_ref(), s)
             .check()
             .expect("FIDL suspend request should succeed");
 
@@ -459,7 +459,7 @@ mod tests {
         let (c, s) = create_proxy::<StreamSuspenderMarker>().unwrap();
         drop(c);
         let fidl_request = controller_svc
-            .suspend(Some(remote_id.into()).as_mut(), s)
+            .suspend(Some(remote_id.into()).as_ref(), s)
             .check()
             .expect("FIDL suspend request should succeed");
 

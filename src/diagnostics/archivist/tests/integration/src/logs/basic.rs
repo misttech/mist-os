@@ -16,7 +16,7 @@ use futures::{channel::mpsc, Stream, StreamExt};
 use tracing::{info, warn};
 
 fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
-    let mut options = LogFilterOptions {
+    let options = LogFilterOptions {
         filter_by_pid: false,
         pid: 0,
         min_severity: LogLevelFilter::None,
@@ -28,13 +28,8 @@ fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     let (send_logs, recv_logs) = mpsc::unbounded();
     let l = Listener { send_logs };
     fasync::Task::spawn(async move {
-        let fut = syslog_listener::run_log_listener_with_proxy(
-            &proxy,
-            l,
-            Some(&mut options),
-            false,
-            None,
-        );
+        let fut =
+            syslog_listener::run_log_listener_with_proxy(&proxy, l, Some(&options), false, None);
         if let Err(e) = fut.await {
             panic!("test fail {e:?}");
         }

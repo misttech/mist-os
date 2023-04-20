@@ -58,7 +58,7 @@ impl AudioConsumerSink {
     fn build(
         audio_consumer: &mut AudioConsumerProxy,
         frames_per_second: u32,
-        mut compression: Option<Compression>,
+        compression: Option<Compression>,
         flags_receiver: mpsc::Receiver<u32>,
     ) -> Result<AudioConsumerSink, Error> {
         let (stream_sink, stream_sink_server) = fidl::endpoints::create_proxy()?;
@@ -88,7 +88,7 @@ impl AudioConsumerSink {
         audio_consumer.create_stream_sink(
             &mut vmos_for_sink.into_iter(),
             &mut audio_stream_type,
-            compression.as_mut(),
+            compression.as_ref(),
             stream_sink_server,
         )?;
 

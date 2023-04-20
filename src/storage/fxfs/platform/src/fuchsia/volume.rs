@@ -1931,7 +1931,7 @@ mod tests {
             assert!(!entries.contains(&num_entries));
             // Page two should have a small set at the end.
             (entries, next_token) = project_proxy
-                .list(next_token.as_deref_mut())
+                .list(next_token.as_deref())
                 .await
                 .unwrap()
                 .expect("To get project listing");
@@ -1951,7 +1951,7 @@ mod tests {
             assert!(!entries.contains(&1));
             assert!(entries.contains(&3));
             (entries, next_token) = project_proxy
-                .list(next_token.as_deref_mut())
+                .list(next_token.as_deref())
                 .await
                 .unwrap()
                 .expect("To get project listing");

@@ -2537,9 +2537,8 @@ mod tests {
             ))) => {
                 let requested_mac = MacAddress::from_bytes(&req.sta_addr).unwrap();
                 assert_eq!(requested_mac, mac);
-                let mut response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
-                let response = Some(&mut response);
-                responder.send(ZX_OK, response).expect("sending fake iface id");
+                let response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
+                responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
             }
         );
         assert_variant!(exec.run_until_stalled(&mut get_ap_future), Poll::Ready(_));
@@ -2584,9 +2583,8 @@ mod tests {
                 }
             ))) => {
                 assert_eq!(req.sta_addr, ieee80211::NULL_MAC_ADDR);
-                let mut response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
-                let response = Some(&mut response);
-                responder.send(ZX_OK, response).expect("sending fake iface id");
+                let response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
+                responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
             }
         );
         // Expect an iface security support query, and send back a response
@@ -2964,10 +2962,8 @@ mod tests {
                         responder,
                     }
                 ))) => {
-                    let mut response =
-                        fidl_service::CreateIfaceResponse { iface_id: req.phy_id };
-                    let response = Some(&mut response);
-                    responder.send(ZX_OK, response).expect("sending fake iface id");
+                    let response =fidl_service::CreateIfaceResponse { iface_id: req.phy_id };
+                    responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
 
                     assert_variant!(exec.run_until_stalled(&mut recovery_fut), Poll::Pending);
 
@@ -3047,9 +3043,7 @@ mod tests {
                         }
                     ))) => {
                         let iface_id = req.phy_id;
-                        let mut response =
-                            fidl_service::CreateIfaceResponse { iface_id };
-                        let response = Some(&mut response);
+                        let response = fidl_service::CreateIfaceResponse { iface_id };
 
                         // As noted above, let the requests for 0 and 2 "fail" and let the request
                         // for PHY 1 succeed.
@@ -3061,7 +3055,7 @@ mod tests {
                             _ => ZX_ERR_NOT_FOUND,
                         };
 
-                        responder.send(result_code, response).expect("sending fake iface id");
+                        responder.send(result_code, Some(&response)).expect("sending fake iface id");
                     }
                 );
 

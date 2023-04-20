@@ -136,7 +136,7 @@ async fn log_unattributed_stream() {
     let (send_logs, recv_logs) = mpsc::unbounded();
     fasync::Task::spawn(async move {
         let listen = Listener { send_logs };
-        let mut options = LogFilterOptions {
+        let options = LogFilterOptions {
             filter_by_pid: true,
             pid: 1000,
             filter_by_tid: true,
@@ -145,9 +145,7 @@ async fn log_unattributed_stream() {
             min_severity: LogLevelFilter::None,
             tags: Vec::new(),
         };
-        run_log_listener_with_proxy(&log_proxy, listen, Some(&mut options), false, None)
-            .await
-            .unwrap();
+        run_log_listener_with_proxy(&log_proxy, listen, Some(&options), false, None).await.unwrap();
     })
     .detach();
 

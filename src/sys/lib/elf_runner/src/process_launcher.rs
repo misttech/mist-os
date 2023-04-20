@@ -115,7 +115,7 @@ impl ProcessLauncher {
 
                     match Self::create_process(info, state).await {
                         Ok(built) => {
-                            let mut process_data = fproc::ProcessStartData {
+                            let process_data = fproc::ProcessStartData {
                                 process: built.process,
                                 root_vmar: built.root_vmar,
                                 thread: built.thread,
@@ -125,7 +125,7 @@ impl ProcessLauncher {
                                 vdso_base: built.vdso_base as u64,
                                 base: built.elf_base as u64,
                             };
-                            responder.send(zx::Status::OK.into_raw(), Some(&mut process_data))?;
+                            responder.send(zx::Status::OK.into_raw(), Some(process_data))?;
                         }
                         Err(err) => {
                             Self::log_launcher_error(&err, "create", job, name);

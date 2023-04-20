@@ -780,9 +780,6 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		Identifier:       val.Identifier,
 	}
 
-	fidlOptionalFmt := "fidl::encoding::Optional<%s>"
-	ownedOptionalFmt := "Option<%s>"
-
 	switch val.Kind {
 	case fidlgen.PrimitiveType:
 		s := compilePrimitiveSubtype(val.PrimitiveSubtype)
@@ -825,6 +822,11 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			// TODO(fxbug.dev/54368): This is the old type. Remove once the migration is done.
 			t.Param = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", el.Param)
 		}
+		if val.Nullable {
+			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
+			t.Param = fmt.Sprintf("Option<%s>", t.Param)
+		}
 	case fidlgen.StringType:
 		if val.ElementCount == nil {
 			t.Fidl = "fidl::encoding::UnboundedString"
@@ -833,17 +835,32 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		}
 		t.Owned = "String"
 		t.Param = "&str"
+		if val.Nullable {
+			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
+			t.Param = fmt.Sprintf("Option<%s>", t.Param)
+		}
 	case fidlgen.HandleType:
 		s := compileHandleSubtype(val.HandleSubtype)
 		objType := compileObjectTypeConst(val.HandleSubtype)
 		t.Fidl = fmt.Sprintf("fidl::encoding::HandleType<%s, { %s.into_raw() }, %d>", s, objType, val.HandleRights)
 		t.Owned = s
 		t.Param = s
+		if val.Nullable {
+			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
+			t.Param = fmt.Sprintf("Option<%s>", t.Param)
+		}
 	case fidlgen.RequestType:
 		s := fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileCamelCompoundIdentifier(val.RequestSubtype))
 		t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 		t.Owned = s
 		t.Param = s
+		if val.Nullable {
+			t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
+			t.Param = fmt.Sprintf("Option<%s>", t.Param)
+		}
 	case fidlgen.IdentifierType:
 		name := c.compileCamelCompoundIdentifier(val.Identifier)
 		declInfo, ok := c.decls[val.Identifier]
@@ -860,8 +877,15 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Fidl = name
 			t.Owned = name
 			t.Param = "&mut " + name
-			fidlOptionalFmt = "fidl::encoding::Boxed<%s>"
-			ownedOptionalFmt = "Option<Box<%s>>"
+			if val.Nullable {
+				t.Fidl = fmt.Sprintf("fidl::encoding::Boxed<%s>", t.Fidl)
+				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
+				if declInfo.IsResourceType() {
+					t.Param = fmt.Sprintf("Option<%s>", name)
+				} else {
+					t.Param = fmt.Sprintf("Option<&%s>", name)
+				}
+			}
 		case fidlgen.TableDeclType:
 			t.Fidl = name
 			t.Owned = name
@@ -870,13 +894,21 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Fidl = name
 			t.Owned = name
 			t.Param = "&mut " + name
-			fidlOptionalFmt = "fidl::encoding::OptionalUnion<%s>"
-			ownedOptionalFmt = "Option<Box<%s>>"
+			if val.Nullable {
+				t.Fidl = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.Fidl)
+				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
+				t.Param = fmt.Sprintf("Option<%s>", t.Param)
+			}
 		case fidlgen.ProtocolDeclType:
 			s := fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
 			t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 			t.Owned = s
 			t.Param = s
+			if val.Nullable {
+				t.Fidl = fmt.Sprintf("fidl::encoding::Optional<%s>", t.Fidl)
+				t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
+				t.Param = fmt.Sprintf("Option<%s>", t.Param)
+			}
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", declInfo.Type))
 		}
@@ -894,11 +926,6 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		panic(fmt.Sprintf("unknown type kind: %v", val.Kind))
 	}
 
-	if val.Nullable {
-		t.Fidl = fmt.Sprintf(fidlOptionalFmt, t.Fidl)
-		t.Owned = fmt.Sprintf(ownedOptionalFmt, t.Owned)
-		t.Param = fmt.Sprintf("Option<%s>", t.Param)
-	}
 	return t
 }
 
@@ -956,7 +983,15 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:
 			return v
-		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
+		case fidlgen.StructDeclType:
+			if t.Nullable {
+				if t.IsResourceType() {
+					return v + ".as_mut()"
+				}
+				return v
+			}
+			fallthrough
+		case fidlgen.UnionDeclType:
 			if t.IsResourceType() {
 				return v
 			}

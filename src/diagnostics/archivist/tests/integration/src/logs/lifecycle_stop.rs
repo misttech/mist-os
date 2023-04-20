@@ -24,7 +24,7 @@ const LOGGING_COMPONENT: &str = "logging_component";
 async fn embedding_stop_api_for_log_listener() {
     let instance = initialize_topology().await;
 
-    let mut options = LogFilterOptions {
+    let options = LogFilterOptions {
         filter_by_pid: false,
         pid: 0,
         min_severity: LogLevelFilter::None,
@@ -38,7 +38,7 @@ async fn embedding_stop_api_for_log_listener() {
     let log_proxy = instance.root.connect_to_protocol_at_exposed_dir::<LogMarker>().unwrap();
     fasync::Task::spawn(async move {
         let l = Listener { send_logs };
-        run_log_listener_with_proxy(&log_proxy, l, Some(&mut options), false, None).await.unwrap();
+        run_log_listener_with_proxy(&log_proxy, l, Some(&options), false, None).await.unwrap();
     })
     .detach();
 

@@ -169,7 +169,7 @@ impl OtaLogListenerImpl {
 #[async_trait(?Send)]
 impl OtaLogListener for OtaLogListenerImpl {
     async fn listen(&self, handler: LogHandlerFnPtr) -> Result<(), Error> {
-        let mut options = flog::LogFilterOptions {
+        let options = flog::LogFilterOptions {
             filter_by_pid: false,
             pid: 0,
             min_severity: flog::LogLevelFilter::None,
@@ -182,7 +182,7 @@ impl OtaLogListener for OtaLogListenerImpl {
         fuchsia_syslog_listener::run_log_listener_with_proxy(
             &self.log_proxy,
             LogProcessorFn(handler),
-            Some(&mut options),
+            Some(&options),
             false,
             None,
         )
