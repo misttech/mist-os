@@ -44,22 +44,22 @@
 #include "src/ui/input/testing/fake_input_report_device/reports_reader.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
 
-// This test exercises the virtual keyboard visibility interactions between Chromium and Root
-// Presenter. It is a multi-component test, and carefully avoids sleeping or polling for component
-// coordination.
-// - It runs real Root Presenter, Input Pipeline and Scenic components.
+// This test exercises the virtual keyboard visibility interactions between
+// Chromium and Virtual Keyboard Manager. It is a multi-component test, and
+// carefully avoids sleeping or polling for component coordination.
+// - It runs real Virtual Keyboard Manager, Scene Manager and Scenic components.
 // - It uses a fake display controller; the physical device is unused.
 //
 // Components involved
 // - This test program
-// - Root Presenter (serves virtual keyboard)
-// - Input Pipeline (serves touch input)
+// - Virtual Keyboard Manager
+// - Scene Manager (serves root view and touch input)
 // - Scenic
 // - WebEngine (built from Chromium)
 //
 // Setup sequence
 // - The test sets up a view hierarchy with two views:
-//   - Top level scene, owned by Root Presenter.
+//   - Top level scene, owned by Scene Manager.
 //   - Bottom view, owned by Chromium.
 
 namespace {
@@ -106,25 +106,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
       fuchsia::ui::input::ImeService::Name_,
       fuchsia::input::virtualkeyboard::Manager::Name_,
       fuchsia::input::virtualkeyboard::ControllerCreator::Name_};
-
-  // GFX x root presenter
-  {
-    ui_testing::UITestRealm::Config config;
-    config.use_input = true;
-    config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
-    config.ui_to_client_services = protocols_required;
-    config.passthrough_capabilities = {
-        {Protocol{fuchsia::process::Launcher::Name_},
-         // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" from all of
-         // these after successful transition to CFv2.
-         Protocol{fuchsia::sys::Environment::Name_},
-         Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }}};
-    configs.push_back(std::move(config));
-  }
 
   // GFX x scene manager
   {

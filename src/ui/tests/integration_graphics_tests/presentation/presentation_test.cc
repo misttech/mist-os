@@ -35,14 +35,6 @@ constexpr auto kViewProvider = "view-provider";
 std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
   std::vector<ui_testing::UITestRealm::Config> configs;
 
-  // GFX x root presenter
-  {
-    ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-    configs.push_back(std::move(config));
-  }
-
   // GFX x scene manager
   {
     ui_testing::UITestRealm::Config config;

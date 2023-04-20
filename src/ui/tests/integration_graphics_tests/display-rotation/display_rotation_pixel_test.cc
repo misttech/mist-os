@@ -28,18 +28,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
     std::vector<int> display_rotations) {
   std::vector<ui_testing::UITestRealm::Config> configs;
 
-  // // GFX x root presenter
-  {
-    ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
-    config.device_pixel_ratio = ui_testing::kDefaultDevicePixelRatio;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
-    for (const auto rotation : display_rotations) {
-      config.display_rotation = rotation;
-      configs.push_back(config);
-    }
-  }
-
   // GFX x scene manager
   {
     ui_testing::UITestRealm::Config config;
@@ -76,7 +64,7 @@ using component_testing::Protocol;
 using component_testing::Realm;
 using component_testing::Route;
 
-// This test verifies that Root Presenter and Scene Manager propagate
+// This test verifies that Scene Manager propagates
 // 'config/data/display_rotation' correctly.
 class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
  protected:

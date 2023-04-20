@@ -38,83 +38,30 @@ executable("bin") {
 
   deps = [
     ":lib",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-provider",
   ]
-
-  configs += [ "//third_party/glm:enable_experimental" ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 source_set("lib") {
   sources = [
     "app.cc",
     "app.h",
-    "inspect.cc",
-    "inspect.h",
-    "presentation.cc",
-    "presentation.h",
   ]
 
   public_deps = [
     ":focus_dispatcher",
     "//sdk/fidl/fuchsia.input.virtualkeyboard:fuchsia.input.virtualkeyboard_hlcpp",
-    "//sdk/fidl/fuchsia.ui.brightness:fuchsia.ui.brightness_hlcpp",
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/fidl/fuchsia.ui.keyboard.focus:fuchsia.ui.keyboard.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_hlcpp",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
-    "//sdk/lib/ui/scenic/cpp",
-    "//src/ui/input/lib/injector",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/inspect",
   ]
 
   deps = [
-    ":constants",
-    ":displays",
-    ":safe_presenter",
     ":virtual_keyboard",
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/cpp",
-    "//src/lib/fxl",
-    "//third_party/glm",
-    "//zircon/system/ulib/trace",
   ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
-source_set("displays") {
-  sources = [
-    "displays/display_configuration.cc",
-    "displays/display_configuration.h",
-    "displays/display_metrics.h",
-    "displays/display_model.cc",
-    "displays/display_model.h",
-  ]
-
-  deps = [
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//src/lib/fxl",
-  ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 source_set("focus_dispatcher") {
@@ -130,28 +77,6 @@ source_set("focus_dispatcher") {
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
   ]
-}
-
-source_set("safe_presenter") {
-  sources = [
-    "safe_presenter.cc",
-    "safe_presenter.h",
-  ]
-
-  public_deps = [ "//sdk/lib/sys/cpp" ]
-
-  deps = [
-    "//sdk/lib/syslog/cpp",
-    "//sdk/lib/ui/scenic/cpp",
-  ]
-}
-
-source_set("constants") {
-  sources = [
-    "constants.cc",
-    "constants.h",
-  ]
-  deps = [ "//src/lib/files" ]
 }
 
 source_set("virtual_keyboard") {

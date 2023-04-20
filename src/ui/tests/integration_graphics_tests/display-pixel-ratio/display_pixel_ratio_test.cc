@@ -31,17 +31,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
   std::vector<ui_testing::UITestRealm::Config> configs;
   std::vector<std::string> protocols_required = {fuchsia::ui::scenic::Scenic::Name_};
 
-  // GFX x root presenter
-  {
-    ui_testing::UITestRealm::Config config;
-    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
-    config.ui_to_client_services = protocols_required;
-    for (auto dpr : pixel_densities) {
-      config.device_pixel_ratio = dpr;
-      configs.push_back(config);
-    }
-  }
-
   // GFX x scene manager
   {
     ui_testing::UITestRealm::Config config;
@@ -77,7 +66,7 @@ using component_testing::Protocol;
 using component_testing::Realm;
 using component_testing::Route;
 
-// This test verifies that Root Presenter and Scene Manager propagate
+// This test verifies that Scene Manager propagates
 // 'config/data/device_pixel_ratio' correctly.
 class DisplayPixelRatioTest
     : public gtest::RealLoopFixture,

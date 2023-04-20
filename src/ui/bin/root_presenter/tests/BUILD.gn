@@ -18,20 +18,12 @@ fuchsia_unittest_component("focus_dispatcher_unittests") {
 }
 
 fuchsia_unittest_component("root_presenter_unittests") {
-  deps = [
-    ":root_presenter_unittests_bin",
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
-    "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
-    "//src/ui/scenic:component_v2_with_supplied_display_provider",
-  ]
-  manifest = "meta/root_presenter_unittests.cml"
+  deps = [ ":root_presenter_unittests_bin" ]
 }
 
 fuchsia_test_package("root_presenter_tests") {
   test_components = [
-    # TODO(fxbug.dev/74262): We decided to disable this test instead of
-    # hermeticizing it.
-    # ":root_presenter_unittests",
+    ":root_presenter_unittests",
     ":focus_dispatcher_unittests",
   ]
   test_specs = {
@@ -47,9 +39,6 @@ executable("root_presenter_unittests_bin") {
   output_name = "root_presenter_unittests"
 
   sources = [
-    "display_configuration_unittest.cc",
-    "root_presenter_unittest.cc",
-    "safe_presenter_unittest.cc",
     "virtual_keyboard_controller_unittest.cc",
     "virtual_keyboard_coordinator_unittest.cc",
     "virtual_keyboard_fidl_test.cc",
@@ -57,34 +46,13 @@ executable("root_presenter_unittests_bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_hlcpp",
-    "//sdk/fidl/fuchsia.recovery.policy:fuchsia.recovery.policy_hlcpp",
-    "//sdk/fidl/fuchsia.ui.brightness:fuchsia.ui.brightness_hlcpp",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/lib/testing/loop_fixture",
-    "//src/ui/a11y/lib/view",
-    "//src/ui/bin/root_presenter:displays",
     "//src/ui/bin/root_presenter:lib",
-    "//src/ui/bin/root_presenter:safe_presenter",
     "//src/ui/bin/root_presenter:virtual_keyboard",
-    "//src/ui/bin/root_presenter/tests/fakes",
-    "//src/ui/input/lib/injector/tests/mocks",
-    "//src/ui/lib/key_util",
-    "//third_party/googletest:gmock",
   ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 executable("focus_dispatcher_unittests_bin") {
@@ -99,6 +67,7 @@ executable("focus_dispatcher_unittests_bin") {
     "//sdk/lib/sys/cpp/testing:integration_fixture",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
+    "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/ui/bin/root_presenter:lib",

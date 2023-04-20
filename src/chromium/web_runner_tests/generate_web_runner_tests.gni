@@ -21,9 +21,6 @@ template("generate_web_runner_tests") {
 
       # The deps below are necessary on minimal product configs.
       "//src/graphics/bin/vulkan_loader",
-
-      # TODO(fxbug.dev/24643): Remove keyboard dispatch from Scenic
-      "//src/ui/bin/root_presenter",
       "//src/ui/bin/text:text_manager",
       "//src/ui/scenic",
 

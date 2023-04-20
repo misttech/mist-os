@@ -28,7 +28,6 @@ use {
 };
 
 const TEST_UI_STACK: &str = "ui";
-const ROOT_PRESENTER_UI_STACK_URL: &str = "gfx-root-presenter-test-ui-stack#meta/test-ui-stack.cm";
 const GFX_SCENE_MANAGER_UI_STACK_URL: &str =
     "gfx-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
 const FLATLAND_UI_STACK_URL: &str = "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
@@ -78,7 +77,6 @@ async fn assemble_realm(test_ui_stack_url: &str) -> RealmInstance {
     builder.build().await.expect("Failed to create test realm.")
 }
 
-#[test_case(ROOT_PRESENTER_UI_STACK_URL; "Standalone Input Pipeline variant")]
 #[test_case(GFX_SCENE_MANAGER_UI_STACK_URL; "GFX Scene Manager variant")]
 #[test_case(FLATLAND_UI_STACK_URL; "Flatland Scene Manager variant")]
 #[fuchsia::test]
@@ -114,8 +112,6 @@ async fn enters_idle_state_without_activity(test_ui_stack_url: &str) {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
-// Note that the root presenter variant is omitted here because keyboards
-// are unsupported in that mode.
 #[test_case(GFX_SCENE_MANAGER_UI_STACK_URL; "GFX Scene Manager variant")]
 #[test_case(FLATLAND_UI_STACK_URL; "Flatland Scene Manager variant")]
 #[fuchsia::test]
@@ -232,7 +228,6 @@ async fn enters_active_state_with_mouse() {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
-#[test_case(ROOT_PRESENTER_UI_STACK_URL; "Standalone Input Pipeline variant")]
 #[test_case(GFX_SCENE_MANAGER_UI_STACK_URL; "GFX Scene Manager variant")]
 #[test_case(FLATLAND_UI_STACK_URL; "Flatland Scene Manager variant")]
 #[fuchsia::test]
@@ -300,7 +295,6 @@ async fn enters_active_state_with_touchscreen(test_ui_stack_url: &str) {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
-#[test_case(ROOT_PRESENTER_UI_STACK_URL; "Standalone Input Pipeline variant")]
 #[test_case(GFX_SCENE_MANAGER_UI_STACK_URL; "GFX Scene Manager variant")]
 #[test_case(FLATLAND_UI_STACK_URL; "Flatland Scene Manager variant")]
 #[fuchsia::test]

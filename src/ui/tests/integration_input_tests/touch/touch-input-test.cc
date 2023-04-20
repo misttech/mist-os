@@ -56,13 +56,12 @@
 
 // This test exercises the touch input dispatch path from Input Pipeline to a Scenic client. It is a
 // multi-component test, and carefully avoids sleeping or polling for component coordination.
-// - It runs real Root Presenter, Input Pipeline, and Scenic components.
+// - It runs real Scene Manager and Scenic components.
 // - It uses a fake display controller; the physical device is unused.
 //
 // Components involved
 // - This test program
-// - Input Pipeline
-// - Root Presenter
+// - Scene Manager
 // - Scenic
 // - Child view, a Scenic client
 //
@@ -71,7 +70,7 @@
 //
 // Setup sequence
 // - The test sets up this view hierarchy:
-//   - Top level scene, owned by Root Presenter.
+//   - Top level scene, owned by Scene Manager.
 //   - Child view, owned by the ui client.
 // - The test waits for a Scenic event that verifies the child has UI content in the scene graph.
 // - The test injects input into Input Pipeline, emulating a display's touch report.
@@ -163,12 +162,6 @@ struct UIStackConfig {
 
 std::vector<UIStackConfig> UIStackConfigsToTest() {
   std::vector<UIStackConfig> configs;
-
-  // GFX x RP
-  configs.push_back({.use_scene_manager = false,
-                     .use_flatland = false,
-                     .display_rotation = 90,
-                     .device_pixel_ratio = 2.f});
 
   // GFX x SM
   configs.push_back({.use_scene_manager = true,

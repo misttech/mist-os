@@ -65,9 +65,7 @@ class ButtonsListenerImpl : public fuchsia::ui::policy::MediaButtonsListener {
   fit::function<void(const fuchsia::ui::input::MediaButtonsEvent&)> on_event_;
 };
 
-class MediaButtonsListenerTest
-    : public gtest::RealLoopFixture,
-      public ::testing::WithParamInterface<ui_testing::UITestRealm::SceneOwnerType> {
+class MediaButtonsListenerTest : public gtest::RealLoopFixture {
  protected:
   MediaButtonsListenerTest() = default;
 
@@ -83,7 +81,7 @@ class MediaButtonsListenerTest
         kTimeout);
 
     ui_testing::UITestRealm::Config config;
-    config.scene_owner = GetParam();
+    config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
     config.use_input = true;
     ui_test_manager_.emplace(std::move(config));
 
@@ -148,10 +146,7 @@ class MediaButtonsListenerTest
   uint32_t injection_count_ = 0;
 };
 
-INSTANTIATE_TEST_SUITE_P(MediaButtonsListenerTestWithParams, MediaButtonsListenerTest,
-                         ::testing::Values(ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER,
-                                           ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER));
-TEST_P(MediaButtonsListenerTest, MediaButtonsWithCallback) {
+TEST_F(MediaButtonsListenerTest, MediaButtonsWithCallback) {
   RegisterInjectionDevice();
   // Callbacks to save the observed media button event.
   std::optional<fuchsia::ui::input::MediaButtonsEvent> observed_event_first_listener;
