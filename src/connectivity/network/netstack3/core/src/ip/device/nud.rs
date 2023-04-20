@@ -1152,22 +1152,14 @@ mod tests {
     fn assert_neighbors<
         'a,
         I: Ip,
-        C: NonSyncContext
-            + NonSyncNudContext<
-                I,
-                EthernetLinkDevice,
-                EthernetDeviceId<<C as InstantContext>::Instant, C::EthernetDeviceState>,
-            >,
+        C: NonSyncContext + NonSyncNudContext<I, EthernetLinkDevice, EthernetDeviceId<C>>,
     >(
         sync_ctx: &'a SyncCtx<C>,
-        device_id: &EthernetDeviceId<C::Instant, C::EthernetDeviceState>,
+        device_id: &EthernetDeviceId<C>,
         expected: HashMap<SpecifiedAddr<I::Addr>, NeighborState<Mac>>,
     ) where
         Locked<&'a SyncCtx<C>, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, C>
-            + DeviceIdContext<
-                EthernetLinkDevice,
-                DeviceId = EthernetDeviceId<C::Instant, C::EthernetDeviceState>,
-            >,
+            + DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<C>>,
     {
         NudContext::<I, EthernetLinkDevice, _>::with_nud_state_mut(
             &mut Locked::new(sync_ctx),

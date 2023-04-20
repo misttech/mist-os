@@ -28,8 +28,8 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, Ctx, DeviceId, IpDeviceConfiguration,
-    Ipv6DeviceConfiguration, Netstack, NonSyncContext, StackTime, SyncCtx,
+    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
+    IpDeviceConfiguration, Ipv6DeviceConfiguration, Netstack, NonSyncContext, SyncCtx,
     DEFAULT_INTERFACE_METRIC,
 };
 
@@ -37,9 +37,7 @@ use crate::bindings::{
 struct Inner {
     device: netdevice_client::Client,
     session: netdevice_client::Session,
-    state: Arc<
-        Mutex<netdevice_client::PortSlab<EthernetWeakDeviceId<StackTime, devices::NetdeviceInfo>>>,
-    >,
+    state: Arc<Mutex<netdevice_client::PortSlab<EthernetWeakDeviceId<BindingsNonSyncCtxImpl>>>>,
 }
 
 /// The worker that receives messages from the ethernet device, and passes them
@@ -466,7 +464,7 @@ impl PortHandler {
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
         let Self { id: _, port_id, inner: Inner { device: _, session, state }, _mac_proxy: _ } =
             self;
-        let _: EthernetWeakDeviceId<_, _> = assert_matches!(
+        let _: EthernetWeakDeviceId<_> = assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
         );

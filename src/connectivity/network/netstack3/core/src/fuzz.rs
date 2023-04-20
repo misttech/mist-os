@@ -27,7 +27,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt},
+    context::testutil::{handle_timer_helper_with_sc_ref, FakeTimerCtxExt},
     device::{ethernet, EthernetDeviceId},
     testutil::{Ctx, DEFAULT_INTERFACE_METRIC},
     TimerId,
@@ -315,7 +315,7 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
 
 fn dispatch(
     Ctx { sync_ctx, non_sync_ctx }: &mut crate::testutil::FakeCtx,
-    device_id: &EthernetDeviceId<FakeInstant, ()>,
+    device_id: &EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
     action: FuzzAction,
 ) {
     use FuzzAction::*;

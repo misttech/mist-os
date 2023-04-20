@@ -67,8 +67,8 @@ use netstack3_core::{
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
     device::{
-        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError,
-        EthernetDeviceId,
+        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceLayerTypes,
+        DeviceSendFrameError, EthernetDeviceId,
     },
     error::NetstackError,
     handle_timer,
@@ -321,14 +321,13 @@ impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
+impl DeviceLayerTypes for BindingsNonSyncCtxImpl {
     type LoopbackDeviceState = LoopbackInfo;
     type EthernetDeviceState = NetdeviceInfo;
+}
 
-    fn wake_rx_task(
-        &mut self,
-        device: &LoopbackDeviceId<Self::Instant, Self::LoopbackDeviceState>,
-    ) {
+impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
+    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self>) {
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             device.external_state();
         rx_notifier.schedule()
@@ -340,7 +339,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
 
     fn send_frame(
         &mut self,
-        device: &EthernetDeviceId<Self::Instant, Self::EthernetDeviceState>,
+        device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         let state = device.external_state();

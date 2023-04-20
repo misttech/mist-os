@@ -29,7 +29,8 @@ use crate::{
     },
     device::{
         ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
-        DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
+        DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId,
+        WeakDeviceId,
     },
     ip::{
         device::{route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
@@ -137,7 +138,7 @@ pub(crate) mod benchmarks {
 pub(crate) struct FakeNonSyncCtxState {
     icmpv4_replies: HashMap<IcmpConnId<Ipv4>, Vec<(u16, Vec<u8>)>>,
     icmpv6_replies: HashMap<IcmpConnId<Ipv6>, Vec<(u16, Vec<u8>)>>,
-    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeInstant, ()>>,
+    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeNonSyncCtx>>,
     pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
 }
 
@@ -270,11 +271,11 @@ impl NonSyncContext for FakeNonSyncCtx {
 }
 
 impl FakeNonSyncCtx {
-    pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeInstant, ()>, Vec<u8>)> {
+    pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
         self.frame_ctx_mut().take_frames()
     }
 
-    pub(crate) fn frames_sent(&self) -> &[(EthernetWeakDeviceId<FakeInstant, ()>, Vec<u8>)] {
+    pub(crate) fn frames_sent(&self) -> &[(EthernetWeakDeviceId<FakeNonSyncCtx>, Vec<u8>)] {
         self.frame_ctx().frames()
     }
 }
@@ -636,7 +637,7 @@ impl FakeEventDispatcherBuilder {
     }
 
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
-    pub(crate) fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeInstant, ()>>) {
+    pub(crate) fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
         self.build_with_modifications(|_| {})
     }
 
@@ -646,7 +647,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
-    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeInstant, ()>>) {
+    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
         let mut stack_builder = StackStateBuilder::default();
         f(&mut stack_builder);
         self.build_with(stack_builder)
@@ -657,7 +658,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn build_with(
         self,
         state_builder: StackStateBuilder,
-    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeInstant, ()>>) {
+    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeNonSyncCtx>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
@@ -753,8 +754,8 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     }
 }
 
-impl AsMut<FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>>> for FakeCtx {
-    fn as_mut(&mut self) -> &mut FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>> {
+impl AsMut<FakeFrameCtx<EthernetWeakDeviceId<FakeNonSyncCtx>>> for FakeCtx {
+    fn as_mut(&mut self) -> &mut FakeFrameCtx<EthernetWeakDeviceId<FakeNonSyncCtx>> {
         self.non_sync_ctx.frame_ctx_mut()
     }
 }
@@ -773,7 +774,7 @@ impl AsMut<FakeTimerCtx<TimerId<FakeNonSyncCtx>>> for FakeCtx {
 
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeNonSyncCtx>;
-    type SendMeta = EthernetWeakDeviceId<FakeInstant, ()>;
+    type SendMeta = EthernetWeakDeviceId<FakeNonSyncCtx>;
 }
 
 pub(crate) trait TestutilIpExt: Ip {
@@ -860,11 +861,13 @@ impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
+impl DeviceLayerTypes for FakeNonSyncCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
+}
 
-    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeInstant, ()>) {
+impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
+    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeNonSyncCtx>) {
         self.state_mut().rx_available.push(device.clone());
     }
 
@@ -874,7 +877,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
 
     fn send_frame(
         &mut self,
-        device: &EthernetDeviceId<FakeInstant, ()>,
+        device: &EthernetDeviceId<FakeNonSyncCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         self.frame_ctx_mut().push(device.downgrade(), frame.into_inner());
@@ -1240,7 +1243,7 @@ mod tests {
         core::mem::drop((alice_device_ids, bob_device_ids));
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx)],
-            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| {
+            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeNonSyncCtx>| {
                 if net == "alice" {
                     vec![("bob", bob_device_id.clone(), Some(latency))]
                 } else {
@@ -1305,12 +1308,12 @@ mod tests {
         fn assert_full_state<
             'a,
             L: FakeNetworkLinks<
-                EthernetWeakDeviceId<FakeInstant, ()>,
-                EthernetDeviceId<FakeInstant, ()>,
+                EthernetWeakDeviceId<FakeNonSyncCtx>,
+                EthernetDeviceId<FakeNonSyncCtx>,
                 &'a str,
             >,
         >(
-            net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeInstant, ()>, FakeCtx, L>,
+            net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeNonSyncCtx>, FakeCtx, L>,
             alice_nop: usize,
             bob_nop: usize,
             bob_echo_request: usize,
@@ -1415,7 +1418,7 @@ mod tests {
         let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
-            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| match net {
+            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeNonSyncCtx>| match net {
                 "alice" => vec![
                     ("bob", bob_device_id.clone(), None),
                     ("calvin", calvin_device_id.clone(), None),

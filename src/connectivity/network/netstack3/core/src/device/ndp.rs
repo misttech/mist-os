@@ -91,8 +91,8 @@ mod tests {
         },
         testutil::{
             assert_empty, get_counter_val, handle_timer, set_logger_for_test, Ctx,
-            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Instant, TimerId, TimerIdInner,
     };
@@ -146,11 +146,11 @@ mod tests {
             .unwrap_b()
     }
 
-    impl TryFrom<DeviceId<crate::testutil::FakeNonSyncCtx>> for EthernetDeviceId<FakeInstant, ()> {
+    impl TryFrom<DeviceId<crate::testutil::FakeNonSyncCtx>> for EthernetDeviceId<FakeNonSyncCtx> {
         type Error = DeviceId<crate::testutil::FakeNonSyncCtx>;
         fn try_from(
             id: DeviceId<crate::testutil::FakeNonSyncCtx>,
-        ) -> Result<EthernetDeviceId<FakeInstant, ()>, DeviceId<crate::testutil::FakeNonSyncCtx>>
+        ) -> Result<EthernetDeviceId<FakeNonSyncCtx>, DeviceId<crate::testutil::FakeNonSyncCtx>>
         {
             match id {
                 DeviceId::Ethernet(id) => Ok(id.clone()),
@@ -162,15 +162,15 @@ mod tests {
     fn setup_net() -> (
         FakeNetwork<
             &'static str,
-            EthernetDeviceId<FakeInstant, ()>,
+            EthernetDeviceId<FakeNonSyncCtx>,
             crate::testutil::FakeCtx,
             impl FakeNetworkLinks<
-                EthernetWeakDeviceId<FakeInstant, ()>,
-                EthernetDeviceId<FakeInstant, ()>,
+                EthernetWeakDeviceId<FakeNonSyncCtx>,
+                EthernetDeviceId<FakeNonSyncCtx>,
                 &'static str,
             >,
         >,
-        EthernetDeviceId<FakeInstant, ()>,
+        EthernetDeviceId<FakeNonSyncCtx>,
         DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) {
         let mut local = FakeEventDispatcherBuilder::default();
@@ -378,7 +378,7 @@ mod tests {
     }
 
     fn dad_timer_id(
-        id: EthernetDeviceId<FakeInstant, ()>,
+        id: EthernetDeviceId<FakeNonSyncCtx>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(
@@ -387,7 +387,7 @@ mod tests {
     }
 
     fn rs_timer_id(
-        id: EthernetDeviceId<FakeInstant, ()>,
+        id: EthernetDeviceId<FakeNonSyncCtx>,
     ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(
             crate::ip::device::router_solicitation::RsTimerId { device_id: id.into() },
