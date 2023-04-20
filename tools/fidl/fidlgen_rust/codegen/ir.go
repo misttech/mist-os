@@ -814,9 +814,15 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Fidl = fmt.Sprintf("fidl::encoding::Vector<%s, %d>", el.Fidl, *val.ElementCount)
 		}
 		t.Owned = fmt.Sprintf("Vec<%s>", el.Owned)
-		if val.ElementType.Kind == fidlgen.PrimitiveType {
-			t.Param = fmt.Sprintf("&[%s]", el.Owned)
-		} else {
+		switch val.ElementType.Kind {
+		case fidlgen.PrimitiveType, fidlgen.ArrayType, fidlgen.VectorType:
+			if el.IsResourceType() {
+				t.Param = fmt.Sprintf("Vec<%s>", el.Owned)
+			} else {
+				t.Param = fmt.Sprintf("&[%s]", el.Owned)
+			}
+		default:
+			// TODO(fxbug.dev/54368): This is the old type. Remove once the migration is done.
 			t.Param = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", el.Param)
 		}
 	case fidlgen.StringType:
@@ -921,7 +927,8 @@ func convertParamToEncodeExpr(v string, t Type) string {
 			return "&" + owned
 		}
 	case fidlgen.VectorType:
-		if t.ElementType.Kind == fidlgen.PrimitiveType {
+		switch t.ElementType.Kind {
+		case fidlgen.PrimitiveType, fidlgen.ArrayType, fidlgen.VectorType:
 			return v
 		}
 		var inner string

@@ -29,13 +29,9 @@ async fn main() -> Result<(), Error> {
     for action in config.script.into_iter() {
         // If the next action in the script is to "PUSH", send a batch of lines to the server.
         if action == "PUSH" {
-            let mut lines: Vec<[&mut Point; 2]> = batched_lines
-                .iter_mut()
-                .map(|line| line.iter_mut().collect::<Vec<&mut Point>>().try_into().unwrap())
-                .collect();
-            instance.add_lines(&mut lines.iter_mut()).context("Could not send lines")?;
+            instance.add_lines(&batched_lines).context("Could not send lines")?;
             println!("AddLines request sent");
-            batched_lines = vec![];
+            batched_lines.clear();
             continue;
         }
         // [END diff_1]

@@ -407,18 +407,17 @@ pub async fn configure_launcher(
         .unwrap_or(job_default().create_child_job().map_err(LaunchError::JobCreation)?);
 
     // Build the command line args for the new process and send them to the launcher.
-    let bin_arg = &[String::from(
-        PKG_PATH
-            .join(&config_args.bin_path)
-            .to_str()
-            .ok_or(LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?,
-    )];
-    let args = config_args.args.unwrap_or(vec![]);
-    let string_iters: Vec<_> = bin_arg.iter().chain(args.iter()).map(|s| s.as_bytes()).collect();
-    config_args
-        .launcher
-        .add_args(&mut string_iters.into_iter())
-        .map_err(|e| LaunchError::AddArgs(e.to_string()))?;
+    let bin_arg = PKG_PATH
+        .join(&config_args.bin_path)
+        .to_str()
+        .ok_or(LaunchError::InvalidBinaryPath(config_args.bin_path.to_string()))?
+        .as_bytes()
+        .to_vec();
+    let mut all_args = vec![bin_arg];
+    if let Some(args) = config_args.args {
+        all_args.extend(args.into_iter().map(|s| s.into_bytes()));
+    }
+    config_args.launcher.add_args(&all_args).map_err(|e| LaunchError::AddArgs(e.to_string()))?;
 
     // Get any initial handles to provide to the new process, if any were provided by the caller.
     // Add handles for the new process's default job (by convention, this is the same job that the
@@ -452,10 +451,10 @@ pub async fn configure_launcher(
     // Send environment variables for the new process, if any, to the launcher.
     let environs: Vec<_> = config_args.environs.unwrap_or(vec![]);
     if environs.len() > 0 {
-        let environs_iters: Vec<_> = environs.iter().map(|s| s.as_bytes()).collect();
+        let environs_bytes: Vec<_> = environs.into_iter().map(|s| s.into_bytes()).collect();
         config_args
             .launcher
-            .add_environs(&mut environs_iters.into_iter())
+            .add_environs(&environs_bytes)
             .map_err(|e| LaunchError::AddEnvirons(e.to_string()))?;
     }
 

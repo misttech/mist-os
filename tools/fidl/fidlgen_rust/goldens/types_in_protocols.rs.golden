@@ -1591,15 +1591,15 @@ pub trait ProtocolProxyInterface: Send + Sync {
     ) -> Self::TwoWayVectorOptionalResponseFut;
     fn r#one_way_array_vector_nested(
         &self,
-        vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        vector_array_uint8: &[[u8; 5]],
+        vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error>;
     type TwoWayArrayVectorNestedResponseFut: std::future::Future<Output = Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error>>
         + Send;
     fn r#two_way_array_vector_nested(
         &self,
-        vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        vector_array_uint8: &[[u8; 5]],
+        vector_vector_uint8: &[Vec<u8>],
     ) -> Self::TwoWayArrayVectorNestedResponseFut;
     fn r#one_way_resource(
         &self,
@@ -2255,30 +2255,24 @@ impl ProtocolSynchronousProxy {
     }
     pub fn r#one_way_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayVectorNested, false>(
-            (
-                fidl::encoding::Iterator(vector_array_uint8.map(|x| *x)),
-                fidl::encoding::Iterator(vector_vector_uint8),
-            ),
+            (vector_array_uint8, vector_vector_uint8),
             0x520dc9cb9b9b5ed7,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     pub fn r#two_way_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
         ___deadline: zx::Time,
     ) -> Result<(Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
         let _response =
             self.client.send_query::<ArrayVectorNested, ArrayVectorNested, false, true>(
-                (
-                    fidl::encoding::Iterator(vector_array_uint8.map(|x| *x)),
-                    fidl::encoding::Iterator(vector_vector_uint8),
-                ),
+                (vector_array_uint8, vector_vector_uint8),
                 0x4a438ce0948817dc,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
@@ -2910,8 +2904,8 @@ impl ProtocolProxy {
     }
     pub fn r#one_way_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_array_vector_nested(
             self,
@@ -2921,8 +2915,8 @@ impl ProtocolProxy {
     }
     pub fn r#two_way_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> fidl::client::QueryResponseFut<(Vec<[u8; 5]>, Vec<Vec<u8>>)> {
         ProtocolProxyInterface::r#two_way_array_vector_nested(
             self,
@@ -3752,14 +3746,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
     }
     fn r#one_way_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         self.client.send::<ArrayVectorNested, false>(
-            (
-                fidl::encoding::Iterator(vector_array_uint8.map(|x| *x)),
-                fidl::encoding::Iterator(vector_vector_uint8),
-            ),
+            (vector_array_uint8, vector_vector_uint8),
             0x520dc9cb9b9b5ed7,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -3768,8 +3759,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
         fidl::client::QueryResponseFut<(Vec<[u8; 5]>, Vec<Vec<u8>>)>;
     fn r#two_way_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Self::TwoWayArrayVectorNestedResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -3779,10 +3770,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
             Ok((_response.vector_array_uint8, _response.vector_vector_uint8))
         }
         self.client.send_query_and_decode::<ArrayVectorNested, (Vec<[u8; 5]>, Vec<Vec<u8>>), false>(
-            (
-                fidl::encoding::Iterator(vector_array_uint8.map(|x| *x)),
-                fidl::encoding::Iterator(vector_vector_uint8),
-            ),
+            (vector_array_uint8, vector_vector_uint8),
             0x4a438ce0948817dc,
             fidl::encoding::DynamicFlags::empty(),
             _decode,
@@ -6644,14 +6632,11 @@ impl ProtocolControlHandle {
     }
     pub fn send_event_array_vector_nested(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         self.inner.send::<ArrayVectorNested, false>(
-            (
-                fidl::encoding::Iterator(vector_array_uint8.map(|x| *x)),
-                fidl::encoding::Iterator(vector_vector_uint8),
-            ),
+            (vector_array_uint8, vector_vector_uint8),
             0,
             0x110b72cfebc4037e,
             fidl::encoding::DynamicFlags::empty(),
@@ -7693,8 +7678,8 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
     /// Sets the channel to shutdown if an error occurs.
     pub fn send(
         self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(vector_array_uint8, vector_vector_uint8);
         if r.is_err() {
@@ -7708,8 +7693,8 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
     /// an error occurs.
     pub fn send_no_shutdown_on_err(
         self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(vector_array_uint8, vector_vector_uint8);
         self.drop_without_shutdown();
@@ -7718,8 +7703,8 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
 
     fn send_raw(
         &self,
-        mut vector_array_uint8: &mut dyn ExactSizeIterator<Item = &mut [u8; 5]>,
-        mut vector_vector_uint8: &mut dyn ExactSizeIterator<Item = &[u8]>,
+        mut vector_array_uint8: &[[u8; 5]],
+        mut vector_vector_uint8: &[Vec<u8>],
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -7727,10 +7712,7 @@ impl ProtocolTwoWayArrayVectorNestedResponder {
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: (
-                fidl::encoding::Iterator(vector_array_uint8.map(|x| *x)),
-                fidl::encoding::Iterator(vector_vector_uint8),
-            ),
+            body: (vector_array_uint8, vector_vector_uint8),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {

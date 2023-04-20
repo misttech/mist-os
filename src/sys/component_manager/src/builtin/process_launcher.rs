@@ -271,9 +271,9 @@ mod tests {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
         let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
 
-        let test_args = vec!["arg0", "arg1", "arg2"];
-        let test_args_bytes: Vec<_> = test_args.iter().map(|s| s.as_bytes()).collect();
-        launcher.add_args(&mut test_args_bytes.into_iter())?;
+        let test_args = &["arg0", "arg1", "arg2"];
+        let test_args_bytes: Vec<_> = test_args.iter().map(|s| s.as_bytes().to_vec()).collect();
+        launcher.add_args(&test_args_bytes)?;
 
         let (status, process) = launcher.launch(&mut launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;
@@ -293,10 +293,10 @@ mod tests {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
         let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
 
-        let test_env = vec![("VAR1", "value2"), ("VAR2", "value2")];
+        let test_env = &[("VAR1", "value2"), ("VAR2", "value2")];
         let test_env_strs: Vec<_> = test_env.iter().map(|v| format!("{}={}", v.0, v.1)).collect();
-        let test_env_bytes: Vec<_> = test_env_strs.iter().map(|s| s.as_bytes()).collect();
-        launcher.add_environs(&mut test_env_bytes.into_iter())?;
+        let test_env_bytes: Vec<_> = test_env_strs.into_iter().map(|s| s.into_bytes()).collect();
+        launcher.add_environs(&test_env_bytes)?;
 
         let (status, process) = launcher.launch(&mut launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;
@@ -357,9 +357,9 @@ mod tests {
         let (launcher, _process_launcher, _task_scope) = serve_launcher().await?;
         let (mut launch_info, proxy) = setup_test_util(&launcher).await?;
 
-        let test_args = vec!["arg0", "arg1", "arg2"];
-        let test_args_bytes: Vec<_> = test_args.iter().map(|s| s.as_bytes()).collect();
-        launcher.add_args(&mut test_args_bytes.into_iter())?;
+        let test_args = &["arg0", "arg1", "arg2"];
+        let test_args_bytes: Vec<_> = test_args.iter().map(|s| s.as_bytes().to_vec()).collect();
+        launcher.add_args(&test_args_bytes)?;
 
         let (status, start_data) = launcher.create_without_starting(&mut launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;

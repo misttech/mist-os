@@ -117,13 +117,12 @@ pub async fn launch_with_handles(
     let launcher = connect_to_protocol::<fproc::LauncherMarker>()
         .map_err(|_| LauncherError::ProcessLauncher)?;
 
-    let opt_cmd: Option<Vec<&[u8]>> = command.as_ref().map(|s| vec![s.as_bytes()]);
     let mut args = Vec::new();
-    if let Some(cmd) = opt_cmd {
-        args.extend_from_slice(&DASH_ARGS_FOR_COMMAND);
-        args.extend_from_slice(&cmd);
+    if let Some(cmd) = command {
+        args.extend(DASH_ARGS_FOR_COMMAND.iter().map(|b| b.to_vec()));
+        args.push(cmd.into_bytes());
     } else {
-        args.extend_from_slice(&DASH_ARGS_FOR_INTERACTIVE);
+        args.extend(DASH_ARGS_FOR_INTERACTIVE.iter().map(|b| b.to_vec()));
     };
 
     // Spawn the dash process.
@@ -132,10 +131,10 @@ pub async fn launch_with_handles(
     launcher
         .add_handles(&mut handle_infos.iter_mut())
         .map_err(|_| LauncherError::ProcessLauncher)?;
-    launcher.add_args(&mut args.into_iter()).map_err(|_| LauncherError::ProcessLauncher)?;
+    launcher.add_args(&args).map_err(|_| LauncherError::ProcessLauncher)?;
     let path_envvar = trampoline::create_env_path(tools_path);
-    let env_vars = vec![path_envvar.as_bytes()];
-    launcher.add_environs(&mut env_vars.into_iter()).map_err(|_| LauncherError::ProcessLauncher)?;
+    let env_vars = &[path_envvar.into_bytes()];
+    launcher.add_environs(env_vars).map_err(|_| LauncherError::ProcessLauncher)?;
     let (status, process) =
         launcher.launch(&mut info).await.map_err(|_| LauncherError::ProcessLauncher)?;
     zx::Status::ok(status).map_err(|_| LauncherError::ProcessLauncher)?;
