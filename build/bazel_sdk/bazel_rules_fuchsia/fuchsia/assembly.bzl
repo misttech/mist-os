@@ -118,6 +118,10 @@ load(
     _fuchsia_product_size_check = "fuchsia_product_size_check",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_package_size_check.bzl",
+    _fuchsia_package_size_check = "fuchsia_package_size_check",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_repository_keys.bzl",
     _fuchsia_repository_keys = "fuchsia_repository_keys",
 )
@@ -140,6 +144,7 @@ fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
 fuchsia_product_size_check = _fuchsia_product_size_check
+fuchsia_package_size_check = _fuchsia_package_size_check
 fuchsia_repository_keys = _fuchsia_repository_keys
 fuchsia_task_flash = _fuchsia_task_flash
 fuchsia_zbi = _fuchsia_zbi

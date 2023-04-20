@@ -17,26 +17,29 @@ $FFX \
     size-check \
     product \
     --assembly-manifest $IMAGES_PATH \
-    --size-breakdown-output $SIZE_FILE
+    --size-breakdown-output $SIZE_FILE \
+    --visualization-dir $VISUALIZATION_DIR
 """
 
 def _fuchsia_product_size_check_impl(ctx):
     images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
-    size_file = ctx.actions.declare_file(ctx.label.name + "_size_summary")
+    size_file = ctx.actions.declare_file(ctx.label.name + "_size_breakdown.txt")
+    visualization_dir = ctx.actions.declare_file(ctx.label.name + "_visualization")
     ctx.actions.run_shell(
         inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
-        outputs = [size_file],
+        outputs = [size_file, visualization_dir],
         command = _SIZE_CHECKER_RUNNER_SH,
         env = {
             "FFX": fuchsia_toolchain.ffx.path,
             "IMAGES_PATH": images_out.path + "/images.json",
             "SIZE_FILE": size_file.path,
+            "VISUALIZATION_DIR": visualization_dir.path
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
-    deps = [size_file]
+    deps = [size_file, visualization_dir]
 
     return [DefaultInfo(files = depset(direct = deps))]
 
