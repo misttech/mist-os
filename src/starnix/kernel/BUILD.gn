@@ -216,6 +216,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/fuchsia/remote_bundle.rs",
     "fs/fuchsia/syslog.rs",
     "fs/fuchsia/timer.rs",
+    "fs/fuse.rs",
     "fs/inotify.rs",
     "fs/layeredfs.rs",
     "fs/mod.rs",

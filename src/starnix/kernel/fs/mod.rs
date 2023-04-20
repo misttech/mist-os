@@ -33,6 +33,7 @@ pub mod eventfd;
 pub mod ext4;
 pub mod file_server;
 pub mod fuchsia;
+pub mod fuse;
 pub mod layeredfs;
 pub mod path;
 pub mod pipe;

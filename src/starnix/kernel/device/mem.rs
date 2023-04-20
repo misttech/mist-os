@@ -7,6 +7,7 @@ use fuchsia_zircon::{self as zx, cprng_draw};
 use crate::auth::FsCred;
 use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::fuse::DevFuse;
 use crate::fs::*;
 use crate::logging::*;
 use crate::mm::*;
@@ -258,8 +259,9 @@ impl DeviceOps for MiscDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(match id.minor() {
-            183 => Box::new(DevRandom),
+        Ok(match id {
+            DeviceType::HW_RANDOM => Box::new(DevRandom),
+            DeviceType::FUSE => Box::new(DevFuse),
             _ => return error!(ENODEV),
         })
     }
