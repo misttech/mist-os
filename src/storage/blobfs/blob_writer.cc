@@ -151,7 +151,7 @@ zx::result<> Blob::Writer::Prepare(Blob& blob, uint64_t data_size) {
   streamer_ =
       std::make_unique<fs::DataStreamer>(blobfs().GetJournal(), Blobfs::WriteBufferBlockCount());
   // Streaming writes are only supported when we're not doing dynamic compression.
-  streaming_write_ = !compress;
+  streaming_write_ = blobfs().use_streaming_writes() && !compress;
 
   return zx::ok();
 }

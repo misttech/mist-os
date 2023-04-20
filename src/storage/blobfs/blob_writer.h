@@ -182,7 +182,7 @@ class Blob::Writer {
 
   // If true, indicates we are streaming the current blob to disk as written. Streaming writes are
   // only supported when compression is disabled or we are writing a pre-compressed delivery blob.
-  bool streaming_write_ = true;
+  bool streaming_write_ = false;
 
   // Block iterator used when writing data to disk.
   //

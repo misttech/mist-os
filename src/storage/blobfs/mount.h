@@ -53,6 +53,17 @@ struct MountOptions {
   bool fsck_at_end_of_every_transaction = false;
 #endif
 
+  // [EXPERIMENTAL] Enable support for streaming writes. Streaming writes are only used when
+  // compression is disabled, or writing pre-compressed blobs (offline compression).
+  // Memory consumption will be reduced in these cases when this is enabled.
+  bool streaming_writes = {
+#ifdef BLOBFS_STREAMING_WRITES_ENABLED_DEFAULT
+      true
+#else
+      false
+#endif
+  };
+
   // [EXPERIMENTAL] Enable support for delivery blobs. Allows writing blobs in the format specified
   // by RFC 0207. Does not require streaming writes, but is suggested to reduce memory consumption.
   bool allow_delivery_blobs = {

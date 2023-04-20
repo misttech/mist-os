@@ -216,6 +216,8 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
 
   DecompressorCreatorConnector* decompression_connector() { return decompression_connector_; }
 
+  bool use_streaming_writes() const { return use_streaming_writes_; }
+
   bool allow_delivery_blobs() const { return allow_delivery_blobs_; }
 
  protected:
@@ -231,7 +233,8 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
          const Superblock* info, Writability writable,
          CompressionSettings write_compression_settings, zx::resource vmex_resource,
          std::optional<CachePolicy> pager_backed_cache_policy,
-         DecompressorCreatorConnector* decompression_connector, bool allow_delivery_blobs);
+         DecompressorCreatorConnector* decompression_connector, bool use_streaming_writes,
+         bool allow_delivery_blobs);
 
   static zx::result<std::unique_ptr<fs::Journal>> InitializeJournal(
       fs::TransactionHandler* transaction_handler, VmoidRegistry* registry, uint64_t journal_start,
@@ -335,6 +338,7 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
 
   DecompressorCreatorConnector* decompression_connector_;
 
+  const bool use_streaming_writes_;
   const bool allow_delivery_blobs_;
 };
 

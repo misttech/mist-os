@@ -423,12 +423,14 @@ From //build/images/filesystem_limits.gni:15
 
 ### blobfs_enable_streaming_writes
 
-TODO(bcastell): Streaming writes is now enabled by default. Remove this argument when out of
-tree users don't set this anymore.
+Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
+by setting the `streaming_writes` option when mounting Blobfs (e.g. for unit tests).
 
-**Current value (from the default):** `true`
+Streaming writes are only supported when writing delivery blobs or when compression is disabled.
 
-From //src/storage/blobfs/BUILD.gn:12
+**Current value (from the default):** `false`
+
+From //src/storage/blobfs/BUILD.gn:14
 
 ### blobfs_maximum_runtime_bytes
 
@@ -458,7 +460,7 @@ metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:17
+From //src/storage/blobfs/BUILD.gn:19
 
 ### blobfs_product_maximum_bytes
 

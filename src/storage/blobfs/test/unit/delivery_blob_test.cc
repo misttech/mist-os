@@ -37,25 +37,30 @@ struct DeliveryBlobTestParams {
   // Blob layout format that the Blobfs instance should be formatted with.
   BlobLayoutFormat format;
 
+  // If true, mount Blobfs with streaming writes enabled.
+  bool streaming_writes;
+
   // If true, specify that the delivery blob should be compressed.
   bool compress;
 
   // Size of the blob the test case should write.
   size_t blob_size;
 
-  using ParamsAsTuple = std::tuple</*format*/ BlobLayoutFormat, /*compress*/ bool,
-                                   /*blob_size*/ size_t>;
+  using ParamsAsTuple =
+      std::tuple</*format*/ BlobLayoutFormat, /*streaming_writes*/ bool, /*compress*/ bool,
+                 /*blob_size*/ size_t>;
 
   explicit DeliveryBlobTestParams(ParamsAsTuple params)
       : format(std::get<0>(params)),
-        compress(std::get<1>(params)),
-        blob_size(std::get<2>(params)) {}
+        streaming_writes(std::get<1>(params)),
+        compress(std::get<2>(params)),
+        blob_size(std::get<3>(params)) {}
 
   static auto GetTestCombinations() {
     return testing::ConvertGenerator<ParamsAsTuple>(testing::Combine(
         /*format*/ testing::Values(BlobLayoutFormat::kCompactMerkleTreeAtEnd,
                                    BlobLayoutFormat::kDeprecatedPaddedMerkleTreeAtStart),
-        /*compress*/ testing::Bool(),
+        /*streaming_writes*/ testing::Bool(), /*compress*/ testing::Bool(),
         /*blob_size*/ testing::Values(0, kSmallBlobSize, kLargeBlobSize)));
   }
 
@@ -71,7 +76,8 @@ struct DeliveryBlobTestParams {
         format_name = "CompactFormat";
         break;
     }
-    return format_name + std::string(params.compress ? "Compressed" : "Uncompressed") +
+    return format_name + std::string(params.streaming_writes ? "Streaming" : "") +
+           std::string(params.compress ? "Compressed" : "Uncompressed") +
            std::string(params.blob_size > 0 ? std::to_string(params.blob_size) : "NullBlob");
   }
 };
@@ -89,6 +95,7 @@ class DeliveryBlobTest : public BlobfsTestSetup,
     ASSERT_EQ(FormatFilesystem(device.get(), filesystem_options), ZX_OK);
 
     const MountOptions mount_options{
+        .streaming_writes = GetParam().streaming_writes,
         .allow_delivery_blobs = true,
     };
     ASSERT_EQ(ZX_OK, Mount(std::move(device), mount_options));

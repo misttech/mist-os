@@ -213,7 +213,6 @@ pub struct Blobfs {
     pub write_compression_level: Option<i32>,
     pub cache_eviction_policy_override: Option<BlobEvictionPolicy>,
     pub component_type: ComponentType,
-    pub allow_delivery_blobs: bool,
 }
 
 impl Blobfs {
@@ -252,7 +251,6 @@ impl FSConfig for Blobfs {
                     write_compression_level: self.write_compression_level.unwrap_or(-1),
                     write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                     cache_eviction_policy_override: EvictionPolicyOverride::None,
-                    allow_delivery_blobs: self.allow_delivery_blobs,
                 };
                 if let Some(compression) = &self.write_compression_algorithm {
                     start_options.write_compression_algorithm = match compression {
@@ -328,7 +326,6 @@ impl FSConfig for Minfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: false,
             },
             component_type: self.component_type.clone(),
         }
@@ -441,7 +438,6 @@ impl FSConfig for Fxfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: false,
             },
             component_type: self.component_type.clone(),
         }
@@ -502,7 +498,6 @@ impl FSConfig for F2fs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
-                allow_delivery_blobs: false,
             },
             component_type: self.component_type.clone(),
         }
