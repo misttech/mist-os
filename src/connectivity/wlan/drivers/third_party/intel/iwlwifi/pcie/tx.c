@@ -1886,7 +1886,7 @@ static zx_status_t iwl_pcie_send_hcmd_sync(struct iwl_trans* trans, struct iwl_h
     status = ZX_ERR_TIMED_OUT;
 
     iwl_force_nmi(trans);
-    iwl_trans_fw_error(trans);
+    iwl_trans_fw_error(trans, false);
 
     goto cancel;
   }
