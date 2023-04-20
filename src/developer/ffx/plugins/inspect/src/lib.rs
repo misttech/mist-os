@@ -8,7 +8,9 @@ use ffx_inspect_common::{run_command, InspectOutput};
 use fho::{deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
 
-mod commands;
+mod apply_selectors;
+#[cfg(test)]
+mod tests;
 
 fho::embedded_plugin!(InspectTool);
 
@@ -33,7 +35,7 @@ impl FfxMain for InspectTool {
             };
         match cmd.sub_command {
             InspectSubCommand::ApplySelectors(cmd) => {
-                commands::apply_selectors::execute(rcs, remote_diagnostics_bridge, cmd).await?;
+                apply_selectors::execute(rcs, remote_diagnostics_bridge, cmd).await?;
             }
             InspectSubCommand::Show(cmd) => {
                 run_command(rcs, remote_diagnostics_bridge, cmd, &mut writer).await?;

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::commands::apply_selectors::screen::Line;
+use crate::apply_selectors::screen::Line;
 use anyhow::Result;
 use diagnostics_data::InspectData;
 use diagnostics_hierarchy::{self, hierarchy, HierarchyMatcher};

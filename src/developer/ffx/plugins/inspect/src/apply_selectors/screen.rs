@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::commands::apply_selectors::terminal::Terminal;
+use crate::apply_selectors::terminal::Terminal;
 use std::cmp::{max, min};
 
 pub struct Line {
@@ -174,7 +174,7 @@ impl<T: Terminal> Screen<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::apply_selectors::test_utils::{get_test_lines, FakeTerminal};
+    use crate::apply_selectors::test_utils::{get_test_lines, FakeTerminal};
 
     #[fuchsia::test]
     fn small_screen_overflow() {

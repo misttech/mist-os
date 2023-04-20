@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::commands::apply_selectors::{
+use crate::apply_selectors::{
     filter::filter_data_to_lines,
     screen::{Line, Screen},
     terminal::{Terminal, Termion},
@@ -107,7 +107,7 @@ fn interactive_apply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::apply_selectors::test_utils::FakeTerminal;
+    use crate::apply_selectors::test_utils::FakeTerminal;
     use ffx_inspect_test_utils::get_v1_json_dump;
     use std::io::Write;
     use tempfile::NamedTempFile;

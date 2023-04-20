@@ -11,19 +11,19 @@ ffx_plugin("ffx_inspect") {
   with_unit_tests = true
 
   sources = [
-    "src/commands/apply_selectors/filter.rs",
-    "src/commands/apply_selectors/mod.rs",
-    "src/commands/apply_selectors/screen.rs",
-    "src/commands/apply_selectors/terminal.rs",
-    "src/commands/apply_selectors/test_utils.rs",
-    "src/commands/list.rs",
-    "src/commands/list_accessors.rs",
-    "src/commands/list_files.rs",
-    "src/commands/mod.rs",
-    "src/commands/mod.rs",
-    "src/commands/selectors.rs",
-    "src/commands/show.rs",
+    "src/apply_selectors/filter.rs",
+    "src/apply_selectors/mod.rs",
+    "src/apply_selectors/screen.rs",
+    "src/apply_selectors/terminal.rs",
+    "src/apply_selectors/test_utils.rs",
     "src/lib.rs",
+    "src/tests/list.rs",
+    "src/tests/list_accessors.rs",
+    "src/tests/list_files.rs",
+    "src/tests/mod.rs",
+    "src/tests/mod.rs",
+    "src/tests/selectors.rs",
+    "src/tests/show.rs",
   ]
 
   deps = [
