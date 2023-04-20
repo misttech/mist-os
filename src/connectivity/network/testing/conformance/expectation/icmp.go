@@ -26,3 +26,22 @@ var icmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{8, 3}:  Pass,
 	{10, 1}: Pass,
 }
+
+var icmpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
+	{1, 1}:  Pass,
+	{2, 2}:  Fail,
+	{2, 3}:  Pass,
+	{2, 4}:  Pass,
+	{2, 5}:  Pass,
+	{3, 1}:  Fail,
+	{4, 2}:  Pass,
+	{4, 3}:  Fail,
+	{4, 4}:  Pass,
+	{5, 1}:  Fail,
+	{5, 2}:  Fail,
+	{5, 3}:  Fail,
+	{8, 1}:  Pass,
+	{8, 2}:  Pass,
+	{8, 3}:  Pass,
+	{10, 1}: Pass,
+}
