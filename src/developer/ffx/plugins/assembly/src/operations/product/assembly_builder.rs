@@ -25,8 +25,6 @@ use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
-type ConfigDataMap = BTreeMap<String, FileEntryMap>;
-
 #[derive(Debug, Serialize)]
 pub struct ImageAssemblyConfigBuilder {
     /// The base packages from the AssemblyInputBundles
@@ -49,9 +47,6 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// The bootfs_files from the AssemblyInputBundles
     bootfs_files: FileEntryMap,
-
-    /// The config_data entries, by package and by destination path.
-    config_data: ConfigDataMap,
 
     /// Modifications that must be made to structured config within bootfs.
     bootfs_structured_config: ComponentConfigs,
@@ -107,7 +102,6 @@ impl ImageAssemblyConfigBuilder {
             boot_args: BTreeSet::default(),
             shell_commands: ShellCommands::default(),
             bootfs_files: FileEntryMap::new("bootfs files"),
-            config_data: ConfigDataMap::default(),
             bootfs_structured_config: ComponentConfigs::default(),
             package_configs: PackageConfigs::default(),
             kernel_path: None,
@@ -296,32 +290,31 @@ impl ImageAssemblyConfigBuilder {
     /// so that any packages that are in conflict with the platform bundles are
     /// flagged as being the issue (and not the platform being the issue).
     pub fn add_product_packages(&mut self, packages: ProductPackagesConfig) -> Result<()> {
-        let mut add_package =
-            |entries: Vec<ProductPackageDetails>, to_package_set: PackageSets| -> Result<()> {
-                for entry in entries {
-                    // Parse the package_manifest.json into a PackageManifest, returning
-                    // both along with any config_data entries defined for the package.
-                    let (manifest_path, pkg_manifest, config_data) =
-                        Self::parse_product_package_entry(entry)?;
-                    let package_manifest_name = pkg_manifest.name().to_string();
-                    let package_entry =
-                        PackageEntry { path: manifest_path.into(), manifest: pkg_manifest };
-                    self.add_unique_package_entry(package_entry, &to_package_set)?;
-                    // Add the config data entries to the map
-                    if !config_data.is_empty() {
-                        self.config_data
-                            .entry(package_manifest_name)
-                            .or_insert(FileEntryMap::new("config data"))
-                            .add_all(config_data)?;
-                    };
-                }
-                Ok(())
-            };
-
         // Add the config data entries to the map
-        add_package(packages.base, PackageSets::BASE)?;
-        add_package(packages.cache, PackageSets::CACHE)?;
+        self.add_product_packages_to_set(packages.base, PackageSets::BASE)?;
+        self.add_product_packages_to_set(packages.cache, PackageSets::CACHE)?;
+        Ok(())
+    }
 
+    /// Add a vector of product packages to a specific package set.
+    fn add_product_packages_to_set(
+        &mut self,
+        entries: Vec<ProductPackageDetails>,
+        to_package_set: PackageSets,
+    ) -> Result<()> {
+        for entry in entries {
+            // Parse the package_manifest.json into a PackageManifest, returning
+            // both along with any config_data entries defined for the package.
+            let (manifest_path, pkg_manifest, config_data) =
+                Self::parse_product_package_entry(entry)?;
+            let package_manifest_name = pkg_manifest.name().to_string();
+            let package_entry = PackageEntry { path: manifest_path.into(), manifest: pkg_manifest };
+            self.add_unique_package_entry(package_entry, &to_package_set)?;
+            // Add the config data entries to the map
+            for config in config_data {
+                self.add_config_data_entry(&package_manifest_name, config)?;
+            }
+        }
         Ok(())
     }
 
@@ -377,10 +370,18 @@ impl ImageAssemblyConfigBuilder {
     /// Add an entry to `config_data` for the given package.  If the entry
     /// duplicates an existing entry, return an error.
     fn add_config_data_entry(&mut self, package: impl AsRef<str>, entry: FileEntry) -> Result<()> {
-        self.config_data
+        self.package_configs
             .entry(package.as_ref().into())
-            .or_insert_with(|| FileEntryMap::new("config data"))
-            .add_entry(entry)
+            .or_insert_with(|| PackageConfiguration::new(package.as_ref()))
+            .config_data
+            .try_insert_unique(entry.destination.clone(), entry)
+            .map_err(|dup| {
+                anyhow!(
+                    "duplicate config data file found for package: {}\n  error: {}",
+                    package.as_ref(),
+                    dup,
+                )
+            })
     }
 
     fn add_shell_command_entry(
@@ -463,7 +464,6 @@ impl ImageAssemblyConfigBuilder {
             mut bootfs_files,
             mut bootfs_packages,
             bootfs_structured_config,
-            config_data,
             kernel_path,
             kernel_args,
             kernel_clock_backstop,
@@ -488,17 +488,17 @@ impl ImageAssemblyConfigBuilder {
         }
 
         // repackage any matching packages
-        for (package, config) in package_configs {
+        for (package, config) in &package_configs {
             // Only process configs that have component entries for structured config.
             if !config.components.is_empty() {
                 // get the manifest for this package name, returning the set from which it was removed
                 if let Some((manifest, source_package_set)) = remove_package_from_sets(
-                    &package,
+                    package,
                     [&mut base, &mut cache, &mut system, &mut bootfs_packages],
                 )
                 .with_context(|| format!("removing {package} for repackaging"))?
                 {
-                    let outdir = outdir.join("repackaged").join(&package);
+                    let outdir = outdir.join("repackaged").join(package);
                     let mut repackager = Repackager::new(manifest, outdir)
                         .with_context(|| format!("reading existing manifest for {package}"))?;
 
@@ -537,18 +537,22 @@ impl ImageAssemblyConfigBuilder {
             base.add_package(PackageEntry::parse_from(driver_manifest_package_manifest_path)?)?;
         }
 
-        if !config_data.is_empty() {
-            // Build the config_data package
-            let mut config_data_builder = ConfigDataBuilder::default();
-            for (package_name, entries) in config_data {
-                for entry in entries.into_file_entries() {
+        // Build the config_data package
+        let mut config_data_builder = ConfigDataBuilder::default();
+        let mut found_config_data = false;
+        for (package_name, config) in &package_configs {
+            if !config.config_data.is_empty() {
+                found_config_data = true;
+                for (_, entry) in config.config_data.iter() {
                     config_data_builder.add_entry(
-                        &package_name,
-                        entry.destination.into(),
-                        entry.source,
+                        package_name,
+                        entry.destination.clone().into(),
+                        entry.source.clone(),
                     )?;
                 }
             }
+        }
+        if found_config_data {
             let manifest_path = config_data_builder
                 .build(outdir)
                 .context("writing the 'config_data' package metafar.")?;
@@ -703,15 +707,6 @@ impl FileEntryMap {
         self.map
             .try_insert_unique(entry.destination, entry.source)
             .with_context(|| format!("Adding entry to set: {}", self.map.name))
-    }
-
-    /// Add FileEntries to the map, ensuring that the destination paths are all
-    /// unique within the map.
-    fn add_all(&mut self, entries: impl IntoIterator<Item = FileEntry>) -> Result<()> {
-        for entry in entries.into_iter() {
-            self.add_entry(entry)?;
-        }
-        Ok(())
     }
 
     /// Return the contents of the FileMap as a Vec<FileEntry>.
@@ -951,7 +946,28 @@ mod tests {
             }],
         );
 
-        let builder = setup_builder(&vars, vec![bundle]);
+        let mut builder = setup_builder(&vars, vec![]);
+        builder
+            .set_package_config(
+                vars.config_data_target_package_name.clone(),
+                PackageConfiguration {
+                    components: ComponentConfigs::default(),
+                    name: vars.config_data_target_package_name.clone(),
+                    config_data: NamedMap {
+                        name: "config data".into(),
+                        entries: [(
+                            "dest/platform/configuration".into(),
+                            FileEntry {
+                                destination: "dest/platform/configuration".into(),
+                                source: vars.config_data_file_path,
+                            },
+                        )]
+                        .into(),
+                    },
+                },
+            )
+            .unwrap();
+        builder.add_parsed_bundle(&vars.bundle_path, bundle).unwrap();
         let result: assembly_config_schema::ImageAssemblyConfig =
             builder.build(&vars.outdir, &tools).unwrap();
 
@@ -993,6 +1009,17 @@ mod tests {
             .unwrap();
 
         // 4.  Validate its contents.
+        assert_eq!(config_file_data, "configuration data".as_bytes());
+
+        // 5.  Read the configuration file from the platform configuration.
+        let config_file_data = far_reader
+            .read_file(&format!(
+                "meta/data/{}/dest/platform/configuration",
+                vars.config_data_target_package_name
+            ))
+            .unwrap();
+
+        // 6.  Validate its contents.
         assert_eq!(config_file_data, "configuration data".as_bytes());
     }
 

@@ -6,7 +6,8 @@ use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-use assembly_config_schema::{BoardInformation, BuildType};
+use assembly_config_schema::{BoardInformation, BuildType, FileEntry};
+use assembly_util::NamedMap;
 
 /// The platform's base service level.
 ///
@@ -145,6 +146,9 @@ pub(crate) trait BootfsConfigBuilder {
 pub(crate) trait PackageConfigBuilder {
     /// Add configuration to the builder for a component within a package.
     fn component(&mut self, pkg_path: &str) -> Result<&mut dyn ComponentConfigBuilder>;
+
+    /// Add a config data file to the package in the builder.
+    fn config_data(&mut self, file_entry: FileEntry) -> Result<&mut dyn PackageConfigBuilder>;
 }
 
 /// The interface for specifying the configuration to provide for a component.
@@ -227,7 +231,7 @@ pub type ComponentConfigs = BTreeMap<String, ComponentConfiguration>;
 /// All of the configuration that applies to a single package.
 ///
 /// This holds:
-/// - config_data entries for the package (coming soon)
+/// - config_data entries for the package
 /// - for each component:
 ///     - Structured Config
 ///
@@ -236,8 +240,22 @@ pub struct PackageConfiguration {
     /// A map from manifest paths within the package namespace to the values for the component.
     pub components: ComponentConfigs,
 
+    /// A map of config data entries, keyed by the destination path.
+    pub config_data: NamedMap<FileEntry>,
+
     /// The package name.
-    name: String,
+    pub name: String,
+}
+
+impl PackageConfiguration {
+    /// Construt a new PackageConfiguration.
+    pub fn new(name: impl AsRef<str>) -> Self {
+        PackageConfiguration {
+            components: ComponentConfigs::default(),
+            config_data: NamedMap::new("config data"),
+            name: name.as_ref().into(),
+        }
+    }
 }
 
 /// All of the configuration for a single component.
@@ -264,7 +282,11 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
 
     fn package(&mut self, name: &str) -> &mut dyn PackageConfigBuilder {
         self.package_configs.entry(name.to_string()).or_insert_with_key(|name| {
-            PackageConfiguration { components: ComponentConfigs::default(), name: name.to_owned() }
+            PackageConfiguration {
+                components: ComponentConfigs::default(),
+                config_data: NamedMap::new("config data"),
+                name: name.to_owned(),
+            }
         })
     }
 }
@@ -284,6 +306,13 @@ impl PackageConfigBuilder for PackageConfiguration {
                     .with_context(|| anyhow!("Setting configuration for package: {}", self.name))
             }
         }
+    }
+
+    fn config_data(&mut self, file_entry: FileEntry) -> Result<&mut dyn PackageConfigBuilder> {
+        self.config_data
+            .try_insert_unique(file_entry.destination.clone(), file_entry)
+            .context("A config data destination can only be set once for a package")?;
+        Ok(self)
     }
 }
 
@@ -443,6 +472,19 @@ mod tests {
                 .field("key_b1", "value_b1")?
                 .field("key_b2", "value_b2")?;
 
+            builder.package("package_a").config_data(FileEntry {
+                destination: "config/one".into(),
+                source: "config_data1".into(),
+            })?;
+            builder.package("package_a").config_data(FileEntry {
+                destination: "config/two".into(),
+                source: "config_data2".into(),
+            })?;
+            builder.package("package_b").config_data(FileEntry {
+                destination: "config/one".into(),
+                source: "config_data1".into(),
+            })?;
+
             Ok(())
         }
         assert!(make_config(&mut builder).is_ok());
@@ -475,7 +517,27 @@ mod tests {
                         }
                     ),
                 ]
-                .into()
+                .into(),
+                config_data: NamedMap {
+                    name: "config data".into(),
+                    entries: [
+                        (
+                            "config/one".into(),
+                            FileEntry {
+                                destination: "config/one".into(),
+                                source: "config_data1".into(),
+                            }
+                        ),
+                        (
+                            "config/two".into(),
+                            FileEntry {
+                                destination: "config/two".into(),
+                                source: "config_data2".into(),
+                            }
+                        ),
+                    ]
+                    .into(),
+                },
             }
         );
         assert_eq!(
@@ -493,7 +555,18 @@ mod tests {
                         .into()
                     }
                 )]
-                .into()
+                .into(),
+                config_data: NamedMap {
+                    name: "config data".into(),
+                    entries: [(
+                        "config/one".into(),
+                        FileEntry {
+                            destination: "config/one".into(),
+                            source: "config_data1".into(),
+                        }
+                    ),]
+                    .into(),
+                },
             }
         );
     }
@@ -513,6 +586,19 @@ mod tests {
         assert!(component.field("key", "diff_value").is_err());
         assert!(component.field("key2", "value2").is_ok());
         assert!(component.field("key2", "value2").is_err());
+
+        assert!(builder
+            .package("foo")
+            .config_data(FileEntry { destination: "bar".into(), source: "baz".into() })
+            .is_ok());
+        assert!(builder
+            .package("foo")
+            .config_data(FileEntry { destination: "cat".into(), source: "baz".into() })
+            .is_ok());
+        assert!(builder
+            .package("foo")
+            .config_data(FileEntry { destination: "cat".into(), source: "diz".into() })
+            .is_err());
     }
 
     #[test]

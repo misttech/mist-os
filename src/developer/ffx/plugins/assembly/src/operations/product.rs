@@ -42,6 +42,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let configuration =
         assembly_platform_configuration::define_configuration(&config, board_info.as_ref())?;
 
+    // Set the configuration for the rest of the packages.
+    for (package, config) in configuration.package_configs {
+        builder.set_package_config(package, config)?;
+    }
+
     // Add the platform Assembly Input Bundles that were chosen by the configuration.
     for platform_bundle_name in &configuration.bundles {
         let platform_bundle_path = make_bundle_path(&input_bundles_dir, platform_bundle_name);
@@ -58,11 +63,6 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Set the Structured Configuration for the components in Bootfs
     builder.set_bootfs_structured_config(configuration.bootfs.components);
-
-    // Set the configuration for the rest of the packages.
-    for (package, config) in configuration.package_configs {
-        builder.set_package_config(package, config)?;
-    }
 
     // Add product-specified packages and configuration
     builder

@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// A named set of things, which are mapped by a String key.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct NamedMap<T> {
     /// The name of the Map.
     pub name: String,

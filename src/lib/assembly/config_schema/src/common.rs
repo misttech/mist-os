@@ -27,6 +27,12 @@ pub struct FileEntry {
     pub destination: String,
 }
 
+impl std::fmt::Display for FileEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(src={}, dest={})", self.source, self.destination)
+    }
+}
+
 /// A typename to clarify intent around what Strings are package names.
 pub(crate) type PackageName = String;
 
