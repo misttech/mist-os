@@ -6,10 +6,7 @@
             ],
             "metric_id": 121,
             "metric_type": "Integer",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_duration:success",
-                "core/system-update-committer:root/verification/ota_verification_duration:success",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_duration:success",
             "upload_once": true
         },
         {
@@ -18,10 +15,7 @@
             ],
             "metric_id": 121,
             "metric_type": "Integer",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_duration:failure_blobfs",
-                "core/system-update-committer:root/verification/ota_verification_duration:failure_blobfs",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_duration:failure_blobfs",
             "upload_once": true
         },
         {
@@ -30,10 +24,7 @@
             ],
             "metric_id": 121,
             "metric_type": "Integer",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_duration:failure_netstack",
-                "core/system-update-committer:root/verification/ota_verification_duration:failure_netstack",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_duration:failure_netstack",
             "upload_once": true
         },
         {
@@ -43,10 +34,7 @@
             ],
             "metric_id": 122,
             "metric_type": "Occurrence",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_failure:blobfs_verify",
-                "core/system-update-committer:root/verification/ota_verification_failure:blobfs_verify",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_failure:blobfs_verify",
             "upload_once": true
         },
         {
@@ -56,10 +44,7 @@
             ],
             "metric_id": 122,
             "metric_type": "Occurrence",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_failure:blobfs_fidl",
-                "core/system-update-committer:root/verification/ota_verification_failure:blobfs_fidl",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_failure:blobfs_fidl",
             "upload_once": true
         },
         {
@@ -69,10 +54,7 @@
             ],
             "metric_id": 122,
             "metric_type": "Occurrence",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_failure:blobfs_timeout",
-                "core/system-update-committer:root/verification/ota_verification_failure:blobfs_timeout",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_failure:blobfs_timeout",
             "upload_once": true
         },
         {
@@ -82,10 +64,7 @@
             ],
             "metric_id": 122,
             "metric_type": "Occurrence",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_failure:netstack_verify",
-                "core/system-update-committer:root/verification/ota_verification_failure:netstack_verify",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_failure:netstack_verify",
             "upload_once": true
         },
         {
@@ -95,10 +74,7 @@
             ],
             "metric_id": 122,
             "metric_type": "Occurrence",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_failure:netstack_fidl",
-                "core/system-update-committer:root/verification/ota_verification_failure:netstack_fidl",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_failure:netstack_fidl",
             "upload_once": true
         },
         {
@@ -108,10 +84,7 @@
             ],
             "metric_id": 122,
             "metric_type": "Occurrence",
-            "selector": [
-                "core/system-update/system-update-committer:root/verification/ota_verification_failure:netstack_timeout",
-                "core/system-update-committer:root/verification/ota_verification_failure:netstack_timeout",
-            ],
+            "selector": "core/system-update/system-update-committer:root/verification/ota_verification_failure:netstack_timeout",
             "upload_once": true
         }
     ],
