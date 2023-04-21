@@ -80,6 +80,9 @@ fuchsia_test_package("fuchsia-storage-benchmarks-tests") {
   ]
   test_specs = {
     parallel = 1
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 
