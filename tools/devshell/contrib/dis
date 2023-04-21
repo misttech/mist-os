@@ -6,7 +6,7 @@
 #### CATEGORY=Diagnostic
 ### Dumps disassembly for binaries from the build.
 
-## usage: fx dis [-l | -S | -n] BINARY...
+## usage: fx dis [-l | -S | -n | -L | -P <path to objdump>] BINARY...
 ##
 ## Dump disassembly for a binary to a file in the build directory.
 ##
@@ -15,6 +15,7 @@
 ##   -r                        list relocations interleaved with assembly
 ##   -n                        do not demangle symbol names
 ##   -L                        use llvm-objdump rather than GNU objdump
+##   -P <path>                 use objdump binary in argument
 ##
 ## Each BINARY can be the name of the binary file without directory, e.g.
 ## "libzircon.so" or "zircon.elf"; or the name of a GN target, e.g. "zircon";
@@ -34,13 +35,15 @@ readonly GNU_OBJDUMP="$PREBUILT_BINUTILS_DIR/bin/objdump"
 
 DEMANGLE=true
 USE_LLVM=false
+PATH_OBJDUMP=""
 OBJDUMP_ARGS=(-d)
 
-while getopts lSrLn OPT; do
+while getopts lSrLnP: OPT; do
   case $OPT in
   [lSr]) OBJDUMP_ARGS+=(-$OPT) ;;
   L) USE_LLVM=true ;;
   n) DEMANGLE=false ;;
+  P) PATH_OBJDUMP=$OPTARG ;;
   esac
 done
 shift $((OPTIND-1))
@@ -54,7 +57,9 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-if $USE_LLVM; then
+if [[ ! -z "$PATH_OBJDUMP" ]] ; then
+  readonly OBJDUMP="$PATH_OBJDUMP"
+elif $USE_LLVM; then
   readonly OBJDUMP="$LLVM_OBJDUMP"
 else
   readonly OBJDUMP="$GNU_OBJDUMP"
