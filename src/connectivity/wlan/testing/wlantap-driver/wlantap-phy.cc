@@ -496,7 +496,7 @@ class WlanPhyImplDevice
     // CreateIface runs on the server dispatcher, but WlantapMac must be created on the driver
     // runtime dispatcher.
     async::PostTask(driver_async_dispatcher_, [&]() {
-      result = CreateWlantapMac(zxdev(), request->role(), phy_config_, wlantap_phy_.get(),
+      result = CreateWlantapMac(parent(), request->role(), phy_config_, wlantap_phy_.get(),
                                 std::move(request->mlme_channel()));
       served.Signal();
     });
@@ -644,8 +644,10 @@ zx_status_t CreatePhy(zx_device_t* wlantapctl, zx::channel user_channel,
       fuchsia_wlan_phyimpl::Service::Name,
   };
 
-  status = phy->DdkAdd(
-      ::ddk::DeviceAddArgs(phy_config->name.get().data()).set_flags(DEVICE_ADD_NON_BINDABLE));
+  status = phy->DdkAdd(::ddk::DeviceAddArgs(phy_config->name.get().data())
+                           .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
+                           .set_runtime_service_offers(offers)
+                           .set_outgoing_dir(endpoints->client.TakeChannel()));
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
@@ -653,30 +655,7 @@ zx_status_t CreatePhy(zx_device_t* wlantapctl, zx::channel user_channel,
   }
 
   // Transfer ownership to devmgr
-  auto* phy_ptr = phy.release();
-
-  // Add a pass through device as well.
-  static zx_protocol_device_t passthrough_proto = {
-      .version = DEVICE_OPS_VERSION,
-      .release = [](void* ctx) {},
-  };
-  device_add_args_t args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "pt",
-      .ctx = phy_ptr,
-      .ops = &passthrough_proto,
-      .proto_id = ZX_PROTOCOL_WLANPHY_IMPL,
-      .runtime_service_offers = offers.data(),
-      .runtime_service_offer_count = offers.size(),
-      .outgoing_dir_channel = endpoints->client.TakeChannel().release(),
-  };
-
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
-    return status;
-  }
-  zx_device_t* out_device;
-  return device_add(phy_ptr->zxdev(), &args, &out_device);
+  phy.release();
 
   zxlogf(INFO, "Phy successfully created");
   return ZX_OK;
