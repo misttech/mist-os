@@ -83,6 +83,7 @@ pub fn create_diagnostics_dir(inspector: Inspector) -> Arc<dyn DirectoryEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use component_debug::dirs::{open_instance_dir_root_readable, OpenDirType};
     use component_events::{
         events::{EventStream, Started},
         matcher::EventMatcher,
@@ -124,18 +125,13 @@ mod tests {
         started_stream.await.expect("failed to observe Started event");
 
         let realm_query = client::connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+        let moniker = format!("./coll:{}", app.child_name());
+        let moniker = moniker.as_str().try_into().unwrap();
         let out_dir = loop {
-            let (_, maybe_resolved) = realm_query
-                .get_instance_info(&format!("./coll:{}", app.child_name()))
-                .await
-                .expect("fidl call succeeds")
-                .expect("the component exists");
-            if let Some(resolved) = maybe_resolved {
-                if let Some(execution) = resolved.execution {
-                    if let Some(out_dir) = execution.out_dir {
-                        break out_dir.into_proxy().expect("dir into proxy");
-                    }
-                }
+            if let Ok(out_dir) =
+                open_instance_dir_root_readable(&moniker, OpenDirType::Outgoing, &realm_query).await
+            {
+                break out_dir;
             }
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         };
