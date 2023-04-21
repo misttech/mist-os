@@ -290,7 +290,10 @@ class CxxRemoteActionTests(unittest.TestCase):
 
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            self.assertEqual(c.prepare(), 0)
+            with mock.patch.object(fuchsia, 'gcc_support_tools',
+                                   return_value=iter([])) as mock_tools:
+                self.assertEqual(c.prepare(), 0)
+        mock_tools.assert_called_with(c.compiler_path)
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root,
             [fake_builddir / source])
@@ -470,7 +473,10 @@ class CxxRemoteActionTests(unittest.TestCase):
                     auto_reproxy=False,
                 )
                 self.assertEqual(c.cpp_strategy, 'integrated')
-                self.assertEqual(c.prepare(), 0)
+                with mock.patch.object(fuchsia, 'gcc_support_tools',
+                                       return_value=iter([])) as mock_tools:
+                    self.assertEqual(c.prepare(), 0)
+                mock_tools.assert_called_with(c.compiler_path)
                 self.assertEqual(c.remote_compiler, remote_compiler_relpath)
                 self.assertEqual(
                     set(

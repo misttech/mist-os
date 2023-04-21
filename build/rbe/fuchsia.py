@@ -144,6 +144,20 @@ def remote_clang_libcxx_static(clang_lib_triple: str) -> str:
     return REMOTE_CLANG_SUBDIR / 'lib' / clang_lib_triple / 'libc++.a'
 
 
+def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
+    bindir = gcc_path.parent
+    install_root = bindir.parent
+    yield install_root / "x86_64-elf/bin/as"
+    libexec_base = install_root / "libexec/gcc/x86_64-elf"
+    libexec_dirs = list(libexec_base.glob("*"))  # dir is a version number
+    if not libexec_dirs:
+        return
+    libexec_dir = libexec_base / libexec_dirs[0]
+    yield libexec_dir / "cc1"
+    yield libexec_dir / "cc1plus"
+    # yield libexec_dir / "collect2"  # needed only if linking remotely
+
+
 def rust_stdlib_subdir(target_triple: str) -> str:
     """Location of rustlib standard libraries relative to rust --sysroot.
 
@@ -232,7 +246,7 @@ _SYSROOT_USR_LIB_FILES = (
 
 
 def c_sysroot_files(sysroot_dir: Path, sysroot_triple: str,
-                  with_libgcc: bool) -> Iterable[Path]:
+                    with_libgcc: bool) -> Iterable[Path]:
     """Expanded list of sysroot files under the Fuchsia build output dir.
 
     Args:

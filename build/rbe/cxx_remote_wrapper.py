@@ -136,6 +136,14 @@ class CxxRemoteAction(object):
         self._cleanup_files = []  # Sequence[Path]
         self._remote_action = None
 
+    @property
+    def compiler_path(self) -> Path:
+        return self.cxx_action.compiler.tool
+
+    @property
+    def compiler_type(self) -> cxx.Compiler:
+        return self.cxx_action.compiler.type
+
     def check_preconditions(self):
         if not self.cxx_action.target and self.cxx_action.compiler_is_clang:
             raise Exception(
@@ -144,8 +152,7 @@ class CxxRemoteAction(object):
 
         # check for required remote tools
         missing_required_tools = list(
-            check_missing_remote_tools(
-                self.cxx_action.compiler.type, self.exec_root_rel))
+            check_missing_remote_tools(self.compiler_type, self.exec_root_rel))
         if missing_required_tools:
             raise Exception(
                 f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563565 for how to fetch the needed packages."
@@ -217,6 +224,11 @@ class CxxRemoteAction(object):
         # to use the output file name for other auxiliary files.
         remote_output_files = list(
             self.cxx_action.output_files()) + self.command_line_output_files
+
+        # Workaround b/239101612: missing gcc support libexec binaries for remote build
+        if self.compiler_type == cxx.Compiler.GCC:
+            remote_inputs.extend(
+                list(fuchsia.gcc_support_tools(self.compiler_path)))
 
         # Support for remote cross-compilation:
         if self.host_platform != fuchsia.REMOTE_PLATFORM:
