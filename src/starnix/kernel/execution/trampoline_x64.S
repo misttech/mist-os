@@ -6,6 +6,9 @@
 restricted_enter:
   // args 0 - 1 are already in place in rdi, rsi
 
+  // save the reason code pointer on the stack
+  push  %rdx
+
   // save the callee saved regs
   push  %rbx
   push  %rbp
@@ -22,7 +25,7 @@ restricted_enter:
   call  zx_restricted_enter
 
   // if we got here it must have failed
-  add   $(7*8),%rsp // pop the previous state on the stack
+  add   $(8*8),%rsp // pop the previous state on the stack
   ret
 
 .globl restricted_return
@@ -36,6 +39,11 @@ restricted_return:
   pop  %r12
   pop  %rbp
   pop  %rbx
+
+  // pop the reason code pointer from the stack and write the reason
+  // code from rdx.
+  pop  %rdx
+  mov  %rax,(%rdx)
 
   // Zero out rax (return ZX_OK).
   xor %eax, %eax

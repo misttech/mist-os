@@ -33,7 +33,15 @@ extern "C" {
     /// restricted mode, the kernel returns control to `restricted_return`, `restricted_return` then
     /// restores the register state and returns back out to where `restricted_enter` was called
     /// from.
-    fn restricted_enter(options: u32, restricted_return: usize) -> zx::sys::zx_status_t;
+    ///
+    /// `exit_reason` is populated with reason code that identifies why the thread has returned to
+    /// normal mode. This is only written if this function returns ZX_OK and is otherwise not
+    /// touched.
+    fn restricted_enter(
+        options: u32,
+        restricted_return: usize,
+        exit_reason: *mut zx::sys::zx_restricted_reason_t,
+    ) -> zx::sys::zx_status_t;
 
     /// The function that is used to "return" from restricted mode. See `restricted_enter` for more
     /// information.
@@ -137,8 +145,10 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         // Copy the register state into the mapped VMO.
         bound_state.copy_from_slice(restricted_state_as_bytes(&mut state));
 
+        let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
         trace_duration_begin!(trace_category_starnix!(), trace_name_user_space!());
-        let status = unsafe { restricted_enter(0, restricted_return_ptr as usize) };
+        let status =
+            unsafe { restricted_enter(0, restricted_return_ptr as usize, &mut reason_code) };
         trace_duration_end!(trace_category_starnix!(), trace_name_user_space!());
         match { status } {
             zx::sys::ZX_OK => {
@@ -147,6 +157,10 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 // information about which system call to dispatch.
             }
             _ => return Err(format_err!("failed to restricted_enter: {:?}", state)),
+        }
+
+        if reason_code != zx::sys::ZX_RESTRICTED_REASON_SYSCALL {
+            return Err(format_err!("Received unexpected restricted reason code: {}", reason_code));
         }
 
         trace_duration_begin!(

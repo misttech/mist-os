@@ -14,8 +14,8 @@ restricted_enter:
   //   - Calls zx_restricted_enter().
   //   - Returns any failures (this will not return at all on success).
 
-  // Save the shadow call stack pointer.
-  str x18, [sp, #-16]!
+  // Save the reason code pointer and shadow call stack pointer on the stack.
+  stp x2, x18, [sp, #-16]!
 
   // Save the callee saved registers (including the link register).
   stp x20, x19, [sp, #-16]!
@@ -38,11 +38,12 @@ restricted_enter:
 restricted_return:
   // This function does the reverse of restricted_enter:
   //   - Restore the stack pointer which will be passed in as the first parameter (r0).
+  //   - Write the reason code to the pointer provided by the caller.
   //   - Pop the callee saved registers we pushed in restricted_enter() above.
   //   - Return to the link register. This will be the one passed in to restricted_enter so will
   //     have the effect of returning from that call.
 
-  // Restore the stack pointer.
+  // x0 holds the context, which is the stack pointer.
   mov sp, x0
 
   // Set the return value to ZX_OK.
@@ -56,8 +57,10 @@ restricted_return:
   ldp x22, x21, [sp], #16
   ldp x20, x19, [sp], #16
 
-  // Restore the shadow call stack pointer.
-  ldr x18, [sp], #16
+  // Load the shadow call stack pointer and reason code pointer.
+  ldp x2, x18, [sp], #16
 
+  // Write the reason code to the pointer provided by the caller.
+  str  x1, [x2]
   ret
 
