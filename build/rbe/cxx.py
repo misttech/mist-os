@@ -24,7 +24,7 @@ def _remove_suffix(text: str, suffix: str) -> str:
 
 def _cxx_command_scanner() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Detects C++ compilation attributes",
+        description="Detects C++ compilation attributes (clang, gcc)",
         argument_default=[],
         add_help=False,
     )
@@ -264,6 +264,10 @@ _CPP_FUSED_FLAGS = {'-I', '-D', '-L', '-U', '-isystem'}
 
 
 class CxxAction(object):
+    """Attributes of C/C++ (or dialect) compilation command.
+
+    Suitable for compilers: clang, gcc
+    """
 
     def __init__(self, command: Sequence[str]):
         self._command = command  # keep a copy of the original command
@@ -318,6 +322,10 @@ class CxxAction(object):
         return self._dialect == SourceLanguage.CXX
 
     @property
+    def profile_list(self) -> Optional[Path]:
+        return self._attributes.profile_list
+
+    @property
     def preprocessed_output(self) -> Path:
         if self._dialect == SourceLanguage.CXX:
             pp_ext = '.ii'
@@ -332,6 +340,28 @@ class CxxAction(object):
         return str(self.sysroot).startswith('/Library/Developer/')
 
     # TODO: scan command for absolute paths (C++-specific)
+
+    def input_files(self) -> Iterable[Path]:
+        """Files known to be inputs based on flags."""
+        # Note: reclient already infers many C++ inputs in its own
+        # input processor, so it is not necessary to list them
+        # for remote actions (but it does not hurt).
+        for s in self.sources:
+            yield s.file
+        if self.profile_list:
+            yield self.profile_list
+
+    def output_files(self) -> Iterable[Path]:
+        # Note: reclient already infers many C++ outputs in its own
+        # input processor, so it is not necessary to list them
+        # for remote actions (but it does not hurt).
+        if self.output_file:
+            yield self.output_file  # This should be first, for naming purposes
+        # TODO: intermediate outputs from -save-temps, like .i, .s
+
+    def output_dirs(self) -> Iterable[Path]:
+        if self.crash_diagnostics_dir:
+            yield self.crash_diagnostics_dir
 
     @property
     def _preprocess_only_command(self) -> Iterable[str]:

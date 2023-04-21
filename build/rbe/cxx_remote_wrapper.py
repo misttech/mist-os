@@ -186,7 +186,8 @@ class CxxRemoteAction(object):
         self._local_preprocess_command, self._compile_preprocessed_command = self.cxx_action.split_preprocessing(
         )
 
-        remote_inputs = self.command_line_inputs
+        remote_inputs = list(
+            self.cxx_action.input_files()) + self.command_line_inputs
         if self.cpp_strategy == 'local':
             # preprocess locally, then compile the result remotely
             preprocessed_source = self.cxx_action.preprocessed_output
@@ -204,7 +205,8 @@ class CxxRemoteAction(object):
             #   ZX_DEBUG_ASSERT.
 
         # Prepare remote compile action
-        remote_output_dirs = self.command_line_output_dirs
+        remote_output_dirs = list(
+            self.cxx_action.output_dirs()) + self.command_line_output_dirs
         remote_options = [
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
@@ -213,12 +215,8 @@ class CxxRemoteAction(object):
         # The output file is inferred automatically by rewrapper in C++ mode,
         # but naming it explicitly here makes it easier for RemoteAction
         # to use the output file name for other auxiliary files.
-        remote_output_files = [
-            self.cxx_action.output_file
-        ] + self.command_line_output_files
-
-        if self.cxx_action.crash_diagnostics_dir:
-            remote_output_dirs.append(self.cxx_action.crash_diagnostics_dir)
+        remote_output_files = list(
+            self.cxx_action.output_files()) + self.command_line_output_files
 
         # Support for remote cross-compilation:
         if self.host_platform != fuchsia.REMOTE_PLATFORM:

@@ -88,6 +88,9 @@ class CheckMissingRemoteToolsTests(unittest.TestCase):
 class CxxRemoteActionTests(unittest.TestCase):
 
     def test_clang_cxx(self):
+        fake_root = Path('/home/project')
+        fake_builddir = Path('out/really-not-default')
+        fake_cwd = fake_root / fake_builddir
         compiler = Path('clang++')
         source = Path('hello.cc')
         output = Path('hello.o')
@@ -98,6 +101,8 @@ class CxxRemoteActionTests(unittest.TestCase):
             ])
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
+            exec_root=fake_root,
+            working_dir=fake_cwd,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
             auto_reproxy=False,
         )
@@ -114,9 +119,9 @@ class CxxRemoteActionTests(unittest.TestCase):
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
             self.assertEqual(c.prepare(), 0)
-        # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
-            c.remote_compile_action.inputs_relative_to_project_root, [])
+            c.remote_compile_action.inputs_relative_to_project_root,
+            [fake_builddir / source])
         with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
                                '_run_remote_action',
                                return_value=0) as mock_call:
@@ -260,12 +265,17 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(wrapped_command, filtered_command)
 
     def test_gcc_cxx(self):
+        fake_root = remote_action.PROJECT_ROOT
+        fake_builddir = Path('make-it-so')
+        fake_cwd = fake_root / fake_builddir
         compiler = Path('g++')
         source = Path('hello.cc')
         output = Path('hello.o')
         command = _strs([compiler, '-c', source, '-o', output])
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
+            working_dir=fake_cwd,
+            exec_root=fake_root,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
             auto_reproxy=False,
         )
@@ -281,9 +291,12 @@ class CxxRemoteActionTests(unittest.TestCase):
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
             self.assertEqual(c.prepare(), 0)
-        # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
-            c.remote_compile_action.inputs_relative_to_project_root, [])
+            c.remote_compile_action.inputs_relative_to_project_root,
+            [fake_builddir / source])
+        self.assertEqual(
+            c.remote_compile_action.output_files_relative_to_project_root,
+            [fake_builddir / output])
         with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
                                '_run_remote_action',
                                return_value=0) as mock_call:
@@ -311,6 +324,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             c = cxx_remote_wrapper.CxxRemoteAction(
                 [f'--exec_root={fake_root}', '--'] + command,
                 working_dir=fake_cwd,
+                exec_root=fake_root,
                 # Pretend host != 'linux-x64' to cross-compile
                 host_platform='mac-arm64',
                 auto_reproxy=False,
@@ -324,8 +338,10 @@ class CxxRemoteActionTests(unittest.TestCase):
 
             self.assertEqual(c.remote_compiler, remote_compiler_relpath)
             self.assertEqual(
-                set(c.remote_compile_action.inputs_relative_to_project_root),
-                {Path('path/to/clang/linux-x64/clang++'), compiler_swapper})
+                set(c.remote_compile_action.inputs_relative_to_project_root), {
+                    fake_builddir / source,
+                    Path('path/to/clang/linux-x64/clang++'), compiler_swapper
+                })
             remote_compile_command = c.remote_compile_action.launch_command
             rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
                 remote_compile_command, '--')
@@ -374,6 +390,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             c = cxx_remote_wrapper.CxxRemoteAction(
                 [f'--exec_root={fake_root}', '--'] + command,
                 working_dir=fake_cwd,
+                exec_root=fake_root,
                 # Pretend host != 'linux-x64' to cross-compile
                 host_platform='mac-arm64',
                 auto_reproxy=False,
@@ -391,6 +408,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             self.assertEqual(c.remote_compiler, remote_compiler_relpath)
             self.assertEqual(
                 set(c.remote_compile_action.inputs_relative_to_project_root), {
+                    fake_builddir / source,
                     Path('path/to/clang/linux-x64/clang++'), compiler_swapper,
                     fake_builddir / c.cxx_action.preprocessed_output
                 })
@@ -425,11 +443,13 @@ class CxxRemoteActionTests(unittest.TestCase):
         fake_root = remote_action.PROJECT_ROOT
         fake_builddir = Path('make-it-so')
         fake_cwd = fake_root / fake_builddir
+        root_rel = cl_utils.relpath(fake_root, start=fake_cwd)
         compiler_relpath = Path('../path/to/gcc/mac-arm64/g++')
         remote_compiler_relpath = Path(
             '../path/to/gcc', fuchsia.REMOTE_PLATFORM, 'g++')
         compiler_swapper = Path('scripts/swapperoo.sh')
-        source = Path('hello.cc')
+        source_in_root = Path('src/hello.cc')
+        source = root_rel / source_in_root
         output = Path('hello.o')
         command = _strs(
             [
@@ -444,6 +464,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                 c = cxx_remote_wrapper.CxxRemoteAction(
                     [f'--exec_root={fake_root}', '--'] + command,
                     working_dir=fake_cwd,
+                    exec_root=fake_root,
                     # Pretend host != 'linux-x64' to cross-compile
                     host_platform='mac-arm64',
                     auto_reproxy=False,
@@ -454,7 +475,10 @@ class CxxRemoteActionTests(unittest.TestCase):
                 self.assertEqual(
                     set(
                         c.remote_compile_action.inputs_relative_to_project_root
-                    ), {Path('path/to/gcc/linux-x64/g++'), compiler_swapper})
+                    ), {
+                        source_in_root,
+                        Path('path/to/gcc/linux-x64/g++'), compiler_swapper
+                    })
                 remote_compile_command = c.remote_compile_action.launch_command
                 rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
                     remote_compile_command, '--')

@@ -63,6 +63,10 @@ class CxxActionTests(unittest.TestCase):
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.sysroot)
+        self.assertIsNone(c.profile_list)
+        self.assertEqual(list(c.input_files()), [source])
+        self.assertEqual(list(c.output_files()), [output])
+        self.assertEqual(list(c.output_dirs()), [])
         self.assertFalse(c.uses_macos_sdk)
         self.assertIsNone(c.crash_diagnostics_dir)
         self.assertEqual(c.preprocessed_output, ii_file)
@@ -93,6 +97,11 @@ class CxxActionTests(unittest.TestCase):
             c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertTrue(c.dialect_is_c)
+        self.assertIsNone(c.sysroot)
+        self.assertIsNone(c.profile_list)
+        self.assertEqual(list(c.input_files()), [source])
+        self.assertEqual(list(c.output_files()), [output])
+        self.assertEqual(list(c.output_dirs()), [])
         self.assertIsNone(c.crash_diagnostics_dir)
         self.assertEqual(c.preprocessed_output, i_file)
         preprocess, compile = c.split_preprocessing()
@@ -216,6 +225,21 @@ class CxxActionTests(unittest.TestCase):
                 'hello.cc', '-o', 'hello.o'
             ])
         self.assertEqual(c.crash_diagnostics_dir, crash_dir)
+        self.assertEqual(set(c.output_dirs()), {crash_dir})
+
+    def test_profile_list(self):
+        source = Path('hello.cc')
+        ii_file = Path('hello.ii')
+        output = Path('hello.o')
+        profile = Path('my/online/profile.list')
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    'clang++', '-c', source, '-o', output,
+                    f'-fprofile-list={profile}'
+                ]))
+        self.assertEqual(c.profile_list, profile)
+        self.assertEqual(set(c.input_files()), {source, profile})
 
     def test_uses_macos_sdk(self):
         sysroot = Path('/Library/Developer/blah')
