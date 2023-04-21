@@ -169,6 +169,9 @@
                 // fpsig_nested_test
                 "FPSigTest.NestedSignals",
 
+                // fuse_test
+                "FuseTest.RejectBadInit",
+
                 // futex_test
                 "PrivateFutexTest.WakeOp0Set",
                 "PrivateFutexTest.WakeOp0Add",

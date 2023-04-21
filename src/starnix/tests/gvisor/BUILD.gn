@@ -56,6 +56,7 @@ gvisor_tests = [
   "fpsig_fork_test",
   "fpsig_nested_test",
   "fsync_test",
+  "fuse_test",
   "futex_test",
   "getcpu_host_test",
   "getcpu_test",

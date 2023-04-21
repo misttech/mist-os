@@ -140,6 +140,9 @@
                 "FsyncTest.TempDirSucceeds",
                 "FsyncTest.TempFileSucceeds",
 
+                // fuse_test
+                "FuseTest.RejectBadInit",
+
                 // futex_test
                 "SharedFutexTest.WakeInterprocessFile",
 
