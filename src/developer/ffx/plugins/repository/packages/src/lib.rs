@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::{offset::Utc, DateTime};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
@@ -66,7 +66,7 @@ async fn show_impl(
             RepositoryError::NoMatchingRepository => {
                 ffx_bail!("repository {:?} does not exist", repo_name)
             }
-            err => ffx_bail!("error listing contents: {}", err),
+            err => ffx_bail!("error listing contents: {:#}", anyhow!(err)),
         },
     }
 

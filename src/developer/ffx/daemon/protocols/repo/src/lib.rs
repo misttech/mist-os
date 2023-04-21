@@ -1058,10 +1058,9 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
                 tracing::error!("Unable to list package contents {:?}: {}", package_name, err);
                 ffx::RepositoryError::IoError
             })?;
-        if values.is_none() {
-            return Err(ffx::RepositoryError::TargetCommunicationFailure);
-        }
-        let mut values = values.unwrap();
+        let Some(mut values) = values else {
+            return Err(ffx::RepositoryError::NoMatchingPackage);
+        };
 
         fasync::Task::spawn(async move {
             let mut chunks = SliceChunker::new(&mut values);

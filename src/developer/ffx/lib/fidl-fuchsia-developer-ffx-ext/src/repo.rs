@@ -333,70 +333,53 @@ pub enum RepositoryError {
 
     #[error("repository server address already in use")]
     ServerAddressAlreadyInUse,
+
+    #[error("package does not exist")]
+    NoMatchingPackage,
 }
 
 impl From<fidl::RepositoryError> for RepositoryError {
     fn from(err: fidl::RepositoryError) -> Self {
+        use {fidl::RepositoryError as fErr, RepositoryError as Err};
         match err {
-            fidl::RepositoryError::MissingRepositoryName => RepositoryError::MissingRepositoryName,
-            fidl::RepositoryError::NoMatchingRepository => RepositoryError::NoMatchingRepository,
-            fidl::RepositoryError::TargetCommunicationFailure => {
-                RepositoryError::TargetCommunicationFailure
-            }
-            fidl::RepositoryError::RepositoryManagerError => {
-                RepositoryError::RepositoryManagerError
-            }
-            fidl::RepositoryError::RewriteEngineError => RepositoryError::RewriteEngineError,
-            fidl::RepositoryError::UnknownRepositorySpec => RepositoryError::UnknownRepositorySpec,
-            fidl::RepositoryError::MissingRepositorySpecField => {
-                RepositoryError::MissingRepositorySpecField
-            }
-            fidl::RepositoryError::IoError => RepositoryError::IoError,
-            fidl::RepositoryError::InternalError => RepositoryError::InternalError,
-            fidl::RepositoryError::ExpiredRepositoryMetadata => {
-                RepositoryError::ExpiredRepositoryMetadata
-            }
-            fidl::RepositoryError::NoMatchingRegistration => {
-                RepositoryError::NoMatchingRegistration
-            }
-            fidl::RepositoryError::ServerNotRunning => RepositoryError::ServerNotRunning,
-            fidl::RepositoryError::InvalidUrl => RepositoryError::InvalidUrl,
-            fidl::RepositoryError::ServerAddressAlreadyInUse => {
-                RepositoryError::ServerAddressAlreadyInUse
-            }
+            fErr::MissingRepositoryName => Err::MissingRepositoryName,
+            fErr::NoMatchingRepository => Err::NoMatchingRepository,
+            fErr::TargetCommunicationFailure => Err::TargetCommunicationFailure,
+            fErr::RepositoryManagerError => Err::RepositoryManagerError,
+            fErr::RewriteEngineError => Err::RewriteEngineError,
+            fErr::UnknownRepositorySpec => Err::UnknownRepositorySpec,
+            fErr::MissingRepositorySpecField => Err::MissingRepositorySpecField,
+            fErr::IoError => Err::IoError,
+            fErr::InternalError => Err::InternalError,
+            fErr::ExpiredRepositoryMetadata => Err::ExpiredRepositoryMetadata,
+            fErr::NoMatchingRegistration => Err::NoMatchingRegistration,
+            fErr::ServerNotRunning => Err::ServerNotRunning,
+            fErr::InvalidUrl => Err::InvalidUrl,
+            fErr::ServerAddressAlreadyInUse => Err::ServerAddressAlreadyInUse,
+            fErr::NoMatchingPackage => Err::NoMatchingPackage,
         }
     }
 }
 
 impl From<RepositoryError> for fidl::RepositoryError {
     fn from(err: RepositoryError) -> Self {
+        use {fidl::RepositoryError as fErr, RepositoryError as Err};
         match err {
-            RepositoryError::MissingRepositoryName => fidl::RepositoryError::MissingRepositoryName,
-            RepositoryError::NoMatchingRepository => fidl::RepositoryError::NoMatchingRepository,
-            RepositoryError::TargetCommunicationFailure => {
-                fidl::RepositoryError::TargetCommunicationFailure
-            }
-            RepositoryError::RepositoryManagerError => {
-                fidl::RepositoryError::RepositoryManagerError
-            }
-            RepositoryError::RewriteEngineError => fidl::RepositoryError::RewriteEngineError,
-            RepositoryError::UnknownRepositorySpec => fidl::RepositoryError::UnknownRepositorySpec,
-            RepositoryError::MissingRepositorySpecField => {
-                fidl::RepositoryError::MissingRepositorySpecField
-            }
-            RepositoryError::IoError => fidl::RepositoryError::IoError,
-            RepositoryError::InternalError => fidl::RepositoryError::InternalError,
-            RepositoryError::ExpiredRepositoryMetadata => {
-                fidl::RepositoryError::ExpiredRepositoryMetadata
-            }
-            RepositoryError::NoMatchingRegistration => {
-                fidl::RepositoryError::NoMatchingRegistration
-            }
-            RepositoryError::ServerNotRunning => fidl::RepositoryError::ServerNotRunning,
-            RepositoryError::InvalidUrl => fidl::RepositoryError::InvalidUrl,
-            RepositoryError::ServerAddressAlreadyInUse => {
-                fidl::RepositoryError::ServerAddressAlreadyInUse
-            }
+            Err::MissingRepositoryName => fErr::MissingRepositoryName,
+            Err::NoMatchingRepository => fErr::NoMatchingRepository,
+            Err::TargetCommunicationFailure => fErr::TargetCommunicationFailure,
+            Err::RepositoryManagerError => fErr::RepositoryManagerError,
+            Err::RewriteEngineError => fErr::RewriteEngineError,
+            Err::UnknownRepositorySpec => fErr::UnknownRepositorySpec,
+            Err::MissingRepositorySpecField => fErr::MissingRepositorySpecField,
+            Err::IoError => fErr::IoError,
+            Err::InternalError => fErr::InternalError,
+            Err::ExpiredRepositoryMetadata => fErr::ExpiredRepositoryMetadata,
+            Err::NoMatchingRegistration => fErr::NoMatchingRegistration,
+            Err::ServerNotRunning => fErr::ServerNotRunning,
+            Err::InvalidUrl => fErr::InvalidUrl,
+            Err::ServerAddressAlreadyInUse => fErr::ServerAddressAlreadyInUse,
+            Err::NoMatchingPackage => fErr::NoMatchingPackage,
         }
     }
 }
