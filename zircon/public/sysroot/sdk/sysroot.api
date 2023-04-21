@@ -202,6 +202,6 @@
   "include/zircon/threads.h": "0e01c22126479fb344bddd7d924cff0e",
   "include/zircon/time.h": "477629b939476cb4f2e8210c3d4f4895",
   "include/zircon/tls.h": "a58546d629e67c2a21cb10f628afe1c2",
-  "include/zircon/types.h": "53f9ba44835ed49ac8bbb27ec11024c2",
+  "include/zircon/types.h": "6d1de82363baef27e7c8d247ce80ad6e",
   "include/zircon/utc.h": "febff051fa44aebb4ad7950d9ecd9a74"
 }

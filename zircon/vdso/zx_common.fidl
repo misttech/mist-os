@@ -44,11 +44,6 @@ alias vaddr = uint64;
 // TODO(fxbug.dev/109734): Paddr.
 alias paddr = uint64;
 
-// zx_paddr32_t: low mem physical address.
-//
-// TODO(fxbug.dev/109734): Paddr32.
-alias paddr32 = uint32;
-
 // zx_gpaddr_t: hypervisor guest physical addresses.
 //
 // TODO(fxbug.dev/109734): Gpaddr.

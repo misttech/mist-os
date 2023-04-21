@@ -22,7 +22,6 @@ pub struct zx_types {
     pub koid: zircon_types::zx_koid_t,
     pub vaddr: zircon_types::zx_vaddr_t,
     pub paddr: zircon_types::zx_paddr_t,
-    pub paddr32: zircon_types::zx_paddr32_t,
     pub gpaddr: zircon_types::zx_gpaddr_t,
     pub offset: zircon_types::zx_off_t,
 }

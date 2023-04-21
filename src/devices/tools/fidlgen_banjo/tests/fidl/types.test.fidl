@@ -52,7 +52,6 @@ type zx_types = struct {
     koid zx.Koid;
     vaddr zx.vaddr;
     paddr zx.paddr;
-    paddr32 zx.paddr32;
     gpaddr zx.gpaddr;
     offset zx.Off;
 };

@@ -99,9 +99,6 @@ std::string echo_service = R"({
         "zx/paddr": {
           "kind": "alias"
         },
-        "zx/paddr32": {
-          "kind": "alias"
-        },
         "zx/gpaddr": {
           "kind": "alias"
         },

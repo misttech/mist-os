@@ -619,7 +619,6 @@ pub type zx_vmo_lock_state_t = zx_vmo_lock_state;
 pub type zx_vm_option_t = u32;
 pub type zx_vaddr_t = usize;
 pub type zx_paddr_t = usize;
-pub type zx_paddr32_t = u32;
 pub type zx_gpaddr_t = usize;
 pub type zx_off_t = u64;
 #[repr(C)]

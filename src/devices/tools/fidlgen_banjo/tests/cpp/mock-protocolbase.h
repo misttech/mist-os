@@ -69,11 +69,6 @@ public:
         return *this;
     }
 
-    virtual MockSynchronousBase& ExpectPaddr32(zx_paddr32_t out_paddr32, zx_paddr32_t paddr32, zx_paddr32_t out_paddr32_2) {
-        mock_paddr32_.ExpectCall({out_paddr32, out_paddr32_2}, paddr32);
-        return *this;
-    }
-
     virtual MockSynchronousBase& ExpectGpaddr(zx_gpaddr_t out_gpaddr, zx_gpaddr_t gpaddr, zx_gpaddr_t out_gpaddr_2) {
         mock_gpaddr_.ExpectCall({out_gpaddr, out_gpaddr_2}, gpaddr);
         return *this;
@@ -91,7 +86,6 @@ public:
         mock_koid_.VerifyAndClear();
         mock_vaddr_.VerifyAndClear();
         mock_paddr_.VerifyAndClear();
-        mock_paddr32_.VerifyAndClear();
         mock_gpaddr_.VerifyAndClear();
         mock_off_.VerifyAndClear();
     }
@@ -132,12 +126,6 @@ public:
         return std::get<0>(ret);
     }
 
-    virtual zx_paddr32_t SynchronousBasePaddr32(zx_paddr32_t paddr32, zx_paddr32_t* out_paddr32_2) {
-        std::tuple<zx_paddr32_t, zx_paddr32_t> ret = mock_paddr32_.Call(paddr32);
-        *out_paddr32_2 = std::get<1>(ret);
-        return std::get<0>(ret);
-    }
-
     virtual zx_gpaddr_t SynchronousBaseGpaddr(zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2) {
         std::tuple<zx_gpaddr_t, zx_gpaddr_t> ret = mock_gpaddr_.Call(gpaddr);
         *out_gpaddr_2 = std::get<1>(ret);
@@ -156,7 +144,6 @@ public:
     mock_function::MockFunction<std::tuple<zx_koid_t, zx_koid_t>, zx_koid_t>& mock_koid() { return mock_koid_; }
     mock_function::MockFunction<std::tuple<zx_vaddr_t, zx_vaddr_t>, zx_vaddr_t>& mock_vaddr() { return mock_vaddr_; }
     mock_function::MockFunction<std::tuple<zx_paddr_t, zx_paddr_t>, zx_paddr_t>& mock_paddr() { return mock_paddr_; }
-    mock_function::MockFunction<std::tuple<zx_paddr32_t, zx_paddr32_t>, zx_paddr32_t>& mock_paddr32() { return mock_paddr32_; }
     mock_function::MockFunction<std::tuple<zx_gpaddr_t, zx_gpaddr_t>, zx_gpaddr_t>& mock_gpaddr() { return mock_gpaddr_; }
     mock_function::MockFunction<std::tuple<zx_off_t, zx_off_t>, zx_off_t>& mock_off() { return mock_off_; }
 
@@ -167,7 +154,6 @@ protected:
     mock_function::MockFunction<std::tuple<zx_koid_t, zx_koid_t>, zx_koid_t> mock_koid_;
     mock_function::MockFunction<std::tuple<zx_vaddr_t, zx_vaddr_t>, zx_vaddr_t> mock_vaddr_;
     mock_function::MockFunction<std::tuple<zx_paddr_t, zx_paddr_t>, zx_paddr_t> mock_paddr_;
-    mock_function::MockFunction<std::tuple<zx_paddr32_t, zx_paddr32_t>, zx_paddr32_t> mock_paddr32_;
     mock_function::MockFunction<std::tuple<zx_gpaddr_t, zx_gpaddr_t>, zx_gpaddr_t> mock_gpaddr_;
     mock_function::MockFunction<std::tuple<zx_off_t, zx_off_t>, zx_off_t> mock_off_;
 
@@ -278,11 +264,6 @@ public:
         return *this;
     }
 
-    virtual MockAsyncBase& ExpectPaddr32(zx_paddr32_t paddr32, zx_paddr32_t out_paddr32, zx_paddr32_t out_paddr32_2) {
-        mock_paddr32_.ExpectCall({out_paddr32, out_paddr32_2}, paddr32);
-        return *this;
-    }
-
     virtual MockAsyncBase& ExpectGpaddr(zx_gpaddr_t gpaddr, zx_gpaddr_t out_gpaddr, zx_gpaddr_t out_gpaddr_2) {
         mock_gpaddr_.ExpectCall({out_gpaddr, out_gpaddr_2}, gpaddr);
         return *this;
@@ -300,7 +281,6 @@ public:
         mock_koid_.VerifyAndClear();
         mock_vaddr_.VerifyAndClear();
         mock_paddr_.VerifyAndClear();
-        mock_paddr32_.VerifyAndClear();
         mock_gpaddr_.VerifyAndClear();
         mock_off_.VerifyAndClear();
     }
@@ -335,11 +315,6 @@ public:
         callback(cookie, std::get<0>(ret), std::get<1>(ret));
     }
 
-    virtual void AsyncBasePaddr32(zx_paddr32_t paddr32, async_base_paddr32_callback callback, void* cookie) {
-        std::tuple<zx_paddr32_t, zx_paddr32_t> ret = mock_paddr32_.Call(paddr32);
-        callback(cookie, std::get<0>(ret), std::get<1>(ret));
-    }
-
     virtual void AsyncBaseGpaddr(zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie) {
         std::tuple<zx_gpaddr_t, zx_gpaddr_t> ret = mock_gpaddr_.Call(gpaddr);
         callback(cookie, std::get<0>(ret), std::get<1>(ret));
@@ -356,7 +331,6 @@ public:
     mock_function::MockFunction<std::tuple<zx_koid_t, zx_koid_t>, zx_koid_t>& mock_koid() { return mock_koid_; }
     mock_function::MockFunction<std::tuple<zx_vaddr_t, zx_vaddr_t>, zx_vaddr_t>& mock_vaddr() { return mock_vaddr_; }
     mock_function::MockFunction<std::tuple<zx_paddr_t, zx_paddr_t>, zx_paddr_t>& mock_paddr() { return mock_paddr_; }
-    mock_function::MockFunction<std::tuple<zx_paddr32_t, zx_paddr32_t>, zx_paddr32_t>& mock_paddr32() { return mock_paddr32_; }
     mock_function::MockFunction<std::tuple<zx_gpaddr_t, zx_gpaddr_t>, zx_gpaddr_t>& mock_gpaddr() { return mock_gpaddr_; }
     mock_function::MockFunction<std::tuple<zx_off_t, zx_off_t>, zx_off_t>& mock_off() { return mock_off_; }
 
@@ -367,7 +341,6 @@ protected:
     mock_function::MockFunction<std::tuple<zx_koid_t, zx_koid_t>, zx_koid_t> mock_koid_;
     mock_function::MockFunction<std::tuple<zx_vaddr_t, zx_vaddr_t>, zx_vaddr_t> mock_vaddr_;
     mock_function::MockFunction<std::tuple<zx_paddr_t, zx_paddr_t>, zx_paddr_t> mock_paddr_;
-    mock_function::MockFunction<std::tuple<zx_paddr32_t, zx_paddr32_t>, zx_paddr32_t> mock_paddr32_;
     mock_function::MockFunction<std::tuple<zx_gpaddr_t, zx_gpaddr_t>, zx_gpaddr_t> mock_gpaddr_;
     mock_function::MockFunction<std::tuple<zx_off_t, zx_off_t>, zx_off_t> mock_off_;
 

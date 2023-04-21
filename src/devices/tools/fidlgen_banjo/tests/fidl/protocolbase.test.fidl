@@ -44,12 +44,6 @@ closed protocol SynchronousBase {
         paddr zx.paddr;
         paddr_2 zx.paddr;
     });
-    strict Paddr32(struct {
-        paddr32 zx.paddr32;
-    }) -> (struct {
-        paddr32 zx.paddr32;
-        paddr32_2 zx.paddr32;
-    });
     strict Gpaddr(struct {
         gpaddr zx.gpaddr;
     }) -> (struct {
@@ -110,13 +104,6 @@ closed protocol AsyncBase {
         paddr_2 zx.paddr;
     });
     @async
-    strict Paddr32(struct {
-        paddr32 zx.paddr32;
-    }) -> (struct {
-        paddr32 zx.paddr32;
-        paddr32_2 zx.paddr32;
-    });
-    @async
     strict Gpaddr(struct {
         gpaddr zx.gpaddr;
     }) -> (struct {
@@ -168,12 +155,6 @@ closed protocol WrongTransport {
     }) -> (struct {
         paddr zx.paddr;
         paddr_2 zx.paddr;
-    });
-    strict Paddr32(struct {
-        paddr32 zx.paddr32;
-    }) -> (struct {
-        paddr32 zx.paddr32;
-        paddr32_2 zx.paddr32;
     });
     strict Gpaddr(struct {
         gpaddr zx.gpaddr;

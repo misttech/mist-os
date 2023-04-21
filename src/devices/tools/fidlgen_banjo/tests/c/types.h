@@ -60,7 +60,6 @@ struct zx_types {
     zx_koid_t koid;
     zx_vaddr_t vaddr;
     zx_paddr_t paddr;
-    zx_paddr32_t paddr32;
     zx_gpaddr_t gpaddr;
     zx_off_t offset;
 };

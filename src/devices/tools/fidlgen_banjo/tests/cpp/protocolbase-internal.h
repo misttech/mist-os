@@ -30,9 +30,6 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protoco
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_paddr, SynchronousBasePaddr,
         zx_paddr_t (C::*)(zx_paddr_t paddr, zx_paddr_t* out_paddr_2));
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_paddr32, SynchronousBasePaddr32,
-        zx_paddr32_t (C::*)(zx_paddr32_t paddr32, zx_paddr32_t* out_paddr32_2));
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_gpaddr, SynchronousBaseGpaddr,
         zx_gpaddr_t (C::*)(zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2));
 
@@ -65,10 +62,6 @@ constexpr void CheckSynchronousBaseProtocolSubclass() {
     static_assert(internal::has_synchronous_base_protocol_paddr<D>::value,
         "SynchronousBaseProtocol subclasses must implement "
         "zx_paddr_t SynchronousBasePaddr(zx_paddr_t paddr, zx_paddr_t* out_paddr_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_paddr32<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_paddr32_t SynchronousBasePaddr32(zx_paddr32_t paddr32, zx_paddr32_t* out_paddr32_2);");
 
     static_assert(internal::has_synchronous_base_protocol_gpaddr<D>::value,
         "SynchronousBaseProtocol subclasses must implement "
@@ -110,9 +103,6 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_vadd
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_paddr, AsyncBasePaddr,
         void (C::*)(zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie));
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_paddr32, AsyncBasePaddr32,
-        void (C::*)(zx_paddr32_t paddr32, async_base_paddr32_callback callback, void* cookie));
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_gpaddr, AsyncBaseGpaddr,
         void (C::*)(zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie));
 
@@ -145,10 +135,6 @@ constexpr void CheckAsyncBaseProtocolSubclass() {
     static_assert(internal::has_async_base_protocol_paddr<D>::value,
         "AsyncBaseProtocol subclasses must implement "
         "void AsyncBasePaddr(zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie);");
-
-    static_assert(internal::has_async_base_protocol_paddr32<D>::value,
-        "AsyncBaseProtocol subclasses must implement "
-        "void AsyncBasePaddr32(zx_paddr32_t paddr32, async_base_paddr32_callback callback, void* cookie);");
 
     static_assert(internal::has_async_base_protocol_gpaddr<D>::value,
         "AsyncBaseProtocol subclasses must implement "

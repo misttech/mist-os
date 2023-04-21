@@ -68,9 +68,6 @@
         "zx/paddr": {
           "kind": "alias"
         },
-        "zx/paddr32": {
-          "kind": "alias"
-        },
         "zx/status": {
           "kind": "alias"
         },
