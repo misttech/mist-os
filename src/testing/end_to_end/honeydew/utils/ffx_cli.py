@@ -174,7 +174,8 @@ def get_target_address(
         ssh_address_entry: Dict[str, Any] = _get_label_entry(
             target_entry["child"], label_value="ssh_address")
         # in 'fe80::92bf:167b:19c3:58f0%qemu:22', ":22" is SSH port.
-        return ssh_address_entry["value"][:-3]
+        # Ports can be 1-5 characters, clip off everything after the last ':'.
+        return ssh_address_entry["value"].rsplit(":", 1)[0]
     except Exception as err:  # pylint: disable=broad-except
         raise errors.FfxCommandError(
             f"Failed to get the ip address of {target}") from err

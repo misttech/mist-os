@@ -13,20 +13,26 @@ from honeydew import errors
 from honeydew.utils import ffx_cli
 from parameterized import parameterized
 
-_FFX_TARGET_SHOW_OUTPUT: bytes = \
-    '[{"title":"Target","label":"target","description":"",' \
-    '"child":[{"title":"Name","label":"name","description":"Target name.",' \
-    '"value":"fuchsia-emulator"},{"title":"SSH Address",' \
-    '"label":"ssh_address","description":"Interface address",' \
-    '"value":"fe80::3804:df7d:daa8:ce6c%qemu:22"}]},{"title":"Build",' \
-    '"label":"build","description":"","child":[{"title":"Version",' \
-    '"label":"version","description":"Build version.",' \
-    '"value":"2023-02-01T17:26:40+00:00"},{"title":"Product",' \
-    '"label":"product","description":"Product config.",' \
-    '"value":"workstation_eng"},{"title":"Board","label":"board",' \
-    '"description":"Board config.","value":"qemu-x64"},{"title":"Commit",' \
-    '"label":"commit","description":"Integration Commit Date",' \
-    '"value":"2023-02-01T17:26:40+00:00"}]}]'.encode()
+_SSH_ADDRESS = "fe80::3804:df7d:daa8:ce6c"
+_SSH_ADDRESS_SCOPE = "qemu"
+_SSH_PORT = "8022"
+
+_FFX_TARGET_SHOW_OUTPUT: bytes = (
+    r'[{"title":"Target","label":"target","description":"",'
+    r'"child":[{"title":"Name","label":"name","description":"Target name.",'
+    r'"value":"fuchsia-emulator"},{"title":"SSH Address",'
+    r'"label":"ssh_address","description":"Interface address",'
+    r'"value":'
+    f'"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}:{_SSH_PORT}"'
+    r'}]},{"title":"Build",'
+    r'"label":"build","description":"","child":[{"title":"Version",'
+    r'"label":"version","description":"Build version.",'
+    r'"value":"2023-02-01T17:26:40+00:00"},{"title":"Product",'
+    r'"label":"product","description":"Product config.",'
+    r'"value":"workstation_eng"},{"title":"Board","label":"board",'
+    r'"description":"Board config.","value":"qemu-x64"},{"title":"Commit",'
+    r'"label":"commit","description":"Integration Commit Date",'
+    r'"value":"2023-02-01T17:26:40+00:00"}]}]').encode()
 
 _FFX_TARGET_SHOW_JSON: List[Dict[str, Any]] = [
     {
@@ -47,7 +53,7 @@ _FFX_TARGET_SHOW_JSON: List[Dict[str, Any]] = [
                     "title": "SSH Address",
                     "label": "ssh_address",
                     "description": "Interface address",
-                    "value": "fe80::3804:df7d:daa8:ce6c%qemu:22"
+                    "value": f"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}:{_SSH_PORT}"
                 }
             ]
     }, {
@@ -199,7 +205,7 @@ class FfxCliTests(unittest.TestCase):
     def test_get_target_address(self) -> None:
         """Verify get_target_address returns ip address of fuchsia device."""
         result: str = ffx_cli.get_target_address(target="fuchsia-emulator")
-        expected: str = _FFX_TARGET_SHOW_JSON[0]["child"][1]["value"][:-3]
+        expected: str = f"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}"
 
         self.assertEqual(result, expected)
 
