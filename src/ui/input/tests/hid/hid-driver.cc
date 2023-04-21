@@ -42,8 +42,9 @@ class HidDriverTest : public zxtest::Test {
 
     auto args = fuchsia::driver::test::RealmArgs();
 #ifdef DFV2
+    args.set_use_driver_framework_v2(false);
+#else
     args.set_use_driver_framework_v2(true);
-    args.set_root_driver("fuchsia-boot:///#meta/test-parent-sys.cm");
 #endif
 
     ASSERT_OK(driver_test_realm->Start(std::move(args), &realm_result));
@@ -119,9 +120,6 @@ const uint8_t kBootMouseReportDesc[50] = {
     0xC0,        // End Collection
 };
 
-// We cannot test the HID driver directly in DFv2 because it still uses Open() which
-// is not supported.
-#ifndef DFV2
 TEST_F(HidDriverTest, BootMouseTest) {
   // Create a fake mouse device
   fuchsia_hardware_hidctl::wire::HidCtlConfig config = {};
@@ -136,6 +134,9 @@ TEST_F(HidDriverTest, BootMouseTest) {
 
   fbl::unique_fd fd_device;
 
+  // Wait for input-report driver to bind to avoid binding to a device which is being torn down.
+  ASSERT_OK(
+      WaitForFirstDevice<fuchsia_input_report::InputDevice>("class/input-report").status_value());
   // Open the /dev/class/input/ device created by MakeHidDevice.
   zx::result input_client = WaitForFirstDevice<fuchsia_hardware_input::Controller>("class/input");
   ASSERT_OK(input_client.status_value());
@@ -196,7 +197,6 @@ TEST_F(HidDriverTest, BootMouseTest) {
     }
   }
 }
-#endif
 
 TEST_F(HidDriverTest, BootMouseTestInputReport) {
   // Create a fake mouse device
