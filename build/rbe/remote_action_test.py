@@ -22,6 +22,11 @@ import output_leak_scanner
 from typing import Any, Sequence
 
 
+class ImmediateExit(Exception):
+    """For mocking functions that do not return."""
+    pass
+
+
 def _write_file_contents(path: Path, contents: str):
     with open(path, 'w') as f:
         f.write(contents)
@@ -1498,17 +1503,10 @@ class MainTests(unittest.TestCase):
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         with contextlib.redirect_stdout(stdout):
-            with mock.patch.object(
-                    remote_action,
-                    'auto_relaunch_with_reproxy') as mock_relaunch:
-                with mock.patch.object(sys, 'exit') as mock_exit:
-                    # Normally, the following would not be reached due to exit(),
-                    # but for testing it needs to be mocked out.
-                    with mock.patch.object(remote_action.RemoteAction,
-                                           'run_with_main_args',
-                                           return_value=0):
-                        self.assertEqual(remote_action.main(['--help']), 0)
-        mock_relaunch.assert_called_once()
+            with mock.patch.object(sys, 'exit',
+                                   side_effect=ImmediateExit) as mock_exit:
+                with self.assertRaises(ImmediateExit):
+                    remote_action.main(['--help'])
         mock_exit.assert_called_with(0)
 
     def test_auto_relaunch_with_reproxy_not_needed_for_local(self):
@@ -1540,18 +1538,15 @@ class MainTests(unittest.TestCase):
         # are absent.
         with mock.patch.object(os.environ, 'get',
                                return_value=None) as mock_env:
-            with mock.patch.object(os, 'execv') as mock_relaunch:
-                # In reality, no other code is reached after an execv,
-                # but the following mock is still needed for unit-testing.
-                with mock.patch.object(remote_action.RemoteAction,
-                                       'run_with_main_args') as mock_run:
+            with mock.patch.object(cl_utils, 'exec_relaunch',
+                                   side_effect=ImmediateExit) as mock_relaunch:
+                with self.assertRaises(ImmediateExit):
                     remote_action.main(command)
-        mock_run.assert_called_once()
         mock_relaunch.assert_called_once()
         args, kwargs = mock_relaunch.call_args_list[0]
-        self.assertEqual(args[0], fuchsia.REPROXY_WRAP)
-        relaunch_args = args[1]
-        cmd_slices = cl_utils.split_into_subsequences(relaunch_args, '--')
+        relaunch_cmd = args[0]
+        self.assertEqual(relaunch_cmd[0], fuchsia.REPROXY_WRAP)
+        cmd_slices = cl_utils.split_into_subsequences(relaunch_cmd[1:], '--')
         reproxy_args, self_script, wrapped_command = cmd_slices
         self.assertEqual(reproxy_args, [])
         self.assertIn('python', self_script[0])

@@ -1406,12 +1406,10 @@ def forward_remote_flags(
       1) main script args, including those propagated from the wrapped command.
       2) wrapped command, but with --remote-* flags filtered out.
     """
-    try:
-        # Split the whole command around '--'.
-        ddash = argv.index('--')
-        script_args = argv[:ddash]
-        unfiltered_command = argv[ddash + 1:]
-    except ValueError:  # '--' not found
+    # Split the whole command around the first '--'.
+    script_args, sep, unfiltered_command = cl_utils.partition_sequence(
+        argv, '--')
+    if sep == None:
         return (['--help'], [])  # Tell the caller to trigger help and exit
 
     forwarded_flags, filtered_command = _FORWARDED_REMOTE_FLAGS.sift(
@@ -1419,7 +1417,8 @@ def forward_remote_flags(
     return script_args + forwarded_flags, filtered_command
 
 
-def auto_relaunch_with_reproxy(script: Path, argv: Sequence[str], args: argparse.Namespace):
+def auto_relaunch_with_reproxy(
+        script: Path, argv: Sequence[str], args: argparse.Namespace):
     """If reproxy is not already running, re-launch with reproxy running.
 
     Args:
@@ -1434,7 +1433,9 @@ def auto_relaunch_with_reproxy(script: Path, argv: Sequence[str], args: argparse
       is replaced by a os.exec*() call.
     """
     if args.auto_reproxy:
-        msg('You no longer need to pass --auto-reproxy, reproxy is launched automatically when needed.')
+        msg(
+            'You no longer need to pass --auto-reproxy, reproxy is launched automatically when needed.'
+        )
 
     if args.dry_run or args.local:
         # Don't need reproxy when no call to rewrapper is expected.
@@ -1456,8 +1457,8 @@ def auto_relaunch_with_reproxy(script: Path, argv: Sequence[str], args: argparse
         cmd_str = cl_utils.command_quoted_str(
             [str(fuchsia.REPROXY_WRAP)] + relaunch_args)
         msg(f'Automatically re-launching: {cmd_str}')
-    os.execv(fuchsia.REPROXY_WRAP, relaunch_args)
-    # os.exec*() does not return
+    cl_utils.exec_relaunch([fuchsia.REPROXY_WRAP] + relaunch_args)
+    assert False, "exec_relaunch() should never return"
 
 
 def main(argv: Sequence[str]) -> int:

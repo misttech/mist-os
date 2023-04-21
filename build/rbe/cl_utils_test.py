@@ -4,12 +4,22 @@
 # found in the LICENSE file.
 
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 import cl_utils
+
+
+class ImmediateExit(Exception):
+    """Mocked calls that are not expected to return can raise this.
+
+  Examples: os.exec*(), sys.exit()
+  """
+    pass
 
 
 class AutoEnvPrefixCommandTests(unittest.TestCase):
@@ -508,6 +518,30 @@ class SymlinkRelativeTests(unittest.TestCase):
             self.assertEqual(
                 _readlink(src), '../../../trash/bin/garbage.txt')  # relative
             self.assertEqual(src.resolve(), dest)
+
+
+class ExecRelaunchTests(unittest.TestCase):
+
+    def go_away(self):
+        cl_utils.exec_relaunch(['/my/handy/tool'])
+
+    def test_mock_launch(self):
+        """Example of how to mock exec_relaunch()."""
+        with mock.patch.object(cl_utils, 'exec_relaunch',
+                               side_effect=ImmediateExit) as mock_launch:
+            with self.assertRaises(ImmediateExit):
+                self.go_away()
+
+    def test_mock_call(self):
+        exit_code = 21
+        with mock.patch.object(subprocess, 'call',
+                               return_value=exit_code) as mock_call:
+            with mock.patch.object(sys, 'exit',
+                                   side_effect=ImmediateExit) as mock_exit:
+                with self.assertRaises(ImmediateExit):
+                    self.go_away()
+        mock_call.assert_called_once()
+        mock_exit.assert_called_with(exit_code)
 
 
 class SubprocessCallTests(unittest.TestCase):

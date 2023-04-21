@@ -41,6 +41,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Prepares a C++ command for remote execution.",
         argument_default=[],
+        add_help=True,  # Want this to exit after printing --help
     )
     remote_action.inherit_main_arg_parser_flags(parser)
     group = parser.add_argument_group(

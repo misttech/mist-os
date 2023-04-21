@@ -12,6 +12,7 @@ import dataclasses
 import io
 import os
 import shlex
+import subprocess
 import sys
 import platform
 
@@ -313,6 +314,31 @@ def symlink_relative(dest: Path, src: Path):
     """
     src.parent.mkdir(parents=True, exist_ok=True)
     src.symlink_to(relpath(dest, start=src.parent))
+
+
+def exec_relaunch(command: Sequence[str]) -> None:
+    """Re-launches a command without returning.
+
+    Works like an os.exec*() call, by replacing the current process with
+    a new one.
+
+    Tip: When mocking this function, give it a side-effect that
+    raises a test-only Exception to quickly simulate an exit, without
+    having to mock any other code that would normally not be reached.
+
+    Args:
+      command: command to execute.  Must start with an executable, specified
+        with a relative or absolute path.
+
+    Returns: (it does not return)
+    """
+    # TODO(http://fxbug.dev/125841): use os.execv(), but figure out
+    # how to get in-python print() of the new process to appear.
+    # os.execv(command[0], command[1:])
+
+    # Workaround: fork a subprocess
+    sys.exit(subprocess.call(command))
+    assert False, "exec_relaunch() should never return"
 
 
 #####################################################################
