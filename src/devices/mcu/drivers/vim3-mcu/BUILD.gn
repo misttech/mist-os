@@ -17,14 +17,13 @@ driver_bind_rules("vim3_mcu_bind") {
   ]
 }
 
-fuchsia_driver("vim3-mcu-driver") {
-  output_name = "vim3-mcu"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+source_set("common_sources") {
+  configs += [ "//build/config:all_source" ]
+  public_configs = [ "//build/config/fuchsia:enable_zircon_asserts" ]
+
   sources = [ "vim3-mcu.cc" ]
-  deps = [
+
+  public_deps = [
     ":vim3_mcu_bind",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
@@ -32,6 +31,13 @@ fuchsia_driver("vim3-mcu-driver") {
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
+  ]
+}
+
+fuchsia_driver("vim3-mcu-driver") {
+  output_name = "vim3-mcu"
+  deps = [
+    ":common_sources",
     "//zircon/system/ulib/pretty",
   ]
 }
@@ -45,25 +51,16 @@ fuchsia_driver_component("vim3-mcu") {
 
 test("vim3-mcu-test-bin") {
   output_name = "vim3-mcu-test"
-  sources = [
-    "vim3-mcu-test.cc",
-    "vim3-mcu.cc",
-  ]
+  sources = [ "vim3-mcu-test.cc" ]
   deps = [
-    ":vim3_mcu_bind",
+    ":common_sources",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/mock-i2c",
-    "//src/devices/lib/driver",
     "//src/devices/testing/no_ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
