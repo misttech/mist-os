@@ -343,7 +343,7 @@ fuchsia_component("component") {
   deps = [ ":driver_manager" ]
 }
 
-fuchsia_package("package") {
+fuchsia_package("dfv1_package") {
   package_name = "driver_manager"
   deps = [
     ":component",
@@ -351,4 +351,9 @@ fuchsia_package("package") {
     "//src/devices/internal/drivers/fragment",
     "//src/devices/internal/drivers/fragment:fragment.proxy",
   ]
+}
+
+fuchsia_package("dfv2_package") {
+  package_name = "driver_manager"
+  deps = [ ":component" ]
 }

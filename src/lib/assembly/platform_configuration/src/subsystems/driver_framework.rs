@@ -21,6 +21,8 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             // exists only one da7219 driver.
             disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
             builder.platform_bundle("driver_framework_v2");
+        } else {
+            builder.platform_bundle("driver_framework_v1");
         }
 
         let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);

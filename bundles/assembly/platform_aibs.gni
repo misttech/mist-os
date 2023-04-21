@@ -72,6 +72,7 @@ user_platform_aib_names = [
   "intl_services.icu_stable_${icu_git_info.stable}",
 
   # Driver Framework
+  "driver_framework_v1",
   "driver_framework_v2",
 ]
 

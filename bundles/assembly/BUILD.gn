@@ -95,7 +95,6 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/sysinfo:package",
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver-index:package",
-    "//src/devices/bin/driver_manager:package",
     "//src/diagnostics/archivist:package",
     "//src/power/power-manager:package",
     "//src/power/shutdown-shim:package",
@@ -624,12 +623,22 @@ assembly_input_bundle("common_minimal_userdebug") {
 # (via the `:core_realm` AIB).  Each should list which feature_set_level and
 # build type that it is valid for.
 
+# Driver Framework V1 support
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("driver_framework_v1") {
+  bootfs_packages = [ "//src/devices/bin/driver_manager:dfv1_package" ]
+}
+
 # Driver Framework V2 support
 #
 # feature_set_levels: minimal
 # build-types: all
 #
 assembly_input_bundle("driver_framework_v2") {
+  bootfs_packages = [ "//src/devices/bin/driver_manager:dfv2_package" ]
   bootfs_files_labels = [ "//src/devices/bin/driver_host2:bootfs" ]
 }
 
