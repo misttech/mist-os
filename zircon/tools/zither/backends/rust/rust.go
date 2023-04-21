@@ -196,7 +196,7 @@ func ScalarTypeName(typ fidlgen.PrimitiveSubtype) string {
 		return "u32"
 	case fidlgen.Uint64:
 		return "u64"
-	case fidlgen.ZxExperimentalUsize, fidlgen.ZxExperimentalUintptr:
+	case fidlgen.ZxExperimentalUsize64, fidlgen.ZxExperimentalUintptr64:
 		return "usize"
 	default:
 		panic(fmt.Sprintf("%s unknown FIDL primitive type: %s", typ))

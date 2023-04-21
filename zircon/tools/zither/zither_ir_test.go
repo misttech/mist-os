@@ -1536,7 +1536,7 @@ protocol Syscall {
 							member: member{Name: "num_structs"},
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
-								Type: "usize",
+								Type: "usize64",
 								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
@@ -1592,7 +1592,7 @@ protocol Syscall {
 							member: member{Name: "void_vec_size"},
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
-								Type: "usize",
+								Type: "usize64",
 								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
@@ -1649,7 +1649,7 @@ protocol Syscall {
 							member: member{Name: "num_inout_i8s"},
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
-								Type: "usize",
+								Type: "usize64",
 								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,
@@ -1707,7 +1707,7 @@ protocol Syscall {
 							member: member{Name: "num_out_bools"},
 							Type: TypeDescriptor{
 								Kind: TypeKindSize,
-								Type: "usize",
+								Type: "usize64",
 								Size: 8,
 							},
 							Orientation: ParameterOrientationIn,

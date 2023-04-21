@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library zx;
 
-const LOG_RECORD_MAX usize = 256;
+const LOG_RECORD_MAX usize64 = 256;
 
 @transport("Syscall")
 protocol Debuglog {

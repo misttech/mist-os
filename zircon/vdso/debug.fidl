@@ -69,7 +69,7 @@ protocol Debug {
         handle handle:RESOURCE;
     }) -> (struct {
         buffer vector<uchar>:MAX;
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary

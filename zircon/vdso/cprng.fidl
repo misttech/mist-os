@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 library zx;
 
-const CPRNG_DRAW_MAX_LEN usize = 256;
-const CPRNG_ADD_ENTROPY_MAX_LEN usize = 256;
+const CPRNG_DRAW_MAX_LEN usize64 = 256;
+const CPRNG_ADD_ENTROPY_MAX_LEN usize64 = 256;
 
 @transport("Syscall")
 protocol Cprng {

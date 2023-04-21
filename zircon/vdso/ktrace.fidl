@@ -54,9 +54,9 @@ protocol Ktrace {
         @voidptr
         data experimental_pointer<byte>;
         offset uint32;
-        data_size usize;
+        data_size usize64;
     }) -> (struct {
-        actual usize;
+        actual usize64;
     }) error status;
 
     // TODO(scottmg): syscalls.banjo had the length of |ptr| being |action|?

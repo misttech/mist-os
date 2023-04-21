@@ -8,13 +8,13 @@ library zither.experimental.zx.types;
 
 /// 'a'
 const CHAR_CONST uchar = 97;
-const SIZE_CONST usize = 100;
-const UINTPTR_CONST uintptr = 0x1234abcd5678ffff;
+const SIZE_CONST usize64 = 100;
+const UINTPTR_CONST uintptr64 = 0x1234abcd5678ffff;
 
 type StructWithPrimitives = struct {
     char_field uchar;
-    size_field usize;
-    uintptr_field uintptr;
+    size_field usize64;
+    uintptr_field uintptr64;
 };
 
 alias Uint8Alias = uint8;
@@ -22,7 +22,7 @@ alias Uint8Alias = uint8;
 type StructWithPointers = struct {
     u64ptr experimental_pointer<uint64>;
     charptr experimental_pointer<uchar>;
-    usizeptr experimental_pointer<usize>;
+    usizeptr experimental_pointer<usize64>;
     byteptr experimental_pointer<byte>;
     @voidptr
     voidptr experimental_pointer<byte>;

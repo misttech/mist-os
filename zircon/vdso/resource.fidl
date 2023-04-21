@@ -111,7 +111,7 @@ protocol Resource {
         parent_rsrc handle:RESOURCE;
         options uint32;
         base uint64;
-        size usize;
+        size usize64;
         name vector<uchar>:MAX_NAME_LEN;
     }) -> (resource struct {
         resource_out handle:RESOURCE;

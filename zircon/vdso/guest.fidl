@@ -228,7 +228,7 @@ protocol Guest {
         handle handle:GUEST;
         kind uint32;
         addr Vaddr;
-        size usize;
+        size usize64;
         port_handle handle:PORT;
         key uint64;
     }) -> () error status;

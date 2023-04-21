@@ -142,8 +142,8 @@ protocol Vmar {
     Allocate(resource struct {
         parent_vmar handle:VMAR;
         options VmOption;
-        offset usize;
-        size usize;
+        offset usize64;
+        size usize64;
     }) -> (resource struct {
         child_vmar handle:VMAR;
         child_addr Vaddr;
@@ -368,10 +368,10 @@ protocol Vmar {
     Map(resource struct {
         handle handle:VMAR;
         options VmOption;
-        vmar_offset usize;
+        vmar_offset usize64;
         vmo handle:VMO;
         vmo_offset uint64;
-        len usize;
+        len usize64;
     }) -> (struct {
         mapped_addr Vaddr;
     }) error status;
@@ -438,7 +438,7 @@ protocol Vmar {
     Unmap(resource struct {
         handle handle:VMAR;
         addr Vaddr;
-        len usize;
+        len usize64;
     }) -> () error status;
 
     /// ## Summary
@@ -538,7 +538,7 @@ protocol Vmar {
         handle handle:VMAR;
         options VmOption;
         addr Vaddr;
-        len usize;
+        len usize64;
     }) -> () error status;
 
     /// ## Summary
@@ -658,7 +658,7 @@ protocol Vmar {
         handle handle:VMAR;
         op uint32;
         address Vaddr;
-        size usize;
+        size usize64;
         @inout
         @voidptr
         buffer vector<byte>:MAX;

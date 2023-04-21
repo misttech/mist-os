@@ -35,8 +35,8 @@ Any declaration type not mentioned below is ignored.
 | `bool`        | `bool`        |
 | `string`      | `const char*` |
 | `uchar`       | `char`        |
-| `usize`       | `size_t`      |
-| `uintptr`     | `uintptr_t`   |
+| `usize64`     | `size_t`      |
+| `uintptr64`   | `uintptr_t`   |
 | `array<T, N>` | `T'[N]`       |
 
 Note that FIDL `string`s are only permitted as constants.

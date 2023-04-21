@@ -4,10 +4,10 @@
 library zx;
 
 // zx_vaddr_t: virtual address.
-alias Vaddr = uintptr;
+alias Vaddr = uintptr64;
 
 // zx_paddr_t: physical address.
-alias Paddr = uintptr;
+alias Paddr = uintptr64;
 
 // zx_gpaddr_t: hypervisor guest physical addresses.
-alias Gpaddr = uintptr;
+alias Gpaddr = uintptr64;

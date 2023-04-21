@@ -29,11 +29,11 @@ to library `zx` behind the experimental `zx_c_types` flag:
 * `experimental_pointer<T>`: represents a pointer (to a type `T`) and has the
 FIDL ABI of a `uint64`.
 
-* `usize`: represents the size of a region of memory and has the FIDL ABI of
+* `usize64`: represents the size of a region of memory and has the FIDL ABI of
 `uint64`. Its binding in Fuchsia-targeting C and C++ code is meant to be
 `size_t`.
 
-* `uintptr`: an integral type of sufficient size so as to be able to hold a
+* `uintptr64`: an integral type of sufficient size so as to be able to hold a
 pointer, practically regarded as an address in a remote address space. It has
 the FIDL ABI of `uint64` and its binding in Fuchsia-targeting C/C++ code is
 intended to be `uintptr_t`.

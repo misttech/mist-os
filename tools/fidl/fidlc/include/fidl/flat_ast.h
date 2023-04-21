@@ -196,8 +196,8 @@ struct Builtin : public Decl {
     kUint16,
     kUint32,
     kUint64,
-    kZxUsize,
-    kZxUintptr,
+    kZxUsize64,
+    kZxUintptr64,
     kFloat32,
     kFloat64,
     // Layouts (other)

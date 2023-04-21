@@ -66,8 +66,8 @@ protocol Fifo {
     /// [`zx_fifo_read()`]: fifo_read.md
     /// [`zx_fifo_write()`]: fifo_write.md
     Create(struct {
-        elem_count usize;
-        elem_size usize;
+        elem_count usize64;
+        elem_size usize64;
         options uint32;
     }) -> (resource struct {
         out0 handle:FIFO;
@@ -146,11 +146,11 @@ protocol Fifo {
     /// [`zx_fifo_write()`]: fifo_write.md
     Read(resource struct {
         handle handle:FIFO;
-        elem_size usize;
+        elem_size usize64;
     }) -> (struct {
         @voidptr
         data vector<byte>:MAX;
-        actual_count usize;
+        actual_count usize64;
     }) error status;
 
     /// ## Summary
@@ -223,12 +223,12 @@ protocol Fifo {
     /// [`zx_fifo_read()`]: fifo_read.md
     Write(resource struct {
         handle handle:FIFO;
-        elem_size usize;
+        elem_size usize64;
         // TODO(joshuaseaton): vector<byte>
         @voidptr
         data experimental_pointer<byte>;
-        count usize;
+        count usize64;
     }) -> (struct {
-        actual_count usize;
+        actual_count usize64;
     }) error status;
 };

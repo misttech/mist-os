@@ -63,7 +63,7 @@
       },
       "type": {
         "kind": "primitive",
-        "subtype": "uintptr",
+        "subtype": "uintptr64",
         "type_shape_v1": {
           "inline_size": 8,
           "alignment": 8,
@@ -106,7 +106,7 @@
       },
       "type": {
         "kind": "primitive",
-        "subtype": "usize",
+        "subtype": "usize64",
         "type_shape_v1": {
           "inline_size": 8,
           "alignment": 8,
@@ -194,7 +194,7 @@
         {
           "type": {
             "kind": "primitive",
-            "subtype": "usize",
+            "subtype": "usize64",
             "type_shape_v1": {
               "inline_size": 8,
               "alignment": 8,
@@ -235,7 +235,7 @@
         {
           "type": {
             "kind": "primitive",
-            "subtype": "uintptr",
+            "subtype": "uintptr64",
             "type_shape_v1": {
               "inline_size": 8,
               "alignment": 8,
@@ -602,7 +602,7 @@
         "length": 14
       },
       "partial_type_ctor": {
-        "name": "uintptr",
+        "name": "uintptr64",
         "args": [],
         "nullable": false
       }
@@ -616,7 +616,7 @@
         "length": 12
       },
       "partial_type_ctor": {
-        "name": "usize",
+        "name": "usize64",
         "args": [],
         "nullable": false
       }

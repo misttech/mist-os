@@ -12,7 +12,7 @@ type StreamSeekOrigin = strict enum : uint32 {
 type Iovec = struct {
     @voidptr
     buffer experimental_pointer<byte>;
-    capacity usize;
+    capacity usize64;
 };
 
 @transport("Syscall")
@@ -191,7 +191,7 @@ protocol Stream {
         options uint32;
         vectors vector<Iovec>:MAX;
     }) -> (struct {
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary
@@ -284,7 +284,7 @@ protocol Stream {
         offset Off;
         vectors vector<Iovec>:MAX;
     }) -> (struct {
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary
@@ -367,7 +367,7 @@ protocol Stream {
         options uint32;
     }) -> (struct {
         vectors vector<Iovec>:MAX;
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary
@@ -450,7 +450,7 @@ protocol Stream {
         offset Off;
     }) -> (struct {
         vectors vector<Iovec>:MAX;
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary

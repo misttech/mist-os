@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library zx;
 
-const IOMMU_MAX_DESC_LEN usize = 4096;
+const IOMMU_MAX_DESC_LEN usize64 = 4096;
 
 @transport("Syscall")
 protocol Iommu {

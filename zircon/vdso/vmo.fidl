@@ -212,7 +212,7 @@ protocol Vmo {
         @voidptr
         buffer experimental_pointer<byte>;
         offset uint64;
-        buffer_size usize;
+        buffer_size usize64;
     }) -> () error status;
 
     // TODO(scottmg): Same problem as Read() above.
@@ -293,7 +293,7 @@ protocol Vmo {
         @voidptr
         buffer experimental_pointer<byte>;
         offset uint64;
-        buffer_size usize;
+        buffer_size usize64;
     }) -> () error status;
 
     // TODO(fxbug.dev/32803): No rights required?
@@ -1016,7 +1016,7 @@ protocol Vmo {
     /// TODO(fxbug.dev/32938)
     CreateContiguous(resource struct {
         bti handle:BTI;
-        size usize;
+        size usize64;
         alignment_log2 uint32;
     }) -> (resource struct {
         out handle:VMO;
@@ -1117,7 +1117,7 @@ protocol Vmo {
     CreatePhysical(resource struct {
         resource handle:RESOURCE;
         paddr Paddr;
-        size usize;
+        size usize64;
     }) -> (resource struct {
         out handle:VMO;
     }) error status;

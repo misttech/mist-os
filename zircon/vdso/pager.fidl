@@ -574,8 +574,8 @@ protocol Pager {
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-        actual usize;
-        avail usize;
+        actual usize64;
+        avail usize64;
     }) error status;
 
     /// ## NAME

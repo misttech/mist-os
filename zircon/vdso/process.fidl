@@ -341,7 +341,7 @@ protocol Process {
         stack Vaddr;
         @release
         arg1 handle;
-        arg2 uintptr;
+        arg2 uintptr64;
     }) -> () error status;
 
     /// ## Summary
@@ -419,7 +419,7 @@ protocol Process {
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary
@@ -503,6 +503,6 @@ protocol Process {
         @voidptr
         buffer vector<byte>:MAX;
     }) -> (struct {
-        actual usize;
+        actual usize64;
     }) error status;
 };

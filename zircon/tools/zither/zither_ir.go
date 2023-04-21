@@ -510,7 +510,7 @@ func newConst(c fidlgen.Const, decls declMap, members memberMap) (*Const, error)
 		switch typ {
 		case string(fidlgen.Bool):
 			kind = TypeKindBool
-		case string(fidlgen.ZxExperimentalUsize):
+		case string(fidlgen.ZxExperimentalUsize64):
 			kind = TypeKindSize
 		default:
 			kind = TypeKindInteger
@@ -727,7 +727,7 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 		switch desc.Type {
 		case string(fidlgen.Bool):
 			desc.Kind = TypeKindBool
-		case string(fidlgen.ZxExperimentalUsize):
+		case string(fidlgen.ZxExperimentalUsize64):
 			desc.Kind = TypeKindSize
 		default:
 			desc.Kind = TypeKindInteger
@@ -994,8 +994,8 @@ func (ctor fidlgenTypeCtor) GetKind() fidlgen.TypeKind {
 		string(fidlgen.Float32),
 		string(fidlgen.Float64),
 		string(fidlgen.ZxExperimentalUchar),
-		string(fidlgen.ZxExperimentalUsize),
-		string(fidlgen.ZxExperimentalUintptr):
+		string(fidlgen.ZxExperimentalUsize64),
+		string(fidlgen.ZxExperimentalUintptr64):
 		return fidlgen.PrimitiveType
 	case "array":
 		return fidlgen.ArrayType
@@ -1071,7 +1071,7 @@ func primitiveWireSize(typ fidlgen.PrimitiveSubtype) int {
 	case fidlgen.Int32, fidlgen.Uint32:
 		return 4
 	case fidlgen.Int64, fidlgen.Uint64,
-		fidlgen.ZxExperimentalUintptr, fidlgen.ZxExperimentalUsize:
+		fidlgen.ZxExperimentalUintptr64, fidlgen.ZxExperimentalUsize64:
 		return 8
 	default:
 		panic(fmt.Sprintf("unknown primitive type: %s", typ))
@@ -1471,7 +1471,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 					} else {
 						length.Type = TypeDescriptor{
 							Kind: TypeKindSize,
-							Type: string(fidlgen.ZxExperimentalUsize),
+							Type: string(fidlgen.ZxExperimentalUsize64),
 							Size: 8,
 						}
 					}

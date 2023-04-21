@@ -4,5 +4,5 @@
 library test.bad.fi0180;
 
 type Data = struct {
-    size usize;
+    size usize64;
 };

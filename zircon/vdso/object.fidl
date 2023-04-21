@@ -7,7 +7,7 @@ library zx;
 // needs to be given to the public/private split of the current C definition.
 alias Signals = uint32;
 
-const WAIT_MANY_MAX_ITEMS usize = 64;
+const WAIT_MANY_MAX_ITEMS usize64 = 64;
 
 // TODO(scottmg): Apply rights spec from WaitMany on |items| to |handle| here,
 // somehow.
@@ -1959,8 +1959,8 @@ protocol Object {
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-        actual usize;
-        avail usize;
+        actual usize64;
+        avail usize64;
     }) error status;
 
     /// ## Summary

@@ -62,7 +62,7 @@ protocol Cache {
     Flush(struct {
         @voidptr
         addr experimental_pointer<byte>;
-        size usize;
+        size usize64;
         options uint32;
     }) -> () error status;
 };

@@ -317,11 +317,11 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
     case ConstantValue::Kind::kUint64:
       target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint64);
       break;
-    case ConstantValue::Kind::kZxUsize:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUsize);
+    case ConstantValue::Kind::kZxUsize64:
+      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUsize64);
       break;
-    case ConstantValue::Kind::kZxUintptr:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUintptr);
+    case ConstantValue::Kind::kZxUintptr64:
+      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUintptr64);
       break;
     case ConstantValue::Kind::kFloat32:
       target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kFloat32);

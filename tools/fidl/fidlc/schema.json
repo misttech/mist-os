@@ -785,8 +785,8 @@
                 "uint32",
                 "uint64",
                 "uchar",
-                "usize",
-                "uintptr"
+                "usize64",
+                "uintptr64"
             ],
             "type": "string"
         },

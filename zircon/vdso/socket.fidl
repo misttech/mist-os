@@ -154,7 +154,7 @@ protocol Socket {
         @voidptr
         buffer vector<byte>:MAX;
     }) -> (struct {
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary
@@ -238,7 +238,7 @@ protocol Socket {
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-        actual usize;
+        actual usize64;
     }) error status;
 
     /// ## Summary

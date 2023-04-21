@@ -134,8 +134,8 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
         return DataSize(4);
       case types::PrimitiveSubtype::kInt64:
       case types::PrimitiveSubtype::kUint64:
-      case types::PrimitiveSubtype::kZxUsize:
-      case types::PrimitiveSubtype::kZxUintptr:
+      case types::PrimitiveSubtype::kZxUsize64:
+      case types::PrimitiveSubtype::kZxUintptr64:
       case types::PrimitiveSubtype::kFloat64:
         return DataSize(8);
     }

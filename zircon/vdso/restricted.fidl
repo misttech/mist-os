@@ -83,8 +83,8 @@ protocol Restricted {
     @next
     Enter(struct {
         options uint32;
-        vector_table_ptr uintptr;
-        context uintptr;
+        vector_table_ptr uintptr64;
+        context uintptr64;
     }) -> () error status;
 
     /// ## Summary

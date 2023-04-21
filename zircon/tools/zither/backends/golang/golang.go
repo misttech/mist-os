@@ -73,8 +73,10 @@ func PrimitiveTypeName(typ fidlgen.PrimitiveSubtype) string {
 	switch typ {
 	case fidlgen.ZxExperimentalUchar:
 		return "byte"
-	case fidlgen.ZxExperimentalUsize:
+	case fidlgen.ZxExperimentalUsize64:
 		return "uint"
+	case fidlgen.ZxExperimentalUintptr64:
+		return "uintptr"
 	default:
 		return string(typ)
 	}
