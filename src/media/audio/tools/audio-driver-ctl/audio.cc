@@ -68,7 +68,7 @@ enum class Type : uint8_t { INPUT, OUTPUT, DUPLEX };
 
 static std::optional<uint32_t> GetUint32(const char* arg) {
   char* end = nullptr;
-  auto result = strtol(arg, &end, 0);
+  auto result = strtol(arg, &end, 16);
   if (*end != '\0' || result < 0 || (result == 0 && arg == end)) {
     return {};
   }
