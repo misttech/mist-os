@@ -20,9 +20,6 @@ pub struct zx_types {
     pub duration: zircon_types::zx_duration_t,
     pub ticks: zircon_types::zx_ticks_t,
     pub koid: zircon_types::zx_koid_t,
-    pub vaddr: zircon_types::zx_vaddr_t,
-    pub paddr: zircon_types::zx_paddr_t,
-    pub gpaddr: zircon_types::zx_gpaddr_t,
     pub offset: zircon_types::zx_off_t,
 }
 

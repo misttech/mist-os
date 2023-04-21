@@ -32,24 +32,6 @@ closed protocol SynchronousBase {
         koid zx.Koid;
         koid_2 zx.Koid;
     });
-    strict Vaddr(struct {
-        vaddr zx.vaddr;
-    }) -> (struct {
-        vaddr zx.vaddr;
-        vaddr_2 zx.vaddr;
-    });
-    strict Paddr(struct {
-        paddr zx.paddr;
-    }) -> (struct {
-        paddr zx.paddr;
-        paddr_2 zx.paddr;
-    });
-    strict Gpaddr(struct {
-        gpaddr zx.gpaddr;
-    }) -> (struct {
-        gpaddr zx.gpaddr;
-        gpaddr_2 zx.gpaddr;
-    });
     strict Off(struct {
         off zx.Off;
     }) -> (struct {
@@ -90,27 +72,6 @@ closed protocol AsyncBase {
         koid_2 zx.Koid;
     });
     @async
-    strict Vaddr(struct {
-        vaddr zx.vaddr;
-    }) -> (struct {
-        vaddr zx.vaddr;
-        vaddr_2 zx.vaddr;
-    });
-    @async
-    strict Paddr(struct {
-        paddr zx.paddr;
-    }) -> (struct {
-        paddr zx.paddr;
-        paddr_2 zx.paddr;
-    });
-    @async
-    strict Gpaddr(struct {
-        gpaddr zx.gpaddr;
-    }) -> (struct {
-        gpaddr zx.gpaddr;
-        gpaddr_2 zx.gpaddr;
-    });
-    @async
     strict Off(struct {
         off zx.Off;
     }) -> (struct {
@@ -143,24 +104,6 @@ closed protocol WrongTransport {
     }) -> (struct {
         koid zx.Koid;
         koid_2 zx.Koid;
-    });
-    strict Vaddr(struct {
-        vaddr zx.vaddr;
-    }) -> (struct {
-        vaddr zx.vaddr;
-        vaddr_2 zx.vaddr;
-    });
-    strict Paddr(struct {
-        paddr zx.paddr;
-    }) -> (struct {
-        paddr zx.paddr;
-        paddr_2 zx.paddr;
-    });
-    strict Gpaddr(struct {
-        gpaddr zx.gpaddr;
-    }) -> (struct {
-        gpaddr zx.gpaddr;
-        gpaddr_2 zx.gpaddr;
     });
     strict Off(struct {
         off zx.Off;

@@ -34,21 +34,6 @@ alias Ticks = int64;
 // zx_koid_t: global kernel object id.
 alias Koid = uint64;
 
-// zx_vaddr_t: virtual address.
-//
-// TODO(fxbug.dev/109734): Vaddr.
-alias vaddr = uint64;
-
-// zx_paddr_t: physical address.
-//
-// TODO(fxbug.dev/109734): Paddr.
-alias paddr = uint64;
-
-// zx_gpaddr_t: hypervisor guest physical addresses.
-//
-// TODO(fxbug.dev/109734): Gpaddr.
-alias gpaddr = uint64;
-
 // zx_off_t: offset.
 alias Off = uint64;
 

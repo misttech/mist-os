@@ -32,9 +32,7 @@ struct api_protocol_ops {
     zx_status_t (*float64)(void* ctx, zx_handle_t handle, double data);
     zx_status_t (*duration)(void* ctx, zx_handle_t handle, zx_duration_t data);
     zx_status_t (*koid)(void* ctx, zx_handle_t handle, zx_koid_t data);
-    zx_status_t (*paddr)(void* ctx, zx_handle_t handle, zx_paddr_t data);
     zx_status_t (*time)(void* ctx, zx_handle_t handle, zx_time_t data);
-    zx_status_t (*vaddr)(void* ctx, zx_handle_t handle, zx_vaddr_t data);
     zx_status_t (*output_bool)(void* ctx, zx_handle_t handle, bool* out_result);
     zx_status_t (*output_int8)(void* ctx, zx_handle_t handle, int8_t* out_result);
     zx_status_t (*output_int16)(void* ctx, zx_handle_t handle, int16_t* out_result);
@@ -48,9 +46,7 @@ struct api_protocol_ops {
     zx_status_t (*output_float64)(void* ctx, zx_handle_t handle, double* out_result);
     zx_status_t (*output_duration)(void* ctx, zx_handle_t handle, zx_duration_t* out_result);
     zx_status_t (*output_koid)(void* ctx, zx_handle_t handle, zx_koid_t* out_result);
-    zx_status_t (*output_paddr)(void* ctx, zx_handle_t handle, zx_paddr_t* out_result);
     zx_status_t (*output_time)(void* ctx, zx_handle_t handle, zx_time_t* out_result);
-    zx_status_t (*output_vaddr)(void* ctx, zx_handle_t handle, zx_vaddr_t* out_result);
     void (*return_void)(void* ctx, zx_handle_t handle);
     zx_status_t (*return_status)(void* ctx, zx_handle_t handle);
     zx_ticks_t (*return_ticks)(void* ctx, zx_handle_t handle);
@@ -119,16 +115,8 @@ static inline zx_status_t api_koid(const api_protocol_t* proto, zx_handle_t hand
     return proto->ops->koid(proto->ctx, handle, data);
 }
 
-static inline zx_status_t api_paddr(const api_protocol_t* proto, zx_handle_t handle, zx_paddr_t data) {
-    return proto->ops->paddr(proto->ctx, handle, data);
-}
-
 static inline zx_status_t api_time(const api_protocol_t* proto, zx_handle_t handle, zx_time_t data) {
     return proto->ops->time(proto->ctx, handle, data);
-}
-
-static inline zx_status_t api_vaddr(const api_protocol_t* proto, zx_handle_t handle, zx_vaddr_t data) {
-    return proto->ops->vaddr(proto->ctx, handle, data);
 }
 
 static inline zx_status_t api_output_bool(const api_protocol_t* proto, zx_handle_t handle, bool* out_result) {
@@ -183,16 +171,8 @@ static inline zx_status_t api_output_koid(const api_protocol_t* proto, zx_handle
     return proto->ops->output_koid(proto->ctx, handle, out_result);
 }
 
-static inline zx_status_t api_output_paddr(const api_protocol_t* proto, zx_handle_t handle, zx_paddr_t* out_result) {
-    return proto->ops->output_paddr(proto->ctx, handle, out_result);
-}
-
 static inline zx_status_t api_output_time(const api_protocol_t* proto, zx_handle_t handle, zx_time_t* out_result) {
     return proto->ops->output_time(proto->ctx, handle, out_result);
-}
-
-static inline zx_status_t api_output_vaddr(const api_protocol_t* proto, zx_handle_t handle, zx_vaddr_t* out_result) {
-    return proto->ops->output_vaddr(proto->ctx, handle, out_result);
 }
 
 static inline void api_return_void(const api_protocol_t* proto, zx_handle_t handle) {

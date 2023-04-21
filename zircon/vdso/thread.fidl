@@ -230,8 +230,8 @@ protocol Thread {
     /// [`zx_vmar_unmap_handle_close_thread_exit()`]: vmar_unmap_handle_close_thread_exit.md
     Start(resource struct {
         handle handle:THREAD;
-        thread_entry vaddr;
-        stack vaddr;
+        thread_entry Vaddr;
+        stack Vaddr;
         arg1 uintptr;
         arg2 uintptr;
     }) -> () error status;

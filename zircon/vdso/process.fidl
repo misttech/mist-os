@@ -337,8 +337,8 @@ protocol Process {
     Start(resource struct {
         handle handle:PROCESS;
         thread handle:THREAD;
-        entry vaddr;
-        stack vaddr;
+        entry Vaddr;
+        stack Vaddr;
         @release
         arg1 handle;
         arg2 uintptr;
@@ -415,7 +415,7 @@ protocol Process {
     /// [`zx_process_write_memory()`]: process_write_memory.md
     ReadMemory(resource struct {
         handle handle:PROCESS;
-        vaddr vaddr;
+        vaddr Vaddr;
     }) -> (struct {
         @voidptr
         buffer vector<byte>;
@@ -499,7 +499,7 @@ protocol Process {
     /// [`zx_process_read_memory()`]: process_read_memory.md
     WriteMemory(resource struct {
         handle handle:PROCESS;
-        vaddr vaddr;
+        vaddr Vaddr;
         @voidptr
         buffer vector<byte>;
     }) -> (struct {

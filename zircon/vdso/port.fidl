@@ -28,7 +28,7 @@ type PacketException = struct {
 };
 
 type PacketGuestBell = struct {
-    addr gpaddr;
+    addr Gpaddr;
     reserved0 uint64;
     reserved1 uint64;
     reserved2 uint64;
@@ -36,7 +36,7 @@ type PacketGuestBell = struct {
 
 // TODO(scottmg): Arch-specific definition.
 type PacketGuestMem = struct {
-    addr gpaddr;
+    addr Gpaddr;
     //#if __aarch64__
     //uint8_t access_size;
     //bool sign_extend;

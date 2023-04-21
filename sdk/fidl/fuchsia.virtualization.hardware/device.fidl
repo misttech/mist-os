@@ -25,7 +25,7 @@ const EVENT_SET_INTERRUPT uint32 = 2;
 /// Contains the details of a device trap.
 type Trap = struct {
     /// The address of the device trap. This must be page-aligned.
-    addr zx.gpaddr;
+    addr uint64;
 
     /// The size of the device trap. This must be a multiple of the page size.
     size uint64;
@@ -58,9 +58,9 @@ protocol VirtioDevice {
     ConfigureQueue(struct {
         queue uint16;
         size uint16;
-        desc zx.gpaddr;
-        avail zx.gpaddr;
-        used zx.gpaddr;
+        desc uint64;
+        avail uint64;
+        used uint64;
     }) -> ();
 
     /// Notify a `queue` for the device. Primarily used for black-box testing.

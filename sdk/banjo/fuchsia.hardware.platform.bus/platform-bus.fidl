@@ -9,7 +9,7 @@ using zx;
 type PbusMmio = struct {
     /// Physical address of MMIO region.
     /// Does not need to be page aligned.
-    base zx.paddr;
+    base uint64;
     /// Length of MMIO region in bytes.
     /// Does not need to be page aligned.
     length uint64;

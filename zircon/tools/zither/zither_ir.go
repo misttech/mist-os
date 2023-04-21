@@ -992,7 +992,10 @@ func (ctor fidlgenTypeCtor) GetKind() fidlgen.TypeKind {
 		string(fidlgen.Uint32),
 		string(fidlgen.Uint64),
 		string(fidlgen.Float32),
-		string(fidlgen.Float64):
+		string(fidlgen.Float64),
+		string(fidlgen.ZxExperimentalUchar),
+		string(fidlgen.ZxExperimentalUsize),
+		string(fidlgen.ZxExperimentalUintptr):
 		return fidlgen.PrimitiveType
 	case "array":
 		return fidlgen.ArrayType

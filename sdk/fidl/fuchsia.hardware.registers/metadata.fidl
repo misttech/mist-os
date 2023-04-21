@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.registers;
 
-using zx;
-
 type Mask = strict union {
     1: r8 uint8;
     2: r16 uint16;
@@ -17,7 +15,7 @@ type MaskEntry = table {
 
     /// MMIO offset of mask range.
     /// Should be aligned to 4 for 32-bit registers, 8 for 64-bit registers, etc.
-    2: mmio_offset zx.paddr;
+    2: mmio_offset uint64;
 
     /// Number of masks with this mask value.
     3: count uint32;

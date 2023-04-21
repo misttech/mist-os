@@ -70,6 +70,7 @@ fidl("zx") {
     "task.fidl",
     "thread.fidl",
     "timer.fidl",
+    "types.fidl",
     "vcpu.fidl",
     "vmar.fidl",
     "vmo.fidl",

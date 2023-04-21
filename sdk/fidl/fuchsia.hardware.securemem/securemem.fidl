@@ -20,6 +20,6 @@ protocol Device {
         secure_mem zx.handle:VMO;
     }) -> (struct {
         s zx.status;
-        paddr zx.paddr;
+        paddr uint64;
     });
 };

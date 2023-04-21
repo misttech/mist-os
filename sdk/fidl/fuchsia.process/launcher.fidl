@@ -73,12 +73,12 @@ type ProcessStartData = resource struct {
     /// The address of the initial entry point in the process.
     ///
     /// Should be passed to `zx_process_start` when starting the process.
-    entry zx.vaddr;
+    entry uint64;
 
     /// The stack pointer value for the initial thread of the process.
     ///
     /// Should be passed to `zx_process_start` when starting the process.
-    stack zx.vaddr;
+    stack uint64;
 
     /// The bootstrap channel to pass to the process on startup.
     ///
@@ -88,12 +88,12 @@ type ProcessStartData = resource struct {
     /// The base address of the vDSO to pass to the process on startup.
     ///
     /// Should be passed to `zx_process_start` when starting the process.
-    vdso_base zx.vaddr;
+    vdso_base uint64;
 
     /// The base load address of the ELF file loaded.
     ///
     /// Most often used by debuggers or other tools that inspect the process.
-    base zx.vaddr;
+    base uint64;
 };
 
 /// A low-level interface for launching processes.

@@ -72,19 +72,10 @@
         "zx/duration": {
           "kind": "alias"
         },
-        "zx/gpaddr": {
-          "kind": "alias"
-        },
-        "zx/paddr": {
-          "kind": "alias"
-        },
         "zx/status": {
           "kind": "alias"
         },
         "zx/time": {
-          "kind": "alias"
-        },
-        "zx/vaddr": {
           "kind": "alias"
         }
       }

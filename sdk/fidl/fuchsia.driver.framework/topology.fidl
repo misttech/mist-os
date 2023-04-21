@@ -34,7 +34,7 @@ type NodeSymbol = table {
     1: name string:MAX_SYMBOL_NAME_LENGTH;
 
     /// Virtual address of the symbol, within a driver host's process.
-    2: address zx.vaddr;
+    2: address uint64;
 };
 
 type NodePropertyKey = strict union {

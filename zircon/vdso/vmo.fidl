@@ -1116,7 +1116,7 @@ protocol Vmo {
     /// [`zx_vmo_write()`]: vmo_write.md
     CreatePhysical(resource struct {
         resource handle:RESOURCE;
-        paddr paddr;
+        paddr Paddr;
         size usize;
     }) -> (resource struct {
         out handle:VMO;

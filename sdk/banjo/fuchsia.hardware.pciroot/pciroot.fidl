@@ -150,13 +150,13 @@ protocol Pciroot {
     /// An error will be returned if |size| cannot be fulfilled, |low| is set with |in_base|+|size|
     /// being >=4GB, or if a requested |in_base| cannot be provided.
     GetAddressSpace(struct {
-        in_base zx.paddr;
+        in_base uint64;
         size uint64;
         type PciAddressSpace;
         low bool;
     }) -> (resource struct {
         s zx.status;
-        base zx.paddr;
+        base uint64;
         resource zx.handle:RESOURCE;
         token zx.handle:EVENTPAIR;
     });

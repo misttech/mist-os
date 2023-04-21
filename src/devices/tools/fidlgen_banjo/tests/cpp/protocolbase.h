@@ -49,12 +49,6 @@
 //
 //     zx_koid_t SynchronousBaseKoid(zx_koid_t koid, zx_koid_t* out_koid_2);
 //
-//     zx_vaddr_t SynchronousBaseVaddr(zx_vaddr_t vaddr, zx_vaddr_t* out_vaddr_2);
-//
-//     zx_paddr_t SynchronousBasePaddr(zx_paddr_t paddr, zx_paddr_t* out_paddr_2);
-//
-//     zx_gpaddr_t SynchronousBaseGpaddr(zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2);
-//
 //     zx_off_t SynchronousBaseOff(zx_off_t off, zx_off_t* out_off_2);
 //
 //     ...
@@ -115,12 +109,6 @@
 //
 //     void AsyncBaseKoid(zx_koid_t koid, async_base_koid_callback callback, void* cookie);
 //
-//     void AsyncBaseVaddr(zx_vaddr_t vaddr, async_base_vaddr_callback callback, void* cookie);
-//
-//     void AsyncBasePaddr(zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie);
-//
-//     void AsyncBaseGpaddr(zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie);
-//
 //     void AsyncBaseOff(zx_off_t off, async_base_off_callback callback, void* cookie);
 //
 //     ...
@@ -137,9 +125,6 @@ public:
         synchronous_base_protocol_ops_.time = SynchronousBaseTime;
         synchronous_base_protocol_ops_.duration = SynchronousBaseDuration;
         synchronous_base_protocol_ops_.koid = SynchronousBaseKoid;
-        synchronous_base_protocol_ops_.vaddr = SynchronousBaseVaddr;
-        synchronous_base_protocol_ops_.paddr = SynchronousBasePaddr;
-        synchronous_base_protocol_ops_.gpaddr = SynchronousBaseGpaddr;
         synchronous_base_protocol_ops_.off = SynchronousBaseOff;
 
         if constexpr (internal::is_base_proto<Base>::value) {
@@ -169,18 +154,6 @@ private:
     }
     static zx_koid_t SynchronousBaseKoid(void* ctx, zx_koid_t koid, zx_koid_t* out_koid_2) {
         auto ret = static_cast<D*>(ctx)->SynchronousBaseKoid(koid, out_koid_2);
-        return ret;
-    }
-    static zx_vaddr_t SynchronousBaseVaddr(void* ctx, zx_vaddr_t vaddr, zx_vaddr_t* out_vaddr_2) {
-        auto ret = static_cast<D*>(ctx)->SynchronousBaseVaddr(vaddr, out_vaddr_2);
-        return ret;
-    }
-    static zx_paddr_t SynchronousBasePaddr(void* ctx, zx_paddr_t paddr, zx_paddr_t* out_paddr_2) {
-        auto ret = static_cast<D*>(ctx)->SynchronousBasePaddr(paddr, out_paddr_2);
-        return ret;
-    }
-    static zx_gpaddr_t SynchronousBaseGpaddr(void* ctx, zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2) {
-        auto ret = static_cast<D*>(ctx)->SynchronousBaseGpaddr(gpaddr, out_gpaddr_2);
         return ret;
     }
     static zx_off_t SynchronousBaseOff(void* ctx, zx_off_t off, zx_off_t* out_off_2) {
@@ -274,18 +247,6 @@ public:
 
     zx_koid_t Koid(zx_koid_t koid, zx_koid_t* out_koid_2) const {
         return ops_->koid(ctx_, koid, out_koid_2);
-    }
-
-    zx_vaddr_t Vaddr(zx_vaddr_t vaddr, zx_vaddr_t* out_vaddr_2) const {
-        return ops_->vaddr(ctx_, vaddr, out_vaddr_2);
-    }
-
-    zx_paddr_t Paddr(zx_paddr_t paddr, zx_paddr_t* out_paddr_2) const {
-        return ops_->paddr(ctx_, paddr, out_paddr_2);
-    }
-
-    zx_gpaddr_t Gpaddr(zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2) const {
-        return ops_->gpaddr(ctx_, gpaddr, out_gpaddr_2);
     }
 
     zx_off_t Off(zx_off_t off, zx_off_t* out_off_2) const {
@@ -412,9 +373,6 @@ public:
         async_base_protocol_ops_.time = AsyncBaseTime;
         async_base_protocol_ops_.duration = AsyncBaseDuration;
         async_base_protocol_ops_.koid = AsyncBaseKoid;
-        async_base_protocol_ops_.vaddr = AsyncBaseVaddr;
-        async_base_protocol_ops_.paddr = AsyncBasePaddr;
-        async_base_protocol_ops_.gpaddr = AsyncBaseGpaddr;
         async_base_protocol_ops_.off = AsyncBaseOff;
 
         if constexpr (internal::is_base_proto<Base>::value) {
@@ -441,15 +399,6 @@ private:
     }
     static void AsyncBaseKoid(void* ctx, zx_koid_t koid, async_base_koid_callback callback, void* cookie) {
         static_cast<D*>(ctx)->AsyncBaseKoid(koid, callback, cookie);
-    }
-    static void AsyncBaseVaddr(void* ctx, zx_vaddr_t vaddr, async_base_vaddr_callback callback, void* cookie) {
-        static_cast<D*>(ctx)->AsyncBaseVaddr(vaddr, callback, cookie);
-    }
-    static void AsyncBasePaddr(void* ctx, zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie) {
-        static_cast<D*>(ctx)->AsyncBasePaddr(paddr, callback, cookie);
-    }
-    static void AsyncBaseGpaddr(void* ctx, zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie) {
-        static_cast<D*>(ctx)->AsyncBaseGpaddr(gpaddr, callback, cookie);
     }
     static void AsyncBaseOff(void* ctx, zx_off_t off, async_base_off_callback callback, void* cookie) {
         static_cast<D*>(ctx)->AsyncBaseOff(off, callback, cookie);
@@ -541,18 +490,6 @@ public:
 
     void Koid(zx_koid_t koid, async_base_koid_callback callback, void* cookie) const {
         ops_->koid(ctx_, koid, callback, cookie);
-    }
-
-    void Vaddr(zx_vaddr_t vaddr, async_base_vaddr_callback callback, void* cookie) const {
-        ops_->vaddr(ctx_, vaddr, callback, cookie);
-    }
-
-    void Paddr(zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie) const {
-        ops_->paddr(ctx_, paddr, callback, cookie);
-    }
-
-    void Gpaddr(zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie) const {
-        ops_->gpaddr(ctx_, gpaddr, callback, cookie);
     }
 
     void Off(zx_off_t off, async_base_off_callback callback, void* cookie) const {

@@ -101,7 +101,7 @@ protocol Vcpu {
     Create(resource struct {
         guest handle:GUEST;
         options uint32;
-        entry vaddr;
+        entry Vaddr;
     }) -> (resource struct {
         out handle:VCPU;
     }) error status;

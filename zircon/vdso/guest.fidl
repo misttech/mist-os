@@ -227,7 +227,7 @@ protocol Guest {
     SetTrap(resource struct {
         handle handle:GUEST;
         kind uint32;
-        addr vaddr;
+        addr Vaddr;
         size usize;
         port_handle handle:PORT;
         key uint64;

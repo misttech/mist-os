@@ -10,7 +10,7 @@ using fuchsia.device.manager;
 type Mmio = table {
     /// Physical address of MMIO region.
     /// Does not need to be page aligned.
-    1: base zx.paddr;
+    1: base uint64;
     /// Length of MMIO region in bytes.
     /// Does not need to be page aligned.
     2: length uint64;

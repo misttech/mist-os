@@ -52,7 +52,7 @@ type EthernetNetbuf = struct {
     @buffer
     data vector<uint8>:MAX;
     /// Only used if ETHERNET_FEATURE_DMA is available.
-    phys zx.paddr;
+    phys uint64;
     reserved uint16;
     flags uint32;
 };

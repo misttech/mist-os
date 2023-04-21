@@ -146,7 +146,7 @@ protocol Vmar {
         size usize;
     }) -> (resource struct {
         child_vmar handle:VMAR;
-        child_addr vaddr;
+        child_addr Vaddr;
     }) error status;
 
     // TODO(fxbug.dev/32803): handle No rights required?
@@ -373,7 +373,7 @@ protocol Vmar {
         vmo_offset uint64;
         len usize;
     }) -> (struct {
-        mapped_addr vaddr;
+        mapped_addr Vaddr;
     }) error status;
 
     // TODO(fxbug.dev/32803): handle No rights required?
@@ -437,7 +437,7 @@ protocol Vmar {
     /// [`zx_vmar_protect()`]: vmar_protect.md
     Unmap(resource struct {
         handle handle:VMAR;
-        addr vaddr;
+        addr Vaddr;
         len usize;
     }) -> () error status;
 
@@ -537,7 +537,7 @@ protocol Vmar {
     Protect(resource struct {
         handle handle:VMAR;
         options VmOption;
-        addr vaddr;
+        addr Vaddr;
         len usize;
     }) -> () error status;
 
@@ -657,7 +657,7 @@ protocol Vmar {
     OpRange(resource struct {
         handle handle:VMAR;
         op uint32;
-        address vaddr;
+        address Vaddr;
         size usize;
         @inout
         @voidptr

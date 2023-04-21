@@ -24,15 +24,6 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protoco
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_koid, SynchronousBaseKoid,
         zx_koid_t (C::*)(zx_koid_t koid, zx_koid_t* out_koid_2));
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_vaddr, SynchronousBaseVaddr,
-        zx_vaddr_t (C::*)(zx_vaddr_t vaddr, zx_vaddr_t* out_vaddr_2));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_paddr, SynchronousBasePaddr,
-        zx_paddr_t (C::*)(zx_paddr_t paddr, zx_paddr_t* out_paddr_2));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_gpaddr, SynchronousBaseGpaddr,
-        zx_gpaddr_t (C::*)(zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2));
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_synchronous_base_protocol_off, SynchronousBaseOff,
         zx_off_t (C::*)(zx_off_t off, zx_off_t* out_off_2));
 
@@ -54,18 +45,6 @@ constexpr void CheckSynchronousBaseProtocolSubclass() {
     static_assert(internal::has_synchronous_base_protocol_koid<D>::value,
         "SynchronousBaseProtocol subclasses must implement "
         "zx_koid_t SynchronousBaseKoid(zx_koid_t koid, zx_koid_t* out_koid_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_vaddr<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_vaddr_t SynchronousBaseVaddr(zx_vaddr_t vaddr, zx_vaddr_t* out_vaddr_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_paddr<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_paddr_t SynchronousBasePaddr(zx_paddr_t paddr, zx_paddr_t* out_paddr_2);");
-
-    static_assert(internal::has_synchronous_base_protocol_gpaddr<D>::value,
-        "SynchronousBaseProtocol subclasses must implement "
-        "zx_gpaddr_t SynchronousBaseGpaddr(zx_gpaddr_t gpaddr, zx_gpaddr_t* out_gpaddr_2);");
 
     static_assert(internal::has_synchronous_base_protocol_off<D>::value,
         "SynchronousBaseProtocol subclasses must implement "
@@ -97,15 +76,6 @@ DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_dura
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_koid, AsyncBaseKoid,
         void (C::*)(zx_koid_t koid, async_base_koid_callback callback, void* cookie));
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_vaddr, AsyncBaseVaddr,
-        void (C::*)(zx_vaddr_t vaddr, async_base_vaddr_callback callback, void* cookie));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_paddr, AsyncBasePaddr,
-        void (C::*)(zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie));
-
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_gpaddr, AsyncBaseGpaddr,
-        void (C::*)(zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie));
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_async_base_protocol_off, AsyncBaseOff,
         void (C::*)(zx_off_t off, async_base_off_callback callback, void* cookie));
 
@@ -127,18 +97,6 @@ constexpr void CheckAsyncBaseProtocolSubclass() {
     static_assert(internal::has_async_base_protocol_koid<D>::value,
         "AsyncBaseProtocol subclasses must implement "
         "void AsyncBaseKoid(zx_koid_t koid, async_base_koid_callback callback, void* cookie);");
-
-    static_assert(internal::has_async_base_protocol_vaddr<D>::value,
-        "AsyncBaseProtocol subclasses must implement "
-        "void AsyncBaseVaddr(zx_vaddr_t vaddr, async_base_vaddr_callback callback, void* cookie);");
-
-    static_assert(internal::has_async_base_protocol_paddr<D>::value,
-        "AsyncBaseProtocol subclasses must implement "
-        "void AsyncBasePaddr(zx_paddr_t paddr, async_base_paddr_callback callback, void* cookie);");
-
-    static_assert(internal::has_async_base_protocol_gpaddr<D>::value,
-        "AsyncBaseProtocol subclasses must implement "
-        "void AsyncBaseGpaddr(zx_gpaddr_t gpaddr, async_base_gpaddr_callback callback, void* cookie);");
 
     static_assert(internal::has_async_base_protocol_off<D>::value,
         "AsyncBaseProtocol subclasses must implement "

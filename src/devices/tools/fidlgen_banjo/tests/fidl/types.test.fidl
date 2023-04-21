@@ -50,9 +50,6 @@ type zx_types = struct {
     duration zx.duration;
     ticks zx.Ticks;
     koid zx.Koid;
-    vaddr zx.vaddr;
-    paddr zx.paddr;
-    gpaddr zx.gpaddr;
     offset zx.Off;
 };
 

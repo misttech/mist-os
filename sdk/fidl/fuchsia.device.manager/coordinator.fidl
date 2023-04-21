@@ -310,7 +310,7 @@ type AddDeviceArgs = struct {
     /// An address pointing to the DFv2 device symbol, which contains its banjo
     /// ops. This exists on every DFv1 device, but it is only used by a DFv2
     /// child.
-    dfv2_device_symbol zx.vaddr;
+    dfv2_device_symbol uint64;
 };
 
 /// Interface for drivers in driver host to coordinate with the driver

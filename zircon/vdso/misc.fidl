@@ -291,7 +291,7 @@ protocol Misc {
     @vdsocall
     VmarUnmapHandleCloseThreadExit(resource struct {
         vmar_handle handle:VMAR;
-        addr vaddr;
+        addr Vaddr;
         size usize;
         @release
         close_handle handle;

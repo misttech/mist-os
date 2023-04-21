@@ -68,11 +68,7 @@
 //
 //     zx_status_t Apikoid(zx::handle handle, zx_koid_t data);
 //
-//     zx_status_t Apipaddr(zx::handle handle, zx_paddr_t data);
-//
 //     zx_status_t Apitime(zx::handle handle, zx_time_t data);
-//
-//     zx_status_t Apivaddr(zx::handle handle, zx_vaddr_t data);
 //
 //     zx_status_t Apioutput_bool(zx::handle handle, bool* out_result);
 //
@@ -100,11 +96,7 @@
 //
 //     zx_status_t Apioutput_koid(zx::handle handle, zx_koid_t* out_result);
 //
-//     zx_status_t Apioutput_paddr(zx::handle handle, zx_paddr_t* out_result);
-//
 //     zx_status_t Apioutput_time(zx::handle handle, zx_time_t* out_result);
-//
-//     zx_status_t Apioutput_vaddr(zx::handle handle, zx_vaddr_t* out_result);
 //
 //     void Apireturn_void(zx::handle handle);
 //
@@ -141,9 +133,7 @@ public:
         api_protocol_ops_.float64 = Apifloat64;
         api_protocol_ops_.duration = Apiduration;
         api_protocol_ops_.koid = Apikoid;
-        api_protocol_ops_.paddr = Apipaddr;
         api_protocol_ops_.time = Apitime;
-        api_protocol_ops_.vaddr = Apivaddr;
         api_protocol_ops_.output_bool = Apioutput_bool;
         api_protocol_ops_.output_int8 = Apioutput_int8;
         api_protocol_ops_.output_int16 = Apioutput_int16;
@@ -157,9 +147,7 @@ public:
         api_protocol_ops_.output_float64 = Apioutput_float64;
         api_protocol_ops_.output_duration = Apioutput_duration;
         api_protocol_ops_.output_koid = Apioutput_koid;
-        api_protocol_ops_.output_paddr = Apioutput_paddr;
         api_protocol_ops_.output_time = Apioutput_time;
-        api_protocol_ops_.output_vaddr = Apioutput_vaddr;
         api_protocol_ops_.return_void = Apireturn_void;
         api_protocol_ops_.return_status = Apireturn_status;
         api_protocol_ops_.return_ticks = Apireturn_ticks;
@@ -232,16 +220,8 @@ private:
         auto ret = static_cast<D*>(ctx)->Apikoid(zx::handle(handle), data);
         return ret;
     }
-    static zx_status_t Apipaddr(void* ctx, zx_handle_t handle, zx_paddr_t data) {
-        auto ret = static_cast<D*>(ctx)->Apipaddr(zx::handle(handle), data);
-        return ret;
-    }
     static zx_status_t Apitime(void* ctx, zx_handle_t handle, zx_time_t data) {
         auto ret = static_cast<D*>(ctx)->Apitime(zx::handle(handle), data);
-        return ret;
-    }
-    static zx_status_t Apivaddr(void* ctx, zx_handle_t handle, zx_vaddr_t data) {
-        auto ret = static_cast<D*>(ctx)->Apivaddr(zx::handle(handle), data);
         return ret;
     }
     static zx_status_t Apioutput_bool(void* ctx, zx_handle_t handle, bool* out_result) {
@@ -296,16 +276,8 @@ private:
         auto ret = static_cast<D*>(ctx)->Apioutput_koid(zx::handle(handle), out_result);
         return ret;
     }
-    static zx_status_t Apioutput_paddr(void* ctx, zx_handle_t handle, zx_paddr_t* out_result) {
-        auto ret = static_cast<D*>(ctx)->Apioutput_paddr(zx::handle(handle), out_result);
-        return ret;
-    }
     static zx_status_t Apioutput_time(void* ctx, zx_handle_t handle, zx_time_t* out_result) {
         auto ret = static_cast<D*>(ctx)->Apioutput_time(zx::handle(handle), out_result);
-        return ret;
-    }
-    static zx_status_t Apioutput_vaddr(void* ctx, zx_handle_t handle, zx_vaddr_t* out_result) {
-        auto ret = static_cast<D*>(ctx)->Apioutput_vaddr(zx::handle(handle), out_result);
         return ret;
     }
     static void Apireturn_void(void* ctx, zx_handle_t handle) {
@@ -456,16 +428,8 @@ public:
         return ops_->koid(ctx_, handle.release(), data);
     }
 
-    zx_status_t paddr(zx::handle handle, zx_paddr_t data) const {
-        return ops_->paddr(ctx_, handle.release(), data);
-    }
-
     zx_status_t time(zx::handle handle, zx_time_t data) const {
         return ops_->time(ctx_, handle.release(), data);
-    }
-
-    zx_status_t vaddr(zx::handle handle, zx_vaddr_t data) const {
-        return ops_->vaddr(ctx_, handle.release(), data);
     }
 
     zx_status_t output_bool(zx::handle handle, bool* out_result) const {
@@ -520,16 +484,8 @@ public:
         return ops_->output_koid(ctx_, handle.release(), out_result);
     }
 
-    zx_status_t output_paddr(zx::handle handle, zx_paddr_t* out_result) const {
-        return ops_->output_paddr(ctx_, handle.release(), out_result);
-    }
-
     zx_status_t output_time(zx::handle handle, zx_time_t* out_result) const {
         return ops_->output_time(ctx_, handle.release(), out_result);
-    }
-
-    zx_status_t output_vaddr(zx::handle handle, zx_vaddr_t* out_result) const {
-        return ops_->output_vaddr(ctx_, handle.release(), out_result);
     }
 
     void return_void(zx::handle handle) const {

@@ -217,8 +217,8 @@ protocol Bti {
         offset uint64;
         size uint64;
     }) -> (resource struct {
-        @embedded_alias("zx/paddr")
-        addrs vector<paddr>;
+        @embedded_alias("zx/Paddr")
+        addrs vector<Paddr>;
         pmt handle:PMT;
     }) error status;
 

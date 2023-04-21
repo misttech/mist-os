@@ -58,9 +58,6 @@ struct zx_types {
     zx_duration_t duration;
     zx_ticks_t ticks;
     zx_koid_t koid;
-    zx_vaddr_t vaddr;
-    zx_paddr_t paddr;
-    zx_gpaddr_t gpaddr;
     zx_off_t offset;
 };
 

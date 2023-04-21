@@ -65,7 +65,7 @@ type UsbRequest = resource struct {
     pmt zx.handle;
     /// Phys addresses of the payload.
     @mutable
-    phys vector<zx.paddr>:MAX;
+    phys vector<uint64>:MAX;
 
     @mutable
     sg vector<ddk.hw.physiter.SgEntry>:MAX;

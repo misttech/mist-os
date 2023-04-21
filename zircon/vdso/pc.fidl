@@ -41,7 +41,7 @@ protocol Pc {
     FirmwareTables(resource struct {
         handle handle:RESOURCE;
     }) -> (struct {
-        acpi_rsdp paddr;
-        smbios paddr;
+        acpi_rsdp Paddr;
+        smbios Paddr;
     }) error status;
 };
