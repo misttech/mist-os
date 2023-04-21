@@ -261,7 +261,7 @@ impl DeviceOps for MiscDevice {
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(match id {
             DeviceType::HW_RANDOM => Box::new(DevRandom),
-            DeviceType::FUSE => Box::new(DevFuse),
+            DeviceType::FUSE => Box::<DevFuse>::default(),
             _ => return error!(ENODEV),
         })
     }

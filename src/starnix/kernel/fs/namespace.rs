@@ -495,7 +495,7 @@ pub fn create_filesystem(
         b"bpf" => BpfFs::new_fs(kernel)?,
         b"devpts" => dev_pts_fs(kernel).clone(),
         b"devtmpfs" => dev_tmp_fs(task).clone(),
-        b"fuse" => new_fuse_fs(task, data),
+        b"fuse" => new_fuse_fs(task, data)?,
         b"proc" => proc_fs(kernel.clone()),
         b"selinuxfs" => selinux_fs(kernel).clone(),
         b"sysfs" => sys_fs(kernel).clone(),

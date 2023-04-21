@@ -31,6 +31,14 @@ impl FdNumber {
     }
 }
 
+impl std::str::FromStr for FdNumber {
+    type Err = Errno;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(FdNumber::from_raw(s.parse::<i32>().map_err(|e| errno!(EINVAL, e))?))
+    }
+}
+
 impl fmt::Display for FdNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "fd({})", self.0)

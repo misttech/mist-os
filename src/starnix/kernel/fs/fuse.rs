@@ -2,17 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FsNode, FsNodeHandle, FsNodeOps, FsStr,
+use {
+    crate::{
+        fs::{
+            buffers::{InputBuffer, OutputBuffer},
+            fileops_impl_nonseekable, fs_args, FdNumber, FileObject, FileOps, FileSystem,
+            FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
+        },
+        task::CurrentTask,
+        types::{errno, error, statfs, Errno, OpenFlags},
     },
-    task::CurrentTask,
-    types::{error, statfs, Errno, OpenFlags},
+    std::sync::Arc,
 };
 
-pub struct DevFuse;
+#[derive(Debug, Default)]
+pub struct FuseState;
+
+#[derive(Debug, Default)]
+pub struct DevFuse {
+    state: Arc<FuseState>,
+}
 
 impl FileOps for DevFuse {
     fileops_impl_nonseekable!();
@@ -36,13 +45,29 @@ impl FileOps for DevFuse {
     }
 }
 
-pub fn new_fuse_fs(task: &CurrentTask, _data: &FsStr) -> FileSystemHandle {
-    let fs = FileSystem::new(task.kernel(), FuseFs {});
+pub fn new_fuse_fs(task: &CurrentTask, data: &FsStr) -> Result<FileSystemHandle, Errno> {
+    let mut mount_options = fs_args::generic_parse_mount_options(data);
+    let fd = fs_args::parse::<FdNumber>(
+        mount_options.remove(b"fd" as &FsStr).ok_or_else(|| errno!(EINVAL))?,
+    )?;
+    let state =
+        task.files.get(fd)?.downcast_file::<DevFuse>().ok_or_else(|| errno!(EINVAL))?.state.clone();
+
+    let fs = FileSystem::new(task.kernel(), FuseFs::new(state));
     fs.set_root_node(FsNode::new_root(FuseNode {}));
-    fs
+    Ok(fs)
 }
 
-struct FuseFs;
+#[derive(Debug)]
+struct FuseFs {
+    _state: Arc<FuseState>,
+}
+
+impl FuseFs {
+    fn new(state: Arc<FuseState>) -> Self {
+        Self { _state: state }
+    }
+}
 
 impl FileSystemOps for FuseFs {
     fn rename(
@@ -63,6 +88,7 @@ impl FileSystemOps for FuseFs {
     }
 }
 
+#[derive(Debug)]
 struct FuseNode;
 
 impl FsNodeOps for FuseNode {
