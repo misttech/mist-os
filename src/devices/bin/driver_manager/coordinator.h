@@ -49,7 +49,6 @@
 #include "src/devices/bin/driver_manager/v1/device_manager.h"
 #include "src/devices/bin/driver_manager/v1/firmware_loader.h"
 #include "src/devices/bin/driver_manager/v1/suspend_resume_manager.h"
-#include "src/devices/bin/driver_manager/v2/driver_runner.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -93,6 +92,7 @@ struct CoordinatorConfig {
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args;
   // Client for the DriverIndex.
   fidl::WireSharedClient<fdi::DriverIndex> driver_index;
+  fidl::WireClient<fuchsia_component::Realm> realm;
   // Whether we should wait until base drivers are indexed before binding fallback drivers.
   bool delay_fallback_until_base_drivers_indexed = false;
   // Whether to enable verbose logging.
@@ -171,8 +171,6 @@ class Coordinator : public CompositeManagerBridge,
   void set_loader_service_connector(LoaderServiceConnector loader_service_connector) {
     loader_service_connector_ = std::move(loader_service_connector);
   }
-  // Set the DFv2 driver runner. `runner` must outlive this class.
-  void set_driver_runner(dfv2::DriverRunner* runner) { driver_runner_ = runner; }
 
   // Getter functions.
   async_dispatcher_t* dispatcher() const { return dispatcher_; }
@@ -225,8 +223,7 @@ class Coordinator : public CompositeManagerBridge,
   void SuspendWithoutExit(SuspendWithoutExitCompleter::Sync& completer) override;
 
   // Creates a DFv2 component with a given driver and attaches it to `dev`.
-  zx_status_t CreateAndStartDFv2Component(const MatchedDriverInfo& driver,
-                                          const fbl::RefPtr<Device>& dev);
+  void CreateAndStartDFv2Component(const MatchedDriverInfo& driver, const fbl::RefPtr<Device>& dev);
 
   CoordinatorConfig config_;
   async_dispatcher_t* const dispatcher_;
@@ -267,9 +264,6 @@ class Coordinator : public CompositeManagerBridge,
   // event loop iteration. Otherwise, we risk use-after-free issues if a client
   // tries to connect to the servers published in it.
   component::OutgoingDirectory* outgoing_;
-
-  // The runner for DFv2 components. This needs to outlive `coordinator`.
-  dfv2::DriverRunner* driver_runner_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COORDINATOR_H_

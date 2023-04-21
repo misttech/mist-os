@@ -51,7 +51,6 @@
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 #include "system_instance.h"
-#include "v2/driver_runner.h"
 
 DriverHostCrashPolicy CrashPolicyFromString(const std::string& crash_policy) {
   if (crash_policy == "reboot-system") {
@@ -220,6 +219,13 @@ int RunDfv1(driver_manager_config::Config dm_config,
   async::Loop firmware_loop(&kAsyncLoopConfigNeverAttachToThread);
   firmware_loop.StartThread("firmware-loop");
 
+  auto realm_result = component::Connect<fuchsia_component::Realm>();
+  if (realm_result.is_error()) {
+    LOGF(ERROR, "Failed to connect to the realm: %s", realm_result.status_string());
+    return realm_result.error_value();
+  }
+  config.realm = fidl::WireClient(std::move(realm_result.value()), loop.dispatcher());
+
   Coordinator coordinator(std::move(config), &inspect_manager, loop.dispatcher(),
                           firmware_loop.dispatcher());
 
@@ -234,17 +240,6 @@ int RunDfv1(driver_manager_config::Config dm_config,
   driver_manager::DevfsExporter devfs_exporter(coordinator.devfs(), &root_node.value(),
                                                loop.dispatcher());
   devfs_exporter.PublishExporter(outgoing);
-
-  // Launch DriverRunner for DFv2 drivers.
-  auto realm_result = component::Connect<fuchsia_component::Realm>();
-  if (realm_result.is_error()) {
-    return realm_result.error_value();
-  }
-  auto driver_index_result = component::Connect<fuchsia_driver_index::DriverIndex>();
-  if (driver_index_result.is_error()) {
-    LOGF(ERROR, "Failed to connect to driver_index: %d", driver_index_result.error_value());
-    return driver_index_result.error_value();
-  }
 
   fbl::unique_fd lib_fd;
   {
@@ -265,15 +260,10 @@ int RunDfv1(driver_manager_config::Config dm_config,
 
   auto loader_service =
       DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
-  auto driver_runner = dfv2::DriverRunner(
-      std::move(realm_result.value()), std::move(driver_index_result.value()),
-      inspect_manager.inspector(), [loader_service]() { return loader_service->Connect(); },
-      loop.dispatcher());
-  driver_runner.PublishComponentRunner(outgoing);
 
   // Find and load v1 Drivers.
-  coordinator.set_driver_runner(&driver_runner);
   coordinator.PublishDriverDevelopmentService(outgoing);
+  coordinator.driver_loader().Publish(outgoing);
 
   // V1 Drivers.
   zx_status_t status =

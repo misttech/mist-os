@@ -135,8 +135,8 @@ TEST_F(DriverLoaderTest, TestFallbackGetsRemoved) {
   fallback->fallback = true;
   resolver.map[fallback_url] = std::move(fallback);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, nullptr);
 
   loop.StartThread("fidl-thread");
 
@@ -165,8 +165,8 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedAfterBaseLoaded) {
   fallback->fallback = true;
   resolver.map[fallback_url] = std::move(fallback);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, nullptr);
   loop.StartThread("fidl-thread");
 
   // Wait for base drivers, which is when we load fallback drivers.
@@ -202,8 +202,8 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedWhenSystemNotRequired) {
   fallback->fallback = true;
   resolver.map[fallback_url] = std::move(fallback);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -231,8 +231,8 @@ TEST_F(DriverLoaderTest, TestUrl) {
   driver2->url = name2;
   resolver.map[name2] = std::move(driver2);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -259,8 +259,8 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
   driver2->url = name2;
   resolver.map[name2] = std::move(driver2);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, nullptr);
   loop.StartThread("fidl-thread");
 
   {
@@ -296,8 +296,8 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeUrl) {
   driver1->url = name1;
   resolver.map[name1] = std::move(driver1);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -330,8 +330,8 @@ TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
   driver3->fallback = true;
   resolver.map[name3] = std::move(driver3);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   // We can also match url by the path that the URL turns into.
@@ -373,8 +373,8 @@ TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
   parent_spec_2.specs(specs_2);
   driver_index_server.specs.push_back(parent_spec_2.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -415,8 +415,8 @@ TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
   driver->url = driver_name;
   resolver.map[driver_name] = std::move(driver);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -448,8 +448,8 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
   parent_spec.specs(specs);
   driver_index_server.specs.push_back(parent_spec.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -467,8 +467,8 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
       allocator, specs));
   driver_index_server.specs.push_back(parent_spec.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -496,8 +496,8 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
   parent_spec.specs(specs);
   driver_index_server.specs.push_back(parent_spec.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             false, nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
@@ -531,8 +531,8 @@ TEST_F(DriverLoaderTest, TestEphemeralDriver) {
   driver2->url = name2;
   resolver.map[name2] = std::move(driver2);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             &universe_resolver);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, &universe_resolver);
   loop.StartThread("fidl-thread");
 
   // We should find driver1 from the universe resolver.
@@ -551,8 +551,8 @@ TEST_F(DriverLoaderTest, TestV2Driver) {
   driver_index_server.fake_drivers.emplace_back(name, fdi::wire::DriverPackageType::kBoot,
                                                 /* is_fallback */ false, /* is_dfv2 */ true);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             &universe_resolver);
+  DriverLoader driver_loader(nullptr, std::move(driver_index), {}, &resolver, loop.dispatcher(),
+                             true, &universe_resolver);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;

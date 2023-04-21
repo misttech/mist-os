@@ -292,8 +292,8 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
                return std::move(diagnostics_client.value());
              }()),
       package_resolver_(config_.boot_args),
-      driver_loader_(config_.boot_args, std::move(config_.driver_index), &base_resolver_,
-                     dispatcher, config_.delay_fallback_until_base_drivers_indexed,
+      driver_loader_(config_.boot_args, std::move(config_.driver_index), std::move(config_.realm),
+                     &base_resolver_, dispatcher, config_.delay_fallback_until_base_drivers_indexed,
                      &package_resolver_),
       firmware_loader_(firmware_dispatcher, config_.path_prefix) {
   bind_driver_manager_ = std::make_unique<BindDriverManager>(this);
@@ -417,14 +417,32 @@ zx_status_t Coordinator::NewDriverHost(const char* name, fbl::RefPtr<DriverHost>
   return ZX_OK;
 }
 
-zx_status_t Coordinator::CreateAndStartDFv2Component(const MatchedDriverInfo& driver,
-                                                     const fbl::RefPtr<Device>& dev) {
-  auto node = dev->CreateDFv2Device();
+void Coordinator::CreateAndStartDFv2Component(const MatchedDriverInfo& driver,
+                                              const fbl::RefPtr<Device>& dev) {
+  zx::result node = dev->CreateDFv2Device();
   if (node.is_error()) {
-    return node.error_value();
+    LOGF(ERROR, "Failed to create dfv2 device: %s", node.status_string());
+    return;
   }
-  return driver_runner_->StartDriver(*node.value(), driver.component_url, driver.package_type)
-      .status_value();
+  std::string moniker = node.value()->MakeComponentMoniker();
+  driver_loader_.LoadDriverComponent(
+      moniker, driver.component_url, node->offers(), driver.package_type,
+      [node = std::move(node.value()),
+       dev = dev](zx::result<DriverLoader::DriverComponent> driver_component) {
+        if (driver_component.is_error()) {
+          LOGF(ERROR, "Failed to create DriverComponent: %s", driver_component.status_string());
+          return;
+        }
+        driver_manager::Runner::StartedComponent& component = driver_component.value().component;
+        fidl::Arena arena;
+        node->StartDriver(fidl::ToWire(arena, std::move(component.info)),
+                          std::move(component.controller), [](zx::result<> result) {
+                            if (result.is_error()) {
+                              LOGF(ERROR, "Node::StartDriver failed: %s", result.status_string());
+                              return;
+                            }
+                          });
+      });
 }
 
 zx_status_t Coordinator::MakeVisible(const fbl::RefPtr<Device>& dev) {
@@ -623,7 +641,8 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   }
 
   if (matched_driver.is_dfv2) {
-    return CreateAndStartDFv2Component(matched_driver, dev);
+    CreateAndStartDFv2Component(matched_driver, dev);
+    return ZX_OK;
   }
 
   const Driver* driver_ptr = driver_loader_.LoadDriverUrl(matched_driver.component_url);

@@ -16,6 +16,7 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/device.h"
 #include "src/devices/bin/driver_manager/driver.h"
+#include "src/devices/bin/driver_manager/v2/runner.h"
 
 class Coordinator;
 
@@ -30,6 +31,7 @@ class DriverLoader {
   // Takes in an unowned connection to base_resolver. base_resolver must outlive DriverLoader.
   explicit DriverLoader(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                         fidl::WireSharedClient<fdi::DriverIndex> driver_index,
+                        fidl::WireClient<fuchsia_component::Realm> realm,
                         internal::PackageResolverInterface* base_resolver,
                         async_dispatcher_t* dispatcher,
                         bool delay_fallback_until_base_drivers_indexed,
@@ -37,7 +39,12 @@ class DriverLoader {
       : base_resolver_(base_resolver),
         driver_index_(std::move(driver_index)),
         include_fallback_drivers_(!delay_fallback_until_base_drivers_indexed),
-        universe_resolver_(universe_resolver) {}
+        universe_resolver_(universe_resolver),
+        runner_(dispatcher, std::move(realm)) {}
+
+  void Publish(component::OutgoingDirectory& outgoing) {
+    ZX_ASSERT(runner_.Publish(outgoing).status_value() == ZX_OK);
+  }
 
   // This will schedule a task on the async_dispatcher that will return
   // when DriverIndex has loaded the base drivers. When the task completes,
@@ -69,6 +76,19 @@ class DriverLoader {
 
   const Driver* LoadDriverUrl(const std::string& manifest_url, bool use_universe_resolver = false);
 
+  // This class represents a loaded driver component.
+  struct DriverComponent {
+    // Information about the DFv1 driver.
+    // If the driver only uses DFv2, this will be null.
+    std::unique_ptr<Driver> driver;
+    // The component's initial information, provided by the component framework.
+    driver_manager::Runner::StartedComponent component;
+  };
+  void LoadDriverComponent(std::string_view moniker, std::string_view manifest_url,
+                           fidl::VectorView<fuchsia_component_decl::wire::Offer> offers,
+                           fuchsia_driver_index::DriverPackageType package_type,
+                           fit::callback<void(zx::result<DriverComponent>)> callback);
+
  private:
   const Driver* UrlToDriver(const std::string& url);
 
@@ -85,6 +105,7 @@ class DriverLoader {
   // The universe package resolver.
   // Currently used only for ephemeral drivers.
   internal::PackageResolverInterface* universe_resolver_;
+  driver_manager::Runner runner_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_LOADER_H_
