@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/cppdocgen/clangdoc"
@@ -178,7 +179,16 @@ func main() {
 	docgen.WriteToc(writeSettings, &index, tocFile)
 
 	// Header references.
-	for _, h := range index.Headers {
+	// Sort them for deterministic outputs.
+	sorted_headers := make([]string, 0, len(index.Headers))
+	for header := range index.Headers {
+		sorted_headers = append(sorted_headers, header)
+	}
+
+	sort.Strings(sorted_headers)
+
+	for _, header_name := range sorted_headers {
+		h := index.Headers[header_name]
 		n := h.ReferenceFileName()
 		headerFile := addFile(n)
 		docgen.WriteHeaderReference(writeSettings, &index, h, headerFile)
