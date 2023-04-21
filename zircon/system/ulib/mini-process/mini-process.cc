@@ -20,6 +20,7 @@
 #include <mini-process/mini-process.h>
 
 #include "subprocess.h"
+#include "subprocess_blob.h"
 
 template <typename Fn>
 static Fn* get_syscall_addr(Fn* syscall_fn, uintptr_t vdso_base) {
@@ -62,10 +63,19 @@ static zx_status_t write_ctx_message(zx_handle_t channel, uintptr_t vdso_base,
 __EXPORT
 zx_status_t mini_process_load_stack(zx_handle_t vmar, bool with_code, zx_vaddr_t* stack_base,
                                     zx_vaddr_t* sp) {
-  // Allocate a single VMO for the child. It doubles as the stack on the top and
-  // as the executable code (minipr_thread_loop()) at the bottom. In theory, actual
-  // stack usage is minimal, like 160 bytes or less.
-  uint64_t stack_size = 16 * 1024u;
+  // Allocate a single VMO for the child. It doubles as the stack on the top
+  // and as the executable code (minipr_thread_loop()) at the bottom. In
+  // theory, actual stack usage is minimal, like 160 bytes or less.
+
+  cpp20::span<const std::byte> code_blob;
+  if (with_code) {
+    code_blob = subprocess_blob();
+  }
+
+  uint64_t stack_size = (16u << 10) + code_blob.size_bytes();
+  const uint64_t page_size = zx_system_get_page_size();
+  stack_size = (stack_size + page_size - 1) & -page_size;
+
   zx_handle_t stack_vmo = ZX_HANDLE_INVALID;
   zx_status_t status = zx_vmo_create(stack_size, 0, &stack_vmo);
   if (status != ZX_OK)
@@ -76,11 +86,8 @@ zx_status_t mini_process_load_stack(zx_handle_t vmar, bool with_code, zx_vaddr_t
   zx_object_set_property(stack_vmo, ZX_PROP_NAME, vmo_name, sizeof(vmo_name));
 
   zx_vm_option_t perms = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
-  if (with_code) {
-    // We assume that the code to execute is less than kSizeLimit bytes.
-    const uint32_t kSizeLimit = 2000;
-    status =
-        zx_vmo_write(stack_vmo, reinterpret_cast<const void*>(&minipr_thread_loop), 0u, kSizeLimit);
+  if (!code_blob.empty()) {
+    status = zx_vmo_write(stack_vmo, code_blob.data(), 0, code_blob.size_bytes());
     if (status != ZX_OK)
       goto exit;
 

@@ -8,26 +8,22 @@
 
 #include <mini-process/mini-process.h>
 
-// This file assumes that it's compiled with minimal optimization to avoid
-// things like the compiler splitting the code into hot and code sections that
-// are no longer contiguous.  The use of minipr_thread_loop assumes that the
-// function is one self-contained contiguous chunk of code.  So it cannot be
-// split up, and it cannot make any direct calls.
+// This file is compiled into an hermetic code blob using minipr_thread_loop as
+// the entry-point symbol. It can have whatever other code it needs, and can
+// have .rodata, but cannot have writable data. The build provides it with
+// string functions (such as memset and memcpy, which the compiler is always
+// free to emit calls to implicitly), but otherwise it must be self-contained.
 //
-// This function is the entire program that the child process will execute. It
-// gets directly mapped into the child process via zx_vmo_write() so it,
-//
-// 1. must not reference any addressable entity outside the function
-//
-// 2. must fit entirely within its containing VMO
-//
-// If you find that this program is crashing for no apparent reason, check to
-// see if it has outgrown its VMO. See kSizeLimit in mini-process.c.
+// This function is explicitly placed into the `.text.entry` section so that
+// its entry point will be at the start of the code segment in the hermetic
+// code blob (see hermetic-code-blob.ld). With no section attribute, the kernel
+// will place the entry point in some `.text*` section but may also place
+// things like a `.text.unlikely` section before the entry point. With the
+// section attribute, the compiler places all the parts of the function in the
+// same section. It's still not actually obliged to make the entry point the
+// first thing in that section, but in practices it always does.
 
-// Specify an explicit section for the function defeats hot/cold section
-// splitting optimizations.
-__attribute__((section(".text.not-split"))) void minipr_thread_loop(zx_handle_t channel,
-                                                                    uintptr_t fnptr) {
+[[gnu::section(".text.entry")]] void minipr_thread_loop(zx_handle_t channel, uintptr_t fnptr) {
   if (fnptr == 0) {
     // In this mode we don't have a VDSO so we don't care what the handle is
     // and therefore we busy-loop. Unless external steps are taken this will
@@ -47,11 +43,7 @@ __attribute__((section(".text.not-split"))) void minipr_thread_loop(zx_handle_t 
     uint32_t actual = 0u;
     uint32_t actual_handles = 0u;
     zx_handle_t original_handle = ZX_HANDLE_INVALID;
-
-    // The program that runs this function must be entirely self-contained.
-    // Mark this as uninitalized to ensure the compiler does not generate a call
-    // to memset.
-    __UNINITIALIZED minip_ctx_t ctx;
+    minip_ctx_t ctx = {};
 
     zx_status_t status =
         (*read_fn)(channel, 0u, &ctx, &original_handle, sizeof(ctx), 1, &actual, &actual_handles);

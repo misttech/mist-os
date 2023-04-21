@@ -2,63 +2,63 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/zx_library.gni")
+import("//build/cpp/library_headers.gni")
+import("//build/toolchain/toolchain_environment.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("//build/zircon/embedded_blob.gni")
+import("//build/zircon/hermetic_code_blob.gni")
 
-zx_library("mini-process") {
+library_headers("headers") {
   testonly = true
 
-  sdk = "shared"
-  sdk_headers = [ "mini-process/mini-process.h" ]
+  headers = [ "mini-process/mini-process.h" ]
+}
+
+shared_library("mini-process") {
+  testonly = true
+
+  public_deps = [ ":headers" ]
 
   sources = [ "mini-process.cc" ]
   deps = [
-    ":subprocess",
+    ":subprocess.basic",
     "//src/lib/elfldltl",
     "//zircon/system/ulib/zx",
   ]
 }
 
-# This code goes into the mini-process where it doesn't have any runtime
-# environment, so it must be compiled specially.
-if (toolchain_variant.instrumented) {
-  # Instrumented variants will just never work for this code.  So
-  # redirect to the default uninstrumented variant to compile this file.
-  group("subprocess") {
-    testonly = true
-    public_deps = [ ":subprocess(${toolchain_variant.base})" ]
-  }
-} else {
-  source_set("subprocess") {
-    visibility = [ ":*" ]
-    testonly = true
+user_basic_redirect("subprocess.basic") {
+  visibility = [ ":*" ]
+  testonly = true
 
-    public = [ "subprocess.h" ]
-    sources = [
-      "include/mini-process/mini-process.h",
-      "subprocess.cc",
-    ]
-    deps = [ "//zircon/system/ulib/backtrace-request" ]
+  public_deps = [ ":subprocess" ]
+}
 
-    configs += [
-      # No real sanitizers should be enabled in this variant anyway.
-      # But this also disables SafeStack, which is on by default.
-      "//build/config/sanitizers:no_sanitizers",
+embedded_blob("subprocess") {
+  visibility = [ ":*" ]
+  testonly = true
 
-      # This defeats optimizations that break the assumptions.
-      ":subprocess.config",
-    ]
-  }
+  sources = [ "$target_out_dir/subprocess.bin" ]
+  deps = [ ":subprocess.blob" ]
+  public_deps = [ ":subprocess.blob.public" ]
+}
 
-  config("subprocess.config") {
-    visibility = [ ":subprocess" ]
+hermetic_code_blob("subprocess.blob") {
+  visibility = [ ":*" ]
+  testonly = true
 
-    # Always compile with some optimization so that always_inline functions
-    # actually get inlined (which they don't at -O0).  Less optimization than
-    # the default should not be a problem for this code and might actually be
-    # helpful because of its special constraints (see subprocess.c).
-    cflags = [ "-O1" ]
+  output_name = "subprocess"
+  public = [ "subprocess.h" ]
+  public_deps = [ "//zircon/system/public" ]
 
-    # Needed to pick up the dependency on mini_process.h.
-    include_dirs = [ "include" ]
-  }
+  allow_rodata = true
+
+  entrypoint = "minipr_thread_loop"
+  sources = [ "subprocess.cc" ]
+  deps = [
+    ":headers",
+    "///src/zircon/lib/zircon:headers",
+    "//zircon/system/ulib/backtrace-request",
+    "//zircon/system/ulib/c/string:hermetic",
+  ]
 }

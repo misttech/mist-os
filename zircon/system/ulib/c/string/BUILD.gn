@@ -185,3 +185,11 @@ llvm_libc_source_set("swab") {
   dir = "unistd"
   functions = [ "swab" ]
 }
+
+# This provides an archive library of the universally safe string functions.
+# When built outside the "user.libc" environment, these always define only
+# hidden-visibility symbols and should be safe in any build environment.
+static_library("hermetic") {
+  complete_static_lib = true
+  deps = [ ":minimal-str" ]
+}
