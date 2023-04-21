@@ -358,11 +358,10 @@ int MsdVsiDevice::DeviceThreadLoop(bool disable_suspend) {
 
   DLOG("DeviceThreadLoop starting thread 0x%lx", device_thread_id_->id());
 
-  const bool applied_role =
-      magma::PlatformThreadHelper::SetRole(platform_device_->platform_device()->GetDeviceHandle(),
-                                           "fuchsia.graphics.drivers.msd-vsi-vip.device");
-  if (!applied_role) {
-    MAGMA_LOG(ERROR, "Failed to get higher priority!");
+  const char* kRoleName = "fuchsia.graphics.drivers.msd-vsi-vip.device";
+  if (!magma::PlatformThreadHelper::SetRole(platform_device_->platform_device()->GetDeviceHandle(),
+                                            kRoleName)) {
+    MAGMA_LOG(ERROR, "Failed to set device thread role: %s", kRoleName);
     return 0;
   }
 
@@ -442,11 +441,10 @@ int MsdVsiDevice::InterruptThreadLoop() {
   magma::PlatformThreadHelper::SetCurrentThreadName("VSI InterruptThread");
   DLOG("VSI Interrupt thread started");
 
-  const bool applied_role =
-      magma::PlatformThreadHelper::SetRole(platform_device_->platform_device()->GetDeviceHandle(),
-                                           "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt");
-  if (!applied_role) {
-    MAGMA_LOG(ERROR, "Failed to get higher priority!");
+  const char* kRoleName = "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt";
+  if (!magma::PlatformThreadHelper::SetRole(platform_device_->platform_device()->GetDeviceHandle(),
+                                            kRoleName)) {
+    MAGMA_LOG(ERROR, "Failed to set interrupt thread role: %s", kRoleName);
     return 0;
   }
 

@@ -22,8 +22,9 @@ bool PlatformThreadHelper::SetRole(void* device_handle, const std::string& role_
 
   const zx_status_t status =
       device_set_profile_by_role(device, thread_handle, role_name.data(), role_name.size());
+
   if (status != ZX_OK)
-    return DRETF(false, "Failed to set role \"%s\": %d", role_name.c_str(), status);
+    return false;
 
   return true;
 }
@@ -41,8 +42,9 @@ bool PlatformThreadHelper::SetThreadRole(void* device_handle, thrd_t thread,
 
   const zx_status_t status =
       device_set_profile_by_role(device, thread_handle, role_name.data(), role_name.size());
+
   if (status != ZX_OK)
-    return DRETF(false, "Failed to set role \"%s\": %d", role_name.c_str(), status);
+    return false;
 
   return true;
 }

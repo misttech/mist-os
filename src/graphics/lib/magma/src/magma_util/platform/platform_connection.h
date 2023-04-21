@@ -110,7 +110,14 @@ class PlatformConnection {
                                                       std::to_string(connection->client_id_));
 
     // Apply the thread role before entering the handler loop.
-    magma::PlatformThreadHelper::SetRole(device_handle, "fuchsia.graphics.magma.connection");
+    const char* kRoleName = "fuchsia.graphics.magma.connection";
+    if (!magma::PlatformThreadHelper::SetRole(device_handle, kRoleName)) {
+      // Log once, otherwise generates a lot of log spam during tests (core build)
+      static std::once_flag s_once;
+      std::call_once(s_once, [&] {
+        MAGMA_LOG(WARNING, "Failed to set role \"%s\" (logged only once)", kRoleName);
+      });
+    }
 
     while (connection->HandleRequest()) {
       connection->request_count_ += 1;
