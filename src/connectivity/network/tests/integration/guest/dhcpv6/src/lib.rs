@@ -20,8 +20,7 @@ use {
 
 #[netstack_test]
 async fn gets_dns_servers(name: &str) {
-    diagnostics_log::initialize(diagnostics_log::PublisherOptions::default())
-        .expect("init logging");
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (network, realm, iface, _): (_, _, _, netemul::TestFakeEndpoint<'_>) =
         setup_network_with::<Netstack2, _>(
