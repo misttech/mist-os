@@ -12,13 +12,14 @@ if (is_host) {
     args_deps = []
     deps = [
       "//src/developer/ffx/lib/emulator_instance:lib",
-      "//src/developer/ffx/lib/errors:lib",
-      "//third_party/rust_crates:cfg-if",
+      "//src/developer/ffx/lib/fho:lib",
+      "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:serde",
     ]
     test_deps = [
+      "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/lib/writer:lib",
       "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:mockall",
     ]
     args_sources = [ "src/args.rs" ]

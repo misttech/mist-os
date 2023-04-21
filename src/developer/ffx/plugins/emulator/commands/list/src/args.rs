@@ -6,7 +6,7 @@ use argh::FromArgs;
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(FromArgs, Default, Debug, PartialEq)]
+#[derive(Clone, FromArgs, Default, Debug, PartialEq)]
 #[argh(subcommand, name = "list")]
 /// List running Fuchsia emulators.
 pub struct ListCommand {
