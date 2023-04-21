@@ -60,8 +60,8 @@ impl Instance {
                 while let Some(req) = stream.try_next().await? {
                     match req {
                         StoreAccessorRequest::GetValue { key, responder } => {
-                            let mut res = acc.get_value(&key).await?;
-                            responder.send(res.as_mut())?;
+                            let res = acc.get_value(&key).await?;
+                            responder.send(res)?;
                         }
                         StoreAccessorRequest::SetValue { key, val, .. } => {
                             acc.set_value(key, val).await?

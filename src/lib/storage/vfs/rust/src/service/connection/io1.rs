@@ -82,8 +82,8 @@ impl Connection {
         };
 
         if describe {
-            let mut info = fio::NodeInfoDeprecated::Service(fio::Service);
-            match control_handle.send_on_open_(Status::OK.into_raw(), Some(&mut info)) {
+            let info = fio::NodeInfoDeprecated::Service(fio::Service);
+            match control_handle.send_on_open_(Status::OK.into_raw(), Some(info)) {
                 Ok(()) => (),
                 Err(_) => return,
             }

@@ -470,8 +470,8 @@ impl<T: Driver> ServeTo<DeviceExtraRequestStream> for T {
                     let responder = ResponderNoShutdown::wrap(responder);
                     self.get_credential()
                         .err_into::<Error>()
-                        .and_then(|mut response| {
-                            ready(responder.unwrap().send(response.as_mut()).map_err(Error::from))
+                        .and_then(|response| {
+                            ready(responder.unwrap().send(response.as_ref()).map_err(Error::from))
                         })
                         .await
                         .context("error in get_credential request")?;

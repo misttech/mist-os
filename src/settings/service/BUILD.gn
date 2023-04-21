@@ -80,6 +80,7 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
     "//src/lib/fuchsia",
     "//src/lib/storage/vfs/rust:vfs",

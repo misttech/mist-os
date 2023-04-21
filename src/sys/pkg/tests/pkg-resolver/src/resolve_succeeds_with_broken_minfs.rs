@@ -299,10 +299,10 @@ impl FailingWriteFileStreamHandler {
                 let mut event_stream = self.backing_file.take_event_stream();
                 let event = event_stream.try_next().await.unwrap();
                 match event.expect("failed to received file event") {
-                    fio::FileEvent::OnOpen_ { s, mut info } => {
+                    fio::FileEvent::OnOpen_ { s, info } => {
                         // info comes as an Option<Box<NodeInfoDeprecated>>, but we need to return an
-                        // Option<&mut NodeInfoDeprecated>. Transform it.
-                        let node_info = info.as_mut().map(|b| &mut **b);
+                        // Option<NodeInfoDeprecated>. Transform it.
+                        let node_info = info.map(|b| *b);
                         control_handle
                             .send_on_open_(s, node_info)
                             .expect("send on open to fake file");

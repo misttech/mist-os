@@ -674,7 +674,7 @@ mod tests {
             match req {
                 ffx::MdnsRequest::GetNextEvent { responder } => {
                     self.call_started.send(()).await.unwrap();
-                    responder.send(self.next_event.recv().await.ok().as_mut()).map_err(Into::into)
+                    responder.send(self.next_event.recv().await.ok().as_ref()).map_err(Into::into)
                 }
                 _ => panic!("unsupported"),
             }

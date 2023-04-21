@@ -567,7 +567,7 @@ async fn serve_failing_blobfs(
             .control_handle()
             .send_on_open_(
                 zx::Status::OK.into_raw(),
-                Some(&mut fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)),
+                Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)),
             )
             .context("sending on open")?;
     }

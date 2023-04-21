@@ -203,9 +203,7 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
 
     if describe {
         let result = match connection.node_info() {
-            Ok(mut info) => {
-                control_handle.send_on_open_(zx::Status::OK.into_raw(), Some(&mut info))
-            }
+            Ok(info) => control_handle.send_on_open_(zx::Status::OK.into_raw(), Some(info)),
             Err(status) => {
                 let result = control_handle.send_on_open_(status.into_raw(), None);
                 let () = control_handle.shutdown_with_epitaph(status);

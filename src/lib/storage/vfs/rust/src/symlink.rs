@@ -120,7 +120,7 @@ impl Connection {
                 .control_handle
                 .send_on_open_(
                     zx::Status::OK.into_raw(),
-                    Some(&mut fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target })),
+                    Some(fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target })),
                 )
                 .is_err()
             {

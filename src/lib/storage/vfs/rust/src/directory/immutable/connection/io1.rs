@@ -85,7 +85,7 @@ impl DerivedConnection for ImmutableConnection {
 
         if describe {
             match control_handle
-                .send_on_open_(Status::OK.into_raw(), Some(&mut connection.base.node_info()))
+                .send_on_open_(Status::OK.into_raw(), Some(connection.base.node_info()))
             {
                 Ok(()) => (),
                 Err(_) => return,

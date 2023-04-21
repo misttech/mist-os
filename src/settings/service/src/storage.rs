@@ -72,6 +72,7 @@ pub(crate) mod testing {
         StoreAccessorMarker, StoreAccessorProxy, StoreAccessorRequest, Value,
     };
     use fuchsia_async as fasync;
+    use fuchsia_zircon as zx;
     use futures::lock::Mutex;
     use futures::prelude::*;
     use serde::{Deserialize, Serialize};
@@ -247,7 +248,20 @@ pub(crate) mod testing {
                         }
                         stored_key = Some(key);
 
-                        responder.send(stored_value.as_mut()).unwrap();
+                        let value = stored_value.as_ref().map(|value| match value {
+                            Value::Intval(v) => Value::Intval(*v),
+                            Value::Floatval(v) => Value::Floatval(*v),
+                            Value::Boolval(v) => Value::Boolval(*v),
+                            Value::Stringval(v) => Value::Stringval(v.clone()),
+                            Value::Bytesval(buffer) => {
+                                let opts = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
+                                Value::Bytesval(fidl_fuchsia_mem::Buffer {
+                                    vmo: buffer.vmo.create_child(opts, 0, buffer.size).unwrap(),
+                                    size: buffer.size,
+                                })
+                            }
+                        });
+                        responder.send(value).unwrap();
                     }
                     StoreAccessorRequest::SetValue { key, val, control_handle: _ } => {
                         stats_clone.lock().await.record(StashAction::Set);

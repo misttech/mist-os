@@ -262,9 +262,7 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
         session_context_client_end,
         &mut host_services_list(vec![], &mut services_for_agents_fs)?,
         services_from_sessionmgr_server_end,
-        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
-            link_token_pair.view_creation_token,
-        )),
+        Some(fmodular_internal::ViewParams::ViewCreationToken(link_token_pair.view_creation_token)),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();
@@ -382,9 +380,7 @@ async fn test_v2_modular_agents() -> Result<(), Error> {
             &mut services_for_agents_fs,
         )?,
         services_from_sessionmgr_server_end,
-        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
-            link_token_pair.view_creation_token,
-        )),
+        Some(fmodular_internal::ViewParams::ViewCreationToken(link_token_pair.view_creation_token)),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();
@@ -570,9 +566,7 @@ async fn test_v2_modular_agent_reconnect() -> Result<(), Error> {
             &mut services_for_agents_fs,
         )?,
         services_from_sessionmgr_server_end,
-        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
-            link_token_pair.view_creation_token,
-        )),
+        Some(fmodular_internal::ViewParams::ViewCreationToken(link_token_pair.view_creation_token)),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();
@@ -698,9 +692,7 @@ async fn test_v2_session_shell() -> Result<(), Error> {
             &mut services_for_agents_fs,
         )?,
         services_from_sessionmgr_server_end,
-        Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
-            link_token_pair.view_creation_token,
-        )),
+        Some(fmodular_internal::ViewParams::ViewCreationToken(link_token_pair.view_creation_token)),
     )?;
 
     fasync::Task::local(services_for_agents_fs.collect()).detach();

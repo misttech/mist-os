@@ -893,7 +893,11 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			if val.Nullable {
 				t.Fidl = fmt.Sprintf("fidl::encoding::OptionalUnion<%s>", t.Fidl)
 				t.Owned = fmt.Sprintf("Option<Box<%s>>", t.Owned)
-				t.Param = fmt.Sprintf("Option<%s>", t.Param)
+				if declInfo.IsResourceType() {
+					t.Param = fmt.Sprintf("Option<%s>", name)
+				} else {
+					t.Param = fmt.Sprintf("Option<&%s>", name)
+				}
 			}
 		case fidlgen.ProtocolDeclType:
 			s := fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
@@ -963,20 +967,15 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:
 			return v
-		case fidlgen.StructDeclType:
+		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
 			if t.Nullable {
 				if t.IsResourceType() {
 					return v + ".as_mut()"
 				}
 				return v
 			}
-			fallthrough
-		case fidlgen.UnionDeclType:
 			if t.IsResourceType() {
 				return v
-			}
-			if t.Nullable {
-				return v + ".map(|x| &*x)"
 			}
 			return "&*" + v
 		case fidlgen.TableDeclType:

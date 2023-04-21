@@ -149,7 +149,7 @@ mod tests {
             control
                 .send_on_open_(
                     zxs::Status::OK.into_raw(),
-                    Some(&mut fio::NodeInfoDeprecated::File(fio::FileObject {
+                    Some(fio::NodeInfoDeprecated::File(fio::FileObject {
                         event: None,
                         stream: None,
                     })),
@@ -194,7 +194,7 @@ mod tests {
             control
                 .send_on_open_(
                     zxs::Status::OK.into_raw(),
-                    Some(&mut fio::NodeInfoDeprecated::File(fio::FileObject {
+                    Some(fio::NodeInfoDeprecated::File(fio::FileObject {
                         event: None,
                         stream: None,
                     })),

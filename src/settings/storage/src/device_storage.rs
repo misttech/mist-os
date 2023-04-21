@@ -539,9 +539,7 @@ mod tests {
         match stash_stream.next().await.unwrap() {
             Ok(StoreAccessorRequest::GetValue { key, responder }) => {
                 assert_eq!(key, STORE_KEY);
-                responder
-                    .send(Some(&mut Value::Stringval(response)))
-                    .expect("unable to send response");
+                responder.send(Some(Value::Stringval(response))).expect("unable to send response");
             }
             request => panic!("Unexpected request: {request:?}"),
         }
@@ -581,9 +579,9 @@ mod tests {
                 match req {
                     StoreAccessorRequest::GetValue { key, responder } => {
                         assert_eq!(key, STORE_KEY);
-                        let mut response = Value::Stringval(value_to_get.serialize_to());
+                        let response = Value::Stringval(value_to_get.serialize_to());
 
-                        responder.send(Some(&mut response)).unwrap();
+                        responder.send(Some(response)).unwrap();
                     }
                     _ => {}
                 }
@@ -642,8 +640,8 @@ mod tests {
                 #[allow(unreachable_patterns)]
                 match req {
                     StoreAccessorRequest::GetValue { key: _, responder } => {
-                        let mut response = Value::Stringval("invalid value".to_string());
-                        responder.send(Some(&mut response)).unwrap();
+                        let response = Value::Stringval("invalid value".to_string());
+                        responder.send(Some(response)).unwrap();
                     }
                     _ => {}
                 }
@@ -816,7 +814,7 @@ mod tests {
                 match request {
                     Ok(StoreAccessorRequest::GetValue { key, responder }) => {
                         assert_eq!(key, STORE_KEY);
-                        let _ = responder.send(Some(&mut Value::Stringval(
+                        let _ = responder.send(Some(Value::Stringval(
                             serde_json::to_string(&TestStruct { value: VALUE2 }).unwrap(),
                         )));
                     }

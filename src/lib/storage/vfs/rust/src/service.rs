@@ -117,11 +117,11 @@ impl Service {
             // TODO(https://fxbug.dev/104708): This is a bit crude but there seems to be no other
             // way of sending on_open_ using FIDL and then getting the channel back.
             let request_stream = fio::NodeRequestStream::from_channel(channel);
-            let (status, mut node_info) = match status {
+            let (status, node_info) = match status {
                 Ok(()) => (Status::OK, Some(fio::NodeInfoDeprecated::Service(fio::Service))),
                 Err(status) => (status, None),
             };
-            request_stream.control_handle().send_on_open_(status.into_raw(), node_info.as_mut())?;
+            request_stream.control_handle().send_on_open_(status.into_raw(), node_info)?;
             let (inner, _is_terminated) = request_stream.into_inner();
             // It's safe to unwrap here because inner is clearly the only Arc reference left.
             Ok(Arc::try_unwrap(inner).unwrap().into_channel())

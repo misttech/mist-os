@@ -273,7 +273,7 @@ impl MutableConnection {
 
         if describe {
             control_handle
-                .send_on_open_(zx::Status::OK.into_raw(), Some(&mut connection.base.node_info()))?;
+                .send_on_open_(zx::Status::OK.into_raw(), Some(connection.base.node_info()))?;
         }
 
         Ok((connection, requests))

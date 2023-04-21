@@ -134,7 +134,7 @@ mod tests {
                                 StoreAccessorRequest::GetValue { key, responder } => {
                                     assert_eq!(key, LIGHT_KEY);
                                     responder
-                                        .send(Some(&mut Value::Stringval("data".to_owned())))
+                                        .send(Some(Value::Stringval("data".to_owned())))
                                         .expect("should be able to send response");
                                 }
                                 _ => panic!("unexpected request: {request:?}"),

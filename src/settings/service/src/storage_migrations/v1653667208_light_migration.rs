@@ -195,7 +195,7 @@ mod tests {
                             if let StoreAccessorRequest::GetValue { key, responder } = request {
                                 assert_eq!(key, LIGHT_KEY);
                                 responder
-                                    .send(Some(&mut Value::Stringval(
+                                    .send(Some(Value::Stringval(
                                         r#"{
                                             "light_groups":{
                                                 "abc":{

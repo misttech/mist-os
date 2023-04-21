@@ -192,7 +192,7 @@ impl DirectoryEntry for DropAfterOpen {
         // Need to send OnOpen because of the Describe flag.
         ch.send_on_open_(
             Status::OK.into_raw(),
-            Some(&mut fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)),
+            Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)),
         )
         .unwrap();
     }

@@ -64,7 +64,7 @@ impl FidlProtocol for Mdns {
                         .recv()
                         .await
                         .ok()
-                        .as_mut(),
+                        .as_ref(),
                 )
                 .map_err(Into::into),
         }

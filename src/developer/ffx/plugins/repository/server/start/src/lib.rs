@@ -60,12 +60,11 @@ async fn start_impl(
         }
     };
 
-    let mut addr =
+    let runtime_address =
         if cmd.address.is_some() { Some(SocketAddress(listen_address).into()) } else { None };
-    let runtime_address = addr.as_mut();
 
     match repos
-        .server_start(runtime_address)
+        .server_start(runtime_address.as_ref())
         .await
         .context("communicating with daemon")?
         .map_err(RepositoryError::from)
