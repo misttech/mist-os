@@ -147,7 +147,11 @@ fn main() -> Result<(), Error> {
 
     let mut executor = fasync::LocalExecutor::new();
 
-    diagnostics_log::init!(&["identity", "account_handler"]);
+    diagnostics_log::initialize(
+        diagnostics_log::PublishOptions::default().tags(&["identity", "account_handler"]),
+    )
+    .unwrap();
+
     info!("Starting account handler");
 
     let inspector = Inspector::default();

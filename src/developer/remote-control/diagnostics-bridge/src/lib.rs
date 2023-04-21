@@ -6,6 +6,7 @@ use {
     anyhow::{anyhow, Context as _, Error, Result},
     async_trait::async_trait,
     diagnostics_data::{Data, Inspect, Logs, LogsData},
+    diagnostics_log::PublishOptions,
     diagnostics_reader::{ArchiveReader, Error as ReaderError},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_developer_remotecontrol::{
@@ -318,7 +319,7 @@ where
 }
 
 pub async fn exec_server() -> Result<()> {
-    diagnostics_log::init!(&["remote-diagnostics-bridge"]);
+    diagnostics_log::initialize(PublishOptions::default().tags(&["remote-diagnostics-bridge"]))?;
     info!("starting log-reader");
     let service = Arc::new(RemoteDiagnosticsBridge::new(|p| ArchiveReaderManagerImpl::new(p))?);
 

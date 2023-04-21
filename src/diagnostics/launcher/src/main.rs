@@ -35,7 +35,7 @@ async fn main() -> Result<(), Error> {
         // help text. Then the program will exit.
         _ => "launcher",
     };
-    diagnostics_log::init!(&[log_tag]);
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default().tags(&[log_tag]))?;
     let args = v2_argh_wrapper::load_command_line::<LauncherArgs>()?;
     match args.program {
         CreateChildArgs::Detect(_args) => detect::main().await,

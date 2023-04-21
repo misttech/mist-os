@@ -26,7 +26,7 @@ mod config;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), anyhow::Error> {
-    diagnostics_log::init!();
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())?;
     info!("started");
 
     let mut fs = ServiceFs::new_local();

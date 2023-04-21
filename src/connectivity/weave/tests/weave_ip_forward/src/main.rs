@@ -287,7 +287,7 @@ async fn main() -> Result<(), Error> {
         Opt::WlanNode { .. } => "wlan_node",
         Opt::WpanNode { .. } => "wpan_node",
     };
-    diagnostics_log::init!(&[node_name_str]);
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default().tags(&[node_name_str]))?;
 
     match opt {
         Opt::WeaveNode { listen_addr_0, listen_addr_1 } => {

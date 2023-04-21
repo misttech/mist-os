@@ -6,7 +6,6 @@ use {
     anyhow::{Context as _, Result},
     argh::FromArgs,
     fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy},
-    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     futures::future::select,
     futures::io::BufReader,
@@ -66,9 +65,8 @@ struct Args {
     id: Option<u64>,
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["remote_control_runner"])]
 async fn main() -> Result<()> {
-    diagnostics_log::init!(&["remote_control_runner"]);
     let args: Args = argh::from_env();
 
     // Ensure the invoking version of ffx supports compatibility checks.
@@ -162,21 +160,21 @@ mod test {
         proxy
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handles_successful_response() -> Result<(), Error> {
         let rcs_proxy = setup_fake_rcs(true);
         assert!(send_request(&rcs_proxy, None).await.is_ok());
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handles_failed_response() -> Result<(), Error> {
         let rcs_proxy = setup_fake_rcs(false);
         assert!(send_request(&rcs_proxy, None).await.is_err());
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_sends_id_if_given() -> Result<(), Error> {
         let rcs_proxy = setup_fake_rcs(true);
         send_request(&rcs_proxy, Some(34u64)).await.unwrap();

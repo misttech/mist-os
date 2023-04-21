@@ -12,7 +12,7 @@ use {
 
 #[fasync::run(10)]
 async fn main() -> Result<(), Error> {
-    diagnostics_log::init!();
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())?;
 
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(Services::Crypt).add_fidl_service(Services::CryptManagement);

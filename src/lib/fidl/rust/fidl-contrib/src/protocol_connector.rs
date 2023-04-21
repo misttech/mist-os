@@ -466,10 +466,8 @@ mod test {
         Ok(builder.build().await?)
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test(logging_tags = ["test_protocol_connector"])]
     async fn test_protocol_connector() -> Result<(), anyhow::Error> {
-        diagnostics_log::init!(&["test_protocol_connector"]);
-
         let calls_made = Arc::new(AtomicU8::new(0));
         let realm = setup_realm(calls_made.clone(), None).await?;
         let (log_received_sender, mut log_received_receiver) = mpsc::channel(1);
@@ -498,10 +496,8 @@ mod test {
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test(logging_tags = ["test_protocol_reconnnect"])]
     async fn test_protocol_reconnect() -> Result<(), anyhow::Error> {
-        diagnostics_log::init!(&["test_protocol_reconnect"]);
-
         let calls_made = Arc::new(AtomicU8::new(0));
 
         // Simulate the protocol closing after each successful call.

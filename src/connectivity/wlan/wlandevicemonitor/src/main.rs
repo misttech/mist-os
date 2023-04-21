@@ -69,11 +69,11 @@ fn serve_phys(
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
-        tags: &["wlan"],
-        metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
-        ..Default::default()
-    });
+    diagnostics_log::initialize(
+        diagnostics_log::PublishOptions::default()
+            .tags(&["wlan"])
+            .enable_metatag(diagnostics_log::Metatag::Target),
+    )?;
     info!("Starting");
 
     let (phys, phy_events) = device::PhyMap::new();

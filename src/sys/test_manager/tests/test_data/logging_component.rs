@@ -3,18 +3,8 @@
 
 #![warn(clippy::all)]
 
-use diagnostics_log::{self, Interest, PublishOptions, Severity};
-
-#[fuchsia::main(logging = false)]
+#[fuchsia::main(logging_minimum_severity = "debug")]
 async fn main() {
-    #[allow(unknown_lints)]
-    #[allow(clippy::let_underscore_future)]
-    let _ = diagnostics_log::init_publishing(PublishOptions {
-        interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY },
-        ..Default::default()
-    })
-    .unwrap();
-
     tracing::debug!("my debug message.");
     tracing::info!("my info message.");
     tracing::warn!("my warn message.");

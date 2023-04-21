@@ -10,6 +10,7 @@
 use anyhow::{Context, Error};
 use archivist_config::Config;
 use archivist_lib::{archivist::Archivist, component_lifecycle, events::router::RouterOptions};
+use diagnostics_log::PublishOptions;
 use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_inspect::{component, health::Reporter};
@@ -75,7 +76,7 @@ async fn init_diagnostics(config: &Config) -> Result<(), Error> {
             .with_max_level(Level::INFO)
             .init();
     } else {
-        diagnostics_log::init!(&["embedded"]);
+        diagnostics_log::initialize(PublishOptions::default().tags(&["embedded"]))?;
     }
 
     if config.log_to_debuglog {

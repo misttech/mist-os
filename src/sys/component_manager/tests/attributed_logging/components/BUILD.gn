@@ -32,9 +32,8 @@ rustc_binary("archive-reader") {
   output_name = "archive_reader"
   deps = [
     "//src/lib/diagnostics/data",
-    "//src/lib/diagnostics/log/rust",
     "//src/lib/diagnostics/reader",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]

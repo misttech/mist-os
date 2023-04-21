@@ -4,20 +4,12 @@
 
 use tracing::info;
 use {
-    diagnostics_data::Logs, diagnostics_reader::ArchiveReader, fuchsia_async as fasync,
-    futures::stream::StreamExt, std::collections::HashMap, std::vec::Vec,
+    diagnostics_data::Logs, diagnostics_reader::ArchiveReader, futures::stream::StreamExt,
+    std::collections::HashMap, std::vec::Vec,
 };
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["archive-reader"])]
 async fn main() {
-    diagnostics_log::init!(
-        &["archive-reader"],
-        diagnostics_log::Interest {
-            min_severity: Some(diagnostics_log::Severity::Info),
-            ..diagnostics_log::Interest::EMPTY
-        }
-    );
-
     let reader = ArchiveReader::new();
     let mut non_matching_logs = vec![];
 

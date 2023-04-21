@@ -8,7 +8,7 @@ use std::io::{Read as _, Write as _};
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    diagnostics_log::init!();
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
 
     let listeners = server_ips()
         .iter()

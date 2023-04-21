@@ -35,19 +35,8 @@ const SPAM_PUPPET_ID: usize = 0;
 const VICTIM_PUPPET_ID: usize = 1;
 const SPAM_COUNT: usize = 9001;
 
-#[fuchsia::test(logging = false)]
+#[fuchsia::test(logging_minimum_severity = "debug")]
 async fn test_budget() {
-    #[allow(unknown_lints)]
-    #[allow(clippy::let_underscore_future)] // TODO(fxbug.dev/117899)
-    let _ = diagnostics_log::init_publishing(diagnostics_log::PublishOptions {
-        interest: diagnostics_log::Interest {
-            min_severity: Some(diagnostics_log::Severity::Debug),
-            ..diagnostics_log::Interest::EMPTY
-        },
-        ..Default::default()
-    })
-    .unwrap();
-
     info!("testing that the archivist's log buffers correctly enforce their budget");
 
     info!("creating nested environment for collecting diagnostics");

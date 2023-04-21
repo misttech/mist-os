@@ -987,11 +987,5 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
 }
 
 pub fn init_syslog() {
-    diagnostics_log::init!(
-        &[],
-        diagnostics_log::Interest {
-            min_severity: Some(diagnostics_log::Severity::Info),
-            ..diagnostics_log::Interest::EMPTY
-        }
-    );
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
 }

@@ -17,7 +17,9 @@ pub use not_fuchsia::*;
 #[cfg(target_os = "fuchsia")]
 pub mod logger {
     pub fn init() -> Result<(), anyhow::Error> {
-        diagnostics_log::init!(&["overnet_hoist"]);
+        diagnostics_log::initialize(
+            diagnostics_log::PublishOptions::default().tags(&["overnet_hoist"]),
+        )?;
         Ok(())
     }
 }

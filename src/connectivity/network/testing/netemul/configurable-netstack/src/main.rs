@@ -22,7 +22,7 @@ use log::{error, info, warn};
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    diagnostics_log::init!();
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
     info!("started");
 
     let mut fs = ServiceFs::new_local();

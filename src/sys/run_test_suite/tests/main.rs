@@ -1435,8 +1435,7 @@ async fn test_logging_component(
     };
     test_params.timeout_seconds = std::num::NonZeroU32::new(600);
     let expected_logs =
-        "[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: Logging initialized
-[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: my debug message
+        "[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: my debug message
 [TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] INFO: my info message
 [TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] WARN: my warn message
 ";
@@ -1711,7 +1710,6 @@ async fn test_max_severity(max_severity: Severity, iterator_option: LogsIterator
 
     let expected_output_prefix = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/error_logging_test.cm'
 [RUNNING]	log_and_exit
-[TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] DEBUG: Logging initialized
 [TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] INFO: my info message
 [TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] WARN: my warn message
 [TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] ERROR: [src/sys/run_test_suite/tests/test_data/error_logging_test.rs(12)] my error message
@@ -1863,8 +1861,7 @@ async fn test_syslog_to_directory(
 
     assert_eq!(outcome, Outcome::Failed);
 
-    const EXPECTED_SYSLOG: &str =  "[TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] DEBUG: Logging initialized\n\
-[TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] INFO: my info message\n\
+    const EXPECTED_SYSLOG: &str =  "[TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] INFO: my info message\n\
 [TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] WARN: my warn message\n\
 [TIMESTAMP][PID][TID][<root>][log_and_exit,error_logging_test] ERROR: [src/sys/run_test_suite/tests/test_data/error_logging_test.rs(12)] my error message\n\
 ";

@@ -9,6 +9,7 @@
 
 use {
     anyhow::{format_err, Context as _, Error},
+    diagnostics_log::PublishOptions,
     fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker,
     fidl_fuchsia_power_clientlevel as fidl_lp, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
@@ -444,11 +445,9 @@ async fn run_all_futures() -> Result<(), Error> {
 // use this simple wrapper to ensure that any errors from run_all_futures() are printed to the log.
 #[fasync::run_singlethreaded]
 async fn main() {
-    diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
-        tags: &["wlan"],
-        metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
-        ..Default::default()
-    });
+    let options =
+        PublishOptions::default().tags(&["wlan"]).enable_metatag(diagnostics_log::Metatag::Target);
+    diagnostics_log::initialize(options).unwrap();
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     ftrace_provider::trace_provider_create_with_fdio();
     ftrace::instant!(

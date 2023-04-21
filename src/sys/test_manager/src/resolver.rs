@@ -11,7 +11,7 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::LocalComponentHandles,
     fuchsia_url::{AbsoluteComponentUrl, ComponentUrl, PackageUrl},
-    futures::{FutureExt, StreamExt, TryStreamExt},
+    futures::{StreamExt, TryStreamExt},
     itertools::Itertools,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -157,21 +157,13 @@ pub async fn serve_hermetic_resolver(
     let log_proxy = handles
         .connect_to_named_protocol::<flogger::LogSinkMarker>(flogger::LogSinkMarker::DEBUG_NAME)?;
     let tags = ["test_resolver"];
-    let (log_publisher, _interest_listener) = match flog::Publisher::new_with_proxy(
-        log_proxy,
-        flog::PublishOptions {
-            interest: flog::interest(tracing::Level::INFO),
-            tags: &tags,
-            ..Default::default()
-        },
+    let log_publisher = match flog::Publisher::new(
+        flog::PublisherOptions::default().tags(&tags).use_log_sink(log_proxy),
     ) {
-        Ok((publisher, listener)) => (Arc::new(publisher) as Arc<LogSubscriber>, listener.boxed()),
+        Ok(publisher) => Arc::new(publisher) as Arc<LogSubscriber>,
         Err(e) => {
             warn!("Error creating log publisher for resolver: {:?}", e);
-            (
-                Arc::new(tracing::subscriber::NoSubscriber::default()) as Arc<LogSubscriber>,
-                futures::future::ready(()).boxed(),
-            )
+            Arc::new(tracing::subscriber::NoSubscriber::default()) as Arc<LogSubscriber>
         }
     };
 

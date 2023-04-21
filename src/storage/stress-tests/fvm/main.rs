@@ -77,10 +77,11 @@ async fn test() {
     let args: Args = argh::from_env();
 
     // Initialize logging
-    match args.log_filter {
-        Some(filter) => diagnostics_log::init!(&[], diagnostics_log::interest(filter)),
-        None => diagnostics_log::init!(),
+    let mut options = diagnostics_log::PublishOptions::default();
+    if let Some(filter) = args.log_filter {
+        options = options.minimum_severity(filter);
     }
+    diagnostics_log::initialize(options).unwrap();
 
     // Setup the fvm environment
     let env = FvmEnvironment::new(args).await;

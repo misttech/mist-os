@@ -4,25 +4,23 @@
 
 use {
     anyhow::Error,
-    diagnostics_log::{PublishOptions, Publisher},
+    diagnostics_log::{Publisher, PublisherOptions},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
-    fuchsia_async::Task,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
 };
 
 pub struct ScopedLogger {
     publisher: Publisher,
-    _interest_listener: Task<()>,
 }
 
 impl ScopedLogger {
     pub fn from_directory(dir: &fio::DirectoryProxy, path: &str) -> Result<Self, Error> {
         let sink = connect_to_named_protocol_at_dir_root::<LogSinkMarker>(dir, path)?;
-        let publish_opts =
-            PublishOptions { wait_for_initial_interest: false, ..Default::default() };
-        let (publisher, interest_listener) = Publisher::new_with_proxy(sink, publish_opts)?;
-        Ok(Self { publisher, _interest_listener: Task::spawn(interest_listener) })
+        let publisher = Publisher::new(
+            PublisherOptions::default().wait_for_initial_interest(false).use_log_sink(sink),
+        )?;
+        Ok(Self { publisher })
     }
 }
 

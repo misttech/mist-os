@@ -42,7 +42,7 @@ fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
 async fn listen_for_syslog() {
     let random = rand::random::<u16>();
     let tag = "logger_integration_rust".to_string() + &random.to_string();
-    diagnostics_log::init!(&[&tag]);
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default().tags(&[&tag])).unwrap();
     let log_proxy = client::connect_to_protocol::<LogMarker>().unwrap();
     let incoming = run_listener(&tag, log_proxy);
     info!("my msg: {}", 10);

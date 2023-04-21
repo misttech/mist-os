@@ -15,6 +15,7 @@ pub mod test_helper;
 
 use anyhow::{Context, Error};
 use argh::FromArgs;
+use diagnostics_log::{Metatag, PublishOptions};
 use fidl_fuchsia_wlan_device_service::DeviceServiceRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{Inspector, InspectorConfig};
@@ -62,11 +63,9 @@ impl From<wlanstack_config::Config> for ServiceCfg {
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    diagnostics_log::init_and_detach_ok!(diagnostics_log::PublishOptions {
-        tags: &["wlan"],
-        metatags: [diagnostics_log::Metatag::Target].into_iter().collect(),
-        ..Default::default()
-    });
+    diagnostics_log::initialize(
+        PublishOptions::default().tags(&["wlan"]).enable_metatag(Metatag::Target),
+    )?;
 
     ftrace_provider::trace_provider_create_with_fdio();
     ftrace::instant!(

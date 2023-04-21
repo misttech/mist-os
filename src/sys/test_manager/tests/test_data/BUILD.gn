@@ -354,7 +354,6 @@ rustc_binary("logging-component-bin") {
   edition = "2021"
 
   deps = [
-    "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:tracing",
   ]

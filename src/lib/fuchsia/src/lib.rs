@@ -35,7 +35,14 @@ pub fn init_logging_for_component_with_executor<'a, R>(
 ) -> impl FnOnce() -> R + 'a {
     move || {
         #[cfg(target_os = "fuchsia")]
-        diagnostics_log::init!(_logging_tags, _interest);
+        {
+            let mut options = diagnostics_log::PublishOptions::default().tags(_logging_tags);
+            if let Some(severity) = _interest.min_severity {
+                options = options.minimum_severity(severity);
+            }
+            diagnostics_log::initialize(options).expect("initialize_logging");
+        }
+
         #[cfg(not(target_os = "fuchsia"))]
         crate::host::logger::init(_interest.min_severity);
 
@@ -73,8 +80,13 @@ pub fn init_logging_for_test_with_executor<'a, R>(
         {
             let mut tags = vec![_name];
             tags.extend_from_slice(_logging_tags);
-            diagnostics_log::init!(tags.as_slice(), _interest.clone());
+            let mut options = diagnostics_log::PublishOptions::default().tags(tags.as_slice());
+            if let Some(severity) = _interest.min_severity {
+                options = options.minimum_severity(severity);
+            }
+            diagnostics_log::initialize(options).expect("initalize logging");
         }
+
         #[cfg(not(target_os = "fuchsia"))]
         crate::host::logger::init(_interest.min_severity);
 
@@ -127,13 +139,14 @@ fn init_logging_with_threads(
     let (send, recv) = std::sync::mpsc::channel();
     let bg_thread = std::thread::spawn(move || {
         let mut exec = fuchsia_async::LocalExecutor::new();
-        let on_interest_changes =
-            diagnostics_log::init_publishing(diagnostics_log::PublishOptions {
-                tags: tags.as_slice(),
-                interest,
-                ..Default::default()
-            });
-        if let Ok(on_interest_changes) = on_interest_changes {
+        let mut options = diagnostics_log::PublisherOptions::default().tags(tags.as_slice());
+        if let Some(severity) = interest.min_severity {
+            options = options.minimum_severity(severity);
+        }
+        let mut publisher = diagnostics_log::Publisher::new(options).expect("create publisher");
+        let interest_listening_task = publisher.take_interest_listening_task();
+        tracing::subscriber::set_global_default(publisher).expect("initlaize subscriber");
+        if let Some(on_interest_changes) = interest_listening_task {
             let (on_interest_changes, cancel_interest) =
                 futures::future::abortable(on_interest_changes);
             send.send(cancel_interest).unwrap();

@@ -38,14 +38,18 @@ pub(crate) struct Sink {
 }
 
 impl Sink {
-    pub fn new(log_sink: &LogSinkProxy) -> Result<Self, PublishError> {
+    pub fn new(
+        log_sink: &LogSinkProxy,
+        tags: &[&str],
+        metatags: HashSet<Metatag>,
+    ) -> Result<Self, PublishError> {
         let (socket, remote_socket) = zx::Socket::create_datagram();
         log_sink.connect_structured(remote_socket).map_err(PublishError::SendSocket)?;
 
         Ok(Self {
             socket,
-            tags: Vec::new(),
-            metatags: HashSet::new(),
+            tags: tags.iter().map(|s| s.to_string()).collect(),
+            metatags,
             num_events_dropped: AtomicU32::new(0),
         })
     }
@@ -126,7 +130,7 @@ mod tests {
 
     async fn init_sink(tags: &[&str], metatags: &[Metatag]) -> fidl::Socket {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let mut sink = Sink::new(&proxy).unwrap();
+        let mut sink = Sink::new(&proxy, &[], HashSet::default()).unwrap();
         sink.tags = tags.iter().copied().map(str::to_string).collect();
         sink.metatags = metatags.iter().copied().collect();
         tracing::subscriber::set_global_default(Registry::default().with(sink)).unwrap();

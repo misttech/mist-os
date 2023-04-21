@@ -563,9 +563,7 @@ async fn update_log_severity_for_all_components() {
     assert_eq!(
         logs,
         vec![
-            "Logging initialized".to_owned(),
             "I'm a debug log from a test".to_owned(),
-            "Logging initialized".to_owned(),
             "Started diagnostics publisher".to_owned(),
             "I'm a debug log from the publisher!".to_owned(),
             "Finishing through Stop".to_owned(),
@@ -588,7 +586,6 @@ async fn update_log_severity_for_the_test() {
     assert_eq!(
         logs,
         vec![
-            "Logging initialized".to_owned(),
             "I'm a debug log from a test".to_owned(),
             "Started diagnostics publisher".to_owned(),
             "Finishing through Stop".to_owned(),

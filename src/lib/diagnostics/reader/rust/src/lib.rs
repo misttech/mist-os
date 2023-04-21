@@ -512,7 +512,7 @@ where
 mod tests {
     use super::*;
     use diagnostics_hierarchy::assert_data_tree;
-    use diagnostics_log::{PublishOptions, Publisher};
+    use diagnostics_log::{Publisher, PublisherOptions};
     use fidl_fuchsia_diagnostics as fdiagnostics;
     use fidl_fuchsia_logger as flogger;
     use fuchsia_component_test::{
@@ -837,9 +837,10 @@ mod tests {
             .unwrap();
         let mut reader = ArchiveReader::new();
         reader.with_archive(accessor_proxy);
-        let options =
-            PublishOptions { wait_for_initial_interest: false, ..PublishOptions::default() };
-        let (publisher, _) = Publisher::new_with_proxy(log_sink_proxy, options).unwrap();
+        let options = PublisherOptions::default()
+            .wait_for_initial_interest(false)
+            .use_log_sink(log_sink_proxy);
+        let publisher = Publisher::new(options).unwrap();
         (instance, publisher, reader)
     }
 }

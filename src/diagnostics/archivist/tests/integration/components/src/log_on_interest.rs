@@ -5,21 +5,19 @@
 #![warn(clippy::all)]
 
 use anyhow::Error;
-use diagnostics_log::{OnInterestChanged, PublishOptions};
+use diagnostics_log::{OnInterestChanged, PublishOptions, Publisher};
 use fidl_fuchsia_diagnostics::Severity;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use tracing::{debug, error, info, warn};
 
 #[fuchsia::main(logging = false)]
 async fn main() -> Result<(), Error> {
-    let options = PublishOptions { wait_for_initial_interest: false, ..Default::default() };
-    let interest_task = diagnostics_log::init_publishing(options).expect("initialized logs");
-    fasync::Task::spawn(interest_task).detach();
+    diagnostics_log::initialize(PublishOptions::default().wait_for_initial_interest(false))
+        .expect("initialized tracing");
     let mut fs = ServiceFs::new();
     tracing::dispatcher::get_default(|dispatcher| {
-        let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
+        let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
         publisher.set_interest_listener(Listener::new());
     });
     fs.take_and_serve_directory_handle()?;

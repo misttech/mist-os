@@ -4,6 +4,7 @@
 
 use {
     anyhow::{Context as _, Error},
+    diagnostics_log::PublishOptions,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream},
@@ -22,7 +23,7 @@ use {
 mod args;
 
 async fn exec_server() -> Result<(), Error> {
-    diagnostics_log::init!(&["remote-control"]);
+    diagnostics_log::initialize(PublishOptions::default().tags(&["remote-control"]))?;
 
     let router = overnet_core::Router::new(
         overnet_core::RouterOptions::new(),

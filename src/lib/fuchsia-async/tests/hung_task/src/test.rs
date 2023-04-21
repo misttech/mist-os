@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{Data, LogsField};
-use diagnostics_log::PublishOptions;
 use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Logs, Subscription};
-use fidl_fuchsia_diagnostics::{Interest, Severity};
+use fidl_fuchsia_diagnostics::Severity;
 use fuchsia_async::{Task, Timer};
 use fuchsia_zircon::AsHandleRef as _;
 use futures::prelude::*;
@@ -34,10 +33,11 @@ fn task_local(fut: impl Future<Output = ()> + Send + 'static) -> Task<()> {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn initialize_logging_and_find_hung_tasks(make_task: MakeTaskFn, make_task_line_num: u32) {
     // initialize logging at TRACE severity without spawning any tasks to the runtime
-    let _ignore_external_severity_changes = diagnostics_log::init_publishing(PublishOptions {
-        interest: Interest { min_severity: Some(Severity::Trace), ..Interest::EMPTY },
-        ..Default::default()
-    })
+    diagnostics_log::initialize(
+        diagnostics_log::PublishOptions::default()
+            .minimum_severity(Severity::Trace)
+            .listen_for_interest_updates(false),
+    )
     .unwrap();
 
     // start listening to our own logs
@@ -135,8 +135,6 @@ impl EventsFromLogs {
             pid: fuchsia_runtime::process_self().get_koid().unwrap().raw_koid(),
         };
 
-        // manually initializing the logging library with DEBUG or below emits this message
-        events.next().await.expect_message("Logging initialized");
         // creating the log stream from the archivereader spawns a task, which creates a log message
         match events.next().await {
             LogEvent::TaskSpawned { id: _, source } => {

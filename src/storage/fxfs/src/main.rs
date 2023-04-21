@@ -81,7 +81,7 @@ fn get_crypt_client() -> Result<Arc<RemoteCrypt>, Error> {
 
 #[fasync::run(6)]
 async fn main() -> Result<(), Error> {
-    diagnostics_log::init!();
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())?;
 
     #[cfg(feature = "tracing")]
     fuchsia_trace_provider::trace_provider_create_with_fdio();

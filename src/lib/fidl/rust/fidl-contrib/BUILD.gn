@@ -26,7 +26,7 @@ rustc_library("fidl-contrib") {
   ]
   test_deps = [
     "//sdk/testing/fidl/protocols_tests:test.protocol.connector_rust",
-    "//src/lib/diagnostics/log/rust",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",

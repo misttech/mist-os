@@ -22,10 +22,9 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/connectivity/overnet/lib/hoist",
-    "//src/lib/diagnostics/log/rust",
     "//src/lib/fdio",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/versioning/version-history/rust:version-history",
     "//third_party/rust_crates:anyhow",
@@ -35,6 +34,8 @@ rustc_binary("bin") {
   ]
 
   sources = [ "src/main.rs" ]
+
+  test_deps = [ "//src/lib/fuchsia-async" ]
 }
 
 fuchsia_unittest_package("remote-control-runner-tests") {

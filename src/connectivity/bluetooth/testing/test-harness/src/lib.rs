@@ -121,7 +121,7 @@ where
     F: FnOnce(H) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    diagnostics_log::init!();
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
     let state = Default::default();
     let (harness, env, runner) = H::init(&state).await.expect("couldn't initialize harness");
     // Drop `state` so that SharedState entries may be dropped if not needed during test execution.

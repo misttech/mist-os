@@ -2521,13 +2521,10 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
     // Use the diagnostics_log library directly rather than e.g. the #[fuchsia::main] macro on
     // the main function, so that we can specify the logging severity level at runtime based on a
     // command line argument.
-    diagnostics_log::init!(
-        &[],
-        diagnostics_log::Interest {
-            min_severity: Some(*min_severity),
-            ..diagnostics_log::Interest::EMPTY
-        }
-    );
+    diagnostics_log::initialize(
+        diagnostics_log::PublishOptions::default().minimum_severity(*min_severity),
+    )?;
+
     info!("starting");
     debug!("starting with options = {:?}", opt);
 

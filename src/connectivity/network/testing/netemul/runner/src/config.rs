@@ -959,10 +959,8 @@ mod tests {
         assert_eq!(remaining, vec![]);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn configurable_netstack() {
-        diagnostics_log::init!();
-
         let (tx, mut rx) = mpsc::unbounded();
         let (controller, server_end) =
             fidl::endpoints::create_proxy::<fsys2::LifecycleControllerMarker>()
@@ -1048,10 +1046,8 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn eager_components() {
-        diagnostics_log::init!();
-
         let (controller, controller_requests) =
             fidl::endpoints::create_proxy_and_stream::<fsys2::LifecycleControllerMarker>()
                 .expect("create proxy and stream");

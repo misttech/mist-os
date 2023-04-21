@@ -23,11 +23,9 @@ async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {
     let mut fs = fserver::ServiceFs::new();
     let mut tasks = vec![];
     let log_proxy = handles.connect_to_protocol::<flogger::LogSinkMarker>()?;
-    let (publisher, fut) = diagnostics_log::Publisher::new_with_proxy(
-        log_proxy,
-        diagnostics_log::PublishOptions::default(),
+    let publisher = diagnostics_log::Publisher::new(
+        diagnostics_log::PublisherOptions::default().use_log_sink(log_proxy),
     )?;
-    let _log_task = fasync::Task::spawn(fut);
     let publisher: Arc<dyn subscriber::Subscriber + Sync + Send + 'static> = Arc::new(publisher);
 
     // Add the echo protocol to the ServiceFs

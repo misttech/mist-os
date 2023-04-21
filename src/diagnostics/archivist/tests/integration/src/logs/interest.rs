@@ -130,11 +130,7 @@ async fn set_interest_before_startup() {
     // Assert logs include the DEBUG log.
     assert_messages(
         &mut logs,
-        &[
-            (Severity::Debug, "Logging initialized"),
-            (Severity::Debug, "debugging world"),
-            (Severity::Info, "Hello, world!"),
-        ],
+        &[(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
         LOG_AND_EXIT_COMPONENT_URL,
     )
     .await;

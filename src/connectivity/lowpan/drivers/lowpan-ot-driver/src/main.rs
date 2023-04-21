@@ -330,7 +330,9 @@ async fn main() -> Result<(), Error> {
     // Use the diagnostics_log library directly rather than e.g. the #[fuchsia::main] macro on
     // the main function, so that we can specify the logging severity level at runtime based on a
     // command line argument.
-    diagnostics_log::init!(&[], diagnostics_log::interest(config.log_level));
+    diagnostics_log::initialize(
+        diagnostics_log::PublishOptions::default().minimum_severity(config.log_level),
+    )?;
 
     // Make sure OpenThread is logging at a similar level as the rest of the system.
     ot::set_logging_level(openthread_fuchsia::logging::ot_log_level_from(config.log_level));

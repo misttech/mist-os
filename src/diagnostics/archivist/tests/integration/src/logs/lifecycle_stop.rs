@@ -55,10 +55,6 @@ async fn embedding_stop_api_for_log_listener() {
     assert_eq!(
         logs,
         vec![
-            (
-                fdiagnostics::Severity::Debug.into_primitive() as i8,
-                "Logging initialized".to_owned()
-            ),
             (fdiagnostics::Severity::Debug.into_primitive() as i8, "my debug message.".to_owned()),
             (fdiagnostics::Severity::Info.into_primitive() as i8, "my info message.".to_owned()),
             (fdiagnostics::Severity::Warn.into_primitive() as i8, "my warn message.".to_owned()),
@@ -95,7 +91,6 @@ async fn embedding_stop_api_works_for_batch_iterator() {
     assert_eq!(
         logs,
         vec![
-            (Severity::Debug, "Logging initialized".to_owned()),
             (Severity::Debug, "my debug message.".to_owned()),
             (Severity::Info, "my info message.".to_owned()),
             (Severity::Warn, "my warn message.".to_owned()),
