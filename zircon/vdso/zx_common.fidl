@@ -29,9 +29,7 @@ alias time = int64;
 alias duration = int64;
 
 // zx_ticks_t: a duration in hardware ticks.
-//
-// TODO(fxbug.dev/109734): Ticks.
-alias ticks = int64;
+alias Ticks = int64;
 
 // zx_koid_t: global kernel object id.
 alias Koid = uint64;

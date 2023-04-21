@@ -109,7 +109,7 @@ protocol Misc {
     /// [ticks_per_second](ticks_per_second.md)
     @vdsocall
     TicksGet() -> (@wrapped_return struct {
-        ticks ticks;
+        ticks Ticks;
     });
 
     /// ## Summary
@@ -169,7 +169,7 @@ protocol Misc {
     @const
     @vdsocall
     TicksPerSecond() -> (@wrapped_return struct {
-        ticks ticks;
+        ticks Ticks;
     });
 
     /// ## Summary
@@ -389,6 +389,6 @@ protocol Misc {
     // accessible from user mode code (for whatever reason).
     @internal
     TicksGetViaKernel() -> (@wrapped_return struct {
-        ticks ticks;
+        ticks Ticks;
     });
 };

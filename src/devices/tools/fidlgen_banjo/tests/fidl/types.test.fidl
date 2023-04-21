@@ -48,7 +48,7 @@ type zx_types = struct {
     status zx.status;
     time zx.time;
     duration zx.duration;
-    ticks zx.ticks;
+    ticks zx.Ticks;
     koid zx.Koid;
     vaddr zx.vaddr;
     paddr zx.paddr;

@@ -55,6 +55,9 @@
         "zx/Off": {
           "kind": "alias"
         },
+        "zx/Ticks": {
+          "kind": "alias"
+        },
         "zx/duration": {
           "kind": "alias"
         },
@@ -68,9 +71,6 @@
           "kind": "alias"
         },
         "zx/status": {
-          "kind": "alias"
-        },
-        "zx/ticks": {
           "kind": "alias"
         },
         "zx/time": {

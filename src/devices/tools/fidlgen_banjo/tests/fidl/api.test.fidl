@@ -212,7 +212,7 @@ closed protocol Api {
     strict return_ticks(resource struct {
         handle zx.handle;
     }) -> (struct {
-        result zx.ticks;
+        result zx.Ticks;
     });
     strict return_time(resource struct {
         handle zx.handle;
