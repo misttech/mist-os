@@ -23,7 +23,7 @@ use {
     fuchsia_zircon::Clock,
     futures::TryStreamExt,
     identity_common::{EnrollmentData, PrekeyMaterial},
-    tracing::log::{error, info, warn},
+    tracing::{error, info, warn},
 };
 
 /// A struct to handle authentication and enrollment requests.

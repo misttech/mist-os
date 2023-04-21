@@ -201,7 +201,6 @@ thiserror = "1.0.23"
 tokio-rustls = "0.22.0"
 toml = "0.5"
 toml_edit = "0.2.1"
-tracing = { version = "0.1.29", features = ["log"] }
 tracing-core = "0.1.21"
 tracing-log = "0.1.2"
 tracing-mutex = { version = "0.2.1", features = ["parkinglot"] }
@@ -254,6 +253,7 @@ rust_icu_uloc = { version = "3.0.0", default-features = false, features = ["rena
 rust_icu_unorm2 = { version = "3.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ustring = { version = "3.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
 tokio = { version = "1.19.2", default-features = false }
+tracing = { version = "0.1.29", default-features = false, features = ["std"] }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["testing"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["testing"] }
 ttf-parser = "0.10.1"
@@ -299,6 +299,7 @@ tinyjson = "2.5.0"
 # supports target-specific feature resolution
 tokio = { version = "1.19.2", default-features = false }
 tokio-stream = "0.1"
+tracing = { version = "0.1.29", default-features = false, features = ["std"] }
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
 # For crates we don't want to vendor, follow instructions at
@@ -637,6 +638,16 @@ rustflags = [
   "--cfg=feature=\\\"winapi\\\"",
 ]
 
+# TODO(fxbug.dev/106164) This manual configuration enables the "log" so that
+# tracing macros also emit log events and binaries with setting up a
+# log::Logger receive tracing events as logs. On Fuchsia we don't need that
+# since all binaries set up a tracing Subscriber.
+[gn.package.tracing."0.1.34".platform."cfg(not(target_os = \"fuchsia\"))"]
+deps = [ ":log-v0_4_11" ]
+rustflags = [
+  "--cfg=feature=\\\"log\\\"",
+]
+
 [gn.package.typenum."1.15.0"]
 env_vars = [
   "TYPENUM_BUILD_CONSTS=../../../compat/typenum/consts.rs",
@@ -743,3 +754,4 @@ rustflags = ["--cfg=limb_width_64"]
 [gn.package.syn."1.0.98"]
 [gn.package.test-case."1.1.0"]
 [gn.package.wasm-bindgen."0.2.63"]
+

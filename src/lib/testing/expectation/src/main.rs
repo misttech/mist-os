@@ -365,10 +365,9 @@ mod test {
         println!("this is a passing test")
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn a_passing_test_with_err_logs() {
-        diagnostics_log::init!();
-        tracing::log::error!("this is an error");
+        tracing::error!("this is an error");
         println!("this is a passing test");
     }
 
@@ -377,10 +376,9 @@ mod test {
         panic!("this is a failing test")
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn a_failing_test_with_err_logs() {
-        diagnostics_log::init!();
-        tracing::log::error!("this is an error");
+        tracing::error!("this is an error");
         panic!("this is a failing test")
     }
 

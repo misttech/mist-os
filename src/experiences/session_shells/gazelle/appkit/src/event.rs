@@ -11,7 +11,7 @@ use fidl_fuchsia_ui_shortcut2 as ui_shortcut2;
 use fidl_fuchsia_ui_views as ui_views;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use pointer_fusion::PointerEvent;
-use tracing::log::error;
+use tracing::error;
 
 use crate::{child_view::ChildViewId, window::WindowId};
 

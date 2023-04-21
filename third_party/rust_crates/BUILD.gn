@@ -930,8 +930,16 @@ group("toml_edit") {
   public_deps = [ ":toml_edit-v0_2_1" ]
 }
 
-group("tracing") {
-  public_deps = [ ":tracing-v0_1_34" ]
+if (!(current_os == "fuchsia")) {
+  group("tracing") {
+    public_deps = [ ":tracing-v0_1_34" ]
+  }
+}
+
+if (current_os == "fuchsia") {
+  group("tracing") {
+    public_deps = [ ":tracing-v0_1_34" ]
+  }
 }
 
 group("tracing-core") {
@@ -11027,10 +11035,12 @@ rust_library("tracing-v0_1_34") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":log-v0_4_11" ]
   deps += [ ":pin-project-lite-v0_2_4" ]
   deps += [ ":tracing-attributes-v0_1_22($host_toolchain)" ]
   deps += [ ":tracing-core-v0_1_26" ]
+  if (!(current_os == "fuchsia")) {
+    deps += [ ":log-v0_4_11" ]
+  }
 
   rustenv = []
 
@@ -11041,10 +11051,12 @@ rust_library("tracing-v0_1_34") {
     "-Cextra-filename=-5bf51f3eb026ae27",
     "--cfg=feature=\"attributes\"",
     "--cfg=feature=\"default\"",
-    "--cfg=feature=\"log\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"tracing-attributes\"",
   ]
+  if (!(current_os == "fuchsia")) {
+    rustflags += [ "--cfg=feature=\"log\"" ]
+  }
 
   visibility = [ ":*" ]
 }
