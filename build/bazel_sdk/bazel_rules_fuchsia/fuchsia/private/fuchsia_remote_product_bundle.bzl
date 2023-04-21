@@ -14,7 +14,7 @@ load("//fuchsia/private/workflows:fuchsia_task_verbs.bzl", "make_help_executable
 def fuchsia_remote_product_bundle(
         name,
         product_name,
-        version = None,
+        product_version = None,
         repository = None,
         **kwargs):
     """
@@ -28,14 +28,14 @@ def fuchsia_remote_product_bundle(
     Args:
         name: The target name.
         product_name: The name of the product to fetch.
-        version: A specific version to fetch. Defaults to the sdk version.
+        product_version: A specific version to fetch.
         repository: The name of the repository to host the product bundle's packages.
         **kwargs: Extra attributes to pass along to the build rule.
     """
     _fuchsia_remote_product_bundle(
         name = name,
         product_name = product_name,
-        version = version,
+        product_version = product_version,
         repository = repository,
         **kwargs
     )
@@ -70,7 +70,7 @@ def _fuchsia_remote_product_bundle_impl(ctx):
             is_remote = True,
             product_bundle = ctx.attr.product_name,
             product_name = ctx.attr.product_name,
-            version = ctx.attr.version,
+            product_version = ctx.attr.product_version,
             repository = ctx.attr.repository,
         ),
     ]
@@ -83,10 +83,8 @@ _fuchsia_remote_product_bundle = rule(
             doc = "The name of the product to download",
             mandatory = True,
         ),
-        "version": attr.string(
-            doc = """
-            The version of the product bundle. If not supplied will default to
-            the version specified by the SDK""",
+        "product_version": attr.string(
+            doc = "The version of the product bundle.",
         ),
         "repository": attr.string(
             doc = """

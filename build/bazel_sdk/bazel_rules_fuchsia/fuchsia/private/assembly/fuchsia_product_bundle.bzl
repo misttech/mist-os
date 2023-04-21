@@ -406,11 +406,12 @@ def _fuchsia_product_bundle_impl(ctx):
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     product_name = "{}.{}".format(ctx.attr.product_name, ctx.attr.board_name)
-    sdk_version = fuchsia_toolchain.sdk_id if fuchsia_toolchain.sdk_id != "" else "unversioned"
 
     # In the future, the product bundles should be versioned independently of
     # the sdk version. So far they have been the same value.
-    product_version = sdk_version
+    product_version = ctx.attr.product_version or fuchsia_toolchain.sdk_id
+    if not product_version:
+        fail("product_version string must not be empty.")
 
     # Gather all the arguments to pass to ffx.
     ffx_invocation = [
@@ -547,6 +548,9 @@ fuchsia_product_bundle = rule(
         "product_name": attr.string(
             doc = "Name of the Fuchsia product. E.g. workstation_eng",
             mandatory = True,
+        ),
+        "product_version": attr.string(
+            doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1",
         ),
         "recovery": attr.label(
             doc = "fuchsia_product_image target to put in slot R",

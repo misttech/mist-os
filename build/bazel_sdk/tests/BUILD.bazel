@@ -67,6 +67,7 @@ filegroup(
 fuchsia_remote_product_bundle(
     name = "pb_ws",
     product_name = "workstation_eng.qemu-x64",
+    product_version = "fake_version",
     repository = "workstation-packages",
 )
 
@@ -74,6 +75,7 @@ fuchsia_remote_product_bundle(
 fuchsia_remote_product_bundle(
     name = "pb_chromebook",
     product_name = "workstation_eng.chromebook-x64",
+    product_version = "fake_version",
     repository = "workstation-packages",
 )
 

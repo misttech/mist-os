@@ -390,9 +390,7 @@ template("product_bundle") {
     # In the future, the product bundles should be versioned independently of
     # the sdk version. So far they have been the same value.
     product_version = sdk_id
-    if (product_version == "") {
-      product_version = "unversioned"
-    }
+    assert(product_version != "")
 
     # A json file will be created by '//build/config/build_api_modules.gni'.
     metadata = {
