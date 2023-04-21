@@ -59,22 +59,3 @@ hwreg_asm_header("case-id-asm") {
   sources = [ "gen-case-id-asm.cc" ]
   include_dirs = [ "//zircon/kernel" ]
 }
-
-config("hermetic-leaf.config") {
-  inputs = [ "hermetic-leaf.ld" ]
-
-  # Use a custom linker script rather than the default PIE layout.
-  ldflags = [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
-
-  # lld defaults to PIE, while the GNU linkers do not.
-  if (!is_gcc) {
-    ldflags += [ "-Wl,--no-pie" ]
-  }
-
-  ldflags += [
-    # Don't add any additional sections or dependencies.
-    "-nostdlib",
-    "-Wl,--build-id=none",
-    "-Wl,--no-dynamic-linker",
-  ]
-}

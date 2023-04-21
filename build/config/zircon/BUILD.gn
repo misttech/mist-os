@@ -411,3 +411,41 @@ config("forbid-guard-variables") {
     ]
   }
 }
+
+# This is used by hermetic_code_blob() in hermetic_code_blob.gni.
+config("hermetic-code-blob") {
+  inputs = [ "hermetic-code-blob.ld" ]
+
+  # Use a custom linker script rather than the default PIE layout.
+  ldflags = [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
+
+  # lld defaults to PIE, while the GNU linkers do not.
+  if (!is_gcc) {
+    ldflags += [ "-Wl,--no-pie" ]
+  }
+
+  # Don't add any additional sections or dependencies.
+  ldflags += [
+    "-Wl,--build-id=none",
+    "-Wl,--no-dynamic-linker",
+    "-Wl,--no-eh-frame-hdr",
+  ]
+  if (!is_kernel) {
+    ldflags += [
+      "-static",
+      "-nostartfiles",
+    ]
+    if (is_gcc) {
+      ldflags += [ "-nostdlib" ]
+    } else {
+      # Note this can still link in builtins, which is generally OK for user
+      # code (even the basic machine ABI), but not for kernel code that has its
+      # own ABI requirements.
+      ldflags += [
+        "-nolibc",
+        "-nostdlib++",
+        "-unwindlib=none",
+      ]
+    }
+  }
+}
