@@ -7,11 +7,11 @@
 #include <lib/inspect/component/cpp/service.h>
 
 namespace inspect {
-ComponentInspector::ComponentInspector(component::OutgoingDirectory& out,
+ComponentInspector::ComponentInspector(component::OutgoingDirectory& outgoing_directory,
                                        async_dispatcher_t* dispatcher, Inspector inspector,
                                        TreeHandlerSettings settings)
     : inspector_(inspector) {
-  auto status = out.AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
+  auto status = outgoing_directory.AddUnmanagedProtocolAt<fuchsia_inspect::Tree>(
       "diagnostics", [dispatcher, inspector = std::move(inspector), settings = std::move(settings)](
                          fidl::ServerEnd<fuchsia_inspect::Tree> server_end) {
         TreeServer::StartSelfManagedServer(std::move(inspector), std::move(settings), dispatcher,
@@ -23,7 +23,7 @@ ComponentInspector::ComponentInspector(component::OutgoingDirectory& out,
 
 NodeHealth& ComponentInspector::Health() {
   if (!component_health_) {
-    component_health_ = std::make_unique<NodeHealth>(&inspector()->GetRoot());
+    component_health_ = std::make_unique<NodeHealth>(&inspector().GetRoot());
   }
   return *component_health_;
 }

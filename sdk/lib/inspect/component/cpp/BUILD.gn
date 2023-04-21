@@ -5,7 +5,7 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("inspect_component_cpp") {
-  category = "experimental"
+  category = "partner"
 
   sdk_name = "inspect_component_cpp"
 

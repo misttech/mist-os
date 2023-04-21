@@ -36,6 +36,7 @@ _sdk_versioned_source_sets_list = [
   "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/fdio:fdio-spawn-actions",
   "//sdk/lib/fidl",
+  "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
   "//sdk/lib/fidl/cpp",
   "//sdk/lib/fidl/cpp/wire",
   "//sdk/lib/fidl/cpp:cpp_base",

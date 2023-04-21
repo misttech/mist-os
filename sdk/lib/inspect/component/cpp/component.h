@@ -49,8 +49,9 @@ class ComponentInspector final {
   // outgoing directory.
   //
   // Note that it is the caller's responsibility to ensure the outgoing directory is served.
-  explicit ComponentInspector(component::OutgoingDirectory& out, async_dispatcher_t* dispatcher,
-                              Inspector inspector = {}, TreeHandlerSettings settings = {});
+  ComponentInspector(component::OutgoingDirectory& outgoing_directory,
+                     async_dispatcher_t* dispatcher, Inspector inspector = {},
+                     TreeHandlerSettings settings = {});
 
   ComponentInspector(ComponentInspector&&) = default;
 
@@ -58,7 +59,7 @@ class ComponentInspector final {
   Node& root() { return inspector_.GetRoot(); }
 
   // Get the wrapped Inspector.
-  Inspector* inspector() { return &inspector_; }
+  Inspector& inspector() { return inspector_; }
 
   // Gets the NodeHealth for this component.
   // This method is not thread safe.
