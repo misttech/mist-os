@@ -6,31 +6,55 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 
+bind_library("fuchsia.test.audio") {
+  source = "fuchsia.test.audio.bind"
+  public_deps = [ "//src/devices/bind/fuchsia.test" ]
+}
+
 driver_bind_rules("codec_test-bind") {
   rules = "test-codec.bind"
   header_output = "codec_test-bind.h"
   bind_output = "codec_test.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.test" ]
+  deps = [ ":fuchsia.test.audio" ]
 }
 driver_bind_rules("codec_test2-bind") {
   rules = "test-codec2.bind"
   header_output = "codec_test2-bind.h"
   bind_output = "codec_test2.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.test" ]
+  deps = [ ":fuchsia.test.audio" ]
 }
 driver_bind_rules("dai_test-bind") {
   rules = "test-dai.bind"
   header_output = "dai_test-bind.h"
   bind_output = "dai_test.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.test" ]
+  deps = [ ":fuchsia.test.audio" ]
+}
+
+driver_bind_rules("root_test-bind") {
+  rules = "test-root.bind"
+  header_output = "test_root-bind.h"
+  deps = [ ":fuchsia.test.audio" ]
+}
+
+fuchsia_driver("audio-test-root-driver") {
+  sources = [ "test-root.cc" ]
+  deps = [
+    ":fuchsia.test.audio_cpp",
+    ":root_test-bind",
+    "//src/devices/lib/driver",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+  ]
+}
+
+fuchsia_driver_component("audio-test-root") {
+  deps = [ ":audio-test-root-driver" ]
+  info = "audio-test-root-info.json"
+  colocate = true
 }
 
 fuchsia_driver("codec-test-driver") {
   output_name = "codec-test-driver"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
   sources = [ "test-codec.cc" ]
   deps = [
     ":codec_test-bind",
@@ -45,10 +69,6 @@ fuchsia_driver("codec-test-driver") {
 }
 fuchsia_driver("codec-test-driver2") {
   output_name = "codec-test-driver2"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
   sources = [ "test-codec2.cc" ]
   deps = [
     ":codec_test2-bind",
@@ -63,10 +83,6 @@ fuchsia_driver("codec-test-driver2") {
 }
 fuchsia_driver("dai-test-driver") {
   output_name = "dai-test-driver"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
   sources = [ "test-dai.cc" ]
   deps = [
     ":dai_test-bind",

@@ -4,6 +4,7 @@
 group("drivers") {
   testonly = true
   deps = [
+    "realm:audio-test-root",
     "realm:test-codec",
     "realm:test-codec2",
     "realm:test-dai",

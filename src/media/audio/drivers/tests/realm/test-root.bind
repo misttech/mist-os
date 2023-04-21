@@ -1,7 +1,7 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 using fuchsia.test;
 
-fuchsia.test.TEST_CHILD ==  "codec2";
+fuchsia.BIND_PROTOCOL == fuchsia.test.BIND_PROTOCOL.PARENT;

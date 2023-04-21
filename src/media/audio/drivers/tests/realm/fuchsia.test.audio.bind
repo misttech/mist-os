@@ -1,0 +1,13 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.test.audio;
+
+using fuchsia.test;
+
+extend string fuchsia.test.TEST_CHILD {
+  CODEC = "codec",
+  CODEC2 = "codec2",
+  DAI = "dai",
+};

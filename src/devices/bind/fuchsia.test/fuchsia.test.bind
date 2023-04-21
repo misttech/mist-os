@@ -11,3 +11,5 @@ extend uint fuchsia.BIND_PROTOCOL {
   PARENT = 83,
   DEVHOST = 124,
 };
+
+string TEST_CHILD;
