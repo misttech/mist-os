@@ -51,7 +51,13 @@ qemu_shim_phys_tests = [
   "zbi-memory-test",
 ]
 
-qemu_shim_tests = qemu_shim_phys_tests + [ "core-tests" ]
+qemu_shim_tests = qemu_shim_phys_tests
+if (current_cpu == target_cpu) {
+  # The userland core-tests binary is built in $default_toolchain, which only
+  # supports the "primary" CPU of the build, not additional CPUs for which the
+  # kernel and phys tests can be built.
+  qemu_shim_tests += [ "core-tests" ]
+}
 
 qemu_boot_format = "linuxboot"
 
