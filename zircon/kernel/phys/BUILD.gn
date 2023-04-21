@@ -23,6 +23,7 @@ declare_args() {
 }
 
 arch_phys = "//zircon/kernel/arch/$zircon_cpu/phys"
+not_needed([ "arch_phys" ])  # Not used in all toolchains.
 
 if (current_toolchain == default_toolchain) {
   # Default toolchain (current_cpu == "") just defines the phys environment.
@@ -608,7 +609,6 @@ group("tests") {
 group("boot_tests") {
   testonly = true
   deps = [
-    "$arch_phys:tests",
     "boot-shim:boot_tests",
     "test",
   ]

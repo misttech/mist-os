@@ -51,9 +51,7 @@ qemu_shim_phys_tests = [
   "zbi-memory-test",
 ]
 
-qemu_shim_tests = qemu_shim_phys_tests + [
-                    #  "core-tests", TODO(mcgrathr): kernel not there yet
-                  ]
+qemu_shim_tests = qemu_shim_phys_tests + [ "core-tests" ]
 
 qemu_boot_format = "linuxboot"
 
