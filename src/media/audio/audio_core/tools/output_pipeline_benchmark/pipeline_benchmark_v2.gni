@@ -37,10 +37,11 @@ template("audio_pipeline_benchmark") {
     contents += "  program: { \"binary\": \"bin/${package_name}\" },"
     contents += "  use: ["
     contents += "      {"
-    contents += "          directory: \"config-data\","
+    contents += "          directory: \"pkg\","
+    contents += "          from: \"framework\","
     contents += "          rights: [ \"r*\" ],"
     contents += "          path: \"/config/data\","
-    contents += "          subdir: \"${package_name}\","
+    contents += "          subdir: \"config-data-for-test\","
     contents += "      },"
     contents += "  ],"
     contents += "}"
@@ -92,10 +93,9 @@ template("audio_pipeline_benchmark") {
     ]
   }
 
-  config_data("${package_name}-config") {
-    for_pkg = package_name
+  resource("${package_name}-config") {
     sources = invoker.config_files
-    outputs = [ "{{source_file_part}}" ]
+    outputs = [ "config-data-for-test/{{source_file_part}}" ]
     testonly = true
   }
 
