@@ -60,7 +60,7 @@ void StmMcu::DdkUnbind(ddk::UnbindTxn txn) {
 void StmMcu::DdkRelease() { delete this; }
 
 void StmMcu::Init() {
-  SetFanLevel(FL1);
+  SetFanLevel(static_cast<FanLevel>(VIM3_MCU_FAN_DEFAULT_LEVEL));
 
   const uint8_t wol_reset_enable[] = {STM_MCU_REG_BOOT_EN_WOL, STM_MCU_REG_EN_WOL_RESET_ENABLE};
   zx_status_t status = i2c_.WriteSync(wol_reset_enable, std::size(wol_reset_enable));

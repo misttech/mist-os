@@ -7,6 +7,17 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
+declare_args() {
+  # The default fan level used by the VIM3 MCU driver.
+  #
+  # Valid values are between 0 (completely off) and 3 (full power).
+  #
+  # Do not depend on this setting in checked-in code. This setting is intended
+  # to facilitate at-desk development, and will be replaced by a more robust
+  # configuration mechanism.
+  vim3_mcu_fan_default_level = 1
+}
+
 driver_bind_rules("vim3_mcu_bind") {
   rules = "vim3_mcu.bind"
   header_output = "vim3_mcu_bind.h"
@@ -22,6 +33,8 @@ source_set("common_sources") {
   public_configs = [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
   sources = [ "vim3-mcu.cc" ]
+
+  defines = [ "VIM3_MCU_FAN_DEFAULT_LEVEL=${vim3_mcu_fan_default_level}" ]
 
   public_deps = [
     ":vim3_mcu_bind",
