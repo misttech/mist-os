@@ -63,12 +63,12 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 1206,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     }
 ]

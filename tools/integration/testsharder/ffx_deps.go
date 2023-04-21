@@ -30,7 +30,7 @@ func AddFFXDeps(s *Shard, buildDir string, images []build.Image, flash bool) err
 			return err
 		}
 		s.AddDeps(deps)
-	} else if s.Env.Dimensions.DeviceType() != "" && s.Env.ImageOverrides.IsEmpty() {
+	} else if s.Env.Dimensions.DeviceType() != "" && s.ImageOverrides.IsEmpty() {
 		deps := []string{}
 		for _, image := range images {
 			// This provisions the images used by `ffx target bootloader boot` in botanist:

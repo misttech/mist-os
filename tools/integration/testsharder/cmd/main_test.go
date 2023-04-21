@@ -406,6 +406,27 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			name: "boot test with modifiers",
+			flags: testsharderFlags{
+				targetDurationSecs: 5,
+			},
+			testSpecs: []build.TestSpec{
+				bootTestSpec("boot-test"),
+				bootTestSpec("another-boot-test"),
+			},
+			modifiers: []testsharder.TestModifier{
+				{
+					Name:        "*",
+					TotalRuns:   -1,
+					MaxAttempts: 1,
+				},
+			},
+			testList: []build.TestListEntry{
+				testListEntry("boot-test", true),
+				testListEntry("another-boot-test", true),
+			},
+		},
+		{
 			name: "various modifiers",
 			flags: testsharderFlags{
 				targetDurationSecs: 5,
@@ -589,6 +610,29 @@ func fuchsiaTestSpec(basename string) build.TestSpec {
 					"device_type": "AEMU",
 				},
 			},
+		},
+	}
+}
+
+func bootTestSpec(basename string) build.TestSpec {
+	return build.TestSpec{
+		Test: build.Test{
+			Name:       packageURL(basename),
+			PackageURL: packageURL(basename),
+			OS:         "fuchsia",
+			CPU:        "x64",
+			Label:      fmt.Sprintf("//src/something:%s(//build/toolchain/fuchsia:x64)", basename),
+			Isolated:   true,
+		},
+		Envs: []build.Environment{
+			{
+				Dimensions: build.DimensionSet{
+					"device_type": "AEMU",
+				},
+			},
+		},
+		ImageOverrides: build.ImageOverrides{
+			ZBI: "zbi-images-overrides",
 		},
 	}
 }

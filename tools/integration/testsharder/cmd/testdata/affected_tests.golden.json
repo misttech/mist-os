@@ -27,13 +27,13 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     },
     {
         "name": "AEMU",
@@ -62,12 +62,12 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     }
 ]

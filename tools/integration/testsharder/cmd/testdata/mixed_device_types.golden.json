@@ -22,13 +22,13 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     },
     {
         "name": "Linux",
@@ -53,8 +53,7 @@
             "dimensions": {
                 "cpu": "x64",
                 "os": "Linux"
-            },
-            "image_overrides": {}
+            }
         },
         "deps": [
             "host_x64/bar",
@@ -64,6 +63,7 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     }
 ]

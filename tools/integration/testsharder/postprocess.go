@@ -196,9 +196,10 @@ func SplitOutMultipliers(
 			numNewShards := min(len(multipliedTests), maxMultipliedShards)
 
 			multShard := &Shard{
-				Name:  prefix + shard.Name,
-				Tests: multipliedTests,
-				Env:   shard.Env,
+				Name:           prefix + shard.Name,
+				Tests:          multipliedTests,
+				Env:            shard.Env,
+				ImageOverrides: shard.ImageOverrides,
 			}
 			newShards := shardByTime(multShard, testDurations, numNewShards)
 
@@ -345,9 +346,10 @@ func PartitionShards(shards []*Shard, partitionFunc func(Test) bool, prefix stri
 		}
 		if len(matching) > 0 {
 			matchingShards = append(matchingShards, &Shard{
-				Name:  prefix + shard.Name,
-				Tests: matching,
-				Env:   shard.Env,
+				Name:           prefix + shard.Name,
+				Tests:          matching,
+				Env:            shard.Env,
+				ImageOverrides: shard.ImageOverrides,
 			})
 		}
 		if len(nonmatching) > 0 {
@@ -375,10 +377,11 @@ func MarkShardsSkipped(shards []*Shard) ([]*Shard, error) {
 			})
 		}
 		newShards = append(newShards, &Shard{
-			Name:    shard.Name,
-			Tests:   shard.Tests,
-			Env:     shard.Env,
-			Summary: summary,
+			Name:           shard.Name,
+			Tests:          shard.Tests,
+			Env:            shard.Env,
+			ImageOverrides: shard.ImageOverrides,
+			Summary:        summary,
 		})
 	}
 	return newShards, nil
@@ -629,10 +632,11 @@ func shardByTime(shard *Shard, testDurations TestDurationsMap, numNewShards int)
 			name = fmt.Sprintf("%s-(%d)", shard.Name, i+1)
 		}
 		newShards = append(newShards, &Shard{
-			Name:        name,
-			Tests:       subshard.tests,
-			Env:         shard.Env,
-			TimeoutSecs: int(computeShardTimeout(subshard).Seconds()),
+			Name:           name,
+			Tests:          subshard.tests,
+			Env:            shard.Env,
+			ImageOverrides: shard.ImageOverrides,
+			TimeoutSecs:    int(computeShardTimeout(subshard).Seconds()),
 		})
 	}
 	return newShards

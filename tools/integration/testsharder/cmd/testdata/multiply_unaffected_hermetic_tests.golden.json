@@ -27,13 +27,13 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     },
     {
         "name": "multiplied:AEMU",
@@ -63,13 +63,13 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 602,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     },
     {
         "name": "hermetic:AEMU",
@@ -98,8 +98,7 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 0,
         "summary": {
@@ -126,6 +125,7 @@
                     ]
                 }
             ]
-        }
+        },
+        "image_overrides": {}
     }
 ]

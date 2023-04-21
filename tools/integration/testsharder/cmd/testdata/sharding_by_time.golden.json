@@ -57,13 +57,13 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 1814,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     },
     {
         "name": "AEMU-(2)",
@@ -89,12 +89,12 @@
         "environment": {
             "dimensions": {
                 "device_type": "AEMU"
-            },
-            "image_overrides": {}
+            }
         },
         "timeout_secs": 1502,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     }
 ]

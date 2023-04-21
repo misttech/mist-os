@@ -52,6 +52,12 @@ type Shard struct {
 
 	// Summary is a TestSummary that is populated if the shard is skipped.
 	Summary runtests.TestSummary `json:"summary,omitempty"`
+
+	// ImageOverrides is a map of the images to override the default values in
+	// images.json used to boot a target. The key should be an ImageOverrideType
+	// and the value should be the label of the image to override with as defined
+	// in images.json.
+	ImageOverrides build.ImageOverrides `json:"image_overrides,omitempty"`
 }
 
 // CreatePackageRepo creates a package repository for the given shard.
@@ -220,10 +226,16 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 				test.updateFromTestList(testListEntry)
 			}
 			if spec.Test.Isolated {
+				// TODO(https://fxbug.dev/122883): At the time of writting this
+				// todo, all the tests that use ImageOverrides (boot tests) are
+				// Isolated, this might not be true for ever. Would be nice to
+				// have a specific branch that covers the case of a test with
+				// ImageOverrides independently of it being Isolated.
 				shards = append(shards, &Shard{
-					Name:  e.shardName,
-					Tests: []Test{test},
-					Env:   e.env,
+					Name:           e.shardName,
+					Tests:          []Test{test},
+					ImageOverrides: spec.ImageOverrides,
+					Env:            e.env,
 				})
 			} else {
 				tests = append(tests, test)

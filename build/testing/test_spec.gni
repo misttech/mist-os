@@ -57,6 +57,15 @@ _max_severity_allowed_val = [
 #   deps (optional)
 #     [list of labels]: List of labels that the test depends on.
 #
+#   image_overrides (optional)
+#     [scope] Images to use instead of the defaults in images.json. This should
+#     only be used by boot_test() defined in //build/testing/zbi_test.gni
+#     which requires different images to boot the target with.
+#
+#     zbi, vbmeta, qemu_kernel, efi_disk (optional)
+#       [label_with_toolchain] Specifies an override via label. One of
+#       these values must be set.
+#
 #   environments (optional, default: Emu for fuchsia; else a VM)
 #     [list of scopes] Device environments in which the test should run.
 #
@@ -73,14 +82,6 @@ _max_severity_allowed_val = [
 #         the Infrastructure team. Labels are used as an escape hatch from the
 #         default testing pipeline for special tests or environments.
 #
-#       image_overrides (optional)
-#         [scope] Images to use instead of the defaults in images.json. This should
-#         only be used by boot_test() defined in //build/testing/zbi_test.gni
-#         which requires different images to boot the target with.
-#
-#         zbi, vbmeta, qemu_kernel, efi_disk (optional)
-#           [label_with_toolchain] Specifies an override via label. One of
-#           these values must be set.
 #
 #   log_settings (optional, default: see below properties)
 #     [json] Properties of logs produced by this test run.
@@ -387,6 +388,7 @@ template("test_spec") {
   }
 
   test_spec = {
+    forward_variables_from(invoker, [ "image_overrides" ])
     test = {
       forward_variables_from(invoker,
                              [

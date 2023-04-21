@@ -46,8 +46,8 @@ class BootTest(object):
         self.label = test["label"]
         self.path = test["path"]
 
-        # Each of the environments should specify the same images.
-        images = test_json["environments"][0]["image_overrides"]
+        images = test_json["image_overrides"]
+
         self.zbi = images_by_label[images["zbi"]] if "zbi" in images else None
         self.qemu_kernel = (
             images_by_label[images["qemu_kernel"]]
@@ -65,8 +65,7 @@ class BootTest(object):
 
     @staticmethod
     def is_boot_test(test_json):
-        envs = test_json.get("environments", [])
-        return "image_overrides" in envs[0] if len(envs) else False
+        return "image_overrides" in test_json
 
     def is_uefi_boot(self):
         if self.efi_disk:

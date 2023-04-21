@@ -45,7 +45,7 @@ func AddImageDeps(s *Shard, buildDir string, images []build.Image, pave bool) er
 func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 	// If image overrides have been specified, then by convention we only wish
 	// to select among the images that could be overridden.
-	overrides := s.Env.ImageOverrides
+	overrides := s.ImageOverrides
 	if !overrides.IsEmpty() {
 		if image.Label == overrides.ZBI || image.Label == overrides.VBMeta || image.Label == overrides.QEMUKernel || image.Label == overrides.EFIDisk {
 			return true

@@ -18,6 +18,12 @@ type TestSpec struct {
 
 	// Envs is a set of environments that the test should be executed in.
 	Envs []Environment `json:"environments"`
+
+	// ImageOverrides is a map of the images to override the default values in
+	// images.json used to boot a target. The key should be an ImageOverrideType
+	// and the value should be the label of the image to override with as defined
+	// in images.json.
+	ImageOverrides ImageOverrides `json:"image_overrides,omitempty"`
 }
 
 // Test encapsulates details about a particular test.
@@ -95,12 +101,6 @@ type Environment struct {
 
 	// Netboot tells whether to "netboot" instead of paving before running the tests.
 	Netboot bool `json:"netboot,omitempty"`
-
-	// ImageOverrides is a map of the images to override the default values in
-	// images.json used to boot a target. The key should be an ImageOverrideType
-	// and the value should be the name of the image to override with as defined
-	// in images.json.
-	ImageOverrides ImageOverrides `json:"image_overrides,omitempty"`
 }
 
 func (env Environment) TargetsEmulator() bool {

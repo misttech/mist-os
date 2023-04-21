@@ -38,8 +38,7 @@
                 "cpu": "x64",
                 "os": "Linux",
                 "other_dimension": "foo"
-            },
-            "image_overrides": {}
+            }
         },
         "deps": [
             "host_x64/bar.sh",
@@ -48,6 +47,7 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        }
+        },
+        "image_overrides": {}
     }
 ]

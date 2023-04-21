@@ -147,8 +147,8 @@ func TestAddImageDeps(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &Shard{
+				ImageOverrides: tc.imageOverrides,
 				Env: build.Environment{
-					ImageOverrides: tc.imageOverrides,
 					Dimensions: build.DimensionSet{
 						"device_type": tc.deviceType,
 					},
