@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library zx;
 
+const IOMMU_MAX_DESC_LEN usize = 4096;
+
 @transport("Syscall")
 protocol Iommu {
     /// ## Summary
@@ -83,7 +85,7 @@ protocol Iommu {
         resource handle:RESOURCE;
         type uint32;
         @voidptr
-        desc vector<byte>;
+        desc vector<byte>:IOMMU_MAX_DESC_LEN;
     }) -> (resource struct {
         out handle:IOMMU;
     }) error status;

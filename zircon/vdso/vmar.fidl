@@ -661,6 +661,6 @@ protocol Vmar {
         size usize;
         @inout
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) -> () error status;
 };

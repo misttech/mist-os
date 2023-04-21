@@ -84,9 +84,6 @@ fidl("zx") {
   # TODO(fxbug.dev/110021): Burn these down.
   experimental_flags = [ "zx_c_types" ]
 
-  # TODO(fxbug.dev/109734): Burn these down.
-  excluded_checks = [ "vector-bounds-not-specified" ]
-
   enable_zither = true
 }
 

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library zx;
 
+const LOG_RECORD_MAX usize = 256;
+
 @transport("Syscall")
 protocol Debuglog {
     // TODO(fxbug.dev/32803): handle == ZX_HANDLE_INVALID accepted.
@@ -128,7 +130,7 @@ protocol Debuglog {
         handle handle:LOG;
         options uint32;
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:LOG_RECORD_MAX;
     }) -> () error status;
 
     /// ## Summary
@@ -237,6 +239,6 @@ protocol Debuglog {
         options uint32;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:LOG_RECORD_MAX;
     }) error status;
 };

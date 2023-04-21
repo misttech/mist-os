@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 library zx;
 
+const CPRNG_DRAW_MAX_LEN usize = 256;
+const CPRNG_ADD_ENTROPY_MAX_LEN usize = 256;
+
 @transport("Syscall")
 protocol Cprng {
     @internal
     DrawOnce() -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:CPRNG_DRAW_MAX_LEN;
     }) error status;
 
     /// ## Summary
@@ -54,7 +57,7 @@ protocol Cprng {
     @vdsocall
     Draw() -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:CPRNG_DRAW_MAX_LEN;
     });
 
     /// ## Summary
@@ -99,6 +102,6 @@ protocol Cprng {
     /// [`zx_cprng_draw()`]: cprng_draw.md
     AddEntropy(struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:CPRNG_ADD_ENTROPY_MAX_LEN;
     }) -> () error status;
 };

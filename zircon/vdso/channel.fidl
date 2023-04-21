@@ -499,10 +499,10 @@ protocol Channel {
         options uint32;
         @voidptr
         @size32
-        bytes vector<byte>;
+        bytes vector<byte>:CHANNEL_MAX_MSG_BYTES;
         @release
         @size32
-        handles vector<handle>;
+        handles vector<handle>:CHANNEL_MAX_MSG_HANDLES;
     }) -> () error status;
 
     /// ## Summary
@@ -681,10 +681,10 @@ protocol Channel {
         options uint32;
         @voidptr
         @size32
-        bytes vector<byte>;
+        bytes vector<byte>:CHANNEL_MAX_MSG_BYTES;
         @inout
         @size32
-        handles vector<HandleDisposition>;
+        handles vector<HandleDisposition>:CHANNEL_MAX_MSG_HANDLES;
     }) -> () error status;
 
     @internal

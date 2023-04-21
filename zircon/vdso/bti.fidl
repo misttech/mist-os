@@ -218,7 +218,7 @@ protocol Bti {
         size uint64;
     }) -> (resource struct {
         @embedded_alias("zx/Paddr")
-        addrs vector<Paddr>;
+        addrs vector<Paddr>:MAX;
         pmt handle:PMT;
     }) error status;
 

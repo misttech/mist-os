@@ -715,7 +715,7 @@ protocol System {
         resource handle:RESOURCE;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) error status;
 
     /// ## Summary

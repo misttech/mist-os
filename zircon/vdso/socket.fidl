@@ -152,7 +152,7 @@ protocol Socket {
         handle handle:SOCKET;
         options uint32;
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) -> (struct {
         actual usize;
     }) error status;
@@ -237,7 +237,7 @@ protocol Socket {
         options uint32;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
         actual usize;
     }) error status;
 

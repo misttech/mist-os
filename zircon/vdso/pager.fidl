@@ -573,7 +573,7 @@ protocol Pager {
         length uint64;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
         actual usize;
         avail usize;
     }) error status;
@@ -661,6 +661,6 @@ protocol Pager {
         options uint32;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) error status;
 };

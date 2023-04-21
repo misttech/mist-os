@@ -149,7 +149,7 @@ protocol Fifo {
         elem_size usize;
     }) -> (struct {
         @voidptr
-        data vector<byte>;
+        data vector<byte>:MAX;
         actual_count usize;
     }) error status;
 

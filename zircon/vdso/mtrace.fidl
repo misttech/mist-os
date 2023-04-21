@@ -52,6 +52,6 @@ protocol Mtrace {
         options uint32;
         @inout
         @voidptr
-        ptr vector<byte>;
+        ptr vector<byte>:MAX;
     }) -> () error status;
 };

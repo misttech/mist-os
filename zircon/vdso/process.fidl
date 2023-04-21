@@ -418,7 +418,7 @@ protocol Process {
         vaddr Vaddr;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
         actual usize;
     }) error status;
 
@@ -501,7 +501,7 @@ protocol Process {
         handle handle:PROCESS;
         vaddr Vaddr;
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) -> (struct {
         actual usize;
     }) error status;

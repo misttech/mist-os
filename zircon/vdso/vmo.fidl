@@ -643,7 +643,7 @@ protocol Vmo {
         size uint64;
         @inout
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) -> () error status;
 
     /// ## SUMMARY

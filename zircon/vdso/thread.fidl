@@ -329,7 +329,7 @@ protocol Thread {
         kind uint32;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) error status;
 
     /// ## Summary
@@ -445,7 +445,7 @@ protocol Thread {
         handle handle:THREAD;
         kind uint32;
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) -> () error status;
 
     /// ## Summary

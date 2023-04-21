@@ -372,7 +372,7 @@ protocol Vcpu {
         kind uint32;
     }) -> (struct {
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) error status;
 
     /// ## Summary
@@ -444,6 +444,6 @@ protocol Vcpu {
         handle handle:VCPU;
         kind uint32;
         @voidptr
-        buffer vector<byte>;
+        buffer vector<byte>:MAX;
     }) -> () error status;
 };

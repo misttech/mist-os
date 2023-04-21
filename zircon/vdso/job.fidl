@@ -293,7 +293,7 @@ protocol Job {
         topic uint32;
         @voidptr
         @size32
-        policy vector<byte>;
+        policy vector<byte>:MAX;
     }) -> () error status;
 
     /// ## Summary

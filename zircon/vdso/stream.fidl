@@ -189,7 +189,7 @@ protocol Stream {
     Writev(resource struct {
         handle handle:STREAM;
         options uint32;
-        vectors vector<Iovec>;
+        vectors vector<Iovec>:MAX;
     }) -> (struct {
         actual usize;
     }) error status;
@@ -282,7 +282,7 @@ protocol Stream {
         handle handle:STREAM;
         options uint32;
         offset Off;
-        vectors vector<Iovec>;
+        vectors vector<Iovec>:MAX;
     }) -> (struct {
         actual usize;
     }) error status;
@@ -366,7 +366,7 @@ protocol Stream {
         handle handle:STREAM;
         options uint32;
     }) -> (struct {
-        vectors vector<Iovec>;
+        vectors vector<Iovec>:MAX;
         actual usize;
     }) error status;
 
@@ -449,7 +449,7 @@ protocol Stream {
         options uint32;
         offset Off;
     }) -> (struct {
-        vectors vector<Iovec>;
+        vectors vector<Iovec>:MAX;
         actual usize;
     }) error status;
 

@@ -125,7 +125,7 @@ protocol Handlefuncs {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     HandleCloseMany(resource struct {
         @release
-        handles vector<handle>;
+        handles vector<handle>:MAX;
     }) -> () error status;
 
     /// ## Summary
