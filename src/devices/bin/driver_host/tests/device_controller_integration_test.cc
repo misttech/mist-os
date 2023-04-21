@@ -314,7 +314,7 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBindFail) {
   fidl::ClientEnd<fuchsia_device::Controller> dev_channel;
   CreateTestDevice(devmgr.value(), kFailDriverName, &dev_channel);
 
-  zx_status_t call_status;
+  zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall(dev_channel)->Bind(fidl::StringView::FromExternal(kFailDriverName));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {

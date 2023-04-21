@@ -408,6 +408,7 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
     FDF_LOG(ERROR, "Failed to load driver '%s', driver note not found", url_str.data());
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  driver_name_ = note->payload.name;
   FDF_LOG(INFO, "Loaded driver '%s'", note->payload.name);
   record_ = static_cast<zx_driver_rec_t*>(dlsym(library_, "__zircon_driver_rec__"));
   if (record_ == nullptr) {
@@ -452,6 +453,38 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   return zx::ok();
 }
 
+zx::result<> Driver::TryRunUnitTests() {
+  auto getvar_bool = [this](const char* key, bool default_value) {
+    zx::result value = GetVariable(key);
+    if (value.is_error()) {
+      return default_value;
+    }
+    if (*value == "0" || *value == "false" || *value == "off") {
+      return false;
+    }
+    return true;
+  };
+
+  bool default_opt = getvar_bool("driver.tests.enable", false);
+  auto variable_name = std::string("driver.") + driver_name_ + ".tests.enable";
+  bool should_run_unittests = getvar_bool(variable_name.c_str(), default_opt);
+  if (should_run_unittests && record_->ops->run_unit_tests != nullptr) {
+    zx::channel test_input, test_output;
+    zx_status_t status = zx::channel::create(0, &test_input, &test_output);
+    ZX_ASSERT_MSG(status == ZX_OK, "zx::channel::create failed with %s",
+                  zx_status_get_string(status));
+
+    bool tests_passed =
+        record_->ops->run_unit_tests(context_, device_.ZxDevice(), test_input.release());
+    if (!tests_passed) {
+      FDF_LOG(ERROR, "[  FAILED  ] %s", driver_path().c_str());
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+    FDF_LOG(INFO, "[  PASSED  ] %s", driver_path().c_str());
+  }
+  return zx::ok();
+}
+
 zx::result<> Driver::StartDriver() {
   std::string& url_str = url().value();
   if (record_->ops->init != nullptr) {
@@ -463,6 +496,12 @@ zx::result<> Driver::StartDriver() {
       return zx::error(status);
     }
   }
+
+  zx::result result = TryRunUnitTests();
+  if (result.is_error()) {
+    return result.take_error();
+  }
+
   if (record_->ops->bind != nullptr) {
     // If provided, run bind and return.
     zx_status_t status = record_->ops->bind(context_, device_.ZxDevice());

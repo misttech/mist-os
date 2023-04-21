@@ -86,6 +86,9 @@ class Driver : public fdf::DriverBase {
   // Starts the DFv1 driver.
   zx::result<> StartDriver();
 
+  // Attempts to trigger run_unit_tests driver hook if they are enabled.
+  zx::result<> TryRunUnitTests();
+
   fpromise::promise<void, zx_status_t> ConnectToParentDevices();
   fpromise::promise<void, zx_status_t> GetDeviceInfo();
 
@@ -105,7 +108,7 @@ class Driver : public fdf::DriverBase {
   std::shared_ptr<fdf::Logger> inner_logger_;
 
   std::string driver_path_;
-  std::string node_name_;
+  std::string driver_name_;
   Device device_;
 
   fuchsia_device_manager::wire::SystemPowerState system_state_ =
