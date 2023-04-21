@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::apply_selectors::{
-    filter::filter_data_to_lines,
-    screen::{Line, Screen},
-    terminal::{Terminal, Termion},
+use crate::{
+    apply_selectors::{
+        filter::filter_data_to_lines,
+        screen::{Line, Screen},
+        terminal::{Terminal, Termion},
+    },
+    DiagnosticsBridgeProvider,
 };
 use anyhow::{Context, Result};
 use diagnostics_data::{Inspect, InspectData};
 use ffx_inspect_args::ApplySelectorsCommand;
-use ffx_inspect_common::DiagnosticsBridgeProvider;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
 use iquery::commands::DiagnosticsProvider;
 use std::{
@@ -107,8 +109,7 @@ fn interactive_apply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::apply_selectors::test_utils::FakeTerminal;
-    use ffx_inspect_test_utils::get_v1_json_dump;
+    use crate::{apply_selectors::test_utils::FakeTerminal, tests::utils::get_v1_json_dump};
     use std::io::Write;
     use tempfile::NamedTempFile;
 

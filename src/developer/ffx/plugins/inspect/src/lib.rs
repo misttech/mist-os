@@ -2,15 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use errors::ffx_bail;
+use anyhow::anyhow;
+use async_trait::async_trait;
+use errors::{ffx_bail, ffx_error};
 use ffx_inspect_args::{InspectCommand, InspectSubCommand};
-use ffx_inspect_common::{run_command, InspectOutput};
-use fho::{deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter};
+use fho::{deferred, selector, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
+use iquery::commands::{
+    Command, ListAccessorsResult, ListFilesResult, ListResult, SelectorsResult, ShowResult,
+};
+use serde::Serialize;
+use std::{fmt, io::Write};
 
 mod apply_selectors;
+mod bridge_provider;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
+
+pub use bridge_provider::DiagnosticsBridgeProvider;
 
 fho::embedded_plugin!(InspectTool);
 
@@ -23,7 +32,7 @@ pub struct InspectTool {
     rcs: Deferred<RemoteControlProxy>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait(?Send)]
 impl FfxMain for InspectTool {
     type Writer = MachineWriter<InspectOutput>;
 
@@ -56,3 +65,54 @@ impl FfxMain for InspectTool {
         Ok(())
     }
 }
+
+pub(crate) async fn run_command<C, O>(
+    rcs_proxy: RemoteControlProxy,
+    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
+    cmd: C,
+    writer: &mut MachineWriter<InspectOutput>,
+) -> anyhow::Result<()>
+where
+    C: Command<Result = O>,
+    InspectOutput: From<O>,
+{
+    let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
+    let result = cmd.execute(&provider).await.map_err(|e| anyhow!(ffx_error!("{}", e)))?;
+    let result = InspectOutput::from(result);
+    if writer.is_machine() {
+        writer.machine(&result)?;
+    } else {
+        writeln!(writer, "{}", result)?;
+    }
+    Ok(())
+}
+
+macro_rules! impl_inspect_output {
+    ($($variant:tt),*) => {
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        pub enum InspectOutput {
+            $($variant( $variant ),)*
+        }
+
+        $(
+            impl From<$variant> for InspectOutput {
+                fn from(item: $variant) -> Self {
+                    Self::$variant(item)
+                }
+            }
+        )*
+
+        impl fmt::Display for InspectOutput {
+             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $(
+                        Self::$variant(value) => value.fmt(f),
+                    )*
+                }
+            }
+        }
+    };
+}
+
+impl_inspect_output!(ShowResult, ListFilesResult, ListAccessorsResult, ListResult, SelectorsResult);

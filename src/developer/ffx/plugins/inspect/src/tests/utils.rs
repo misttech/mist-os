@@ -5,7 +5,6 @@
 use anyhow::Result;
 use diagnostics_data::{Data, DiagnosticsHierarchy, InspectData, InspectHandleName, Property};
 use errors as _;
-use ffx_inspect_common as _;
 use ffx_writer as _;
 use fidl::{endpoints::ServerEnd, prelude::*};
 use fidl_fuchsia_developer_remotecontrol::{

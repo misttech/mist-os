@@ -153,9 +153,7 @@ pub fn filter_data_to_lines(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_inspect_test_utils::{
-        get_empty_value_json, get_v1_json_dump, get_v1_single_value_json,
-    };
+    use crate::tests::utils::{get_empty_value_json, get_v1_json_dump, get_v1_single_value_json};
     use fuchsia;
     use std::io::Write;
     use tempfile;

@@ -16,6 +16,7 @@ ffx_plugin("ffx_inspect") {
     "src/apply_selectors/screen.rs",
     "src/apply_selectors/terminal.rs",
     "src/apply_selectors/test_utils.rs",
+    "src/bridge_provider.rs",
     "src/lib.rs",
     "src/tests/list.rs",
     "src/tests/list_accessors.rs",
@@ -24,22 +25,25 @@ ffx_plugin("ffx_inspect") {
     "src/tests/mod.rs",
     "src/tests/selectors.rs",
     "src/tests/show.rs",
+    "src/tests/utils.rs",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/plugins/inspect/common:ffx_inspect_common",
     "//src/diagnostics/iquery:lib",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/selectors",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:termion",
   ]
@@ -48,8 +52,9 @@ ffx_plugin("ffx_inspect") {
 
   test_deps = [
     "//src/developer/ffx/lib/writer:lib",
-    "//src/developer/ffx/plugins/inspect/test_utils:ffx_inspect_test_utils",
+    "//src/diagnostics/iquery/test_support:iquery_test_support",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",

@@ -9,7 +9,7 @@ use ffx_config::keys::TARGET_DEFAULT_KEY;
 use ffx_core::ffx_plugin;
 use ffx_flutter_tunnel_args::TunnelCommand;
 use ffx_flutter_tunnel_ctrlc::wait_for_kill;
-use ffx_inspect_common::DiagnosticsBridgeProvider;
+use ffx_inspect::DiagnosticsBridgeProvider;
 use fidl_fuchsia_developer_ffx::{DaemonError, TargetAddrInfo, TargetProxy};
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlProxy, RemoteDiagnosticsBridgeProxy};
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};

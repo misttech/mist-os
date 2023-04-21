@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use errors::ResultExt as _;
-use ffx_inspect_common::run_command;
-use ffx_inspect_test_utils::{
+use crate::run_command;
+use crate::tests::utils::{
     inspect_bridge_data, make_inspect_with_length, make_inspects_for_lifecycle,
     setup_fake_diagnostics_bridge, setup_fake_rcs, FakeBridgeData,
 };
+use errors::ResultExt as _;
 use ffx_writer::{Format, MachineWriter, TestBuffers};
 use fidl_fuchsia_developer_remotecontrol::BridgeStreamParameters;
 use fidl_fuchsia_diagnostics::{

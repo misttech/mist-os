@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    run_command,
+    tests::utils::{setup_fake_diagnostics_bridge, setup_fake_rcs},
+};
 use assert_matches::assert_matches;
-use ffx_inspect_common::run_command;
-use ffx_inspect_test_utils::{setup_fake_diagnostics_bridge, setup_fake_rcs};
 use ffx_writer::{Format, MachineWriter, TestBuffers};
 use iquery::commands::{ListFilesCommand, ListFilesResultItem};
 

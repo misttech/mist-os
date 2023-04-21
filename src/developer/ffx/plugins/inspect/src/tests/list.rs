@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use errors::ResultExt as _;
-use ffx_inspect_common::run_command;
-use ffx_inspect_test_utils::{
+use crate::run_command;
+use crate::tests::utils::{
     make_inspects_for_lifecycle, setup_fake_diagnostics_bridge, setup_fake_rcs,
     FakeArchiveIteratorResponse, FakeBridgeData,
 };
+use errors::ResultExt as _;
 use ffx_writer::{Format, MachineWriter, TestBuffers};
 use fidl_fuchsia_developer_remotecontrol::{ArchiveIteratorError, BridgeStreamParameters};
 use fidl_fuchsia_diagnostics::{ClientSelectorConfiguration, DataType, StreamMode};

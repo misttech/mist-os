@@ -5,8 +5,6 @@
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use diagnostics_data::Data;
-use errors::ffx_error;
-use fho::{MachineWriter, ToolIO};
 use fidl::{self, endpoints::create_proxy, AsyncSocket};
 use fidl_fuchsia_developer_remotecontrol::{
     ArchiveIteratorMarker, BridgeStreamParameters, DiagnosticsData, RemoteControlProxy,
@@ -19,71 +17,10 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_sys2 as fsys2;
 use futures::AsyncReadExt as _;
 use iquery::{
-    commands::{
-        get_accessor_selectors, list_files, Command, DiagnosticsProvider, ListAccessorsResult,
-        ListFilesResult, ListFilesResultItem, ListResult, SelectorsResult, ShowResult,
-    },
+    commands::{get_accessor_selectors, list_files, DiagnosticsProvider, ListFilesResultItem},
     types::Error,
 };
-use lazy_static::lazy_static;
 use selectors;
-use serde::Serialize;
-use std::{fmt, io::Write};
-
-lazy_static! {
-    static ref READDIR_TIMEOUT_SECONDS: u64 = 15;
-}
-
-macro_rules! impl_inspect_output {
-    ($($variant:tt),*) => {
-        #[derive(Serialize)]
-        #[serde(untagged)]
-        pub enum InspectOutput {
-            $($variant( $variant ),)*
-        }
-
-        $(
-            impl From<$variant> for InspectOutput {
-                fn from(item: $variant) -> Self {
-                    Self::$variant(item)
-                }
-            }
-        )*
-
-        impl fmt::Display for InspectOutput {
-             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self {
-                    $(
-                        Self::$variant(value) => value.fmt(f),
-                    )*
-                }
-            }
-        }
-    };
-}
-
-impl_inspect_output!(ShowResult, ListFilesResult, ListAccessorsResult, ListResult, SelectorsResult);
-
-pub async fn run_command<C, O>(
-    rcs_proxy: RemoteControlProxy,
-    diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-    cmd: C,
-    writer: &mut MachineWriter<InspectOutput>,
-) -> anyhow::Result<()>
-where
-    C: Command<Result = O>,
-    InspectOutput: From<O>,
-{
-    let provider = DiagnosticsBridgeProvider::new(diagnostics_proxy, rcs_proxy);
-    let result = cmd.execute(&provider).await.map_err(|e| anyhow!(ffx_error!("{}", e)))?;
-    let result = InspectOutput::from(result);
-    if writer.is_machine() {
-        writer.machine(&result)?;
-    } else {
-        writeln!(writer, "{}", result)?;
-    }
-    Ok(())
-}
 
 pub struct DiagnosticsBridgeProvider {
     diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
