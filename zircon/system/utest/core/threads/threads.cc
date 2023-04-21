@@ -1319,6 +1319,7 @@ TEST(Threads, WritingSingleStepState) {
   RegisterWriteSetup<zx_thread_state_single_step_t> setup;
   setup.Init();
 
+#if !defined(__riscv)
   // 0 is valid.
   zx_thread_state_single_step_t single_step = 0;
   ASSERT_EQ(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_SINGLE_STEP, &single_step,
@@ -1350,6 +1351,13 @@ TEST(Threads, WritingSingleStepState) {
   ASSERT_EQ(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_SINGLE_STEP, &single_step,
                                   sizeof(single_step) - 1),
             ZX_ERR_BUFFER_TOO_SMALL);
+#else
+  // RISC-V currently does not allow setting of the single step state.
+  zx_thread_state_single_step_t single_step = 0;
+  ASSERT_EQ(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_SINGLE_STEP, &single_step,
+                                  sizeof(single_step)),
+            ZX_ERR_NOT_SUPPORTED);
+#endif
 }
 
 TEST(Threads, WritingFpRegisterState) {
@@ -1472,6 +1480,11 @@ TEST(Threads, ThreadLocalRegisterState) {
 #elif defined(__aarch64__)
   uint64_t tpidr_value = 0x1234;
   regs.tpidr = (uintptr_t)&tpidr_value;
+#elif defined(__riscv)
+  uint64_t tp_value = 0x1234;
+  regs.tp = (uintptr_t)&tp_value;
+#else
+#error "what machine?"
 #endif
 
   ASSERT_EQ(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_GENERAL_REGS, &regs,
@@ -1489,6 +1502,11 @@ TEST(Threads, ThreadLocalRegisterState) {
 #elif defined(__aarch64__)
   EXPECT_EQ(tls_regs.tpidr_value, 0x1234);
   EXPECT_EQ(tpidr_value, 0x12345678);
+#elif defined(__riscv)
+  EXPECT_EQ(tls_regs.tp_value, 0x1234);
+  EXPECT_EQ(tp_value, 0x12345678);
+#else
+#error "what machine?"
 #endif
 }
 

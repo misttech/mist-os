@@ -415,10 +415,15 @@
 
 #elif defined(__riscv)
 
+  // Save a structure that directly matches zx_riscv64_thread_state_fp_regs_t.
+  li      a0, -1
   .macro save_fp_on_stack n
-    fsd f\n, REGS_F(\n)(sp)
+    fsd   f\n, REGS_F(\n)(sp)
+    sd    a0, (REGS_F(\n)+8)(sp)
   .endm
   on_32 save_fp_on_stack
+  csrr    a0, fcsr
+  sw      a0, REGS_F(32)(sp)
 
   call zx_thread_exit
   unimp
@@ -490,7 +495,9 @@
 
 #elif defined(__riscv)
 
-// TODO(fxbug.dev/124336): RISC-V vector state not supported yet.
+  // TODO(fxbug.dev/124336): RISC-V vector state not supported yet.
+  call zx_thread_exit
+  unimp
 
 #else
 
@@ -539,6 +546,9 @@
   sd a0, (sp)
   li a0, 0x12345678
   sd a0, (tp)
+
+  call zx_thread_exit
+  unimp
 
 #else
 
