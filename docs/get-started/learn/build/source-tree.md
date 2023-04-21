@@ -238,7 +238,7 @@ but may provide some interesting places to begin exploring:
     <td>Power management services.</td>
   </tr>
   <tr>
-    <td><code>src/proc</code></td>
+    <td><code>src/starnix</code></td>
     <td>POSIX compatibility libraries.</td>
   </tr>
   <tr>

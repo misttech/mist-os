@@ -22,6 +22,6 @@ declare_args() {
     "//examples/fortune:fortune_teller",
 
     # Starnix
-    "//src/proc/bundles:starnix",
+    "//src/starnix",
   ]
 }

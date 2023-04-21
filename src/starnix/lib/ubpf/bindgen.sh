@@ -5,7 +5,7 @@
 
 set -e
 
-if [[ ! -f src/proc/lib/ubpf/wrapper.h ]]; then
+if [[ ! -f src/starnix/lib/ubpf/wrapper.h ]]; then
   echo 'Please run this script from the root of your Fuchsia source tree.'
   exit 1
 fi
@@ -27,9 +27,8 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --explicit-padding \
   --allowlist-function "ubpf_.*" \
   --raw-line "${RAW_LINES}" \
-  -o src/proc/lib/ubpf/src/ubpf.rs \
-  src/proc/lib/ubpf/wrapper.h \
+  -o src/starnix/lib/ubpf/src/ubpf.rs \
+  src/starnix/lib/ubpf/wrapper.h \
   -- \
   -I third_party/android/platform/bionic/libc/include/ \
   -I third_party/ubpf/vm/inc
-  

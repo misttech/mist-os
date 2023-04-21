@@ -83,7 +83,6 @@ config("allow_unused_results") {
     "//src/modular/*",
     "//src/performance/*",
     "//src/power/*",
-    "//src/proc/*",
     "//src/recovery/*",
     "//src/security/*",
     "//src/session/*",

@@ -1,7 +1,0 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-{
-    // Just a forwarding shard while //src/proc -> //src/starnix is in process.
-    include: [ "//src/starnix/kernel/meta/starnix_kernel.cml" ],
-}
