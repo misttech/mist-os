@@ -27,6 +27,7 @@
 #include <linux/fcntl.h>
 #include <linux/filter.h>
 #include <linux/fs.h>
+#include <linux/fuse.h>
 #include <linux/futex.h>
 #include <linux/inotify.h>
 #include <linux/input.h>
