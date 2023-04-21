@@ -72,6 +72,13 @@ pub(crate) struct Ipv6DiscoveredRouteTimerId<DeviceId> {
     route: Ipv6DiscoveredRoute,
 }
 
+impl<DeviceId> Ipv6DiscoveredRouteTimerId<DeviceId> {
+    pub(super) fn device_id(&self) -> &DeviceId {
+        let Self { device_id, route: _ } = self;
+        device_id
+    }
+}
+
 /// The execution context for IPv6 route discovery.
 pub(super) trait Ipv6RouteDiscoveryContext<C>: DeviceIdContext<AnyDevice> {
     /// Gets the route discovery state, mutably.

@@ -70,6 +70,13 @@ pub(crate) struct SlaacTimerId<DeviceId> {
 }
 
 impl<DeviceId> SlaacTimerId<DeviceId> {
+    pub(super) fn device_id(&self) -> &DeviceId {
+        let Self { device_id, inner: _ } = self;
+        device_id
+    }
+}
+
+impl<DeviceId> SlaacTimerId<DeviceId> {
     pub(crate) fn new_deprecate_slaac_address(
         device_id: DeviceId,
         addr: UnicastAddr<Ipv6Addr>,

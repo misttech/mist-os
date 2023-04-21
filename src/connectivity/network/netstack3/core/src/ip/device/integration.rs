@@ -188,45 +188,6 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
     }
 }
 
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    SlaacContext<C> for Locked<&'a SyncCtx<C>, L>
-{
-    type SlaacAddrs<'s> = SlaacAddrs<'s, C>;
-
-    fn with_slaac_addrs_mut_and_configs<
-        O,
-        F: FnOnce(SlaacAddrsMutAndConfig<'_, C, SlaacAddrs<'_, C>>) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.with_slaac_addrs_mut_and_configs(device_id, cb),
-        )
-    }
-}
-
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    Ipv6RouteDiscoveryContext<C> for Locked<&SyncCtx<C>, L>
-{
-    fn with_discovered_routes_mut<F: FnOnce(&mut Ipv6RouteDiscoveryState)>(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.with_discovered_routes_mut(device_id, cb),
-        )
-    }
-}
-
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>> IgmpStateContext<C>
     for Locked<&SyncCtx<C>, L>
 {
@@ -245,57 +206,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>> 
     }
 }
 
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
-    IgmpContext<C> for Locked<&SyncCtx<C>, L>
-{
-    fn with_igmp_state_mut<
-        O,
-        F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<C::Instant>>) -> O,
-    >(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        device::IpDeviceConfigurationContext::<Ipv4, _>::with_ip_device_configuration(
-            self,
-            device,
-            |_config, mut sync_ctx| sync_ctx.with_igmp_state_mut(device, cb),
-        )
-    }
-
-    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
-        device::IpDeviceConfigurationContext::<Ipv4, _>::with_ip_device_configuration(
-            self,
-            device,
-            |_config, mut sync_ctx| sync_ctx.get_ip_addr_subnet(device),
-        )
-    }
-}
-
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
-    SendFrameContext<
-        C,
-        EmptyBuf,
-        IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-    > for Locked<&SyncCtx<C>, L>
-{
-    fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
-        &mut self,
-        ctx: &mut C,
-        meta: IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-        body: S,
-    ) -> Result<(), S> {
-        let device = meta.device.clone();
-        device::IpDeviceConfigurationContext::<Ipv4, _>::with_ip_device_configuration(
-            self,
-            &device,
-            |_config, mut sync_ctx| sync_ctx.send_frame(ctx, meta, body),
-        )
-    }
-}
-
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>> MldStateContext<C>
     for Locked<&SyncCtx<C>, L>
 {
@@ -311,116 +221,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>> 
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
             cb(&state)
         })
-    }
-}
-
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    MldContext<C> for Locked<&SyncCtx<C>, L>
-{
-    fn with_mld_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device,
-            |_config, mut sync_ctx| sync_ctx.with_mld_state_mut(device, cb),
-        )
-    }
-
-    fn get_ipv6_link_local_addr(
-        &mut self,
-        device: &Self::DeviceId,
-    ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device,
-            |_config, mut sync_ctx| sync_ctx.get_ipv6_link_local_addr(device),
-        )
-    }
-}
-
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    DadContext<C> for Locked<&SyncCtx<C>, L>
-{
-    fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
-        &mut self,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-        cb: F,
-    ) -> O {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.with_dad_state(device_id, addr, cb),
-        )
-    }
-
-    fn send_dad_packet(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        dst_ip: MulticastAddr<Ipv6Addr>,
-        message: NeighborSolicitation,
-    ) -> Result<(), ()> {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.send_dad_packet(ctx, device_id, dst_ip, message),
-        )
-    }
-}
-
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    RsContext<C> for Locked<&SyncCtx<C>, L>
-{
-    type LinkLayerAddr = <Self as device::Ipv6DeviceContext<C>>::LinkLayerAddr;
-
-    fn with_rs_remaining_mut_and_max<
-        O,
-        F: FnOnce(&mut Option<NonZeroU8>, Option<NonZeroU8>) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.with_rs_remaining_mut_and_max(device_id, cb),
-        )
-    }
-
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Self::LinkLayerAddr> {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.get_link_layer_addr_bytes(device_id),
-        )
-    }
-
-    fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf>,
-        F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
-    >(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        message: RouterSolicitation,
-        body: F,
-    ) -> Result<(), S> {
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            device_id,
-            |_config, mut sync_ctx| sync_ctx.send_rs_packet(ctx, device_id, message, body),
-        )
     }
 }
 
@@ -681,26 +481,6 @@ fn assignment_state_v6<
             }
         })
     })
-}
-
-// TODO(https://fxbug.dev/125261): Remove when no longer needed.
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
-    SendFrameContext<C, EmptyBuf, MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
-    for Locked<&SyncCtx<C>, L>
-{
-    fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
-        &mut self,
-        ctx: &mut C,
-        meta: MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-        body: S,
-    ) -> Result<(), S> {
-        let device = meta.device.clone();
-        device::Ipv6DeviceConfigurationContext::with_ipv6_device_configuration(
-            self,
-            &device,
-            |_config, mut sync_ctx| sync_ctx.send_frame(ctx, meta, body),
-        )
-    }
 }
 
 impl<

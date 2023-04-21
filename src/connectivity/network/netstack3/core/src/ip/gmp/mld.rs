@@ -370,6 +370,13 @@ pub(crate) struct MldDelayedReportTimerId<DeviceId>(
     pub(crate) GmpDelayedReportTimerId<Ipv6Addr, DeviceId>,
 );
 
+impl<DeviceId> MldDelayedReportTimerId<DeviceId> {
+    pub(crate) fn device_id(&self) -> &DeviceId {
+        let Self(this) = self;
+        this.device_id()
+    }
+}
+
 impl<DeviceId> From<GmpDelayedReportTimerId<Ipv6Addr, DeviceId>>
     for MldDelayedReportTimerId<DeviceId>
 {

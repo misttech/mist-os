@@ -309,6 +309,15 @@ pub(crate) enum IgmpTimerId<DeviceId> {
     V1RouterPresent { device: DeviceId },
 }
 
+impl<DeviceId> IgmpTimerId<DeviceId> {
+    pub(crate) fn device_id(&self) -> &DeviceId {
+        match self {
+            Self::Gmp(id) => id.device_id(),
+            Self::V1RouterPresent { device } => device,
+        }
+    }
+}
+
 impl<DeviceId> From<GmpDelayedReportTimerId<Ipv4Addr, DeviceId>> for IgmpTimerId<DeviceId> {
     fn from(id: GmpDelayedReportTimerId<Ipv4Addr, DeviceId>) -> IgmpTimerId<DeviceId> {
         IgmpTimerId::Gmp(id)

@@ -47,6 +47,13 @@ pub(crate) struct RsTimerId<DeviceId> {
     pub(crate) device_id: DeviceId,
 }
 
+impl<DeviceId> RsTimerId<DeviceId> {
+    pub(super) fn device_id(&self) -> &DeviceId {
+        let Self { device_id } = self;
+        device_id
+    }
+}
+
 /// The execution context for router solicitation.
 pub(super) trait RsContext<C>: DeviceIdContext<AnyDevice> {
     /// A link-layer address.

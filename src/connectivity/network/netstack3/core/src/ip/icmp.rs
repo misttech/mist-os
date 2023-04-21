@@ -48,13 +48,9 @@ use crate::{
     device::FrameDestination,
     ip::{
         device::{
-            nud::NudIpHandler,
-            route_discovery::{Ipv6DiscoveredRoute, RouteDiscoveryHandler},
-            slaac::SlaacHandler,
-            state::Ipv6DadState,
+            nud::NudIpHandler, route_discovery::Ipv6DiscoveredRoute, state::Ipv6DadState,
             IpDeviceHandler, Ipv6DeviceHandler,
         },
-        gmp::mld::MldPacketHandler,
         path_mtu::PmtuHandler,
         socket::{
             BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockCreationError,
@@ -1200,8 +1196,6 @@ fn receive_ndp_packet<
     SC: InnerIcmpv6Context<C>
         + Ipv6DeviceHandler<C>
         + IpDeviceHandler<Ipv6, C>
-        + RouteDiscoveryHandler<C>
-        + SlaacHandler<C>
         + NudIpHandler<Ipv6, C>
         + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
 >(
@@ -1465,7 +1459,7 @@ fn receive_ndp_packet<
                 IpDeviceHandler::set_default_hop_limit(sync_ctx, &device_id, hop_limit);
             }
 
-            RouteDiscoveryHandler::update_route(
+            Ipv6DeviceHandler::update_discovered_ipv6_route(
                 sync_ctx,
                 ctx,
                 &device_id,
@@ -1553,7 +1547,7 @@ fn receive_ndp_packet<
                         let valid_lifetime = prefix_info.valid_lifetime();
 
                         if prefix_info.on_link_flag() {
-                            RouteDiscoveryHandler::update_route(
+                            Ipv6DeviceHandler::update_discovered_ipv6_route(
                                 sync_ctx,
                                 ctx,
                                 &device_id,
@@ -1563,7 +1557,7 @@ fn receive_ndp_packet<
                         }
 
                         if prefix_info.autonomous_address_configuration_flag() {
-                            SlaacHandler::apply_slaac_update(
+                            Ipv6DeviceHandler::apply_slaac_update(
                                 sync_ctx,
                                 ctx,
                                 &device_id,
@@ -1593,9 +1587,6 @@ impl<
             + Ipv6DeviceHandler<C>
             + IpDeviceHandler<Ipv6, C>
             + PmtuHandler<Ipv6, C>
-            + MldPacketHandler<C, <SC as DeviceIdContext<AnyDevice>>::DeviceId>
-            + RouteDiscoveryHandler<C>
-            + SlaacHandler<C>
             + NudIpHandler<Ipv6, C>
             + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
     > BufferIpTransportContext<Ipv6, C, SC, B> for IcmpIpTransportContext
@@ -3004,7 +2995,7 @@ mod tests {
     use core::{convert::TryInto, fmt::Debug, num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
-    use net_types::ip::{AddrSubnet, Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
+    use net_types::ip::{Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
     use packet::{Buf, Serializer};
     use packet_formats::{
         icmp::{
@@ -3026,11 +3017,8 @@ mod tests {
         },
         ip::{
             device::{
-                route_discovery::Ipv6DiscoveredRoute,
-                state::{DelIpv6AddrReason, IpDeviceStateIpExt, SlaacConfig},
-                IpDeviceHandler,
+                route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceHandler,
             },
-            gmp::mld::MldPacketHandler,
             path_mtu::testutil::FakePmtuState,
             receive_ip_packet,
             socket::testutil::FakeIpSocketCtx,
@@ -4120,67 +4108,6 @@ mod tests {
         Icmpv6State
     );
 
-    impl MldPacketHandler<Fakev6NonSyncCtx, FakeDeviceId> for Fakev6SyncCtx {
-        fn receive_mld_packet<B: ByteSlice>(
-            &mut self,
-            _ctx: &mut Fakev6NonSyncCtx,
-            _device: &FakeDeviceId,
-            _src_ip: Ipv6SourceAddr,
-            _dst_ip: SpecifiedAddr<Ipv6Addr>,
-            _packet: MldPacket<B>,
-        ) {
-            unimplemented!()
-        }
-    }
-
-    impl RouteDiscoveryHandler<Fakev6NonSyncCtx> for Fakev6SyncCtx {
-        fn update_route(
-            &mut self,
-            _ctx: &mut Fakev6NonSyncCtx,
-            _device_id: &Self::DeviceId,
-            _route: Ipv6DiscoveredRoute,
-            _lifetime: Option<NonZeroNdpLifetime>,
-        ) {
-            unimplemented!()
-        }
-
-        fn invalidate_routes(&mut self, _ctx: &mut Fakev6NonSyncCtx, _device_id: &Self::DeviceId) {
-            unimplemented!()
-        }
-    }
-
-    impl SlaacHandler<Fakev6NonSyncCtx> for Fakev6SyncCtx {
-        fn apply_slaac_update(
-            &mut self,
-            _ctx: &mut Fakev6NonSyncCtx,
-            _device_id: &Self::DeviceId,
-            _subnet: Subnet<Ipv6Addr>,
-            _preferred_lifetime: Option<NonZeroNdpLifetime>,
-            _valid_lifetime: Option<NonZeroNdpLifetime>,
-        ) {
-            unimplemented!()
-        }
-
-        fn on_address_removed(
-            &mut self,
-            _ctx: &mut Fakev6NonSyncCtx,
-            _device_id: &Self::DeviceId,
-            _addr: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-            _state: SlaacConfig<FakeInstant>,
-            _reason: DelIpv6AddrReason,
-        ) {
-            unimplemented!()
-        }
-
-        fn remove_all_slaac_addresses(
-            &mut self,
-            _ctx: &mut Fakev6NonSyncCtx,
-            _device_id: &Self::DeviceId,
-        ) {
-            unimplemented!()
-        }
-    }
-
     impl IpDeviceHandler<Ipv6, Fakev6NonSyncCtx> for Fakev6SyncCtx {
         fn is_router_device(&mut self, _device_id: &Self::DeviceId) -> bool {
             unimplemented!()
@@ -4217,6 +4144,38 @@ mod tests {
         }
 
         fn set_link_mtu(&mut self, _device_id: &Self::DeviceId, _mtu: Mtu) {
+            unimplemented!()
+        }
+
+        fn update_discovered_ipv6_route(
+            &mut self,
+            _ctx: &mut Fakev6NonSyncCtx,
+            _device_id: &Self::DeviceId,
+            _route: Ipv6DiscoveredRoute,
+            _lifetime: Option<NonZeroNdpLifetime>,
+        ) {
+            unimplemented!()
+        }
+
+        fn apply_slaac_update(
+            &mut self,
+            _ctx: &mut Fakev6NonSyncCtx,
+            _device_id: &Self::DeviceId,
+            _subnet: Subnet<Ipv6Addr>,
+            _preferred_lifetime: Option<NonZeroNdpLifetime>,
+            _valid_lifetime: Option<NonZeroNdpLifetime>,
+        ) {
+            unimplemented!()
+        }
+
+        fn receive_mld_packet<B: ByteSlice>(
+            &mut self,
+            _ctx: &mut Fakev6NonSyncCtx,
+            _device: &FakeDeviceId,
+            _src_ip: Ipv6SourceAddr,
+            _dst_ip: SpecifiedAddr<Ipv6Addr>,
+            _packet: MldPacket<B>,
+        ) {
             unimplemented!()
         }
     }

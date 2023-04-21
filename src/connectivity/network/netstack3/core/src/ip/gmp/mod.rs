@@ -881,6 +881,13 @@ pub(crate) struct GmpDelayedReportTimerId<A, D> {
     pub(crate) group_addr: MulticastAddr<A>,
 }
 
+impl<A, DeviceId> GmpDelayedReportTimerId<A, DeviceId> {
+    fn device_id(&self) -> &DeviceId {
+        let Self { device, group_addr: _ } = self;
+        device
+    }
+}
+
 /// A type of GMP message.
 #[derive(Debug)]
 enum GmpMessageType<P> {

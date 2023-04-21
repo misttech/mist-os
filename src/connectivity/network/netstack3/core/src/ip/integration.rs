@@ -16,7 +16,6 @@ use crate::{
     ip::{
         self,
         device::{self, IpDeviceIpExt, IpDeviceNonSyncContext},
-        gmp::GmpHandler,
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::FragmentStateContext,
         send_ipv4_packet_from_device, send_ipv6_packet_from_device,
@@ -123,7 +122,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IpState<I>>,
     > MulticastMembershipHandler<I, C> for Locked<&SyncCtx<C>, L>
 where
-    Self: device::IpDeviceConfigurationContext<I, C> + GmpHandler<I, C>,
+    Self: device::IpDeviceConfigurationContext<I, C>,
 {
     fn join_multicast_group(
         &mut self,

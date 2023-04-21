@@ -59,9 +59,11 @@ use crate::{
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     error::NotFoundError,
     ip::{
-        device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
+        device::{
+            state::IpDeviceStateIpExt, BufferIpv4DeviceHandler, IpDeviceIpExt,
+            IpDeviceNonSyncContext,
+        },
         forwarding::{Destination, ForwardingTable, IpForwardingDeviceContext, NextHop},
-        gmp::igmp::IgmpPacketHandler,
         icmp::{
             BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpSockets,
             Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder,
@@ -958,7 +960,9 @@ impl<
                 self, ctx, device, src_ip, dst_ip, body
             ),
             Ipv4Proto::Igmp => {
-                IgmpPacketHandler::receive_igmp_packet(self, ctx, device, src_ip, dst_ip, body);
+                BufferIpv4DeviceHandler::receive_igmp_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                );
                 Ok(())
             }
             Ipv4Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as BufferIpTransportContext<

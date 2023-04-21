@@ -23,6 +23,13 @@ pub(crate) struct DadTimerId<DeviceId> {
     pub(crate) addr: UnicastAddr<Ipv6Addr>,
 }
 
+impl<DeviceId> DadTimerId<DeviceId> {
+    pub(super) fn device_id(&self) -> &DeviceId {
+        let Self { device_id, addr: _ } = self;
+        device_id
+    }
+}
+
 /// Holds references to state associated with duplicate address detection.
 pub(super) struct DadStateRef<'a> {
     /// A mutable reference to an address' state.
