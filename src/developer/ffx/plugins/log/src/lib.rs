@@ -202,6 +202,10 @@ impl LogFilterCriteria {
         return log.moniker == filter_string;
     }
 
+    fn match_filters_to_event(&self) -> bool {
+        self.moniker_filters.is_empty()
+    }
+
     fn match_filters_to_log_data(&self, data: &LogsData, msg: &str) -> bool {
         if data.metadata.severity < self.min_severity {
             return false;
@@ -251,6 +255,7 @@ impl LogFilterCriteria {
             LogEntry { data: LogData::SymbolizedTargetLog(data, message), .. } => {
                 self.match_filters_to_log_data(data, message)
             }
+            LogEntry { data: LogData::FfxEvent(_), .. } => self.match_filters_to_event(),
             _ => true,
         }
     }
@@ -1555,6 +1560,16 @@ mod test {
             .build()
             .into()
         )));
+
+        assert!(!criteria.matches_filters_to_log_entry(&make_log_entry(LogData::FfxEvent(
+            EventType::LoggingStarted
+        ),)));
+
+        let allowed_cmd = LogCommand { ..empty_dump_command() };
+        let allowed_criteria = LogFilterCriteria::try_from_cmd(&allowed_cmd, None).unwrap();
+        assert!(allowed_criteria.matches_filters_to_log_entry(&make_log_entry(LogData::FfxEvent(
+            EventType::LoggingStarted
+        ),)));
 
         assert!(criteria.matches_filters_to_log_entry(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
