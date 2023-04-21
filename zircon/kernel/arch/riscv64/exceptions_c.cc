@@ -370,12 +370,18 @@ zx_status_t arch_dispatch_user_policy_exception(uint32_t policy_exception_code,
   return dispatch_user_exception(ZX_EXCP_POLICY_ERROR, &context);
 }
 
-// TODO-rvbringup: fill these in as user space starts to hit these cases in testing and use.
 bool arch_install_exception_context(Thread* thread, const arch_exception_context_t* context) {
+  if (!context->frame) {
+    // TODO(fxbug.dev/30521): Must be a synthetic exception as they don't (yet) provide the
+    // registers.
+    return false;
+  }
+
+  arch_set_suspended_general_regs(thread, GeneralRegsSource::Iframe, context->frame);
   return true;
 }
 
-void arch_remove_exception_context(Thread* thread) {}
+void arch_remove_exception_context(Thread* thread) { arch_reset_suspended_general_regs(thread); }
 
 void PrintFrame(FILE* f, const iframe_t& frame) {
   // Define a shorter macro to keep the code formatter from badly wrapping the following code.
