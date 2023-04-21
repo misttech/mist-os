@@ -8,7 +8,7 @@ alias HandleOp = uint32;
 // TODO(scottmg): ZX_HANDLE_OP_xyz here.
 
 type HandleInfo = resource struct {
-    handle handle;
+    handle Handle;
     type ObjType;
     rights Rights;
     unused uint32;
@@ -19,10 +19,10 @@ type ChannelCallArgs = resource struct {};
 
 type HandleDisposition = resource struct {
     operation HandleOp;
-    handle handle;
+    handle Handle;
     type ObjType;
     rights Rights;
-    result status;
+    result Status;
 };
 
 // TODO(fxbug.dev/110021): We cannot yet conveniently express this.
@@ -105,9 +105,9 @@ protocol Channel {
     Create(struct {
         options uint32;
     }) -> (resource struct {
-        out0 handle;
-        out1 handle;
-    }) error status;
+        out0 Handle;
+        out1 Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -215,19 +215,19 @@ protocol Channel {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     @handle_unchecked
     Read(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
         @out
         @voidptr
         bytes experimental_pointer<byte>;
         @out
-        handles experimental_pointer<handle>;
+        handles experimental_pointer<Handle>;
         num_bytes uint32;
         num_handles uint32;
     }) -> (resource struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -335,7 +335,7 @@ protocol Channel {
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
     ReadEtc(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
         @out
         @voidptr
@@ -347,7 +347,7 @@ protocol Channel {
     }) -> (resource struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -495,15 +495,15 @@ protocol Channel {
     /// [`zx_object_wait_many()`]: object_wait_many.md
     /// [`zx_object_wait_one()`]: object_wait_one.md
     Write(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
         @voidptr
         @size32
         bytes vector<byte>:CHANNEL_MAX_MSG_BYTES;
         @release
         @size32
-        handles vector<handle>:CHANNEL_MAX_MSG_HANDLES;
-    }) -> () error status;
+        handles vector<Handle>:CHANNEL_MAX_MSG_HANDLES;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -677,7 +677,7 @@ protocol Channel {
     /// [`zx_handle_duplicate()`]: handle_duplicate.md
     /// [`zx_handle_replace()`]: handle_replace.md
     WriteEtc(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
         @voidptr
         @size32
@@ -685,27 +685,27 @@ protocol Channel {
         @inout
         @size32
         handles vector<HandleDisposition>:CHANNEL_MAX_MSG_HANDLES;
-    }) -> () error status;
+    }) -> () error Status;
 
     @internal
     CallNoretry(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
-        deadline time;
+        deadline Time;
         args ChannelCallArgs;
     }) -> (struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     @internal
     CallFinish(resource struct {
-        deadline time;
+        deadline Time;
         args ChannelCallArgs;
     }) -> (struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     // TODO(scottmg): Express "All wr_handles of args must have ZX_RIGHT_TRANSFER."
     /// ## Summary
@@ -889,36 +889,36 @@ protocol Channel {
     @blocking
     @vdsocall
     Call(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
-        deadline time;
+        deadline Time;
         args ChannelCallArgs;
     }) -> (struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     @internal
     CallEtcNoretry(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
-        deadline time;
+        deadline Time;
         @inout
         args ChannelCallEtcArgs;
     }) -> (struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     @internal
     CallEtcFinish(resource struct {
-        deadline time;
+        deadline Time;
         @inout
         args ChannelCallEtcArgs;
     }) -> (struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -1060,13 +1060,13 @@ protocol Channel {
     @vdsocall
     // TODO(scottmg): Express "All wr_handles of args must have ZX_RIGHT_TRANSFER."
     CallEtc(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
-        deadline time;
+        deadline Time;
         @inout
         args ChannelCallEtcArgs;
     }) -> (struct {
         actual_bytes uint32;
         actual_handles uint32;
-    }) error status;
+    }) error Status;
 };

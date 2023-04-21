@@ -108,12 +108,12 @@ protocol Resource {
     /// [`zx_object_get_info()`]: object_get_info.md
     /// [`zx_vmo_create_physical()`]: vmo_create_physical.md
     Create(resource struct {
-        parent_rsrc handle:RESOURCE;
+        parent_rsrc Handle:RESOURCE;
         options uint32;
         base uint64;
         size usize64;
         name vector<uchar>:MAX_NAME_LEN;
     }) -> (resource struct {
-        resource_out handle:RESOURCE;
-    }) error status;
+        resource_out Handle:RESOURCE;
+    }) error Status;
 };

@@ -12,7 +12,7 @@ protocol Cprng {
     DrawOnce() -> (struct {
         @voidptr
         buffer vector<byte>:CPRNG_DRAW_MAX_LEN;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -103,5 +103,5 @@ protocol Cprng {
     AddEntropy(struct {
         @voidptr
         buffer vector<byte>:CPRNG_ADD_ENTROPY_MAX_LEN;
-    }) -> () error status;
+    }) -> () error Status;
 };

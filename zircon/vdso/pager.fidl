@@ -53,8 +53,8 @@ protocol Pager {
     Create(struct {
         options uint32;
     }) -> (resource struct {
-        out handle:PAGER;
-    }) error status;
+        out Handle:PAGER;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -163,14 +163,14 @@ protocol Pager {
     /// [`zx_port_wait()`]: port_wait.md
     /// [`zx_vmo_create()`]: vmo_create.md
     CreateVmo(resource struct {
-        pager handle:PAGER;
+        pager Handle:PAGER;
         options uint32;
-        port handle:PORT;
+        port Handle:PORT;
         key uint64;
         size uint64;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -228,9 +228,9 @@ protocol Pager {
     /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_pager_query_dirty_ranges()`]: pager_query_dirty_ranges.md
     DetachVmo(resource struct {
-        pager handle:PAGER;
-        vmo handle:VMO;
-    }) -> () error status;
+        pager Handle:PAGER;
+        vmo Handle:VMO;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -305,13 +305,13 @@ protocol Pager {
     /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_vmo_create()`]: vmo_create.md
     SupplyPages(resource struct {
-        pager handle:PAGER;
-        pager_vmo handle:VMO;
+        pager Handle:PAGER;
+        pager_vmo Handle:VMO;
         offset uint64;
         length uint64;
-        aux_vmo handle:VMO;
+        aux_vmo Handle:VMO;
         aux_offset uint64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -437,13 +437,13 @@ protocol Pager {
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_write()`]: vmo_write.md
     OpRange(resource struct {
-        pager handle:PAGER;
+        pager Handle:PAGER;
         op uint32;
-        pager_vmo handle:VMO;
+        pager_vmo Handle:VMO;
         offset uint64;
         length uint64;
         data uint64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -567,8 +567,8 @@ protocol Pager {
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     @next
     QueryDirtyRanges(resource struct {
-        pager handle:PAGER;
-        pager_vmo handle:VMO;
+        pager Handle:PAGER;
+        pager_vmo Handle:VMO;
         offset uint64;
         length uint64;
     }) -> (struct {
@@ -576,7 +576,7 @@ protocol Pager {
         buffer vector<byte>:MAX;
         actual usize64;
         avail usize64;
-    }) error status;
+    }) error Status;
 
     /// ## NAME
     ///
@@ -656,11 +656,11 @@ protocol Pager {
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     @next
     QueryVmoStats(resource struct {
-        pager handle:PAGER;
-        pager_vmo handle:VMO;
+        pager Handle:PAGER;
+        pager_vmo Handle:VMO;
         options uint32;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-    }) error status;
+    }) error Status;
 };

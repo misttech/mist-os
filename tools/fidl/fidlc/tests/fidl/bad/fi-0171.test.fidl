@@ -6,5 +6,5 @@ library test.bad.fi0171;
 using zx;
 
 type MyStruct = resource struct {
-    my_resource_member box<zx.handle>;
+    my_resource_member box<zx.Handle>;
 };

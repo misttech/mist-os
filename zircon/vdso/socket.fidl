@@ -64,9 +64,9 @@ protocol Socket {
     Create(struct {
         options uint32;
     }) -> (resource struct {
-        out0 handle;
-        out1 handle;
-    }) error status;
+        out0 Handle;
+        out1 Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -149,13 +149,13 @@ protocol Socket {
     /// [`zx_socket_read()`]: socket_read.md
     /// [`zx_socket_set_disposition()`]: socket_set_disposition.md
     Write(resource struct {
-        handle handle:SOCKET;
+        handle Handle:SOCKET;
         options uint32;
         @voidptr
         buffer vector<byte>:MAX;
     }) -> (struct {
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -233,13 +233,13 @@ protocol Socket {
     /// [`zx_socket_set_disposition()`]: socket_set_disposition.md
     /// [`zx_socket_write()`]: socket_write.md
     Read(resource struct {
-        handle handle:SOCKET;
+        handle Handle:SOCKET;
         options uint32;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -316,8 +316,8 @@ protocol Socket {
     /// [`zx_socket_read()`]: socket_read.md
     /// [`zx_socket_write()`]: socket_write.md
     SetDisposition(resource struct {
-        handle handle:<SOCKET, Rights.MANAGE_SOCKET>;
+        handle Handle:<SOCKET, Rights.MANAGE_SOCKET>;
         disposition uint32;
         disposition_peer uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

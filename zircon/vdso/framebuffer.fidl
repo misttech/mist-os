@@ -41,13 +41,13 @@ protocol Framebuffer {
     ///
     /// TODO(fxbug.dev/32938)
     GetInfo(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
     }) -> (struct {
         format uint32;
         width uint32;
         height uint32;
         stride uint32;
-    }) error status;
+    }) error Status;
 
     // TODO(fxbug.dev/32803): vmo ZX_OBJ_TYPE_VMO; No rights required?
     /// ## Summary
@@ -88,12 +88,12 @@ protocol Framebuffer {
     ///
     /// TODO(fxbug.dev/32938)
     SetRange(resource struct {
-        resource handle:RESOURCE;
-        vmo handle:VMO;
+        resource Handle:RESOURCE;
+        vmo Handle:VMO;
         len uint32;
         format uint32;
         width uint32;
         height uint32;
         stride uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

@@ -504,12 +504,12 @@ library example;
 using zx;
 
 type TypeDecl = resource struct {
-  h0 zx.handle;
-  h1 zx.handle:VMO;
-  h2 zx.handle:optional;
-  h3 zx.handle:<VMO,optional>;
-  h4 zx.handle:<VMO,zx.Rights.TRANSFER>;
-  h5 zx.handle:<VMO,zx.Rights.TRANSFER,optional>;
+  h0 zx.Handle;
+  h1 zx.Handle:VMO;
+  h2 zx.Handle:optional;
+  h3 zx.Handle:<VMO,optional>;
+  h4 zx.Handle:<VMO,zx.Rights.TRANSFER>;
+  h5 zx.Handle:<VMO,zx.Rights.TRANSFER,optional>;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -609,7 +609,7 @@ library example;
 
 using zx;
 
-alias MyVmo = zx.handle:VMO;
+alias MyVmo = zx.Handle:VMO;
 
 type Foo = struct {
     foo MyVmo:zx.ObjType.CHANNEL;
@@ -630,7 +630,7 @@ library example;
 
 using zx;
 
-alias MyVmo = zx.handle:<VMO, zx.Rights.TRANSFER>;
+alias MyVmo = zx.Handle:<VMO, zx.Rights.TRANSFER>;
 
 type Foo = resource struct {
     foo MyVmo:optional;

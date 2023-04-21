@@ -10,14 +10,14 @@ type Subtype = enum : uint32 {
 };
 
 /// This is a handle.
-resource_definition handle : uint32 { // fidlc constraint: must be uint32
+resource_definition Handle : uint32 { // fidlc constraint: must be uint32
     properties {
         subtype Subtype; // fidlc constraint: must have a property called "subtype"
     };
 };
 
 type StructWithHandleMembers = resource struct {
-    untyped_handle handle;
-    handle_a handle:A;
-    handle_b handle:B;
+    untyped_handle Handle;
+    handle_a Handle:A;
+    handle_b Handle:B;
 };

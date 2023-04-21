@@ -102,7 +102,7 @@ type NewString = string;
 type NewArray = array<int8, 3>;
 type NewVector = vector<bool>;
 type NewBox = box<Struct>;
-type NewHandle = zx.handle;
+type NewHandle = zx.Handle;
 type NewClientEnd = client_end:Protocol;
 type NewServerEnd = server_end:Protocol;
 )FIDL");

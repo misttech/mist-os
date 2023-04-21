@@ -100,9 +100,9 @@ protocol Futexfuncs {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         current_value Futex;
-        new_futex_owner handle;
-        deadline time;
-    }) -> () error status;
+        new_futex_owner Handle;
+        deadline Time;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -164,7 +164,7 @@ protocol Futexfuncs {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         wake_count uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -265,8 +265,8 @@ protocol Futexfuncs {
         @embedded_alias("zx/Futex")
         requeue_ptr experimental_pointer<Futex>;
         requeue_count uint32;
-        new_requeue_owner handle;
-    }) -> () error status;
+        new_requeue_owner Handle;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -314,7 +314,7 @@ protocol Futexfuncs {
     FutexWakeSingleOwner(struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -387,8 +387,8 @@ protocol Futexfuncs {
         @embedded_alias("zx/Futex")
         requeue_ptr experimental_pointer<Futex>;
         requeue_count uint32;
-        new_requeue_owner handle;
-    }) -> () error status;
+        new_requeue_owner Handle;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -438,5 +438,5 @@ protocol Futexfuncs {
         value_ptr experimental_pointer<Futex>;
     }) -> (struct {
         koid Koid;
-    }) error status;
+    }) error Status;
 };

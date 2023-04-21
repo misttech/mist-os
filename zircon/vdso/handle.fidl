@@ -61,8 +61,8 @@ protocol Handlefuncs {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     HandleClose(resource struct {
         @release
-        handle handle;
-    }) -> () error status;
+        handle Handle;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -125,8 +125,8 @@ protocol Handlefuncs {
     /// [`zx_object_wait_one()`]: object_wait_one.md
     HandleCloseMany(resource struct {
         @release
-        handles vector<handle>:MAX;
-    }) -> () error status;
+        handles vector<Handle>:MAX;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -187,11 +187,11 @@ protocol Handlefuncs {
     /// [`zx_handle_close_many()`]: handle_close_many.md
     /// [`zx_handle_replace()`]: handle_replace.md
     HandleDuplicate(resource struct {
-        handle handle;
+        handle Handle;
         rights Rights;
     }) -> (resource struct {
-        out handle;
-    }) error status;
+        out Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -249,9 +249,9 @@ protocol Handlefuncs {
     /// [`zx_handle_duplicate()`]: handle_duplicate.md
     HandleReplace(resource struct {
         @release
-        handle handle;
+        handle Handle;
         rights Rights;
     }) -> (resource struct {
-        out handle;
-    }) error status;
+        out Handle;
+    }) error Status;
 };

@@ -12,21 +12,15 @@
 library zx;
 
 // zx_status_t and errors.h.
-//
-// TODO(fxbug.dev/109734): Status.
-alias status = int32;
+alias Status = int32;
 
 // zx_time_t: absolute monotonic time in nanoseconds, from a device-specific
 // timebase defined here:
 // https://fuchsia.dev/fuchsia-src/concepts/kernel/time/monotonic.md
-//
-// TODO(fxbug.dev/109734): Time.
-alias time = int64;
+alias Time = int64;
 
 // zx_duration_t: a duration in nanoseconds.
-//
-// TODO(fxbug.dev/109734): Duration.
-alias duration = int64;
+alias Duration = int64;
 
 // zx_ticks_t: a duration in hardware ticks.
 alias Ticks = int64;
@@ -77,7 +71,7 @@ type ObjType = strict enum : uint32 {
     MSI = 32;
 };
 
-resource_definition handle : uint32 {
+resource_definition Handle : uint32 {
     properties {
         subtype ObjType;
         rights Rights;

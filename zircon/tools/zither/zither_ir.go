@@ -1089,8 +1089,8 @@ type Handle struct {
 
 func newHandle(resource fidlgen.Resource, typeKinds map[TypeKind]struct{}) (*Handle, error) {
 	name := fidlgen.MustReadName(string(resource.Name)).DeclarationName()
-	if name != "handle" {
-		return nil, fmt.Errorf("resource declarations must be named \"handle\", not %s", name)
+	if name != "Handle" {
+		return nil, fmt.Errorf("resource declarations must be named \"Handle\", not %s", name)
 	}
 	typeKinds[TypeKindInteger] = struct{}{}
 	return &Handle{decl: newDecl(resource)}, nil

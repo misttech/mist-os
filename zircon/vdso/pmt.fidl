@@ -53,6 +53,6 @@ protocol Pmt {
     /// [`zx_handle_close()`]: handle_close.md
     Unpin(resource struct {
         @release
-        handle handle:PMT;
-    }) -> () error status;
+        handle Handle:PMT;
+    }) -> () error Status;
 };

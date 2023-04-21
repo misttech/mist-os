@@ -9,7 +9,7 @@ namespace fidl::flat {
 std::string_view HandleClassName(HandleClass handle_class) {
   switch (handle_class) {
     case HandleClass::kZircon:
-      return "zx.handle";
+      return "zx.Handle";
     case HandleClass::kDriver:
       return "fdf.handle";
     case HandleClass::kBanjo:
@@ -18,7 +18,7 @@ std::string_view HandleClassName(HandleClass handle_class) {
 }
 
 std::optional<HandleClass> HandleClassFromName(std::string_view name) {
-  if (name == "zx.handle") {
+  if (name == "zx.Handle") {
     return HandleClass::kZircon;
   }
   if (name == "fdf.handle") {

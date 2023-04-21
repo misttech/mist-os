@@ -46,12 +46,12 @@ protocol Mtrace {
     ///
     /// TODO(fxbug.dev/32938)
     Control(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         kind uint32;
         action uint32;
         options uint32;
         @inout
         @voidptr
         ptr vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 };

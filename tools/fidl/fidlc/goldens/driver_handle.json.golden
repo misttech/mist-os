@@ -46,8 +46,11 @@
         "zx/ObjType": {
           "kind": "enum"
         },
-        "zx/handle": {
+        "zx/Handle": {
           "kind": "experimental_resource"
+        },
+        "zx/Duration": {
+          "kind": "alias"
         },
         "zx/Koid": {
           "kind": "alias"
@@ -55,16 +58,13 @@
         "zx/Off": {
           "kind": "alias"
         },
+        "zx/Status": {
+          "kind": "alias"
+        },
         "zx/Ticks": {
           "kind": "alias"
         },
-        "zx/duration": {
-          "kind": "alias"
-        },
-        "zx/status": {
-          "kind": "alias"
-        },
-        "zx/time": {
+        "zx/Time": {
           "kind": "alias"
         }
       }
@@ -568,7 +568,7 @@
             "subtype": "event",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,

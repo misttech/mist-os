@@ -146,13 +146,13 @@ protocol Process {
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_thread_start()`]: thread_start.md
     Create(resource struct {
-        job handle:JOB;
+        job Handle:JOB;
         name vector<uchar>:MAX_NAME_LEN;
         options uint32;
     }) -> (resource struct {
-        proc_handle handle:PROCESS;
-        vmar_handle handle:VMAR;
-    }) error status;
+        proc_handle Handle:PROCESS;
+        vmar_handle Handle:VMAR;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -224,13 +224,13 @@ protocol Process {
     /// [`zx_process_create()`]: process_create.md
     @next
     CreateShared(resource struct {
-        shared_proc handle:PROCESS;
+        shared_proc Handle:PROCESS;
         options uint32;
         name vector<uchar>:MAX_NAME_LEN;
     }) -> (resource struct {
-        proc_handle handle:PROCESS;
-        restricted_vmar_handle handle:VMAR;
-    }) error status;
+        proc_handle Handle:PROCESS;
+        restricted_vmar_handle Handle:VMAR;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -335,14 +335,14 @@ protocol Process {
     /// [`zx_thread_start()`]: thread_start.md
     /// [`zx_vmo_create()`]: vmo_create.md
     Start(resource struct {
-        handle handle:PROCESS;
-        thread handle:THREAD;
+        handle Handle:PROCESS;
+        thread Handle:THREAD;
         entry Vaddr;
         stack Vaddr;
         @release
-        arg1 handle;
+        arg1 Handle;
         arg2 uintptr64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -414,13 +414,13 @@ protocol Process {
     ///
     /// [`zx_process_write_memory()`]: process_write_memory.md
     ReadMemory(resource struct {
-        handle handle:PROCESS;
+        handle Handle:PROCESS;
         vaddr Vaddr;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -498,11 +498,11 @@ protocol Process {
     ///
     /// [`zx_process_read_memory()`]: process_read_memory.md
     WriteMemory(resource struct {
-        handle handle:PROCESS;
+        handle Handle:PROCESS;
         vaddr Vaddr;
         @voidptr
         buffer vector<byte>:MAX;
     }) -> (struct {
         actual usize64;
-    }) error status;
+    }) error Status;
 };

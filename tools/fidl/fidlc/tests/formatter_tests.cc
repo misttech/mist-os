@@ -4893,7 +4893,7 @@ TEST(FormatterTests, ListSpacing) {
 library foo.bar;
 
 const RIGHTS_BASIC rights = rights.TRANSFER|rights.DUPLICATE|rights.WAIT|rights.INSPECT;
-alias constrained_handle = zx.handle:<VMO,RIGHTS_BASIC>;
+alias constrained_handle = zx.Handle:<VMO,RIGHTS_BASIC>;
 )FIDL";
 
   // ---------------40---------------- |
@@ -4903,7 +4903,7 @@ library foo.bar;
 const RIGHTS_BASIC rights
         = rights.TRANSFER | rights.DUPLICATE | rights.WAIT | rights.INSPECT;
 alias constrained_handle
-        = zx.handle:<VMO, RIGHTS_BASIC>;
+        = zx.Handle:<VMO, RIGHTS_BASIC>;
 )FIDL";
 
   ASSERT_FORMATTED(unformatted, formatted);
@@ -5012,12 +5012,12 @@ type MyTable = struct {
 // Don't wrap if <8 chars have been used before the wrapping, as this will cause greater offsetting
 // with no readability benefit.  For example:
 //
-//     foo zx.handle:<VMO, RIGHT_A | RIGHT_B>;
+//     foo zx.Handle:<VMO, RIGHT_A | RIGHT_B>;
 //
 // would otherwise get divided into:
 //
 //     foo
-//             zx.handle:<VMO, RIGHT_A | RIGHT_B>;
+//             zx.Handle:<VMO, RIGHT_A | RIGHT_B>;
 //
 // which looks and reads strictly worse.
 TEST(FormatterTests, NoPointlessWrapping) {
@@ -5026,8 +5026,8 @@ TEST(FormatterTests, NoPointlessWrapping) {
 library foo.bar;
 
 type MyStruct = resource struct {
-    lilname zx.handle:<VMO, RIGHT_A | RIGHT_B>;
-    longname zx.handle:<VMO, RIGHT_A | RIGHT_B>;
+    lilname zx.Handle:<VMO, RIGHT_A | RIGHT_B>;
+    longname zx.Handle:<VMO, RIGHT_A | RIGHT_B>;
 };
 )FIDL";
 
@@ -5036,9 +5036,9 @@ type MyStruct = resource struct {
 library foo.bar;
 
 type MyStruct = resource struct {
-    lilname zx.handle:<VMO, RIGHT_A | RIGHT_B>;
+    lilname zx.Handle:<VMO, RIGHT_A | RIGHT_B>;
     longname
-            zx.handle:<VMO, RIGHT_A | RIGHT_B>;
+            zx.Handle:<VMO, RIGHT_A | RIGHT_B>;
 };
 )FIDL";
 

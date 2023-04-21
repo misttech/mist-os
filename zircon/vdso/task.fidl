@@ -96,10 +96,10 @@ protocol Task {
     /// [`zx_task_kill()`]: task_kill.md
     /// [`zx_thread_start()`]: thread_start.md
     Suspend(resource struct {
-        handle handle;
+        handle Handle;
     }) -> (resource struct {
-        token handle;
-    }) error status;
+        token Handle;
+    }) error Status;
 
     /// This function replaces [task_suspend](task_suspend.md). When all callers are
     /// updated, [`zx_task_suspend()`] will be deleted and this function will be renamed
@@ -163,10 +163,10 @@ protocol Task {
     /// [`zx_task_kill()`]: task_kill.md
     /// [`zx_task_suspend()`]: task_suspend.md
     SuspendToken(resource struct {
-        handle handle;
+        handle Handle;
     }) -> (resource struct {
-        token handle;
-    }) error status;
+        token Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -264,11 +264,11 @@ protocol Task {
     /// [`zx_channel_read()`]: channel_read.md
     /// [`zx_object_get_property()`]: object_get_property.md
     CreateExceptionChannel(resource struct {
-        handle handle;
+        handle Handle;
         options uint32;
     }) -> (resource struct {
-        out handle:CHANNEL;
-    }) error status;
+        out Handle:CHANNEL;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -330,6 +330,6 @@ protocol Task {
     /// [`zx_object_get_info()`]: object_get_info.md
     /// [`zx_process_create()`]: process_create.md
     Kill(resource struct {
-        handle handle;
-    }) -> () error status;
+        handle Handle;
+    }) -> () error Status;
 };

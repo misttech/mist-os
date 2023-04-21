@@ -81,9 +81,9 @@ protocol Smc {
     ///
     /// **ZX_ERR_INVALID_ARGS**  *parameters* or *out_smc_result* a null pointer
     Call(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         parameters SmcParameters;
     }) -> (struct {
         out_smc_result SmcResult;
-    }) error status;
+    }) error Status;
 };

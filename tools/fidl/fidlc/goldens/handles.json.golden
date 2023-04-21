@@ -57,8 +57,11 @@
         "zx/ObjType": {
           "kind": "enum"
         },
-        "zx/handle": {
+        "zx/Handle": {
           "kind": "experimental_resource"
+        },
+        "zx/Duration": {
+          "kind": "alias"
         },
         "zx/Koid": {
           "kind": "alias"
@@ -66,16 +69,13 @@
         "zx/Off": {
           "kind": "alias"
         },
+        "zx/Status": {
+          "kind": "alias"
+        },
         "zx/Ticks": {
           "kind": "alias"
         },
-        "zx/duration": {
-          "kind": "alias"
-        },
-        "zx/status": {
-          "kind": "alias"
-        },
-        "zx/time": {
+        "zx/Time": {
           "kind": "alias"
         }
       }
@@ -364,7 +364,7 @@
             "subtype": "handle",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -409,7 +409,7 @@
             "subtype": "bti",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -454,7 +454,7 @@
             "subtype": "channel",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -499,7 +499,7 @@
             "subtype": "clock",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -544,7 +544,7 @@
             "subtype": "debuglog",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -589,7 +589,7 @@
             "subtype": "event",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -634,7 +634,7 @@
             "subtype": "eventpair",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -679,7 +679,7 @@
             "subtype": "exception",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -724,7 +724,7 @@
             "subtype": "fifo",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -769,7 +769,7 @@
             "subtype": "guest",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -814,7 +814,7 @@
             "subtype": "interrupt",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -859,7 +859,7 @@
             "subtype": "iommu",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -904,7 +904,7 @@
             "subtype": "job",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -949,7 +949,7 @@
             "subtype": "msi",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -994,7 +994,7 @@
             "subtype": "pager",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1039,7 +1039,7 @@
             "subtype": "pmt",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1084,7 +1084,7 @@
             "subtype": "port",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1129,7 +1129,7 @@
             "subtype": "process",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1174,7 +1174,7 @@
             "subtype": "profile",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1219,7 +1219,7 @@
             "subtype": "resource",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1264,7 +1264,7 @@
             "subtype": "socket",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1309,7 +1309,7 @@
             "subtype": "stream",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1354,7 +1354,7 @@
             "subtype": "suspendtoken",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1399,7 +1399,7 @@
             "subtype": "thread",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1444,7 +1444,7 @@
             "subtype": "timer",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1489,7 +1489,7 @@
             "subtype": "vcpu",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1534,7 +1534,7 @@
             "subtype": "vmar",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1579,7 +1579,7 @@
             "subtype": "vmo",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1624,7 +1624,7 @@
             "subtype": "vmo",
             "rights": 5,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1669,7 +1669,7 @@
             "subtype": "handle",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1719,7 +1719,7 @@
             "subtype": "vmo",
             "rights": 2147483648,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1769,7 +1769,7 @@
             "subtype": "vmo",
             "rights": 1,
             "nullable": false,
-            "resource_identifier": "zx/handle",
+            "resource_identifier": "zx/Handle",
             "type_shape_v1": {
               "inline_size": 4,
               "alignment": 4,
@@ -1935,7 +1935,7 @@
         "length": 20
       },
       "partial_type_ctor": {
-        "name": "zx/handle",
+        "name": "zx/Handle",
         "args": [],
         "nullable": false
       }
@@ -1949,7 +1949,7 @@
         "length": 21
       },
       "partial_type_ctor": {
-        "name": "zx/handle",
+        "name": "zx/Handle",
         "args": [],
         "nullable": false,
         "handle_rights": {
@@ -1969,7 +1969,7 @@
         "length": 22
       },
       "partial_type_ctor": {
-        "name": "zx/handle",
+        "name": "zx/Handle",
         "args": [],
         "nullable": false
       }

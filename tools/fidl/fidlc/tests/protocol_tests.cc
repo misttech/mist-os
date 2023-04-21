@@ -1206,7 +1206,7 @@ type Rights = strict bits : uint32 {
     TRANSFER = 1;
 };
 
-resource_definition handle : uint32 {
+resource_definition Handle : uint32 {
     properties {
         subtype ObjType;
         rights Rights;
@@ -1214,11 +1214,11 @@ resource_definition handle : uint32 {
 };
 
 protocol MyProtocol {
-    MyMethod(handle);
+    MyMethod(Handle);
 };
 )FIDL");
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidMethodPayloadType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "handle");
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Handle");
 }
 
 TEST(ProtocolTests, BadMethodNamedInvalidAlias) {
@@ -1234,7 +1234,7 @@ type Rights = strict bits : uint32 {
     TRANSFER = 1;
 };
 
-resource_definition handle : uint32 {
+resource_definition Handle : uint32 {
     properties {
         subtype ObjType;
         rights Rights;
@@ -1242,7 +1242,7 @@ resource_definition handle : uint32 {
 };
 
 alias MyPrimAlias = bool;
-alias MyHandleAlias = handle;
+alias MyHandleAlias = Handle;
 alias MyVectorAlias = vector<MyPrimAlias>;
 alias MyAliasAlias = MyVectorAlias:optional;
 
@@ -1258,7 +1258,7 @@ protocol MyProtocol {
   ASSERT_ERR(library.errors()[0], fidl::ErrInvalidMethodPayloadType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bool");
   ASSERT_ERR(library.errors()[1], fidl::ErrInvalidMethodPayloadType);
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "example/handle");
+  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "example/Handle");
 
   ASSERT_ERR(library.errors()[2], fidl::ErrInvalidMethodPayloadType);
   ASSERT_SUBSTR(library.errors()[2]->msg.c_str(), "vector<bool>");

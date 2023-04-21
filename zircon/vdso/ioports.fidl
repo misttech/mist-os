@@ -39,10 +39,10 @@ protocol Ioports {
     ///
     /// TODO(fxbug.dev/32938)
     Request(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         io_addr uint16;
         len uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -78,8 +78,8 @@ protocol Ioports {
     ///
     /// TODO(fxbug.dev/32938)
     Release(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         io_addr uint16;
         len uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

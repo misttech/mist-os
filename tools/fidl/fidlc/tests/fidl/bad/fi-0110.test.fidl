@@ -6,5 +6,5 @@ library test.bad.fi0110;
 using zx;
 
 type Foo = struct {
-    handle zx.handle;
+    handle zx.Handle;
 };

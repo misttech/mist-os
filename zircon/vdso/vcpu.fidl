@@ -99,12 +99,12 @@ protocol Vcpu {
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     Create(resource struct {
-        guest handle:GUEST;
+        guest Handle:GUEST;
         options uint32;
         entry Vaddr;
     }) -> (resource struct {
-        out handle:VCPU;
-    }) error status;
+        out Handle:VCPU;
+    }) error Status;
 
     // See port.fidl for definition of PortPacket.
     /// ## Summary
@@ -180,10 +180,10 @@ protocol Vcpu {
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     @blocking
     Enter(resource struct {
-        handle handle:VCPU;
+        handle Handle:VCPU;
     }) -> (struct {
         packet PortPacket;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -240,8 +240,8 @@ protocol Vcpu {
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     Kick(resource struct {
-        handle handle:VCPU;
-    }) -> () error status;
+        handle Handle:VCPU;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -298,9 +298,9 @@ protocol Vcpu {
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     Interrupt(resource struct {
-        handle handle:VCPU;
+        handle Handle:VCPU;
         vector uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -368,12 +368,12 @@ protocol Vcpu {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     ReadState(resource struct {
-        handle handle:VCPU;
+        handle Handle:VCPU;
         kind uint32;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -441,9 +441,9 @@ protocol Vcpu {
     /// [`zx_vcpu_kick()`]: vcpu_kick.md
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     WriteState(resource struct {
-        handle handle:VCPU;
+        handle Handle:VCPU;
         kind uint32;
         @voidptr
         buffer vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 };

@@ -68,12 +68,12 @@ protocol Bti {
     /// [`zx_bti_release_quarantine()`]: bti_release_quarantine.md
     /// [`zx_pmt_unpin()`]: pmt_unpin.md
     Create(resource struct {
-        iommu handle:IOMMU;
+        iommu Handle:IOMMU;
         options uint32;
         bti_id uint64;
     }) -> (resource struct {
-        out handle:BTI;
-    }) error status;
+        out Handle:BTI;
+    }) error Status;
 
     // READ is intentional in the EXECUTE condition.
     /// ## Summary
@@ -211,16 +211,16 @@ protocol Bti {
     /// [`zx_vmo_op_range()`]: vmo_op_range.md
     /// [`zx_vmo_set_size()`]: vmo_set_size.md
     Pin(resource struct {
-        handle handle:BTI;
+        handle Handle:BTI;
         options uint32;
-        vmo handle:VMO;
+        vmo Handle:VMO;
         offset uint64;
         size uint64;
     }) -> (resource struct {
         @embedded_alias("zx/Paddr")
         addrs vector<Paddr>:MAX;
-        pmt handle:PMT;
-    }) error status;
+        pmt Handle:PMT;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -266,6 +266,6 @@ protocol Bti {
     /// [`zx_bti_pin()`]: bti_pin.md
     /// [`zx_pmt_unpin()`]: pmt_unpin.md
     ReleaseQuarantine(resource struct {
-        handle handle:BTI;
-    }) -> () error status;
+        handle Handle:BTI;
+    }) -> () error Status;
 };

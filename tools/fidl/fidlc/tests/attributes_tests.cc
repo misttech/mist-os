@@ -745,7 +745,7 @@ using zx;
 type MyUnion = resource union {
   1: hello uint8;
   2: world array<uint8,8>;
-  3: foo vector<zx.handle:VMO>:6;
+  3: foo vector<zx.Handle:VMO>:6;
 };
 
 )FIDL");

@@ -131,12 +131,12 @@ protocol Thread {
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_thread_start()`]: thread_start.md
     Create(resource struct {
-        process handle:PROCESS;
+        process Handle:PROCESS;
         name vector<uchar>:MAX_NAME_LEN;
         options uint32;
     }) -> (resource struct {
-        out handle:THREAD;
-    }) error status;
+        out Handle:THREAD;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -229,12 +229,12 @@ protocol Thread {
     /// [`zx_thread_exit()`]: thread_exit.md
     /// [`zx_vmar_unmap_handle_close_thread_exit()`]: vmar_unmap_handle_close_thread_exit.md
     Start(resource struct {
-        handle handle:THREAD;
+        handle Handle:THREAD;
         thread_entry Vaddr;
         stack Vaddr;
         arg1 uintptr64;
         arg2 uintptr64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -325,12 +325,12 @@ protocol Thread {
     ///
     /// [thread_write_state](thread_write_state.md).
     ReadState(resource struct {
-        handle handle:THREAD;
+        handle Handle:THREAD;
         kind uint32;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -442,11 +442,11 @@ protocol Thread {
     ///
     /// [`zx_thread_read_state()`]: thread_read_state.md
     WriteState(resource struct {
-        handle handle:THREAD;
+        handle Handle:THREAD;
         kind uint32;
         @voidptr
         buffer vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -485,5 +485,5 @@ protocol Thread {
     /// [`zx_nanosleep()`]: nanosleep.md
     LegacyYield(resource struct {
         options uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

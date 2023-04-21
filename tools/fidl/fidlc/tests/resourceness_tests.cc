@@ -107,9 +107,9 @@ TEST(ResourcenessTests, GoodResourceStruct) {
   for (const std::string& definition : {
            "type Foo =  resource struct {};",
            "type Foo = resource struct { b bool; };",
-           "using zx;\ntype Foo = resource struct{ h zx.handle; };",
-           "using zx;\ntype Foo = resource struct{ a array<zx.handle, 1>; };",
-           "using zx;\ntype Foo = resource struct{ v vector<zx.handle>; };",
+           "using zx;\ntype Foo = resource struct{ h zx.Handle; };",
+           "using zx;\ntype Foo = resource struct{ a array<zx.Handle, 1>; };",
+           "using zx;\ntype Foo = resource struct{ v vector<zx.Handle>; };",
        }) {
     std::string fidl_library = "library example;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
@@ -124,9 +124,9 @@ TEST(ResourcenessTests, GoodResourceTable) {
   for (const std::string& definition : {
            "type Foo = resource table {};",
            "type Foo = resource table { 1: b bool; };",
-           "using zx;\ntype Foo = resource table { 1: h zx.handle; };",
-           "using zx;\ntype Foo = resource table { 1: a array<zx.handle, 1>; };",
-           "using zx;\ntype Foo = resource table { 1: v vector<zx.handle>; };",
+           "using zx;\ntype Foo = resource table { 1: h zx.Handle; };",
+           "using zx;\ntype Foo = resource table { 1: a array<zx.Handle, 1>; };",
+           "using zx;\ntype Foo = resource table { 1: v vector<zx.Handle>; };",
        }) {
     std::string fidl_library = "library example;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
@@ -140,9 +140,9 @@ TEST(ResourcenessTests, GoodResourceTable) {
 TEST(ResourcenessTests, GoodResourceUnion) {
   for (const std::string& definition : {
            "type Foo = resource union { 1: b bool; };",
-           "using zx;\ntype Foo = resource union { 1: h zx.handle; };",
-           "using zx;\ntype Foo = resource union { 1: a array<zx.handle, 1>; };",
-           "using zx;\ntype Foo = resource union { 1: v vector<zx.handle>; };",
+           "using zx;\ntype Foo = resource union { 1: h zx.Handle; };",
+           "using zx;\ntype Foo = resource union { 1: a array<zx.Handle, 1>; };",
+           "using zx;\ntype Foo = resource union { 1: v vector<zx.Handle>; };",
        }) {
     std::string fidl_library = "library example;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
@@ -156,11 +156,11 @@ TEST(ResourcenessTests, GoodResourceUnion) {
 
 TEST(ResourcenessTests, BadHandlesInValueStruct) {
   for (const std::string& definition : {
-           "type Foo = struct { bad_member zx.handle; };",
-           "type Foo = struct { bad_member zx.handle:optional; };",
-           "type Foo = struct { bad_member array<zx.handle, 1>; };",
-           "type Foo = struct { bad_member vector<zx.handle>; };",
-           "type Foo = struct { bad_member vector<zx.handle>:0; };",
+           "type Foo = struct { bad_member zx.Handle; };",
+           "type Foo = struct { bad_member zx.Handle:optional; };",
+           "type Foo = struct { bad_member array<zx.Handle, 1>; };",
+           "type Foo = struct { bad_member vector<zx.Handle>; };",
+           "type Foo = struct { bad_member vector<zx.Handle>:0; };",
        }) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
@@ -173,10 +173,10 @@ TEST(ResourcenessTests, BadHandlesInValueStruct) {
 
 TEST(ResourcenessTests, BadHandlesInValueTable) {
   for (const std::string& definition : {
-           "type Foo = table { 1: bad_member zx.handle; };",
-           "type Foo = table { 1: bad_member array<zx.handle, 1>; };",
-           "type Foo = table { 1: bad_member vector<zx.handle>; };",
-           "type Foo = table { 1: bad_member vector<zx.handle>:0; };",
+           "type Foo = table { 1: bad_member zx.Handle; };",
+           "type Foo = table { 1: bad_member array<zx.Handle, 1>; };",
+           "type Foo = table { 1: bad_member vector<zx.Handle>; };",
+           "type Foo = table { 1: bad_member vector<zx.Handle>:0; };",
        }) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
@@ -189,10 +189,10 @@ TEST(ResourcenessTests, BadHandlesInValueTable) {
 
 TEST(ResourcenessTests, BadHandlesInValueUnion) {
   for (const std::string& definition : {
-           "type Foo = union { 1: bad_member zx.handle; };",
-           "type Foo = union { 1: bad_member array<zx.handle, 1>; };",
-           "type Foo = union { 1: bad_member vector<zx.handle>; };",
-           "type Foo = union { 1: bad_member vector<zx.handle>:0; };",
+           "type Foo = union { 1: bad_member zx.Handle; };",
+           "type Foo = union { 1: bad_member array<zx.Handle, 1>; };",
+           "type Foo = union { 1: bad_member vector<zx.Handle>; };",
+           "type Foo = union { 1: bad_member vector<zx.Handle>:0; };",
        }) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
@@ -263,7 +263,7 @@ TEST(ResourcenessTests, BadResourceAliasesInValueType) {
 library example;
 using zx;
 
-alias HandleAlias = zx.handle;
+alias HandleAlias = zx.Handle;
 alias ProtocolAlias = client_end:Protocol;
 alias ResourceStructAlias = ResourceStruct;
 alias ResourceTableAlias = ResourceStruct;
@@ -287,8 +287,8 @@ type ResourceUnion = resource union { 1: b bool; };
 TEST(ResourcenessTests, BadResourcesInNestedContainers) {
   for (
       const std::string& definition : {
-          "type Foo = struct { bad_member vector<vector<zx.handle>>; };",
-          "type Foo = struct { bad_member vector<vector<zx.handle:optional>>; };",
+          "type Foo = struct { bad_member vector<vector<zx.Handle>>; };",
+          "type Foo = struct { bad_member vector<vector<zx.Handle:optional>>; };",
           "type Foo = struct { bad_member vector<vector<client_end:Protocol>>; };",
           "type Foo = struct { bad_member vector<vector<ResourceStruct>>; };",
           "type Foo = struct { bad_member vector<vector<ResourceTable>>; };",
@@ -320,8 +320,8 @@ library example;
 using zx;
 
 type Foo = struct {
-  first zx.handle;
-  second zx.handle:optional;
+  first zx.Handle;
+  second zx.Handle:optional;
   third ResourceStruct;
 };
 

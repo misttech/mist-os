@@ -39,9 +39,9 @@ protocol Pc {
     ///
     /// TODO(fxbug.dev/32938)
     FirmwareTables(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
     }) -> (struct {
         acpi_rsdp Paddr;
         smbios Paddr;
-    }) error status;
+    }) error Status;
 };

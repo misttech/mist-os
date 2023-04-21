@@ -57,8 +57,8 @@ class ExperimentalFlags {
     // TODO(fxbug.dev/88366): Remove once unknown interactions are supported.
     kUnknownInteractionsNewDefaults = 1 << 9,
 
-    // TODO(fxbug.dev/109734): By default, mixed case references to zx.status,
-    // zx.handle, zx.time, and zx.duration are permitted as a measure for the
+    // TODO(fxbug.dev/109734): By default, mixed case references to zx.Status,
+    // zx.Handle, zx.Time, and zx.Duration are permitted as a measure for the
     // in the soft transition of redefining these definitions with camel-cased
     // names (per the style guide); this flag disables that.
     kZxSelectCaseSensitivity = 1 << 10,

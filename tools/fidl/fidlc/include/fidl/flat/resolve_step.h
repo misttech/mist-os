@@ -48,8 +48,8 @@ class ResolveStep : public Compiler::Step {
     // deferring the final contextual lookup to kResolve.
     bool allow_contextual = false;
     // Used in kResolve. If non-null, we look up contextual names in this enum.
-    // This enables, for example, `zx.handle:CHANNEL` as a shorthand for
-    // `zx.handle:zx.ObjType.CHANNEL` (here the enum is `zx.ObjType`).
+    // This enables, for example, `zx.Handle:CHANNEL` as a shorthand for
+    // `zx.Handle:zx.ObjType.CHANNEL` (here the enum is `zx.ObjType`).
     Enum* maybe_resource_subtype = nullptr;
   };
 

@@ -85,7 +85,7 @@ protocol Restricted {
         options uint32;
         vector_table_ptr uintptr64;
         context uintptr64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -167,8 +167,8 @@ protocol Restricted {
     BindState(resource struct {
         options uint32;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -211,5 +211,5 @@ protocol Restricted {
     @next
     UnbindState(resource struct {
         options uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

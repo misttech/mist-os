@@ -25,7 +25,7 @@ type Rights = bits : uint32 {
     TRANSFER = 0x00000002;
 };
 
-resource_definition handle : uint32 {
+resource_definition Handle : uint32 {
     properties {
         subtype ObjType;
         rights Rights;

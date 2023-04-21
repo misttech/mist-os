@@ -40,8 +40,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CHANNEL_MAX_MSG_BYTES",
-        "start_offset": 1291,
-        "end_offset": 1312
+        "start_offset": 1177,
+        "end_offset": 1198
       }
     },
     {
@@ -50,8 +50,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CHANNEL_MAX_MSG_HANDLES",
-        "start_offset": 1335,
-        "end_offset": 1358
+        "start_offset": 1221,
+        "end_offset": 1244
       }
     },
     {
@@ -80,8 +80,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "MAX_CPUS",
-        "start_offset": 1410,
-        "end_offset": 1418
+        "start_offset": 1296,
+        "end_offset": 1304
       }
     },
     {
@@ -90,8 +90,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "MAX_NAME_LEN",
-        "start_offset": 1378,
-        "end_offset": 1390
+        "start_offset": 1264,
+        "end_offset": 1276
       }
     },
     {
@@ -140,8 +140,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "ObjType",
-        "start_offset": 1439,
-        "end_offset": 1446
+        "start_offset": 1325,
+        "end_offset": 1332
       }
     },
     {
@@ -150,8 +150,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "NONE",
-        "start_offset": 1476,
-        "end_offset": 1480
+        "start_offset": 1362,
+        "end_offset": 1366
       }
     },
     {
@@ -160,8 +160,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PROCESS",
-        "start_offset": 1490,
-        "end_offset": 1497
+        "start_offset": 1376,
+        "end_offset": 1383
       }
     },
     {
@@ -170,8 +170,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "THREAD",
-        "start_offset": 1507,
-        "end_offset": 1513
+        "start_offset": 1393,
+        "end_offset": 1399
       }
     },
     {
@@ -180,8 +180,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "VMO",
-        "start_offset": 1523,
-        "end_offset": 1526
+        "start_offset": 1409,
+        "end_offset": 1412
       }
     },
     {
@@ -190,8 +190,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CHANNEL",
-        "start_offset": 1536,
-        "end_offset": 1543
+        "start_offset": 1422,
+        "end_offset": 1429
       }
     },
     {
@@ -200,8 +200,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "EVENT",
-        "start_offset": 1553,
-        "end_offset": 1558
+        "start_offset": 1439,
+        "end_offset": 1444
       }
     },
     {
@@ -210,8 +210,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PORT",
-        "start_offset": 1568,
-        "end_offset": 1572
+        "start_offset": 1454,
+        "end_offset": 1458
       }
     },
     {
@@ -220,8 +220,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "INTERRUPT",
-        "start_offset": 1582,
-        "end_offset": 1591
+        "start_offset": 1468,
+        "end_offset": 1477
       }
     },
     {
@@ -230,8 +230,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PCI_DEVICE",
-        "start_offset": 1601,
-        "end_offset": 1611
+        "start_offset": 1487,
+        "end_offset": 1497
       }
     },
     {
@@ -240,8 +240,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "LOG",
-        "start_offset": 1622,
-        "end_offset": 1625
+        "start_offset": 1508,
+        "end_offset": 1511
       }
     },
     {
@@ -250,8 +250,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "SOCKET",
-        "start_offset": 1636,
-        "end_offset": 1642
+        "start_offset": 1522,
+        "end_offset": 1528
       }
     },
     {
@@ -260,8 +260,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "RESOURCE",
-        "start_offset": 1653,
-        "end_offset": 1661
+        "start_offset": 1539,
+        "end_offset": 1547
       }
     },
     {
@@ -270,8 +270,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "EVENTPAIR",
-        "start_offset": 1672,
-        "end_offset": 1681
+        "start_offset": 1558,
+        "end_offset": 1567
       }
     },
     {
@@ -280,8 +280,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "JOB",
-        "start_offset": 1692,
-        "end_offset": 1695
+        "start_offset": 1578,
+        "end_offset": 1581
       }
     },
     {
@@ -290,8 +290,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "VMAR",
-        "start_offset": 1706,
-        "end_offset": 1710
+        "start_offset": 1592,
+        "end_offset": 1596
       }
     },
     {
@@ -300,8 +300,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "FIFO",
-        "start_offset": 1721,
-        "end_offset": 1725
+        "start_offset": 1607,
+        "end_offset": 1611
       }
     },
     {
@@ -310,8 +310,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "GUEST",
-        "start_offset": 1736,
-        "end_offset": 1741
+        "start_offset": 1622,
+        "end_offset": 1627
       }
     },
     {
@@ -320,8 +320,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "VCPU",
-        "start_offset": 1752,
-        "end_offset": 1756
+        "start_offset": 1638,
+        "end_offset": 1642
       }
     },
     {
@@ -330,8 +330,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "TIMER",
-        "start_offset": 1767,
-        "end_offset": 1772
+        "start_offset": 1653,
+        "end_offset": 1658
       }
     },
     {
@@ -340,8 +340,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "IOMMU",
-        "start_offset": 1783,
-        "end_offset": 1788
+        "start_offset": 1669,
+        "end_offset": 1674
       }
     },
     {
@@ -350,8 +350,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "BTI",
-        "start_offset": 1799,
-        "end_offset": 1802
+        "start_offset": 1685,
+        "end_offset": 1688
       }
     },
     {
@@ -360,8 +360,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PROFILE",
-        "start_offset": 1813,
-        "end_offset": 1820
+        "start_offset": 1699,
+        "end_offset": 1706
       }
     },
     {
@@ -370,8 +370,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PMT",
-        "start_offset": 1831,
-        "end_offset": 1834
+        "start_offset": 1717,
+        "end_offset": 1720
       }
     },
     {
@@ -380,8 +380,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "SUSPEND_TOKEN",
-        "start_offset": 1845,
-        "end_offset": 1858
+        "start_offset": 1731,
+        "end_offset": 1744
       }
     },
     {
@@ -390,8 +390,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PAGER",
-        "start_offset": 1869,
-        "end_offset": 1874
+        "start_offset": 1755,
+        "end_offset": 1760
       }
     },
     {
@@ -400,8 +400,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "EXCEPTION",
-        "start_offset": 1885,
-        "end_offset": 1894
+        "start_offset": 1771,
+        "end_offset": 1780
       }
     },
     {
@@ -410,8 +410,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CLOCK",
-        "start_offset": 1905,
-        "end_offset": 1910
+        "start_offset": 1791,
+        "end_offset": 1796
       }
     },
     {
@@ -420,8 +420,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "STREAM",
-        "start_offset": 1921,
-        "end_offset": 1927
+        "start_offset": 1807,
+        "end_offset": 1813
       }
     },
     {
@@ -430,8 +430,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "MSI",
-        "start_offset": 1938,
-        "end_offset": 1941
+        "start_offset": 1824,
+        "end_offset": 1827
       }
     }
   ],
@@ -442,8 +442,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
         "data": "FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE",
-        "start_offset": 6360,
-        "end_offset": 6394
+        "start_offset": 6359,
+        "end_offset": 6393
       },
       "value": {
         "type": "literal"
@@ -455,8 +455,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
         "data": "HANDLE_CARRYING_ELEMENTS_COUNT",
-        "start_offset": 5902,
-        "end_offset": 5932
+        "start_offset": 5901,
+        "end_offset": 5931
       },
       "value": {
         "type": "literal"
@@ -468,8 +468,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
         "data": "LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE",
-        "start_offset": 6905,
-        "end_offset": 6940
+        "start_offset": 6904,
+        "end_offset": 6939
       },
       "value": {
         "type": "literal"
@@ -507,8 +507,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
         "data": "SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE",
-        "start_offset": 6849,
-        "end_offset": 6884
+        "start_offset": 6848,
+        "end_offset": 6883
       },
       "value": {
         "type": "literal"
@@ -662,8 +662,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "handle",
-            "start_offset": 5306,
-            "end_offset": 5312
+            "start_offset": 5305,
+            "end_offset": 5311
           },
           "type": {
             "kind": "handle"
@@ -675,8 +675,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "bytes",
-            "start_offset": 5341,
-            "end_offset": 5346
+            "start_offset": 5340,
+            "end_offset": 5345
           },
           "type": {
             "kind": "vector"
@@ -744,8 +744,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
         "data": "Overflowing",
-        "start_offset": 6970,
-        "end_offset": 6981
+        "start_offset": 6969,
+        "end_offset": 6980
       },
       "methods": [
         {
@@ -754,8 +754,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "DecodeBoundedKnownToBeSmall",
-            "start_offset": 7039,
-            "end_offset": 7066
+            "start_offset": 7038,
+            "end_offset": 7065
           },
           "request_type": {
             "kind": "identifier",
@@ -765,8 +765,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "BoundedKnownToBeSmall",
-              "start_offset": 7067,
-              "end_offset": 7088
+              "start_offset": 7066,
+              "end_offset": 7087
             }
           }
         },
@@ -776,8 +776,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "DecodeBoundedMaybeLarge",
-            "start_offset": 7146,
-            "end_offset": 7169
+            "start_offset": 7145,
+            "end_offset": 7168
           },
           "request_type": {
             "kind": "identifier",
@@ -787,8 +787,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "BoundedMaybeLarge",
-              "start_offset": 7170,
-              "end_offset": 7187
+              "start_offset": 7169,
+              "end_offset": 7186
             }
           }
         },
@@ -798,8 +798,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "DecodeSemiBoundedBelievedToBeSmall",
-            "start_offset": 7245,
-            "end_offset": 7279
+            "start_offset": 7244,
+            "end_offset": 7278
           },
           "request_type": {
             "kind": "identifier",
@@ -809,8 +809,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "SemiBoundedBelievedToBeSmall",
-              "start_offset": 7280,
-              "end_offset": 7308
+              "start_offset": 7279,
+              "end_offset": 7307
             }
           }
         },
@@ -820,8 +820,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "DecodeSemiBoundedMaybeLarge",
-            "start_offset": 7366,
-            "end_offset": 7393
+            "start_offset": 7365,
+            "end_offset": 7392
           },
           "request_type": {
             "kind": "identifier",
@@ -831,8 +831,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "SemiBoundedMaybeLarge",
-              "start_offset": 7394,
-              "end_offset": 7415
+              "start_offset": 7393,
+              "end_offset": 7414
             }
           }
         },
@@ -842,8 +842,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "DecodeUnboundedMaybeLargeValue",
-            "start_offset": 7473,
-            "end_offset": 7503
+            "start_offset": 7472,
+            "end_offset": 7502
           },
           "request_type": {
             "kind": "identifier",
@@ -853,8 +853,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "UnboundedMaybeLargeValue",
-              "start_offset": 7504,
-              "end_offset": 7528
+              "start_offset": 7503,
+              "end_offset": 7527
             }
           }
         },
@@ -864,8 +864,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "DecodeUnboundedMaybeLargeResource",
-            "start_offset": 7586,
-            "end_offset": 7619
+            "start_offset": 7585,
+            "end_offset": 7618
           },
           "request_type": {
             "kind": "identifier",
@@ -875,8 +875,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "UnboundedMaybeLargeResource",
-              "start_offset": 7620,
-              "end_offset": 7647
+              "start_offset": 7619,
+              "end_offset": 7646
             }
           }
         },
@@ -886,8 +886,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "EncodeBoundedKnownToBeSmall",
-            "start_offset": 7720,
-            "end_offset": 7747
+            "start_offset": 7719,
+            "end_offset": 7746
           },
           "request_type": {
             "kind": "identifier",
@@ -897,8 +897,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "BoundedKnownToBeSmall",
-              "start_offset": 7748,
-              "end_offset": 7769
+              "start_offset": 7747,
+              "end_offset": 7768
             }
           },
           "response_type": {
@@ -909,8 +909,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "BoundedKnownToBeSmall",
-              "start_offset": 7775,
-              "end_offset": 7796
+              "start_offset": 7774,
+              "end_offset": 7795
             }
           }
         },
@@ -920,8 +920,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "EncodeBoundedMaybeLarge",
-            "start_offset": 7869,
-            "end_offset": 7892
+            "start_offset": 7868,
+            "end_offset": 7891
           },
           "request_type": {
             "kind": "identifier",
@@ -931,8 +931,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "BoundedMaybeLarge",
-              "start_offset": 7893,
-              "end_offset": 7910
+              "start_offset": 7892,
+              "end_offset": 7909
             }
           },
           "response_type": {
@@ -943,8 +943,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "BoundedMaybeLarge",
-              "start_offset": 7916,
-              "end_offset": 7933
+              "start_offset": 7915,
+              "end_offset": 7932
             }
           }
         },
@@ -954,8 +954,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "EncodeSemiBoundedBelievedToBeSmall",
-            "start_offset": 8006,
-            "end_offset": 8040
+            "start_offset": 8005,
+            "end_offset": 8039
           },
           "request_type": {
             "kind": "identifier",
@@ -965,8 +965,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "SemiBoundedBelievedToBeSmall",
-              "start_offset": 8041,
-              "end_offset": 8069
+              "start_offset": 8040,
+              "end_offset": 8068
             }
           },
           "response_type": {
@@ -977,8 +977,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "SemiBoundedBelievedToBeSmall",
-              "start_offset": 8075,
-              "end_offset": 8103
+              "start_offset": 8074,
+              "end_offset": 8102
             }
           }
         },
@@ -988,8 +988,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "EncodeSemiBoundedMaybeLarge",
-            "start_offset": 8176,
-            "end_offset": 8203
+            "start_offset": 8175,
+            "end_offset": 8202
           },
           "request_type": {
             "kind": "identifier",
@@ -999,8 +999,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "SemiBoundedMaybeLarge",
-              "start_offset": 8204,
-              "end_offset": 8225
+              "start_offset": 8203,
+              "end_offset": 8224
             }
           },
           "response_type": {
@@ -1011,8 +1011,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "SemiBoundedMaybeLarge",
-              "start_offset": 8231,
-              "end_offset": 8252
+              "start_offset": 8230,
+              "end_offset": 8251
             }
           }
         },
@@ -1022,8 +1022,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "EncodeUnboundedMaybeLargeValue",
-            "start_offset": 8325,
-            "end_offset": 8355
+            "start_offset": 8324,
+            "end_offset": 8354
           },
           "request_type": {
             "kind": "identifier",
@@ -1033,8 +1033,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "UnboundedMaybeLargeValue",
-              "start_offset": 8356,
-              "end_offset": 8380
+              "start_offset": 8355,
+              "end_offset": 8379
             }
           },
           "response_type": {
@@ -1045,8 +1045,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "UnboundedMaybeLargeValue",
-              "start_offset": 8386,
-              "end_offset": 8410
+              "start_offset": 8385,
+              "end_offset": 8409
             }
           }
         },
@@ -1056,8 +1056,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
             "data": "EncodeUnboundedMaybeLargeResource",
-            "start_offset": 9853,
-            "end_offset": 9886
+            "start_offset": 9852,
+            "end_offset": 9885
           },
           "request_type": {
             "kind": "identifier",
@@ -1067,8 +1067,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "UnboundedMaybeLargeResource",
-              "start_offset": 9887,
-              "end_offset": 9914
+              "start_offset": 9886,
+              "end_offset": 9913
             }
           },
           "response_type": {
@@ -1079,8 +1079,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
               "data": "UnboundedMaybeLargeResource",
-              "start_offset": 9920,
-              "end_offset": 9947
+              "start_offset": 9919,
+              "end_offset": 9946
             }
           }
         }

@@ -66,7 +66,7 @@ class SharedAmongstLibraries final : public SharedInterface {
   SharedAmongstLibraries(const SharedAmongstLibraries&) = delete;
   SharedAmongstLibraries(SharedAmongstLibraries&&) = delete;
 
-  // Adds and compiles a library similar to //zircon/vsdo/zx, defining "handle",
+  // Adds and compiles a library similar to //zircon/vsdo/zx, defining "Handle",
   // "ObjType", and "Rights".
   void AddLibraryZx();
 

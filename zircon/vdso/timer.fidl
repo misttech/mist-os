@@ -77,8 +77,8 @@ protocol Timer {
         options uint32;
         clock_id Clock;
     }) -> (resource struct {
-        out handle:TIMER;
-    }) error status;
+        out Handle:TIMER;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -149,10 +149,10 @@ protocol Timer {
     /// [`zx_timer_cancel()`]: timer_cancel.md
     /// [`zx_timer_create()`]: timer_create.md
     Set(resource struct {
-        handle handle:TIMER;
-        deadline time;
-        slack duration;
-    }) -> () error status;
+        handle Handle:TIMER;
+        deadline Time;
+        slack Duration;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -203,6 +203,6 @@ protocol Timer {
     /// [`zx_timer_create()`]: timer_create.md
     /// [`zx_timer_set()`]: timer_set.md
     Cancel(resource struct {
-        handle handle:TIMER;
-    }) -> () error status;
+        handle Handle:TIMER;
+    }) -> () error Status;
 };

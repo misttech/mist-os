@@ -6,5 +6,5 @@ library test.good.fi0171;
 using zx;
 
 type MyStruct = resource struct {
-    my_resource_member zx.handle:optional;
+    my_resource_member zx.Handle:optional;
 };

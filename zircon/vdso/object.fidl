@@ -12,7 +12,7 @@ const WAIT_MANY_MAX_ITEMS usize64 = 64;
 // TODO(scottmg): Apply rights spec from WaitMany on |items| to |handle| here,
 // somehow.
 type WaitItem = resource struct {
-    handle handle;
+    handle Handle;
     waitfor Signals;
     pending Signals;
 };
@@ -108,12 +108,12 @@ protocol Object {
     /// [`zx_object_wait_many()`]: object_wait_many.md
     @blocking
     WaitOne(resource struct {
-        handle handle;
+        handle Handle;
         signals Signals;
-        deadline time;
+        deadline Time;
     }) -> (struct {
         observed Signals;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -229,8 +229,8 @@ protocol Object {
     WaitMany(resource struct {
         @inout
         items vector<WaitItem>:WAIT_MANY_MAX_ITEMS;
-        deadline time;
-    }) -> () error status;
+        deadline Time;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -369,12 +369,12 @@ protocol Object {
     /// [`zx_port_queue()`]: port_queue.md
     /// [`zx_port_wait()`]: port_wait.md
     WaitAsync(resource struct {
-        handle handle;
-        port handle:PORT;
+        handle Handle;
+        port Handle:PORT;
         key uint64;
         signals Signals;
         options uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -434,10 +434,10 @@ protocol Object {
     /// [`zx_eventpair_create()`]: eventpair_create.md
     /// [`zx_object_signal_peer()`]: object_signal_peer.md
     Signal(resource struct {
-        handle handle;
+        handle Handle;
         clear_mask uint32;
         set_mask uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -499,10 +499,10 @@ protocol Object {
     /// [`zx_eventpair_create()`]: eventpair_create.md
     /// [`zx_object_signal()`]: object_signal.md
     SignalPeer(resource struct {
-        handle handle;
+        handle Handle;
         clear_mask uint32;
         set_mask uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -769,12 +769,12 @@ protocol Object {
     ///
     /// [`zx_object_set_property()`]: object_set_property.md
     GetProperty(resource struct {
-        handle handle;
+        handle Handle;
         property uint32;
     }) -> (struct {
         @voidptr
         value vector<byte>:MAX;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -818,11 +818,11 @@ protocol Object {
     ///
     /// [`zx_object_get_property()`]: object_get_property.md
     SetProperty(resource struct {
-        handle handle;
+        handle Handle;
         property uint32;
         @voidptr
         value vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -1954,14 +1954,14 @@ protocol Object {
     /// [`zx_port_wait()`]: port_wait.md
     /// [`zx_task_suspend()`]: task_suspend.md
     GetInfo(resource struct {
-        handle handle;
+        handle Handle;
         topic uint32;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
         actual usize64;
         avail usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -2032,12 +2032,12 @@ protocol Object {
     /// [`zx_handle_replace()`]: handle_replace.md
     /// [`zx_object_get_info()`]: object_get_info.md
     GetChild(resource struct {
-        handle handle;
+        handle Handle;
         koid uint64;
         rights Rights;
     }) -> (resource struct {
-        out handle;
-    }) error status;
+        out Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -2094,8 +2094,8 @@ protocol Object {
     ///
     /// [`zx_profile_create()`]: profile_create.md
     SetProfile(resource struct {
-        handle handle:THREAD;
-        profile handle:PROFILE;
+        handle Handle:THREAD;
+        profile Handle:PROFILE;
         options uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

@@ -56,11 +56,11 @@ protocol Msi {
     ///
     /// [`zx_msi_create()`]: msi_create.md
     Allocate(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         count uint32;
     }) -> (resource struct {
-        out_allocation handle;
-    }) error status;
+        out_allocation Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -150,12 +150,12 @@ protocol Msi {
     /// [`zx_vmo_create_physical()`]: vmo_create_physical.md
     /// [`zx_vmo_set_cache_policy()`]: vmo_set_cache_policy.md
     Create(resource struct {
-        handle handle;
+        handle Handle;
         options uint32;
         msi_id uint32;
-        vmo handle:VMO;
+        vmo Handle:VMO;
         vmo_offset usize64;
     }) -> (resource struct {
-        out_interrupt handle;
-    }) error status;
+        out_interrupt Handle;
+    }) error Status;
 };

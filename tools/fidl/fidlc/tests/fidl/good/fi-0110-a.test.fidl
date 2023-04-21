@@ -6,5 +6,5 @@ library test.good.fi0110a;
 using zx;
 
 type Foo = resource struct {
-    handle zx.handle;
+    handle zx.Handle;
 };

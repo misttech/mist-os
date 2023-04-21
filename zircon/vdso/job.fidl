@@ -73,11 +73,11 @@ protocol Job {
     /// [`zx_process_create()`]: process_create.md
     /// [`zx_task_kill()`]: task_kill.md
     Create(resource struct {
-        parent_job handle:JOB;
+        parent_job Handle:JOB;
         options uint32;
     }) -> (resource struct {
-        out handle:JOB;
-    }) error status;
+        out Handle:JOB;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -288,13 +288,13 @@ protocol Job {
     /// [`zx_process_create()`]: process_create.md
     /// [`zx_vmo_replace_as_executable()`]: vmo_replace_as_executable.md
     SetPolicy(resource struct {
-        handle handle:JOB;
+        handle Handle:JOB;
         options uint32;
         topic uint32;
         @voidptr
         @size32
         policy vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -357,8 +357,8 @@ protocol Job {
     /// [`zx_process_create()`]: process_create.md
     /// [`zx_task_kill()`]: task_kill.md
     SetCritical(resource struct {
-        job handle:JOB;
+        job Handle:JOB;
         options uint32;
-        process handle:PROCESS;
-    }) -> () error status;
+        process Handle:PROCESS;
+    }) -> () error Status;
 };

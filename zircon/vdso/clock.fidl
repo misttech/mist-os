@@ -44,7 +44,7 @@ protocol Clockfuncs {
     /// `zx_clock_get_monotonic()` cannot fail.
     @vdsocall
     ClockGetMonotonic() -> (@wrapped_return struct {
-        time time;
+        time Time;
     });
 
     // Read clock monotonic, but demand that the read be performed using a
@@ -54,7 +54,7 @@ protocol Clockfuncs {
     // to be used by application code.
     @internal
     ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
-        time time;
+        time Time;
     });
 
     // TODO: handle:CLOCK for all of these.
@@ -171,8 +171,8 @@ protocol Clockfuncs {
         @voidptr
         args experimental_pointer<byte>;
     }) -> (resource struct {
-        out handle;
-    }) error status;
+        out Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -217,10 +217,10 @@ protocol Clockfuncs {
     /// [`zx_clock_get_details()`]: clock_get_details.md
     /// [`zx_clock_update()`]: clock_update.md
     ClockRead(resource struct {
-        handle handle;
+        handle Handle;
     }) -> (struct {
-        now time;
-    }) error status;
+        now Time;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -292,12 +292,12 @@ protocol Clockfuncs {
     /// [`zx_clock_read()`]: clock_read.md
     /// [`zx_clock_update()`]: clock_update.md
     ClockGetDetails(resource struct {
-        handle handle;
+        handle Handle;
         options uint64;
     }) -> (struct {
         @voidptr
         details experimental_pointer<byte>;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -525,9 +525,9 @@ protocol Clockfuncs {
     /// [`zx_clock_get_details()`]: clock_get_details.md
     /// [`zx_clock_read()`]: clock_read.md
     ClockUpdate(resource struct {
-        handle handle;
+        handle Handle;
         options uint64;
         @voidptr
         args experimental_pointer<byte>;
-    }) -> () error status;
+    }) -> () error Status;
 };

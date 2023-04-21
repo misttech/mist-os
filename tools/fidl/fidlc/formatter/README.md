@@ -676,7 +676,7 @@ contains three `MultilineSpanSequence`s:
 
 ```fidl
 resource struct {
-   a zx.handle;
+   a zx.Handle;
 };
 ```
 

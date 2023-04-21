@@ -698,7 +698,7 @@ library example;
 using zx;
 
 type TableWithOneHandle = resource table {
-  1: h zx.handle;
+  1: h zx.Handle;
 };
 
 )FIDL");
@@ -1204,15 +1204,15 @@ library example;
 using zx;
 
 type OneHandleUnion = strict resource union {
-  1: one_handle zx.handle;
+  1: one_handle zx.Handle;
   2: one_bool bool;
   3: one_int uint32;
 };
 
 type ManyHandleUnion = strict resource union {
-  1: one_handle zx.handle;
-  2: handle_array array<zx.handle, 8>;
-  3: handle_vector vector<zx.handle>:8;
+  1: one_handle zx.Handle;
+  2: handle_array array<zx.Handle, 8>;
+  3: handle_vector vector<zx.Handle>:8;
 };
 
 )FIDL");
@@ -1513,27 +1513,27 @@ library example;
 using zx;
 
 type HandleVector = resource struct {
-  hv vector<zx.handle>:8;
+  hv vector<zx.Handle>:8;
 };
 
 type HandleNullableVector = resource struct {
-  hv vector<zx.handle>:<8, optional>;
+  hv vector<zx.Handle>:<8, optional>;
 };
 
 type TableWithHandleVector = resource table {
-  1: hv vector<zx.handle>:8;
+  1: hv vector<zx.Handle>:8;
 };
 
 type UnboundedHandleVector = resource struct {
-  hv vector<zx.handle>;
+  hv vector<zx.Handle>;
 };
 
 type TableWithUnboundedHandleVector = resource table {
-  1: hv vector<zx.handle>;
+  1: hv vector<zx.Handle>;
 };
 
 type OneHandle = resource struct {
-  h zx.handle;
+  h zx.Handle;
 };
 
 type HandleStructVector = resource struct {
@@ -1541,7 +1541,7 @@ type HandleStructVector = resource struct {
 };
 
 type TableWithOneHandle = resource table {
-  1: h zx.handle;
+  1: h zx.Handle;
 };
 
 type HandleTableVector = resource struct {
@@ -1871,19 +1871,19 @@ library example;
 using zx;
 
 type HandleArray = resource struct {
-  h1 array<zx.handle, 8>;
+  h1 array<zx.Handle, 8>;
 };
 
 type TableWithHandleArray = resource table {
-  1: ha array<zx.handle, 8>;
+  1: ha array<zx.Handle, 8>;
 };
 
 type NullableHandleArray = resource struct {
-  ha array<zx.handle:optional, 8>;
+  ha array<zx.Handle:optional, 8>;
 };
 
 type TableWithNullableHandleArray = resource table {
-  1: ha array<zx.handle:optional, 8>;
+  1: ha array<zx.Handle:optional, 8>;
 };
 
 )FIDL");
@@ -2422,7 +2422,7 @@ type ExternalStringSizeStruct = struct {
 };
 
 type ExternalVectorSizeStruct = resource struct {
-    a vector<zx.handle>:EXTERNAL_SIZE_DEF;
+    a vector<zx.Handle>:EXTERNAL_SIZE_DEF;
 };
 
 )FIDL");
@@ -2943,12 +2943,12 @@ library example;
 using zx;
 
 type A = resource struct {
-    a zx.handle;
+    a zx.Handle;
     foo box<B>;
 };
 
 type B = resource struct {
-    b zx.handle;
+    b zx.Handle;
     bar box<A>;
 };
 )FIDL");
@@ -3382,7 +3382,7 @@ library example;
 using zx;
 
 type A = resource struct {
-    zero_size vector<zx.handle>:0;
+    zero_size vector<zx.Handle>:0;
 };
 
 )FIDL");

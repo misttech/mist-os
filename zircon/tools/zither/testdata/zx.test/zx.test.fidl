@@ -16,7 +16,7 @@ type Subtype = enum : uint32 {
     RESOURCE = 2;
 };
 
-resource_definition handle : uint32 {
+resource_definition Handle : uint32 {
     properties {
         subtype Subtype;
     };
@@ -26,13 +26,13 @@ resource_definition handle : uint32 {
 protocol Channel {
     @handle_unchecked
     Read(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
         @out
         @voidptr
         bytes experimental_pointer<byte>;
         @out
-        handles experimental_pointer<handle>;
+        handles experimental_pointer<Handle>;
         num_bytes uint32;
         num_handles uint32;
     }) -> (resource struct {
@@ -41,14 +41,14 @@ protocol Channel {
     }) error Status;
 
     Write(resource struct {
-        handle handle:CHANNEL;
+        handle Handle:CHANNEL;
         options uint32;
         @voidptr
         @size32
         bytes vector<byte>;
         @release
         @size32
-        handles vector<handle>;
+        handles vector<Handle>;
     }) -> () error Status;
 };
 
@@ -71,14 +71,14 @@ protocol Clockfuncs {
 protocol Handlefuncs {
     HandleCloseMany(resource struct {
         @release
-        handles vector<handle>;
+        handles vector<Handle>;
     }) -> () error Status;
 };
 
 @transport("Syscall")
 protocol Ktrace {
     Control(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         action uint32;
         options uint32;
 

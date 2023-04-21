@@ -20,7 +20,7 @@ library example;
 using zx;
 
 type MyStruct = resource struct {
-    h zx.handle:<THREAD, zx.Rights.DUPLICATE | zx.Rights.TRANSFER>;
+    h zx.Handle:<THREAD, zx.Rights.DUPLICATE | zx.Rights.TRANSFER>;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -49,7 +49,7 @@ library example;
 using zx;
 
 type MyStruct = resource struct {
-    h zx.handle:VMO;
+    h zx.Handle:VMO;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -77,7 +77,7 @@ library example;
 using zx;
 
 protocol P {
-    Method(struct { h zx.handle:<VMO, 1>; });  // rights must be zx.Rights-typed.
+    Method(struct { h zx.Handle:<VMO, 1>; });  // rights must be zx.Rights-typed.
 };
 )FIDL");
   library.UseLibraryZx();
@@ -95,7 +95,7 @@ library example;
 using zx;
 
 type MyStruct = resource struct {
-    h zx.handle;
+    h zx.Handle;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -121,9 +121,9 @@ library example;
 using zx;
 
 type MyStruct = resource struct {
-  a zx.handle:THREAD;
-  b zx.handle:<PROCESS>;
-  c zx.handle:<VMO, zx.Rights.TRANSFER>;
+  a zx.Handle:THREAD;
+  b zx.Handle:<PROCESS>;
+  c zx.Handle:<VMO, zx.Rights.TRANSFER>;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -164,7 +164,7 @@ library example;
 using zx;
 
 type MyStruct = struct {
-  a zx.handle:ZIPPY;
+  a zx.Handle:ZIPPY;
 };
 )FIDL");
   library.UseLibraryZx();

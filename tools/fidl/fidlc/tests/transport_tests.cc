@@ -59,7 +59,7 @@ using zx;
 @transport("Driver")
 protocol P {
   M() -> (resource struct{
-     h zx.handle;
+     h zx.Handle;
   });
 };
 )FIDL");
@@ -76,7 +76,7 @@ using zx;
 @transport("Syscall")
 protocol P {
   M() -> (resource struct{
-     h zx.handle;
+     h zx.Handle;
   });
 };
 )FIDL");
@@ -93,7 +93,7 @@ using zx;
 @transport("Banjo")
 protocol P {
   M() -> (resource struct{
-     h zx.handle;
+     h zx.Handle;
   });
 };
 )FIDL");

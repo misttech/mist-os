@@ -51,10 +51,10 @@ protocol Exception {
     /// [`zx_exception_get_process()`]: exception_get_process.md
     /// [`zx_task_create_exception_channel()`]: task_create_exception_channel.md
     GetThread(resource struct {
-        handle handle:EXCEPTION;
+        handle Handle:EXCEPTION;
     }) -> (resource struct {
-        out handle:THREAD;
-    }) error status;
+        out Handle:THREAD;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -107,8 +107,8 @@ protocol Exception {
     /// [`zx_exception_get_thread()`]: exception_get_thread.md
     /// [`zx_task_create_exception_channel()`]: task_create_exception_channel.md
     GetProcess(resource struct {
-        handle handle:EXCEPTION;
+        handle Handle:EXCEPTION;
     }) -> (resource struct {
-        out handle:PROCESS;
-    }) error status;
+        out Handle:PROCESS;
+    }) error Status;
 };

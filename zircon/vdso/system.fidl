@@ -312,7 +312,7 @@ protocol System {
         kind uint32;
     }) -> (struct {
         features uint32;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -408,11 +408,11 @@ protocol System {
     /// **ZX_ERR_INVALID_ARGS** *kind* was not one of the supported values specified
     /// above.
     GetEvent(resource struct {
-        root_job handle:JOB;
+        root_job Handle:JOB;
         kind uint32;
     }) -> (resource struct {
-        event handle:EVENT;
-    }) error status;
+        event Handle:EVENT;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -491,13 +491,13 @@ protocol System {
     ///
     /// [`zx_system_get_performance_info()`]: system_get_performance_info.md
     SetPerformanceInfo(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         topic uint32;
         // TODO(joshuaseaton): vector<byte>
         @voidptr
         info experimental_pointer<byte>;
         count usize64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -589,7 +589,7 @@ protocol System {
     ///
     /// [`zx_system_set_performance_info()`]: system_set_performance_info.md
     GetPerformanceInfo(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         topic uint32;
         count usize64;
     }) -> (resource struct {
@@ -597,7 +597,7 @@ protocol System {
         @voidptr
         info experimental_pointer<byte>;
         output_count usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -654,10 +654,10 @@ protocol System {
     ///
     /// [`zx_system_mexec_payload_get()`]: system_mexec_payload_get.md
     Mexec(resource struct {
-        resource handle:RESOURCE;
-        kernel_vmo handle:VMO;
-        bootimage_vmo handle:VMO;
-    }) -> () error status;
+        resource Handle:RESOURCE;
+        kernel_vmo Handle:VMO;
+        bootimage_vmo Handle:VMO;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -712,11 +712,11 @@ protocol System {
     ///
     /// [`zx_system_mexec()`]: system_mexec.md
     MexecPayloadGet(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:MAX;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -866,8 +866,8 @@ protocol System {
     ///
     /// TODO(fxbug.dev/32938)
     Powerctl(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         cmd uint32;
         arg SystemPowerctlArg;
-    }) -> () error status;
+    }) -> () error Status;
 };

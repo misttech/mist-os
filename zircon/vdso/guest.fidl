@@ -96,12 +96,12 @@ protocol Guest {
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmo_create()`]: vmo_create.md
     Create(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         options uint32;
     }) -> (resource struct {
-        guest_handle handle:GUEST;
-        vmar_handle handle:VMAR;
-    }) error status;
+        guest_handle Handle:GUEST;
+        vmar_handle Handle:VMAR;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -225,11 +225,11 @@ protocol Guest {
     /// [`zx_vcpu_read_state()`]: vcpu_read_state.md
     /// [`zx_vcpu_write_state()`]: vcpu_write_state.md
     SetTrap(resource struct {
-        handle handle:GUEST;
+        handle Handle:GUEST;
         kind uint32;
         addr Vaddr;
         size usize64;
-        port_handle handle:PORT;
+        port_handle Handle:PORT;
         key uint64;
-    }) -> () error status;
+    }) -> () error Status;
 };

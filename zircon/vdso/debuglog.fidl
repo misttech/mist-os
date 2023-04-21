@@ -60,11 +60,11 @@ protocol Debuglog {
     /// [`zx_debuglog_read()`]: debuglog_read.md
     /// [`zx_debuglog_write()`]: debuglog_write.md
     Create(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         options uint32;
     }) -> (resource struct {
-        out handle:LOG;
-    }) error status;
+        out Handle:LOG;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -127,11 +127,11 @@ protocol Debuglog {
     /// [`zx_debuglog_create()`]: debuglog_create.md
     /// [`zx_debuglog_read()`]: debuglog_read.md
     Write(resource struct {
-        handle handle:LOG;
+        handle Handle:LOG;
         options uint32;
         @voidptr
         buffer vector<byte>:LOG_RECORD_MAX;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -235,10 +235,10 @@ protocol Debuglog {
     /// [`zx_debuglog_create()`]: debuglog_create.md
     /// [`zx_debuglog_write()`]: debuglog_write.md
     Read(resource struct {
-        handle handle:LOG;
+        handle Handle:LOG;
         options uint32;
     }) -> (struct {
         @voidptr
         buffer vector<byte>:LOG_RECORD_MAX;
-    }) error status;
+    }) error Status;
 };

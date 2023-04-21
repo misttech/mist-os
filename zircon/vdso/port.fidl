@@ -91,7 +91,7 @@ type PacketGuestVcpu = struct {
 };
 
 type PacketInterrupt = struct {
-    timestamp time;
+    timestamp Time;
     reserved0 uint64;
     reserved1 uint64;
     reserved2 uint64;
@@ -109,7 +109,7 @@ type PacketPageRequest = struct {
 type PortPacket = struct {
     key uint64;
     type uint32;
-    status status;
+    status Status;
     // TODO(scottmg): Unnamed union.
     // union {
     user PacketUser;
@@ -193,8 +193,8 @@ protocol Port {
     Create(struct {
         options uint32;
     }) -> (resource struct {
-        out handle:PORT;
-    }) error status;
+        out Handle:PORT;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -269,9 +269,9 @@ protocol Port {
     /// [`zx_port_create()`]: port_create.md
     /// [`zx_port_wait()`]: port_wait.md
     Queue(resource struct {
-        handle handle:PORT;
+        handle Handle:PORT;
         packet PortPacket;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -396,11 +396,11 @@ protocol Port {
     /// [`zx_port_queue()`]: port_queue.md
     @blocking
     Wait(resource struct {
-        handle handle:PORT;
-        deadline time;
+        handle Handle:PORT;
+        deadline Time;
     }) -> (struct {
         packet PortPacket;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -455,8 +455,8 @@ protocol Port {
     /// [`zx_object_wait_async()`]: object_wait_async.md
     /// [`zx_port_wait()`]: port_wait.md
     Cancel(resource struct {
-        handle handle:PORT;
-        source handle;
+        handle Handle:PORT;
+        source Handle;
         key uint64;
-    }) -> () error status;
+    }) -> () error Status;
 };

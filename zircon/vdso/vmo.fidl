@@ -117,8 +117,8 @@ protocol Vmo {
         size uint64;
         options uint32;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 
     // TODO(scottmg): This syscall is very weird, it's currently:
     //    (handle, buffer, offset, buffer_size)
@@ -207,13 +207,13 @@ protocol Vmo {
     /// [`zx_vmo_write()`]: vmo_write.md
     @blocking
     Read(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
         @out
         @voidptr
         buffer experimental_pointer<byte>;
         offset uint64;
         buffer_size usize64;
-    }) -> () error status;
+    }) -> () error Status;
 
     // TODO(scottmg): Same problem as Read() above.
     /// ## Summary
@@ -289,12 +289,12 @@ protocol Vmo {
     /// [`zx_vmo_set_size()`]: vmo_set_size.md
     @blocking
     Write(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
         @voidptr
         buffer experimental_pointer<byte>;
         offset uint64;
         buffer_size usize64;
-    }) -> () error status;
+    }) -> () error Status;
 
     // TODO(fxbug.dev/32803): No rights required?
     /// ## SUMMARY
@@ -352,10 +352,10 @@ protocol Vmo {
     /// [`zx_vmo_write()`]: vmo_write.md
     /// Read the current size of a VMO object.
     GetSize(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
     }) -> (struct {
         size uint64;
-    }) error status;
+    }) error Status;
 
     /// ## SUMMARY
     ///
@@ -430,9 +430,9 @@ protocol Vmo {
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_write()`]: vmo_write.md
     SetSize(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
         size uint64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## SUMMARY
     ///
@@ -637,14 +637,14 @@ protocol Vmo {
     /// [`zx_vmo_write()`]: vmo_write.md
     @blocking
     OpRange(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
         op uint32;
         offset uint64;
         size uint64;
         @inout
         @voidptr
         buffer vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## SUMMARY
     ///
@@ -821,13 +821,13 @@ protocol Vmo {
     /// [`zx_vmo_set_size()`]: vmo_set_size.md
     /// [`zx_vmo_write()`]: vmo_write.md
     CreateChild(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
         options uint32;
         offset uint64;
         size uint64;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 
     /// ## SUMMARY
     ///
@@ -915,9 +915,9 @@ protocol Vmo {
     /// [`zx_vmo_set_size()`]: vmo_set_size.md
     /// [`zx_vmo_write()`]: vmo_write.md
     SetCachePolicy(resource struct {
-        handle handle:VMO;
+        handle Handle:VMO;
         cache_policy uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     // TODO(fxbug.dev/32803): handle: No rights required, ZX_RIGHT_EXECUTE added to dup out
     // TODO(fxbug.dev/32803): vmex == ZX_HANDLE_INVALID also accepted.
@@ -974,11 +974,11 @@ protocol Vmo {
     /// [`zx_vmar_map()`]: vmar_map.md
     ReplaceAsExecutable(resource struct {
         @release
-        handle handle:VMO;
-        vmex handle:RESOURCE;
+        handle Handle:VMO;
+        vmex Handle:RESOURCE;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 
     /// ## SUMMARY
     ///
@@ -1015,12 +1015,12 @@ protocol Vmo {
     ///
     /// TODO(fxbug.dev/32938)
     CreateContiguous(resource struct {
-        bti handle:BTI;
+        bti Handle:BTI;
         size usize64;
         alignment_log2 uint32;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 
     /// ## SUMMARY
     ///
@@ -1115,10 +1115,10 @@ protocol Vmo {
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_write()`]: vmo_write.md
     CreatePhysical(resource struct {
-        resource handle:RESOURCE;
+        resource Handle:RESOURCE;
         paddr Paddr;
         size usize64;
     }) -> (resource struct {
-        out handle:VMO;
-    }) error status;
+        out Handle:VMO;
+    }) error Status;
 };

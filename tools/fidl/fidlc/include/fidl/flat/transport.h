@@ -15,7 +15,7 @@ namespace fidl::flat {
 // The class / namespace of the handle, used for compatibility checking with
 // transports.
 enum class HandleClass {
-  kZircon,  // zx.handle
+  kZircon,  // zx.Handle
   kDriver,  // fdf.handle
   kBanjo,   // only referenced by client_end / server_end
 };
@@ -36,7 +36,7 @@ struct Transport {
   // e.g. "Channel".
   std::string_view name;
   // The class of handle used to represent client and server endpoints of this transport
-  // (e.g. zx.handle for @transport("Channel")).
+  // (e.g. zx.Handle for @transport("Channel")).
   std::optional<HandleClass> handle_class;
   // The classes of handles that can be used in this transport.
   std::set<HandleClass> compatible_handle_classes;

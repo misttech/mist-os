@@ -61,8 +61,8 @@ protocol Misc {
     /// [`zx_timer_set()`]: timer_set.md
     @blocking
     Nanosleep(struct {
-        deadline time;
-    }) -> () error status;
+        deadline Time;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -216,9 +216,9 @@ protocol Misc {
     /// [ticks_get](ticks_get.md)
     @vdsocall
     DeadlineAfter(struct {
-        nanoseconds duration;
+        nanoseconds Duration;
     }) -> (@wrapped_return struct {
-        time time;
+        time Time;
     });
 
     /// ## Summary
@@ -290,12 +290,12 @@ protocol Misc {
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     @vdsocall
     VmarUnmapHandleCloseThreadExit(resource struct {
-        vmar_handle handle:VMAR;
+        vmar_handle Handle:VMAR;
         addr Vaddr;
         size usize64;
         @release
-        close_handle handle;
-    }) -> () error status;
+        close_handle Handle;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -376,7 +376,7 @@ protocol Misc {
         wake_count uint32;
         new_value int32;
         @release
-        close_handle handle;
+        close_handle Handle;
     });
 
     // Read the number of high-precision timer ticks since boot, but demand

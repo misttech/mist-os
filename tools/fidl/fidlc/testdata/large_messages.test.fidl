@@ -117,8 +117,8 @@ type UnboundedMaybeLargeValue = struct {
 //   64536
 // +   ???      (64th struct's byte vector size, set to 984/985 to make the message small/large)
 type UnboundedMaybeLargeResource = resource struct {
-    elements array< resource struct {
-        handle zx.handle:optional;
+    elements array<resource struct {
+        handle zx.Handle:optional;
         bytes vector<byte>:FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE;
     }, HANDLE_CARRYING_ELEMENTS_COUNT>;
 };

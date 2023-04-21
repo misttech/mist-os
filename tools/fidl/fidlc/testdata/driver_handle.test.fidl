@@ -24,7 +24,7 @@ type ServerEndWrapper = resource struct {
 closed protocol HandlesInProtocol {
     strict SendHandles(resource struct {
         t resource table {
-            1: zircon_handle zx.handle:EVENT;
+            1: zircon_handle zx.Handle:EVENT;
             2: fdf_handle client_end:DriverProtocol;
         };
     });

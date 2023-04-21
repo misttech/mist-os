@@ -32,7 +32,7 @@ type StructPaddingTestStruct = struct {
 
 type NonInlineStructTestStruct = resource struct {
     element box<Int16Int8>; // 8-byte alignment
-    h zx.handle;
+    h zx.Handle;
     // 4-byte padding after handle.
 };
 

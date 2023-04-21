@@ -140,14 +140,14 @@ protocol Vmar {
     /// [`zx_vmar_protect()`]: vmar_protect.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     Allocate(resource struct {
-        parent_vmar handle:VMAR;
+        parent_vmar Handle:VMAR;
         options VmOption;
         offset usize64;
         size usize64;
     }) -> (resource struct {
-        child_vmar handle:VMAR;
+        child_vmar Handle:VMAR;
         child_addr Vaddr;
-    }) error status;
+    }) error Status;
 
     // TODO(fxbug.dev/32803): handle No rights required?
     /// ## Summary
@@ -206,8 +206,8 @@ protocol Vmar {
     /// [`zx_vmar_protect()`]: vmar_protect.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     Destroy(resource struct {
-        handle handle:VMAR;
-    }) -> () error status;
+        handle Handle:VMAR;
+    }) -> () error Status;
 
     // TODO(fxbug.dev/32253): TODO handle and vmo and options must all match, and options can't specify them.
     /// ## Summary
@@ -366,15 +366,15 @@ protocol Vmar {
     /// [`zx_vmar_protect()`]: vmar_protect.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     Map(resource struct {
-        handle handle:VMAR;
+        handle Handle:VMAR;
         options VmOption;
         vmar_offset usize64;
-        vmo handle:VMO;
+        vmo Handle:VMO;
         vmo_offset uint64;
         len usize64;
     }) -> (struct {
         mapped_addr Vaddr;
-    }) error status;
+    }) error Status;
 
     // TODO(fxbug.dev/32803): handle No rights required?
     /// ## Summary
@@ -436,10 +436,10 @@ protocol Vmar {
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_protect()`]: vmar_protect.md
     Unmap(resource struct {
-        handle handle:VMAR;
+        handle Handle:VMAR;
         addr Vaddr;
         len usize64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -535,11 +535,11 @@ protocol Vmar {
     /// [`zx_vmar_map()`]: vmar_map.md
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     Protect(resource struct {
-        handle handle:VMAR;
+        handle Handle:VMAR;
         options VmOption;
         addr Vaddr;
         len usize64;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -655,12 +655,12 @@ protocol Vmar {
     /// [`zx_vmar_unmap()`]: vmar_unmap.md
     /// [`zx_vmo_op_range()`]: vmo_op_range.md
     OpRange(resource struct {
-        handle handle:VMAR;
+        handle Handle:VMAR;
         op uint32;
         address Vaddr;
         size usize64;
         @inout
         @voidptr
         buffer vector<byte>:MAX;
-    }) -> () error status;
+    }) -> () error Status;
 };

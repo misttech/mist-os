@@ -49,7 +49,7 @@ protocol Ktrace {
     ///
     /// TODO(fxbug.dev/32938)
     Read(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         @out
         @voidptr
         data experimental_pointer<byte>;
@@ -57,7 +57,7 @@ protocol Ktrace {
         data_size usize64;
     }) -> (struct {
         actual usize64;
-    }) error status;
+    }) error Status;
 
     // TODO(scottmg): syscalls.banjo had the length of |ptr| being |action|?
     /// ## Summary
@@ -99,14 +99,14 @@ protocol Ktrace {
     ///
     /// TODO(fxbug.dev/32938)
     Control(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         action uint32;
         options uint32;
 
         @inout
         @voidptr
         ptr experimental_pointer<byte>;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -147,9 +147,9 @@ protocol Ktrace {
     ///
     /// TODO(fxbug.dev/32938)
     Write(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         id uint32;
         arg0 uint32;
         arg1 uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };

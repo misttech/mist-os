@@ -5,42 +5,42 @@ using fdf;
 
 closed protocol SomeProtocol {};
 
-alias aliased_plain_handle = zx.handle;
-alias aliased_subtype_handle = zx.handle:VMO;
-alias aliased_rights_handle = zx.handle:<VMO, zx.Rights.DUPLICATE>;
+alias aliased_plain_handle = zx.Handle;
+alias aliased_subtype_handle = zx.Handle:VMO;
+alias aliased_rights_handle = zx.Handle:<VMO, zx.Rights.DUPLICATE>;
 
 type Handles = resource struct {
-    plain_handle zx.handle;
+    plain_handle zx.Handle;
 
-    bti_handle zx.handle:BTI;
-    channel_handle zx.handle:CHANNEL;
-    clock_handle zx.handle:CLOCK;
-    debuglog_handle zx.handle:LOG;
-    event_handle zx.handle:EVENT;
-    eventpair_handle zx.handle:EVENTPAIR;
-    exception_handle zx.handle:EXCEPTION;
-    fifo_handle zx.handle:FIFO;
-    guest_handle zx.handle:GUEST;
-    interrupt_handle zx.handle:INTERRUPT;
-    iommu_handle zx.handle:IOMMU;
-    job_handle zx.handle:JOB;
-    msi_handle zx.handle:MSI;
-    pager_handle zx.handle:PAGER;
-    pmt_handle zx.handle:PMT;
-    port_handle zx.handle:PORT;
-    process_handle zx.handle:PROCESS;
-    profile_handle zx.handle:PROFILE;
-    resource_handle zx.handle:RESOURCE;
-    socket_handle zx.handle:SOCKET;
-    stream_handle zx.handle:STREAM;
-    suspendtoken_handle zx.handle:SUSPEND_TOKEN;
-    thread_handle zx.handle:THREAD;
-    timer_handle zx.handle:TIMER;
-    vcpu_handle zx.handle:VCPU;
-    vmar_handle zx.handle:VMAR;
-    vmo_handle zx.handle:VMO;
+    bti_handle zx.Handle:BTI;
+    channel_handle zx.Handle:CHANNEL;
+    clock_handle zx.Handle:CLOCK;
+    debuglog_handle zx.Handle:LOG;
+    event_handle zx.Handle:EVENT;
+    eventpair_handle zx.Handle:EVENTPAIR;
+    exception_handle zx.Handle:EXCEPTION;
+    fifo_handle zx.Handle:FIFO;
+    guest_handle zx.Handle:GUEST;
+    interrupt_handle zx.Handle:INTERRUPT;
+    iommu_handle zx.Handle:IOMMU;
+    job_handle zx.Handle:JOB;
+    msi_handle zx.Handle:MSI;
+    pager_handle zx.Handle:PAGER;
+    pmt_handle zx.Handle:PMT;
+    port_handle zx.Handle:PORT;
+    process_handle zx.Handle:PROCESS;
+    profile_handle zx.Handle:PROFILE;
+    resource_handle zx.Handle:RESOURCE;
+    socket_handle zx.Handle:SOCKET;
+    stream_handle zx.Handle:STREAM;
+    suspendtoken_handle zx.Handle:SUSPEND_TOKEN;
+    thread_handle zx.Handle:THREAD;
+    timer_handle zx.Handle:TIMER;
+    vcpu_handle zx.Handle:VCPU;
+    vmar_handle zx.Handle:VMAR;
+    vmo_handle zx.Handle:VMO;
 
-    rights_handle zx.handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
+    rights_handle zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
 
 
     aliased_plain_handle_field aliased_plain_handle;

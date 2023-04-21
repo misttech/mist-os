@@ -230,7 +230,7 @@ func (dn nameVariants) nestVariants(v nameVariants) nameVariants {
 
 // nameVariantsForHandle returns the C++ name for a handle type
 func nameVariantsForHandle(resourceIdentifier string, t fidlgen.HandleSubtype) nameVariants {
-	if resourceIdentifier == "zx/handle" || strings.HasPrefix(resourceIdentifier, "test.") {
+	if resourceIdentifier == "zx/Handle" || strings.HasPrefix(resourceIdentifier, "test.") {
 		if typeName, ok := handleTypeNames[t]; ok {
 			return commonNameVariants(zxNs.member(typeName))
 		}

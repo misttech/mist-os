@@ -167,7 +167,7 @@ type Value = resource struct {
   maybe3 vector<PaddingStruct>;
   maybe4 vector<vector<uint32>>;
   maybe5 vector<string>;
-  maybe6 vector<zx.handle>;
+  maybe6 vector<zx.Handle>;
   maybe7 vector<server_end:P>;
   maybe8 vector<client_end:P>;
   maybe9 vector<Table>;
@@ -931,7 +931,7 @@ type SimpleUnion = union {
 
 type OuterStruct = resource struct {
   a InnerStruct;
-  opt_handle zx.handle:optional;
+  opt_handle zx.Handle:optional;
   opt_union SimpleUnion:optional;
   b InnerStruct;
 };

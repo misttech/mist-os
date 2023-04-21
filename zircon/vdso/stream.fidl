@@ -93,11 +93,11 @@ protocol Stream {
     /// [`zx_stream_writev_at()`]: stream_writev_at.md
     Create(resource struct {
         options uint32;
-        vmo handle:VMO;
+        vmo Handle:VMO;
         seek Off;
     }) -> (resource struct {
-        out_stream handle:STREAM;
-    }) error status;
+        out_stream Handle:STREAM;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -187,12 +187,12 @@ protocol Stream {
     /// [`zx_stream_writev_at()`]: stream_writev_at.md
     @blocking
     Writev(resource struct {
-        handle handle:STREAM;
+        handle Handle:STREAM;
         options uint32;
         vectors vector<Iovec>:MAX;
     }) -> (struct {
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -279,13 +279,13 @@ protocol Stream {
     /// [`zx_stream_writev()`]: stream_writev.md
     @blocking
     WritevAt(resource struct {
-        handle handle:STREAM;
+        handle Handle:STREAM;
         options uint32;
         offset Off;
         vectors vector<Iovec>:MAX;
     }) -> (struct {
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -363,12 +363,12 @@ protocol Stream {
     /// [`zx_stream_writev_at()`]: stream_writev_at.md
     @blocking
     Readv(resource struct {
-        handle handle:STREAM;
+        handle Handle:STREAM;
         options uint32;
     }) -> (struct {
         vectors vector<Iovec>:MAX;
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -445,13 +445,13 @@ protocol Stream {
     /// [`zx_stream_writev_at()`]: stream_writev_at.md
     @blocking
     ReadvAt(resource struct {
-        handle handle:STREAM;
+        handle Handle:STREAM;
         options uint32;
         offset Off;
     }) -> (struct {
         vectors vector<Iovec>:MAX;
         actual usize64;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -527,10 +527,10 @@ protocol Stream {
     /// [`zx_stream_writev()`]: stream_writev.md
     /// [`zx_stream_writev_at()`]: stream_writev_at.md
     Seek(resource struct {
-        handle handle:STREAM;
+        handle Handle:STREAM;
         whence StreamSeekOrigin;
         offset int64;
     }) -> (struct {
         out_seek Off;
-    }) error status;
+    }) error Status;
 };

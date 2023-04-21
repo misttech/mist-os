@@ -346,7 +346,7 @@ TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
            "type Foo = struct { union_member box<union { 1: data uint8; }>; };",
            "type Foo = struct { vector_member box<vector<uint8>>; };",
            "type Foo = struct { string_member box<string>; };",
-           "type Foo = resource struct { handle_member box<zx.handle>; };",
+           "type Foo = resource struct { handle_member box<zx.Handle>; };",
            "protocol Bar {}; type Foo = resource struct { client_member box<client_end:Bar>; };",
            "protocol Bar {}; type Foo = resource struct { server_member box<server_end:Bar>; };",
        }) {

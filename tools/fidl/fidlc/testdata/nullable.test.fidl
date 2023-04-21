@@ -11,7 +11,7 @@ type StructWithNullableVector = struct {
 };
 
 type StructWithNullableHandle = resource struct {
-    val zx.handle:<VMO, optional>;
+    val zx.Handle:<VMO, optional>;
 };
 
 closed protocol SimpleProtocol {

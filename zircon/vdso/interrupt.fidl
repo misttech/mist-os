@@ -91,12 +91,12 @@ protocol Interrupt {
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
     Create(resource struct {
-        src_obj handle:RESOURCE;
+        src_obj Handle:RESOURCE;
         src_num uint32;
         options uint32;
     }) -> (resource struct {
-        out_handle handle:INTERRUPT;
-    }) error status;
+        out_handle Handle:INTERRUPT;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -194,11 +194,11 @@ protocol Interrupt {
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
     Bind(resource struct {
-        handle handle:INTERRUPT;
-        port_handle handle:PORT;
+        handle Handle:INTERRUPT;
+        port_handle Handle:PORT;
         key uint64;
         options uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -267,10 +267,10 @@ protocol Interrupt {
     /// [`zx_port_wait()`]: port_wait.md
     @blocking
     Wait(resource struct {
-        handle handle:INTERRUPT;
+        handle Handle:INTERRUPT;
     }) -> (struct {
-        out_timestamp time;
-    }) error status;
+        out_timestamp Time;
+    }) error Status;
 
     // TODO(fxbug.dev/32803): No DESTROY rights here.
     /// ## Summary
@@ -340,8 +340,8 @@ protocol Interrupt {
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
     Destroy(resource struct {
-        handle handle:INTERRUPT;
-    }) -> () error status;
+        handle Handle:INTERRUPT;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -410,8 +410,8 @@ protocol Interrupt {
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
     Ack(resource struct {
-        handle handle:INTERRUPT;
-    }) -> () error status;
+        handle Handle:INTERRUPT;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -476,8 +476,8 @@ protocol Interrupt {
     /// [`zx_interrupt_wait()`]: interrupt_wait.md
     /// [`zx_port_wait()`]: port_wait.md
     Trigger(resource struct {
-        handle handle:INTERRUPT;
+        handle Handle:INTERRUPT;
         options uint32;
-        timestamp time;
-    }) -> () error status;
+        timestamp Time;
+    }) -> () error Status;
 };

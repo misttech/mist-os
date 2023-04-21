@@ -14,7 +14,7 @@ type PciBar = struct {
     // TODO(scottmg): Unnamed union.
     //union {
     //    uintptr_t addr;
-    //    zx_handle_t handle;
+    //    zx_handle_t Handle;
     //};
 };
 
@@ -98,12 +98,12 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     GetNthDevice(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         index uint32;
     }) -> (resource struct {
         out_info PcieDeviceInfo;
-        out_handle handle;
-    }) error status;
+        out_handle Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -138,9 +138,9 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     EnableBusMaster(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         enable uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -175,8 +175,8 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     ResetDevice(resource struct {
-        handle handle:PCI_DEVICE;
-    }) -> () error status;
+        handle Handle:PCI_DEVICE;
+    }) -> () error Status;
 
     // TODO(scottmg): In banjo/abigen out_val wasn't optional, but was an input
     // OUT, so didn't get the __NONNULL() tag, so we match by making it optional
@@ -218,12 +218,12 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     ConfigRead(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         offset uint16;
         width usize64;
     }) -> (struct {
         out_val uint32;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -261,11 +261,11 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     ConfigWrite(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         offset uint16;
         width usize64;
         val uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -307,7 +307,7 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     CfgPioRw(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         bus uint8;
         dev uint8;
         func uint8;
@@ -316,7 +316,7 @@ protocol Pci {
         val uint32;
         width usize64;
         write uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     // TODO(scottmg): type of out_handle?
     // TODO(scottmg): In banjo/abigen out_bar wasn't optional, but was an input
@@ -358,12 +358,12 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     GetBar(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         bar_num uint32;
     }) -> (resource struct {
         out_bar PciBar;
-        out_handle handle;
-    }) error status;
+        out_handle Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -400,11 +400,11 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     MapInterrupt(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         which_irq int32;
     }) -> (resource struct {
-        out_handle handle;
-    }) error status;
+        out_handle Handle;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -441,11 +441,11 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     QueryIrqMode(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         mode uint32;
     }) -> (struct {
         out_max_irqs uint32;
-    }) error status;
+    }) error Status;
 
     /// ## Summary
     ///
@@ -482,10 +482,10 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     SetIrqMode(resource struct {
-        handle handle:PCI_DEVICE;
+        handle Handle:PCI_DEVICE;
         mode uint32;
         requested_irq_count uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     // Note that init_buf isn't a vector of PciInitArg, it's a variable sized
     // structure starting with a zx_pci_init_arg_t.
@@ -524,10 +524,10 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     Init(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         init_buf PciInitArg;
         len uint32;
-    }) -> () error status;
+    }) -> () error Status;
 
     /// ## Summary
     ///
@@ -566,10 +566,10 @@ protocol Pci {
     ///
     /// TODO(fxbug.dev/32938)
     AddSubtractIoRange(resource struct {
-        handle handle:RESOURCE;
+        handle Handle:RESOURCE;
         mmio uint32;
         base uint64;
         len uint64;
         add uint32;
-    }) -> () error status;
+    }) -> () error Status;
 };
