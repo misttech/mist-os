@@ -8,11 +8,14 @@
 
 script="$0"
 script_dir="$(dirname "$script")"
+
+source "$script_dir"/common-setup.sh
+
 project_root="$(readlink -f "$script_dir"/../..)"
-project_root_rel="$(realpath --relative-to=. "$project_root")"
+project_root_rel="$(relpath . "$project_root")"
 
 diff_limit=25
-clang_dir_local="$project_root_rel"/prebuilt/third_party/clang/linux-x64
+clang_dir_local="$project_root_rel"/prebuilt/third_party/clang/"$HOST_PLATFORM"
 
 # Tools
 objdump="$clang_dir_local"/bin/llvm-objdump
