@@ -342,13 +342,7 @@ TEST(VmoTestCase, ParallelRead) {
   thread.join();
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_ReadOnlyMap DISABLED_ReadOnlyMap
-#else
-#define MAYBE_ReadOnlyMap ReadOnlyMap
-#endif
-TEST(VmoTestCase, MAYBE_ReadOnlyMap) {
+TEST(VmoTestCase, ReadOnlyMap) {
   zx_status_t status;
   zx_handle_t vmo;
 
@@ -373,13 +367,7 @@ TEST(VmoTestCase, MAYBE_ReadOnlyMap) {
   EXPECT_OK(status, "handle_close");
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_NoPermMap DISABLED_NoPermMap
-#else
-#define MAYBE_NoPermMap NoPermMap
-#endif
-TEST(VmoTestCase, MAYBE_NoPermMap) {
+TEST(VmoTestCase, NoPermMap) {
   zx_status_t status;
   zx_handle_t vmo;
 
@@ -409,13 +397,7 @@ TEST(VmoTestCase, MAYBE_NoPermMap) {
   EXPECT_OK(zx_handle_close(vmo), "handle_close");
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_NoPermProtect DISABLED_NoPermProtect
-#else
-#define MAYBE_NoPermProtect NoPermProtect
-#endif
-TEST(VmoTestCase, MAYBE_NoPermProtect) {
+TEST(VmoTestCase, NoPermProtect) {
   zx_status_t status;
   zx_handle_t vmo;
 
@@ -1672,14 +1654,7 @@ TEST(VmoTestCase, DecommitMisaligned) {
 }
 
 // Resizing a regular mapped VMO causes a fault.
-//
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_ResizeHazard DISABLED_ResizeHazard
-#else
-#define MAYBE_ResizeHazard ResizeHazard
-#endif
-TEST(VmoTestCase, MAYBE_ResizeHazard) {
+TEST(VmoTestCase, ResizeHazard) {
   const size_t size = zx_system_get_page_size() * 2;
   zx_handle_t vmo;
   ASSERT_OK(zx_vmo_create(size, ZX_VMO_RESIZABLE, &vmo));

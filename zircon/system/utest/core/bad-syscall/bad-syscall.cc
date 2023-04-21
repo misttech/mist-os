@@ -49,13 +49,7 @@ TEST(BadAccessTest, NormalMappedAddressChannelWriteSucceeds) {
             "Valid syscall failed");
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_SyscallNumTest DISABLED_SyscallNumTest
-#else
-#define MAYBE_SyscallNumTest SyscallNumTest
-#endif
-TEST(BadAccessTest, MAYBE_SyscallNumTest) {
+TEST(BadAccessTest, SyscallNumTest) {
   ASSERT_DEATH(([]() { bad_syscall(ZX_SYS_COUNT); }));
   ASSERT_DEATH(([]() { bad_syscall(0x80000000ull); }));
   ASSERT_DEATH(([]() { bad_syscall(0xff00ff0000000000ull); }));

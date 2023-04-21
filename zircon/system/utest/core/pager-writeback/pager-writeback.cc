@@ -1654,14 +1654,7 @@ TEST(PagerWriteback, DirtyDuringWriteback) {
 }
 
 // Tests that mapping write permissions are cleared as expected on writeback.
-//
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_WritebackWithMapping DISABLED_WritebackWithMapping
-#else
-#define MAYBE_WritebackWithMapping WritebackWithMapping
-#endif
-TEST(PagerWriteback, MAYBE_WritebackWithMapping) {
+TEST(PagerWriteback, WritebackWithMapping) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 

@@ -198,13 +198,7 @@ TEST(MemoryMappingTest, MmapFlagsTest) {
   EXPECT_NE(MAP_FAILED, addr, "mmap failed with MAP_SHARED flags");
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_MprotectTest DISABLED_MprotectTest
-#else
-#define MAYBE_MprotectTest MprotectTest
-#endif
-TEST(MemoryMappingTest, MAYBE_MprotectTest) {
+TEST(MemoryMappingTest, MprotectTest) {
   uint32_t* addr = (uint32_t*)mmap(nullptr, sizeof(uint32_t), PROT_READ | PROT_WRITE,
                                    MAP_PRIVATE | MAP_ANON, -1, 0);
   ASSERT_NE(MAP_FAILED, addr, "mmap failed to map");
