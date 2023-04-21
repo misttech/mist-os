@@ -10,6 +10,7 @@ use ffx_fastboot::common::{cmd::OemFile, from_manifest};
 use ffx_flash_args::FlashCommand;
 use fidl_fuchsia_developer_ffx::FastbootProxy;
 use std::io::{stdout, Write};
+use termion::{color, style};
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 
@@ -24,6 +25,13 @@ pub async fn flash_plugin_impl<W: Write>(
     mut cmd: FlashCommand,
     writer: &mut W,
 ) -> Result<()> {
+    if cmd.manifest_path.is_some() {
+        // TODO(fxb/125854)
+        writeln!(writer, "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (fxb/125854)", color::Fg(color::Red), style::Reset)?;
+    }
+    if cmd.manifest_path.is_some() && cmd.manifest.is_some() {
+        ffx_bail!("Error: the manifest must be specified either by positional argument or the --manifest flag")
+    }
     match cmd.authorized_keys.as_ref() {
         Some(ssh) => {
             let ssh_file = match std::fs::canonicalize(ssh) {
@@ -70,6 +78,7 @@ pub async fn flash_plugin_impl<W: Write>(
 mod test {
     use super::*;
     use ffx_fastboot::test::setup;
+    use pretty_assertions::assert_eq;
     use std::{default::Default, path::PathBuf};
     use tempfile::NamedTempFile;
 
@@ -78,7 +87,7 @@ mod test {
         assert!(flash(
             setup().1,
             FlashCommand {
-                manifest: Some(PathBuf::from("ffx_test_does_not_exist")),
+                manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
                 ..Default::default()
             }
         )
@@ -93,12 +102,38 @@ mod test {
         assert!(flash(
             setup().1,
             FlashCommand {
-                manifest: Some(PathBuf::from(tmp_file_name)),
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
                 authorized_keys: Some("ssh_does_not_exist".to_string()),
                 ..Default::default()
             }
         )
         .await
         .is_err())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_specify_manifest_twice_throws_error() {
+        let tmp_file = NamedTempFile::new().expect("tmp access failed");
+        let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
+        let mut w = Vec::new();
+        assert!(flash_plugin_impl(
+            setup().1,
+            FlashCommand {
+                manifest: Some(PathBuf::from(tmp_file_name.clone())),
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
+                ..Default::default()
+            },
+            &mut w
+        )
+        .await
+        .is_err());
+        // Additionally, check that the warning was printed
+        assert_eq!(
+            std::str::from_utf8(&w).expect("UTF8 String"),
+            format!(
+                "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (fxb/125854)\n",
+                color::Fg(color::Red),
+                style::Reset
+        ));
     }
 }

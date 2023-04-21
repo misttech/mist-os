@@ -15,7 +15,7 @@ use std::{default::Default, path::PathBuf};
     description = "Flash an image to a target device",
     example = "To flash a specific image:
 
-    $ ffx target flash $(fx get-build-dir)/flash.json --product fuchsia
+    $ ffx target flash --manifest $(fx get-build-dir)/flash.json --product fuchsia
 
 To include SSH keys as well:
 
@@ -45,7 +45,7 @@ pub struct FlashCommand {
         positional,
         description = "path to flashing manifest or zip file containing images and manifest"
     )]
-    pub manifest: Option<PathBuf>,
+    pub manifest_path: Option<PathBuf>,
 
     #[argh(
         option,
@@ -57,6 +57,9 @@ pub struct FlashCommand {
 
     #[argh(option, short = 'b', description = "optional product bundle name")]
     pub product_bundle: Option<String>,
+
+    #[argh(option, short = 'm', description = "optional manifest path")]
+    pub manifest: Option<PathBuf>,
 
     #[argh(option, description = "oem staged file - can be supplied multiple times")]
     pub oem_stage: Vec<OemFile>,
@@ -83,8 +86,9 @@ pub struct FlashCommand {
 
 impl Into<ManifestParams> for FlashCommand {
     fn into(self) -> ManifestParams {
+        let manifest = self.manifest.or_else(|| self.manifest_path);
         ManifestParams {
-            manifest: self.manifest,
+            manifest,
             product: self.product,
             product_bundle: self.product_bundle,
             oem_stage: self.oem_stage,
@@ -141,6 +145,7 @@ mod test {
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
         let test_staged_file = format!("{},{}", test_oem_cmd, tmp_file_name).parse::<OemFile>()?;
         let cmd = FlashCommand {
+            manifest_path: None,
             manifest: None,
             product: "fuchsia".to_string(),
             product_bundle: None,

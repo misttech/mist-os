@@ -18,11 +18,13 @@ ffx_plugin("ffx_flash") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot:lib",
+    "//third_party/rust_crates:termion",
     "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
   ]
   args_test_deps = [
