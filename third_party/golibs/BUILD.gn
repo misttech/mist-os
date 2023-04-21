@@ -14,6 +14,7 @@ go_library("cloud.google.com/go/compute/metadata") {
     "metadata.go",
     "retry.go",
     "retry_linux.go",
+    "tidyfix.go",
   ]
 }
 
@@ -26,7 +27,12 @@ go_library("cloud.google.com/go/iam") {
     ":google.golang.org/genproto/googleapis/iam/v1",
     ":google.golang.org/grpc",
   ]
-  sources = [ "iam.go" ]
+  sources = [
+    "apiv1/iampb/iam_policy.pb.go",
+    "apiv1/iampb/options.pb.go",
+    "apiv1/iampb/policy.pb.go",
+    "iam.go",
+  ]
 }
 
 # Actually aggregates the dependencies of other cloud.google.com/go/internal/*
@@ -311,6 +317,7 @@ go_library("github.com/googleapis/gax-go/v2") {
     "apierror/internal/proto/custom_error.pb.go",
     "apierror/internal/proto/error.pb.go",
     "call_option.go",
+    "content_type.go",
     "gax.go",
     "header.go",
     "internal/version.go",
@@ -552,15 +559,6 @@ go_library("github.com/spdx/tools-golang") {
     "spdx/common/identifier.go",
     "spdx/common/package.go",
     "spdx/common/snippet.go",
-    "spdx/v2_1/annotation.go",
-    "spdx/v2_1/creation_info.go",
-    "spdx/v2_1/document.go",
-    "spdx/v2_1/file.go",
-    "spdx/v2_1/other_license.go",
-    "spdx/v2_1/package.go",
-    "spdx/v2_1/relationship.go",
-    "spdx/v2_1/review.go",
-    "spdx/v2_1/snippet.go",
     "spdx/v2_2/annotation.go",
     "spdx/v2_2/creation_info.go",
     "spdx/v2_2/document.go",
@@ -570,17 +568,6 @@ go_library("github.com/spdx/tools-golang") {
     "spdx/v2_2/relationship.go",
     "spdx/v2_2/review.go",
     "spdx/v2_2/snippet.go",
-    "spdx/v2_3/annotation.go",
-    "spdx/v2_3/creation_info.go",
-    "spdx/v2_3/document.go",
-    "spdx/v2_3/file.go",
-    "spdx/v2_3/other_license.go",
-    "spdx/v2_3/package.go",
-    "spdx/v2_3/relationship.go",
-    "spdx/v2_3/review.go",
-    "spdx/v2_3/snippet.go",
-    "utils/filesystem.go",
-    "utils/verification.go",
   ]
 }
 
@@ -979,6 +966,7 @@ go_library("golang.org/x/net") {
     "http2/hpack/encode.go",
     "http2/hpack/hpack.go",
     "http2/hpack/huffman.go",
+    "http2/hpack/static_table.go",
     "http2/hpack/tables.go",
     "http2/http2.go",
     "http2/not_go111.go",
@@ -1099,6 +1087,8 @@ go_library("golang.org/x/net") {
     "internal/socket/zsys_openbsd_arm.go",
     "internal/socket/zsys_openbsd_arm64.go",
     "internal/socket/zsys_openbsd_mips64.go",
+    "internal/socket/zsys_openbsd_ppc64.go",
+    "internal/socket/zsys_openbsd_riscv64.go",
     "internal/socket/zsys_solaris_amd64.go",
     "internal/socket/zsys_zos_s390x.go",
     "internal/timeseries/timeseries.go",
@@ -1342,6 +1332,8 @@ go_library("golang.org/x/sys") {
     "cpu/cpu_zos.go",
     "cpu/cpu_zos_s390x.go",
     "cpu/hwcap_linux.go",
+    "cpu/parse.go",
+    "cpu/proc_cpuinfo_linux.go",
     "cpu/syscall_aix_gccgo.go",
     "cpu/syscall_aix_ppc64_gc.go",
     "internal/unsafeheader/unsafeheader.go",
@@ -1424,6 +1416,8 @@ go_library("golang.org/x/sys") {
     "unix/syscall_freebsd_arm.go",
     "unix/syscall_freebsd_arm64.go",
     "unix/syscall_freebsd_riscv64.go",
+    "unix/syscall_hurd.go",
+    "unix/syscall_hurd_386.go",
     "unix/syscall_illumos.go",
     "unix/syscall_linux.go",
     "unix/syscall_linux_386.go",
@@ -1559,6 +1553,7 @@ go_library("golang.org/x/sys") {
     "unix/zsyscall_openbsd_arm64.go",
     "unix/zsyscall_openbsd_arm64.s",
     "unix/zsyscall_openbsd_mips64.go",
+    "unix/zsyscall_openbsd_mips64.s",
     "unix/zsyscall_openbsd_ppc64.go",
     "unix/zsyscall_openbsd_ppc64.s",
     "unix/zsyscall_openbsd_riscv64.go",
@@ -1818,17 +1813,18 @@ go_library("gonum.org/v1/gonum") {
 }
 
 ### google.golang.org/*
-go_library("google.golang.org/genproto/googleapis/api/annotations") {
-  name = "google.golang.org/genproto/googleapis/api/annotations/..."
-  source_dir = "vendor/google.golang.org/genproto/googleapis/api/annotations"
+go_library("google.golang.org/genproto/googleapis/api") {
+  name = "google.golang.org/genproto/googleapis/api/..."
+  source_dir = "vendor/google.golang.org/genproto/googleapis/api"
   deps = [ ":github.com/golang/protobuf" ]
   sources = [
-    "annotations.pb.go",
-    "client.pb.go",
-    "field_behavior.pb.go",
-    "http.pb.go",
-    "resource.pb.go",
-    "routing.pb.go",
+    "annotations/annotations.pb.go",
+    "annotations/client.pb.go",
+    "annotations/field_behavior.pb.go",
+    "annotations/http.pb.go",
+    "annotations/resource.pb.go",
+    "annotations/routing.pb.go",
+    "launch_stage.pb.go",
   ]
 }
 
@@ -1837,15 +1833,11 @@ go_library("google.golang.org/genproto/googleapis/iam/v1") {
   source_dir = "vendor/google.golang.org/genproto/googleapis/iam/v1"
   deps = [
     ":github.com/golang/protobuf",
-    ":google.golang.org/genproto/googleapis/api/annotations",
+    ":google.golang.org/genproto/googleapis/api",
     ":google.golang.org/genproto/googleapis/type/expr",
     ":google.golang.org/grpc",
   ]
-  sources = [
-    "iam_policy.pb.go",
-    "options.pb.go",
-    "policy.pb.go",
-  ]
+  sources = [ "alias.go" ]
 }
 
 go_library("google.golang.org/genproto/googleapis/rpc/code") {
@@ -1915,7 +1907,7 @@ go_library("google.golang.org/grpc") {
     "balancer/grpclb/grpclb_picker.go",
     "balancer/grpclb/grpclb_remote_balancer.go",
     "balancer/grpclb/grpclb_util.go",
-    "balancer/grpclb/state/state.go",
+    "balancer/grpclb/grpclbstate/state.go",
     "balancer/roundrobin/roundrobin.go",
     "balancer_conn_wrappers.go",
     "binarylog/grpc_binarylog_v1/binarylog.pb.go",
@@ -1982,6 +1974,7 @@ go_library("google.golang.org/grpc") {
     "internal/credentials/syscallconn.go",
     "internal/credentials/util.go",
     "internal/envconfig/envconfig.go",
+    "internal/envconfig/observability.go",
     "internal/envconfig/xds.go",
     "internal/googlecloud/googlecloud.go",
     "internal/googlecloud/manufacturer.go",
@@ -1991,6 +1984,8 @@ go_library("google.golang.org/grpc") {
     "internal/grpclog/prefixLogger.go",
     "internal/grpcrand/grpcrand.go",
     "internal/grpcsync/event.go",
+    "internal/grpcsync/oncefunc.go",
+    "internal/grpcutil/compressor.go",
     "internal/grpcutil/encode_duration.go",
     "internal/grpcutil/grpcutil.go",
     "internal/grpcutil/metadata.go",
@@ -2071,6 +2066,7 @@ go_library("google.golang.org/api/internal") {
     "creds.go",
     "gensupport/buffer.go",
     "gensupport/doc.go",
+    "gensupport/error.go",
     "gensupport/json.go",
     "gensupport/jsonfloat.go",
     "gensupport/media.go",
@@ -2285,6 +2281,7 @@ go_library("google.golang.org/protobuf") {
     "reflect/protoreflect/source_gen.go",
     "reflect/protoreflect/type.go",
     "reflect/protoreflect/value.go",
+    "reflect/protoreflect/value_equal.go",
     "reflect/protoreflect/value_pure.go",
     "reflect/protoreflect/value_union.go",
     "reflect/protoreflect/value_unsafe.go",
@@ -2370,8 +2367,8 @@ go_library("gvisor.dev/gvisor") {
     "pkg/gohacks/string_go113_unsafe.go",
     "pkg/gohacks/string_go120_unsafe.go",
     "pkg/goid/goid.go",
-    "pkg/goid/goid_impl_amd64.s",
-    "pkg/goid/goid_impl_arm64.s",
+    "pkg/goid/goid_amd64.s",
+    "pkg/goid/goid_arm64.s",
     "pkg/linewriter/linewriter.go",
     "pkg/log/glog.go",
     "pkg/log/json.go",
@@ -2418,11 +2415,12 @@ go_library("gvisor.dev/gvisor") {
     "pkg/sync/race_amd64.s",
     "pkg/sync/race_arm64.s",
     "pkg/sync/race_unsafe.go",
+    "pkg/sync/runtime.go",
     "pkg/sync/runtime_amd64.go",
-    "pkg/sync/runtime_constants_impl.go",
+    "pkg/sync/runtime_constants.go",
     "pkg/sync/runtime_other.go",
-    "pkg/sync/runtime_spinning_impl_amd64.s",
-    "pkg/sync/runtime_spinning_impl_arm64.s",
+    "pkg/sync/runtime_spinning_amd64.s",
+    "pkg/sync/runtime_spinning_other.s",
     "pkg/sync/runtime_unsafe.go",
     "pkg/sync/rwmutex_unsafe.go",
     "pkg/sync/seqcount.go",
