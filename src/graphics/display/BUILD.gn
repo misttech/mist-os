@@ -31,6 +31,7 @@ group("tools") {
   testonly = true
   deps = [
     "bin/display-factory-test",
+    "bin/display-png",
     "bin/display-tool",
     "bin/display-tweak",
   ]
@@ -40,7 +41,7 @@ group("tests") {
   testonly = true
   deps = [
     ":display-fuzzers",
-    "bin/display-factory-test:tests",
+    "bin/display-png:tests",
     "bin/display-test:tests",
     "bin/display-tool:tests",
     "bin/display-tweak:tests",
