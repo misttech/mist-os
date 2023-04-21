@@ -188,17 +188,16 @@ config_data("omaha-client-config") {
   sources = [ omaha_app_id_file ]
 }
 
-config_data("omaha-client-test-config") {
+resource("omaha-client-test-config") {
   testonly = true
-  for_pkg = "omaha-client-service-bin-tests"
-  outputs = [ "omaha_app_id" ]
+  outputs = [ "test-config-data/omaha-client-service-bin-tests/omaha_app_id" ]
   sources = [ rebase_path("test_data/omaha_test_app_id") ]
 }
 
-config_data("omaha-client-channels-test-config") {
+resource("omaha-client-channels-test-config") {
   testonly = true
-  for_pkg = "omaha-client-service-bin-tests"
-  outputs = [ "channel_config.json" ]
+  outputs =
+      [ "test-config-data/omaha-client-service-bin-tests/channel_config.json" ]
   sources = [ rebase_path("test_data/test_channel_config.json") ]
 }
 

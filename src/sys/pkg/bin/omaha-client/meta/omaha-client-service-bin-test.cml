@@ -39,9 +39,11 @@
             to: "#test_driver",
         },
         {
-            directory: "config-data",
-            from: "parent",
+            directory: "pkg",
+            from: "framework",
+            as: "config-data",
             to: "#test_driver",
+            subdir: "test-config-data",
         },
         {
             protocol: "fuchsia.update.channelcontrol.ChannelControl",
