@@ -8,7 +8,9 @@ use {
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_config as fconfig,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata,
+    fidl_fuchsia_diagnostics::InspectSinkMarker,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
     fuchsia_async as fasync,
     fuchsia_component::server as fserver,
@@ -45,6 +47,11 @@ lazy_static! {
             // TODO(fxbug.dev/107231): Support optional exposes.
             availability: cm_rust::Availability::Required,
         },);
+
+    static ref PROTOCOLS_ROUTED_TO_ALL: [cm_rust::CapabilityName; 2] = [
+        cm_rust::CapabilityName::from(LogSinkMarker::PROTOCOL_NAME),
+        cm_rust::CapabilityName::from(InspectSinkMarker::PROTOCOL_NAME),
+    ];
 }
 
 #[fuchsia::main]
@@ -871,10 +878,8 @@ impl RealmNodeState {
     ///
     /// Protocols are matched via their `target_name`.
     fn route_common_protocols_from_parent(&mut self) {
-        let protocols_to_offer = &[cm_rust::CapabilityName::from(LogSinkMarker::PROTOCOL_NAME)];
-
-        for protocol in protocols_to_offer {
-            for child in &self.decl.children {
+        for child in &self.decl.children {
+            for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
                 if self.decl.offers.iter().any(|offer| {
                     offer.target_name() == protocol
                         && match offer.target() {
@@ -2018,32 +2023,30 @@ mod tests {
         }
 
         fn add_recursive_automatic_decls(&mut self) {
-            for child in &self.decl.children {
-                self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+            let create_offer_decl = |child_name: &str, protocol: cm_rust::CapabilityName| {
+                cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child.name.clone().into(),
+                        name: child_name.into(),
                         collection: None,
                     }),
-                    source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                    target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                    source_name: protocol.clone(),
+                    target_name: protocol,
                     dependency_type: cm_rust::DependencyType::Strong,
                     availability: cm_rust::Availability::Required,
-                }));
+                })
+            };
+
+            for child in &self.decl.children {
+                for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
+                    self.decl.offers.push(create_offer_decl(child.name.as_ref(), protocol.clone()));
+                }
             }
 
             for (child_name, _, _) in &self.children {
-                self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                    source: cm_rust::OfferSource::Parent,
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child_name.clone().into(),
-                        collection: None,
-                    }),
-                    source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                    target_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Required,
-                }));
+                for protocol in &*PROTOCOLS_ROUTED_TO_ALL {
+                    self.decl.offers.push(create_offer_decl(child_name.as_ref(), protocol.clone()));
+                }
             }
 
             for (_, _, child_tree) in &mut self.children {
@@ -2332,11 +2335,33 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                            name: "a".into(),
+                            collection: None,
+                        }),
+                        source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        dependency_type: cm_rust::DependencyType::Strong,
+                        availability: cm_rust::Availability::Required,
+                    }),
+                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                        source: cm_rust::OfferSource::Parent,
+                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                             name: "b".into(),
                             collection: None,
                         }),
                         source_name: LogSinkMarker::PROTOCOL_NAME.into(),
                         target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                        dependency_type: cm_rust::DependencyType::Strong,
+                        availability: cm_rust::Availability::Required,
+                    }),
+                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                        source: cm_rust::OfferSource::Parent,
+                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                            name: "b".into(),
+                            collection: None,
+                        }),
+                        source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
                         dependency_type: cm_rust::DependencyType::Strong,
                         availability: cm_rust::Availability::Required,
                     }),
@@ -2370,11 +2395,33 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                    name: "b_child_static".into(),
+                                    collection: None,
+                                }),
+                                source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                                target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                                dependency_type: cm_rust::DependencyType::Strong,
+                                availability: cm_rust::Availability::Required,
+                            }),
+                            cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                                source: cm_rust::OfferSource::Parent,
+                                target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
                                     name: "b_child_dynamic".into(),
                                     collection: None,
                                 }),
                                 source_name: LogSinkMarker::PROTOCOL_NAME.into(),
                                 target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                                dependency_type: cm_rust::DependencyType::Strong,
+                                availability: cm_rust::Availability::Required,
+                            }),
+                            cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                                source: cm_rust::OfferSource::Parent,
+                                target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                                    name: "b_child_dynamic".into(),
+                                    collection: None,
+                                }),
+                                source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                                target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
                                 dependency_type: cm_rust::DependencyType::Strong,
                                 availability: cm_rust::Availability::Required,
                             }),
@@ -2857,17 +2904,30 @@ mod tests {
 
         let mut expected_tree = ComponentTree {
             decl: cm_rust::ComponentDecl {
-                offers: vec![cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-                    source: cm_rust::OfferSource::Parent,
-                    target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "realm_with_child".into(),
-                        collection: None,
+                offers: vec![
+                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                        source: cm_rust::OfferSource::Parent,
+                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                            name: "realm_with_child".into(),
+                            collection: None,
+                        }),
+                        source_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                        target_name: LogSinkMarker::PROTOCOL_NAME.into(),
+                        dependency_type: cm_rust::DependencyType::Strong,
+                        availability: cm_rust::Availability::Required,
                     }),
-                    source_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                    target_name: LogSinkMarker::PROTOCOL_NAME.into(),
-                    dependency_type: cm_rust::DependencyType::Strong,
-                    availability: cm_rust::Availability::Required,
-                })],
+                    cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+                        source: cm_rust::OfferSource::Parent,
+                        target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
+                            name: "realm_with_child".into(),
+                            collection: None,
+                        }),
+                        source_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        target_name: InspectSinkMarker::PROTOCOL_NAME.into(),
+                        dependency_type: cm_rust::DependencyType::Strong,
+                        availability: cm_rust::Availability::Required,
+                    }),
+                ],
                 ..cm_rust::ComponentDecl::default()
             },
             children: vec![(
@@ -2886,6 +2946,7 @@ mod tests {
                 },
             )],
         };
+
         expected_tree.add_binder_expose();
         assert_decls_eq!(tree_from_resolver, expected_tree);
     }
