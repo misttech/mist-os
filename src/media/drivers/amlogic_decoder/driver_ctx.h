@@ -66,6 +66,14 @@ class DriverCtx {
 
   CodecDiagnostics& diagnostics();
 
+  void Suspend() {
+    metrics_ = std::nullopt;
+    shared_fidl_loop_->Quit();
+    shared_fidl_loop_->JoinThreads();
+    shared_fidl_loop_->Shutdown();
+    shared_fidl_loop_.reset();
+  }
+
  private:
   static constexpr std::string_view kDriverName = "amlogic-video-decoder";
 
@@ -76,7 +84,7 @@ class DriverCtx {
   std::shared_ptr<sys::ServiceDirectory> aux_service_directory_;
 
   // Cobalt:
-  CodecMetrics metrics_;
+  std::optional<CodecMetrics> metrics_;
 
   // Inspector diagnostics
   CodecDiagnostics diagnostics_{kDriverName};

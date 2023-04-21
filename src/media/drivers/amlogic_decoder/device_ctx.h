@@ -24,7 +24,8 @@ namespace amlogic_decoder {
 class DeviceCtx;
 
 using DdkDeviceType =
-    ddk::Device<DeviceCtx, ddk::Messageable<fuchsia_hardware_mediacodec::Device>::Mixin>;
+    ddk::Device<DeviceCtx, ddk::Messageable<fuchsia_hardware_mediacodec::Device>::Mixin,
+                ddk::Suspendable>;
 
 // A pointer to an instance of this class is the per-device "ctx".  The purpose
 // of this class is to provide a place for device-lifetime stuff to be rooted,
@@ -55,6 +56,7 @@ class DeviceCtx : public DdkDeviceType,
   CodecDiagnostics& diagnostics();
 
   void DdkRelease() { delete this; }
+  void DdkSuspend(ddk::SuspendTxn txn);
 
   // AmlogicVideo::Owner implementation
   void SetThreadProfile(zx::unowned_thread thread, ThreadRole role) const override;
@@ -66,6 +68,7 @@ class DeviceCtx : public DdkDeviceType,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 
  private:
+  void TeardownDeviceFidl();
   DriverCtx* driver_ = nullptr;
 
   //

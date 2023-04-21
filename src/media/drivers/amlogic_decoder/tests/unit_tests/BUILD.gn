@@ -16,7 +16,10 @@ executable("amlogic-decoder-unittest-bin") {
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
   ]
-  sources = [ "test_vdec1.cc" ]
+  sources = [
+    "test_binding.cc",
+    "test_vdec1.cc",
+  ]
 }
 
 fuchsia_unittest_package("amlogic-decoder-unittest") {

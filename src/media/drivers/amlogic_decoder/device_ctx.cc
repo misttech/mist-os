@@ -54,7 +54,12 @@ DeviceCtx::DeviceCtx(DriverCtx* driver, zx_device_t* parent)
   device_fidl_ = std::make_unique<DeviceFidl>(this);
 }
 
-DeviceCtx::~DeviceCtx() {
+DeviceCtx::~DeviceCtx() { TeardownDeviceFidl(); }
+
+void DeviceCtx::TeardownDeviceFidl() {
+  if (!device_fidl_) {
+    return;
+  }
   // There are two ways to destroy a fidl::Binding safely:
   //   * Switch to FIDL thread before Unbind() or ~Binding.
   //   * async::Loop Quit() + JoinThreads() before Unbind() or ~Binding
@@ -85,6 +90,21 @@ zx_status_t DeviceCtx::Bind() {
   diagnostics().SetBindTime();
 
   return status;
+}
+
+void DeviceCtx::DdkSuspend(ddk::SuspendTxn txn) {
+  if (txn.enable_wake()) {
+    zxlogf(ERROR, "Suspending with wake enabled not supported.");
+    txn.Reply(ZX_ERR_NOT_SUPPORTED, DEV_POWER_STATE_D0);
+    return;
+  }
+  // Tear down everything to ensure that no driver threads are active by the time blobfs is
+  // unmounted, since attempting to page in code from blobfs after that point could fail. The driver
+  // framework shouldn't call into the driver after suspend has completed.
+  TeardownDeviceFidl();
+  video_.reset();
+  driver_->Suspend();
+  txn.Reply(ZX_OK, txn.requested_state());
 }
 
 void DeviceCtx::SetThreadProfile(zx::unowned_thread thread, ThreadRole role) const {

@@ -73,19 +73,21 @@ DriverCtx::DriverCtx() {
   // DriverCtx.  We'll plumb async_t(s) explicitly instead.
   shared_fidl_loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
   shared_fidl_loop_->StartThread("shared_fidl_thread", &shared_fidl_thread_);
+  metrics_.emplace();
   // This won't actually be logged until codec_factory opens a device and calls
   // SetAuxServiceDirectory() on it.  Until then we're buffering event counts.
-  metrics_.LogEvent(
+  metrics_->LogEvent(
       media_metrics::
           StreamProcessorEvents2MigratedMetricDimensionImplementation_AmlogicDecoderShared,
       media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_HostProcessStart);
 }
 
 DriverCtx::~DriverCtx() {
-  assert(shared_fidl_loop_);
-  shared_fidl_loop_->Quit();
-  shared_fidl_loop_->JoinThreads();
-  shared_fidl_loop_->Shutdown();
+  if (shared_fidl_loop_) {
+    shared_fidl_loop_->Quit();
+    shared_fidl_loop_->JoinThreads();
+    shared_fidl_loop_->Shutdown();
+  }
 }
 
 // TODO(dustingreen): Do format, printf, log, maybe some epitaphs.
@@ -153,10 +155,10 @@ void DriverCtx::SetAuxServiceDirectory(
   aux_service_directory_ =
       std::make_shared<sys::ServiceDirectory>(std::move(aux_service_directory));
   ZX_DEBUG_ASSERT(aux_service_directory_);
-  metrics_.SetServiceDirectory(aux_service_directory_);
+  metrics_->SetServiceDirectory(aux_service_directory_);
 }
 
-CodecMetrics& DriverCtx::metrics() { return metrics_; }
+CodecMetrics& DriverCtx::metrics() { return *metrics_; }
 
 CodecDiagnostics& DriverCtx::diagnostics() { return diagnostics_; }
 
