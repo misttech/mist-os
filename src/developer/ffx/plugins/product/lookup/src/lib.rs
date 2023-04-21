@@ -35,28 +35,35 @@ pub async fn pb_lookup(cmd: LookupCommand) -> Result<()> {
     let mut output = stdout();
     let mut err_out = stderr();
     let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_lookup_impl(&cmd, &mut ui).await
+    pb_lookup_impl(&cmd.auth, &cmd.base_url, &cmd.name, &cmd.version, &mut ui).await?;
+    Ok(())
 }
 
-async fn pb_lookup_impl<I>(cmd: &LookupCommand, ui: &I) -> Result<()>
+pub async fn pb_lookup_impl<I>(
+    auth: &AuthFlowChoice,
+    base_url: &str,
+    name: &str,
+    version: &str,
+    ui: &I,
+) -> Result<String>
 where
     I: structured_ui::Interface + Sync,
 {
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Lookup Begin ----------------------------");
     let client = Client::initial()?;
-    let products = pb_gather_from_url(&cmd.base_url, &cmd.auth, ui, &client).await?;
+    let products = pb_gather_from_url(base_url, auth, ui, &client).await?;
 
-    tracing::debug!("Looking for product bundle {}, version {}", cmd.name, cmd.version);
+    tracing::debug!("Looking for product bundle {}, version {}", name, version);
     let products = products
         .iter()
-        .filter(|x| x.name == cmd.name)
-        .filter(|x| x.product_version == cmd.version)
+        .filter(|x| x.name == name)
+        .filter(|x| x.product_version == version)
         .map(|x| x.to_owned())
         .collect::<Vec<ProductBundle>>();
     if products.is_empty() {
         tracing::debug!("products {:?}", products);
-        println!("Error: No product matching name {}, version {} found.", cmd.name, cmd.version);
+        println!("Error: No product matching name {}, version {} found.", name, version);
         std::process::exit(1);
     } else if products.len() > 1 {
         tracing::debug!("products {:?}", products);
@@ -67,7 +74,7 @@ where
     }
     tracing::debug!("Total ffx product lookup runtime {} seconds.", start.elapsed().as_secs_f32());
     tracing::debug!("End");
-    Ok(())
+    Ok(products[0].transfer_manifest_url.to_owned())
 }
 
 /// Fetch product bundle descriptions from a base URL.
@@ -127,13 +134,16 @@ mod test {
         )
         .expect("write_all");
 
-        let cmd = LookupCommand {
-            auth: AuthFlowChoice::Default,
-            base_url: format!("file:{}", test_env.home.display()),
-            name: "fake_name".to_string(),
-            version: "fake_version".to_string(),
-        };
         let ui = structured_ui::MockUi::new();
-        pb_lookup_impl(&cmd, &ui).await.expect("testing lookup");
+        let url = pb_lookup_impl(
+            &AuthFlowChoice::Default,
+            &format!("file:{}", test_env.home.display()),
+            "fake_name",
+            "fake_version",
+            &ui,
+        )
+        .await
+        .expect("testing lookup");
+        assert_eq!(url, "fake_url");
     }
 }

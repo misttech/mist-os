@@ -12,8 +12,12 @@ use async_fs::rename;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_product_download_args::DownloadCommand;
+use pbms::AuthFlowChoice;
 use pbms::{make_way_for_output, transfer_download};
-use std::io::{stderr, stdin, stdout};
+use std::{
+    io::{stderr, stdin, stdout},
+    path::Path,
+};
 use structured_ui;
 
 /// `ffx product download` sub-command.
@@ -24,32 +28,34 @@ pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
     let mut output = stdout();
     let mut err_out = stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_download_impl(&cmd, &client, &ui).await
+    pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.out_dir, &client, &ui).await
 }
 
-async fn pb_download_impl<I: structured_ui::Interface + Sync>(
-    cmd: &DownloadCommand,
+pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
+    auth: &AuthFlowChoice,
+    force: bool,
+    manifest_url: &str,
+    out_dir: &Path,
     client: &Client,
     ui: &I,
 ) -> Result<()> {
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Begin ----------------------------");
     tracing::debug!("transfer_manifest_url Url::parse");
-    let transfer_manifest_url = match url::Url::parse(&cmd.manifest_url) {
+    let transfer_manifest_url = match url::Url::parse(manifest_url) {
         Ok(p) => p,
-        _ => ffx_bail!("The source location must be a URL, failed to parse {:?}", cmd.manifest_url),
+        _ => ffx_bail!("The source location must be a URL, failed to parse {:?}", manifest_url),
     };
-    let local_dir = &cmd.out_dir;
-    tracing::debug!("make_way_for_output {:?}", local_dir);
-    make_way_for_output(&local_dir, cmd.force).await?;
+    tracing::debug!("make_way_for_output {:?}", out_dir);
+    make_way_for_output(&out_dir, force).await?;
 
-    let parent_dir = local_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
+    let parent_dir = out_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
     let temp_dir = tempfile::TempDir::new_in(&parent_dir)?;
     tracing::debug!("transfer_manifest, transfer_manifest_url {:?}", transfer_manifest_url);
     transfer_download(
         &transfer_manifest_url,
         &temp_dir.path(),
-        &cmd.auth,
+        &auth,
         &|layers| {
             let mut progress = structured_ui::Progress::builder();
             progress.title("Transfer download");
@@ -69,9 +75,9 @@ async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     // Workaround for having the product bundle nested in a sub-dir.
     let extra_dir = temp_dir.path().join("product_bundle");
     let pb_dir = if extra_dir.exists() { extra_dir } else { temp_dir.path().to_path_buf() };
-    rename(&pb_dir, &local_dir)
+    rename(&pb_dir, &out_dir)
         .await
-        .with_context(|| format!("moving dir {:?} to {:?}", pb_dir, local_dir))?;
+        .with_context(|| format!("moving dir {:?} to {:?}", pb_dir, out_dir))?;
 
     let layers = vec![ProgressState { name: "complete", at: 2, of: 2, units: "steps" }];
     let mut progress = structured_ui::Progress::builder();
@@ -101,7 +107,7 @@ mod test {
     };
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_gcs_download() {
+    async fn test_gcs_pb_download_impl() {
         let test_dir = tempfile::TempDir::new().expect("temp dir");
         let server = TestServer::builder()
             .handler(ForPath::new(
@@ -122,20 +128,19 @@ mod test {
             .handler(ForPath::new("/api/b/example/o", StaticResponse::ok_body(r#"{}"#)))
             .start()
             .await;
-        let download_dir = test_dir.path().join("download");
-        let cmd = DownloadCommand {
-            auth: pbms::AuthFlowChoice::Default,
-            force: false,
-            out_dir: download_dir.to_path_buf(),
-            manifest_url: "gs://example/fake/transfer.json".to_string(),
-        };
+        let auth = pbms::AuthFlowChoice::Default;
+        let force = false;
+        let manifest_url = "gs://example/fake/transfer.json".to_string();
+        let out_dir = test_dir.path().join("download");
         let client = Client::initial_with_urls(
             &server.local_url_for_path("api"),
             &server.local_url_for_path("storage"),
         )
         .expect("creating client");
         let ui = structured_ui::MockUi::new();
-        pb_download_impl(&cmd, &client, &ui).await.expect("testing download");
+        pb_download_impl(&auth, force, &manifest_url, &out_dir, &client, &ui)
+            .await
+            .expect("testing download");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -164,15 +169,15 @@ mod test {
             .await;
         let test_dir = tempfile::TempDir::new().expect("temp dir");
         let download_dir = test_dir.path().join("download");
-        let cmd = DownloadCommand {
-            auth: pbms::AuthFlowChoice::NoAuth,
-            force: false,
-            out_dir: download_dir.to_path_buf(),
-            manifest_url: server.local_url_for_path("example/fake/transfer.json"),
-        };
+        let auth = pbms::AuthFlowChoice::NoAuth;
+        let force = false;
+        let manifest_url = server.local_url_for_path("example/fake/transfer.json");
+        let out_dir = test_dir.path().join("download");
         let client = Client::initial().expect("creating client");
         let ui = structured_ui::MockUi::new();
-        pb_download_impl(&cmd, &client, &ui).await.expect("testing download");
+        pb_download_impl(&auth, force, &manifest_url, &out_dir, &client, &ui)
+            .await
+            .expect("testing download");
         assert!(download_dir.join("foo").join("payload.txt").exists());
     }
 }
