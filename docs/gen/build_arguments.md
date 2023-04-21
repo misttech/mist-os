@@ -8569,6 +8569,20 @@ is meant solely for developer debugging.
 
 From //build/images/args.gni:177
 
+### vim3_mcu_fan_default_level
+
+The default fan level used by the VIM3 MCU driver.
+
+Valid values are between 0 (completely off) and 3 (full power).
+
+Do not depend on this setting in checked-in code. This setting is intended
+to facilitate at-desk development, and will be replaced by a more robust
+configuration mechanism.
+
+**Current value (from the default):** `1`
+
+From //src/devices/mcu/drivers/vim3-mcu/BUILD.gn:18
+
 ### virtcon_boot_animation_path
 
 **Current value (from the default):** `"//src/bringup/bin/virtcon/data/boot-animation.riv"`
