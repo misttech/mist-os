@@ -18,6 +18,8 @@ namespace usb_xhci {
 
 constexpr static uint16_t kPrimaryInterrupter = 0;
 constexpr static uint32_t k64KiB = (1u << 16);
+constexpr static uint32_t kOSOwned = (1u << 24);
+constexpr static uint32_t kBiosOwned = (1u << 16);
 
 // section 3.2.7
 struct TRB {
@@ -434,6 +436,24 @@ class XECP : public hwreg::RegisterBase<XECP, uint32_t> {
   DEF_FIELD(15, 8, NEXT);
   DEF_ENUM_FIELD(Type, 7, 0, ID);
   static auto Get(HCCPARAMS1 params) { return hwreg::RegisterAddr<XECP>(params.xECP() * 4); }
+};
+
+class CapabilityRegWord0 : public hwreg::RegisterBase<CapabilityRegWord0, uint32_t> {
+ public:
+  DEF_FIELD(31, 24, MAJOR_REVISION);
+  DEF_FIELD(23, 16, MINOR_REVISION);
+  static auto Get(XECP xecp) { return hwreg::RegisterAddr<CapabilityRegWord0>(xecp.reg_addr()); }
+};
+
+class CapabilityRegWord2 : public hwreg::RegisterBase<CapabilityRegWord2, uint32_t> {
+ public:
+  DEF_FIELD(31, 28, PSIC);
+  DEF_FIELD(27, 16, Reserved);
+  DEF_FIELD(15, 8, PortCount);
+  DEF_FIELD(7, 0, PortOffset);
+  static auto Get(XECP xecp) {
+    return hwreg::RegisterAddr<CapabilityRegWord2>(xecp.reg_addr() + (2 * sizeof(uint32_t)));
+  }
 };
 
 class DoorbellOffset : public hwreg::RegisterBase<DoorbellOffset, uint32_t> {

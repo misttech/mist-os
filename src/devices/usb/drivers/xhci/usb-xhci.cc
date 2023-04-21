@@ -1888,15 +1888,44 @@ zx_status_t UsbXhci::InitMmio() {
   return ZX_OK;
 }
 
+void UsbXhci::ParseSupportedProtocol() {
+  HCCPARAMS1 hcc = HCCPARAMS1::Get().ReadFrom(&mmio_.value());
+  if (hcc.ReadFrom(&mmio_.value()).xECP()) {
+    XECP current = XECP::Get(hcc).ReadFrom(&mmio_.value());
+    while (true) {
+      if (current.ID() == XECP::SupportedProtocol) {
+        auto word0 = CapabilityRegWord0::Get(current).ReadFrom(&mmio_.value());
+        auto word2 = CapabilityRegWord2::Get(current).ReadFrom(&mmio_.value());
+
+        zxlogf(DEBUG, "Supported protocol info: Revision:%d:%d USB%d port offset %d port count %d",
+               word0.MAJOR_REVISION(), word0.MINOR_REVISION(), word0.MAJOR_REVISION(),
+               word2.PortOffset(), word2.PortCount());
+      }
+      if (!current.NEXT()) {
+        break;
+      }
+      current = current.Next().ReadFrom(&mmio_.value());
+    }
+  }
+}
+
 void UsbXhci::BiosHandoff() {
   HCCPARAMS1 hcc = HCCPARAMS1::Get().ReadFrom(&mmio_.value());
   if (hcc.ReadFrom(&mmio_.value()).xECP()) {
     XECP current = XECP::Get(hcc).ReadFrom(&mmio_.value());
     while (true) {
       if (current.ID() == XECP::UsbLegacySupport) {
-        current.set_reg_value(current.reg_value() | 1 << 24).WriteTo(&mmio_.value());
-        while ((current = current.ReadFrom(&mmio_.value())).reg_value() & 1 << 16) {
-        };
+        // Check is BIOS owns the host controller. If so, signal BIOS.
+        if (current.reg_value() & kBiosOwned) {
+          current.set_reg_value(current.reg_value() | kOSOwned).WriteTo(&mmio_.value());
+
+          // Wait for control transfer.
+          current = current.ReadFrom(&mmio_.value());
+          while (current.reg_value() & kBiosOwned) {
+            current = current.ReadFrom(&mmio_.value());
+            usleep(10);
+          };
+        }
       }
       if (!current.NEXT()) {
         break;
@@ -1944,6 +1973,9 @@ int UsbXhci::InitThread() {
   }
   // Perform the BIOS handoff if necessary
   BiosHandoff();
+
+  // Read Supported Protocol Capabilities if available.
+  ParseSupportedProtocol();
 
   // At startup the device is in an unknown state
   // Reset the xHCI to place everything in its well-defined

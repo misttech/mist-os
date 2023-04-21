@@ -492,6 +492,8 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   zx_status_t InitMmio();
   // Performs the handoff from the BIOS to the xHCI driver
   void BiosHandoff();
+  // Parse Supported Protocol Capability to log the revision and port info.
+  void ParseSupportedProtocol();
   // Performs platform-specific initialization functions
   void InitQuirks();
   // Complete initialization of host controller.
