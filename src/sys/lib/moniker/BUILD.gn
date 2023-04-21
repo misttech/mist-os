@@ -15,6 +15,7 @@ rustc_library("moniker") {
     "//src/developer/ffx/plugins/inspect/*",
     "//src/developer/ffx/plugins/log/*",
     "//src/developer/remote-control/*",
+    "//src/diagnostics/iquery/*",
     "//src/security/lib/scrutiny/*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_moniker/*",

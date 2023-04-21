@@ -9,11 +9,12 @@ use {
         types::Error,
     },
     anyhow::anyhow,
-    fidl as _, fidl_fuchsia_component_decl as fcomponent_decl, fidl_fuchsia_sys2 as fsys2,
-    fuchsia_fs,
+    cm_rust::*,
+    component_debug::{dirs::*, realm::*},
+    fidl as _, fidl_fuchsia_sys2 as fsys2, fuchsia_fs,
     futures::StreamExt,
-    itertools::Itertools,
     lazy_static::lazy_static,
+    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
     regex::Regex,
     std::collections::HashSet,
 };
@@ -92,31 +93,11 @@ pub fn expand_selectors(selectors: Vec<String>) -> Result<Vec<String>, Error> {
 
 /// Helper method to get all `InstanceInfo` from the `RealmExplorer`.
 pub(crate) async fn get_instance_infos(
-    explorer_proxy: &mut fsys2::RealmExplorerProxy,
-) -> Result<Vec<fsys2::InstanceInfo>, Error> {
-    // Server creates a client_end iterator for us.
-    let infos = explorer_proxy
-        .get_all_instance_infos()
+    query_proxy: &fsys2::RealmQueryProxy,
+) -> Result<Vec<Instance>, Error> {
+    component_debug::realm::get_all_instances(query_proxy)
         .await
-        .map_err(|e| Error::ConnectingTo("RealmExplorer".to_owned(), e))?
-        .map_err(|e| Error::CommunicatingWith("RealmExplorer".to_owned(), anyhow!("{:?}", e)))?
-        .into_proxy()
-        .map_err(|e| Error::ConnectingTo("InstanceInfoIterator".to_owned(), e))?;
-
-    let mut output_vec = vec![];
-
-    loop {
-        let instance_infos = infos
-            .next()
-            .await
-            .map_err(|e| Error::ConnectingTo("InstanceInfoIterator".to_owned(), e))?;
-
-        if instance_infos.is_empty() {
-            break;
-        }
-        output_vec.extend(instance_infos);
-    }
-    Ok(output_vec)
+        .map_err(|e| Error::CommunicatingWith("RealmExplorer".to_owned(), anyhow!("{:?}", e)))
 }
 
 /// Helper method to strip the leading "./" of a relative moniker.
@@ -134,155 +115,115 @@ pub async fn prepend_leading_moniker(moniker: &str) -> String {
 /// Get all the exposed `ArchiveAccessor` from any child component which
 /// directly exposes them or places them in its outgoing directory.
 pub async fn get_accessor_selectors(
-    explorer_proxy: &mut fsys2::RealmExplorerProxy,
-    query_proxy: &mut fsys2::RealmQueryProxy,
+    query_proxy: &fsys2::RealmQueryProxy,
     paths: &[String],
 ) -> Result<Vec<String>, Error> {
-    let instance_infos = get_instance_infos(explorer_proxy).await?;
+    let instance_infos = get_instance_infos(query_proxy).await?;
     let expected_accessor_re = Regex::new(&EXPECTED_PROTOCOL_RE).unwrap();
 
     let mut output_vec = vec![];
 
     for ref instance_info in instance_infos {
+        let stripped_moniker = instance_info.moniker.to_string();
+        let stripped_moniker =
+            stripped_moniker.strip_prefix("/").expect("AbsoluteMoniker must start with /");
+        if !paths.is_empty() && !paths.iter().any(|path| stripped_moniker.starts_with(path)) {
+            // We have a path parameter and the moniker is not matched.
+            continue;
+        }
+
         // Use the `RealmQuery `protocol to obtain detailed info for the instances.
-        let (ret_instance_info, res_info) = match query_proxy
-            .get_instance_info(&instance_info.moniker)
-            .await
-            .map_err(|e| Error::ConnectingTo("RealmQuery".to_owned(), e))?
-            .map_err(|e| Error::CommunicatingWith("RealmQuery".to_owned(), anyhow!("{:?}", e)))
-        {
+        let manifest = match get_manifest(&instance_info.moniker, query_proxy).await {
             Ok(res) => res,
             Err(_) => continue,
         };
 
-        let normalized_moniker = strip_leading_relative_moniker(&ret_instance_info.moniker).await;
+        let mut seen_accessors_set = HashSet::new();
 
-        if let Some(resolved_state) = res_info {
-            if !paths.is_empty() && !paths.iter().any(|path| normalized_moniker.starts_with(path)) {
-                // We have a path parameter and the moniker is not matched.
-                continue;
+        manifest.exposes.iter().for_each(|expose| {
+            if let ExposeDecl::Protocol(protocol) = expose {
+                let expose_target = protocol.target_name.to_string();
+                // Only show directly exposed protocols.
+                if expected_accessor_re.is_match(&expose_target)
+                    && protocol.source == ExposeSource::Self_
+                {
+                    // Push "<relative_moniker>:expose:<service_name>" into the output vector.
+                    // Stripes out the leading "./".
+                    output_vec.push(format!("{}:expose:{}", stripped_moniker, expose_target));
+                    seen_accessors_set.insert(expose_target);
+                }
             }
+        });
 
-            let mut seen_accessors_set = HashSet::new();
+        let moniker =
+            RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &instance_info.moniker).unwrap();
 
-            resolved_state.exposes.iter().for_each(|expose| {
-                if let fcomponent_decl::Expose::Protocol(ref expose_protocol) = expose {
-                    if let Some(ref expose_target) = expose_protocol.target_name {
-                        // Only show directly exposed protocols.
-                        if expected_accessor_re.is_match(expose_target)
-                            && matches!(
-                                expose_protocol.source,
-                                Some(fcomponent_decl::Ref::Self_(_))
-                            )
-                        {
-                            // Push "<relative_moniker>:expose:<service_name>" into the output vector.
-                            // Stripes out the leading "./".
-                            output_vec
-                                .push(format!("{}:expose:{}", normalized_moniker, expose_target));
-                            seen_accessors_set.insert(String::from(expose_target));
-                        }
+        let svc_dir = match open_instance_subdir_readable(
+            &moniker,
+            OpenDirType::Outgoing,
+            "svc",
+            query_proxy,
+        )
+        .await
+        {
+            Ok(dir) => dir,
+            Err(_) => continue,
+        };
+
+        let entries =
+            fuchsia_fs::directory::readdir_recursive(&svc_dir, Some(IQUERY_TIMEOUT.into()))
+                .collect::<Vec<_>>()
+                .await;
+
+        for ref entry in entries {
+            match entry {
+                Ok(ref dir_entry) => {
+                    let svc_name = dir_entry
+                        .name
+                        .split_once("/")
+                        .map(|(_, name)| name)
+                        .unwrap_or(dir_entry.name.as_str());
+                    if (dir_entry.kind == fuchsia_fs::directory::DirentKind::File
+                        || dir_entry.kind == fuchsia_fs::directory::DirentKind::Service)
+                        && !seen_accessors_set.contains(svc_name)
+                        && expected_accessor_re.is_match(svc_name)
+                    {
+                        output_vec.push(format!("{}:out:{}", stripped_moniker, svc_name));
                     }
                 }
-            });
-            // Look at `out` dir to find anything matches.
-            let execution_state = match resolved_state.execution {
-                Some(state) => state,
-                _ => continue,
-            };
-            let out_dir = match execution_state.out_dir {
-                Some(out_dir) => out_dir,
-                _ => continue,
-            };
-            let out_dir_proxy = match out_dir.into_proxy() {
-                Ok(proxy) => proxy,
-                Err(_) => continue,
-            };
-            // Only look at `out/svc`.
-            let out_svc_dir_proxy = match fuchsia_fs::directory::open_directory_no_describe(
-                &out_dir_proxy,
-                "svc",
-                fuchsia_fs::OpenFlags::empty(),
-            ) {
-                Ok(proxy) => proxy,
-                Err(_) => continue,
-            };
-
-            let entries = fuchsia_fs::directory::readdir_recursive(
-                &out_svc_dir_proxy,
-                Some(IQUERY_TIMEOUT.into()),
-            )
-            .collect::<Vec<_>>()
-            .await;
-
-            for ref entry in entries {
-                match entry {
-                    Ok(ref dir_entry) => {
-                        if (dir_entry.kind == fuchsia_fs::directory::DirentKind::File
-                            || dir_entry.kind == fuchsia_fs::directory::DirentKind::Service)
-                            && !seen_accessors_set.contains(&dir_entry.name)
-                            && expected_accessor_re.is_match(&dir_entry.name)
-                        {
-                            // Split the entry so that field is a single element.
-                            let dir_entry_elements = &dir_entry.name.split("/").collect::<Vec<_>>();
-                            // "out" here implicitly means "out/svc" to be consistent with
-                            // component framework.
-                            let (service_prefix, service) = if dir_entry_elements.len() > 1 {
-                                (
-                                    ["out"]
-                                        .iter()
-                                        .chain(
-                                            dir_entry_elements[0..dir_entry_elements.len() - 1]
-                                                .into_iter(),
-                                        )
-                                        .join("/"),
-                                    dir_entry_elements.last().unwrap(),
-                                )
-                            } else {
-                                ("out".to_owned(), dir_entry_elements.first().unwrap())
-                            };
-
-                            output_vec.push(format!(
-                                "{}:{}:{}",
-                                normalized_moniker, service_prefix, service
-                            ));
-                        }
-                    }
-                    Err(fuchsia_fs::directory::RecursiveEnumerateError::Timeout) => {
-                        eprintln!(
-                            "Warning: Read directory timed out after {} second(s).",
-                            IQUERY_TIMEOUT_SECS,
-                        );
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Warning: Unable to read directory for component {}, error: {:?}.",
-                            &normalized_moniker, e
-                        );
-                    }
+                Err(fuchsia_fs::directory::RecursiveEnumerateError::Timeout) => {
+                    eprintln!(
+                        "Warning: Read directory timed out after {} second(s).",
+                        IQUERY_TIMEOUT_SECS,
+                    );
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Unable to read directory for component {}, error: {:?}.",
+                        &stripped_moniker, e
+                    );
                 }
             }
         }
     }
+
+    output_vec.sort();
     Ok(output_vec)
 }
 
 #[cfg(test)]
 mod test {
     use {
-        super::*,
-        assert_matches::assert_matches,
-        iquery_test_support::{MockRealmExplorer, MockRealmQuery},
+        super::*, assert_matches::assert_matches, iquery_test_support::MockRealmQuery,
         std::sync::Arc,
     };
 
     #[fuchsia::test]
     async fn test_get_accessors_no_paths() {
         let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let fake_realm_explorer = Arc::new(MockRealmExplorer::default());
-        let mut realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
-        let mut realm_explorer = Arc::clone(&fake_realm_explorer).get_proxy().await;
+        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
 
-        let res = get_accessor_selectors(&mut realm_explorer, &mut realm_query, &vec![]).await;
+        let res = get_accessor_selectors(&realm_query, &vec![]).await;
 
         assert_matches!(res, Ok(_));
 
@@ -290,9 +231,9 @@ mod test {
             res.unwrap(),
             vec![
                 String::from("example/component:expose:fuchsia.diagnostics.ArchiveAccessor"),
-                String::from("other/component:out:fuchsia.diagnostics.MagicArchiveAccessor"),
-                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
                 String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                String::from("other/component:out:fuchsia.diagnostics.MagicArchiveAccessor"),
             ]
         );
     }
@@ -300,16 +241,9 @@ mod test {
     #[fuchsia::test]
     async fn test_get_accessors_valid_path() {
         let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let fake_realm_explorer = Arc::new(MockRealmExplorer::default());
-        let mut realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
-        let mut realm_explorer = Arc::clone(&fake_realm_explorer).get_proxy().await;
+        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
 
-        let res = get_accessor_selectors(
-            &mut realm_explorer,
-            &mut realm_query,
-            &vec!["example".to_owned()],
-        )
-        .await;
+        let res = get_accessor_selectors(&realm_query, &vec!["example".to_owned()]).await;
 
         assert_matches!(res, Ok(_));
 
@@ -322,16 +256,9 @@ mod test {
     #[fuchsia::test]
     async fn test_get_accessors_valid_path_with_slash() {
         let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let fake_realm_explorer = Arc::new(MockRealmExplorer::default());
-        let mut realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
-        let mut realm_explorer = Arc::clone(&fake_realm_explorer).get_proxy().await;
+        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
 
-        let res = get_accessor_selectors(
-            &mut realm_explorer,
-            &mut realm_query,
-            &vec!["example/".to_owned()],
-        )
-        .await;
+        let res = get_accessor_selectors(&realm_query, &vec!["example/".to_owned()]).await;
 
         assert_matches!(res, Ok(_));
 
@@ -344,16 +271,9 @@ mod test {
     #[fuchsia::test]
     async fn test_get_accessors_valid_path_deep() {
         let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let fake_realm_explorer = Arc::new(MockRealmExplorer::default());
-        let mut realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
-        let mut realm_explorer = Arc::clone(&fake_realm_explorer).get_proxy().await;
+        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
 
-        let res = get_accessor_selectors(
-            &mut realm_explorer,
-            &mut realm_query,
-            &vec!["foo/bar/thing".to_owned()],
-        )
-        .await;
+        let res = get_accessor_selectors(&realm_query, &vec!["foo/bar/thing".to_owned()]).await;
 
         assert_matches!(res, Ok(_));
 
@@ -366,12 +286,27 @@ mod test {
     #[fuchsia::test]
     async fn test_get_accessors_multi_component() {
         let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let fake_realm_explorer = Arc::new(MockRealmExplorer::default());
-        let mut realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
-        let mut realm_explorer = Arc::clone(&fake_realm_explorer).get_proxy().await;
+        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
+
+        let res = get_accessor_selectors(&realm_query, &vec!["foo/".to_owned()]).await;
+
+        assert_matches!(res, Ok(_));
+
+        assert_eq!(
+            res.unwrap(),
+            vec![
+                String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+            ]
+        );
+    }
+    #[fuchsia::test]
+    async fn test_get_accessors_multi_path() {
+        let fake_realm_query = Arc::new(MockRealmQuery::default());
+        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
 
         let res =
-            get_accessor_selectors(&mut realm_explorer, &mut realm_query, &vec!["foo/".to_owned()])
+            get_accessor_selectors(&realm_query, &vec!["foo/".to_owned(), "example/".to_owned()])
                 .await;
 
         assert_matches!(res, Ok(_));
@@ -379,33 +314,9 @@ mod test {
         assert_eq!(
             res.unwrap(),
             vec![
-                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
-                String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
-            ]
-        );
-    }
-    #[fuchsia::test]
-    async fn test_get_accessors_multi_path() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let fake_realm_explorer = Arc::new(MockRealmExplorer::default());
-        let mut realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
-        let mut realm_explorer = Arc::clone(&fake_realm_explorer).get_proxy().await;
-
-        let res = get_accessor_selectors(
-            &mut realm_explorer,
-            &mut realm_query,
-            &vec!["foo/".to_owned(), "example/".to_owned()],
-        )
-        .await;
-
-        assert_matches!(res, Ok(_));
-
-        assert_eq!(
-            res.unwrap(),
-            vec![
                 String::from("example/component:expose:fuchsia.diagnostics.ArchiveAccessor"),
-                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
                 String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+                String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
             ]
         );
     }

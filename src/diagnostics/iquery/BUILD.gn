@@ -7,7 +7,6 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 
 iquery_deps = [
-  "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
   "//src/lib/diagnostics/data/rust",
@@ -15,6 +14,9 @@ iquery_deps = [
   "//src/lib/diagnostics/selectors",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-fs",
+  "//src/sys/lib/cm_rust",
+  "//src/sys/lib/component_debug",
+  "//src/sys/lib/moniker",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:argh",
   "//third_party/rust_crates:async-trait",

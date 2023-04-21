@@ -23,9 +23,9 @@ async fn test_list_accessors_no_parameters() {
 
     let expected = serde_json::to_string(&vec![
         String::from("example/component:expose:fuchsia.diagnostics.ArchiveAccessor"),
-        String::from("other/component:out:fuchsia.diagnostics.MagicArchiveAccessor"),
-        String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
         String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+        String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+        String::from("other/component:out:fuchsia.diagnostics.MagicArchiveAccessor"),
     ])
     .unwrap();
     let output = test_buffers.into_stdout_str();
@@ -47,8 +47,8 @@ async fn test_list_accessors_subcomponent() {
     .unwrap();
 
     let expected = serde_json::to_string(&vec![
-        String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
         String::from("foo/bar/thing:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
+        String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
     ])
     .unwrap();
     let output = test_buffers.into_stdout_str();

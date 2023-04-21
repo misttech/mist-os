@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use fidl::encoding::Decodable;
 use fidl::endpoints::ControlHandle;
 use fidl::endpoints::RequestStream;
 use fidl::endpoints::ServerEnd;
 use fidl::endpoints::{create_endpoints, create_proxy};
-use fidl_fuchsia_component_config::ResolvedConfig;
-use fidl_fuchsia_component_decl::{ConfigChecksum, Expose, ExposeProtocol, Ref, SelfRef};
+use fidl_fuchsia_component_decl::{Component, Expose, ExposeProtocol, ParentRef, Ref, SelfRef};
 use fidl_fuchsia_io::{self as fio, DirectoryMarker};
 use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_async;
@@ -21,110 +19,6 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-
-/// Provides a mock `RealmExplorer` interface.
-/// The `info_vec` contained in this struct will be the returned
-/// result of `GetAllInstanceInfos`.
-pub struct MockRealmExplorer {
-    info_vec: Vec<fsys2::InstanceInfo>,
-}
-
-/// Creates the default test fixures for `MockRealmExplorer`.
-impl Default for MockRealmExplorer {
-    fn default() -> Self {
-        let mut mock_realm_explorer = MockRealmExplorer::new();
-        mock_realm_explorer.info_vec.push(fsys2::InstanceInfo {
-            moniker: "./example/component".to_owned(),
-            url: "".to_owned(),
-            instance_id: None,
-            state: fsys2::InstanceState::Resolved,
-        });
-        mock_realm_explorer.info_vec.push(fsys2::InstanceInfo {
-            moniker: "./other/component".to_owned(),
-            url: "".to_owned(),
-            instance_id: None,
-            state: fsys2::InstanceState::Resolved,
-        });
-        mock_realm_explorer.info_vec.push(fsys2::InstanceInfo {
-            moniker: "./foo/component".to_owned(),
-            url: "".to_owned(),
-            instance_id: None,
-            state: fsys2::InstanceState::Resolved,
-        });
-        mock_realm_explorer.info_vec.push(fsys2::InstanceInfo {
-            moniker: "./foo/bar/thing".to_owned(),
-            url: "".to_owned(),
-            instance_id: None,
-            state: fsys2::InstanceState::Resolved,
-        });
-        mock_realm_explorer
-    }
-}
-
-impl MockRealmExplorer {
-    /// Creates an empty `MockRealmExplorer`, which will return no results when called.
-    pub fn new() -> Self {
-        MockRealmExplorer { info_vec: vec![] }
-    }
-
-    /// Creats a `MockRealmExplorer` which will return the vector of `InstanceInfo`
-    /// when called.
-    pub fn new_with(info_vec: Vec<fsys2::InstanceInfo>) -> Self {
-        MockRealmExplorer { info_vec }
-    }
-
-    /// Serves the `RealmExplorer` interface asynchronously and runs until the program terminates.
-    pub async fn serve(self: Arc<Self>, object: ServerEnd<fsys2::RealmExplorerMarker>) {
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        let drain_task = fuchsia_async::Task::spawn(async move {
-            rx.for_each_concurrent(None, |task| async move { task.await }).await;
-        });
-
-        let mut stream = object.into_stream().unwrap();
-        while let Ok(Some(request)) = stream.try_next().await {
-            match request {
-                fsys2::RealmExplorerRequest::GetAllInstanceInfos { responder } => {
-                    let (client_end, server_end) =
-                        create_endpoints::<fsys2::InstanceInfoIteratorMarker>();
-                    let mut cloned_info = self.info_vec.clone();
-
-                    tx.unbounded_send(fuchsia_async::Task::spawn(async move {
-                        let mut first_get = true;
-                        let mut stream: fsys2::InstanceInfoIteratorRequestStream =
-                            server_end.into_stream().unwrap();
-                        while let Some(Ok(fsys2::InstanceInfoIteratorRequest::Next { responder })) =
-                            stream.next().await
-                        {
-                            if first_get {
-                                responder.send(&mut cloned_info.iter_mut()).unwrap();
-                                first_get = false;
-                            } else {
-                                let mut ret: Vec<fsys2::InstanceInfo> = vec![];
-                                responder.send(&mut ret.iter_mut()).unwrap();
-                            }
-                        }
-                    }))
-                    .unwrap();
-
-                    responder.send(&mut Ok(client_end)).unwrap()
-                }
-            }
-        }
-        drain_task.await;
-    }
-
-    /// Serves the `RealmExplorer` interface asynchronously and runs until the program terminates.
-    /// Then, instead of needing the client to discover the protocol, return the proxy for futher
-    /// test use.
-    pub async fn get_proxy(self: Arc<Self>) -> fsys2::RealmExplorerProxy {
-        let (proxy, server_end) = create_proxy::<fsys2::RealmExplorerMarker>().unwrap();
-        fuchsia_async::Task::local(async move { self.serve(server_end).await }).detach();
-        proxy
-    }
-}
-
-/// Quick alias for for RealmQuery protocol.
-type RealmQueryResult = (fsys2::InstanceInfo, Option<Box<fsys2::ResolvedState>>);
 
 /// Builder struct for `RealmQueryResult`/
 /// This is an builder interface meant to simplify building of test fixtures.
@@ -158,63 +52,6 @@ pub struct MockRealmQueryBuilderInner {
     svc_dir_entry: Vec<String>,
     diagnostics_dir_entry: Vec<String>,
     parent: Option<Box<MockRealmQueryBuilder>>,
-}
-
-/// Convert a `MockRealmQueryBuilderInner` to a `RealmQueryResult` which we can
-/// transmit over the wire.
-async fn to_realm_query_result(builder: &MockRealmQueryBuilderInner) -> RealmQueryResult {
-    let (exposed_client, _) = create_endpoints::<DirectoryMarker>();
-    let (ns_client, _) = create_endpoints::<DirectoryMarker>();
-    let (outdir_client, outdir_server) = create_endpoints::<DirectoryMarker>();
-
-    let mut mock_dir_top = MockDir::new("out".to_owned());
-    let mut mock_dir_diagnostics = MockDir::new("diagnostics".to_owned());
-    let mut mock_dir_svc = MockDir::new("svc".to_owned());
-
-    for entry in &builder.diagnostics_dir_entry {
-        mock_dir_diagnostics = mock_dir_diagnostics.add_entry(MockFile::new_arc(entry.to_owned()));
-    }
-
-    for entry in &builder.svc_dir_entry {
-        mock_dir_svc = mock_dir_svc.add_entry(MockFile::new_arc(entry.to_owned()));
-    }
-
-    for entry in &builder.out_dir_entry {
-        mock_dir_top = mock_dir_top.add_entry(MockFile::new_arc(entry.to_owned()));
-    }
-
-    mock_dir_top =
-        mock_dir_top.add_entry(Arc::new(mock_dir_diagnostics)).add_entry(Arc::new(mock_dir_svc));
-
-    fuchsia_async::Task::local(async move { Arc::new(mock_dir_top).serve(outdir_server).await })
-        .detach();
-
-    let rs = fsys2::ResolvedState {
-        uses: vec![],
-        exposes: builder.exposes.clone(),
-        config: Some(Box::new(ResolvedConfig {
-            fields: vec![],
-            checksum: ConfigChecksum::new_empty(),
-        })),
-        pkg_dir: None,
-        execution: Some(Box::new(fsys2::ExecutionState {
-            start_reason: "reason".to_owned(),
-            out_dir: Some(outdir_client),
-            runtime_dir: None,
-        })),
-        exposed_dir: exposed_client,
-        ns_dir: ns_client,
-    };
-
-    (
-        fsys2::InstanceInfo {
-            moniker: builder.moniker.to_owned(),
-            url: "".to_owned(),
-            instance_id: None,
-            state: fsys2::InstanceState::Resolved,
-        },
-        Some(Box::new(rs)),
-    )
 }
 
 impl MockRealmQueryBuilderInner {
@@ -255,6 +92,49 @@ impl MockRealmQueryBuilderInner {
 
         parent.mapping.insert(self.when.to_owned(), Box::new(self));
         parent
+    }
+
+    pub fn serve_out_dir(&self, server_end: ServerEnd<DirectoryMarker>) {
+        let mut mock_dir_top = MockDir::new("out".to_owned());
+        let mut mock_dir_diagnostics = MockDir::new("diagnostics".to_owned());
+        let mut mock_dir_svc = MockDir::new("svc".to_owned());
+
+        for entry in &self.diagnostics_dir_entry {
+            mock_dir_diagnostics =
+                mock_dir_diagnostics.add_entry(MockFile::new_arc(entry.to_owned()));
+        }
+
+        for entry in &self.svc_dir_entry {
+            mock_dir_svc = mock_dir_svc.add_entry(MockFile::new_arc(entry.to_owned()));
+        }
+
+        for entry in &self.out_dir_entry {
+            mock_dir_top = mock_dir_top.add_entry(MockFile::new_arc(entry.to_owned()));
+        }
+
+        mock_dir_top = mock_dir_top
+            .add_entry(Arc::new(mock_dir_diagnostics))
+            .add_entry(Arc::new(mock_dir_svc));
+
+        fuchsia_async::Task::local(async move { Arc::new(mock_dir_top).serve(server_end).await })
+            .detach();
+    }
+
+    fn to_instance(&self) -> fsys2::Instance {
+        fsys2::Instance {
+            moniker: Some(self.moniker.to_owned()),
+            url: Some("".to_owned()),
+            instance_id: None,
+            resolved_info: Some(fsys2::ResolvedInfo {
+                resolved_url: Some("".to_owned()),
+                ..fsys2::ResolvedInfo::EMPTY
+            }),
+            ..fsys2::Instance::EMPTY
+        }
+    }
+
+    fn to_manifest(&self) -> Component {
+        Component { exposes: Some(self.exposes.clone()), ..Component::EMPTY }
     }
 }
 
@@ -298,7 +178,7 @@ impl Default for MockRealmQuery {
             .moniker("./example/component")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
-                target: Some(Ref::Self_(SelfRef)),
+                target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.diagnostics.ArchiveAccessor".to_owned()),
                 ..ExposeProtocol::EMPTY
@@ -311,7 +191,7 @@ impl Default for MockRealmQuery {
             .moniker("./other/component")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
-                target: Some(Ref::Self_(SelfRef)),
+                target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.io.SomeOtherThing".to_owned()),
                 ..ExposeProtocol::EMPTY
@@ -321,7 +201,7 @@ impl Default for MockRealmQuery {
             .moniker("./other/component")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
-                target: Some(Ref::Self_(SelfRef)),
+                target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.io.MagicStuff".to_owned()),
                 ..ExposeProtocol::EMPTY
@@ -333,7 +213,7 @@ impl Default for MockRealmQuery {
             .moniker("./foo/component")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
-                target: Some(Ref::Self_(SelfRef)),
+                target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
                 ..ExposeProtocol::EMPTY
@@ -343,7 +223,7 @@ impl Default for MockRealmQuery {
             .moniker("./foo/bar/thing")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Self_(SelfRef)),
-                target: Some(Ref::Self_(SelfRef)),
+                target: Some(Ref::Parent(ParentRef)),
                 source_name: Some("src".to_owned()),
                 target_name: Some("fuchsia.diagnostics.FeedbackArchiveAccessor".to_owned()),
                 ..ExposeProtocol::EMPTY
@@ -359,19 +239,68 @@ impl MockRealmQuery {
         let mut stream = object.into_stream().unwrap();
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                fsys2::RealmQueryRequest::GetInstanceInfo { moniker, responder } => {
-                    let query_moniker =
-                        if moniker.starts_with("./") { &moniker[2..] } else { &moniker };
-                    match self.mapping.get(query_moniker) {
-                        Some(res) => {
-                            responder.send(&mut Ok(to_realm_query_result(res).await)).unwrap();
+                fsys2::RealmQueryRequest::GetInstance { moniker, responder } => {
+                    assert!(moniker.starts_with("./"));
+                    let query_moniker = &moniker[2..];
+                    let res = self.mapping.get(query_moniker).unwrap();
+                    responder.send(&mut Ok(res.to_instance())).unwrap();
+                }
+                fsys2::RealmQueryRequest::Open { moniker, dir_type, object, responder, .. } => {
+                    assert!(moniker.starts_with("./"));
+                    let query_moniker = &moniker[2..];
+                    if let Some(res) = self.mapping.get(query_moniker) {
+                        if dir_type == fsys2::OpenDirType::OutgoingDir {
+                            // Serve the out dir, everything else doesn't get served.
+                            res.serve_out_dir(object.into_channel().into());
                         }
-                        None => {
-                            responder.send(&mut Err(fsys2::RealmQueryError::BadMoniker)).unwrap()
-                        }
+                        responder.send(&mut Ok(())).unwrap();
+                    } else {
+                        responder.send(&mut Err(fsys2::OpenError::InstanceNotFound)).unwrap();
                     }
                 }
-                _ => unreachable!(),
+                fsys2::RealmQueryRequest::GetManifest { moniker, responder, .. } => {
+                    assert!(moniker.starts_with("./"));
+                    let query_moniker = &moniker[2..];
+                    let res = self.mapping.get(query_moniker).unwrap();
+                    let manifest = res.to_manifest();
+                    let manifest = fidl::encoding::persist(&manifest).unwrap();
+                    let (client_end, server_end) =
+                        create_endpoints::<fsys2::ManifestBytesIteratorMarker>();
+
+                    fuchsia_async::Task::spawn(async move {
+                        let mut stream = server_end.into_stream().unwrap();
+                        let fsys2::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(manifest.as_slice()).unwrap();
+                        let fsys2::ManifestBytesIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&[]).unwrap();
+                    })
+                    .detach();
+
+                    responder.send(&mut Ok(client_end)).unwrap();
+                }
+                fsys2::RealmQueryRequest::GetAllInstances { responder } => {
+                    let instances: Vec<fsys2::Instance> =
+                        self.mapping.values().map(|m| m.to_instance()).collect();
+
+                    let (client_end, server_end) =
+                        create_endpoints::<fsys2::InstanceIteratorMarker>();
+
+                    fuchsia_async::Task::spawn(async move {
+                        let mut stream = server_end.into_stream().unwrap();
+                        let fsys2::InstanceIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&mut instances.into_iter()).unwrap();
+                        let fsys2::InstanceIteratorRequest::Next { responder } =
+                            stream.next().await.unwrap().unwrap();
+                        responder.send(&mut std::iter::empty()).unwrap();
+                    })
+                    .detach();
+
+                    responder.send(&mut Ok(client_end)).unwrap();
+                }
+                _ => unreachable!("request {:?}", request),
             }
         }
     }

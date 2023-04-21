@@ -11,6 +11,7 @@ use {
     crate::types::Error,
     anyhow::anyhow,
     async_trait::async_trait,
+    component_debug::dirs::*,
     diagnostics_data::{Data, DiagnosticsData},
     diagnostics_reader::ArchiveReader,
     fidl_fuchsia_diagnostics::{
@@ -19,16 +20,15 @@ use {
     fidl_fuchsia_io::DirectoryProxy,
     fidl_fuchsia_sys2 as fsys2,
     fuchsia_component::client,
-    fuchsia_fs,
     lazy_static::lazy_static,
     selectors,
 };
 
+const ROOT_REALM_QUERY: &'static str = "/svc/fuchsia.sys2.RealmQuery.root";
+const ROOT_ARCHIVIST_ACCESSOR: &'static str =
+    "./bootstrap/archivist:expose:fuchsia.diagnostics.ArchiveAccessor";
+
 lazy_static! {
-    static ref ROOT_REALM_EXPLORER: &'static str = "fuchsia.sys2.RealmExplorer.root";
-    static ref ROOT_REALM_QUERY: &'static str = "fuchsia.sys2.RealmQuery.root";
-    static ref ROOT_ARCHIVIST_ACCESSOR: &'static str =
-        "./bootstrap/archivist:expose:fuchsia.diagnostics.ArchiveAccessor";
     static ref CURRENT_DIR: Vec<String> = vec![".".to_string()];
 }
 
@@ -66,42 +66,24 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
 }
 
 async fn list_files_auto_proxy(monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {
-    let (realm_query_proxy, realm_explorer_proxy) = connect_realm_protocols().await?;
-    list_files(realm_query_proxy, realm_explorer_proxy, monikers).await
+    let realm_query_proxy = connect_realm_query().await?;
+    list_files(realm_query_proxy, monikers).await
 }
 
 /// Helper method to connect to both the `RealmQuery` and the `RealmExplorer`.
-pub(crate) async fn connect_realm_protocols(
-) -> Result<(fsys2::RealmQueryProxy, fsys2::RealmExplorerProxy), Error> {
-    let dir_proxy =
-        fuchsia_fs::directory::open_in_namespace("/svc", fuchsia_fs::OpenFlags::empty()).map_err(
-            |e| {
-                Error::IOError(
-                    "unable to connect to DirectoryProxy for /svc".to_owned(),
-                    anyhow!("{:?}", e),
-                )
-            },
-        )?;
-
+pub(crate) async fn connect_realm_query() -> Result<fsys2::RealmQueryProxy, Error> {
     let realm_query_proxy =
-        client::connect_to_named_protocol_at_dir_root::<fsys2::RealmQueryMarker>(
-            &dir_proxy,
-            &ROOT_REALM_QUERY,
-        )
-        .map_err(|e| Error::IOError("unable to connect to root RealmQuery".to_owned(), e))?;
-    let realm_explorer_proxy = client::connect_to_named_protocol_at_dir_root::<
-        fsys2::RealmExplorerMarker,
-    >(&dir_proxy, &ROOT_REALM_EXPLORER)
-    .map_err(|e| Error::IOError("unable to connect to root RealmExplorer".to_owned(), e))?;
+        client::connect_to_protocol_at_path::<fsys2::RealmQueryMarker>(ROOT_REALM_QUERY)
+            .map_err(|e| Error::IOError("unable to connect to root RealmQuery".to_owned(), e))?;
 
-    Ok((realm_query_proxy, realm_explorer_proxy))
+    Ok(realm_query_proxy)
 }
 
 /// Lists all ArchiveAccessor files under the provided paths. If no paths are provided, it'll list
 /// everything under the Root Realm.
 async fn get_accessor_selectors_auto_proxy(paths: &[String]) -> Result<Vec<String>, Error> {
-    let (mut realm_query_proxy, mut realm_explorer_proxy) = connect_realm_protocols().await?;
-    get_accessor_selectors(&mut realm_explorer_proxy, &mut realm_query_proxy, paths).await
+    let realm_query_proxy = connect_realm_query().await?;
+    get_accessor_selectors(&realm_query_proxy, paths).await
 }
 
 /// Connect to `fuchsia.sys2.*ArchivistAccessor` with the provided selector string.
@@ -111,7 +93,7 @@ async fn get_accessor_selectors_auto_proxy(paths: &[String]) -> Result<Vec<Strin
 pub async fn connect_to_archivist_selector_str(
     selector: &Option<String>,
 ) -> Result<ArchiveAccessorProxy, Error> {
-    let (mut realm_query_proxy, _) = connect_realm_protocols().await?;
+    let mut realm_query_proxy = connect_realm_query().await?;
     match selector {
         Some(s) => {
             let selector =
@@ -127,7 +109,7 @@ pub async fn connect_to_archivist_selector_str(
 pub async fn connect_to_archivist_selector(
     selector: &Selector,
 ) -> Result<ArchiveAccessorProxy, Error> {
-    let (mut realm_query_proxy, _) = connect_realm_protocols().await?;
+    let mut realm_query_proxy = connect_realm_query().await?;
     connect_to_archivist(selector, &mut realm_query_proxy).await
 }
 
@@ -138,10 +120,10 @@ pub async fn connect_to_archivist_selector(
 async fn connect_to_the_first_archivist(
     query_proxy: &mut fsys2::RealmQueryProxy,
 ) -> Result<ArchiveAccessorProxy, Error> {
-    let selector = selectors::parse_selector::<selectors::VerboseError>(&ROOT_ARCHIVIST_ACCESSOR)
+    let selector = selectors::parse_selector::<selectors::VerboseError>(ROOT_ARCHIVIST_ACCESSOR)
         .map_err(|e| {
-        Error::ParseSelector("unable to parse selector".to_owned(), anyhow!("{:?}", e))
-    })?;
+            Error::ParseSelector("unable to parse selector".to_owned(), anyhow!("{:?}", e))
+        })?;
     connect_to_archivist(&selector, query_proxy).await
 }
 
@@ -207,31 +189,11 @@ async fn get_dir_proxy(
         full_moniker = format!("./{}", full_moniker);
     }
 
-    // Get the instance info for `expose` dir.
-    let (_, resolved_state) = proxy
-        .get_instance_info(&full_moniker)
-        .await
-        .map_err(|e| Error::ConnectingTo("RealmQuery".to_owned(), e))?
-        .map_err(|e| Error::CommunicatingWith("RealmQuery".to_owned(), anyhow!("{:?}", e)))?;
-
-    let resolved_state =
-        resolved_state.ok_or_else(|| Error::InvalidSelector("no component selector".to_owned()))?;
-
-    let directory_proxy = if property_node_selector == "expose" {
-        resolved_state
-            .exposed_dir
-            .into_proxy()
-            .map_err(|e| Error::ConnectingTo("ArchiveAccessor".to_owned(), e))?
+    let full_moniker = full_moniker.as_str().try_into().unwrap();
+    let dir_type = if property_node_selector == "expose" {
+        OpenDirType::Exposed
     } else if property_node_selector == "out" {
-        let execution_state = match resolved_state.execution {
-            Some(state) => state,
-            _ => return Err(Error::InvalidSelector("no execution state".to_owned())),
-        };
-        let out_dir = match execution_state.out_dir {
-            Some(out_dir) => out_dir,
-            _ => return Err(Error::InvalidSelector("no outdir".to_owned())),
-        };
-        out_dir.into_proxy().map_err(|e| Error::ConnectingTo("ArchiveAccessor".to_owned(), e))?
+        OpenDirType::Outgoing
     } else {
         return Err(Error::InvalidSelector(format!(
             "directory {} is not valid. Must be one of out|expose.",
@@ -239,6 +201,9 @@ async fn get_dir_proxy(
         )));
     };
 
+    let directory_proxy = open_instance_dir_root_readable(&full_moniker, dir_type, proxy)
+        .await
+        .map_err(|e| Error::CommunicatingWith("RealmQuery".to_owned(), anyhow!("{:?}", e)))?;
     Ok((directory_proxy, target_property.to_owned()))
 }
 

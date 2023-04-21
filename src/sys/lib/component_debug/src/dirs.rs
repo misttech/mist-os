@@ -138,6 +138,28 @@ pub async fn open_instance_dir_root_readable(
     Ok(root_dir)
 }
 
+/// Opens the subdirectory of a component instance directory with read rights.
+pub async fn open_instance_subdir_readable(
+    moniker: &RelativeMoniker,
+    dir_type: OpenDirType,
+    path: &str,
+    realm: &fsys::RealmQueryProxy,
+) -> Result<fio::DirectoryProxy, OpenError> {
+    let (root_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    let server_end = server_end.into_channel();
+    open_in_instance_dir(
+        moniker,
+        dir_type,
+        fio::OpenFlags::RIGHT_READABLE,
+        fio::ModeType::empty(),
+        path,
+        server_end,
+        realm,
+    )
+    .await?;
+    Ok(root_dir)
+}
+
 /// Opens an object in a component instance directory with the given |flags|, |mode| and |path|.
 /// Component manager will make the corresponding `fuchsia.io.Directory/Open` call on
 /// the directory.

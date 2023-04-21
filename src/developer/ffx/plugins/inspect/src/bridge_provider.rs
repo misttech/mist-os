@@ -136,30 +136,20 @@ impl DiagnosticsProvider for DiagnosticsBridgeProvider {
     }
 
     async fn get_accessor_paths(&self, paths: &Vec<String>) -> Result<Vec<String>, Error> {
-        let (mut query_proxy, mut explorer_proxy) = connect_realm_proxies(&self.rcs_proxy).await?;
-        get_accessor_selectors(&mut explorer_proxy, &mut query_proxy, paths).await
+        let query_proxy = connect_realm_query(&self.rcs_proxy).await?;
+        get_accessor_selectors(&query_proxy, paths).await
     }
 
     async fn list_files(&self, monikers: &[String]) -> Result<Vec<ListFilesResultItem>, Error> {
-        let (query_proxy, explorer_proxy) = connect_realm_proxies(&self.rcs_proxy).await?;
-        list_files(query_proxy, explorer_proxy, monikers).await
+        let query_proxy = connect_realm_query(&self.rcs_proxy).await?;
+        list_files(query_proxy, monikers).await
     }
 }
 
 /// Connect to Root `RealmExplorer` and Root `RealmQuery` with the provided `RemoteControlProxy`.
-async fn connect_realm_proxies(
+async fn connect_realm_query(
     rcs_proxy: &RemoteControlProxy,
-) -> Result<(fsys2::RealmQueryProxy, fsys2::RealmExplorerProxy), Error> {
-    let (realm_explorer_proxy, realm_explorer_server_end) =
-        fidl::endpoints::create_proxy::<fsys2::RealmExplorerMarker>()
-            .map_err(|e| Error::IOError("create realm explorer proxy".into(), e.into()))?;
-    // Connect to RootRealmExplorer.
-    flatten_proxy_connection(
-        rcs_proxy.root_realm_explorer(realm_explorer_server_end).await,
-        "RootRealmExplorer",
-    )
-    .await?;
-
+) -> Result<fsys2::RealmQueryProxy, Error> {
     // Connect RootRealmQuery.
     let (realm_query_proxy, realm_query_server_end) =
         fidl::endpoints::create_proxy::<fsys2::RealmQueryMarker>()
@@ -170,7 +160,7 @@ async fn connect_realm_proxies(
     )
     .await?;
 
-    Ok((realm_query_proxy, realm_explorer_proxy))
+    Ok(realm_query_proxy)
 }
 
 /// Helper method to unwrap `RemoteControlProxy` creation.

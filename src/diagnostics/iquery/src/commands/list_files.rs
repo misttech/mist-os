@@ -11,9 +11,9 @@ use {
         },
         types::Error,
     },
-    anyhow::anyhow,
     argh::FromArgs,
     async_trait::async_trait,
+    component_debug::dirs::*,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
     futures::StreamExt,
     lazy_static::lazy_static,
@@ -123,14 +123,13 @@ async fn recursive_list_inspect_files(proxy: fio::DirectoryProxy) -> Vec<String>
 
 pub async fn list_files(
     realm_query_proxy: fsys2::RealmQueryProxy,
-    mut realm_explorer_proxy: fsys2::RealmExplorerProxy,
     monikers: &[String],
 ) -> Result<Vec<ListFilesResultItem>, Error> {
     let monikers = if monikers.is_empty() {
-        get_instance_infos(&mut realm_explorer_proxy)
+        get_instance_infos(&realm_query_proxy)
             .await?
             .iter()
-            .map(|e| e.moniker.to_owned())
+            .map(|e| format!(".{}", e.moniker))
             .collect::<Vec<_>>()
     } else {
         let mut processed = vec![];
@@ -143,49 +142,42 @@ pub async fn list_files(
     let mut output_vec = vec![];
 
     for moniker in &monikers {
-        let (_, res_info) = realm_query_proxy
-            .get_instance_info(moniker)
-            .await
-            .map_err(|e| Error::ConnectingTo("RealmQuery".to_owned(), e))?
-            .map_err(|e| Error::CommunicatingWith("RealmQuery".to_owned(), anyhow!("{:?}", e)))?;
+        let relative_moniker = moniker.as_str().try_into().unwrap();
+        let result = open_instance_dir_root_readable(
+            &relative_moniker,
+            OpenDirType::Outgoing,
+            &realm_query_proxy,
+        )
+        .await;
 
-        if let Some(resolved_state) = res_info {
-            let execution_state = match resolved_state.execution {
-                Some(state) => state,
-                _ => continue,
-            };
-
-            let out_dir = match execution_state.out_dir {
-                Some(out_dir) => out_dir,
-                _ => continue,
-            };
-
-            let out_dir_proxy = match out_dir.into_proxy() {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-
-            // `fuchsia_fs::directory::open_directory` could block forever when the directory
-            // it is trying to open does not exist.
-            // TODO(https://fxbug.dev/110964): use `open_directory` hang bug is fixed.
-            let diagnostics_dir_proxy = match fuchsia_fs::directory::open_directory_no_describe(
-                &out_dir_proxy,
-                "diagnostics",
-                fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            ) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-
-            let mut files = recursive_list_inspect_files(diagnostics_dir_proxy).await;
-            files.sort();
-
-            if files.len() > 0 {
-                output_vec.push(ListFilesResultItem {
-                    moniker: String::from(strip_leading_relative_moniker(moniker).await),
-                    files,
-                })
+        let out_dir_proxy = match result {
+            Ok(out_dir_proxy) => out_dir_proxy,
+            Err(OpenError::InstanceNotFound(_)) => {
+                return Err(Error::InvalidComponent(moniker.to_string()))
             }
+            Err(_) => continue,
+        };
+
+        // `fuchsia_fs::directory::open_directory` could block forever when the directory
+        // it is trying to open does not exist.
+        // TODO(https://fxbug.dev/110964): use `open_directory` hang bug is fixed.
+        let diagnostics_dir_proxy = match fuchsia_fs::directory::open_directory_no_describe(
+            &out_dir_proxy,
+            "diagnostics",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        ) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        let mut files = recursive_list_inspect_files(diagnostics_dir_proxy).await;
+        files.sort();
+
+        if files.len() > 0 {
+            output_vec.push(ListFilesResultItem {
+                moniker: String::from(strip_leading_relative_moniker(moniker).await),
+                files,
+            })
         }
     }
 

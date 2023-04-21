@@ -127,20 +127,12 @@ pub fn make_inspects_for_lifecycle() -> Vec<InspectData> {
 }
 
 pub fn setup_fake_rcs() -> RemoteControlProxy {
-    let mock_realm_explorer = iquery_test_support::MockRealmExplorer::default();
     let mock_realm_query = iquery_test_support::MockRealmQuery::default();
     let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<<fidl_fuchsia_developer_remotecontrol::RemoteControlProxy as fidl::endpoints::Proxy>::Protocol>().unwrap();
     fuchsia_async::Task::local(async move {
-        let explorer = Arc::new(mock_realm_explorer);
         let querier = Arc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteControlRequest::RootRealmExplorer { server, responder } => {
-                    let explorer = Arc::clone(&explorer);
-                    fuchsia_async::Task::local(async move { explorer.serve(server).await })
-                        .detach();
-                    responder.send(&mut Ok(())).unwrap();
-                }
                 RemoteControlRequest::RootRealmQuery { server, responder } => {
                     let querier = Arc::clone(&querier);
                     fuchsia_async::Task::local(async move { querier.serve(server).await }).detach();
