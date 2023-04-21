@@ -67,7 +67,7 @@ class RustcTargetToClangTargetTests(unittest.TestCase):
 
     def test_known(self):
         for t in ('x86_64-linux-gnu', 'aarch64-linux-gnu',
-                  'x86_64-unknown-fuchsia'):
+                  'x86_64-unknown-fuchsia', 'x86_64-apple-darwin'):
             fuchsia.rustc_target_to_clang_target(t)
 
     def test_unknown(self):

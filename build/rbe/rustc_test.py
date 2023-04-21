@@ -56,7 +56,8 @@ class RustActionTests(unittest.TestCase):
         self.assertIsNone(r.linker)
         self.assertEqual(r.link_arg_files, [])
         self.assertIsNone(r.link_map_output)
-        self.assertEqual(r.c_sysroot, '')
+        self.assertIsNone(r.c_sysroot)
+        self.assertIsNone(r.use_ld)
         self.assertEqual(r.native, [])
         self.assertEqual(r.explicit_link_arg_files, [])
         self.assertEqual(r.externs, {})
@@ -204,6 +205,15 @@ class RustActionTests(unittest.TestCase):
             ])
         self.assertEqual(r.rust_sysroot, rust_sysroot)
 
+    def test_fuse_ld(self):
+        ld = Path('gold')
+        r = rustc.RustAction(
+            [
+                '../tools/rustc', f'-Clink-arg=-fuse-ld={ld}', '../foo/lib.rs',
+                '-o', 'foo.rlib'
+            ])
+        self.assertEqual(r.use_ld, ld)
+
     def test_rust_sysroot_default(self):
         working_dir = Path('/home/project/build')
         fake_default_sysroot = Path('/home/project/tools/fake/sysroot')
@@ -349,12 +359,26 @@ class RustActionTests(unittest.TestCase):
             ])
         self.assertEqual(
             r.externs, {
-                'this_lib': [libdir1],
-                'that_lib': [libdir2],
+                'this_lib': libdir1,
+                'that_lib': libdir2,
             })
         self.assertEqual(
             set(r.extern_paths()),
             _paths({'path/to/this_lib', 'path/to/that_lib'}))
+
+    def test_externs_last_wins(self):
+        libdir1 = Path('path/to/this_lib')
+        libdir2 = Path('path/to/that_lib')
+        r = rustc.RustAction(
+            [
+                '../tools/rustc', '--extern', f'this_lib={libdir1}',
+                '../foo/lib.rs', '--extern', f'this_lib={libdir2}', '-o',
+                'foo.rlib'
+            ])
+        self.assertEqual(r.externs, {
+            'this_lib': libdir2,
+        })
+        self.assertEqual(set(r.extern_paths()), _paths({'path/to/that_lib'}))
 
     def test_dep_only_command(self):
         new_depfile = 'some/where/new-foo.rlib.d.other'

@@ -180,14 +180,20 @@ class RustAction(object):
             self._attributes.L_flags)
         self._emit = cl_utils.keyed_flags_to_values_dict(
             cl_utils.flatten_comma_list(self._attributes.emit))
-        self._extern = cl_utils.keyed_flags_to_values_dict(
+        raw_extern = cl_utils.keyed_flags_to_values_dict(
             cl_utils.flatten_comma_list(self._attributes.extern),
             convert_type=Path)
+        self._extern: Dict[str, Path] = {
+            k: v[-1]  # last value wins
+            for k, v in raw_extern.items()
+            if v  # ignore empty lists
+        }
 
         # post-process some flags
-        self._c_sysroot = ''
+        self._c_sysroot: Path = None
+        self._use_ld: Path = None
         self._want_sysroot_libgcc = False
-        self._link_arg_files = []
+        self._link_arg_files: Sequence[Path] = []
         for arg in self._link_arg_flags:
             if arg == '-lgcc':
                 self._want_sysroot_libgcc = True
@@ -195,6 +201,9 @@ class RustAction(object):
             left, sep, right = arg.partition('=')
             if left == '--sysroot':
                 self._c_sysroot = Path(right)
+                continue
+            if left == '-fuse-ld':
+                self._use_ld = Path(right)
                 continue
             if is_linkable(arg):
                 self._link_arg_files.append(arg)
@@ -276,6 +285,10 @@ class RustAction(object):
         return Path(d) if d else None
 
     @property
+    def use_ld(self) -> Optional[Path]:
+        return self._use_ld
+
+    @property
     def linker(self) -> Optional[Path]:
         d = cl_utils.last_value_of_dict_flag(self._C_flags, 'linker')
         return Path(d) if d else None
@@ -314,7 +327,7 @@ class RustAction(object):
         return self._attributes.sysroot or self.default_rust_sysroot()
 
     @property
-    def c_sysroot(self) -> Path:
+    def c_sysroot(self) -> Optional[Path]:
         return self._c_sysroot
 
     @property
@@ -338,13 +351,11 @@ class RustAction(object):
         ]
 
     @property
-    def externs(self) -> Dict[str, Sequence[Path]]:
+    def externs(self) -> Dict[str, Path]:
         return self._extern
 
     def extern_paths(self) -> Iterable[Path]:
-        for lib, paths in self.externs.items():
-            if paths:  # ignore any empty lists
-                yield paths[-1]  # last value wins
+        yield from self.externs.values()
 
     @property
     def _output_file_base(self) -> str:

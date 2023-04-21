@@ -139,6 +139,19 @@ class SplitIntoSubequencesTests(unittest.TestCase):
         )
 
 
+class MatchPrefixTransformSuffixTests(unittest.TestCase):
+
+    def test_no_match(self):
+        result = cl_utils.match_prefix_transform_suffix(
+            'abc', 'xyz', lambda x: x)
+        self.assertIsNone(result)
+
+    def test_match(self):
+        result = cl_utils.match_prefix_transform_suffix(
+            'abcdef', 'abc', lambda x: x.upper())
+        self.assertEqual(result, 'abcDEF')
+
+
 class FlattenCommaListTests(unittest.TestCase):
 
     def test_empty(self):
@@ -468,7 +481,8 @@ class SymlinkRelativeTests(unittest.TestCase):
             cl_utils.symlink_relative(dest, src)
             self.assertTrue(src.is_symlink())
             self.assertEqual(_readlink(src), 'dest.txt')  # relative
-            self.assertEqual(src.resolve(), dest)
+            # Need dest.resolve() on Mac OS where tempdirs can be symlinks
+            self.assertEqual(src.resolve(), dest.resolve())
 
     def test_dest_in_subdir(self):
         with tempfile.TemporaryDirectory() as td:
@@ -479,7 +493,7 @@ class SymlinkRelativeTests(unittest.TestCase):
             self.assertTrue(src.is_symlink())
             self.assertEqual(
                 _readlink(src), 'must/go/deeper/log.txt')  # relative
-            self.assertEqual(src.resolve(), dest)
+            self.assertEqual(src.resolve(), dest.resolve())
 
     def test_dest_in_parent(self):
         with tempfile.TemporaryDirectory() as td:
@@ -489,7 +503,7 @@ class SymlinkRelativeTests(unittest.TestCase):
             cl_utils.symlink_relative(dest, src)
             self.assertTrue(src.is_symlink())
             self.assertEqual(_readlink(src), '../../../log.txt')  # relative
-            self.assertEqual(src.resolve(), dest)
+            self.assertEqual(src.resolve(), dest.resolve())
 
     def test_common_parent_srcdir_does_not_exist_yet(self):
         with tempfile.TemporaryDirectory() as td:
@@ -502,7 +516,7 @@ class SymlinkRelativeTests(unittest.TestCase):
             self.assertTrue(src.is_symlink())
             self.assertEqual(
                 _readlink(src), '../../../trash/bin/garbage.txt')  # relative
-            self.assertEqual(src.resolve(), dest)
+            self.assertEqual(src.resolve(), dest.resolve())
 
     def test_common_parent_srcdir_already_exists(self):
         with tempfile.TemporaryDirectory() as td:
@@ -517,7 +531,7 @@ class SymlinkRelativeTests(unittest.TestCase):
             self.assertTrue(src.is_symlink())
             self.assertEqual(
                 _readlink(src), '../../../trash/bin/garbage.txt')  # relative
-            self.assertEqual(src.resolve(), dest)
+            self.assertEqual(src.resolve(), dest.resolve())
 
 
 class ExecRelaunchTests(unittest.TestCase):

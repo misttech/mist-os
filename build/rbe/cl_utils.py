@@ -17,7 +17,7 @@ import sys
 import platform
 
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Optional, Sequence, Tuple
 
 # Local subprocess and remote environment calls need this when a
 # command is prefixed with an X=Y environment variable.
@@ -96,6 +96,29 @@ def split_into_subsequences(seq: Iterable[Any],
             subseq.append(elem)
 
     yield subseq
+
+
+def match_prefix_transform_suffix(
+        text: str, prefix: str, transform: Callable[[str],
+                                                    str]) -> Optional[str]:
+    """If text matches prefix, transform the text after the prefix.
+
+	This can be useful for transforming command flags.
+
+	Args:
+       text: string to match and possibly transform.
+       prefix: check if text starts with this string
+       transform: function to apply to remainder of text after the
+          matched prefix.
+
+	Returns:
+      Transformed text if prefix was matched, else None.
+    """
+    if not text.startswith(prefix):
+        return None
+    suffix = text[len(prefix):]
+    transformed = transform(suffix)
+    return prefix + transformed
 
 
 def command_quoted_str(command: Iterable[str]) -> str:

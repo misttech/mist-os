@@ -347,7 +347,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         command = _strs(
             [
                 compiler, source, '-o', exe, '--crate-type', 'bin',
-                f'-Clinker={linker}', f'--target={target}'
+                f'-Clinker={linker}', f'--target={target}',
+                f'-Clink-arg=-fuse-ld=lld'
             ])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
@@ -355,6 +356,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             working_dir=working_dir,
             auto_reproxy=False,
         )
+        self.assertEqual(r.linker, linker)
+        self.assertEqual(r.remote_ld_path, lld)
 
         mocks = self.generate_prepare_mocks(
             depfile_contents=depfile_contents,
@@ -468,25 +471,118 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             set(_paths([compiler, shlib_rel, source, env_file] + deps)))
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_prepare_remote_cross_compile(self):
+    def test_native_compile(self):
+        host_platform = fuchsia.REMOTE_PLATFORM
         exec_root = Path('/home/project')
         working_dir = exec_root / 'build-here'
-        compiler = Path('../tools/mac-arm64/bin/rustc')
-        remote_compiler = Path('../tools/linux-x64/bin/rustc')
-        shlib = Path('tools/lib/librusteze.so')
-        shlib_abs = exec_root / shlib
-        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        compiler = Path(f'../tools/{host_platform}/bin/rustc')
         source = Path('../foo/src/lib.rs')
         rlib = Path('obj/foo.rlib')
-        deps = [Path('../foo/src/other.rs')]
-        depfile_contents = [str(d) + ':' for d in deps]
         command = _strs([compiler, source, '-o', rlib])
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            host_platform=host_platform,
+            auto_reproxy=False,
+        )
+        self.assertTrue(r.host_matches_remote)
+
+    def test_target_linker_prefix(self):
+        for target, ld in [
+            ('arm64-unknown-linux-gnu', 'ld'),
+            ('x86_64-unknown-linux-gnu', 'ld'),
+            ('x86_64-unknown-freebsd', 'ld'),
+            ('x86_64-apple-darwin', 'ld64'),
+            ('ppc64-apple-darwin', 'ld64'),
+        ]:
+            exec_root = Path('/home/project')
+            working_dir = exec_root / 'build-here'
+            compiler = Path('../tools/host-platform/bin/rustc')
+            source = Path('../foo/src/lib.rs')
+            rlib = Path('obj/foo.rlib')
+            command = _strs(
+                [compiler, source, '-o', rlib, f'--target={target}'])
+            r = rustc_remote_wrapper.RustRemoteAction(
+                ['--'] + command,
+                exec_root=exec_root,
+                working_dir=working_dir,
+                auto_reproxy=False,
+            )
+            self.assertEqual(r.target_linker_prefix, ld)
+
+    def test_cdylib_rust_lld(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/mac-x64/bin/rustc')
+        remote_compiler = Path('../tools/linux-x64/bin/rustc')
+        remote_rust_lld = remote_compiler.parent / fuchsia._REMOTE_RUST_LLD_RELPATH
+        source = Path('../foo/src/lib.rs')
+        dylib = Path('obj/foo.dylib')
+        command = _strs(
+            [compiler, source, '--crate-type', 'cdylib', '-o', dylib])
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
         )
+        mocks = self.generate_prepare_mocks()
+        with contextlib.ExitStack() as stack:
+            for m in mocks:
+                stack.enter_context(m)
+            with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
+                                   '_local_depfile_inputs') as mock_deps:
+                with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
+                                       '_remote_rustc_shlibs') as mock_shlibs:
+                    prepare_status = r.prepare()
+
+        mock_deps.assert_called_once()
+        mock_shlibs.assert_called_once()
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        self.assertIn(remote_compiler, remote_inputs)
+        self.assertIn(remote_rust_lld, remote_inputs)
+
+    def test_prepare_remote_cross_compile(self):
+        host_platform = 'mac-arm64'
+        remote_platform = fuchsia.REMOTE_PLATFORM
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path(f'../tools/{host_platform}/bin/rustc')
+        remote_compiler = Path(f'../tools/{remote_platform}/bin/rustc')
+        linker = Path(f'../tools/{host_platform}/bin/linker')
+        remote_linker = Path(f'../tools/{remote_platform}/bin/linker')
+        remote_ld_path = Path(f'../tools/{remote_platform}/bin/ld.lld')
+        shlib = Path('tools/lib/librusteze.so')
+        shlib_abs = exec_root / shlib
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        libcxx = Path('../std/tools/bin/../lib/libc++.a')
+        libcxx_norm = Path('../std/tools/lib/libc++.a')
+        target = 'powerpc-unknown-freebsd'
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        deps = [Path('../foo/src/other.rs')]
+        depfile_contents = [str(d) + ':' for d in deps]
+        command = _strs(
+            [
+                compiler, source, '-o', rlib, f'--target={target}',
+                f'-Clinker={linker}', f'-Clink-arg={libcxx}',
+                f'-Clink-arg=-fuse-ld=lld'
+            ])
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            host_platform=host_platform,
+            auto_reproxy=False,
+        )
+        self.assertEqual(r.working_dir, working_dir)
+        self.assertFalse(r.host_matches_remote)
+        self.assertEqual(r.original_command, command)
+        self.assertEqual(r.linker, linker)
+        self.assertEqual(r.remote_linker, remote_linker)
+        self.assertEqual(r.remote_ld_path, remote_ld_path)
 
         mocks = self.generate_prepare_mocks(
             depfile_contents=depfile_contents,
@@ -500,12 +596,26 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(prepare_status, 0)  # success
         self.assertEqual(r.remote_compiler, remote_compiler)
         a = r.remote_action
+        self.assertEqual(list(r.remote_compile_command()), a.local_command)
         self.assertEqual(
-            a.local_command, _strs([remote_compiler, source, '-o', rlib]))
+            a.local_command,
+            _strs(
+                [
+                    remote_compiler,
+                    source,
+                    '-o',
+                    rlib,
+                    f'--target={target}',
+                    f'-Clinker={remote_linker}',
+                    f'-Clink-arg={libcxx_norm}',  # normalized
+                    f'-Clink-arg=-fuse-ld=lld',
+                    f'-Clink-arg=--ld-path={remote_ld_path}',  # added by wrapper
+                ]))
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
-            remote_inputs, set([remote_compiler, shlib_rel, source] + deps))
+            remote_inputs,
+            set([remote_compiler, shlib_rel, libcxx, source] + deps))
         self.assertEqual(remote_output_files, {rlib})
 
     def test_post_run_actions(self):

@@ -200,13 +200,20 @@ def rustc_target_to_clang_target(target: str) -> str:
     if target == 'wasm32-unknown-unknown':
         return "wasm32-unknown-unknown"
 
+    if target == "x86_64-apple-darwin":
+        return "x86_64-apple-darwin"
+
     raise ValueError(
         f"Unhandled case for mapping to clang lib target dir: {target}")
 
 
+_REMOTE_RUST_LLD_RELPATH = Path(
+    '../lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld')
+
+
 def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
     # remote is only linux-64
-    rust_lld = rustc.parent / '../lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld'
+    rust_lld = rustc.parent / _REMOTE_RUST_LLD_RELPATH
     return rust_lld  # already normalized by Path construction
 
 

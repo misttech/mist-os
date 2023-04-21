@@ -605,6 +605,7 @@ class RemoteAction(object):
             self._output_files.append(self._remote_log_name)
             self._inputs.append(self._remote_log_script_path)
 
+        # TODO(http://fxbug.dev/125627): support remote tracing from Macs
         self._fsatrace_path = fsatrace_path  # relative to working dir
         if self._fsatrace_path:
             self._inputs.extend([self._fsatrace_path, self._fsatrace_so])
