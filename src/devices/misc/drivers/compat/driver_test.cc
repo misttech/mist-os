@@ -420,6 +420,15 @@ class IncomingNamespace {
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
+// Log through a zx_driver logger.
+void log(zx_driver_t* drv, FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
+         const char* msg, ...) {
+  va_list args;
+  va_start(args, msg);
+  drv->Log(severity, tag, file, line, msg, args);
+  va_end(args);
+}
+
 }  // namespace
 
 class DriverTest : public testing::Test {
@@ -889,16 +898,21 @@ TEST_F(GlobalLoggerListTest, TestWithoutNodeNames) {
   auto& node_names_res_3 = zx_driver_3->node_names_for_testing();
   ASSERT_NE(&node_names_res_2, &node_names_res_3);
   ASSERT_EQ(0ul, node_names_res_3.size());
+  log(zx_driver_3, FUCHSIA_LOG_INFO, nullptr, __FILE__, __LINE__, "Hello!");
 
   global_list.RemoveLogger("path_2", logger_3, std::nullopt);
-  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_2"));
+  ASSERT_EQ(0, global_list.loggers_count_for_testing("path_2"));
 
   global_list.RemoveLogger("path_1", logger_1, std::nullopt);
   ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
   ASSERT_EQ(0ul, node_names_res_2.size());
 
   global_list.RemoveLogger("path_1", logger_2, std::nullopt);
-  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
+  ASSERT_EQ(0, global_list.loggers_count_for_testing("path_1"));
+
+  // Make sure we can still log with the zx_drivers that we got even when it is emptied out.
+  log(zx_driver_3, FUCHSIA_LOG_INFO, nullptr, __FILE__, __LINE__, "Done with test: %s",
+      "TestWithoutNodeNames");
 }
 
 TEST_F(GlobalLoggerListTest, TestWithNodeNames) {
@@ -930,9 +944,10 @@ TEST_F(GlobalLoggerListTest, TestWithNodeNames) {
   ASSERT_NE(&node_names_res_2, &node_names_res_3);
   ASSERT_EQ(1ul, node_names_res_3.size());
   ASSERT_EQ("node_3", node_names_res_3[0]);
+  log(zx_driver_3, FUCHSIA_LOG_INFO, nullptr, __FILE__, __LINE__, "Hello!");
 
   global_list.RemoveLogger("path_2", logger_3, "node_3");
-  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_2"));
+  ASSERT_EQ(0, global_list.loggers_count_for_testing("path_2"));
 
   global_list.RemoveLogger("path_1", logger_1, "node_1");
   ASSERT_EQ(1, global_list.loggers_count_for_testing("path_1"));
@@ -940,5 +955,9 @@ TEST_F(GlobalLoggerListTest, TestWithNodeNames) {
   ASSERT_EQ("node_2", node_names_res_2[0]);
 
   global_list.RemoveLogger("path_1", logger_2, "node_2");
-  ASSERT_EQ(std::nullopt, global_list.loggers_count_for_testing("path_1"));
+  ASSERT_EQ(0, global_list.loggers_count_for_testing("path_1"));
+
+  // Make sure we can still log with the zx_drivers that we got even when it is emptied out.
+  log(zx_driver_3, FUCHSIA_LOG_INFO, nullptr, __FILE__, __LINE__, "Done with test: %s",
+      "TestWithNodeNames");
 }

@@ -20,6 +20,7 @@
 #include <lib/sync/cpp/completion.h>
 #include <zircon/dlfcn.h>
 
+#include "src/devices/lib/log/log.h"
 #include "src/devices/misc/drivers/compat/loader.h"
 
 namespace fboot = fuchsia_boot;
@@ -144,8 +145,13 @@ void GlobalLoggerList::LoggerInstances::Log(FuchsiaLogSeverity severity, const c
                                             va_list args) {
   std::lock_guard guard(kGlobalLoggerListLock);
   auto it = loggers_.begin();
-  ZX_ASSERT_MSG(it != loggers_.end(),
-                "Invalid state. There should be at least 1 logger in this LoggerInstances.");
+
+  if (it == loggers_.end()) {
+    LOGF(WARNING, "No logger available in this LoggerInstances. Using host logger.");
+    driver_logger::GetLogger().VLogWrite(severity, tag, msg, args, file, line);
+    return;
+  }
+
   if (!log_node_names_) {
     (*it)->logvf(severity, tag, file, line, msg, args);
     return;
@@ -197,9 +203,10 @@ void GlobalLoggerList::RemoveLogger(const std::string& driver_path,
   auto it = instances_.find(driver_path);
   if (it != instances_.end()) {
     it->second.RemoveLogger(logger, node_name);
-    if (it->second.count() == 0) {
-      instances_.erase(it);
-    }
+    // Don't erase the instance even if it becomes empty. There are some drivers that incorrectly
+    // log after they have been destroyed. We want to make sure that the logger instance that we
+    // put for them is kept around. The empty loggers will just cause it to log with the
+    // driver host's logger.
   }
 }
 
