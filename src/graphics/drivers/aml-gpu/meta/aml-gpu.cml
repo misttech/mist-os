@@ -15,8 +15,17 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.gpu.mali.Service" },
+    ],
     use: [
         { protocol: "fuchsia.boot.RootResource" },
         { service: "fuchsia.hardware.registers.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.gpu.mali.Service",
+            from: "self",
+        },
     ],
 }
