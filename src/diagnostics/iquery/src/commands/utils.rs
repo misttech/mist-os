@@ -40,6 +40,7 @@ pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
             let monikers = list_command
                 .execute(provider)
                 .await?
+                .into_inner()
                 .into_iter()
                 .map(|item| item.into_moniker())
                 .collect::<Vec<_>>();

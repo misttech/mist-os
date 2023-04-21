@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        commands::types::*,
-        types::{Error, ToText},
-    },
+    crate::{commands::types::*, types::Error},
     argh::FromArgs,
     async_trait::async_trait,
     diagnostics_data::{Logs, LogsData},
+    serde::Serialize,
+    std::fmt,
 };
 
 /// Prints the logs.
@@ -29,15 +28,21 @@ pub struct LogsCommand {
     pub accessor: Option<String>,
 }
 
-impl ToText for Vec<LogsData> {
-    fn to_text(self) -> String {
-        self.into_iter().map(|log| format!("{}", log)).collect::<Vec<_>>().join("\n")
+#[derive(Serialize)]
+pub struct LogsResult(Vec<LogsData>);
+
+impl fmt::Display for LogsResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for log in self.0.iter() {
+            writeln!(f, "{}", log)?;
+        }
+        Ok(())
     }
 }
 
 #[async_trait]
 impl Command for LogsCommand {
-    type Result = Vec<LogsData>;
+    type Result = LogsResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
         let mut results = provider.snapshot::<Logs>(&self.accessor, &[]).await?;
@@ -46,6 +51,6 @@ impl Command for LogsCommand {
                 hierarchy.sort();
             }
         }
-        Ok(results)
+        Ok(LogsResult(results))
     }
 }

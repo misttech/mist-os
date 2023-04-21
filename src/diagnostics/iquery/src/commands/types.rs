@@ -4,15 +4,16 @@
 
 use {
     crate::commands::list_files::ListFilesResultItem,
-    crate::types::{Error, ToText},
+    crate::types::Error,
     async_trait::async_trait,
     diagnostics_data::{Data, DiagnosticsData},
     serde::Serialize,
+    std::fmt::Display,
 };
 
 #[async_trait]
 pub trait Command {
-    type Result: Serialize + ToText;
+    type Result: Serialize + Display;
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error>;
 }
 

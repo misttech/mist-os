@@ -9,18 +9,17 @@ use {
             types::*,
             utils::*,
         },
-        types::{Error, ToText},
+        types::Error,
     },
     anyhow::anyhow,
     argh::FromArgs,
     async_trait::async_trait,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
     futures::StreamExt,
-    itertools::Itertools,
     lazy_static::lazy_static,
     regex::Regex,
     serde::Serialize,
-    std::cmp::Ordering,
+    std::{cmp::Ordering, fmt},
 };
 
 lazy_static! {
@@ -52,15 +51,24 @@ impl Ord for ListFilesResultItem {
     }
 }
 
-impl ToText for ListFilesResultItem {
-    fn to_text(self) -> String {
-        format!("{}\n  {}", &self.moniker, &self.files.join("\n  "))
+#[derive(Serialize)]
+pub struct ListFilesResult(Vec<ListFilesResultItem>);
+
+impl ListFilesResult {
+    pub fn into_inner(self) -> Vec<ListFilesResultItem> {
+        self.0
     }
 }
 
-impl ToText for Vec<ListFilesResultItem> {
-    fn to_text(self) -> String {
-        self.into_iter().map(|e| e.to_text()).join("\n")
+impl fmt::Display for ListFilesResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for item in self.0.iter() {
+            writeln!(f, "{}:", item.moniker)?;
+            for file in item.files.iter() {
+                writeln!(f, "  {}", file)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -77,10 +85,10 @@ pub struct ListFilesCommand {
 
 #[async_trait]
 impl Command for ListFilesCommand {
-    type Result = Vec<ListFilesResultItem>;
+    type Result = ListFilesResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
-        provider.list_files(&self.monikers).await
+        provider.list_files(&self.monikers).await.map(ListFilesResult)
     }
 }
 

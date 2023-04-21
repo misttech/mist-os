@@ -6,7 +6,7 @@ use {
     crate::{
         commands::{types::*, utils},
         text_formatter,
-        types::{Error, ToText},
+        types::Error,
     },
     argh::FromArgs,
     async_trait::async_trait,
@@ -15,14 +15,14 @@ use {
     glob,
     itertools::Itertools,
     serde::Serialize,
-    std::{cmp::Ordering, ops::Deref},
+    std::{cmp::Ordering, fmt, ops::Deref},
 };
 
 #[derive(Derivative, Serialize, PartialEq)]
 #[derivative(Eq)]
-pub struct ShowCommandResultItem(InspectData);
+pub struct ShowResultItem(InspectData);
 
-impl Deref for ShowCommandResultItem {
+impl Deref for ShowResultItem {
     type Target = InspectData;
 
     fn deref(&self) -> &Self::Target {
@@ -30,13 +30,13 @@ impl Deref for ShowCommandResultItem {
     }
 }
 
-impl PartialOrd for ShowCommandResultItem {
+impl PartialOrd for ShowResultItem {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for ShowCommandResultItem {
+impl Ord for ShowResultItem {
     fn cmp(&self, other: &Self) -> Ordering {
         self.moniker.cmp(&other.moniker).then_with(|| {
             let this_name = self.metadata.name.as_ref().map(InspectHandleName::as_ref);
@@ -46,12 +46,15 @@ impl Ord for ShowCommandResultItem {
     }
 }
 
-impl ToText for Vec<ShowCommandResultItem> {
-    fn to_text(self) -> String {
-        self.into_iter()
-            .map(|item| text_formatter::format_schema(item.0))
-            .collect::<Vec<_>>()
-            .join("\n")
+#[derive(Serialize)]
+pub struct ShowResult(Vec<ShowResultItem>);
+
+impl fmt::Display for ShowResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for item in self.0.iter() {
+            text_formatter::output_schema(f, &item.0)?;
+        }
+        Ok(())
     }
 }
 
@@ -94,7 +97,7 @@ pub struct ShowCommand {
 
 #[async_trait]
 impl Command for ShowCommand {
-    type Result = Vec<ShowCommandResultItem>;
+    type Result = ShowResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
         let selectors = utils::get_selectors_for_manifest(
@@ -151,11 +154,11 @@ impl Command for ShowCommand {
                 if let Some(hierarchy) = &mut d.payload {
                     hierarchy.sort();
                 }
-                ShowCommandResultItem(d)
+                ShowResultItem(d)
             })
             .collect::<Vec<_>>();
 
         results.sort();
-        Ok(results)
+        Ok(ShowResult(results))
     }
 }

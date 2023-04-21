@@ -16,100 +16,128 @@ use {
 const INDENT: usize = 2;
 const HEX_DISPLAY_CHUNK_SIZE: usize = 16;
 
-pub fn format(path: &str, diagnostics_hierarchy: DiagnosticsHierarchy) -> String {
-    let result = output_hierarchy(diagnostics_hierarchy, 1);
-    format!("{}:\n{}", path, result)
+pub fn format<W>(w: &mut W, path: &str, diagnostics_hierarchy: DiagnosticsHierarchy) -> fmt::Result
+where
+    W: fmt::Write,
+{
+    writeln!(w, "{}:", path)?;
+    output_hierarchy(w, &diagnostics_hierarchy, 1)
 }
 
-pub fn format_schema(schema: InspectData) -> String {
-    let mut result = format!("{}:\n", schema.moniker);
-
-    result.push_str("  metadata:\n");
+pub fn output_schema<W>(w: &mut W, schema: &InspectData) -> fmt::Result
+where
+    W: fmt::Write,
+{
+    writeln!(w, "{}:", schema.moniker)?;
+    writeln!(w, "  metadata:")?;
     if let Some(errors) = &schema.metadata.errors {
-        result.push_str(&format!("    errors = {}\n", errors.join(", ")));
+        writeln!(w, "    errors = {}", errors.join(", "))?;
     }
 
-    if let Some(name) = schema.metadata.name {
+    if let Some(name) = &schema.metadata.name {
         match name {
             InspectHandleName::Filename(f) => {
-                result.push_str(&format!("    filename = {}\n", f));
+                writeln!(w, "    filename = {}", f)?;
             }
             InspectHandleName::Name(n) => {
-                result.push_str(&format!("    name = {}\n", n));
+                writeln!(w, "    name = {}", n)?;
             }
         }
     }
 
-    result.push_str(&format!(
-        "    component_url = {}\n",
-        schema.metadata.component_url.unwrap_or("null".to_string())
-    ));
-    result.push_str(&format!("    timestamp = {}\n", schema.metadata.timestamp));
-
-    match schema.payload {
-        Some(hierarchy) => {
-            let payload = output_hierarchy(hierarchy, 2);
-            result.push_str(&format!("  payload:\n{}", payload))
-        }
-        None => result.push_str("  payload: null"),
+    write!(w, "    component_url = ")?;
+    match &schema.metadata.component_url {
+        Some(url) => writeln!(w, "{}", url)?,
+        None => writeln!(w, "null")?,
     }
-    result
+    writeln!(w, "    timestamp = {}", schema.metadata.timestamp)?;
+
+    match &schema.payload {
+        Some(hierarchy) => {
+            writeln!(w, "  payload:")?;
+            output_hierarchy(w, &hierarchy, 2)
+        }
+        None => writeln!(w, "  payload: null"),
+    }
 }
 
-fn output_hierarchy(diagnostics_hierarchy: DiagnosticsHierarchy, indent: usize) -> String {
-    let mut lines = vec![];
+fn output_hierarchy<W>(
+    w: &mut W,
+    diagnostics_hierarchy: &DiagnosticsHierarchy,
+    indent: usize,
+) -> fmt::Result
+where
+    W: fmt::Write,
+{
     let name_indent = " ".repeat(INDENT * indent);
     let value_indent = " ".repeat(INDENT * (indent + 1));
 
-    lines.push(format!("{}{}:", name_indent, diagnostics_hierarchy.name));
+    writeln!(w, "{}{}:", name_indent, diagnostics_hierarchy.name)?;
 
-    lines.extend(diagnostics_hierarchy.properties.into_iter().map(|property| match property {
-        Property::String(name, value) => format!("{}{} = {}", value_indent, name, value),
-        Property::Int(name, value) => format!("{}{} = {}", value_indent, name, value),
-        Property::Uint(name, value) => format!("{}{} = {}", value_indent, name, value),
-        Property::Double(name, value) => format!("{}{} = {:.6}", value_indent, name, value),
-        Property::Bytes(name, array) => {
-            let byte_str = array.to_hex(HEX_DISPLAY_CHUNK_SIZE);
-            format!("{}{} = Binary:\n{}", value_indent, name, byte_str.trim())
+    for property in &diagnostics_hierarchy.properties {
+        match property {
+            Property::String(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
+            Property::Int(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
+            Property::Uint(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
+            Property::Double(name, value) => {
+                writeln!(w, "{}{} = {:.6}", value_indent, name, value)?
+            }
+            Property::Bytes(name, array) => {
+                let byte_str = array.to_hex(HEX_DISPLAY_CHUNK_SIZE);
+                writeln!(w, "{}{} = Binary:\n{}", value_indent, name, byte_str.trim())?;
+            }
+            Property::Bool(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
+            Property::IntArray(name, array) => output_array(w, &value_indent, &name, &array)?,
+            Property::UintArray(name, array) => output_array(w, &value_indent, &name, &array)?,
+            Property::DoubleArray(name, array) => output_array(w, &value_indent, &name, &array)?,
+            Property::StringList(name, list) => {
+                writeln!(w, "{}{} = {:?}", value_indent, name, list)?;
+            }
         }
-        Property::Bool(name, value) => format!("{}{} = {}", value_indent, name, value),
-        Property::IntArray(name, array) => output_array(&value_indent, &name, &array),
-        Property::UintArray(name, array) => output_array(&value_indent, &name, &array),
-        Property::DoubleArray(name, array) => output_array(&value_indent, &name, &array),
-        Property::StringList(name, list) => format!("{}{} = {:?}", value_indent, name, list),
-    }));
+    }
 
-    lines.extend(
-        diagnostics_hierarchy.children.into_iter().map(|child| output_hierarchy(child, indent + 1)),
-    );
-
-    lines.join("\n")
+    for child in &diagnostics_hierarchy.children {
+        output_hierarchy(w, child, indent + 1)?;
+    }
+    Ok(())
 }
 
-fn output_array<
-    T: AddAssign + MulAssign + Copy + Add<Output = T> + fmt::Display + NumberFormat + Bounded,
->(
+fn output_array<T, W>(
+    w: &mut W,
     value_indent: &str,
     name: &str,
     array: &ArrayContent<T>,
-) -> String {
-    let content = match array {
+) -> fmt::Result
+where
+    W: fmt::Write,
+    T: AddAssign + MulAssign + Copy + Add<Output = T> + fmt::Display + NumberFormat + Bounded,
+{
+    write!(w, "{}{} = [", value_indent, name)?;
+    match array {
         ArrayContent::Values(values) => {
-            values.iter().map(|x| x.to_string()).collect::<Vec<String>>()
+            for (i, value) in values.iter().enumerate() {
+                write!(w, "{}", value)?;
+                if i < values.len() - 1 {
+                    write!(w, ", ")?;
+                }
+            }
         }
-        ArrayContent::Buckets(buckets) => buckets
-            .iter()
-            .map(|bucket| {
-                format!(
+        ArrayContent::Buckets(buckets) => {
+            for (i, bucket) in buckets.iter().enumerate() {
+                write!(
+                    w,
                     "[{},{})={}",
                     bucket.floor.format(),
                     bucket.ceiling.format(),
                     bucket.count.format()
-                )
-            })
-            .collect::<Vec<String>>(),
+                )?;
+                if i < buckets.len() - 1 {
+                    write!(w, ", ")?;
+                }
+            }
+        }
     };
-    format!("{}{} = [{}]", value_indent, name, content.join(", "))
+    writeln!(w, "]")
 }
 
 trait NumberFormat {

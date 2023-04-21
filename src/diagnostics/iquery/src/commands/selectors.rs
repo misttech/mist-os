@@ -12,6 +12,8 @@ use {
     diagnostics_data::{Inspect, InspectData},
     diagnostics_hierarchy::DiagnosticsHierarchy,
     selectors,
+    serde::Serialize,
+    std::fmt,
 };
 
 /// Lists all available full selectors (component selector + tree selector).
@@ -46,7 +48,7 @@ pub struct SelectorsCommand {
 
 #[async_trait]
 impl Command for SelectorsCommand {
-    type Result = Vec<String>;
+    type Result = SelectorsResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
         if self.selectors.is_empty() && self.manifest.is_none() {
@@ -67,7 +69,19 @@ impl Command for SelectorsCommand {
                 hierarchy.sort();
             }
         }
-        Ok(inspect_to_selectors(results))
+        Ok(SelectorsResult(inspect_to_selectors(results)))
+    }
+}
+
+#[derive(Serialize)]
+pub struct SelectorsResult(Vec<String>);
+
+impl fmt::Display for SelectorsResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for item in self.0.iter() {
+            writeln!(f, "{}", item)?;
+        }
+        Ok(())
     }
 }
 

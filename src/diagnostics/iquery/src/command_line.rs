@@ -45,7 +45,7 @@ macro_rules! execute_and_format {
                                 .map_err(|e| Error::InvalidCommandResponse(e))
                         }
                         Format::Text => {
-                            Ok(result.to_text())
+                            Ok(result.to_string())
                         }
                     }
                 }

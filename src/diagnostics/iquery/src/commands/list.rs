@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        commands::types::*,
-        types::{Error, ToText},
-    },
+    crate::{commands::types::*, types::Error},
     argh::FromArgs,
     async_trait::async_trait,
     diagnostics_data::{Inspect, InspectData},
     serde::{Serialize, Serializer},
-    std::{cmp::Ordering, collections::BTreeSet},
+    std::{cmp::Ordering, collections::BTreeSet, fmt},
 };
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Serialize)]
@@ -21,12 +18,12 @@ pub struct MonikerWithUrl {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum ListResponseItem {
+pub enum ListResultItem {
     Moniker(String),
     MonikerWithUrl(MonikerWithUrl),
 }
 
-impl ListResponseItem {
+impl ListResultItem {
     pub fn into_moniker(self) -> String {
         match self {
             Self::Moniker(moniker) => moniker,
@@ -35,27 +32,27 @@ impl ListResponseItem {
     }
 }
 
-impl Ord for ListResponseItem {
+impl Ord for ListResultItem {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
     }
 }
 
-impl PartialOrd for ListResponseItem {
+impl PartialOrd for ListResultItem {
     // Compare based on the moniker only. To enable sorting using the moniker only.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (ListResponseItem::Moniker(moniker), ListResponseItem::Moniker(other_moniker))
+            (ListResultItem::Moniker(moniker), ListResultItem::Moniker(other_moniker))
             | (
-                ListResponseItem::MonikerWithUrl(MonikerWithUrl { moniker, .. }),
-                ListResponseItem::MonikerWithUrl(MonikerWithUrl { moniker: other_moniker, .. }),
+                ListResultItem::MonikerWithUrl(MonikerWithUrl { moniker, .. }),
+                ListResultItem::MonikerWithUrl(MonikerWithUrl { moniker: other_moniker, .. }),
             ) => moniker.partial_cmp(other_moniker),
             _ => unreachable!("all lists must contain variants of the same type"),
         }
     }
 }
 
-impl Serialize for ListResponseItem {
+impl Serialize for ListResultItem {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Self::Moniker(string) => serializer.serialize_str(&string),
@@ -64,32 +61,42 @@ impl Serialize for ListResponseItem {
     }
 }
 
-impl ToText for Vec<ListResponseItem> {
-    fn to_text(self) -> String {
-        self.into_iter()
-            .map(|item| match item {
-                ListResponseItem::Moniker(string) => string,
-                ListResponseItem::MonikerWithUrl(MonikerWithUrl { component_url, moniker }) => {
-                    format!("{}:\n  {}", moniker, component_url)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+#[derive(Serialize)]
+pub struct ListResult(Vec<ListResultItem>);
+
+impl ListResult {
+    pub(crate) fn into_inner(self) -> Vec<ListResultItem> {
+        self.0
     }
 }
 
-fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListResponseItem> {
+impl fmt::Display for ListResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for item in self.0.iter() {
+            match item {
+                ListResultItem::Moniker(moniker) => writeln!(f, "{}", moniker)?,
+                ListResultItem::MonikerWithUrl(MonikerWithUrl { component_url, moniker }) => {
+                    writeln!(f, "{}:", moniker)?;
+                    writeln!(f, "  {}", component_url)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListResultItem> {
     let mut result = vec![];
     for value in inspect_data {
         match value.metadata.component_url {
             Some(ref url) => {
-                result.push(ListResponseItem::MonikerWithUrl(MonikerWithUrl {
+                result.push(ListResultItem::MonikerWithUrl(MonikerWithUrl {
                     moniker: value.moniker,
                     component_url: url.clone(),
                 }));
             }
             None => {
-                result.push(ListResponseItem::Moniker(value.moniker));
+                result.push(ListResultItem::Moniker(value.moniker));
             }
         }
     }
@@ -99,15 +106,15 @@ fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListRespo
 pub fn list_response_items_from_components(
     manifest: &Option<String>,
     with_url: bool,
-    components: Vec<ListResponseItem>,
-) -> Vec<ListResponseItem> {
+    components: Vec<ListResultItem>,
+) -> Vec<ListResultItem> {
     components
         .into_iter()
         .filter(|result| match manifest {
             None => true,
             Some(manifest) => match result {
-                ListResponseItem::Moniker(_) => true,
-                ListResponseItem::MonikerWithUrl(url) => url.component_url.contains(manifest),
+                ListResultItem::Moniker(_) => true,
+                ListResultItem::MonikerWithUrl(url) => url.component_url.contains(manifest),
             },
         })
         .map(|result| {
@@ -115,8 +122,8 @@ pub fn list_response_items_from_components(
                 result
             } else {
                 match result {
-                    ListResponseItem::Moniker(_) => result,
-                    ListResponseItem::MonikerWithUrl(val) => ListResponseItem::Moniker(val.moniker),
+                    ListResultItem::Moniker(_) => result,
+                    ListResultItem::MonikerWithUrl(val) => ListResultItem::Moniker(val.moniker),
                 }
             }
         })
@@ -155,14 +162,14 @@ pub struct ListCommand {
 
 #[async_trait]
 impl Command for ListCommand {
-    type Result = Vec<ListResponseItem>;
+    type Result = ListResult;
 
     async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
         let inspect = provider.snapshot::<Inspect>(&self.accessor, &[]).await?;
         let components = components_from_inspect_data(inspect);
         let results =
             list_response_items_from_components(&self.manifest, self.with_url, components);
-        Ok(results)
+        Ok(ListResult(results))
     }
 }
 

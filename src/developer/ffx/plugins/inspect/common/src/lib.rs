@@ -20,41 +20,41 @@ use fidl_fuchsia_sys2 as fsys2;
 use futures::AsyncReadExt as _;
 use iquery::{
     commands::{
-        get_accessor_selectors, list_files, Command, DiagnosticsProvider, ListFilesResultItem,
-        ListResponseItem, ShowCommandResultItem,
+        get_accessor_selectors, list_files, Command, DiagnosticsProvider, ListAccessorsResult,
+        ListFilesResult, ListFilesResultItem, ListResult, SelectorsResult, ShowResult,
     },
-    types::{Error, ToText},
+    types::Error,
 };
 use lazy_static::lazy_static;
 use selectors;
 use serde::Serialize;
-use std::io::Write;
+use std::{fmt, io::Write};
 
 lazy_static! {
     static ref READDIR_TIMEOUT_SECONDS: u64 = 15;
 }
 
 macro_rules! impl_inspect_output {
-    ($(($variant:ident, $type:ty)),*) => {
+    ($($variant:tt),*) => {
         #[derive(Serialize)]
         #[serde(untagged)]
         pub enum InspectOutput {
-            $($variant( $type ),)*
+            $($variant( $variant ),)*
         }
 
         $(
-            impl From<$type> for InspectOutput {
-                fn from(item: $type) -> Self {
+            impl From<$variant> for InspectOutput {
+                fn from(item: $variant) -> Self {
                     Self::$variant(item)
                 }
             }
         )*
 
-        impl ToText for InspectOutput {
-            fn to_text(self) -> String {
+        impl fmt::Display for InspectOutput {
+             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self {
                     $(
-                        Self::$variant(value) => value.to_text(),
+                        Self::$variant(value) => value.fmt(f),
                     )*
                 }
             }
@@ -62,13 +62,7 @@ macro_rules! impl_inspect_output {
     };
 }
 
-impl_inspect_output!(
-    (MultipleStrings, Vec<String>),
-    (SingleString, String),
-    (ListResult, Vec<ListResponseItem>),
-    (ListFilesResult, Vec<ListFilesResultItem>),
-    (ShowResult, Vec<ShowCommandResultItem>)
-);
+impl_inspect_output!(ShowResult, ListFilesResult, ListAccessorsResult, ListResult, SelectorsResult);
 
 pub async fn run_command<C, O>(
     rcs_proxy: RemoteControlProxy,
@@ -86,7 +80,7 @@ where
     if writer.is_machine() {
         writer.machine(&result)?;
     } else {
-        writeln!(writer, "{}", result.to_text())?;
+        writeln!(writer, "{}", result)?;
     }
     Ok(())
 }
