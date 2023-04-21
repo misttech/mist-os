@@ -18,7 +18,10 @@ use super::tmpfs::TmpFs;
 use super::*;
 use crate::bpf::BpfFs;
 use crate::device::BinderFs;
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::{
+    buffers::{InputBuffer, OutputBuffer},
+    fuse::new_fuse_fs,
+};
 use crate::lock::{Mutex, RwLock};
 use crate::mutable_state::*;
 use crate::selinux::selinux_fs;
@@ -162,10 +165,11 @@ impl Mount {
         origin_mount: Option<MountHandle>,
         flags: MountFlags,
     ) -> MountHandle {
+        let known_flags = MountFlags::STORED_FLAGS | MountFlags::SILENT;
         assert!(
-            !flags.intersects(!MountFlags::STORED_FLAGS),
+            !flags.intersects(!known_flags),
             "mount created with extra flags {:?}",
-            flags - MountFlags::STORED_FLAGS
+            flags - known_flags
         );
         let fs = root.node.fs();
         Arc::new(Self {
@@ -487,14 +491,15 @@ pub fn create_filesystem(
 ) -> Result<WhatToMount, Errno> {
     let kernel = task.kernel();
     let fs = match fs_type {
-        b"devtmpfs" => dev_tmp_fs(task).clone(),
+        b"binder" => BinderFs::new_fs(task)?,
+        b"bpf" => BpfFs::new_fs(kernel)?,
         b"devpts" => dev_pts_fs(kernel).clone(),
+        b"devtmpfs" => dev_tmp_fs(task).clone(),
+        b"fuse" => new_fuse_fs(task, data),
         b"proc" => proc_fs(kernel.clone()),
         b"selinuxfs" => selinux_fs(kernel).clone(),
         b"sysfs" => sys_fs(kernel).clone(),
         b"tmpfs" => TmpFs::new_fs_with_data(kernel, data),
-        b"binder" => BinderFs::new_fs(task)?,
-        b"bpf" => BpfFs::new_fs(kernel)?,
         _ => return error!(ENODEV, String::from_utf8_lossy(fs_type)),
     };
 
