@@ -397,7 +397,7 @@ impl EpollFileObject {
         &self,
         current_task: &CurrentTask,
         max_events: usize,
-        timeout: zx::Duration,
+        mut deadline: zx::Time,
     ) -> Result<Vec<EpollEvent>, Errno> {
         // First we start waiting again on wait objects that have
         // previously been triggered.
@@ -413,7 +413,6 @@ impl EpollFileObject {
 
         // Process any events that are already available in the triggered queue.
         // TODO(tbodt) fold this into the wait_until_pending_event loop
-        let mut wait_deadline = zx::Time::after(timeout);
         let mut pending_list = vec![];
         self.process_triggered_events(current_task, &mut pending_list, max_events);
         if !pending_list.is_empty() {
@@ -422,14 +421,14 @@ impl EpollFileObject {
             // We still need to call wait_until_pending_event() (this time with a 0 deadline) to
             // process any events currently pending in the Waiter that haven't been added to our
             // triggered queue yet.
-            wait_deadline = zx::Time::ZERO;
+            deadline = zx::Time::ZERO;
         }
 
         // Note: wait_until_pending_event() can be interrupted with EINTR. We must be careful not to
         // lose state if that happens. The only state that can be lost are items already in the
         // pending list, and the code above sets the deadline to 0 in that case which will remove
         // the wait and avoid EINTR.
-        self.wait_until_pending_event(current_task, &mut pending_list, max_events, wait_deadline)?;
+        self.wait_until_pending_event(current_task, &mut pending_list, max_events, deadline)?;
 
         // Process the pending list and add processed ReadyObject
         // entries to the rearm_list for the next wait.
@@ -558,7 +557,7 @@ mod tests {
             assert_eq!(bytes_written, test_len);
             WRITE_COUNT.fetch_add(bytes_written as u64, Ordering::Relaxed);
         });
-        let events = epoll_file.wait(&current_task, 10, zx::Duration::INFINITE).unwrap();
+        let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
         let _ = thread.join();
         assert_eq!(1, events.len());
         let event = &events[0];
@@ -601,7 +600,7 @@ mod tests {
             )
             .unwrap();
 
-        let events = epoll_file.wait(&current_task, 10, zx::Duration::INFINITE).unwrap();
+        let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
         assert_eq!(1, events.len());
         let event = &events[0];
         assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
@@ -657,7 +656,7 @@ mod tests {
                 std::mem::size_of::<u64>()
             );
 
-            let events = epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap();
+            let events = epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap();
 
             if do_cancel {
                 assert_eq!(0, events.len());
@@ -702,7 +701,7 @@ mod tests {
                     EpollEvent::new(FdEvents::POLLIN.bits(), 2),
                 )
                 .expect("epoll_file.add");
-            epoll_file.wait(&current_task, 2, zx::Duration::from_millis(0)).expect("wait")
+            epoll_file.wait(&current_task, 2, zx::Time::ZERO).expect("wait")
         };
 
         let fds = poll();
@@ -758,19 +757,13 @@ mod tests {
             std::mem::size_of::<u64>()
         );
 
-        assert_eq!(
-            epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap().len(),
-            1
-        );
+        assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 1);
 
         // Remove the thing
         epoll_file.delete(&event).unwrap();
 
         // Wait for new notifications
-        assert_eq!(
-            epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap().len(),
-            0
-        );
+        assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 0);
         // That shouldn't crash
     }
 
@@ -797,17 +790,13 @@ mod tests {
                 EpollEvent::new(FdEvents::POLLIN.bits(), EVENT_DATA),
             )
             .unwrap();
-        assert_eq!(
-            epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap().len(),
-            0
-        );
+        assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 0);
 
         let read_write_event = FdEvents::POLLIN | FdEvents::POLLOUT;
         epoll_file
             .modify(&current_task, &socket1, EpollEvent::new(read_write_event.bits(), EVENT_DATA))
             .unwrap();
-        let triggered_events =
-            epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap();
+        let triggered_events = epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap();
         assert_eq!(1, triggered_events.len());
         let event = &triggered_events[0];
         let events = event.events;

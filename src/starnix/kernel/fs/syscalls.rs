@@ -1750,13 +1750,13 @@ pub fn sys_epoll_ctl(
     Ok(())
 }
 
-// Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded duration.
+// Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded deadline.
 fn do_epoll_pwait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
-    timeout: zx::Duration,
+    deadline: zx::Time,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(epfd)?;
@@ -1776,10 +1776,10 @@ fn do_epoll_pwait(
     let active_events = if !user_sigmask.is_null() {
         let signal_mask = current_task.mm.read_object(user_sigmask)?;
         current_task.wait_with_temporary_mask(signal_mask, |current_task| {
-            epoll_file.wait(current_task, max_events, timeout)
+            epoll_file.wait(current_task, max_events, deadline)
         })?
     } else {
-        epoll_file.wait(current_task, max_events, timeout)?
+        epoll_file.wait(current_task, max_events, deadline)?
     };
 
     let mut event_ref = events;
@@ -1799,8 +1799,8 @@ pub fn sys_epoll_pwait(
     timeout: i32,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let timeout = duration_from_poll_timeout(timeout)?;
-    do_epoll_pwait(current_task, epfd, events, max_events, timeout, user_sigmask)
+    let deadline = zx::Time::after(duration_from_poll_timeout(timeout)?);
+    do_epoll_pwait(current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
 pub fn sys_epoll_pwait2(
@@ -1811,13 +1811,13 @@ pub fn sys_epoll_pwait2(
     user_timespec: UserRef<timespec>,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let timeout = if user_timespec.is_null() {
-        zx::Duration::INFINITE
+    let deadline = if user_timespec.is_null() {
+        zx::Time::INFINITE
     } else {
         let ts = current_task.mm.read_object(user_timespec)?;
-        duration_from_timespec(ts)?
+        zx::Time::after(duration_from_timespec(ts)?)
     };
-    do_epoll_pwait(current_task, epfd, events, max_events, timeout, user_sigmask)
+    do_epoll_pwait(current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
 trait ReadItemKey: Copy + Send + Sync + 'static {}

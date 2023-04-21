@@ -720,7 +720,7 @@ mod test {
         let event = EpollEvent::new(FdEvents::POLLIN.bits(), 0);
         epoll_file.add(&current_task, &pipe, &epoll_object, event).expect("poll_file.add");
 
-        let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
+        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
@@ -729,13 +729,13 @@ mod test {
             pipe.query_events(&current_task),
             FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM
         );
-        let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
+        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(pipe.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
         assert_eq!(pipe.query_events(&current_task), FdEvents::POLLOUT | FdEvents::POLLWRNORM);
-        let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
+        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
     }
 
