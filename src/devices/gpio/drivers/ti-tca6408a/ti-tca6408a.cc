@@ -48,7 +48,8 @@ zx_status_t TiTca6408a::Create(void* ctx, zx_device_t* parent) {
   }
 
   auto dev = std::make_unique<TiTca6408a>(parent, std::move(i2c), pin_index_offset);
-  if ((status = dev->DdkAdd("ti-tca6408a")) != ZX_OK) {
+  if ((status = dev->DdkAdd(ddk::DeviceAddArgs("ti-tca6408a")
+                                .forward_metadata(parent, DEVICE_METADATA_GPIO_PINS))) != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
     return status;
   }

@@ -108,6 +108,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
   gpio_impl_protocol_t gpio;
   auto status = device_get_protocol(parent, ZX_PROTOCOL_GPIO_IMPL, &gpio);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get gpio impl protocol: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -116,6 +117,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
 
   auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
   if (!pins.is_ok()) {
+    zxlogf(ERROR, "Failed to get metadata array: %s", pins.status_string());
     return pins.error_value();
   }
 
@@ -144,6 +146,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
 
     status = dev->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
     if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to add device \"%s\": %s", name, zx_status_get_string(status));
       return status;
     }
 
