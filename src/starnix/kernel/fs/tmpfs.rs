@@ -75,62 +75,41 @@ impl FileSystemOps for Arc<TmpFs> {
 
 impl TmpFs {
     pub fn new_fs(kernel: &Kernel) -> FileSystemHandle {
-        Self::new_fs_with_data(kernel, b"")
+        Self::new_fs_with_data(kernel, b"").expect("empty options cannot fail")
     }
 
-    pub fn new_fs_with_data(kernel: &Kernel, data: &FsStr) -> FileSystemHandle {
+    pub fn new_fs_with_data(kernel: &Kernel, data: &FsStr) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new_with_permanent_entries(kernel, Arc::new(TmpFs(())));
         fs.set_root(TmpfsDirectory::new());
         let root_node = &fs.root().node;
-        if !data.is_empty() {
-            for option in data.split(|c| *c == b',') {
-                let mut splitted_option = option.split(|c| *c == b'=');
-                match splitted_option.next() {
-                    Some(b"mode") => {
-                        if let Some(mode) = splitted_option.next() {
-                            if splitted_option.next().is_none() {
-                                if let Ok(mode) = FileMode::from_string(mode) {
-                                    root_node.chmod(mode);
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                    Some(b"uid") => {
-                        if let Some(uid) = splitted_option.next() {
-                            if splitted_option.next().is_none() {
-                                if let Ok(uid) = std::str::from_utf8(uid) {
-                                    if let Ok(uid) = uid.parse::<uid_t>() {
-                                        root_node.chown(Some(uid), None);
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Some(b"gid") => {
-                        if let Some(gid) = splitted_option.next() {
-                            if splitted_option.next().is_none() {
-                                if let Ok(gid) = std::str::from_utf8(gid) {
-                                    if let Ok(gid) = gid.parse::<gid_t>() {
-                                        root_node.chown(None, Some(gid));
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-                // Overall fallback. All matched option ended up in a continue.
-                not_implemented!(
-                    "[system]",
-                    "Unknown tmpfs option: {}",
-                    String::from_utf8_lossy(option)
-                );
-            }
+        let mut mount_options = fs_args::generic_parse_mount_options(data);
+        if let Some(mode) = mount_options.remove(b"mode" as &FsStr) {
+            let mode = FileMode::from_string(mode)?;
+            root_node.chmod(mode);
         }
-        fs
+        if let Some(uid) = mount_options.remove(b"uid" as &FsStr) {
+            let uid = fs_args::parse::<uid_t>(uid)?;
+            root_node.chown(Some(uid), None);
+        }
+        if let Some(gid) = mount_options.remove(b"gid" as &FsStr) {
+            let gid = fs_args::parse::<uid_t>(gid)?;
+            root_node.chown(None, Some(gid));
+        }
+        if !mount_options.is_empty() {
+            not_implemented!(
+                "[system]",
+                "Unknown tmpfs option: {:?}",
+                itertools::join(
+                    mount_options.iter().map(|(k, v)| format!(
+                        "{}={}",
+                        String::from_utf8_lossy(k),
+                        String::from_utf8_lossy(v)
+                    )),
+                    ","
+                )
+            );
+        }
+        Ok(fs)
     }
 }
 
@@ -437,7 +416,7 @@ mod test {
     #[::fuchsia::test]
     fn test_data() {
         let (kernel, _current_task) = create_kernel_and_task();
-        let fs = TmpFs::new_fs_with_data(&kernel, b"mode=0123,uid=42,gid=84");
+        let fs = TmpFs::new_fs_with_data(&kernel, b"mode=0123,uid=42,gid=84").expect("new_fs");
         let info = fs.root().node.info();
         assert_eq!(info.mode, mode!(IFDIR, 0o123));
         assert_eq!(info.uid, 42);
