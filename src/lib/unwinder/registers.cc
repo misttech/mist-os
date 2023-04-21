@@ -12,10 +12,33 @@
 
 namespace unwinder {
 
-Error Registers::Get(RegisterID reg_id, uint64_t& val) const {
-  if (reg_id >= (arch_ == Arch::kX64 ? RegisterID::kX64_last : RegisterID::kArm64_last)) {
-    return Error("invalid reg_id %hhu", reg_id);
+namespace {
+
+RegisterID GetPcReg(Registers::Arch arch) {
+  switch (arch) {
+    case Registers::Arch::kX64:
+      return RegisterID::kX64_rip;
+    case Registers::Arch::kArm64:
+      return RegisterID::kArm64_pc;
+    case Registers::Arch::kRiscv64:
+      return RegisterID::kRiscv64_pc;
   }
+}
+
+RegisterID GetSpReg(Registers::Arch arch) {
+  switch (arch) {
+    case Registers::Arch::kX64:
+      return RegisterID::kX64_rsp;
+    case Registers::Arch::kArm64:
+      return RegisterID::kArm64_sp;
+    case Registers::Arch::kRiscv64:
+      return RegisterID::kRiscv64_sp;
+  }
+}
+
+}  // namespace
+
+Error Registers::Get(RegisterID reg_id, uint64_t& val) const {
   auto it = regs_.find(reg_id);
   if (it == regs_.end()) {
     return Error("register %s is undefined", GetRegName(reg_id));
@@ -25,36 +48,22 @@ Error Registers::Get(RegisterID reg_id, uint64_t& val) const {
 }
 
 Error Registers::Set(RegisterID reg_id, uint64_t val) {
-  if (reg_id >= (arch_ == Arch::kX64 ? RegisterID::kX64_last : RegisterID::kArm64_last)) {
-    return Error("invalid reg_id %hhu", reg_id);
-  }
   regs_[reg_id] = val;
   return Success();
 }
 
 Error Registers::Unset(RegisterID reg_id) {
-  if (reg_id >= (arch_ == Arch::kX64 ? RegisterID::kX64_last : RegisterID::kArm64_last)) {
-    return Error("invalid reg_id %hhu", reg_id);
-  }
   regs_.erase(reg_id);
   return Success();
 }
 
-Error Registers::GetSP(uint64_t& sp) const {
-  return Get(arch_ == Arch::kX64 ? RegisterID::kX64_sp : RegisterID::kArm64_sp, sp);
-}
+Error Registers::GetSP(uint64_t& sp) const { return Get(GetSpReg(arch_), sp); }
 
-Error Registers::SetSP(uint64_t sp) {
-  return Set(arch_ == Arch::kX64 ? RegisterID::kX64_sp : RegisterID::kArm64_sp, sp);
-}
+Error Registers::SetSP(uint64_t sp) { return Set(GetSpReg(arch_), sp); }
 
-Error Registers::GetPC(uint64_t& pc) const {
-  return Get(arch_ == Arch::kX64 ? RegisterID::kX64_pc : RegisterID::kArm64_pc, pc);
-}
+Error Registers::GetPC(uint64_t& pc) const { return Get(GetPcReg(arch_), pc); }
 
-Error Registers::SetPC(uint64_t pc) {
-  return Set(arch_ == Arch::kX64 ? RegisterID::kX64_pc : RegisterID::kArm64_pc, pc);
-}
+Error Registers::SetPC(uint64_t pc) { return Set(GetPcReg(arch_), pc); }
 
 std::string Registers::Describe() const {
   std::vector<RegisterID> keys;
@@ -87,9 +96,37 @@ const char* Registers::GetRegName(RegisterID reg_id) const {
       "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20", "x21",
       "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "lr",  "sp",  "pc",
   };
+  static const char* riscv64_names[] = {
+      "zero", "ra", "sp", "gp", "tp",  "t0",  "t1", "t2", "s0", "s1", "a0",
+      "a1",   "a2", "a3", "a4", "a5",  "a6",  "a7", "s2", "s3", "s4", "s5",
+      "s6",   "s7", "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+  };
 
-  const char** names = arch_ == unwinder::Registers::Arch::kX64 ? x64_names : arm64_names;
-  return names[static_cast<uint8_t>(reg_id)];
+  const char** names;
+  size_t length;
+  switch (arch_) {
+    case Arch::kX64:
+      names = x64_names;
+      length = sizeof(x64_names) / sizeof(char*);
+      break;
+    case Arch::kArm64:
+      names = arm64_names;
+      length = sizeof(arm64_names) / sizeof(char*);
+      break;
+    case Arch::kRiscv64:
+      if (reg_id == RegisterID::kRiscv64_pc) {
+        return "pc";
+      }
+      names = riscv64_names;
+      length = sizeof(riscv64_names) / sizeof(char*);
+      break;
+  }
+
+  if (static_cast<size_t>(reg_id) < length) {
+    return names[static_cast<size_t>(reg_id)];
+  }
+
+  return "<unknown>";
 }
 
 }  // namespace unwinder

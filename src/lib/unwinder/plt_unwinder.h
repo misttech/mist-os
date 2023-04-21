@@ -24,6 +24,7 @@ class PltUnwinder {
  private:
   Error StepX64(Memory* stack, const Registers& current, Registers& next);
   Error StepArm64(Memory* stack, const Registers& current, Registers& next);
+  Error StepRiscv64(Memory* stack, const Registers& current, Registers& next);
 
   CfiUnwinder* cfi_unwinder_;
 };

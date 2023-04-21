@@ -12,6 +12,8 @@ Error PltUnwinder::Step(Memory* stack, const Registers& current, Registers& next
       return StepX64(stack, current, next);
     case Registers::Arch::kArm64:
       return StepArm64(stack, current, next);
+    case Registers::Arch::kRiscv64:
+      return StepRiscv64(stack, current, next);
   }
 }
 
@@ -70,6 +72,10 @@ Error PltUnwinder::StepArm64(Memory* stack, const Registers& current, Registers&
   next.Unset(RegisterID::kArm64_x16);
   next.Unset(RegisterID::kArm64_x17);
   return Success();
+}
+
+Error PltUnwinder::StepRiscv64(Memory* stack, const Registers& current, Registers& next) {
+  return Error("not implemented");
 }
 
 }  // namespace unwinder

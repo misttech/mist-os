@@ -78,6 +78,9 @@ debug::RegisterID ConvertRegisterID(unwinder::Registers::Arch arch, unwinder::Re
     case unwinder::Registers::Arch::kArm64:
       map = &arm64_map;
       break;
+    case unwinder::Registers::Arch::kRiscv64:
+      FX_NOTIMPLEMENTED();
+      break;
   }
 
   auto found = map->find(reg_id);

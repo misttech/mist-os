@@ -40,7 +40,7 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
                      int64_t data_alignment_factor)
     : code_alignment_factor_(code_alignment_factor), data_alignment_factor_(data_alignment_factor) {
   // Initialize those callee-preserved registers as kSameValue.
-  static RegisterID kX64Preserved[] = {
+  static const RegisterID x64_preserved[] = {
       RegisterID::kX64_rbx, RegisterID::kX64_rbp, RegisterID::kX64_r12,
       RegisterID::kX64_r13, RegisterID::kX64_r14, RegisterID::kX64_r15,
   };
@@ -53,7 +53,7 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
   //
   // SP is not considered to be preserved: its value will be recovered from CFA, unless it's
   // overridden by custom rules, e.g., in starnix restricted executor.
-  static RegisterID kArm64Preserved[] = {
+  static const RegisterID arm64_preserved[] = {
       RegisterID::kArm64_x18, RegisterID::kArm64_x19, RegisterID::kArm64_x20,
       RegisterID::kArm64_x21, RegisterID::kArm64_x22, RegisterID::kArm64_x23,
       RegisterID::kArm64_x24, RegisterID::kArm64_x25, RegisterID::kArm64_x26,
@@ -61,16 +61,27 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
       RegisterID::kArm64_x30,
   };
 
-  RegisterID* preserved;
+  static const RegisterID riscv64_preserved[] = {
+      RegisterID::kRiscv64_s0, RegisterID::kRiscv64_s1,  RegisterID::kRiscv64_s2,
+      RegisterID::kRiscv64_s3, RegisterID::kRiscv64_s4,  RegisterID::kRiscv64_s5,
+      RegisterID::kRiscv64_s6, RegisterID::kRiscv64_s7,  RegisterID::kRiscv64_s8,
+      RegisterID::kRiscv64_s9, RegisterID::kRiscv64_s10, RegisterID::kRiscv64_s11,
+  };
+
+  const RegisterID* preserved;
   size_t length;
   switch (arch) {
     case Registers::Arch::kX64:
-      preserved = kX64Preserved;
-      length = sizeof(kX64Preserved) / sizeof(RegisterID);
+      preserved = x64_preserved;
+      length = sizeof(x64_preserved) / sizeof(RegisterID);
       break;
     case Registers::Arch::kArm64:
-      preserved = kArm64Preserved;
-      length = sizeof(kArm64Preserved) / sizeof(RegisterID);
+      preserved = arm64_preserved;
+      length = sizeof(arm64_preserved) / sizeof(RegisterID);
+      break;
+    case Registers::Arch::kRiscv64:
+      preserved = riscv64_preserved;
+      length = sizeof(riscv64_preserved) / sizeof(RegisterID);
       break;
   }
 
@@ -492,9 +503,9 @@ Error CfiParser::Step(Memory* stack, RegisterID return_address_register, const R
     next.SetSP(cfa);
   }
 
-  // Return address is the address after the call instruction, so setting IP to that simulates a
+  // Return address is the address after the call instruction, so setting PC to that simulates a
   // return. On x64, return_address_register is just RIP so it's a noop. On arm64,
-  // return_address_register is LR, which must be copied to IP.
+  // return_address_register is LR, which must be copied to PC.
   //
   // An unavailable return address, usually because of "DW_CFA_undefined: RIP/LR", marks the end of
   // the unwinding. We don't consider it an error.
