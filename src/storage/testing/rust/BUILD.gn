@@ -51,6 +51,9 @@ fuchsia_test_package("storage-isolated-driver-manager-unittests") {
   test_components = [ ":storage-isolated-driver-manager-unittests-component" ]
   test_specs = {
     parallel = 1
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 
