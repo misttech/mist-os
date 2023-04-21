@@ -11,8 +11,8 @@ use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
 use log::{debug, error, trace};
 use net_types::{
     ip::{
-        Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
-        SubnetError,
+        GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+        Ipv6SourceAddr, Mtu, SubnetError,
     },
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -95,6 +95,10 @@ pub enum Icmpv4ErrorCode {
     ParameterProblem(Icmpv4ParameterProblemCode),
 }
 
+impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv4ErrorCode {
+    type Type = I::ErrorCode;
+}
+
 /// An ICMPv6 error type and code.
 ///
 /// Each enum variant corresponds to a particular error type, and contains the
@@ -106,6 +110,31 @@ pub enum Icmpv6ErrorCode {
     PacketTooBig,
     TimeExceeded(Icmpv6TimeExceededCode),
     ParameterProblem(Icmpv6ParameterProblemCode),
+}
+
+impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv6ErrorCode {
+    type Type = I::ErrorCode;
+}
+
+/// An ICMP error of either IPv4 or IPv6.
+#[derive(Debug, Clone, Copy)]
+pub enum IcmpErrorCode {
+    /// ICMPv4 error.
+    V4(Icmpv4ErrorCode),
+    /// ICMPv6 error.
+    V6(Icmpv6ErrorCode),
+}
+
+impl From<Icmpv4ErrorCode> for IcmpErrorCode {
+    fn from(v4_err: Icmpv4ErrorCode) -> Self {
+        IcmpErrorCode::V4(v4_err)
+    }
+}
+
+impl From<Icmpv6ErrorCode> for IcmpErrorCode {
+    fn from(v6_err: Icmpv6ErrorCode) -> Self {
+        IcmpErrorCode::V6(v6_err)
+    }
 }
 
 #[derive(Derivative)]
@@ -344,7 +373,12 @@ impl<I: Ip> IdMapCollectionKey for IcmpConnId<I> {
 pub trait IcmpIpExt: packet_formats::ip::IpExt + packet_formats::icmp::IcmpIpExt {
     /// The type of error code for this version of ICMP - [`Icmpv4ErrorCode`] or
     /// [`Icmpv6ErrorCode`].
-    type ErrorCode: Debug;
+    type ErrorCode: Debug
+        + Copy
+        + GenericOverIp<Self, Type = Self::ErrorCode>
+        + GenericOverIp<Ipv4, Type = Icmpv4ErrorCode>
+        + GenericOverIp<Ipv6, Type = Icmpv6ErrorCode>
+        + Into<IcmpErrorCode>;
 }
 
 impl IcmpIpExt for Ipv4 {

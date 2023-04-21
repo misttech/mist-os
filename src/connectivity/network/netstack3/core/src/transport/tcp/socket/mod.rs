@@ -59,6 +59,7 @@ use crate::{
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
+        icmp::IcmpErrorCode,
         socket::{
             BufferIpSocketHandler as _, DefaultSendOptions, DeviceIpSocketHandler, IpSock,
             IpSockCreationError, IpSocketHandler as _, Mms,
@@ -73,9 +74,10 @@ use crate::{
     },
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
+        seqnum::SeqNum,
         socket::{demux::tcp_serialize_segment, isn::IsnGenerator},
         state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
-        BufferSizes, Mss, OptionalBufferSizes, SocketOptions,
+        BufferSizes, ConnectionError, Mss, OptionalBufferSizes, SocketOptions,
     },
     Instant, SyncCtx,
 };
@@ -843,7 +845,7 @@ impl<I: IpExt, D: WeakId, C: NonSyncContext> Sockets<I, D, C> {
 /// The link is an [`Acceptor::Pending`] iff the acceptee is in the pending
 /// state; The link is an [`Acceptor::Ready`] iff the acceptee is ready and has
 /// an established connection.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Acceptor<I: Ip> {
     Pending(ListenerId<I>),
     Ready(ListenerId<I>),
@@ -864,6 +866,10 @@ struct Connection<I: IpExt, D: Id, II: Instant, R: ReceiveBuffer, S: SendBuffer,
     /// be auto removed once the state reaches Closed.
     defunct: bool,
     socket_options: SocketOptions,
+    /// In contrast to a hard error, which will cause a connection to be closed,
+    /// a soft error will not abort the connection, but it can be read by either
+    /// calling `get_connection_error`, or after the connection times out.
+    soft_error: Option<ConnectionError>,
 }
 
 /// The Listener state.
@@ -1133,6 +1139,20 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         reuse: bool,
     ) -> Result<(), SetReuseAddrError>;
     fn reuseaddr(&mut self, id: SocketId<I>) -> bool;
+
+    /// Receives an ICMP error from the IP layer.
+    fn on_icmp_error(
+        &mut self,
+        ctx: &mut C,
+        orig_src_ip: SpecifiedAddr<I::Addr>,
+        orig_dst_ip: SpecifiedAddr<I::Addr>,
+        orig_src_port: NonZeroU16,
+        orig_dst_port: NonZeroU16,
+        seq: SeqNum,
+        error: IcmpErrorCode,
+    );
+
+    fn get_connection_error(&mut self, conn_id: ConnectionId<I>) -> Option<ConnectionError>;
 }
 
 impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
@@ -1624,8 +1644,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     Ok(entry) => Ok(entry),
                     Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
                 }?;
-                let Connection { ip_sock, acceptor: _, state: _, defunct: _, socket_options: _ } =
-                    new_entry.get_state_mut();
+                let Connection {
+                    ip_sock,
+                    acceptor: _,
+                    state: _,
+                    defunct: _,
+                    socket_options: _,
+                    soft_error: _,
+                } = new_entry.get_state_mut();
                 *ip_sock = new_socket;
                 Ok(())
             },
@@ -1823,6 +1849,95 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     fn reuseaddr(&mut self, id: SocketId<I>) -> bool {
         get_reuseaddr(self, id.into())
     }
+
+    fn on_icmp_error(
+        &mut self,
+        ctx: &mut C,
+        orig_src_ip: SpecifiedAddr<I::Addr>,
+        orig_dst_ip: SpecifiedAddr<I::Addr>,
+        orig_src_port: NonZeroU16,
+        orig_dst_port: NonZeroU16,
+        seq: SeqNum,
+        error: IcmpErrorCode,
+    ) {
+        self.with_tcp_sockets_mut(|Sockets { port_alloc: _, inactive: _, socketmap }| {
+            let conn_id = match socketmap.conns().get_by_addr(&ConnAddr {
+                ip: ConnIpAddr {
+                    local: (orig_src_ip, orig_src_port),
+                    remote: (orig_dst_ip, orig_dst_port),
+                },
+                device: None,
+            }) {
+                Some(ConnAddrState { sharing: _, id }) => *id,
+                None => return,
+            };
+            let (
+                Connection {
+                    acceptor,
+                    state,
+                    ip_sock: _,
+                    defunct: _,
+                    socket_options: _,
+                    soft_error,
+                },
+                _sharing,
+                _addr,
+            ) = socketmap.conns_mut().get_by_id_mut(&conn_id).expect("inconsistent state");
+            *soft_error = soft_error.or(state.on_icmp_error(error, seq));
+
+            if let State::Closed(Closed { reason }) = state {
+                match *acceptor {
+                    Some(acceptor) => match acceptor {
+                        Acceptor::Pending(listener_id) | Acceptor::Ready(listener_id) => {
+                            if let (MaybeListener::Listener(listener), _sharing, _addr) = socketmap
+                                .listeners_mut()
+                                .get_by_id_mut(&listener_id.into())
+                                .unwrap()
+                            {
+                                let old_len = listener.pending.len() + listener.ready.len();
+                                listener
+                                    .pending
+                                    .retain(|id| MaybeClosedConnectionId::from(*id) != conn_id);
+                                listener.ready.retain(|(id, _passive_open)| {
+                                    MaybeClosedConnectionId::from(*id) != conn_id
+                                });
+                                assert_eq!(
+                                    listener.pending.len() + listener.ready.len() + 1,
+                                    old_len
+                                );
+                            } else {
+                                unreachable!("inconsistent state: expected listener, got bound");
+                            }
+                        }
+                    },
+                    None => {
+                        if let Some(err) = reason {
+                            let MaybeClosedConnectionId(id, marker) = conn_id;
+                            ctx.on_connection_status_change(
+                                ConnectionId(id, marker),
+                                ConnectionStatusUpdate::Aborted(*err),
+                            )
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    fn get_connection_error(&mut self, conn_id: ConnectionId<I>) -> Option<ConnectionError> {
+        self.with_tcp_sockets_mut(|Sockets { port_alloc: _, inactive: _, socketmap }| {
+            let (conn, _sharing, _addr) = socketmap
+                .conns_mut()
+                .get_by_id_mut(&conn_id.into())
+                .expect("invalid connection ID");
+            let hard_error = if let State::Closed(Closed { reason: hard_error }) = conn.state {
+                hard_error.clone()
+            } else {
+                None
+            };
+            hard_error.or_else(|| conn.soft_error.take())
+        })
+    }
 }
 
 fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
@@ -2018,8 +2133,14 @@ fn set_buffer_size<
             SocketId::Connection(id) => {
                 let (conn, _, _): (_, &SharingState, &ConnAddr<_, _, _, _>) =
                     socketmap.conns_mut().get_by_id_mut(&id.into()).expect("invalid ID");
-                let Connection { acceptor: _, state, ip_sock: _, defunct: _, socket_options: _ } =
-                    conn;
+                let Connection {
+                    acceptor: _,
+                    state,
+                    ip_sock: _,
+                    defunct: _,
+                    socket_options: _,
+                    soft_error: _,
+                } = conn;
                 return Which::set_connected_size(state, size);
             }
             SocketId::Bound(id) => socketmap.listeners_mut().get_by_id_mut(&id.into()),
@@ -2069,6 +2190,7 @@ fn get_buffer_size<
                         ip_sock: _,
                         defunct: _,
                         socket_options: _,
+                        soft_error: _,
                     } = conn;
                     return state.target_buffer_sizes();
                 }
@@ -2466,6 +2588,7 @@ where
                 ip_sock: ip_sock.clone(),
                 defunct: false,
                 socket_options,
+                soft_error: None,
             },
             sharing,
         )
@@ -2529,8 +2652,8 @@ where
 pub enum ConnectionStatusUpdate {
     /// The connection has been established on both ends.
     Connected,
-    /// The connection was reset by the remote end.
-    Reset,
+    /// The connection was closed by an RST or an ICMP message.
+    Aborted(ConnectionError),
 }
 
 /// Removes an unbound socket.
@@ -2903,6 +3026,24 @@ pub fn receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>
     size
 }
 
+/// Gets the last error on the connection.
+pub fn get_connection_error<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    conn_id: ConnectionId<I>,
+) -> Option<ConnectionError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    let IpInvariant(err) = I::map_ip(
+        (IpInvariant(&mut sync_ctx), conn_id),
+        |(IpInvariant(sync_ctx), conn_id)| {
+            IpInvariant(SocketHandler::get_connection_error(sync_ctx, conn_id))
+        },
+        |(IpInvariant(sync_ctx), conn_id)| {
+            IpInvariant(SocketHandler::get_connection_error(sync_ctx, conn_id))
+        },
+    );
+    err
+}
+
 /// Call this function whenever a socket can push out more data. That means either:
 ///
 /// - A retransmission timer fires.
@@ -3010,7 +3151,10 @@ mod tests {
         AddrAndZone, LinkLocalAddr, Witness,
     };
     use packet::ParseBuffer as _;
-    use packet_formats::tcp::{TcpParseArgs, TcpSegment};
+    use packet_formats::{
+        icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
+        tcp::{TcpParseArgs, TcpSegment},
+    };
     use rand::Rng as _;
     use test_case::test_case;
 
@@ -3028,18 +3172,19 @@ mod tests {
             device::state::{
                 AddrConfig, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry, Ipv6DadState,
             },
+            icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::{
                 testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
                 MmsError, SendOptions,
             },
-            BufferIpTransportContext as _, SendIpPacketMeta,
+            BufferIpTransportContext as _, IpTransportContext, SendIpPacketMeta,
         },
         testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
         transport::tcp::{
             buffer::{Buffer, BufferLimits, RingBuffer, SendPayload},
             segment::Payload,
             state::MSL,
-            UserError, DEFAULT_FIN_WAIT2_TIMEOUT,
+            ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT,
         },
     };
 
@@ -3520,12 +3665,20 @@ mod tests {
     ///
     /// * `listen_addr` - The address to listen on.
     /// * `bind_client` - Whether to bind the client before connecting.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of
+    ///   - the created test network.
+    ///   - the client socket from local.
+    ///   - the send end of the client socket.
+    ///   - the accepted socket from remote.
     fn bind_listen_connect_accept_inner<I: Ip + TcpTestIpExt>(
         listen_addr: I::Addr,
         bind_client: bool,
         seed: u128,
         drop_rate: f64,
-    ) -> (TcpTestNetwork<I>, ConnectionId<I>, ConnectionId<I>) {
+    ) -> (TcpTestNetwork<I>, ConnectionId<I>, Rc<RefCell<Vec<u8>>>, ConnectionId<I>) {
         let mut net = new_test_net::<I>();
         let mut rng = new_rng(seed);
 
@@ -3645,6 +3798,7 @@ mod tests {
                     ip_sock: _,
                     defunct: false,
                     socket_options: _,
+                    soft_error: None,
                 }
             )
         };
@@ -3665,7 +3819,7 @@ mod tests {
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
             client_ends.as_ref().borrow_mut().take().unwrap();
         let ClientBuffers { send: accepted_snd_end, receive: accepted_rcv_end } = accepted_ends;
-        for snd_end in [client_snd_end, accepted_snd_end] {
+        for snd_end in [client_snd_end.clone(), accepted_snd_end] {
             snd_end.borrow_mut().extend_from_slice(b"Hello");
         }
 
@@ -3693,7 +3847,7 @@ mod tests {
             Some(&mut Listener::new(backlog, BufferSizes::default(), SocketOptions::default())),
         );
 
-        (net, client, accepted)
+        (net, client, client_snd_end, accepted)
     }
 
     #[ip_test]
@@ -3701,7 +3855,7 @@ mod tests {
         set_logger_for_test();
         for bind_client in [true, false] {
             for listen_addr in [I::UNSPECIFIED_ADDRESS, *I::FAKE_CONFIG.remote_ip] {
-                let (_net, _client, _accepted) =
+                let (_net, _client, _client_snd_end, _accepted) =
                     bind_listen_connect_accept_inner::<I>(listen_addr, bind_client, 0, 0.0);
             }
         }
@@ -3921,10 +4075,11 @@ mod tests {
             conn,
             Connection {
                 acceptor: None,
-                state: State::Closed(Closed { reason: UserError::ConnectionReset }),
+                state: State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
                 ip_sock: _,
                 defunct: false,
                 socket_options: _,
+                soft_error: None,
             }
         );
         net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
@@ -3932,7 +4087,7 @@ mod tests {
                 non_sync_ctx.take_tcp_events(),
                 &[NonSyncEvent::ConnectionStatusUpdate(
                     client.into(),
-                    ConnectionStatusUpdate::Reset
+                    ConnectionStatusUpdate::Aborted(ConnectionError::ConnectionReset),
                 )]
             );
         });
@@ -3942,7 +4097,7 @@ mod tests {
     fn retransmission<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
         run_with_many_seeds(|seed| {
-            let (_net, _client, _accepted) =
+            let (_net, _client, _client_snd_end, _accepted) =
                 bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, seed, 0.2);
         });
     }
@@ -4304,7 +4459,7 @@ mod tests {
         expected_time_to_close: Duration,
     ) {
         set_logger_for_test();
-        let (mut net, local, remote) =
+        let (mut net, local, _local_snd_end, remote) =
             bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
         let close_called = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
@@ -4350,7 +4505,7 @@ mod tests {
     #[ip_test]
     fn connection_shutdown_then_close_peer_doesnt_call_close<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
-        let (mut net, local, _remote) =
+        let (mut net, local, _local_snd_end, _remote) =
             bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             assert_eq!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, local), Ok(()));
@@ -4385,7 +4540,7 @@ mod tests {
     #[ip_test]
     fn connection_shutdown_then_close<I: Ip + TcpTestIpExt>() {
         set_logger_for_test();
-        let (mut net, local, remote) =
+        let (mut net, local, _local_snd_end, remote) =
             bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
 
         for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
@@ -4556,11 +4711,11 @@ mod tests {
                     // established in.
                     NonSyncEvent::ConnectionStatusUpdate(
                         remote_connection.into(),
-                        ConnectionStatusUpdate::Reset
+                        ConnectionStatusUpdate::Aborted(ConnectionError::ConnectionReset),
                     ),
                     NonSyncEvent::ConnectionStatusUpdate(
                         second_connection.into(),
-                        ConnectionStatusUpdate::Reset
+                        ConnectionStatusUpdate::Aborted(ConnectionError::ConnectionReset),
                     ),
                 ]
             );
@@ -4569,7 +4724,7 @@ mod tests {
                 let (conn, _, _addr) = remote_connection.get_from_socketmap(&sockets.socketmap);
                 assert_matches!(
                     conn.state,
-                    State::Closed(Closed { reason: UserError::ConnectionReset })
+                    State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) })
                 );
             });
         });
@@ -5109,5 +5264,244 @@ mod tests {
         )
         .expect("can connect");
         SocketHandler::set_reuseaddr_listener(&mut sync_ctx, listener, false).expect("can unset")
+    }
+
+    fn deliver_icmp_error<
+        I: TcpTestIpExt + IcmpIpExt,
+        SC: SyncContext<I, C, DeviceId = FakeDeviceId>,
+        C: NonSyncContext,
+    >(
+        sync_ctx: &mut SC,
+        non_sync_ctx: &mut C,
+        original_src_ip: SpecifiedAddr<I::Addr>,
+        original_dst_ip: SpecifiedAddr<I::Addr>,
+        original_body: &[u8],
+        err: I::ErrorCode,
+    ) {
+        <TcpIpTransportContext as IpTransportContext<I, _, _>>::receive_icmp_error(
+            sync_ctx,
+            non_sync_ctx,
+            &FakeDeviceId,
+            Some(original_src_ip),
+            original_dst_ip,
+            original_body,
+            err,
+        );
+    }
+
+    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => ConnectionError::HostUnreachable)]
+    fn icmp_destination_unreachable_connect_v4(
+        error: Icmpv4DestUnreachableCode,
+    ) -> ConnectionError {
+        icmp_destination_unreachable_connect_inner::<Ipv4>(Icmpv4ErrorCode::DestUnreachable(error))
+    }
+
+    #[test_case(Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::NetworkUnreachable)]
+    fn icmp_destination_unreachable_connect_v6(
+        error: Icmpv6DestUnreachableCode,
+    ) -> ConnectionError {
+        icmp_destination_unreachable_connect_inner::<Ipv6>(Icmpv6ErrorCode::DestUnreachable(error))
+    }
+
+    fn icmp_destination_unreachable_connect_inner<I: TcpTestIpExt + IcmpIpExt>(
+        icmp_error: I::ErrorCode,
+    ) -> ConnectionError {
+        let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
+            TcpCtx::<I, _>::with_sync_ctx(TcpSyncCtx::new(
+                I::FAKE_CONFIG.local_ip,
+                I::FAKE_CONFIG.remote_ip,
+                I::FAKE_CONFIG.subnet.prefix(),
+            ));
+
+        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let _connection = SocketHandler::connect_unbound(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            unbound,
+            ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
+            PORT_1,
+            Default::default(),
+        )
+        .expect("failed to create a connection socket");
+        let frames = sync_ctx.inner.take_frames();
+        let frame = assert_matches!(&frames[..], [(_meta, frame)] => frame);
+        deliver_icmp_error(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            &frame[0..8],
+            icmp_error,
+        );
+        // The TCP handshake should be aborted.
+        assert_matches!(
+            &non_sync_ctx.take_tcp_events()[..],
+            &[NonSyncEvent::ConnectionStatusUpdate(
+                _,
+                ConnectionStatusUpdate::Aborted(connection_error)
+            )] => connection_error
+        )
+    }
+
+    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => ConnectionError::HostUnreachable)]
+    fn icmp_destination_unreachable_established_v4(
+        error: Icmpv4DestUnreachableCode,
+    ) -> ConnectionError {
+        icmp_destination_unreachable_established_inner::<Ipv4>(Icmpv4ErrorCode::DestUnreachable(
+            error,
+        ))
+    }
+
+    #[test_case(Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::NetworkUnreachable)]
+    fn icmp_destination_unreachable_established_v6(
+        error: Icmpv6DestUnreachableCode,
+    ) -> ConnectionError {
+        icmp_destination_unreachable_established_inner::<Ipv6>(Icmpv6ErrorCode::DestUnreachable(
+            error,
+        ))
+    }
+
+    fn icmp_destination_unreachable_established_inner<I: TcpTestIpExt + IcmpIpExt>(
+        icmp_error: I::ErrorCode,
+    ) -> ConnectionError {
+        let (mut net, local, local_snd_end, _remote) =
+            bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
+        local_snd_end.borrow_mut().extend_from_slice(b"Hello");
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            SocketHandler::do_send(sync_ctx, non_sync_ctx, local.into());
+        });
+        net.collect_frames();
+        let original_body = assert_matches!(
+            &net.iter_pending_frames().collect::<Vec<_>>()[..],
+            [InstantAndData(_instant, PendingFrameData {
+                dst_context: _,
+                meta: _,
+                frame,
+            })] => {
+            frame.clone()
+        });
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            deliver_icmp_error(
+                sync_ctx,
+                non_sync_ctx,
+                I::FAKE_CONFIG.local_ip,
+                I::FAKE_CONFIG.remote_ip,
+                &original_body[..],
+                icmp_error,
+            );
+            // An error should be posted on the connection.
+            let error = assert_matches!(
+                SocketHandler::get_connection_error(sync_ctx, local),
+                Some(error) => error
+            );
+            // But it should stay established.
+            sync_ctx.with_tcp_sockets(|Sockets { inactive: _, port_alloc: _, socketmap }| {
+                let (conn, _sharing, _addr) =
+                    socketmap.conns().get_by_id(&local.into()).expect("invalid connection ID");
+                assert_matches!(conn.state, State::Established(_));
+            });
+            error
+        })
+    }
+
+    #[ip_test]
+    fn icmp_destination_unreachable_listener<I: Ip + TcpTestIpExt + IcmpIpExt>() {
+        let mut net = new_test_net::<I>();
+
+        let backlog = NonZeroUsize::new(1).unwrap();
+        let server = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let bound = SocketHandler::bind(sync_ctx, non_sync_ctx, conn, None, Some(PORT_1))
+                .expect("failed to bind the server socket");
+            SocketHandler::listen(sync_ctx, non_sync_ctx, bound, backlog).expect("can listen")
+        });
+
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
+            let _client = SocketHandler::connect_unbound(
+                sync_ctx,
+                non_sync_ctx,
+                conn,
+                ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip),
+                PORT_1,
+                Default::default(),
+            )
+            .expect("failed to connect");
+        });
+
+        assert!(!net.step(handle_frame, handle_timer).is_idle());
+
+        net.collect_frames();
+        let original_body = assert_matches!(
+            &net.iter_pending_frames().collect::<Vec<_>>()[..],
+            [InstantAndData(_instant, PendingFrameData {
+                dst_context: _,
+                meta: _,
+                frame,
+            })] => {
+            frame.clone()
+        });
+        let icmp_error = I::map_ip(
+            (),
+            |()| Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable),
+            |()| Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::PortUnreachable),
+        );
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            deliver_icmp_error(
+                sync_ctx,
+                non_sync_ctx,
+                I::FAKE_CONFIG.remote_ip,
+                I::FAKE_CONFIG.local_ip,
+                &original_body[..],
+                icmp_error,
+            );
+            sync_ctx.with_tcp_sockets(|Sockets { inactive: _, port_alloc: _, socketmap }| {
+                let (listener, _sharing, _addr) =
+                    socketmap.listeners().get_by_id(&server.into()).expect("invalid connection ID");
+                let listener = assert_matches!(listener, MaybeListener::Listener(l) => l);
+                assert_eq!(listener.pending.len(), 0);
+                assert_eq!(listener.ready.len(), 0);
+            });
+        });
     }
 }

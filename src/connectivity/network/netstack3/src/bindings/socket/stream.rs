@@ -39,9 +39,9 @@ use netstack3_core::{
         segment::Payload,
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
-            get_bound_info, get_connection_info, get_listener_info, listen, receive_buffer_size,
-            remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_bound_device,
-            set_connection_device, set_listener_device, set_receive_buffer_size,
+            get_bound_info, get_connection_error, get_connection_info, get_listener_info, listen,
+            receive_buffer_size, remove_bound, remove_unbound, reuseaddr, send_buffer_size,
+            set_bound_device, set_connection_device, set_listener_device, set_receive_buffer_size,
             set_reuseaddr_bound, set_reuseaddr_listener, set_reuseaddr_unbound,
             set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
             with_socket_options, with_socket_options_mut, AcceptError, BoundId, BoundInfo,
@@ -49,7 +49,7 @@ use netstack3_core::{
             ListenerId, NoConnection, SetReuseAddrError, SocketAddr, UnboundId,
         },
         state::Takeable,
-        BufferSizes, SocketOptions,
+        BufferSizes, ConnectionError, SocketOptions,
     },
     SyncCtx,
 };
@@ -90,7 +90,7 @@ pub(crate) struct ListenerState(zx::Socket);
 pub(crate) enum ConnectionStatus {
     InProgress,
     Connected { reported: bool },
-    Rejected { reported: bool },
+    Rejected { error_to_report: Option<ConnectionError> },
 }
 
 impl BindingsNonSyncCtxImpl {
@@ -293,12 +293,12 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
                     ConnectionStatusUpdate::Connected => {
                         *status = ConnectionStatus::Connected { reported: false }
                     }
-                    ConnectionStatusUpdate::Reset => {
-                        *status = ConnectionStatus::Rejected { reported: false }
+                    ConnectionStatusUpdate::Aborted(err) => {
+                        *status = ConnectionStatus::Rejected { error_to_report: Some(err) }
                     }
                 },
                 ConnectionStatus::Connected { reported: _ }
-                | ConnectionStatus::Rejected { reported: _ } => {
+                | ConnectionStatus::Rejected { error_to_report: _ } => {
                     // TODO(https://fxbug.dev/103982): Signal peer on reset.
                 }
             }
@@ -725,6 +725,22 @@ impl IntoErrno for SetReuseAddrError {
     }
 }
 
+// Mapping guided by: https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go
+impl IntoErrno for ConnectionError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            ConnectionError::ConnectionReset => fposix::Errno::Econnrefused,
+            ConnectionError::NetworkUnreachable => fposix::Errno::Enetunreach,
+            ConnectionError::HostUnreachable => fposix::Errno::Ehostunreach,
+            ConnectionError::ProtocolUnreachable => fposix::Errno::Enoprotoopt,
+            ConnectionError::PortUnreachable => fposix::Errno::Econnrefused,
+            ConnectionError::DestinationHostDown => fposix::Errno::Ehostdown,
+            ConnectionError::SourceRouteFailed => fposix::Errno::Eopnotsupp,
+            ConnectionError::SourceHostIsolated => fposix::Errno::Enonet,
+        }
+    }
+}
+
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
 fn spawn_send_task<I: IpExt>(
@@ -829,7 +845,9 @@ where
                         }
                         Err(fposix::Errno::Eisconn)
                     }
-                    ConnectionStatus::Rejected { reported: _ } => Err(fposix::Errno::Econnrefused),
+                    ConnectionStatus::Rejected { error_to_report: _ } => {
+                        Err(fposix::Errno::Econnrefused)
+                    }
                     ConnectionStatus::InProgress => Err(fposix::Errno::Ealready),
                 })?;
                 return Ok(());
@@ -971,16 +989,19 @@ where
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) | SocketId::Listener(_) => Ok(()),
             SocketId::Connection(conn_id) => {
                 let mut ctx = ctx.clone();
-                let Ctx { sync_ctx: _, non_sync_ctx } = &mut ctx;
+                let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
                 non_sync_ctx.with_connection_mut(conn_id, |status| match status {
                     ConnectionStatus::InProgress => Err(fposix::Errno::Einprogress),
-                    ConnectionStatus::Connected { reported: _ } => Ok(()),
-                    ConnectionStatus::Rejected { reported } => {
-                        if !*reported {
-                            *reported = true;
-                            Err(fposix::Errno::Econnrefused)
-                        } else {
-                            Ok(())
+                    ConnectionStatus::Connected { reported: _ } => {
+                        match get_connection_error(sync_ctx, conn_id) {
+                            Some(err) => Err(err.into_errno()),
+                            None => Ok(()),
+                        }
+                    }
+                    ConnectionStatus::Rejected { error_to_report } => {
+                        match error_to_report.take() {
+                            Some(err) => Err(err.into_errno()),
+                            None => Ok(()),
                         }
                     }
                 })

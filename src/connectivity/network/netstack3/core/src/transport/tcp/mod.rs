@@ -19,12 +19,19 @@ use core::{
 
 use const_unwrap::const_unwrap_option;
 use net_types::ip::{Ip, IpVersion};
-use packet_formats::utils::NonZeroDuration;
+use packet_formats::{
+    icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
+    utils::NonZeroDuration,
+};
 use rand::RngCore;
 
 use crate::{
     device::WeakId,
-    ip::{socket::Mms, IpExt},
+    ip::{
+        icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
+        socket::Mms,
+        IpExt,
+    },
     sync::Mutex,
     transport::tcp::{
         self,
@@ -58,13 +65,110 @@ impl Control {
 }
 
 /// Errors surfaced to the user.
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) enum UserError {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ConnectionError {
     /// The connection was reset because of a RST segment.
     ConnectionReset,
-    /// The connection was closed because of a user request.
-    ConnectionClosed,
+    /// The connection was closed because the network is unreachable.
+    NetworkUnreachable,
+    /// The connection was closed because the host is unreachable.
+    HostUnreachable,
+    /// The connection was closed because the protocol is unreachable.
+    ProtocolUnreachable,
+    /// The connection was closed because the port is unreachable.
+    PortUnreachable,
+    /// The connection was closed because the host is down.
+    DestinationHostDown,
+    /// The connection was closed because the source route failed.
+    SourceRouteFailed,
+    /// The connection was closed because the source host is isolated.
+    SourceHostIsolated,
+}
+
+impl From<IcmpErrorCode> for Option<ConnectionError> {
+    // Notes: the following mappings are guided by the packetimpact test here:
+    // https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go;drc=611e6e1247a0691f5fd198f411c68b3bc79d90af
+    fn from(err: IcmpErrorCode) -> Self {
+        match err {
+            IcmpErrorCode::V4(Icmpv4ErrorCode::DestUnreachable(code)) => match code {
+                Icmpv4DestUnreachableCode::DestNetworkUnreachable => {
+                    Some(ConnectionError::NetworkUnreachable)
+                }
+                Icmpv4DestUnreachableCode::DestHostUnreachable => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+                Icmpv4DestUnreachableCode::DestProtocolUnreachable => {
+                    Some(ConnectionError::ProtocolUnreachable)
+                }
+                Icmpv4DestUnreachableCode::DestPortUnreachable => {
+                    Some(ConnectionError::PortUnreachable)
+                }
+                Icmpv4DestUnreachableCode::FragmentationRequired => None,
+                Icmpv4DestUnreachableCode::SourceRouteFailed => {
+                    Some(ConnectionError::SourceRouteFailed)
+                }
+                Icmpv4DestUnreachableCode::DestNetworkUnknown => {
+                    Some(ConnectionError::NetworkUnreachable)
+                }
+                Icmpv4DestUnreachableCode::DestHostUnknown => {
+                    Some(ConnectionError::DestinationHostDown)
+                }
+                Icmpv4DestUnreachableCode::SourceHostIsolated => {
+                    Some(ConnectionError::SourceHostIsolated)
+                }
+                Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => {
+                    Some(ConnectionError::NetworkUnreachable)
+                }
+                Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+                Icmpv4DestUnreachableCode::NetworkUnreachableForToS => {
+                    Some(ConnectionError::NetworkUnreachable)
+                }
+                Icmpv4DestUnreachableCode::HostUnreachableForToS => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+                Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+                Icmpv4DestUnreachableCode::HostPrecedenceViolation => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+                Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+            },
+            // TODO(https://fxbug.dev/101806): Map the following ICMP messages.
+            IcmpErrorCode::V4(
+                Icmpv4ErrorCode::ParameterProblem(_)
+                | Icmpv4ErrorCode::Redirect(_)
+                | Icmpv4ErrorCode::TimeExceeded(_),
+            ) => None,
+            IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => match code {
+                Icmpv6DestUnreachableCode::NoRoute => Some(ConnectionError::NetworkUnreachable),
+                Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
+                    Some(ConnectionError::HostUnreachable)
+                }
+                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::NetworkUnreachable),
+                Icmpv6DestUnreachableCode::AddrUnreachable => {
+                    Some(ConnectionError::NetworkUnreachable)
+                }
+                Icmpv6DestUnreachableCode::PortUnreachable => {
+                    Some(ConnectionError::PortUnreachable)
+                }
+                Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
+                    Some(ConnectionError::SourceRouteFailed)
+                }
+                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::NetworkUnreachable),
+            },
+            // TODO(https://fxbug.dev/101806): Map the following ICMP messages.
+            IcmpErrorCode::V6(
+                Icmpv6ErrorCode::PacketTooBig
+                | Icmpv6ErrorCode::ParameterProblem(_)
+                | Icmpv6ErrorCode::TimeExceeded(_),
+            ) => None,
+        }
+    }
 }
 
 pub(crate) struct TcpState<I: IpExt, D: WeakId, C: tcp::socket::NonSyncContext> {

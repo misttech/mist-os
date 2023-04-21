@@ -390,13 +390,8 @@ impl FragmentCacheData {
         use core::ops::Bound::{Included, Unbounded};
 
         // Find a gap that starts earlier or at the same point as a fragment.
-        let possible_free_place = self.missing_blocks.range((
-            Unbounded,
-            Included(BlockRange {
-                start,
-                end: u16::MAX,
-            }),
-        ));
+        let possible_free_place =
+            self.missing_blocks.range((Unbounded, Included(BlockRange { start, end: u16::MAX })));
 
         // Make sure that `fragment` belongs purely within
         // `potential_gap`.
@@ -411,7 +406,8 @@ impl FragmentCacheData {
             .filter(|&range| {
                 // range.start <= start must be always true here - so comparing only ending part
                 return end <= range.end;
-            }).copied()
+            })
+            .copied()
     }
 }
 

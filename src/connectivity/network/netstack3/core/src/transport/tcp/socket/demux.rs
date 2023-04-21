@@ -45,7 +45,7 @@ use crate::{
             SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
-        BufferSizes, Control, Mss, SocketOptions, UserError,
+        BufferSizes, ConnectionError, Control, Mss, SocketOptions,
     },
 };
 
@@ -228,7 +228,8 @@ fn handle_incoming_packet<I, B, C, SC>(
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
         // CLOSED is fictional because it represents the state when
         // there is no TCB, and therefore, no connection.
-        if let Some(seg) = (Closed { reason: UserError::ConnectionClosed }.on_segment(incoming)) {
+        if let Some(seg) = (Closed { reason: None::<Option<ConnectionError>> }.on_segment(incoming))
+        {
             match ip_transport_ctx.new_ip_socket(
                 ctx,
                 None,
@@ -292,13 +293,13 @@ where
         .get_by_id_mut(&conn_id)
         .expect("inconsistent state: invalid connection id");
 
-    let Connection { acceptor, state, ip_sock, defunct, socket_options } = conn;
+    let Connection { acceptor, state, ip_sock, defunct, socket_options, soft_error: _ } = conn;
 
     #[derive(Debug)]
     enum StateCategory {
         Connecting,
         Connected,
-        Closed(UserError),
+        Closed(Option<ConnectionError>),
     }
     impl StateCategory {
         fn new<I, R, S, A>(state: &State<I, R, S, A>) -> Self {
@@ -344,18 +345,19 @@ where
             // IDs that bindings is aware of.
             if acceptor.is_none() {
                 match (prev_state, reason) {
-                    (
-                        StateCategory::Connected | StateCategory::Connecting,
-                        UserError::ConnectionReset,
-                    ) => {
-                        let MaybeClosedConnectionId(id, marker) = conn_id;
-                        let conn_id = ConnectionId(id, marker);
-                        ctx.on_connection_status_change(conn_id, ConnectionStatusUpdate::Reset)
+                    (StateCategory::Connected | StateCategory::Connecting, err) => {
+                        if let Some(err) = err {
+                            let MaybeClosedConnectionId(id, marker) = conn_id;
+                            let conn_id = ConnectionId(id, marker);
+                            ctx.on_connection_status_change(
+                                conn_id,
+                                ConnectionStatusUpdate::Aborted(err),
+                            )
+                        }
                     }
                     (StateCategory::Closed(_), _) => {
                         // No change, no need to signal.
                     }
-                    (_, UserError::ConnectionClosed) => (),
                 }
             }
         }
@@ -396,11 +398,11 @@ where
     // socket's accept queue.
     if let Some(passive_open) = passive_open {
         let acceptor_id = assert_matches!(conn, Connection {
-            acceptor: Some(Acceptor::Pending(listener_id)),
+            acceptor:Some(Acceptor::Pending(listener_id)),
             state: _,
             ip_sock: _,
             defunct: _,
-            socket_options: _,
+            socket_options: _, soft_error: _
         } => {
             let listener_id = *listener_id;
             conn.acceptor = Some(Acceptor::Ready(listener_id));
@@ -564,6 +566,7 @@ where
                     ip_sock,
                     defunct: false,
                     socket_options,
+                    soft_error: None,
                 },
                 sharing,
             )

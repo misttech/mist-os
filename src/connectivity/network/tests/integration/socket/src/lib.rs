@@ -37,7 +37,8 @@ use net_declare::{
     std_ip_v4, std_socket_addr,
 };
 use net_types::{
-    ip::{Ip, IpAddress as _, IpInvariant, Ipv4, Ipv6},
+    ethernet::Mac,
+    ip::{Ip, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
     Witness as _,
 };
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface};
@@ -48,11 +49,22 @@ use netstack_testing_common::{
     Result,
 };
 use netstack_testing_macros::netstack_test;
-use packet::Serializer as _;
+use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
     self,
-    icmp::ndp::options::{NdpOptionBuilder, PrefixInformation},
-    ipv4::Ipv4Header as _,
+    arp::{ArpOp, ArpPacketBuilder},
+    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
+    icmp::{
+        ndp::{
+            options::{NdpOptionBuilder, PrefixInformation},
+            NeighborAdvertisement,
+        },
+        IcmpDestUnreachable, IcmpPacketBuilder, Icmpv4DestUnreachableCode,
+        Icmpv6DestUnreachableCode,
+    },
+    ip::{IpProto, Ipv4Proto, Ipv6Proto},
+    ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
+    ipv6::{Ipv6Header as _, Ipv6Packet},
 };
 use socket2::SockRef;
 use test_case::test_case;
@@ -1992,7 +2004,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                 let mut bv = &frame_data[..];
                 let ipv6 = Ipv6Packet::parse(&mut bv, ())
                     .with_context(|| format!("failed to parse IPv6 packet {:?}", frame_data))?;
-                if ipv6.proto() == packet_formats::ip::Ipv6Proto::Icmpv6 {
+                if ipv6.proto() == Ipv6Proto::Icmpv6 {
                     let parse_args =
                         packet_formats::icmp::IcmpParseArgs::new(ipv6.src_ip(), ipv6.dst_ip());
                     match Icmpv6Packet::parse(&mut bv, parse_args)
@@ -2020,7 +2032,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                 let mut bv = &frame_data[..];
                 let ipv4 = Ipv4Packet::parse(&mut bv, ())
                     .with_context(|| format!("failed to parse IPv4 packet {:?}", frame_data))?;
-                if ipv4.proto() == packet_formats::ip::Ipv4Proto::Igmp {
+                if ipv4.proto() == Ipv4Proto::Igmp {
                     let p =
                         IgmpPacket::parse(&mut bv, ()).context("failed to parse IGMP packet")?;
                     println!("ignoring IGMP packet {:?}", p);
@@ -2071,7 +2083,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             IcmpUnusedCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
-        .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 1, packet_formats::ip::Ipv4Proto::Icmp))
+        .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Icmp))
         .serialize_vec_outer()
         .expect("serialization failed")
         .as_ref()
@@ -2143,12 +2155,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             IcmpUnusedCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
-        .encapsulate(Ipv6PacketBuilder::new(
-            src_ip,
-            dst_ip,
-            1,
-            packet_formats::ip::Ipv6Proto::Icmpv6,
-        ))
+        .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, 1, Ipv6Proto::Icmpv6))
         .serialize_vec_outer()
         .expect("serialization failed")
         .as_ref()
@@ -2457,7 +2464,7 @@ async fn with_multinic_and_peer_networks<
                 |(v4, IpInvariant(host))| {
                     let mut addr = v4.ipv4_bytes();
                     *addr.last_mut().unwrap() = host;
-                    net_types::ip::Ipv4Addr::new(addr)
+                    Ipv4Addr::new(addr)
                 },
                 |(v6, IpInvariant(host))| {
                     let mut addr = v6.ipv6_bytes();
@@ -3109,4 +3116,223 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
             | zx::sys::ZX_RIGHT_WRITE
             | zx::sys::ZX_RIGHT_READ
     );
+}
+
+#[netstack_test]
+#[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => libc::ENETUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => libc::EHOSTUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => libc::ENOPROTOOPT)]
+#[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => libc::ECONNREFUSED)]
+#[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => libc::EOPNOTSUPP)]
+#[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => libc::ENETUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => libc::EHOSTDOWN)]
+#[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => libc::ENONET)]
+#[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => libc::ENETUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => libc::EHOSTUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => libc::ENETUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => libc::EHOSTUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => libc::EHOSTUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => libc::EHOSTUNREACH)]
+#[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => libc::EHOSTUNREACH)]
+async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableCode) -> i32 {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let net = sandbox.create_network("net").await.expect("failed to create network");
+    let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
+    let fake_ep = &fake_ep;
+
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .expect("failed to create client realm");
+    let client_interface =
+        client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
+    client_interface
+        .add_address_and_subnet_route(Ipv4::CLIENT_SUBNET)
+        .await
+        .expect("configure address");
+
+    let fnet_ext::IpAddress(server_ip) = Ipv4::SERVER_SUBNET.addr.into();
+    let fnet_ext::IpAddress(client_ip) = Ipv4::CLIENT_SUBNET.addr.into();
+    let server_mac = Mac::new(SERVER_MAC.octets);
+    let fake_ep_loop = async move {
+        fake_ep
+            .frame_stream()
+            .map(|r| r.expect("failed to read frame"))
+            .for_each(|(frame, _dropped)| async move {
+                let mut frame = &frame[..];
+                let eth = packet_formats::ethernet::EthernetFrame::parse(
+                    &mut frame,
+                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("error parsing ethernet frame");
+
+                let mut frame_body = eth.body();
+                let v4_packet = match Ipv4Packet::parse(&mut frame_body, ()) {
+                    Ok(v4_packet) if v4_packet.proto() == IpProto::Tcp.into() => v4_packet,
+                    _ => {
+                        let arp = ArpPacketBuilder::<Mac, Ipv4Addr>::new(
+                            ArpOp::Response,
+                            server_mac,
+                            assert_matches!(server_ip, std::net::IpAddr::V4(addr) => addr).into(),
+                            eth.src_mac(),
+                            assert_matches!(client_ip, std::net::IpAddr::V4(addr) => addr).into(),
+                        )
+                        .into_serializer()
+                        .encapsulate(EthernetFrameBuilder::new(
+                            server_mac,
+                            eth.src_mac(),
+                            EtherType::Arp,
+                            ETHERNET_MIN_BODY_LEN_NO_TAG,
+                        ))
+                        .serialize_vec_outer()
+                        .expect("failed to serialize ARP response")
+                        .unwrap_b();
+                        return fake_ep
+                            .write(arp.as_ref())
+                            .await
+                            .expect("failed to write ARP response");
+                    }
+                };
+                let mut body = eth.body().to_vec();
+                let icmp_error = packet::Buf::new(&mut body, ..)
+                    .encapsulate(IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
+                        v4_packet.dst_ip(),
+                        v4_packet.src_ip(),
+                        code,
+                        IcmpDestUnreachable::default(),
+                    ))
+                    .encapsulate(Ipv4PacketBuilder::new(
+                        v4_packet.dst_ip(),
+                        v4_packet.src_ip(),
+                        u8::MAX,
+                        Ipv4Proto::Icmp.into(),
+                    ))
+                    .encapsulate(EthernetFrameBuilder::new(
+                        eth.dst_mac(),
+                        eth.src_mac(),
+                        EtherType::Ipv4,
+                        ETHERNET_MIN_BODY_LEN_NO_TAG,
+                    ))
+                    .serialize_vec_outer()
+                    .expect("failed to serialize ICMP error")
+                    .unwrap_b();
+                fake_ep.write(icmp_error.as_ref()).await.expect("failed to write ICMP error");
+            })
+            .await;
+    };
+
+    let server_addr = std::net::SocketAddr::new(server_ip, 8080);
+
+    let connect = async move {
+        let error = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
+            .await
+            .expect_err("connect should fail");
+        let error = error.downcast::<std::io::Error>().expect("failed to cast to std::io::Result");
+        error.raw_os_error()
+    };
+
+    futures::select! {
+        () = fake_ep_loop.fuse() => unreachable!("should never finish"),
+        errno = connect.fuse() => return errno.expect("must have an errno"),
+    }
+}
+
+#[netstack_test]
+#[test_case(Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH)]
+#[test_case(Icmpv6DestUnreachableCode::PortUnreachable => libc::ECONNREFUSED)]
+// TODO(https://fxbug.dev/125901): Test against all possible codes once we can
+// timeout in handshake states.
+async fn tcp_icmp_error_v6<N: Netstack>(name: &str, code: Icmpv6DestUnreachableCode) -> i32 {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let net = sandbox.create_network("net").await.expect("failed to create network");
+    let fake_ep = net.create_fake_endpoint().expect("failed to create fake endpoint");
+    let fake_ep = &fake_ep;
+
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .expect("failed to create client realm");
+    let client_interface =
+        client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
+    client_interface
+        .add_address_and_subnet_route(Ipv6::CLIENT_SUBNET)
+        .await
+        .expect("configure address");
+
+    let fnet_ext::IpAddress(server_ip) = Ipv6::SERVER_SUBNET.addr.into();
+    let fnet_ext::IpAddress(client_ip) = Ipv6::CLIENT_SUBNET.addr.into();
+    let server_mac = Mac::new(SERVER_MAC.octets);
+    let fake_ep_loop = async move {
+        fake_ep
+            .frame_stream()
+            .map(|r| r.expect("failed to read frame"))
+            .for_each(|(frame, _dropped)| async move {
+                let mut frame = &frame[..];
+                let eth = packet_formats::ethernet::EthernetFrame::parse(
+                    &mut frame,
+                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("error parsing ethernet frame");
+                let server_ip: net_types::ip::Ipv6Addr =
+                    assert_matches!(server_ip, std::net::IpAddr::V6(addr) => addr).into();
+                let client_ip: net_types::ip::Ipv6Addr =
+                    assert_matches!(client_ip, std::net::IpAddr::V6(addr) => addr).into();
+                let mut frame_body = eth.body();
+                let v6_packet = match Ipv6Packet::parse(&mut frame_body, ()) {
+                    Ok(v6_packet) if v6_packet.proto() == IpProto::Tcp.into() => v6_packet,
+                    _ => {
+                        let options =
+                            &[NdpOptionBuilder::TargetLinkLayerAddress(&SERVER_MAC.octets)];
+                        return ndp::write_message::<&[u8], _>(
+                            server_mac,
+                            eth.src_mac(),
+                            server_ip,
+                            client_ip,
+                            NeighborAdvertisement::new(false, true, false, server_ip),
+                            options,
+                            fake_ep,
+                        )
+                        .await
+                        .expect("failed to send neighbor advertisement");
+                    }
+                };
+                let mut body = eth.body().to_vec();
+                let icmp_error = packet::Buf::new(&mut body, ..)
+                    .encapsulate(IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
+                        v6_packet.dst_ip(),
+                        v6_packet.src_ip(),
+                        code,
+                        IcmpDestUnreachable::default(),
+                    ))
+                    .encapsulate(packet_formats::ipv6::Ipv6PacketBuilder::new(
+                        v6_packet.dst_ip(),
+                        v6_packet.src_ip(),
+                        ipv6_consts::DEFAULT_HOP_LIMIT,
+                        Ipv6Proto::Icmpv6.into(),
+                    ))
+                    .encapsulate(EthernetFrameBuilder::new(
+                        eth.dst_mac(),
+                        eth.src_mac(),
+                        EtherType::Ipv6,
+                        ETHERNET_MIN_BODY_LEN_NO_TAG,
+                    ))
+                    .serialize_vec_outer()
+                    .expect("failed to serialize")
+                    .unwrap_b();
+                fake_ep.write(icmp_error.as_ref()).await.expect("failed to write to fake ep");
+            })
+            .await;
+    };
+
+    let server_addr = std::net::SocketAddr::new(server_ip, 8080);
+    let connect = async move {
+        let error = fasync::net::TcpStream::connect_in_realm(&client, server_addr)
+            .await
+            .expect_err("connect should fail");
+        let error = error.downcast::<std::io::Error>().expect("failed to cast to std::io::Result");
+        error.raw_os_error()
+    };
+
+    futures::select! {
+        () = fake_ep_loop.fuse() => unreachable!("should never finish"),
+        errno = connect.fuse() => return errno.expect("must have an errno"),
+    }
 }

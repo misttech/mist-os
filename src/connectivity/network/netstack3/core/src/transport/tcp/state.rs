@@ -20,13 +20,14 @@ use explicit::ResultExt as _;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::{
+    ip::icmp::IcmpErrorCode,
     transport::tcp::{
         buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
         congestion::CongestionControl,
         rtt::Estimator,
         segment::{Options, Payload, Segment},
         seqnum::{SeqNum, WindowSize},
-        BufferSizes, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions, UserError,
+        BufferSizes, ConnectionError, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions,
     },
     Instant,
 };
@@ -274,8 +275,8 @@ pub(crate) struct SynSent<I, ActiveOpen> {
 enum SynSentOnSegmentDisposition<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> {
     SendAckAndEnterEstablished(Segment<()>, Established<I, R, S>),
     SendSynAckAndEnterSynRcvd(Segment<()>, SynRcvd<I, ActiveOpen>),
-    SendRstAndEnterClosed(Segment<()>, Closed<UserError>),
-    EnterClosed(Closed<UserError>),
+    SendRstAndEnterClosed(Segment<()>, Closed<Option<ConnectionError>>),
+    EnterClosed(Closed<Option<ConnectionError>>),
     Ignore,
 }
 
@@ -326,7 +327,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                     } else {
                         SynSentOnSegmentDisposition::SendRstAndEnterClosed(
                             Segment::rst(ack),
-                            Closed { reason: UserError::ConnectionReset },
+                            Closed { reason: Some(ConnectionError::ConnectionReset) },
                         )
                     };
                 }
@@ -346,7 +347,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                 //     segment and return.
                 if has_ack {
                     SynSentOnSegmentDisposition::EnterClosed(Closed {
-                        reason: UserError::ConnectionReset,
+                        reason: Some(ConnectionError::ConnectionReset),
                     })
                 } else {
                     SynSentOnSegmentDisposition::Ignore
@@ -450,9 +451,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                 },
                             )
                         } else {
-                            SynSentOnSegmentDisposition::EnterClosed(Closed {
-                                reason: UserError::ConnectionClosed,
-                            })
+                            SynSentOnSegmentDisposition::EnterClosed(Closed { reason: None })
                         }
                     }
                 }
@@ -1290,7 +1289,7 @@ fn new_time_wait_expiry<I: Instant>(now: I) -> I {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) enum State<I, R, S, ActiveOpen> {
-    Closed(Closed<UserError>),
+    Closed(Closed<Option<ConnectionError>>),
     Listen(Listen),
     SynRcvd(SynRcvd<I, ActiveOpen>),
     SynSent(SynSent<I, ActiveOpen>),
@@ -1493,7 +1492,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             //   "connection reset" signal.  Enter the CLOSED state, delete the
             //   TCB, and return.
             if contents.control() == Some(Control::RST) {
-                *self = State::Closed(Closed { reason: UserError::ConnectionReset });
+                *self = State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) });
                 return None;
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-70):
@@ -1507,7 +1506,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             //   and an ack would have been sent in the first step (sequence
             //   number check).
             if contents.control() == Some(Control::SYN) {
-                *self = State::Closed(Closed { reason: UserError::ConnectionReset });
+                *self = State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) });
                 return Some(Segment::rst(snd_nxt));
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
@@ -1597,7 +1596,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         ) {
                             return Some(ack);
                         } else if seg_ack == fin_seq {
-                            *self = State::Closed(Closed { reason: UserError::ConnectionClosed });
+                            *self = State::Closed(Closed { reason: None });
                             return None;
                         }
                     }
@@ -1937,7 +1936,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             }
         };
         if !alive {
-            *self = State::Closed(Closed { reason: UserError::ConnectionClosed });
+            *self = State::Closed(Closed { reason: None });
         }
         !alive
     }
@@ -2012,7 +2011,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         match self {
             State::Closed(_) => Err(CloseError::NoConnection),
             State::Listen(_) | State::SynSent(_) => {
-                *self = State::Closed(Closed { reason: UserError::ConnectionClosed });
+                *self = State::Closed(Closed { reason: None });
                 Ok(())
             }
             State::SynRcvd(SynRcvd {
@@ -2155,7 +2154,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 Some(Segment::rst_ack(snd.nxt, *last_ack))
             }
         };
-        *self = State::Closed(Closed { reason: UserError::ConnectionReset });
+        *self = State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) });
         reply
     }
 
@@ -2283,6 +2282,77 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
                 OptionalBufferSizes { send: Some(snd.target_capacity()), receive: None }
             }
+        }
+    }
+
+    /// Processes an incoming ICMP error, returns an soft error that needs to be
+    /// recorded in the containing socket.
+    pub(super) fn on_icmp_error(
+        &mut self,
+        err: IcmpErrorCode,
+        seq: SeqNum,
+    ) -> Option<ConnectionError> {
+        let err = Option::<ConnectionError>::from(err)?;
+        // We consider the following RFC quotes when implementing this function.
+        // Per RFC 5927 Section 4.1:
+        //  Many TCP implementations have incorporated a validation check such
+        //  that they react only to those ICMP error messages that appear to
+        //  relate to segments currently "in flight" to the destination system.
+        //  These implementations check that the TCP sequence number contained
+        //  in the payload of the ICMP error message is within the range
+        //  SND.UNA =< SEG.SEQ < SND.NXT.
+        // Per RFC 5927 Section 5.2:
+        //  Based on this analysis, most popular TCP implementations treat all
+        //  ICMP "hard errors" received for connections in any of the
+        //  synchronized states (ESTABLISHED, FIN-WAIT-1, FIN-WAIT-2, CLOSE-WAIT,
+        //  CLOSING, LAST-ACK, or TIME-WAIT) as "soft errors".  That is, they do
+        //  not abort the corresponding connection upon receipt of them.
+        // Per RFC 5461 Section 4.1:
+        //  A number of TCP implementations have modified their reaction to all
+        //  ICMP soft errors and treat them as hard errors when they are received
+        //  for connections in the SYN-SENT or SYN-RECEIVED states. For example,
+        //  this workaround has been implemented in the Linux kernel since
+        //  version 2.0.0 (released in 1996) [Linux]
+        match self {
+            State::Closed(_) => None,
+            State::Listen(listen) => unreachable!(
+                "ICMP errors should not be delivered on a listener, received code {:?} on {:?}",
+                err, listen
+            ),
+            State::SynRcvd(SynRcvd {
+                iss,
+                irs: _,
+                timestamp: _,
+                retrans_timer: _,
+                simultaneous_open: _,
+                buffer_sizes: _,
+                smss: _,
+            })
+            | State::SynSent(SynSent {
+                iss,
+                timestamp: _,
+                retrans_timer: _,
+                active_open: _,
+                buffer_sizes: _,
+                device_mss: _,
+                default_mss: _,
+            }) => {
+                if *iss == seq {
+                    *self = State::Closed(Closed { reason: Some(err) });
+                }
+                None
+            }
+            State::Established(Established { snd, rcv: _ })
+            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
+                (!snd.una.after(seq) && seq.before(snd.nxt)).then_some(err)
+            }
+            State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ })
+            | State::FinWait1(FinWait1 { snd, rcv: _ }) => {
+                (!snd.una.after(seq) && seq.before(snd.nxt)).then_some(err)
+            }
+            // The following states does not have any outstanding segments, so
+            // they don't expect any incoming ICMP error.
+            State::FinWait2(_) | State::Closing(_) | State::TimeWait(_) => None,
         }
     }
 }
@@ -2489,17 +2559,17 @@ mod test {
         Segment::ack(ISS_2, ISS_1 - 1, WindowSize::DEFAULT), RTT
     => SynSentOnSegmentDisposition::SendRstAndEnterClosed(
         Segment::rst(ISS_1-1),
-        Closed { reason: UserError::ConnectionReset },
+        Closed { reason: Some(ConnectionError::ConnectionReset) },
     ); "unacceptable ACK without RST")]
     #[test_case(
         Segment::rst_ack(ISS_2, ISS_1), RTT
     => SynSentOnSegmentDisposition::EnterClosed(
-        Closed { reason: UserError::ConnectionReset },
+        Closed { reason: Some(ConnectionError::ConnectionReset) },
     ); "acceptable ACK(ISS) with RST")]
     #[test_case(
         Segment::rst_ack(ISS_2, ISS_1 + 1), RTT
     => SynSentOnSegmentDisposition::EnterClosed(
-        Closed { reason: UserError::ConnectionReset },
+        Closed { reason: Some(ConnectionError::ConnectionReset) },
     ); "acceptable ACK(ISS+1) with RST")]
     #[test_case(
         Segment::rst(ISS_2), RTT
@@ -2531,7 +2601,7 @@ mod test {
         Segment::syn(ISS_2, WindowSize::DEFAULT, Options { mss: None }),
         DEFAULT_USER_TIMEOUT
     => SynSentOnSegmentDisposition::EnterClosed(Closed {
-        reason: UserError::ConnectionClosed
+        reason: None
     }); "syn but timed out")]
     fn segment_arrives_when_syn_sent(
         incoming: Segment<()>,
@@ -2593,11 +2663,11 @@ mod test {
     => None; "OTW RST")]
     #[test_case(
         Segment::rst_ack(ISS_1 + 1, ISS_2),
-        Some(State::Closed(Closed { reason: UserError::ConnectionReset }))
+        Some(State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }))
     => None; "acceptable RST")]
     #[test_case(
         Segment::syn(ISS_1 + 1, WindowSize::DEFAULT, Options { mss: None }),
-        Some(State::Closed(Closed { reason: UserError::ConnectionReset }))
+        Some(State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }))
     => Some(
         Segment::rst(ISS_2 + 1)
     ); "duplicate syn")]
@@ -2708,13 +2778,13 @@ mod test {
     #[test_case(
         Segment::syn(ISS_2 + 1, WindowSize::DEFAULT, Options { mss: None }),
         Some(State::Closed (
-            Closed { reason: UserError::ConnectionReset },
+            Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
     => Some(Segment::rst(ISS_1 + 1)); "duplicate syn")]
     #[test_case(
         Segment::rst(ISS_2 + 1),
         Some(State::Closed (
-            Closed { reason: UserError::ConnectionReset },
+            Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
     => None; "accepatable rst")]
     #[test_case(
@@ -2954,13 +3024,13 @@ mod test {
     #[test_case(
         Segment::syn(ISS_2 + 2, WindowSize::DEFAULT, Options { mss: None }),
         Some(State::Closed (
-            Closed { reason: UserError::ConnectionReset },
+            Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
     => Some(Segment::rst(ISS_1 + 1)); "syn")]
     #[test_case(
         Segment::rst(ISS_2 + 2),
         Some(State::Closed (
-            Closed { reason: UserError::ConnectionReset },
+            Closed { reason: Some(ConnectionError::ConnectionReset) },
         ))
     => None; "rst")]
     #[test_case(
@@ -3732,7 +3802,7 @@ mod test {
             (None, None)
         );
         // The connection is closed.
-        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
+        assert_eq!(state, State::Closed(Closed { reason: None }));
     }
 
     #[test]
@@ -3932,7 +4002,7 @@ mod test {
         clock.sleep(SMALLEST_DURATION);
         // The state should become closed.
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
-        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
+        assert_eq!(state, State::Closed(Closed { reason: None }));
     }
 
     #[test]
@@ -4069,7 +4139,7 @@ mod test {
         clock.sleep(SMALLEST_DURATION);
         // The state should become closed.
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
-        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
+        assert_eq!(state, State::Closed(Closed { reason: None }));
     }
 
     #[test]
@@ -4343,7 +4413,7 @@ mod test {
             ),
             None,
         );
-        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
+        assert_eq!(state, State::Closed(Closed { reason: None }));
     }
 
     /// A `SendBuffer` that doesn't allow peeking some number of bytes.
@@ -4717,7 +4787,7 @@ mod test {
         } else {
             assert!(times < DEFAULT_MAX_RETRIES.get());
         }
-        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }))
+        assert_eq!(state, State::Closed(Closed { reason: None }))
     }
 
     #[test]
@@ -4998,6 +5068,6 @@ mod test {
         assert_eq!(state.poll_send_at(), Some(clock.now().add(DEFAULT_FIN_WAIT2_TIMEOUT)));
         clock.sleep(DEFAULT_FIN_WAIT2_TIMEOUT);
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
-        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
+        assert_eq!(state, State::Closed(Closed { reason: None }));
     }
 }

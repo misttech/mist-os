@@ -448,8 +448,10 @@ impl<B: ByteSlice> TcpSegment<B> {
 /// [`TcpSegmentRaw`].
 #[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
 #[repr(C)]
-struct TcpFlowHeader {
+pub struct TcpFlowHeader {
+    /// Source port.
     src_port: U16,
+    /// Destination port.
     dst_port: U16,
 }
 
@@ -457,6 +459,38 @@ struct TcpFlowHeader {
 struct PartialHeaderPrefix<B: ByteSlice> {
     flow: LayoutVerified<B, TcpFlowHeader>,
     rest: B,
+}
+
+/// Contains the TCP flow info and its sequence number.
+///
+/// This is useful for TCP endpoints processing ingress ICMP messages so that it
+/// can deliver the ICMP message to the right socket and also perform checks
+/// against the sequence number to make sure it corresponds to an in-flight
+/// segment.
+#[derive(Debug, Default, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[repr(C)]
+pub struct TcpFlowAndSeqNum {
+    /// The flow header.
+    flow: TcpFlowHeader,
+    /// The sequence number.
+    seqnum: U32,
+}
+
+impl TcpFlowAndSeqNum {
+    /// Gets the source port.
+    pub fn src_port(&self) -> u16 {
+        self.flow.src_port.get()
+    }
+
+    /// Gets the destination port.
+    pub fn dst_port(&self) -> u16 {
+        self.flow.dst_port.get()
+    }
+
+    /// Gets the sequence number.
+    pub fn sequence_num(&self) -> u32 {
+        self.seqnum.get()
+    }
 }
 
 /// A partially-parsed and not yet validated TCP segment.
