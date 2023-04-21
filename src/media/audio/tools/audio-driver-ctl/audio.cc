@@ -79,10 +79,6 @@ static std::optional<uint32_t> GetUint32(const char* arg) {
 void usage(const char* prog_name, bool full_usage) {
   // clang-format off
   printf(
-      "Important: audio-driver-ctl is deprecated. Please use ffx audio device \n"
-      "to interact with audio drivers. For more information, run \n"
-      "ffx audio device --help and see the README located at \n"
-      "https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/plugins/audio/README.md\n\n"
       "Usage:\n"
       "  audio-driver-ctl [-d <id>] [-t (input|output)] agc (on|off)\n\n"
       "  audio-driver-ctl [-a <mask>] [-b (8|16|20|24|32)] [-c <channels>] \\\n"
@@ -505,6 +501,12 @@ int main(int argc, const char** argv) {
   Command cmd = Command::INVALID;
   auto print_usage = fit::defer([prog_name = argv[0]]() { usage(prog_name, false); });
   int arg = 1;
+
+  printf(
+      "Important: audio-driver-ctl is deprecated. Please use ffx audio device \n"
+      "to interact with audio drivers. For more information, run \n"
+      "ffx audio device --help and see the README located at \n"
+      "https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/plugins/audio/README.md\n\n");
 
   if (arg >= argc)
     return -1;
