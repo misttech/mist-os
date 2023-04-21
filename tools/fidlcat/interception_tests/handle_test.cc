@@ -45,11 +45,10 @@ std::unique_ptr<SystemCallTest> ZxHandleCloseMany(int64_t result, std::string_vi
   return value;
 }
 
-#define HANDLE_CLOSE_MANY_DISPLAY_TEST_CONTENT(result, expected)                         \
-  std::vector<zx_handle_t> handles = {kHandle, kHandle2, kHandle3};                      \
-  PerformDisplayTest("$plt(zx_handle_close_many)",                                       \
-                     ZxHandleCloseMany(result, #result, handles.data(), handles.size()), \
-                     expected)
+#define HANDLE_CLOSE_MANY_DISPLAY_TEST_CONTENT(result, expected)    \
+  std::vector<zx_handle_t> handles = {kHandle, kHandle2, kHandle3}; \
+  PerformDisplayTest("$plt(zx_handle_close_many)",                  \
+                     ZxHandleCloseMany(result, #result, handles.data(), handles.size()), expected)
 
 #define HANDLE_CLOSE_MANY_DISPLAY_TEST(name, errno, expected) \
   TEST_F(InterceptionWorkflowTestX64, name) {                 \

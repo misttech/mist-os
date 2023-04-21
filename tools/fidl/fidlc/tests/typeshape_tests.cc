@@ -14,7 +14,7 @@ namespace {
 const std::string kPrologWithHandleDefinition(R"FIDL(
 library example;
 
-type obj_type = enum : uint32 {
+type ObjType = enum : uint32 {
     NONE = 0;
     PROCESS = 1;
     THREAD = 2;
@@ -26,7 +26,7 @@ type obj_type = enum : uint32 {
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
     };
 };
 )FIDL");

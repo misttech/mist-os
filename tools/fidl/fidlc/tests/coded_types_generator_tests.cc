@@ -640,24 +640,24 @@ type Wrapper2 = struct {
 TEST(CodedTypesGeneratorTests, GoodCodedHandle) {
   TestLibrary library(R"FIDL(library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
-type rights = strict bits {
+type Rights = strict bits {
     SOME_RIGHT = 1;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
-        rights rights;
+        subtype ObjType;
+        rights Rights;
     };
 };
 
 type MyStruct = resource struct {
-    h handle:<VMO, rights.SOME_RIGHT>;
+    h handle:<VMO, Rights.SOME_RIGHT>;
 };
 )FIDL");
 

@@ -13,8 +13,8 @@ const USERNAME string = "\"squeenze\"";
 const MIN_TEMP float32 = -273.15;
 const CONVERSION_FACTOR float64 = 1.41421358;
 
-const ZX_OBJ_VAL zx.obj_type = zx.obj_type.CHANNEL;
-const ZX_RIGHTS_VAL zx.rights = zx.rights.READ;
+const ZX_OBJ_VAL zx.ObjType = zx.ObjType.CHANNEL;
+const ZX_RIGHTS_VAL zx.Rights = zx.Rights.READ;
 const ZX_CONST uint64 = zx.CHANNEL_MAX_MSG_BYTES;
 
 type EnumType = strict enum : int32 {

@@ -344,7 +344,7 @@ protocol BufferCollectionToken {
     ///
     /// All table fields are currently required.
     DuplicateSync(table {
-        1: rights_attenuation_masks vector<zx.rights>:MAX_COUNT_DUPLICATES;
+        1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource table {
         1: tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_DUPLICATES;
     });
@@ -833,7 +833,7 @@ protocol BufferCollectionTokenGroup {
     /// number of nodes in an overall tree (from the root) are capped to limits
     /// which are not configurable via these protocols.
     CreateChildrenSync(table {
-        1: rights_attenuation_masks vector<zx.rights>:MAX_COUNT_CREATE_CHILDREN;
+        1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_CREATE_CHILDREN;
     }) -> (resource table {
         1: tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_CREATE_CHILDREN;
     });

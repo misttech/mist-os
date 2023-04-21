@@ -37,7 +37,7 @@ protocol FactoryDevice {
     /// instead of sending one command at a time, this method opens an opens an interactive shell
     /// operated over `server_socket`.
     SetupOtCli(resource struct {
-        server_socket zx.handle:<SOCKET, zx.RIGHTS_IO | zx.rights.WAIT>;
+        server_socket zx.handle:<SOCKET, zx.RIGHTS_IO | zx.Rights.WAIT>;
     }) -> ();
 };
 

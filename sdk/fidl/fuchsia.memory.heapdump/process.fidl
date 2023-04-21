@@ -6,8 +6,8 @@ library fuchsia.memory.heapdump.process;
 using zx;
 
 /// Rights to map a VMO in read-only mode and read its "content size" property.
-const VMO_MAP_READONLY_RIGHTS zx.rights
-        = zx.RIGHTS_BASIC | zx.rights.READ | zx.rights.GET_PROPERTY | zx.rights.MAP;
+const VMO_MAP_READONLY_RIGHTS zx.Rights
+        = zx.RIGHTS_BASIC | zx.Rights.READ | zx.Rights.GET_PROPERTY | zx.Rights.MAP;
 
 /// Instrumented processes send application-initiated snapshots over this channel.
 ///
@@ -20,7 +20,7 @@ protocol SnapshotSinkV1 {};
 protocol Registry {
     /// Binds the given process to the registry and share the relevant resources.
     RegisterV1(resource struct {
-        process zx.handle:<PROCESS, zx.RIGHTS_BASIC | zx.RIGHTS_IO | zx.rights.GET_PROPERTY>;
+        process zx.handle:<PROCESS, zx.RIGHTS_BASIC | zx.RIGHTS_IO | zx.Rights.GET_PROPERTY>;
         allocations_vmo zx.handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
         resources_vmo zx.handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
         snapshot_sink server_end:SnapshotSinkV1;

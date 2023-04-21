@@ -1197,19 +1197,19 @@ TEST(ProtocolTests, BadMethodNamedInvalidHandle) {
   TestLibrary library(R"FIDL(
 library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
-type rights = strict bits : uint32 {
+type Rights = strict bits : uint32 {
     TRANSFER = 1;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
-        rights rights;
+        subtype ObjType;
+        rights Rights;
     };
 };
 
@@ -1225,19 +1225,19 @@ TEST(ProtocolTests, BadMethodNamedInvalidAlias) {
   TestLibrary library(R"FIDL(
 library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
-type rights = strict bits : uint32 {
+type Rights = strict bits : uint32 {
     TRANSFER = 1;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
-        rights rights;
+        subtype ObjType;
+        rights Rights;
     };
 };
 

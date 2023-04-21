@@ -12,7 +12,7 @@ Consider a simple client and server communicating over the following protocol:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/life_of_a_handle.test.fidl" region_tag="protocol" %}
 ```
 
-Suppose that we remove `zx.rights.WRITE` from the handle rights, but only
+Suppose that we remove `zx.Rights.WRITE` from the handle rights, but only
 recompile the server, not the client. What happens when the client creates a VMO
 and passes it to `Method`?
 

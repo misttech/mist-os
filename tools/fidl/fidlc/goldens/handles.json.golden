@@ -21,7 +21,7 @@
     {
       "name": "zx",
       "declarations": {
-        "zx/rights": {
+        "zx/Rights": {
           "kind": "bits"
         },
         "zx/CHANNEL_MAX_MSG_BYTES": {
@@ -54,7 +54,7 @@
         "zx/RIGHTS_PROPERTY": {
           "kind": "const"
         },
-        "zx/obj_type": {
+        "zx/ObjType": {
           "kind": "enum"
         },
         "zx/handle": {
@@ -1955,8 +1955,8 @@
         "handle_rights": {
           "kind": "identifier",
           "value": "1",
-          "expression": "zx.rights.DUPLICATE",
-          "identifier": "zx/rights.DUPLICATE"
+          "expression": "zx.Rights.DUPLICATE",
+          "identifier": "zx/Rights.DUPLICATE"
         }
       }
     },

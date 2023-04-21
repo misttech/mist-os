@@ -373,7 +373,7 @@ Zircon, e.g. `channel`, `thread`, `vmo`. Please refer to the
 
 _R_ can be any [right](/docs/concepts/kernel/rights.md) supported by Zircon.
 Rights are bits-typed values, defined in the [`zx`](/zircon/vdso/rights.fidl)
-FIDL library, e.g. `zx.rights.READ`. In both the incoming and outgoing
+FIDL library, e.g. `zx.Rights.READ`. In both the incoming and outgoing
 directions, handles are validated to have the correct Zircon object type and at
 least as many rights as are specified in FIDL. If the handle has more rights
 than is specified in FIDL, then its rights will be reduced by a call to

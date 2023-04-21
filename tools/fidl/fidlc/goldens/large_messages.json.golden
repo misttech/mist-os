@@ -11,7 +11,7 @@
     {
       "name": "zx",
       "declarations": {
-        "zx/rights": {
+        "zx/Rights": {
           "kind": "bits"
         },
         "zx/CHANNEL_MAX_MSG_BYTES": {
@@ -44,7 +44,7 @@
         "zx/RIGHTS_PROPERTY": {
           "kind": "const"
         },
-        "zx/obj_type": {
+        "zx/ObjType": {
           "kind": "enum"
         },
         "zx/handle": {

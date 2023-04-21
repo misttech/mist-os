@@ -229,17 +229,17 @@ TEST(TransportTests, BadCustomHandleInZirconChannel) {
   TestLibrary library(R"FIDL(
 library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
   NONE = 0;
 };
-type rights = strict enum : uint32 {
+type Rights = strict enum : uint32 {
   SAME_RIGHTS = 0;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
-        rights rights;
+        subtype ObjType;
+        rights Rights;
     };
 };
 

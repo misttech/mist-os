@@ -36,7 +36,7 @@ type ExampleFlexibleUnion = flexible union {
 };
 
 type ExampleHandleStruct = resource struct {
-    channel zx.handle:<CHANNEL, zx.rights.DUPLICATE>;
+    channel zx.handle:<CHANNEL, zx.Rights.DUPLICATE>;
 };
 
 closed protocol Protocol {};

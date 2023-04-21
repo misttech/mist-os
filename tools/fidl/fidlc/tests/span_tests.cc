@@ -743,7 +743,7 @@ const std::vector<TestCase> test_cases = {
     {NodeKind::kTypeConstructor,
      {
          R"FIDL(library x; const x «int32» = 1;)FIDL",
-         R"FIDL(library x; const x «zx.handle:<VMO, zx.rights.READ, optional>» = 1;)FIDL",
+         R"FIDL(library x; const x «zx.handle:<VMO, zx.Rights.READ, optional>» = 1;)FIDL",
          R"FIDL(library x; const x «Foo<«Bar<«zx.handle:VMO»>:20»>:optional» = 1;)FIDL",
          R"FIDL(library x; const x «zx.handle:VMO» = 1;)FIDL",
          R"FIDL(library x; type y = «array<uint8,4>»;)FIDL",

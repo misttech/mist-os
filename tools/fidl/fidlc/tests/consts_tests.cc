@@ -302,14 +302,14 @@ TEST(ConstsTests, BadConstTestHandleOfThread) {
   TestLibrary library(R"FIDL(
 library example;
 
-type obj_type = enum : uint32 {
+type ObjType = enum : uint32 {
     NONE = 0;
     THREAD = 2;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
     };
 };
 

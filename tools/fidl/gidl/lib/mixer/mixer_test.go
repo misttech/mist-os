@@ -536,7 +536,7 @@ func TestHandleDeclConforms(t *testing.T) {
 			conformFail{0, "expecting handle"},
 		},
 	)
-	// The FIDL type `zx.handle<CHANNEL, zx.rights.READ | zx.rights.WRITE>`
+	// The FIDL type `zx.handle<CHANNEL, zx.Rights.READ | zx.Rights.WRITE>`
 	// requires a channel with the appropriate rights.
 	checkConforms(t,
 		context{

@@ -508,8 +508,8 @@ type TypeDecl = resource struct {
   h1 zx.handle:VMO;
   h2 zx.handle:optional;
   h3 zx.handle:<VMO,optional>;
-  h4 zx.handle:<VMO,zx.rights.TRANSFER>;
-  h5 zx.handle:<VMO,zx.rights.TRANSFER,optional>;
+  h4 zx.handle:<VMO,zx.Rights.TRANSFER>;
+  h5 zx.handle:<VMO,zx.Rights.TRANSFER,optional>;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -612,7 +612,7 @@ using zx;
 alias MyVmo = zx.handle:VMO;
 
 type Foo = struct {
-    foo MyVmo:zx.obj_type.CHANNEL;
+    foo MyVmo:zx.ObjType.CHANNEL;
 };
 
 )FIDL");
@@ -620,7 +620,7 @@ type Foo = struct {
 
   // TODO(fxbug.dev/74193): We plan to disallow constraints on aliases, so this
   // error message should change to that. For now, to test this we have to use
-  // `zx.obj_type` above because contextual lookup is not done through aliases.
+  // `zx.ObjType` above because contextual lookup is not done through aliases.
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotConstrainTwice);
 }
 
@@ -630,7 +630,7 @@ library example;
 
 using zx;
 
-alias MyVmo = zx.handle:<VMO, zx.rights.TRANSFER>;
+alias MyVmo = zx.handle:<VMO, zx.Rights.TRANSFER>;
 
 type Foo = resource struct {
     foo MyVmo:optional;

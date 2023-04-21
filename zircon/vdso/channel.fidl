@@ -9,8 +9,8 @@ alias HandleOp = uint32;
 
 type HandleInfo = resource struct {
     handle handle;
-    type obj_type;
-    rights rights;
+    type ObjType;
+    rights Rights;
     unused uint32;
 };
 
@@ -20,8 +20,8 @@ type ChannelCallArgs = resource struct {};
 type HandleDisposition = resource struct {
     operation HandleOp;
     handle handle;
-    type obj_type;
-    rights rights;
+    type ObjType;
+    rights Rights;
     result status;
 };
 

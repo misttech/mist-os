@@ -120,7 +120,7 @@ class Reference final {
 
   // An alternative to Key for a single component whose meaning is contextual.
   // For example, in zx.handle:CHANNEL, CHANNEL is contextual and ultimately
-  // resolves to zx.obj_type.CHANNEL.
+  // resolves to zx.ObjType.CHANNEL.
   struct Contextual {
     std::string_view name;
   };

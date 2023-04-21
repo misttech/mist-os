@@ -8,7 +8,7 @@ using zx;
 // [START protocol]
 protocol LifeOfAHandle {
     Method(resource struct {
-        h zx.handle:<VMO, zx.rights.MAP | zx.rights.READ | zx.rights.WRITE>;
+        h zx.handle:<VMO, zx.Rights.MAP | zx.Rights.READ | zx.Rights.WRITE>;
     }) -> ();
 };
 // [END protocol]

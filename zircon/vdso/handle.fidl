@@ -188,7 +188,7 @@ protocol Handlefuncs {
     /// [`zx_handle_replace()`]: handle_replace.md
     HandleDuplicate(resource struct {
         handle handle;
-        rights rights;
+        rights Rights;
     }) -> (resource struct {
         out handle;
     }) error status;
@@ -250,7 +250,7 @@ protocol Handlefuncs {
     HandleReplace(resource struct {
         @release
         handle handle;
-        rights rights;
+        rights Rights;
     }) -> (resource struct {
         out handle;
     }) error status;

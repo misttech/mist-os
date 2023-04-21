@@ -336,7 +336,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionToken.DuplicateSync",
         "ordinal": "332940554004438808",
-        "type": "(vector<zx/rights>:64 rights_attenuation_masks) -> (vector<client_end:fuchsia.sysmem/BufferCollectionToken>:64 tokens)"
+        "type": "(vector<zx/Rights>:64 rights_attenuation_masks) -> (vector<client_end:fuchsia.sysmem/BufferCollectionToken>:64 tokens)"
     },
     {
         "kind": "protocol/member",
@@ -412,7 +412,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollectionTokenGroup.CreateChildrenSync",
         "ordinal": "6241359931670852917",
-        "type": "(vector<zx/rights>:64 rights_attenuation_masks) -> (vector<client_end:fuchsia.sysmem/BufferCollectionToken>:64 tokens)"
+        "type": "(vector<zx/Rights>:64 rights_attenuation_masks) -> (vector<client_end:fuchsia.sysmem/BufferCollectionToken>:64 tokens)"
     },
     {
         "kind": "protocol/member",

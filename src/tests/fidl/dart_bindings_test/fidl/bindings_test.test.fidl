@@ -295,5 +295,5 @@ type ChannelWithDefaultRights = resource struct {
 };
 
 type ChannelWithReducedRights = resource struct {
-    c zx.handle:<CHANNEL, zx.rights.TRANSFER>;
+    c zx.handle:<CHANNEL, zx.Rights.TRANSFER>;
 };

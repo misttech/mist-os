@@ -7,7 +7,7 @@ using zx;
 
 closed protocol SendHandleProtocol {
     strict SendHandleReducedRights(resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER>;
     });
     strict SendHandleSameRights(resource struct {
         h zx.handle:EVENT;
@@ -16,13 +16,13 @@ closed protocol SendHandleProtocol {
 
 closed protocol EchoHandleProtocol {
     strict EchoHandleRequestResponseReducedRights(resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.DUPLICATE>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
     }) -> (resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER>;
     });
 
     strict EchoHandleRequestReducedRights(resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER>;
     }) -> (resource struct {
         h zx.handle:EVENT;
     });
@@ -35,7 +35,7 @@ closed protocol EchoHandleProtocol {
     strict EchoHandleResponseReducedRights(resource struct {
         h zx.handle:EVENT;
     }) -> (resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER>;
     });
     strict EchoHandleResponseSameRights(resource struct {
         h zx.handle:EVENT;
@@ -46,7 +46,7 @@ closed protocol EchoHandleProtocol {
 
 closed protocol PushEventProtocol {
     strict -> PushEventReducedRights(resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER>;
     });
     strict -> PushEventSameRights(resource struct {
         h zx.handle:EVENT;
@@ -55,6 +55,6 @@ closed protocol PushEventProtocol {
 
 closed protocol ErrorSyntaxProtocol {
     strict TestErrorSyntax() -> (resource struct {
-        h zx.handle:<EVENT, zx.rights.TRANSFER>;
+        h zx.handle:<EVENT, zx.Rights.TRANSFER>;
     }) error uint32;
 };

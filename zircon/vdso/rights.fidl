@@ -4,9 +4,7 @@
 library zx;
 
 // TODO(scottmg): (1 << 4) notation or something else for bits would be nice.
-//
-// TODO(fxbug.dev/109734): Rights.
-type rights = strict bits : uint32 {
+type Rights = strict bits : uint32 {
     // TODO(scottmg): "bits members must be powers of two"
     // NONE =           0x00000000;
     DUPLICATE = 0x00000001;
@@ -35,11 +33,11 @@ type rights = strict bits : uint32 {
     SAME_RIGHTS = 0x80000000;
 };
 
-const RIGHTS_BASIC rights = rights.TRANSFER | rights.DUPLICATE | rights.WAIT | rights.INSPECT;
-const RIGHTS_IO rights = rights.READ | rights.WRITE;
-const RIGHTS_PROPERTY rights = rights.GET_PROPERTY | rights.SET_PROPERTY;
-const RIGHTS_POLICY rights = rights.GET_POLICY | rights.SET_POLICY;
+const RIGHTS_BASIC Rights = Rights.TRANSFER | Rights.DUPLICATE | Rights.WAIT | Rights.INSPECT;
+const RIGHTS_IO Rights = Rights.READ | Rights.WRITE;
+const RIGHTS_PROPERTY Rights = Rights.GET_PROPERTY | Rights.SET_PROPERTY;
+const RIGHTS_POLICY Rights = Rights.GET_POLICY | Rights.SET_POLICY;
 
-const DEFAULT_CHANNEL_RIGHTS rights
-        = rights.TRANSFER | rights.WAIT | rights.INSPECT | RIGHTS_IO | rights.SIGNAL | rights.SIGNAL_PEER;
-const DEFAULT_EVENT_RIGHTS rights = RIGHTS_BASIC | rights.SIGNAL;
+const DEFAULT_CHANNEL_RIGHTS Rights
+        = Rights.TRANSFER | Rights.WAIT | Rights.INSPECT | RIGHTS_IO | Rights.SIGNAL | Rights.SIGNAL_PEER;
+const DEFAULT_EVENT_RIGHTS Rights = RIGHTS_BASIC | Rights.SIGNAL;

@@ -385,7 +385,7 @@ protocol BufferCollectionToken {
     /// The value ZX_RIGHT_SAME_RIGHTS can be used to specify that no
     /// attenuation should be applied.
     DuplicateSync(struct {
-        rights_attenuation_masks vector<zx.rights>:MAX_COUNT_DUPLICATES;
+        rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource struct {
         tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_DUPLICATES;
     });
@@ -982,7 +982,7 @@ protocol BufferCollectionTokenGroup {
     /// number of nodes in an overall tree (from the root) are capped to limits
     /// which are not configurable via these protocols.
     CreateChildrenSync(struct {
-        rights_attenuation_masks vector<zx.rights>:MAX_COUNT_CREATE_CHILDREN;
+        rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_CREATE_CHILDREN;
     }) -> (resource struct {
         tokens vector<client_end:BufferCollectionToken>:MAX_COUNT_CREATE_CHILDREN;
     });

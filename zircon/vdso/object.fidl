@@ -2032,7 +2032,7 @@ protocol Object {
     GetChild(resource struct {
         handle handle;
         koid uint64;
-        rights rights;
+        rights Rights;
     }) -> (resource struct {
         out handle;
     }) error status;

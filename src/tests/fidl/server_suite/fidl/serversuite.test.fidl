@@ -200,22 +200,22 @@ closed protocol ClosedTarget {
     }) -> (struct {
             // Rights should be obtained by calling zx_object_get_info on |handle|
             // with topic ZX_INFO_HANDLE_BASIC.
-        rights zx.rights;
+        rights zx.Rights;
     });
 
     strict GetSignalableEventRights(resource struct {
-        handle zx.handle:<EVENT, zx.rights.SIGNAL>;
+        handle zx.handle:<EVENT, zx.Rights.SIGNAL>;
     }) -> (struct {
         // Rights should be obtained by calling zx_object_get_info on |handle|
         // with topic ZX_INFO_HANDLE_BASIC.
-        rights zx.rights;
+        rights zx.Rights;
     });
 
     strict EchoAsTransferableSignalableEvent(resource struct {
         handle zx.handle;
     }) -> (resource struct {
         // The response handle should be the same as the request handle.
-        handle zx.handle:<EVENT, zx.rights.TRANSFER | zx.rights.SIGNAL>;
+        handle zx.handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.SIGNAL>;
     });
 
     strict ByteVectorSize(struct {

@@ -97,7 +97,7 @@ protocol CombinedBufferCollectionToken {
     });
     @selector("fuchsia.sysmem/BufferCollectionToken.DuplicateSync")
     DuplicateSyncV1(struct {
-        rights_attenuation_masks vector<zx.rights>:MAX_COUNT_DUPLICATES_V1;
+        rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES_V1;
     }) -> (resource struct {
         tokens vector<client_end:fuchsia.sysmem.BufferCollectionToken>:MAX_COUNT_DUPLICATES_V1;
     });
@@ -148,7 +148,7 @@ protocol CombinedBufferCollectionToken {
     // fuchsia.sysmem2/BufferCollectionToken, with de-conflicted names:
     @selector("fuchsia.sysmem2/BufferCollectionToken.DuplicateSync")
     DuplicateSyncV2(table {
-        1: rights_attenuation_masks vector<zx.rights>:MAX_COUNT_DUPLICATES_V2;
+        1: rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES_V2;
     }) -> (resource table {
         1: tokens vector<client_end:fuchsia.sysmem2.BufferCollectionToken>:MAX_COUNT_DUPLICATES_V2;
     });

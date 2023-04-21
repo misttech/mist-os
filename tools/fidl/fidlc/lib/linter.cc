@@ -52,9 +52,6 @@ constexpr bool IsZirconLibrary(std::string_view name) {
 // invalid-case-for-decl-name check.
 //
 // TODO(fxbug.dev/109734): Burn these down.
-constexpr bool IsLayoutCaseCheckExempt(std::string_view library_name, std::string_view declname) {
-  return library_name == kZirconLibraryZx && (declname == "obj_type" || declname == "rights");
-}
 constexpr bool IsAliasCaseCheckExempt(std::string_view library_name, std::string_view declname) {
   return library_name == kZirconLibraryZx &&
          (declname == "status" || declname == "time" || declname == "duration");
@@ -600,15 +597,10 @@ Linter::Linter()
         if (layout_ref->kind == raw::LayoutReference::kNamed) {
           return;
         }
-
-        // TODO(fxbug.dev/109734): Remove these exemptions.
-        std::string_view name = to_string_view(element.identifier);
-        if (!IsLayoutCaseCheckExempt(linter.library_prefix_, name)) {
-          auto* inline_layout = static_cast<raw::InlineLayoutReference*>(layout_ref);
-          std::string layout_kind = name_layout_kind(*inline_layout->layout);
-          linter.CheckCase(layout_kind + "s", element.identifier,
-                           linter.invalid_case_for_decl_name(), linter.upper_camel_);
-        }
+        auto* inline_layout = static_cast<raw::InlineLayoutReference*>(layout_ref);
+        std::string layout_kind = name_layout_kind(*inline_layout->layout);
+        linter.CheckCase(layout_kind + "s", element.identifier, linter.invalid_case_for_decl_name(),
+                         linter.upper_camel_);
       });
   callbacks_.OnAliasDeclaration([&linter = *this]
                                 //

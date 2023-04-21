@@ -57,20 +57,20 @@ open protocol Store {
     /// the relatively heavy load of generating a backup to acknowledge and bear some of the costs.
     ///
     /// This method operates by having the client supply an empty VMO, which the server then
-    /// attempts to fill. Notice that the server removes the `zx.rights.WRITE` and
-    /// `zx.rights.SET_PROPERTY` rights from the returned VMO - not even the requesting client may
+    /// attempts to fill. Notice that the server removes the `zx.Rights.WRITE` and
+    /// `zx.Rights.SET_PROPERTY` rights from the returned VMO - not even the requesting client may
     /// alter the backup once it has been minted by the server.
     flexible Export(resource struct {
         /// Note that the empty VMO has more rights than the filled one being returned: it has
-        /// `zx.rights.WRITE` (via `zx.RIGHTS_IO`) so that the VMO may be filled with exported data,
-        /// and `zx.rights.SET_PROPERTY` (via `zx.RIGHTS_PROPERTY`) so that it may be resized to
+        /// `zx.Rights.WRITE` (via `zx.RIGHTS_IO`) so that the VMO may be filled with exported data,
+        /// and `zx.Rights.SET_PROPERTY` (via `zx.RIGHTS_PROPERTY`) so that it may be resized to
         /// truncate any remaining empty buffer.
         empty zx.handle:<VMO, zx.RIGHTS_BASIC | zx.RIGHTS_PROPERTY | zx.RIGHTS_IO>;
     }) -> (resource struct {
-        /// The `zx.rights.WRITE` and `zx.rights.SET_PROPERTY` rights have been removed from the now
+        /// The `zx.Rights.WRITE` and `zx.Rights.SET_PROPERTY` rights have been removed from the now
         /// filled VMO. No one, not even the client that requested the export, is able to modify
         /// this VMO going forward.
-        filled zx.handle:<VMO, zx.RIGHTS_BASIC | zx.rights.GET_PROPERTY | zx.rights.READ>;
+        filled zx.handle:<VMO, zx.RIGHTS_BASIC | zx.Rights.GET_PROPERTY | zx.Rights.READ>;
     }) error ExportError;
     // [END diff_3]
 };

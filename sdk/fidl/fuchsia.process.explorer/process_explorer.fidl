@@ -29,6 +29,6 @@ protocol Query {
     // }
     // TODO(fxbug.dev/107973): define the schema of data in FIDL and return the data via a response struct
     WriteJsonProcessesData(resource struct {
-        socket zx.handle:<SOCKET, zx.rights.WRITE | zx.rights.WAIT>;
+        socket zx.handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };

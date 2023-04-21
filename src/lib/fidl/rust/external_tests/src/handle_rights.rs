@@ -211,7 +211,7 @@ fn send_handle_sync_end_to_end() {
 #[ignore] // TODO(fxbug.dev/74939) Remove the ignore
 fn send_handle_sync_send() {
     // - The client creates an event with same rights.
-    // - In zx_channel_write_etc, the rights are reduced to zx.rights.TRANSFER (specified by FIDL
+    // - In zx_channel_write_etc, the rights are reduced to zx.Rights.TRANSFER (specified by FIDL
     //   in the handle disposition).
     // - The ordinal is changed in the message bytes to fool the server into expecting
     //   SendHandleSameRights. Therefore we know the server had no part in reducing rights.
@@ -379,7 +379,7 @@ fn echo_handle_sync_end_to_end() {
 #[ignore] // TODO(fxbug.dev/74939) Remove the ignore
 fn echo_handle_sync_request_send() {
     // - The client creates an event with same rights.
-    // - In zx_channel_write_etc, the rights are reduced to zx.rights.TRANSFER (specified by FIDL
+    // - In zx_channel_write_etc, the rights are reduced to zx.Rights.TRANSFER (specified by FIDL
     //   in the handle disposition).
     // - The ordinal is changed in the message bytes to fool the server into expecting
     //   SendHandleSameRights. Therefore we know the server had no part in reducing rights.

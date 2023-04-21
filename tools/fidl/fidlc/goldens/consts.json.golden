@@ -10,7 +10,7 @@
     {
       "name": "zx",
       "declarations": {
-        "zx/rights": {
+        "zx/Rights": {
           "kind": "bits"
         },
         "zx/CHANNEL_MAX_MSG_BYTES": {
@@ -43,7 +43,7 @@
         "zx/RIGHTS_PROPERTY": {
           "kind": "const"
         },
-        "zx/obj_type": {
+        "zx/ObjType": {
           "kind": "enum"
         },
         "zx/handle": {
@@ -630,7 +630,7 @@
       },
       "type": {
         "kind": "identifier",
-        "identifier": "zx/obj_type",
+        "identifier": "zx/ObjType",
         "nullable": false,
         "type_shape_v1": {
           "inline_size": 4,
@@ -656,8 +656,8 @@
       "value": {
         "kind": "identifier",
         "value": "4",
-        "expression": "zx.obj_type.CHANNEL",
-        "identifier": "zx/obj_type.CHANNEL"
+        "expression": "zx.ObjType.CHANNEL",
+        "identifier": "zx/ObjType.CHANNEL"
       }
     },
     {
@@ -670,7 +670,7 @@
       },
       "type": {
         "kind": "identifier",
-        "identifier": "zx/rights",
+        "identifier": "zx/Rights",
         "nullable": false,
         "type_shape_v1": {
           "inline_size": 4,
@@ -696,8 +696,8 @@
       "value": {
         "kind": "identifier",
         "value": "4",
-        "expression": "zx.rights.READ",
-        "identifier": "zx/rights.READ"
+        "expression": "zx.Rights.READ",
+        "identifier": "zx/Rights.READ"
       }
     },
     {

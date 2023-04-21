@@ -10,7 +10,7 @@ void SharedAmongstLibraries::AddLibraryZx() {
   TestLibrary zx_lib(this, "zx.fidl", R"FIDL(
 library zx;
 
-type obj_type = enum : uint32 {
+type ObjType = enum : uint32 {
     NONE = 0;
     PROCESS = 1;
     THREAD = 2;
@@ -20,15 +20,15 @@ type obj_type = enum : uint32 {
     PORT = 6;
 };
 
-type rights = bits : uint32 {
+type Rights = bits : uint32 {
     DUPLICATE = 0x00000001;
     TRANSFER = 0x00000002;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
-        rights rights;
+        subtype ObjType;
+        rights Rights;
     };
 };
 )FIDL");
@@ -39,13 +39,13 @@ void SharedAmongstLibraries::AddLibraryFdf() {
   TestLibrary fdf_lib(this, "fdf.fidl", R"FIDL(
 library fdf;
 
-type obj_type = enum : uint32 {
+type ObjType = enum : uint32 {
   CHANNEL = 1;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
     };
 };
 )FIDL");

@@ -74,7 +74,7 @@ type ProofOfInterfaceAuthorization = resource struct {
     /// The ID of the interface this credential is authenticating.
     interface_id fuchsia.net.InterfaceId;
     /// The EVENTPAIR providing authentication over this interface.
-    token zx.handle:<EVENTPAIR, zx.rights.INSPECT>;
+    token zx.handle:<EVENTPAIR, zx.Rights.INSPECT>;
 };
 
 /// Provides control over an interface.
@@ -212,7 +212,7 @@ protocol Control {
             /// The ID of the interface this credential is authenticating.
             interface_id fuchsia.net.InterfaceId;
             /// The EVENTPAIR providing authentication over this interface.
-            token zx.handle:<EVENTPAIR, zx.rights.TRANSFER | zx.rights.DUPLICATE | zx.rights.INSPECT>;
+            token zx.handle:<EVENTPAIR, zx.Rights.TRANSFER | zx.Rights.DUPLICATE | zx.Rights.INSPECT>;
         };
     });
 

@@ -20,7 +20,7 @@ library example;
 using zx;
 
 type MyStruct = resource struct {
-    h zx.handle:<THREAD, zx.rights.DUPLICATE | zx.rights.TRANSFER>;
+    h zx.handle:<THREAD, zx.Rights.DUPLICATE | zx.Rights.TRANSFER>;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -77,7 +77,7 @@ library example;
 using zx;
 
 protocol P {
-    Method(struct { h zx.handle:<VMO, 1>; });  // rights must be zx.rights-typed.
+    Method(struct { h zx.handle:<VMO, 1>; });  // rights must be zx.Rights-typed.
 };
 )FIDL");
   library.UseLibraryZx();
@@ -123,7 +123,7 @@ using zx;
 type MyStruct = resource struct {
   a zx.handle:THREAD;
   b zx.handle:<PROCESS>;
-  c zx.handle:<VMO, zx.rights.TRANSFER>;
+  c zx.handle:<VMO, zx.Rights.TRANSFER>;
 };
 )FIDL");
   library.UseLibraryZx();
@@ -192,14 +192,14 @@ type MyStruct = struct {
 TEST(HandleTests, GoodResourceDefinitionOnlySubtypeNoRightsTest) {
   TestLibrary library(R"FIDL(library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
     };
 };
 
@@ -228,14 +228,14 @@ TEST(HandleTests, BadInvalidSubtypeAtUseSite) {
   TestLibrary library(R"FIDL(
 library example;
 
-type obj_type = enum : uint32 {
+type ObjType = enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
     };
 };
 
@@ -252,14 +252,14 @@ TEST(HandleTests, BadInvalidRightsAtUseSite) {
   TestLibrary library(R"FIDL(
 library example;
 
-type obj_type = enum : uint32 {
+type ObjType = enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
         rights uint32;
     };
 };

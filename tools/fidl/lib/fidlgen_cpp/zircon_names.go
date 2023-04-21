@@ -17,11 +17,11 @@ type zxName = struct {
 }
 
 var zirconNames = map[string]zxName{
-	"rights": {
+	"Rights": {
 		typeName: "zx_rights_t",
 		prefix:   "ZX_RIGHT",
 	},
-	"obj_type": {
+	"ObjType": {
 		typeName: "zx_obj_type_t",
 		prefix:   "ZX_OBJ_TYPE",
 	},

@@ -166,7 +166,7 @@ alias float64_constraint = vector<S>:float64;
 TEST(ParsingTests, GoodParsingHandlesInStructTest) {
   TestLibrary library(R"FIDL(library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
     NONE = 0;
     PROCESS = 1;
     THREAD = 2;
@@ -198,7 +198,7 @@ type obj_type = strict enum : uint32 {
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
+        subtype ObjType;
     };
 };
 
@@ -240,26 +240,26 @@ type Handles = resource struct {
 TEST(ParsingTests, GoodParsingHandleConstraintTest) {
   TestLibrary library(R"FIDL(library example;
 
-type obj_type = strict enum : uint32 {
+type ObjType = strict enum : uint32 {
     NONE = 0;
     VMO = 3;
 };
 
-type rights = strict bits : uint32 {
+type Rights = strict bits : uint32 {
     TRANSFER = 1;
 };
 
 resource_definition handle : uint32 {
     properties {
-        subtype obj_type;
-        rights rights;
+        subtype ObjType;
+        rights Rights;
     };
 };
 
 type Handles = resource struct {
     plain_handle handle;
     subtype_handle handle:VMO;
-    rights_handle handle:<VMO, rights.TRANSFER>;
+    rights_handle handle:<VMO, Rights.TRANSFER>;
 };
 )FIDL");
 

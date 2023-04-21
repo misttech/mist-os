@@ -840,24 +840,24 @@ also contributes to the auditability of API surfaces.
 
 When determining which rights to provide, prefer being minimal, i.e. the least
 amount of rights needed to achieve the functionality sought. For instance, if
-it is known that only `zx.rights.READ` and `zx.rights.WRITE` will be needed,
+it is known that only `zx.Rights.READ` and `zx.Rights.WRITE` will be needed,
 then only these two rights should be specified.
 
 Do not add rights based on speculative needs. If a right needs to be added
 at a future time, it can be added by starting with the source and adding it
 to each location along the call path up until the final point of use.
 
-#### Use `zx.rights.SAME_RIGHTS` sparingly
+#### Use `zx.Rights.SAME_RIGHTS` sparingly
 
-`zx.rights.SAME_RIGHTS` is well suited for a protocol that forwards a handle of
+`zx.Rights.SAME_RIGHTS` is well suited for a protocol that forwards a handle of
 unknown rights, but for most cases a specific set of rights should be used
-instead. Part of the motivation for this is that `zx.rights.SAME_RIGHTS` tells
+instead. Part of the motivation for this is that `zx.Rights.SAME_RIGHTS` tells
 bindings to skip rights checks, so it disables the security protection that
-handle rights may offer. Additionally, `zx.rights.SAME_RIGHTS` makes the rights
+handle rights may offer. Additionally, `zx.Rights.SAME_RIGHTS` makes the rights
 set dynamic, meaning that a process might receive fewer or greater rights than
 it actually needs.
 
-It is worth noting that `zx.rights.SAME_RIGHTS` is not the same as the defaults
+It is worth noting that `zx.Rights.SAME_RIGHTS` is not the same as the defaults
 rights set for a type, e.g. `zx.DEFAULT_CHANNEL_RIGHTS`. While the former skips
 rights checks, the latter requires all normal rights for a given object type to
 be present.

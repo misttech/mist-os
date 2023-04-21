@@ -23,7 +23,7 @@ closed protocol Test1 {
         foo string;
     });
     strict EchoHandleRights(resource struct {
-        h zx.handle:<PORT, zx.rights.READ | zx.rights.TRANSFER | zx.rights.DUPLICATE>;
+        h zx.handle:<PORT, zx.Rights.READ | zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
     }) -> (struct {
         rights uint32;
     });

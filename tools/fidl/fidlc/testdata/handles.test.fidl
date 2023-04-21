@@ -7,7 +7,7 @@ closed protocol SomeProtocol {};
 
 alias aliased_plain_handle = zx.handle;
 alias aliased_subtype_handle = zx.handle:VMO;
-alias aliased_rights_handle = zx.handle:<VMO, zx.rights.DUPLICATE>;
+alias aliased_rights_handle = zx.handle:<VMO, zx.Rights.DUPLICATE>;
 
 type Handles = resource struct {
     plain_handle zx.handle;
@@ -40,7 +40,7 @@ type Handles = resource struct {
     vmar_handle zx.handle:VMAR;
     vmo_handle zx.handle:VMO;
 
-    rights_handle zx.handle:<VMO, zx.rights.DUPLICATE | zx.rights.READ>;
+    rights_handle zx.handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
 
 
     aliased_plain_handle_field aliased_plain_handle;
