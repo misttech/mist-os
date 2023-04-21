@@ -57,7 +57,6 @@ static std::vector<Frame> unwind_from_unwinder(zx_handle_t process, zx_handle_t 
   // Setup registers.
   zx_thread_state_general_regs_t regs;
   if (inspector_read_general_regs(thread, &regs) != ZX_OK) {
-    print_error("inspector_read_general_regs failed");
     return {};
   }
   auto registers = unwinder::FromFuchsiaRegisters(regs);
@@ -200,7 +199,6 @@ static std::vector<Frame> unwind_from_ngunwind(zx_handle_t process, zx_handle_t 
 static std::vector<Frame> unwind_from_shadow_call_stack(zx_handle_t process, zx_handle_t thread) {
   zx_thread_state_general_regs_t regs;
   if (inspector_read_general_regs(thread, &regs) != ZX_OK) {
-    print_error("inspector_read_general_regs failed");
     return {};
   }
 
