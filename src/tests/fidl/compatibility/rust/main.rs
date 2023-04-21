@@ -244,14 +244,14 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         value = echo
-                            .echo_xunions(&mut value.iter_mut(), "")
+                            .echo_xunions(value, "")
                             .await
                             .context("Error calling echo_xunions on proxy")?;
                     }
-                    responder.send(&mut value.iter_mut()).context("Error responding")?;
+                    responder.send(value).context("Error responding")?;
                 }
                 EchoRequest::EchoXunionsWithError {
-                    mut value,
+                    value,
                     result_err,
                     forward_to_server,
                     result_variant,
@@ -260,12 +260,7 @@ async fn echo_server(stream: EchoRequestStream) -> Result<(), Error> {
                     if !forward_to_server.is_empty() {
                         let echo = connect_to_echo().context("Error connecting to proxy")?;
                         let mut result = echo
-                            .echo_xunions_with_error(
-                                &mut value.iter_mut(),
-                                result_err,
-                                "",
-                                result_variant,
-                            )
+                            .echo_xunions_with_error(value, result_err, "", result_variant)
                             .await
                             .context("Error calling echo_struct_with_error on proxy")?;
                         responder.send(&mut result).context("Error responding")?;

@@ -808,6 +808,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		if val.ElementType.Kind == fidlgen.PrimitiveType ||
 			val.ElementType.Kind == fidlgen.ArrayType ||
 			val.ElementType.Kind == fidlgen.VectorType ||
+			el.IsResourceType() ||
 			val.Nullable {
 			if el.IsResourceType() {
 				t.Param = fmt.Sprintf("Vec<%s>", el.Owned)
@@ -947,7 +948,11 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		if t.ElementType.Kind == fidlgen.PrimitiveType ||
 			t.ElementType.Kind == fidlgen.ArrayType ||
 			t.ElementType.Kind == fidlgen.VectorType ||
+			t.IsResourceType() ||
 			t.Nullable {
+			if t.IsResourceType() {
+				return v + ".as_mut()"
+			}
 			return v
 		}
 		var inner string

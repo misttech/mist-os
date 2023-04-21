@@ -194,7 +194,7 @@ async fn run_closed_target_server(
                 for _ in 0..n {
                     handles.push(Event::create());
                 }
-                responder.send(&mut handles.into_iter())?;
+                responder.send(handles)?;
             }
         }
     }

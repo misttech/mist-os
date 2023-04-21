@@ -112,13 +112,11 @@ mod tests {
             )?),
             ll_service_chan,
         );
-        let mut handle_infos = vec![fprocess::HandleInfo {
+        let handle_infos = vec![fprocess::HandleInfo {
             handle: ll_client_chan.into_handle(),
             id: fruntime::HandleInfo::new(fruntime::HandleType::LdsvcLoader, 0).as_raw(),
         }];
-        launcher_proxy
-            .add_handles(&mut handle_infos.iter_mut())
-            .context("failed to add loader service handle")?;
+        launcher_proxy.add_handles(handle_infos).context("failed to add loader service handle")?;
 
         // Load the executable into a vmo
         let executable_file_proxy = fuchsia_fs::file::open_in_namespace(

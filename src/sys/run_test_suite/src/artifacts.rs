@@ -328,7 +328,7 @@ mod file_tests {
             while let Ok(Some(request)) = iterator_stream.try_next().await {
                 let ftest_manager::DebugDataIteratorRequest::GetNext { responder } = request;
                 let resp: Vec<_> = files_iter.by_ref().take(3).collect();
-                let _ = responder.send(&mut resp.into_iter());
+                let _ = responder.send(resp);
             }
         };
         futures::future::join(

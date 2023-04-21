@@ -245,7 +245,7 @@ mod tests {
         let job = job_default();
 
         let (dir_client, dir_server) = zx::Channel::create();
-        let mut handles = vec![
+        let handles = vec![
             fproc::HandleInfo {
                 handle: dir_server.into_handle(),
                 id: HandleInfo::new(HandleType::DirectoryRequest, 0).as_raw(),
@@ -255,7 +255,7 @@ mod tests {
                 id: HandleInfo::new(HandleType::LdsvcLoader, 0).as_raw(),
             },
         ];
-        launcher.add_handles(&mut handles.iter_mut())?;
+        launcher.add_handles(handles)?;
 
         let launch_info = fproc::LaunchInfo {
             name: "process_builder_test_util".to_owned(),
@@ -333,11 +333,11 @@ mod tests {
             ServerEnd::new(dir_server),
         );
 
-        let mut name_infos = vec![fproc::NameInfo {
+        let name_infos = vec![fproc::NameInfo {
             path: "/dir".to_string(),
             directory: ClientEnd::new(dir_client),
         }];
-        launcher.add_names(&mut name_infos.iter_mut())?;
+        launcher.add_names(name_infos)?;
 
         let (status, process) = launcher.launch(&mut launch_info).await?;
         zx::Status::ok(status).context("Failed to launch test util process")?;

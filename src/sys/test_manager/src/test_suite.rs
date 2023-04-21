@@ -113,7 +113,7 @@ impl TestRunBuilder {
                 let next_chunk = event_chunks.next().await.unwrap_or_default();
                 diagnostics_ref.set_property("events", "idle");
                 let done = next_chunk.is_empty();
-                responder.send(&mut next_chunk.into_iter())?;
+                responder.send(next_chunk)?;
                 if done {
                     diagnostics_ref.set_flag("events_drained");
                     break;

@@ -250,7 +250,7 @@ impl Accessor {
                         chunk.push(iter.next().unwrap());
                     }
 
-                    responder.send(&mut chunk.iter_mut())?;
+                    responder.send(chunk)?;
                 }
                 Ok(())
             }

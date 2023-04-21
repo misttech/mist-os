@@ -228,7 +228,7 @@ mod tests {
             match request {
                 fcomponent::EventStreamRequest::GetNext { responder } => {
                     if let Some(event) = rx.next().await {
-                        responder.send(&mut vec![event].into_iter()).unwrap();
+                        responder.send(vec![event]).unwrap();
                     } else {
                         return;
                     }

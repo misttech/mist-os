@@ -364,7 +364,7 @@ impl LogReader for EventStreamLogReader {
             while let Some(Ok(request)) = event_stream.next().await {
                 match request {
                     fcomponent::EventStreamRequest::GetNext { responder } => {
-                        responder.send(&mut vec![rx.next().await.unwrap()].into_iter()).unwrap();
+                        responder.send(vec![rx.next().await.unwrap()]).unwrap();
                     }
                     fcomponent::EventStreamRequest::WaitForReady { responder } => {
                         responder.send().unwrap()

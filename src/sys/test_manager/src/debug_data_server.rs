@@ -236,7 +236,7 @@ pub(crate) async fn serve_iterator(
                 })
             })
             .collect::<Result<Vec<_>, Error>>()?;
-        let _ = responder.send(&mut debug_data.into_iter());
+        let _ = responder.send(debug_data);
     }
     Ok(())
 }

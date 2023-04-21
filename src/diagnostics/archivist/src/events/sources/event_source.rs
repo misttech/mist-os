@@ -154,7 +154,7 @@ pub mod tests {
                     match request {
                         fcomponent::EventStreamRequest::GetNext { responder } => {
                             if let Some(event) = receiver.next().await {
-                                responder.send(&mut vec![event].into_iter()).unwrap();
+                                responder.send(vec![event]).unwrap();
                             } else {
                                 break;
                             }

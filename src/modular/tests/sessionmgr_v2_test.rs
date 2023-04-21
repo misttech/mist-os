@@ -707,24 +707,21 @@ async fn test_v2_session_shell() -> Result<(), Error> {
     puppet_master.control_story("test_story", story_puppet_master_server_end)?;
 
     // Launch the test mod.
-    story_puppet_master.enqueue(
-        &mut vec![fmodular::StoryCommand::AddMod(fmodular::AddMod {
-            mod_name: vec![],
-            mod_name_transitional: Some("test_mod".to_string()),
-            surface_relation: fmodular::SurfaceRelation {
-                arrangement: fmodular::SurfaceArrangement::None,
-                dependency: fmodular::SurfaceDependency::None,
-                emphasis: 1.0,
-            },
-            surface_parent_mod_name: None,
-            intent: fmodular::Intent {
-                action: None,
-                handler: Some(TEST_MOD_URL.to_string()),
-                parameters: None,
-            },
-        })]
-        .iter_mut(),
-    )?;
+    story_puppet_master.enqueue(vec![fmodular::StoryCommand::AddMod(fmodular::AddMod {
+        mod_name: vec![],
+        mod_name_transitional: Some("test_mod".to_string()),
+        surface_relation: fmodular::SurfaceRelation {
+            arrangement: fmodular::SurfaceArrangement::None,
+            dependency: fmodular::SurfaceDependency::None,
+            emphasis: 1.0,
+        },
+        surface_parent_mod_name: None,
+        intent: fmodular::Intent {
+            action: None,
+            handler: Some(TEST_MOD_URL.to_string()),
+            parameters: None,
+        },
+    })])?;
     let execute_result = story_puppet_master.execute().await?;
     assert_eq!(fmodular::ExecuteStatus::Ok, execute_result.status);
 

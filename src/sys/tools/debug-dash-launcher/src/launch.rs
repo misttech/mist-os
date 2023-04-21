@@ -85,10 +85,10 @@ pub async fn launch_with_handles(
         fuchsia_runtime::job_default().create_child_job().map_err(|_| LauncherError::Internal)?;
 
     // Add handles for the current job, stdio, library loader and UTC time.
-    let mut handle_infos = create_handle_infos(&job, stdin, stdout, stderr)?;
+    let handle_infos = create_handle_infos(&job, stdin, stdout, stderr)?;
 
     // Add all the necessary entries into the dash namespace.
-    let mut name_infos = match ns_layout {
+    let name_infos = match ns_layout {
         fdash::DashNamespaceLayout::NestAllInstanceDirs => {
             // Add a custom `/svc` directory to dash that contains `fuchsia.process.Launcher` and
             // `fuchsia.process.Resolver`.
@@ -127,10 +127,8 @@ pub async fn launch_with_handles(
 
     // Spawn the dash process.
     let mut info = create_launch_info(process_name, &job).await?;
-    launcher.add_names(&mut name_infos.iter_mut()).map_err(|_| LauncherError::ProcessLauncher)?;
-    launcher
-        .add_handles(&mut handle_infos.iter_mut())
-        .map_err(|_| LauncherError::ProcessLauncher)?;
+    launcher.add_names(name_infos).map_err(|_| LauncherError::ProcessLauncher)?;
+    launcher.add_handles(handle_infos).map_err(|_| LauncherError::ProcessLauncher)?;
     launcher.add_args(&args).map_err(|_| LauncherError::ProcessLauncher)?;
     let path_envvar = trampoline::create_env_path(tools_path);
     let env_vars = &[path_envvar.into_bytes()];

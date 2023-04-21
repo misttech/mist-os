@@ -535,11 +535,11 @@ mod test {
                 match req {
                     ftest_manager::RunControllerRequest::GetEvents { responder, .. } => {
                         if events.is_none() {
-                            let _ = responder.send(&mut vec![].into_iter());
+                            let _ = responder.send(vec![]);
                             continue;
                         }
                         let events = events.take().unwrap();
-                        let _ = responder.send(&mut events.into_iter());
+                        let _ = responder.send(events);
                     }
                     _ => {
                         // ignore all other requests
@@ -840,7 +840,7 @@ mod test {
             while let Ok(Some(request)) = service.try_next().await {
                 match request {
                     ftest_manager::DebugDataIteratorRequest::GetNext { responder, .. } => {
-                        let _ = responder.send(&mut data.drain(0..));
+                        let _ = responder.send(std::mem::take(&mut data));
                     }
                 }
             }

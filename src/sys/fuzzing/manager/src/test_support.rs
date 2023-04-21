@@ -479,15 +479,14 @@ async fn serve_run_controller(
                         }
                     }
                     let run_events: Vec<RunEvent> = payloads
-                        .drain(..)
+                        .into_iter()
                         .map(|payload| RunEvent {
                             timestamp: Some(zx::Time::get_monotonic().into_nanos()),
                             payload: Some(payload),
                             ..RunEvent::EMPTY
                         })
                         .collect();
-                    let mut response = run_events.into_iter();
-                    match responder.send(&mut response) {
+                    match responder.send(run_events) {
                         Err(fidl::Error::ServerResponseWrite(status))
                             if killable && status == zx::Status::PEER_CLOSED =>
                         {

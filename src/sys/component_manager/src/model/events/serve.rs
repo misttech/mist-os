@@ -283,7 +283,7 @@ async fn try_handle_get_next_request(
 ) -> bool {
     let events = handle_get_next_request(event_stream, buffer).await;
     if let Some(events) = events {
-        responder.send(&mut events.into_iter()).is_ok()
+        responder.send(events).is_ok()
     } else {
         unreachable!("Internal: The event_stream internal channel should never be closed.");
     }

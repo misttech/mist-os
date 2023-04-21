@@ -126,8 +126,8 @@ impl DebugDataProcessor {
 
         let proxy = proxy_init_fn()?;
         proxy.set_directory(directory_proxy)?;
-        while let Some(mut chunk) = peekable_reciever.next().await {
-            proxy.add_debug_vmos(&mut chunk.iter_mut()).await?;
+        while let Some(chunk) = peekable_reciever.next().await {
+            proxy.add_debug_vmos(chunk).await?;
         }
         proxy.finish().await?;
 

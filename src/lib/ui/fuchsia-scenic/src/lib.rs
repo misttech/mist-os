@@ -70,12 +70,12 @@ impl Session {
         // there's no strict relationship between the number of commands
         // and the size of the serialized data.
         const CHUNK_SIZE: usize = 32;
-        for chunk in self.commands.chunks_mut(CHUNK_SIZE).into_iter() {
+        let mut iter = self.commands.drain(..);
+        while iter.len() != 0 {
             self.session
-                .enqueue(&mut chunk.into_iter())
+                .enqueue(iter.by_ref().take(CHUNK_SIZE).collect())
                 .expect("Session failed to enqueue commands");
         }
-        self.commands.truncate(0);
     }
 
     pub fn present(
@@ -85,8 +85,8 @@ impl Session {
         self.flush();
         self.session.present(
             presentation_time,
-            &mut self.acquire_fences.drain(..),
-            &mut self.release_fences.drain(..),
+            std::mem::take(&mut self.acquire_fences),
+            std::mem::take(&mut self.release_fences),
         )
     }
 
@@ -99,8 +99,8 @@ impl Session {
         let args = Present2Args {
             requested_presentation_time: Some(requested_presentation_time),
             requested_prediction_span: Some(requested_prediction_span),
-            acquire_fences: Some(self.acquire_fences.drain(..).collect()),
-            release_fences: Some(self.release_fences.drain(..).collect()),
+            acquire_fences: Some(std::mem::take(&mut self.acquire_fences)),
+            release_fences: Some(std::mem::take(&mut self.release_fences)),
             ..Present2Args::EMPTY
         };
         self.session.present2(args)

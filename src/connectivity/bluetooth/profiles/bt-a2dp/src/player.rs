@@ -86,7 +86,7 @@ impl AudioConsumerSink {
         let buffers_free = (0..buffers.len()).collect();
 
         audio_consumer.create_stream_sink(
-            &mut vmos_for_sink.into_iter(),
+            vmos_for_sink,
             &mut audio_stream_type,
             compression.as_ref(),
             stream_sink_server,

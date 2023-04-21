@@ -438,7 +438,7 @@ pub async fn configure_launcher(
     ]);
     config_args
         .launcher
-        .add_handles(&mut handle_infos.iter_mut())
+        .add_handles(handle_infos)
         .map_err(|e| LaunchError::AddHandles(e.to_string()))?;
 
     if !config_args.options.is_empty() {
@@ -470,10 +470,7 @@ pub async fn configure_launcher(
         );
         name_infos.push(fproc::NameInfo { path, directory });
     }
-    config_args
-        .launcher
-        .add_names(&mut name_infos.iter_mut())
-        .map_err(|e| LaunchError::AddNames(e.to_string()))?;
+    config_args.launcher.add_names(name_infos).map_err(|e| LaunchError::AddNames(e.to_string()))?;
 
     let name = truncate_str(config_args.name, zx::sys::ZX_MAX_NAME_LEN).to_owned();
 

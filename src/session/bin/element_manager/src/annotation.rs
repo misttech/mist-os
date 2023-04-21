@@ -542,11 +542,10 @@ mod tests {
         let holder = Arc::new(Mutex::new(AnnotationHolder::new()));
         let proxy = spawn_annotation_controller_handler(holder.clone());
         let _ = proxy.update_annotations(
-            &mut vec![felement::Annotation {
+            vec![felement::Annotation {
                 key: make_annotation_key("NAMESPACE", "id1"),
                 value: make_annotation_text("original1"),
-            }]
-            .iter_mut(),
+            }],
             &mut vec![].iter_mut(),
         );
         let annotations = proxy.watch_annotations().await?.unwrap();
@@ -567,11 +566,10 @@ mod tests {
         let annotations = proxy.watch_annotations();
         let update = fasync::Task::spawn(async move {
             let _ = proxy.update_annotations(
-                &mut vec![felement::Annotation {
+                vec![felement::Annotation {
                     key: make_annotation_key("NAMESPACE", "id1"),
                     value: make_annotation_text("original1"),
-                }]
-                .iter_mut(),
+                }],
                 &mut vec![].iter_mut(),
             );
         });
@@ -599,11 +597,10 @@ mod tests {
         let client2_annotations = client2_proxy.watch_annotations();
         let update = fasync::Task::spawn(async move {
             let _ = client1_proxy.update_annotations(
-                &mut vec![felement::Annotation {
+                vec![felement::Annotation {
                     key: make_annotation_key("NAMESPACE", "id1"),
                     value: make_annotation_text("original1"),
-                }]
-                .iter_mut(),
+                }],
                 &mut vec![].iter_mut(),
             );
         });
@@ -840,7 +837,7 @@ mod tests {
         .unwrap();
 
         let _ = proxy.update_annotations(
-            &mut vec![
+            vec![
                 felement::Annotation {
                     key: make_annotation_key(NAMESPACE, ID1),
                     value: make_annotation_text("original1"),
@@ -849,18 +846,15 @@ mod tests {
                     key: make_annotation_key(NAMESPACE, ID2),
                     value: make_annotation_text("original2"),
                 },
-            ]
-            .iter_mut(),
+            ],
             &mut vec![].iter_mut(),
         );
 
         let annotations = proxy.get_annotations().await?.unwrap();
         assert_eq!(annotations.len(), 2);
 
-        let _ = proxy.update_annotations(
-            &mut vec![].iter_mut(),
-            &mut vec![make_annotation_key(NAMESPACE, ID1)].iter_mut(),
-        );
+        let _ = proxy
+            .update_annotations(vec![], &mut vec![make_annotation_key(NAMESPACE, ID1)].iter_mut());
 
         let annotations = proxy.get_annotations().await?.unwrap();
         assert_eq!(annotations.len(), 1);
