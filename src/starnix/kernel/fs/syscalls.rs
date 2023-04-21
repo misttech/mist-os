@@ -1522,18 +1522,16 @@ pub fn sys_timerfd_settime(
     Ok(())
 }
 
-pub fn sys_pselect6(
+fn select(
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    timeout_addr: UserRef<timespec>,
+    deadline: zx::Time,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
     const BITS_PER_BYTE: usize = 8;
-
-    let start_time = zx::Time::get_monotonic();
 
     fn sizeof<T>(_: &T) -> usize {
         BITS_PER_BYTE * std::mem::size_of::<T>()
@@ -1560,13 +1558,6 @@ pub fn sys_pselect6(
     if nfds as usize >= BITS_PER_BYTE * std::mem::size_of::<__kernel_fd_set>() {
         return error!(EINVAL);
     }
-
-    let deadline = if timeout_addr.is_null() {
-        zx::Time::INFINITE
-    } else {
-        let timespec = current_task.mm.read_object(timeout_addr)?;
-        start_time + duration_from_timespec(timespec)?
-    };
 
     let read_events = POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR;
     let write_events = POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR;
@@ -1642,11 +1633,80 @@ pub fn sys_pselect6(
     write_fd_set(readfds_addr, readfds)?;
     write_fd_set(writefds_addr, writefds)?;
     write_fd_set(exceptfds_addr, exceptfds)?;
+    Ok(num_fds)
+}
+
+pub fn sys_pselect6(
+    current_task: &mut CurrentTask,
+    nfds: u32,
+    readfds_addr: UserRef<__kernel_fd_set>,
+    writefds_addr: UserRef<__kernel_fd_set>,
+    exceptfds_addr: UserRef<__kernel_fd_set>,
+    timeout_addr: UserRef<timespec>,
+    sigmask_addr: UserRef<pselect6_sigmask>,
+) -> Result<i32, Errno> {
+    let start_time = zx::Time::get_monotonic();
+
+    let deadline = if timeout_addr.is_null() {
+        zx::Time::INFINITE
+    } else {
+        let timespec = current_task.mm.read_object(timeout_addr)?;
+        start_time + duration_from_timespec(timespec)?
+    };
+
+    let num_fds = select(
+        current_task,
+        nfds,
+        readfds_addr,
+        writefds_addr,
+        exceptfds_addr,
+        deadline,
+        sigmask_addr,
+    )?;
+
     if !timeout_addr.is_null() {
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task.mm.write_object(timeout_addr, &timespec_from_duration(remaining))?;
     }
+
+    Ok(num_fds)
+}
+
+#[cfg(target_arch = "x86_64")]
+pub fn sys_select(
+    current_task: &mut CurrentTask,
+    nfds: u32,
+    readfds_addr: UserRef<__kernel_fd_set>,
+    writefds_addr: UserRef<__kernel_fd_set>,
+    exceptfds_addr: UserRef<__kernel_fd_set>,
+    timeout_addr: UserRef<timeval>,
+) -> Result<i32, Errno> {
+    let start_time = zx::Time::get_monotonic();
+
+    let deadline = if timeout_addr.is_null() {
+        zx::Time::INFINITE
+    } else {
+        let timeval = current_task.mm.read_object(timeout_addr)?;
+        start_time + duration_from_timeval(timeval)?
+    };
+
+    let num_fds = select(
+        current_task,
+        nfds,
+        readfds_addr,
+        writefds_addr,
+        exceptfds_addr,
+        deadline,
+        UserRef::<pselect6_sigmask>::default(),
+    )?;
+
+    if !timeout_addr.is_null() {
+        let now = zx::Time::get_monotonic();
+        let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
+        current_task.mm.write_object(timeout_addr, &timeval_from_duration(remaining))?;
+    }
+
     Ok(num_fds)
 }
 

@@ -215,6 +215,7 @@ pub fn dispatch_syscall(
         sched_setscheduler[3],
         sched_yield[0],
         seccomp[3],
+        #[cfg(target_arch = "x86_64")] select[5],
         sendmmsg[4],
         sendmsg[3],
         sendto[6],
