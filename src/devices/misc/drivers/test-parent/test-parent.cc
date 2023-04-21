@@ -31,9 +31,8 @@ class TestParent : public TestParentType {
 
 zx_status_t TestParent::Create(zx_device_t* parent) {
   auto test_parent = std::make_unique<TestParent>(parent);
-  zx_status_t status = test_parent->DdkAdd(ddk::DeviceAddArgs("test")
-                                               .set_proto_id(ZX_PROTOCOL_TEST_PARENT)
-                                               .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
+  zx_status_t status =
+      test_parent->DdkAdd(ddk::DeviceAddArgs("test").set_proto_id(ZX_PROTOCOL_TEST_PARENT));
   if (status != ZX_OK) {
     return status;
   }
