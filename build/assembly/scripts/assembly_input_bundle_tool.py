@@ -159,10 +159,31 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
     for package_def in _compiled_packages:
         # Differentiate entries by field names
         if "component_shards" in package_def:
+            # Transform from the GN format to the internal format
+            shards = {}
+            for definition in package_def['component_shards']:
+                if definition['component_name'] in shards:
+                    raise ValueError(
+                        f"Unexpected repeated component name: {definition['component_name']}"
+                    )
+
+                shards[definition['component_name']] = definition['shards']
+            package_def['component_shards'] = shards
+
             aib_creator.compiled_package_shards.append(
                 instance_from_dict(
                     CompiledPackageAdditionalShards, package_def))
         else:
+            shards = {}
+            for definition in package_def['components']:
+                if definition['component_name'] in shards:
+                    raise ValueError(
+                        f"Unexpected repeated component name: {definition['component_name']}"
+                    )
+
+                shards[definition['component_name']] = definition['shards']
+            package_def['components'] = shards
+
             main_def = instance_from_dict(
                 CompiledPackageMainDefinition, package_def)
             aib_creator.compiled_packages.append(main_def)
