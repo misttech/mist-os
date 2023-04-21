@@ -4,6 +4,7 @@
 
 """Rule for running size checker on given package."""
 
+load(":providers.bzl", "FuchsiaProductImageInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 def _fuchsia_package_size_check_impl(ctx):
@@ -37,12 +38,12 @@ def _fuchsia_package_size_check_impl(ctx):
     ]
 
     # We only need blobs configuration for blobfs case.
-    if ctx.file.blobs_config_file:
-        blobs_config_file = ctx.file.blobs_config_file
-        inputs.append(blobs_config_file)
+    if ctx.attr.product_image:
+        images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
+        inputs += ctx.files.product_image
         ffx_invocation += [
             "--blob-sizes",
-            blobs_config_file.path,
+            images_out.path + "/blobs.json",
         ]
 
     script_lines = [
@@ -71,9 +72,9 @@ fuchsia_package_size_check = rule(
             allow_single_file = True,
             mandatory = True,
         ),
-        "blobs_config_file": attr.label(
-            doc = "Blobs config file containing sizes of blobs",
-            allow_single_file = True,
+        "product_image": attr.label(
+            doc = "fuchsia_product_image target to check size",
+            providers = [FuchsiaProductImageInfo],
         ),
     },
 )
