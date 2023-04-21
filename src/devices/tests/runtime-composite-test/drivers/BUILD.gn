@@ -50,10 +50,10 @@ fuchsia_driver("root-driver") {
 }
 
 fuchsia_driver_component("root") {
+  manifest = "meta/root-driver.cml"
   component_name = "root-driver"
   deps = [ ":root-driver" ]
   info = "root-driver-info.json"
-  colocate = true
 }
 
 driver_bind_rules("leaf-driver-bind") {
