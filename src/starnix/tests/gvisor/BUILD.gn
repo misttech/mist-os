@@ -10,7 +10,10 @@ import("//src/starnix/kernel/starnix.gni")
 group("tests") {
   testonly = true
   if (target_cpu == "x64" && !is_asan) {
-    deps = [ ":starnix_gvisor_tests" ]
+    deps = [
+      ":starnix_gvisor_tests",
+      ":starnix_gvisor_tests_on_fxfs",
+    ]
   }
 }
 
@@ -290,17 +293,15 @@ group("container_resources") {
 template("gvisor_test_component") {
   test_name = target_name
 
-  resource("${test_name}_bin") {
-    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
-    outputs = [ "data/tests/${test_name}" ]
-  }
-
   _storage_shard = "meta/gvisor_use_tmp_storage.shard.cml"
+  _manifest_label = "${test_name}.cml"
+  component_name = target_name
   if (defined(invoker.use_persistent_storage) &&
       invoker.use_persistent_storage) {
     _storage_shard = "meta/gvisor_use_persistent_storage.shard.cml"
+    _manifest_label = "${test_name}_use_persistent_storage.cml"
+    component_name = "${target_name}_use_persistent_storage"
   }
-  _manifest_label = "${test_name}.cml"
   cmc_merge(_manifest_label) {
     sources = [
       "meta/${test_name}.cml",
@@ -310,7 +311,7 @@ template("gvisor_test_component") {
   _outputs = get_target_outputs(":${_manifest_label}")
   _manifest_file = _outputs[0]
 
-  fuchsia_test_component(target_name) {
+  fuchsia_test_component(component_name) {
     forward_variables_from(invoker, "*")
 
     testonly = true
@@ -336,36 +337,64 @@ template("gvisor_test_component") {
   }
 }
 
+# gVisor tests currently run either on tmpfs (default) or Fxfs. This will create
+# two versions of the test components for testing.
 foreach(test_name, gvisor_tests) {
+  resource("${test_name}_bin") {
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
+    outputs = [ "data/tests/${test_name}" ]
+  }
   gvisor_test_component(test_name) {
     use_expectations = true
     use_persistent_storage = false
   }
+  gvisor_test_component(test_name) {
+    use_expectations = true
+    use_persistent_storage = true
+  }
 }
 
 foreach(benchmark_name, gvisor_benchmarks) {
+  resource("${benchmark_name}_bin") {
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${benchmark_name}" ]
+    outputs = [ "data/tests/${benchmark_name}" ]
+  }
   gvisor_test_component(benchmark_name) {
   }
 }
 
-fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
-  deps = [ ":container_resources" ]
+template("gvisor_with_expectations_test_package") {
+  fuchsia_test_with_expectations_package(target_name) {
+    deps = [ ":container_resources" ]
 
-  if (target_cpu == "x64") {
-    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+    if (target_cpu == "x64") {
+      subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+    }
+
+    forward_variables_from(invoker, [ "test_components" ])
+
+    expectations = invoker.expectations
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+    }
   }
+}
 
+gvisor_with_expectations_test_package("starnix_gvisor_tests") {
+  expectations = "expectations/default.json5"
   test_components = []
-
   foreach(test_name, gvisor_tests) {
     test_components += [ ":${test_name}" ]
   }
+}
 
-  expectations = "expectations/default.json5"
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
+gvisor_with_expectations_test_package("starnix_gvisor_tests_on_fxfs") {
+  expectations = "expectations/using_fxfs_test.json5"
+  test_components = []
+  foreach(test_name, gvisor_tests) {
+    test_components += [ ":${test_name}_use_persistent_storage" ]
   }
 }
 

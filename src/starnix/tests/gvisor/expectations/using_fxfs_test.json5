@@ -1,0 +1,910 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        // Import the default behaviour (gVisor tests running on tmpfs)
+        {
+            include: "default.json5",
+        },
+
+        // Define tests that failed when running on Fxfs
+        {
+            type: "expect_failure",
+            matchers: [
+                // access_test
+                "AccessTest.RelativeFile",
+                "AccessTest.RelativeDir",
+                "AccessTest.AbsFile",
+                "AccessTest.AbsDir",
+                "AccessTest.RelDoesNotExist",
+                "AccessTest.AbsDoesNotExist",
+                "AccessTest.InvalidMode",
+                "AccessTest.NoPerms",
+                "AccessTest.InvalidName",
+                "AccessTest.UsrReadOnly",
+                "AccessTest.UsrReadExec",
+                "AccessTest.UsrReadWrite",
+                "AccessTest.UsrReadWriteExec",
+                "FaccessatTest.SymlinkFollowed",
+                "Faccessat2Test.SymlinkFollowedByDefault",
+                "Faccessat2Test.SymlinkNofollow",
+
+                // chdir_test
+                "ChdirTest.Success",
+                "ChdirTest.PermissionDenied",
+
+                // chmod_test
+                "ChmodTest.ChmodFileSucceeds",
+                "ChmodTest.ChmodDirSucceeds",
+                "ChmodTest.FchmodDirSucceeds",
+                "ChmodTest.FchmodDirWithOpath",
+                "ChmodTest.FchmodatDirAbsolutePath",
+                "ChmodTest.FchmodatDir",
+                "ChmodTest.FchmodDowngradeWritability",
+
+                // chown_test
+                "ChownTest.FchownDirWithOpath",
+                "ChownTest.FchownatWithOpath",
+                "ChownTest.FchownatEmptyPath",
+
+                // chroot_test
+                "ChrootTest.ProcFdLinkResolutionInChroot",
+                "ChrootTest.DotDotFromOpenFD",
+                "ChrootTest.CreatesNewRoot",
+                "ChrootTest.WithoutCapability",
+                "ChrootTest.PermissionDenied",
+
+                // creat_test
+                "CreatTest.CreatTruncatesExistingFile",
+
+                // exec_test
+                "ExecTest.ExecFn",
+                "ExecTest.ExecNameScript",
+                "ExecTest.InterpreterScriptArgNUL",
+                "ExecTest.InterpreterScriptArgSplit",
+                "ExecTest.InterpreterScriptArgWhitespace",
+                "ExecTest.InterpreterScriptArgvZero",
+                "ExecTest.InterpreterScriptArgvZeroAdded",
+                "ExecTest.InterpreterScriptArgvZeroRelative",
+                "ExecTest.InterpreterScriptTrailingWhitespace",
+                "ExecTest.SymlinkLimitExceeded",
+                "ExecTest.SymlinkLimitRefreshedForInterpreter",
+                "ExecveatTest.SymlinkNoFollowAndEmptyPath",
+                "ExecveatTest.SymlinkNoFollowWithAbsolutePath",
+                "ExecveatTest.SymlinkNoFollowWithRelativePath",
+
+                // exec_binary_test
+                "ElfTest.MissingHeader",
+                "ElfTest.OutOfBoundsPhdrs",
+                "ExecveTest.BinaryAsDirectory",
+
+                // fallocate_test
+                "AllocateTest.Fallocate",
+                "AllocateTest.FallocateChar",
+                "AllocateTest.FallocateInvalid",
+                "AllocateTest.FallocateOtherFDs",
+                "AllocateTest.FallocatePipe",
+                "AllocateTest.FallocateReadonly",
+                "AllocateTest.FallocateWithOpath",
+
+                // fchdir_test
+                "FchdirTest.FchdirWithOpath",
+                "FchdirTest.PermissionDenied",
+                "FchdirTest.Success",
+
+                // fcntl_test
+                "FcntlLockTest.SetLockAcrossRename",
+                "FcntlLockTest.SetLockDir",
+                "FcntlLockTest.SetLockSymlink",
+                "FcntlTest.GetOpathFlag",
+
+                // fifo_test
+                "FifoTest.Fifo",
+                "FifoTest.FifoOpenRDWR",
+                "FifoTest.FifoOtrunc",
+                "FifoTest.FifoTruncNoOp",
+                "FifoTest.MknodAtFIFO",
+
+                // flock_test
+                "FlockTest.BlockingLockFirstExclusiveSecondExclusive",
+                "FlockTest.BlockingLockFirstExclusiveSecondShared",
+                "FlockTest.BlockingLockFirstSharedSecondExclusive",
+                "FlockTest.BlockingLockNoBlockingForSharedLocks",
+                "FlockTest.InvalidOpCombinations",
+                "FlockTest.NoOperationSpecified",
+                "FlockTest.TestDupFdCloseRelease",
+                "FlockTest.TestDupFdDowngrade",
+                "FlockTest.TestDupFdFollowedByLock",
+                "FlockTest.TestDupFdUnlockRelease",
+                "FlockTest.TestDupFdUpgrade",
+                "FlockTest.TestExclusiveLockFailExclusiveHolderNonblocking",
+                "FlockTest.TestLockableAnyMode",
+                "FlockTest.TestMultipleHolderSharedExclusive",
+                "FlockTest.TestMultipleHolderSharedExclusiveDowngrade",
+                "FlockTest.TestMultipleHolderSharedExclusiveUpgrade",
+                "FlockTest.TestMultipleShared",
+                "FlockTest.TestRepeatedExLockingBySameHolder",
+                "FlockTest.TestRepeatedExLockingSingleUnlock",
+                "FlockTest.TestRepeatedShLockingBySameHolder",
+                "FlockTest.TestSharedLockFailExclusiveHolderNonblocking",
+                "FlockTest.TestSimpleExLock",
+                "FlockTest.TestSimpleShLock",
+                "FlockTest.TestSingleHolderDowngrade",
+                "FlockTest.TestSingleHolderUpgrade",
+                "FlockTest.TestUnlockWithNoHolders",
+                "FlockTestNoFixture.FlockDir",
+                "FlockTestNoFixture.FlockSymlink",
+
+                // fsync_test
+                "FsyncTest.TempDirSucceeds",
+                "FsyncTest.TempFileSucceeds",
+
+                // futex_test
+                "SharedFutexTest.WakeInterprocessFile",
+
+                // getdents_test
+                "GetdentsTest/*.Issue128ProcSeekEnd",
+                "GetdentsTest/*.LargeDir",
+                "GetdentsTest/*.NotDir",
+                "GetdentsTest/*.OpathDirectory",
+                "GetdentsTest/*.OpathFile",
+                "GetdentsTest/*.PartialBuffer",
+                "GetdentsTest/*.ProcSelfFd",
+                "GetdentsTest/*.SeekResetsCursor",
+                "GetdentsTest/*.SmallDir",
+                "GetdentsTest/*.VerifyEntries",
+                "GetdentsTest/*.VerifyPadding",
+                "GetdentsTest/*.ZeroLengthOutBuffer",
+                "ReaddirTest.GoneAfterRemoveCache",
+                "ReaddirTest.GoneAfterRenameCache",
+
+                // inotify_test
+                "Inotify.CanDeleteFileAfterRemovingWatch",
+                "Inotify.ClosingInotifyFdWithoutRemovingWatchesWorks",
+                "Inotify.ConcurrentFileDeletionAndWatchRemoval",
+                "InotifyTest.AddRemoveUnlinkDoNotDeadlock",
+                "InotifyTest.InotifyAndTargetDestructionDoNotDeadlock",
+                "InotifyTest.NotifyNoDeadlock",
+
+                // link_test
+                "LinkTest.AbsPathsNonDirFDsWithOpath",
+                "LinkTest.AbsPathsWithNonDirFDs",
+                "LinkTest.CanCreateLinkFile",
+                "LinkTest.CannotLinkDirectory",
+                "LinkTest.LinkDoesNotFollowSymlinks",
+                "LinkTest.LinkatDoesNotFollowSymlinkByDefault",
+                "LinkTest.LinkatWithSymlinkFollow",
+                "LinkTest.NewDirFDWithOpath",
+                "LinkTest.WithNewDirFD",
+                "LinkTest.WithOldDirFD",
+
+                // lseek_test
+                "LseekTest.Cur",
+                "LseekTest.End",
+                "LseekTest.InvalidWhence",
+                "LseekTest.NegativeOffset",
+                "LseekTest.Overflow",
+                "LseekTest.Set",
+
+                // madvise_test
+                "MadviseDontneedTest.DoesNotModifySharedFilePage",
+
+                // mkdir_test
+                "MkdirTest.CanCreateWritableDir",
+                "MkdirTest.DirAlreadyExists",
+                "MkdirTest.FailsOnDirWithoutWritePerms",
+                "MkdirTest.HonorsUmask",
+                "MkdirTest.HonorsUmask2",
+                "MkdirTest.MkdirAtEmptyPath",
+                "MkdirTest.TrailingSlash",
+
+                // mknod_test
+                "MknodTest.MknodAtEmptyPath",
+                "MknodTest.MknodAtFIFO",
+                "MknodTest.MknodOnExistingPathFails",
+                "MknodTest.RegularFilePermissions",
+                "MknodTest.Socket",
+
+                // mount_test
+                "MountTest.MountBadFilesystem",
+                "MountTest.MountNoAtime",
+                "MountTest.MountOverBusy",
+                "MountTest.MountPermDenied",
+                "MountTest.MountTmpfs",
+                "MountTest.MultiplePropagationFlagsFails",
+                "MountTest.NullData",
+                "MountTest.RenameRemoveMountPoint",
+                "MountTest.SimpleBind",
+                "MountTest.TmpfsSizeFtruncate",
+                "MountTest.TmpfsUnlinkRegularFileAllocCheck",
+                "MountTest.UmountDetach",
+                "MountTest.UmountMountsStackedOnDot",
+                "MountTest.UmountNoFollow",
+                "MountTest.UmountPermDenied",
+
+                // mremap_test
+                "MremapTest.ExpansionPreservesCOWPagesAndExposesNewFilePages",
+
+                // open_create_test
+                "CreateTest.ChmodReadToWriteBetweenOpens",
+                "CreateTest.ChmodWriteToReadBetweenOpens",
+                "CreateTest.CreatDirWithOTruncAndReadOnly",
+                "CreateTest.CreatFileWithOTruncAndReadOnly",
+                "CreateTest.CreatWithOTrunc",
+                "CreateTest.CreateAtFile",
+                "CreateTest.CreateExclusively",
+                "CreateTest.CreateFailsOnDirWithoutWritePerms",
+                "CreateTest.CreateWithReadFlagNotAllowedByMode",
+                "CreateTest.CreateWithWriteFlagNotAllowedByMode",
+                "CreateTest.ExistingFile",
+                "CreateTest.HonorsUmask",
+                "CreateTest.TmpFile",
+
+                // open_test
+                "OpenTest.AbsPath",
+                "OpenTest.AppendConcurrentWrite",
+                "OpenTest.AppendOnly",
+                "OpenTest.AtAbsPath",
+                "OpenTest.AtRelPath",
+                "OpenTest.CanTruncateReadOnly",
+                "OpenTest.CanTruncateReadOnlyNoWritePermission",
+                "OpenTest.CanTruncateWithStrangePermissions",
+                "OpenTest.CanTruncateWriteOnlyNoReadPermission",
+                "OpenTest.CreateWithAppend",
+                "OpenTest.DirectoryWritableFails",
+                "OpenTest.DotsFromRoot",
+                "OpenTest.Fault",
+                "OpenTest.FileNotDirectory",
+                "OpenTest.MustCreateExisting",
+                "OpenTest.NameTooLong",
+                "OpenTest.Null",
+                "OpenTest.OCreateDirectory",
+                "OpenTest.OPathWithODirectory",
+                "OpenTest.OTrunc",
+                "OpenTest.OTruncAndReadOnlyDir",
+                "OpenTest.OTruncAndReadOnlyFile",
+                "OpenTest.OpenNoFollowStillFollowsLinksInPath",
+                "OpenTest.OpenNoFollowSymlink",
+                "OpenTest.OpenNonDirectoryWithTrailingSlash",
+                "OpenTest.OpenWithOpath",
+                "OpenTest.OpenWithStrangeFlags",
+                "OpenTest.ReadOnly",
+                "OpenTest.ReadWrite",
+                "OpenTest.RelPath",
+                "OpenTest.SymlinkDirectory",
+                "OpenTest.SymlinkRecurse",
+                "OpenTest.Truncate",
+                "OpenTest.WriteOnly",
+
+                // read_test
+                "ReadTest.PartialReadSIGSEGV",
+
+                // readv_test
+                "ReadvTest.BadFileDescriptor",
+                "ReadvTest.BadIovecBase_File",
+                "ReadvTest.BadIovecBase_Pipe",
+                "ReadvTest.BadIovecsPointer_File",
+                "ReadvTest.BadIovecsPointer_Pipe",
+                "ReadvTest.DirNotReadable",
+                "ReadvTest.EndOfFile",
+                "ReadvTest.IovecOutsideTaskAddressRangeInNonemptyArray",
+                "ReadvTest.NotReadable_File",
+                "ReadvTest.NotReadable_Pipe",
+                "ReadvTest.NullIovecInNonemptyArray",
+                "ReadvTest.OffsetIncremented",
+                "ReadvTest.ReadAllOneBuffer_File",
+                "ReadvTest.ReadAllOneBuffer_Pipe",
+                "ReadvTest.ReadAllOneLargeBuffer_File",
+                "ReadvTest.ReadAllOneLargeBuffer_Pipe",
+                "ReadvTest.ReadBuffersDiscontinuous_File",
+                "ReadvTest.ReadBuffersDiscontinuous_Pipe",
+                "ReadvTest.ReadBuffersOverlapping_File",
+                "ReadvTest.ReadBuffersOverlapping_Pipe",
+                "ReadvTest.ReadIovecsCompletelyFilled_File",
+                "ReadvTest.ReadIovecsCompletelyFilled_Pipe",
+                "ReadvTest.ReadOneBufferPerByte_File",
+                "ReadvTest.ReadOneBufferPerByte_Pipe",
+                "ReadvTest.ReadOneHalfAtATime_File",
+                "ReadvTest.ReadOneHalfAtATime_Pipe",
+                "ReadvTest.ReadvWithOpath",
+                "ReadvTest.WouldBlock_Pipe",
+                "ReadvTest.ZeroBuffer",
+                "ReadvTest.ZeroIovecs_File",
+                "ReadvTest.ZeroIovecs_Pipe",
+
+                // rename_test
+                "RenameTest.DirectoryDoesNotOverwriteFile",
+                "RenameTest.DirectoryDoesNotOverwriteNonemptyDirectory",
+                "RenameTest.DirectoryOverwritesDirectoryLinkCount",
+                "RenameTest.DirectoryOverwritesEmptyDirectory",
+                "RenameTest.DirectoryToChildDirectory",
+                "RenameTest.DirectoryToOwnChildDirectory",
+                "RenameTest.DirectoryToParentDirectory",
+                "RenameTest.DirectoryToSameDirectory",
+                "RenameTest.DirectoryToSelf",
+                "RenameTest.DirectoryWithOpenFdOverwritesEmptyDirectory",
+                "RenameTest.FailsWhenNewParentNotWritable",
+                "RenameTest.FailsWhenOldParentNotWritable",
+                "RenameTest.FailsWithDots",
+                "RenameTest.FileDoesNotExist",
+                "RenameTest.FileDoesNotExistWhenNewParentNotExecutable",
+                "RenameTest.FileDoesNotOverwriteDirectory",
+                "RenameTest.FileOverwritesFile",
+                "RenameTest.FileToChildDirectory",
+                "RenameTest.FileToParentDirectory",
+                "RenameTest.FileToSameDirectory",
+                "RenameTest.FileWithOpenFd",
+                "RenameTest.OverwriteFailsWhenNewParentNotWritable",
+                "RenameTest.PathEndingWithDots",
+                "RenameTest.RenameAfterWritableFDAndChmod",
+                "RenameTest.SourceIsAncestorOfTarget",
+                "RenameTest.TargetIsAncestorOfSource",
+                "Renameat2Test.NoReplaceDot",
+
+                // sendfile_socket_test
+                "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/*",
+
+                // socket_filesystem_non_blocking_test
+                "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.ReadNothingAvailable/*",
+                "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.RecvMsgNothingAvailable/*",
+                "NonBlockingFilesystemUnixSockets/NonBlockingSocketPairTest.RecvNothingAvailable/*",
+
+                // socket_filesystem_test
+                //
+                // Note, since expectations are processed from top to bottom,
+                // we have to be careful of collisions where tests are defined
+                // with a different expectation in the imported file.
+                //
+                // For example,
+                // "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
+                // is defined as type: "skip" in the default.json5 file.
+                // So if we defined "FilesystemUnixSockets/AllSocketPairTest.*/*"
+                // here as type: "expect_failure", the initial tests will the
+                // latter type. To avoid this, we can be more explicit with
+                // the file names.
+                "FilesystemUnixSockets/AllSocketPairTest.BasicReadWrite/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicReadWriteBadBuffer/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicRecvmmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicSendmmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.BasicSendRecv/*",
+                "FilesystemUnixSockets/AllSocketPairTest.LingerSocketOption/*",
+                "FilesystemUnixSockets/AllSocketPairTest.KeepAliveSocketOption/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSndBufSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSocketRcvbufOption/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSockoptDomain/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSockoptType/*",
+                "FilesystemUnixSockets/AllSocketPairTest.GetSockoptProtocol/*",
+                "FilesystemUnixSockets/AllSocketPairTest.MsgPeek/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RcvBufSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RcvufSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetSendDefault/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetSendTimeout/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetSendTimeoutLargerArg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetRecvTimeout/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetGetRecvTimeoutLargerArg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutDefault/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgMsghdrFlagsNotClearedOnFailure/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmsgIovNotUpdated/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutReadSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvOneSecondSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvmsgSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutDefault/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutAllowsWrite/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutAllowsSend/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutAllowsSendmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutUsecTooLarge/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SendTimeoutUsecNeg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutNegSecRead/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutNegSecRecv/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutNegSecRecvmsg/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutWaitAll/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvWaitAll/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvWaitAllDontWait/*",
+                "FilesystemUnixSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BadFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicCredPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassNoSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassNoSpaceMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassNotEnoughSpaceMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassUnalignedRecv/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicFDPassUnalignedRecvNoMsgTrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicThreeFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicThreeFDPassTruncationMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicTwoFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.BasicTwoFDPassUnalignedRecvTruncationMsgTrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CloexecRecvFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CloexecDroppedWhenFDPassed/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredAndFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassNoMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassNoSpaceMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassTruncated/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.CredPassTruncatedMsgCtrunc/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.ConcurrentBasicFDPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCredWithoutCredHeaderSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCredWithoutCredSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassBeforeSoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassInterspersed1/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassInterspersed2/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassNoRecv/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassNotCoalesced/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassPeek/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.FDPassAfterSoPassCredWithoutCredHeaderSpace/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.MsgCtruncInputIsNoop/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.NoDataCredPass/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.NoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsAfterSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsAfterSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.SoPassCred/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.ShortCmsg/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteAfterSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteAfterSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsAfterSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsAfterSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsBeforeSoPassCredRecvEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairCmsgTest.WriteNullCredsBeforeSoPassCredSendEnd/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.InvalidGetSockOpt/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.RecvmmsgTimeoutAfterRecv/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.TIOCINQSucceeds/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.TIOCOUTQSucceeds/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.Shutdown/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.ShutdownRead/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.ShutdownWrite/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.SocketReopenFromProcfs/*",
+                "FilesystemUnixSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
+
+                // socket_test
+                "SocketTest.UnixSocketStat",
+                "OpenModes/SocketOpenTest.Unix/*",
+
+                // socket_unix_unbound_filesystem_test
+                "AllUnixDomainSockets/UnboundFilesystemUnixSocketPairTest.*/*",
+
+                // splice_test
+                "SpliceTest.TwoRegularFiles",
+
+                // stat_test
+                "StatTest.BlocksIncreaseOnWrite",
+                "StatTest.ChildOfNonDir",
+                "StatTest.FstatDirWithOpath",
+                "StatTest.FstatFileWithOpath",
+                "StatTest.FstatatAbs",
+                "StatTest.FstatatDirWithOpath",
+                "StatTest.FstatatEmptyPath",
+                "StatTest.FstatatRel",
+                "StatTest.FstatatSymlink",
+                "StatTest.FstatatSymlinkDir",
+                "StatTest.FstatatSymlinkDirWithTrailingSlash",
+                "StatTest.FstatatSymlinkDirWithTrailingSlashSameInode",
+                "StatTest.LeadingDoubleSlash",
+                "StatTest.LinkCountsWithDirChild",
+                "StatTest.LinkCountsWithRegularFileChild",
+                "StatTest.LstatELOOPPath",
+                "StatTest.LstatSymlinkDir",
+                "StatTest.Nlinks",
+                "StatTest.PathCanContainDotDot",
+                "StatTest.PathCanContainEmptyComponent",
+                "StatTest.PathNotCleaned",
+                "StatTest.StatDoesntChangeAfterRename",
+                "StatTest.StatxAbsPath",
+                "StatTest.StatxDoesNotRejectExtraneousMaskBits",
+                "StatTest.StatxEmptyPath",
+                "StatTest.StatxInvalidFlags",
+                "StatTest.StatxRejectsReservedMaskBit",
+                "StatTest.StatxRelPathCwd",
+                "StatTest.StatxRelPathDirFD",
+                "StatTest.StatxSymlink",
+                "StatTest.TrailingSlashNotCleanedReturnsENOTDIR",
+                "StatTest.ZeroLinksOpenFdRegularFileChild_NoSave",
+
+                // stat_times_test
+                "StatTimesTest.DirCreateDir",
+                "StatTimesTest.DirCreateFile",
+                "StatTimesTest.DirList",
+                "StatTimesTest.DirRemoveFile",
+                "StatTimesTest.FileRename",
+                "StatTimesTest.FileRenameOpenFD",
+
+                // sticky_test
+                "StickyTest.StickyBitCapFOWNER",
+                "StickyTest.StickyBitSameUID",
+
+                // sync_file_range_test
+                "SyncFileRangeTest.CannotSyncFileRangeWithWaitBefore",
+
+                // truncate_test
+                "FixtureTruncateTest.Ftruncate",
+                "FixtureTruncateTest.FtruncateShrinkGrow",
+                "FixtureTruncateTest.Truncate",
+                "TruncateTest.FtruncateDir",
+                "TruncateTest.TruncateDir",
+
+                // unlink_test
+                "RmdirTest.CanRemoveWithTrailingSlashes",
+                "RmdirTest.CannotRemoveDots",
+                "UnlinkTest.AbsTmpFile",
+                "UnlinkTest.AtBad",
+                "UnlinkTest.AtDir",
+                "UnlinkTest.AtDirDegradedPermissions",
+                "UnlinkTest.AtFile",
+                "UnlinkTest.DirNotEmpty",
+                "UnlinkTest.IsDir",
+                "UnlinkTest.OpenFile",
+                "UnlinkTest.ParentDegradedPermissions",
+                "UnlinkTest.Rmdir",
+                "UnlinkTest.UnlinkAtEmptyPath",
+
+                // write test
+                "WriteTest.PwriteNoChangeOffset",
+                "WriteTest.WriteIncrementOffset",
+                "WriteTest.WriteIncrementOffsetAppend",
+                "WriteTest.WriteIncrementOffsetEOF",
+                "WriteTest.WriteIncrementOffsetSeek",
+
+                // xattr_test
+                "XattrTest.GetXattr",
+                "XattrTest.GetXattrNonexistentName",
+                "XattrTest.GetXattrNullValue",
+                "XattrTest.GetXattrNullValueAndZeroSize",
+                "XattrTest.GetXattrSizeLargerThanValue",
+                "XattrTest.GetXattrSizeSmallerThanValue",
+                "XattrTest.GetXattrSizeTooLarge",
+                "XattrTest.GetXattrZeroSize",
+                "XattrTest.LXattrOnNonsymlink",
+                "XattrTest.LXattrOnSymlink",
+                "XattrTest.ListXattr",
+                "XattrTest.ListXattrNoXattrs",
+                "XattrTest.ListXattrNullBuffer",
+                "XattrTest.ListXattrSizeTooSmall",
+                "XattrTest.ListXattrZeroSize",
+                "XattrTest.RemoveXattr",
+                "XattrTest.RemoveXattrNonexistentName",
+                "XattrTest.SetXattrCreateFlag",
+                "XattrTest.SetXattrInvalidFlags",
+                "XattrTest.SetXattrNullValueAndNonzeroSize",
+                "XattrTest.SetXattrNullValueAndZeroSize",
+                "XattrTest.SetXattrReplaceFlag",
+                "XattrTest.SetXattrReplaceWithLarger",
+                "XattrTest.SetXattrReplaceWithSmaller",
+                "XattrTest.SetXattrSizeSmallerThanValue",
+                "XattrTest.SetXattrSizeTooLarge",
+                "XattrTest.SetXattrValueTooLargeButOKSize",
+                "XattrTest.SetXattrZeroSize",
+                "XattrTest.TrustedNamespaceWithCapSysAdmin",
+                "XattrTest.TrustedNamespaceWithoutCapSysAdmin",
+                "XattrTest.XattrEmptyName",
+                "XattrTest.XattrInvalidPrefix",
+                "XattrTest.XattrLargeName",
+                "XattrTest.XattrNonexistentFile",
+                "XattrTest.XattrNullName",
+                "XattrTest.XattrOnDirectory",
+                "XattrTest.XattrOnInvalidFileTypes",
+                "XattrTest.XattrOnSymlink",
+                "XattrTest.XattrReadOnly",
+                "XattrTest.XattrTrustedWithNonadmin",
+                "XattrTest.XattrWithFD",
+                "XattrTest.XattrWithOPath",
+                "XattrTest.XattrWriteOnly",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // These tests pass and fail in different cases
+                // Skip these tests for now until it can pass in all cases
+                "Pwrite64.Overflow",
+                "ExecTest.InterpreterScriptNoPath",
+                "AbstractUnixSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
+                "AllUnixDomainSockets/UnixSocketPairTest.SendFromMmapBeyondEof/*",
+                "Renameat2Test.NoReplaceSuccess",
+
+                // accept_bind_test
+                // Tests [0-3] fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/AllSocketPairTest.Listen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.ListenIncreaseBacklog/*",
+                "AllUnixDomainSockets/AllSocketPairTest.ListenDecreaseBacklog/*",
+                "AllUnixDomainSockets/AllSocketPairTest.ListenBacklogSizes/*",
+                "AllUnixDomainSockets/AllSocketPairTest.DoubleBind/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BindListenBind/*",
+                "AllUnixDomainSockets/AllSocketPairTest.DoubleListen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.DoubleConnect/*",
+                "AllUnixDomainSockets/AllSocketPairTest.Connect/*",
+                "AllUnixDomainSockets/AllSocketPairTest.ConnectWithWrongType/*",
+                "AllUnixDomainSockets/AllSocketPairTest.ConnectNonListening/*",
+                "AllUnixDomainSockets/AllSocketPairTest.SelfConnect/*",
+                "AllUnixDomainSockets/AllSocketPairTest.ConnectWithoutListen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.Accept/*",
+                "AllUnixDomainSockets/AllSocketPairTest.AcceptValidAddrLen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.AcceptNegativeAddrLen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.AcceptLargePositiveAddrLen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.AcceptVeryLargePositiveAddrLen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.AcceptWithoutListen/*",
+                "AllUnixDomainSockets/AllSocketPairTest.GetRemoteAddress/*",
+                "AllUnixDomainSockets/AllSocketPairTest.UnboundGetLocalAddress/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BoundGetLocalAddress/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BoundConnector/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BoundGetLocalAddress/*",
+                "AllUnixDomainSockets/AllSocketPairTest.UnboundSenderAddr/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BoundSenderAddr/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BindAfterConnectSenderAddr/*",
+                "AllUnixDomainSockets/AllSocketPairTest.BindAfterAcceptSenderAddr/*",
+
+                // accept_bind_stream test
+                // Tests [0-1] fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/AllSocketPairTest.BoundSenderAddrCoalesced/*",
+
+                // bind_test
+                // Tests [0-5] fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/AllSocketPairTest.Bind/*",
+                "AllUnixDomainSockets/AllSocketPairTest.DoubleBindSocket/*",
+                "AllUnixDomainSockets/AllSocketPairTest.GetLocalAddr/*",
+                "AllUnixDomainSockets/AllSocketPairTest.DoubleBindAddress/*",
+                "AllUnixDomainSockets/AllSocketPairTest.Unbind/*",
+
+                // chroot_test - panicked
+                "ChrootTest.Success",
+
+                // epoll_test - these tests hang
+                "EpollTest.AllWritable",
+                "EpollTest.CloseFile",
+                "EpollTest.CycleOfOneDisallowed",
+                "EpollTest.CycleOfThreeDisallowed",
+                "EpollTest.DoubleLayerEpoll",
+                "EpollTest.EdgeTriggered",
+                "EpollTest.EpollPwait2Timeout",
+                "EpollTest.LastNonWritable",
+                "EpollTest.LastReadable",
+                "EpollTest.Oneshot",
+                "EpollTest.PipeReaderHupAfterWriterClosed",
+                "EpollTest.ReadyMutexCircularity",
+                "EpollTest.RegularFiles",
+                "EpollTest.Timeout",
+                "EpollTest.TimeoutNoFds",
+                "EpollTest.UnblockWithNewFD",
+                "EpollTest.WaitThenUnblock",
+
+                // msync_test
+                // Test 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23 fails
+                // sometimes. Skip all tests for now.
+                "All/MsyncFullParamTest.InvalidateUnlockedSucceeds/*",
+                "All/MsyncFullParamTest.NormallySucceeds/*",
+                "All/MsyncFullParamTest.UnalignedAddressFails/*",
+                "All/MsyncFullParamTest.UnalignedLengthSucceeds/*",
+
+                // mmap_test - these tests hang
+                "MMapTest.AccessCOWInvalidatesCachedSegments",
+                "MMapTest.BadFd",
+                "MMapTest.ExceedLimitAS",
+                "MMapTest.ExceedLimitData",
+                "MMapTest.ExceedLimitDataPrlimit",
+                "MMapTest.ExceedLimitDataPrlimitPID",
+                "MMapTest.FixedAlignment",
+                "MMapTest.HugeLength",
+                "MMapTest.HintAddress",
+                "MMapTest.InvalidLength",
+                "MMapTest.MapAnything",
+                "MMapTest.MapCharDevice",
+                "MMapTest.MapDevZeroShared",
+                "MMapTest.MapDevZeroPrivate",
+                "MMapTest.MapDevZeroNoPersistence",
+                "MMapTest.MapDevZeroSharedMultiplePages",
+                "MMapTest.MapDevZeroSharedFdNoPersistence",
+                "MMapTest.MapDevZeroSegfaultAfterUnmap",
+                "MMapTest.MapDevZeroUnaligned",
+                "MMapTest.MapDirectory",
+                "MMapTest.MapFixed",
+                "MMapTest.MapFixed64",
+                "MMapTest.MapStack",
+                "MMapTest.MapLocked",
+                "MMapTest.MapPipe",
+                "MMapTest.MprotectHugeLength",
+                "MMapTest.MprotectNotPageAligned",
+                "MMapTest.NoExceedLimitAS",
+                "MMapTest.NoExceedLimitData",
+                "MMapTest.NonFixedAlignment",
+                "MMapTest.NoReserve",
+                "MMapTest.NotPrivateOrShared",
+                "MMapTest.PrivateAndShared",
+                "MMapTest.ProtectProtWrite",
+                "MMapTest.ProtExec",
+                "MMapTest.ProtWrite",
+                "MMapTest.ProtWriteOnly",
+                "MMapTest.ProtWriteOnlyReadable",
+                "MMapTest.SettingProtNoneDoesntFreeMemory",
+                "MMapTest.SmallMap",
+                "MMapFileTest.Bug38498194",
+                "MMapFileTest.InternalSigBus",
+                "MMapFileTest.InternalSigBusZeroing",
+                "MMapFileTest.MapLastPositivePage",
+                "MMapFileTest.MapOffset",
+                "MMapFileTest.MapSecondToLastPositivePage",
+                "MMapFileTest.MapFirstNegativePage",
+                "MMapFileTest.MapLastNegativePage",
+                "MMapFileTest.MapSecondToLastNegativePage",
+                "MMapFileTest.MmapFileWithOpath",
+                "MMapFileTest.Read",
+                "MMapFileTest.ReadingWritableSharedFilePageSucceeds",
+                "MMapFileTest.ReadSharedConsistentWithOverwrite",
+                "MMapFileTest.ReadSharedConsistentWithPartialOverwrite",
+                "MMapFileTest.ReadSharedConsistentWithWriteAndFile",
+                "MMapFileTest.ReadSharedTruncateDownThenUp",
+                "MMapFileTest.ReadSharedTruncatePartialPage",
+                "MMapFileTest.SelfRead",
+                "MMapFileTest.SelfWrite",
+                "MMapFileTest.WritePrivate",
+                "MMapFileTest.WritePrivateOnReadOnlyFd",
+                "MMapFileTest.WriteShared",
+                "MMapFileTest.WriteSharedBeyondEnd",
+                "MMapFileTest.WriteSharedOnReadOnlyFd",
+                "MMapFileTest.WriteSharedTruncateDownThenUp",
+                "MMapFileTest.WriteSharedTruncatePartialPage",
+                "MMapFileTest.WriteSharedTruncateUp",
+                "MMapNoFixtureTest.Map32Bit",
+                "MMapNoFixtureTest.MapReadOnlyAfterCreateWriteOnly",
+                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulate/*",
+                "ReadWriteSharedPrivate/MMapFileParamTest.MapPopulateShort/*",
+                "ReadWriteSharedPrivate/MMapFileParamTest.NoSigBusOnPageContainingEOF/*",
+                "ReadWriteSharedPrivate/MMapFileParamTest.NoSigBusOnPagesBeforeEOF/*",
+                "ReadWriteSharedPrivate/MMapFileParamTest.WriteOnlyFd/*",
+
+                // select_test - these tests hang
+                "SelectTest.NullFds",
+                "SelectTest.NegativeNfds",
+                "SelectTest.ClosedFds",
+                "SelectTest.ZeroTimeout",
+                "SelectTest.NoTimeout",
+                "SelectTest.InvalidTimeoutNegative",
+                "SelectTest.InterruptedBySignal",
+                "SelectTest.IgnoreBitsAboveNfds",
+                "SelectTest.SetrlimitCallNOFILE",
+
+                // sendfile_test - these tests hang
+                "SendFileTest.SendZeroBytes",
+                "SendFileTest.InvalidOffset",
+                "SendFileTest.Overflow",
+                "SendFileTest.SendTrivially",
+                "SendFileTest.SendTriviallyWithBothFilesReadWrite",
+                "SendFileTest.SendAndUpdateFileOffset",
+                "SendFileTest.SendAndUpdateFileOffsetFromNonzeroStartingPoint",
+                "SendFileTest.SendAndUpdateGivenOffset",
+                "SendFileTest.DoNotSendfileIfOutfileIsAppendOnly",
+                "SendFileTest.AppendCheckOrdering",
+                "SendFileTest.DoNotSendfileIfOutfileIsNotWritable",
+                "SendFileTest.DoNotSendfileIfInfileIsNotReadable",
+                "SendFileTest.DoNotSendANegativeNumberOfBytes",
+                "SendFileTest.SendTheCorrectNumberOfBytesEvenIfWeTryToSendTooManyBytes",
+                "SendFileTest.SendToNotARegularFile",
+                "SendFileTest.SendPipeWouldBlock",
+                "SendFileTest.SendPipeEOF",
+                "SendFileTest.SendToFullPipeReturnsEAGAIN",
+                "SendFileTest.SendPipeBlocks",
+                "SendFileTest.SendFileToPipe",
+                "SendFileTest.SendFileToSelf",
+                "SendFileTest.LargeCount",
+
+                // setgid_test
+                // These tests pass and fail in different cases
+                // Skip these tests for now until it can pass in all cases
+                "FileModes/FileModeTest.TruncateFile/*",
+                "FileModes/FileModeTest.WriteToFile/*",
+                "SetgidDirTest.ChownDirDoesNotClear",
+                "SetgidDirTest.ChownFileClears",
+                "SetgidDirTest.ChownNoExecFileDoesNotClear",
+                "SetgidDirTest.Control",
+                "SetgidDirTest.CreateDir",
+                "SetgidDirTest.CreateFile",
+                "SetgidDirTest.NoGroupExec",
+                "SetgidDirTest.OldDir",
+                "SetgidDirTest.OldFile",
+
+                // socket_blocking_local_test
+                // Tests 3, 4, 5, 12, 13, 14 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "NonBlockingUnixDomainSockets/BlockingSocketPairTest.RecvBlocks/*",
+
+                // socket_stream_local_test
+                // Tests 2, 3, 8, 9 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "StreamUnixSockets/StreamSocketPairTest.CoalescedRecv/*",
+                "StreamUnixSockets/StreamSocketPairTest.MsgTrunc/*",
+                "StreamUnixSockets/StreamSocketPairTest.RecvmsgMsghdrFlagsNoMsgTrunc/*",
+                "StreamUnixSockets/StreamSocketPairTest.RecvmsgTruncPeekZeroLen/*",
+                "StreamUnixSockets/StreamSocketPairTest.RecvmsgTruncZeroLen/*",
+                "StreamUnixSockets/StreamSocketPairTest.SplitRecv/*",
+                "StreamUnixSockets/StreamSocketPairTest.WriteOneSideClosed/*",
+
+                // socket_non_stream_blocking_local_test
+                // Tests 2, 3, 8, 9 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "BlockingNonStreamUnixSockets/BlockingNonStreamSocketPairTest.RecvLessThanBufferWaitAll/*",
+                "BlockingNonStreamUnixSockets/BlockingNonStreamSocketPairTest.RecvmsgTruncPeekDontwaitZeroLenBlocking/*",
+
+                // socket_stream_blocking_local_test
+                // Tests 1, 4 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
+                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.RecvLessThanBuffer/*",
+                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.RecvLessThanBufferWaitAll/*",
+                "BlockingStreamUnixSockets/BlockingStreamSocketPairTest.SendTimeout/*",
+
+                // socket_stream_nonblock_local_test
+                // Tests 1, 4 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "NonBlockingStreamUnixSockets/NonBlockingStreamSocketPairTest.SendMsgTooLarge/*",
+
+                // socket_unix_dgram_local_test
+                // Tests 4-7, 16-19 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "DgramUnixSockets/DgramUnixSocketPairTest.*/*",
+                "DgramUnixSockets/NonStreamSocketPairTest.*/*",
+                "DgramUnixSockets/UnixNonStreamSocketPairTest.*/*",
+
+                // socket_unix_seqpacket_local_test
+                // Tests 2, 3, 8, 9 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "SeqpacketUnixSockets/NonStreamSocketPairTest.*/*",
+                "SeqpacketUnixSockets/SeqpacketUnixSocketPairTest.*/*",
+                "SeqpacketUnixSockets/UnixNonStreamSocketPairTest.*/*",
+
+                // socket_unix_stream_test
+                // Tests 2, 3, 8, 9 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/StreamUnixSocketPairTest.*/*",
+
+                // socket_unix_unbound_dgram_test
+                // Tests 0, 1 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.BindConnect/*",
+                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.SelfConnect/*",
+                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.DoubleConnect/*",
+                "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.GetRemoteAddress/*",
+
+                // socket_unix_unbound_seqpacket_test
+                // Tests 0, 1, 4, 5 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/UnboundUnixSeqpacketSocketPairTest.SendtoWithoutConnect/*",
+
+                // socket_unix_unbound_stream_test
+                // Tests 2, 3, 8, 9 fail.
+                // Skip all until we fix the issue causing the tests to fail
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassCoalescedRead/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassCoalescedRecv/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.ReadsNotCoalescedAfterFDPass/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.FDPassNotCombined/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.CredsNotCoalescedDown/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCreds1/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.NonCoalescedDifferingCreds1/*",
+                "AllUnixDomainSockets/UnixStreamSocketPairTest.NonCoalescedDifferingCreds2/*",
+
+                // symlink_test - gave fatal signals
+                "AbsAndRelTarget/ParamSymlinkTest.OpenLinkNoFollowFails/*",
+                "AbsAndRelTarget/ParamSymlinkTest.OpenLinkExclFails/*",
+                "AbsAndRelTarget/ParamSymlinkTest.CreateExistingParentLink/*",
+                "AbsAndRelTarget/ParamSymlinkTest.CreateExistingSelfLink/*",
+                "AbsAndRelTarget/ParamSymlinkTest.OpenLinkCreatesTarget/*",
+                "AbsAndRelTarget/ParamSymlinkTest.CreatLinkCreatesTarget/*",
+                "SymlinkTest.*",
+            ],
+        },
+    ],
+}
