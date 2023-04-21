@@ -252,7 +252,6 @@ void InfraNetif::Init(uint32_t infra_if_idx) {
   struct ifaddrs *if_addrs = nullptr;
 
   VERIFY_OR_ASSERT(getifaddrs(&if_addrs) != -1, OT_EXIT_ERROR_ERRNO);
-  VERIFY_OR_ASSERT(infra_if_name_len_ == 0, "InfraNetif::Init() memory corrputed");
 
   if_indextoname(infra_if_idx_, infra_if_name_);
   otPlatLog(OT_LOG_LEVEL_INFO, OT_LOG_REGION_PLATFORM,
