@@ -120,8 +120,8 @@ case "$_FUCHSIA_RBE_CACHE_VAR_relpath_uses" in
     function relpath() {
       local -r from="$1"
       local -r to="$2"
-      local -r python="$_FUCHSIA_RBE_CACHE_VAR_relpath_uses"
-      "$python" -c "import os; print(os.path.relpath('$to', start='$from'))"
+      local -r _python="$_FUCHSIA_RBE_CACHE_VAR_relpath_uses"
+      "$_python" -c "import os; print(os.path.relpath('$to', start='$from'))"
     }
     ;;
 esac
