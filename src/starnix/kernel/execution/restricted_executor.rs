@@ -188,7 +188,8 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         restore_cfi_directives!();
 
         if let Some(exit_status) = process_completed_syscall(current_task, &error_context)? {
-            if let ExitStatus::CoreDump(_) = exit_status {
+            let dump_on_exit = current_task.read().dump_on_exit;
+            if dump_on_exit {
                 log_trace!("requesting backtrace");
                 // Disable exception processing on the exception handling thread since we're about
                 // to generate a SW breakpoint exception and we want the system to handle it. This
