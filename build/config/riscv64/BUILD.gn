@@ -21,6 +21,22 @@ config("riscv64") {
     "-march=$_march",
     "-mabi=$fuchsia_riscv_abi",
   ]
+
+  # TODO(fxbug.dev/125867): Clang should do this everywhere for Fuchsia
+  # targets. When it does, put this under `if (is_gcc)`.
+  #
+  # Don't use .sdata/.sbss sections. Even though linker gp relaxation is
+  # separately disabled (gp is reserved for the shadow-call-stack in the
+  # Fuchsia Compiler ABI), we still don't want to use these sections
+  # because the compiler will place read-only (or RELRO) data in .sdata,
+  # which is suboptimal for security and sharing as well as creating
+  # problems for pure code.
+  #
+  # This is the default for -fPIC and Clang warns about specifying it.
+  if (!toolchain_variant.is_pic_default) {
+    cflags += [ "-msmall-data-limit=0" ]
+  }
+
   ldflags = cflags
   asmflags = cflags
 }

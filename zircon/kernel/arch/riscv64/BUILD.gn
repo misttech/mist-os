@@ -37,13 +37,6 @@ if (toolchain_base_environment == "kernel") {
       "-mabi=lp64",  # vs lp64d for userland.
     ]
 
-    # This is the default for -fPIC and Clang warns about specifying it.
-    if (!toolchain_variant.is_pic_default) {
-      # Don't use .sdata/.sbss sections so the linker won't ever relax accesses
-      # into using the gp register, which we reserve in the kernel for percpu.
-      cflags += [ "-msmall-data-limit=0" ]
-    }
-
     if (!is_gcc) {
       cflags += [
         # Use shadow-call-stack rather than safe-stack for the kernel,
