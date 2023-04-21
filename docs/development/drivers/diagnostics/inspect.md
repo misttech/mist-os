@@ -177,8 +177,8 @@ only with a bringup build. For these situations, prefer using `iquery` which is 
 
 ## Include `iquery` in bootfs {#include-iquery-bootfs}
 
-The `bringup` product already includes `iquery` in bootfs, so if you are working
-with that product, you can skip this section.
+The `bringup` product and all `*_eng` products already include `iquery` in bootfs, so if you are
+working with any of those products, you can skip this section.
 
 If you are working on some other product and need to have `iquery` available in
 bootfs, then add the following to your `fx set`:

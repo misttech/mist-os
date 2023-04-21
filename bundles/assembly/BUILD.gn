@@ -274,6 +274,10 @@ assembly_input_bundle("core_realm_eng") {
     "//src/storage/fs_realm",
     "//src/storage/bin:fs_realm_tools",
   ]
+  bootfs_files_labels = [
+    # NOTE: this might belong to a currently not-existing bootstrap_eng AIB.
+    "//src/diagnostics/iquery:bootfs",
+  ]
   shell_commands = [
     {
       package = "fs_realm_tools"
