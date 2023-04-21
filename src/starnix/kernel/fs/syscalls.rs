@@ -1885,13 +1885,12 @@ pub fn poll(
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
     mask: Option<SigSet>,
-    timeout: i32,
+    deadline: zx::Time,
 ) -> Result<usize, Errno> {
     if num_fds < 0 || num_fds as u64 > current_task.thread_group.get_rlimit(Resource::NOFILE) {
         return error!(EINVAL);
     }
 
-    let timeout = duration_from_poll_timeout(timeout)?;
     let mut pollfds = vec![pollfd::default(); num_fds as usize];
     let waiter = FileWaiter::<usize>::default();
 
@@ -1910,7 +1909,7 @@ pub fn poll(
         );
     }
 
-    waiter.wait(current_task, mask, zx::Time::after(timeout))?;
+    waiter.wait(current_task, mask, deadline)?;
 
     let ready_items = waiter.ready_items.lock();
     for ready_item in ready_items.iter() {
@@ -1935,6 +1934,8 @@ pub fn sys_ppoll(
     user_timespec: UserRef<timespec>,
     user_mask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
+    let start_time = zx::Time::get_monotonic();
+
     let timeout = if user_timespec.is_null() {
         // Passing -1 to poll is equivalent to an infinite timeout.
         -1
@@ -1943,7 +1944,7 @@ pub fn sys_ppoll(
         duration_from_timespec(ts)?.into_millis() as i32
     };
 
-    let start_time = zx::Time::get_monotonic();
+    let deadline = start_time + duration_from_poll_timeout(timeout)?;
 
     let mask = if !user_mask.is_null() {
         let mask = current_task.mm.read_object(user_mask)?;
@@ -1952,16 +1953,11 @@ pub fn sys_ppoll(
         None
     };
 
-    let poll_result = poll(current_task, user_fds, num_fds, mask, timeout);
+    let poll_result = poll(current_task, user_fds, num_fds, mask, deadline);
 
-    let elapsed_duration =
-        zx::Duration::from_millis(timeout as i64) - (zx::Time::get_monotonic() - start_time);
-    let remaining_duration = if elapsed_duration < zx::Duration::from_millis(0) {
-        zx::Duration::from_millis(0)
-    } else {
-        elapsed_duration
-    };
-    let remaining_timespec = timespec_from_duration(remaining_duration);
+    let now = zx::Time::get_monotonic();
+    let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
+    let remaining_timespec = timespec_from_duration(remaining);
 
     // From gVisor: "ppoll is normally restartable if interrupted by something other than a signal
     // handled by the application (i.e. returns ERESTARTNOHAND). However, if

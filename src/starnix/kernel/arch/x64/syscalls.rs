@@ -203,7 +203,8 @@ pub fn sys_poll(
     num_fds: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {
-    poll(current_task, user_fds, num_fds, None, timeout)
+    let deadline = zx::Time::after(duration_from_poll_timeout(timeout)?);
+    poll(current_task, user_fds, num_fds, None, deadline)
 }
 
 pub fn sys_readlink(
