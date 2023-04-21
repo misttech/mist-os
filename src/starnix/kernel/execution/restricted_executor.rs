@@ -163,7 +163,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             return Err(format_err!("Received unexpected restricted reason code: {}", reason_code));
         }
 
-        trace_duration_begin!(
+        trace_duration!(
             trace_category_starnix!(),
             trace_name_run_task_loop!(),
             trace_arg_name!() => syscall_decl.name
@@ -202,11 +202,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 backtrace_request::backtrace_request();
                 restore_cfi_directives!();
             }
-            trace_duration_end!(
-                trace_category_starnix!(),
-                trace_name_run_task_loop!(),
-                trace_arg_name!() => syscall_decl.name
-            );
             return Ok(exit_status);
         }
     }
