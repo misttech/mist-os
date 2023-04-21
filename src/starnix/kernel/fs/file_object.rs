@@ -76,6 +76,10 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Called when the FileObject is closed.
     fn close(&self, _file: &FileObject) {}
 
+    /// Called every time close() is called on this file, even if the file is not ready to be
+    /// released.
+    fn flush(&self, _file: &FileObject) {}
+
     /// Read from the file without an offset. If your file is seekable, consider implementing this
     /// with [`fileops_impl_seekable`].
     fn read(
@@ -965,6 +969,10 @@ impl FileObject {
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
         self.name.entry.node.record_lock(current_task, self, cmd, flock)
+    }
+
+    pub fn flush(&self) {
+        self.ops().flush(self)
     }
 }
 

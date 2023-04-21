@@ -43,6 +43,7 @@ pub struct FdTableEntry {
 impl Drop for FdTableEntry {
     fn drop(&mut self) {
         self.file.name.entry.node.record_lock_release(self.fd_table_id);
+        self.file.flush();
     }
 }
 

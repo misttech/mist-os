@@ -240,6 +240,12 @@ impl FileOps for BinderConnection {
     ) -> Result<usize, Errno> {
         error!(EOPNOTSUPP)
     }
+
+    fn flush(&self, _file: &FileObject) {
+        // The current task check is impractical here, skip it.
+        let Ok(proc) = self.driver.find_process(self.identifier) else { return };
+        proc.kick_all_threads();
+    }
 }
 
 /// A connection to a binder driver from a remote process.
@@ -529,6 +535,16 @@ impl BinderProcess {
             state.thread_pool.notify_all();
             self.command_queue.lock().notify_all();
         }
+    }
+
+    /// Make all blocked threads stop waiting and return nothing. This is used by flush to
+    /// make userspace recheck whether binder is being shut down.
+    fn kick_all_threads(self: &Arc<Self>) {
+        let state = self.lock();
+        for thread in state.thread_pool.0.values() {
+            thread.lock().request_kick = true;
+        }
+        state.thread_pool.notify_all();
     }
 
     /// Return the `ResourceAccessor` to use to access the resources of this process.
@@ -1454,6 +1470,9 @@ struct BinderThreadState {
     /// The binder driver uses this queue to communicate with a binder thread. When a binder thread
     /// issues a [`uapi::BINDER_WRITE_READ`] ioctl, it will read from this command queue.
     command_queue: CommandQueueWithWaitQueue,
+    /// The thread should finish waiting without returning anything, then reset the flag. Used by
+    /// kick_all_threads by flush.
+    request_kick: bool,
 }
 
 impl BinderThreadState {
@@ -1463,6 +1482,7 @@ impl BinderThreadState {
             registration: RegistrationState::empty(),
             transactions: Default::default(),
             command_queue: Default::default(),
+            request_kick: false,
         }
     }
 
@@ -3055,6 +3075,11 @@ impl BinderDriver {
             let mut thread_state = binder_thread.lock();
             let mut proc_command_queue = binder_proc.command_queue.lock();
 
+            if thread_state.request_kick {
+                thread_state.request_kick = false;
+                return Ok(0);
+            }
+
             // Select which command queue to read from, preferring the thread-local one.
             // If a transaction is pending, deadlocks can happen if reading from the process queue.
             let command_queue = Self::get_active_queue(&mut thread_state, &mut proc_command_queue);
@@ -3981,7 +4006,7 @@ pub mod tests {
             0,
         );
         scopeguard::defer! {
-             transaction_ref.ack_acquire().expect("ack_acquire");
+            transaction_ref.ack_acquire().expect("ack_acquire");
         }
 
         // Transactions always take a strong reference to binder objects.
@@ -5726,6 +5751,47 @@ pub mod tests {
     }
 
     #[fuchsia::test]
+    fn flush_kicks_threads() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let binder_driver = BinderDriver::new();
+        let node = FsNode::new_root(PanickingFsNode);
+
+        // Open the binder device, which creates an instance of the binder device associated with
+        // the process.
+        let binder_instance = binder_driver
+            .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
+            .expect("binder dev open failed");
+        let binder_connection = binder_instance
+            .as_any()
+            .downcast_ref::<BinderConnection>()
+            .expect("must be a BinderConnection");
+        let binder_proc = binder_connection.proc(&current_task).unwrap();
+        let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.pid);
+
+        let task = Arc::clone(&current_task.task);
+        let binder_proc_for_thread = Arc::clone(&binder_proc);
+        std::thread::spawn(move || {
+            // Wait for the task to start waiting.
+            while !task.read().signals.waiter.is_valid() {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            // Do the kick.
+            binder_proc_for_thread.kick_all_threads();
+        });
+
+        let read_buffer_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let bytes_read = binder_driver
+            .handle_thread_read(
+                &current_task,
+                &binder_proc,
+                &binder_thread,
+                &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+            )
+            .unwrap();
+        assert_eq!(bytes_read, 0);
+    }
+
+    #[fuchsia::test]
     fn decrementing_refs_on_dead_binder_succeeds() {
         let driver = BinderDriver::new();
 
@@ -6574,8 +6640,8 @@ pub mod tests {
             .map(0, &vmo, 0, vmo_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
             .expect("map");
         scopeguard::defer! {
-          // SAFETY This is a ffi call to a kernel syscall.
-          unsafe { fuchsia_runtime::vmar_root_self().unmap(addr, vmo_size).expect("unmap"); }
+            // SAFETY This is a ffi call to a kernel syscall.
+            unsafe { fuchsia_runtime::vmar_root_self().unmap(addr, vmo_size).expect("unmap"); }
         }
 
         binder_proxy.set_vmo(vmo, addr as u64).expect("set_vmo");
