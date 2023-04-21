@@ -35,14 +35,14 @@
 #include "src/devices/bin/driver_manager/v2/node.h"
 #include "src/devices/bin/driver_manager/v2/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/v2/node_remover.h"
+#include "src/devices/bin/driver_manager/v2/runner.h"
 
 // Note, all of the logic here assumes we are operating on a single-threaded
 // dispatcher. It is not safe to use a multi-threaded dispatcher with this code.
 
 namespace dfv2 {
 
-class DriverRunner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner>,
-                     public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
+class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
                      public CompositeManagerBridge,
                      public NodeManager,
                      public NodeRemover {
@@ -102,22 +102,16 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
 
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
+  driver_manager::Runner& runner_for_tests() { return runner_; }
+
  private:
   using BindMatchCompleteCallback = fit::callback<void()>;
-
-  struct CreateComponentOpts {
-    const Node* node = nullptr;
-    zx::handle token;
-    fidl::ServerEnd<fuchsia_io::Directory> exposed_dir;
-  };
 
   struct BindRequest {
     std::weak_ptr<Node> node;
     std::shared_ptr<BindResultTracker> tracker;
   };
 
-  // fidl::WireServer<fuchsia_component_runner::ComponentRunner>
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
   // NodeManager
   // Attempt to bind `node`.
   // A nullptr for result_tracker is acceptable if the caller doesn't intend to
@@ -152,11 +146,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   // Should only be called when |bind_orphan_ongoing_| is true.
   void ProcessPendingBindRequests();
 
-  zx::result<> CreateComponent(std::string name, Collection collection, std::string url,
-                               CreateComponentOpts opts);
+  zx::result<> CreateDriverHostComponent(std::string moniker,
+                                         fidl::ServerEnd<fuchsia_io::Directory> exposed_dir);
 
   uint64_t next_driver_host_id_ = 0;
-  fidl::WireClient<fuchsia_component::Realm> realm_;
   fidl::WireClient<fuchsia_driver_index::DriverIndex> driver_index_;
   LoaderServiceFactory loader_service_factory_;
   fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> runner_bindings_;
@@ -170,9 +163,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   // This is for dfv2 composite node specs.
   CompositeNodeSpecManager composite_node_spec_manager_;
 
+  driver_manager::Runner runner_;
+
   NodeRemovalTracker removal_tracker_;
 
-  std::unordered_map<zx_koid_t, Node&> driver_args_;
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
 
   // True when a call to TryBindAllOrphans() or Bind() was made and not yet completed.

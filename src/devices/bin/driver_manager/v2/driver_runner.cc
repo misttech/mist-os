@@ -45,7 +45,6 @@ namespace dfv2 {
 
 namespace {
 
-constexpr uint32_t kTokenId = PA_HND(PA_USER0, 0);
 constexpr auto kBootScheme = "fuchsia-boot://";
 constexpr std::string_view kRootDeviceName = "dev";
 
@@ -196,13 +195,13 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
                            inspect::Inspector& inspector,
                            LoaderServiceFactory loader_service_factory,
                            async_dispatcher_t* dispatcher)
-    : realm_(std::move(realm), dispatcher),
-      driver_index_(std::move(driver_index), dispatcher),
+    : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
       root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher)),
       composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphans(); }),
-      composite_node_spec_manager_(this) {
+      composite_node_spec_manager_(this),
+      runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)) {
   inspector.GetRoot().CreateLazyNode(
       "driver_runner", [this] { return Inspect(); }, &inspector);
 
@@ -297,9 +296,8 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
 size_t DriverRunner::NumOrphanedNodes() const { return orphaned_nodes_.size(); }
 
 void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddUnmanagedProtocol<frunner::ComponentRunner>(
-      runner_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT(result.is_ok());
+  zx::result result = runner_.Publish(outgoing);
+  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
   composite_device_manager_.Publish(outgoing);
 }
@@ -369,28 +367,30 @@ void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callba
 
 zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
                                        fdi::DriverPackageType package_type) {
-  zx::event token;
-  zx_status_t status = zx::event::create(0, &token);
-  if (status != ZX_OK) {
-    node.CompleteBind(zx::error(status));
-    return zx::error(status);
-  }
-  zx_info_handle_basic_t info{};
-  status = token.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (status != ZX_OK) {
-    node.CompleteBind(zx::error(status));
-    return zx::error(status);
-  }
-
   Collection collection = ToCollection(package_type);
   node.set_collection(collection);
-  auto create = CreateComponent(node.MakeComponentMoniker(), collection, std::string(url),
-                                {.node = &node, .token = std::move(token)});
-  if (create.is_error()) {
-    node.CompleteBind(zx::error(create.error_value()));
-    return create.take_error();
-  }
-  driver_args_.emplace(info.koid, node);
+
+  std::weak_ptr node_weak = node.shared_from_this();
+  runner_.StartDriverComponent(
+      node.MakeComponentMoniker(), url, package_type, node.offers(),
+      [node_weak](zx::result<driver_manager::Runner::StartedComponent> component) {
+        std::shared_ptr node = node_weak.lock();
+        if (!node) {
+          return;
+        }
+
+        if (component.is_error()) {
+          node->CompleteBind(component.take_error());
+          return;
+        }
+        fidl::Arena arena;
+        node->StartDriver(fidl::ToWire(arena, std::move(component->info)),
+                          std::move(component->controller), [node_weak](zx::result<> result) {
+                            if (std::shared_ptr node = node_weak.lock(); node) {
+                              node->CompleteBind(result);
+                            }
+                          });
+      });
   return zx::ok();
 }
 
@@ -401,58 +401,7 @@ void DriverRunner::DestroyDriverComponent(dfv2::Node& node,
       .name = fidl::StringView::FromExternal(name),
       .collection = CollectionName(node.collection()),
   };
-  realm_->DestroyChild(child_ref).Then(std::move(callback));
-}
-
-void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& completer) {
-  auto url = request->start_info.resolved_url().get();
-
-  // When we start a driver, we associate an unforgeable token (the KOID of a
-  // zx::event) with the start request, through the use of the numbered_handles
-  // field. We do this so:
-  //  1. We can securely validate the origin of the request
-  //  2. We avoid collisions that can occur when relying on the package URL
-  //  3. We avoid relying on the resolved URL matching the package URL
-  if (!request->start_info.has_numbered_handles()) {
-    LOGF(ERROR, "Failed to start driver '%.*s', invalid request for driver",
-         static_cast<int>(url.size()), url.data());
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  auto& handles = request->start_info.numbered_handles();
-  if (handles.count() != 1 || !handles[0].handle || handles[0].id != kTokenId) {
-    LOGF(ERROR, "Failed to start driver '%.*s', invalid request for driver",
-         static_cast<int>(url.size()), url.data());
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  zx_info_handle_basic_t info{};
-  zx_status_t status =
-      handles[0].handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (status != ZX_OK) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  auto it = driver_args_.find(info.koid);
-  if (it == driver_args_.end()) {
-    LOGF(ERROR, "Failed to start driver '%.*s', unknown request for driver",
-         static_cast<int>(url.size()), url.data());
-    completer.Close(ZX_ERR_UNAVAILABLE);
-    return;
-  }
-  Node& node = it->second;
-  driver_args_.erase(it);
-
-  node.StartDriver(request->start_info, std::move(request->controller),
-                   [node_weak = std::weak_ptr(node.shared_from_this()),
-                    completer = completer.ToAsync()](zx::result<> result) mutable {
-                     if (result.is_error()) {
-                       completer.Close(result.error_value());
-                     }
-                     if (auto node = node_weak.lock(); node) {
-                       node->CompleteBind(result);
-                     }
-                   });
+  runner_.realm()->DestroyChild(child_ref).Then(std::move(callback));
 }
 
 void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) {
@@ -712,9 +661,8 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  auto name = "driver-host-" + std::to_string(next_driver_host_id_++);
-  auto create = CreateComponent(name, Collection::kHost, "#meta/driver_host2.cm",
-                                {.exposed_dir = std::move(endpoints->server)});
+  std::string name = "driver-host-" + std::to_string(next_driver_host_id_++);
+  auto create = CreateDriverHostComponent(name, std::move(endpoints->server));
   if (create.is_error()) {
     return create.take_error();
   }
@@ -747,64 +695,53 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
   return zx::ok(driver_host_ptr);
 }
 
-zx::result<> DriverRunner::CreateComponent(std::string name, Collection collection, std::string url,
-                                           CreateComponentOpts opts) {
+zx::result<> DriverRunner::CreateDriverHostComponent(
+    std::string moniker, fidl::ServerEnd<fuchsia_io::Directory> exposed_dir) {
+  std::string url = "#meta/driver_host2.cm";
   fidl::Arena arena;
-  auto child_decl_builder = fdecl::wire::Child::Builder(arena);
-  child_decl_builder.name(fidl::StringView::FromExternal(name))
-      .url(fidl::StringView::FromExternal(url))
-      .startup(fdecl::wire::StartupMode::kLazy);
+  auto child_decl_builder = fdecl::wire::Child::Builder(arena).name(moniker).url(url).startup(
+      fdecl::wire::StartupMode::kLazy);
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena);
-  if (opts.node != nullptr) {
-    child_args_builder.dynamic_offers(opts.node->offers());
-  }
-  fprocess::wire::HandleInfo handle_info;
-  if (opts.token) {
-    handle_info = {
-        .handle = std::move(opts.token),
-        .id = kTokenId,
-    };
-    child_args_builder.numbered_handles(
-        fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
-  }
-  auto open_callback = [name,
+  auto open_callback = [moniker,
                         url](fidl::WireUnownedResult<fcomponent::Realm::OpenExposedDir>& result) {
     if (!result.ok()) {
-      LOGF(ERROR, "Failed to open exposed directory for component '%s' (%s): %s", name.data(),
-           url.data(), result.FormatDescription().data());
+      LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %s", moniker.c_str(),
+           result.FormatDescription().data());
       return;
     }
     if (result->is_error()) {
-      LOGF(ERROR, "Failed to open exposed directory for component '%s' (%s): %u", name.data(),
-           url.data(), result->error_value());
+      LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %u", moniker.c_str(),
+           result->error_value());
     }
   };
   auto create_callback =
-      [this, name, url, collection, exposed_dir = std::move(opts.exposed_dir),
+      [this, moniker, url, exposed_dir = std::move(exposed_dir),
        open_callback = std::move(open_callback)](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         if (!result.ok()) {
-          LOGF(ERROR, "Failed to create component '%s' (%s): %s", name.data(), url.data(),
+          LOGF(ERROR, "Failed to create driver host '%s': %s", moniker.c_str(),
                result.error().FormatDescription().data());
           return;
         }
         if (result->is_error()) {
-          LOGF(ERROR, "Failed to create component '%s' (%s): %u", name.data(), url.data(),
+          LOGF(ERROR, "Failed to create driver host '%s': %u", moniker.c_str(),
                result->error_value());
           return;
         }
-        if (exposed_dir) {
-          fdecl::wire::ChildRef child_ref{
-              .name = fidl::StringView::FromExternal(name),
-              .collection = CollectionName(collection),
-          };
-          realm_->OpenExposedDir(child_ref, std::move(exposed_dir))
-              .ThenExactlyOnce(std::move(open_callback));
-        }
+        fdecl::wire::ChildRef child_ref{
+            .name = fidl::StringView::FromExternal(moniker),
+            .collection = "driver-hosts",
+        };
+        runner_.realm()
+            ->OpenExposedDir(child_ref, std::move(exposed_dir))
+            .ThenExactlyOnce(std::move(open_callback));
       };
-  realm_
-      ->CreateChild(fdecl::wire::CollectionRef{.name = CollectionName(collection)},
-                    child_decl_builder.Build(), child_args_builder.Build())
+  runner_.realm()
+      ->CreateChild(
+          fdecl::wire::CollectionRef{
+              .name = "driver-hosts",
+          },
+          child_decl_builder.Build(), child_args_builder.Build())
       .Then(std::move(create_callback));
   return zx::ok();
 }

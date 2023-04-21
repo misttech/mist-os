@@ -22,7 +22,9 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace fdata = fuchsia_data;
-namespace fdf = fuchsia::driver::framework;
+namespace fdf {
+using namespace fuchsia::driver::framework;
+}
 namespace fdh = fuchsia::driver::host;
 namespace fio = fuchsia::io;
 namespace fprocess = fuchsia_process;
@@ -403,7 +405,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
       fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
       fidl::WireRequest<frunner::ComponentRunner::Start> request{
           start_info_builder.Build(), std::move(controller_endpoints->server)};
-      static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_runner)
+      static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_runner.runner_for_tests())
           .Start(&request, completer);
     }
     RunLoopUntilIdle();

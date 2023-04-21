@@ -15,7 +15,9 @@
 #include "src/lib/storage/vfs/cpp/service.h"
 
 namespace fdd = fuchsia_driver_development;
-namespace fdf = fuchsia_driver_framework;
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
 
 namespace driver_manager {
 

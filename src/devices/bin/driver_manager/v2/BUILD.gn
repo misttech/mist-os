@@ -21,6 +21,8 @@ source_set("driver_runner") {
     "node_removal_tracker.h",
     "parent_set_collector.cc",
     "parent_set_collector.h",
+    "runner.cc",
+    "runner.h",
     "shutdown_manager.cc",
     "shutdown_manager.h",
   ]
