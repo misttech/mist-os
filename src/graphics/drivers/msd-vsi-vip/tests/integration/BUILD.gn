@@ -5,7 +5,9 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-test("test_magma_vsi_exec_bin") {
+source_set("magma_vsi_exec") {
+  testonly = true
+
   sources = [
     "//third_party/etnaviv_gpu_tests/src/etnaviv_cl_test_gc7000.c",
     "test_magma_vsi.h",
@@ -24,20 +26,6 @@ test("test_magma_vsi_exec_bin") {
   ]
 }
 
-fuchsia_unittest_package("test-magma-vsi-exec") {
-  manifest = "meta/test_magma_vsi_exec.cml"
-  deps = [ ":test_magma_vsi_exec_bin" ]
-  test_specs = {
-    environments = [
-      sherlock_env,
-      vim3_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
 test("msd_vsi_vip_integration_tests") {
   sources = [
     "run_unit_tests.cc",
@@ -46,6 +34,7 @@ test("msd_vsi_vip_integration_tests") {
   ]
 
   deps = [
+    ":magma_vsi_exec",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
     "//src/graphics/drivers/msd-vsi-vip/include",
     "//src/graphics/lib/magma/src/libmagma",
@@ -73,8 +62,5 @@ fuchsia_unittest_package("msd-vsi-vip-integration-tests") {
 
 group("integration") {
   testonly = true
-  deps = [
-    ":msd-vsi-vip-integration-tests",
-    ":test-magma-vsi-exec",
-  ]
+  deps = [ ":msd-vsi-vip-integration-tests" ]
 }
