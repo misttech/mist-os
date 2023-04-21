@@ -72,7 +72,7 @@ protocol RadarBurstReader {
         burst_size uint32;
     });
 
-    @available(added=HEAD)
+    @available(added=12)
     // TODO(fxbug.dev/100020): Remove @transitional when all servers implement
     // this method.
     @transitional

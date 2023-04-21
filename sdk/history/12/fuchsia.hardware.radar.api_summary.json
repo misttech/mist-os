@@ -17,6 +17,12 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstReader.GetBurstProperties",
+        "ordinal": "3836925016865417559",
+        "type": "() -> (uint32 size,int64 period)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.radar/RadarBurstReader.GetBurstSize",
         "ordinal": "158162301588276931",
         "type": "() -> (uint32 burst_size)"
