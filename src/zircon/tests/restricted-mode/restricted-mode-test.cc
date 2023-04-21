@@ -103,7 +103,7 @@ asm(R"(
 vectab:
   // back from restricted mode
   // rdi holds the context
-  // rsi holds the error code
+  // rsi holds the reason code
   mov  %rdi,%rsp
   pop  %rsp
   pop  %r15
@@ -113,15 +113,15 @@ vectab:
   pop  %rbp
   pop  %rbx
 
-  // pop the error code return slot
+  // pop the reason code return slot
   pop  %rdx
 
-  // return the error code from this function
-  mov  %rax,(%rdx)
+  // return the reason code from this function
+  mov  %rsi,(%rdx)
 
   // return back to whatever the address was on the stack
   // make it appear as if the wrapper had returned ZX_OK
-  xor  %rax,%rax
+  xor  %eax,%eax
   ret
 )");
 
@@ -193,7 +193,7 @@ extern "C" void vectab();
 extern "C" void bounce();
 extern "C" void bounce_post_syscall();
 extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vector_table,
-                                                uint64_t* exit_code);
+                                                zx_restricted_reason_t* reason_code);
 
 // This is the happy case.
 TEST(RestrictedMode, Basic) {
@@ -230,9 +230,9 @@ TEST(RestrictedMode, Basic) {
   ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
 
   // Enter restricted mode with reasonable args, expect a bounce back.
-  uint64_t exit_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &exit_code));
-  ASSERT_EQ(0, exit_code);
+  zx_restricted_reason_t reason_code = 99;
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+  ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
   state = {};
@@ -287,10 +287,10 @@ TEST(RestrictedMode, Bench) {
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
     constexpr int iter = 1000000;  // about a second worth of iterations on a mid range x86
-    uint64_t exit_code;
+    zx_restricted_reason_t reason_code;
     auto t = zx::ticks::now();
     for (int i = 0; i < iter; i++) {
-      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &exit_code));
+      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
     }
     t = zx::ticks::now() - t;
 
@@ -351,7 +351,7 @@ asm(R"(
 vectab:
   // Back from restricted mode
   // x0 holds the context, which is the stack pointer
-  // x1 holds the error code
+  // x1 holds the reason code
 
   // Restore the stack pointer at the point of the restricted enter wrapper.
   mov  sp,x0
@@ -366,10 +366,10 @@ vectab:
   ldp x22, x21, [sp], #16
   ldp x20, x19, [sp], #16
 
-  // Load the shadow call stack pointer and exit code pointer.
+  // Load the shadow call stack pointer and reason code pointer.
   ldp x2, x18, [sp], #16
 
-  // Return the error code from this function by setting the exit code pointer.
+  // Return the reason code from this function by setting the reason code pointer.
   str  x1, [x2]
 
   // Return back to whatever the address was in the link register.
@@ -433,7 +433,7 @@ asm(R"(
 restricted_enter_wrapper:
   // Args 0 - 1 are already in place in X0 and X1.
 
-  // Save the exit code pointer and shadow call stack pointer on the stack.
+  // Save the reason code pointer and shadow call stack pointer on the stack.
   stp x2, x18, [sp, #-16]!
 
   // Save the callee saved regs since the return from restricted mode
@@ -461,7 +461,7 @@ extern "C" void vectab();
 extern "C" void bounce();
 extern "C" void bounce_post_syscall();
 extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vector_table,
-                                                uint64_t* exit_code);
+                                                zx_restricted_reason_t* reason_code);
 
 // This is the happy case.
 TEST(RestrictedMode, Basic) {
@@ -519,9 +519,9 @@ TEST(RestrictedMode, Basic) {
   ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
 
   // Enter restricted mode and expect a bounce back.
-  uint64_t exit_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &exit_code));
-  ASSERT_EQ(0, exit_code);
+  zx_restricted_reason_t reason_code = 99;
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+  ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
   state = {};
@@ -588,10 +588,10 @@ TEST(RestrictedMode, Bench) {
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
     constexpr int iter = 1000000;
-    uint64_t exit_code;
+    zx_restricted_reason_t reason_code;
     auto t = zx::ticks::now();
     for (int i = 0; i < iter; i++) {
-      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &exit_code));
+      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
     }
     t = zx::ticks::now() - t;
 
