@@ -7,19 +7,14 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
-#include <zircon/status.h>
 
 #include "inspector/inspector.h"
 #include "utils-impl.h"
 
 namespace inspector {
-
-int verbosity_level = 0;
-
-extern "C" __EXPORT void inspector_set_verbosity(int level) { verbosity_level = level; }
 
 // Same as basename, except will not modify |path|.
 // Returns "" if |path| has a trailing /.

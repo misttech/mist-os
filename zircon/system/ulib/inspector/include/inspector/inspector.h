@@ -29,9 +29,6 @@ typedef zx_arm64_exc_data_t inspector_excp_data_t;
 typedef int inspector_excp_data_t;
 #endif
 
-// Set internal verbosity level, for debugging inspector itself.
-extern void inspector_set_verbosity(int level);
-
 // Print a backtrace of |thread| to |f|.
 // |thread| must currently be stopped: either suspended or in an exception.
 // The format of the output is verify specific: It outputs the format

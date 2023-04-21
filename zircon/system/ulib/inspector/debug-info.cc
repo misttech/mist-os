@@ -362,9 +362,6 @@ void inspector_print_debug_info_impl(FILE* out, zx_handle_t process_handle,
     print_gwp_asan_info(out, *process, report);
 
   inspector_dso_free_list(dso_list);
-
-  if (inspector::verbosity_level >= 1)
-    printf("Done handling thread %" PRIu64 ".%" PRIu64 ".\n", pid, tid);
 }
 
 }  // namespace inspector

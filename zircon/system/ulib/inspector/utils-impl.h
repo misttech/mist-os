@@ -11,8 +11,6 @@
 
 namespace inspector {
 
-extern int verbosity_level;
-
 extern void do_print_error(const char* file, int line, const char* fmt, ...);
 
 extern void do_print_zx_error(const char* file, int line, const char* what, zx_status_t status);
@@ -29,11 +27,9 @@ extern void do_print_zx_error(const char* file, int line, const char* what, zx_s
 
 extern void do_print_debug(const char* file, int line, const char* func, const char* fmt, ...);
 
-#define debugf(level, fmt...)                                         \
-  do {                                                                \
-    if (::inspector::verbosity_level >= (level)) {                    \
-      ::inspector::do_print_debug(__FILE__, __LINE__, __func__, fmt); \
-    }                                                                 \
+#define debugf(level, fmt...)                                       \
+  do {                                                              \
+    ::inspector::do_print_debug(__FILE__, __LINE__, __func__, fmt); \
   } while (0)
 
 extern const char* path_basename(const char* path);

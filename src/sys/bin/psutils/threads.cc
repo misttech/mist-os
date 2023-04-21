@@ -475,8 +475,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  inspector_set_verbosity(verbosity_level);
-
   zx_handle_t thread_self = thrd_get_zx_handle(thrd_current());
   if (thread_self == ZX_HANDLE_INVALID) {
     print_error("unable to get thread self");

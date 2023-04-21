@@ -114,12 +114,6 @@ static std::vector<Frame> unwind_from_ngunwind(zx_handle_t process, zx_handle_t 
   // Set up libunwind
   bool libunwind_ok = true;
 
-  if (verbosity_level > 0) {
-    // Don't turn on libunwind debugging for -d1.
-    // Note: max libunwind debugging level is 16
-    unw_set_debug_level(verbosity_level - 1);
-  }
-
   unw_fuchsia_info_t* fuchsia = nullptr;
   unw_addr_space_t remote_as = nullptr;
 
