@@ -56,7 +56,7 @@ if (is_host) {
     ]
     test_deps = [ "//src/lib/fuchsia-async" ]
 
-    non_rust_deps = [ ":doc_checker_test_data($host_toolchain)" ]
+    data_deps = [ ":doc_checker_test_data($host_toolchain)" ]
   }
 
   install_host_tools("doc_checker_host_tool") {

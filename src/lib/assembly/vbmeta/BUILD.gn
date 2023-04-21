@@ -126,6 +126,8 @@ rustc_test("integration_test") {
     ":vbmeta",
     "//third_party/rust_crates:hex",
   ]
+
+  # These are not host_test_data(), but are compiled-in files.
   non_rust_deps = [
     ":expected_descriptor",
     ":expected_vbmeta",

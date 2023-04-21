@@ -51,17 +51,23 @@ template("rustc_test_internal") {
 
   if (is_host) {
     exe_target_name = "${target_name}_executable"
-    all_deps = [ ":${exe_target_name}" ]
-    if (defined(invoker.deps)) {
-      all_deps += invoker.deps
-    }
-    if (defined(invoker.non_rust_deps)) {
-      all_deps += invoker.non_rust_deps
-    }
-
     host_test(target_name) {
       binary_path = "${root_out_dir}/${crate_name}"
-      deps = all_deps
+
+      # The host test can only depend on the _actual_ binary, because only the
+      # actual binary is able to properly depend on the toolchain variants
+      # correctly.  It cannot depend on any of the "deps" as they will be in the
+      # wrong toolchain when variants are in use, and it will cause the
+      # compilation of non-variant toolchain artifacts that aren't actually
+      # used.
+      deps = [ ":${exe_target_name}.actual" ]
+
+      # However, if there is host-test-data, then that could be passed via
+      # data_deps, so include those here
+      if (defined(invoker.data_deps)) {
+        deps += invoker.data_deps
+      }
+
       if (defined(invoker.test_environments)) {
         environments = invoker.test_environments
       }
@@ -247,10 +253,11 @@ template("rustc_test_internal") {
 #
 #   non_rust_deps (optional)
 #     List of non-rust_library GN targets on which this crate depends.
-#     Obsolete. Please use deps instead.
+#     OBSOLETE! Please use deps or data_deps instead.
 #
 #   data_deps (optional)
-#     List of GN targets that are only needed at runtime.
+#     List of GN targets that are only needed at runtime.  Use this for any
+#     host_test_data() that is needed by the test.
 #
 #   test_environments (optional)
 #     What environments the unit test should target. Only used here

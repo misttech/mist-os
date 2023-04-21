@@ -50,7 +50,7 @@ copy("copy_configs") {
     "test_data/config/sample_tags.triage",
   ]
 
-  # If this path changes then the integration.rs file needs to be udpated
+  # If this path changes then the integration.rs file needs to be updated
   # to look in the correct place.
   outputs = [ "$root_out_dir/test_data/triage/config/{{source_file_part}}" ]
 }
@@ -64,7 +64,7 @@ copy("copy_snapshot") {
     "test_data/snapshot/inspect.json",
   ]
 
-  # If this path changes then the integration.rs file needs to be udpated
+  # If this path changes then the integration.rs file needs to be updated
   # to look in the correct place.
   outputs = [ "$root_out_dir/test_data/triage/snapshot/{{source_file_part}}" ]
 }
@@ -113,14 +113,16 @@ rustc_test("triage_lib_test") {
   edition = "2021"
 
   deps = lib_deps + [
-           ":test_data",
            "//src/diagnostics/lib/triage",
            "//src/lib/fuchsia",
            "//third_party/rust_crates:serde_json",
          ]
 
   # we need to take a dependency on our bin because our integration tests invoke it
-  data_deps = [ ":triage_bin" ]
+  data_deps = [
+    ":test_data",
+    ":triage_bin",
+  ]
 
   sources = [
     "src/app.rs",

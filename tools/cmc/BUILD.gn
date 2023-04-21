@@ -32,7 +32,8 @@ rustc_binary("cmc") {
     "//tools/lib/reference_doc",
   ]
 
-  non_rust_deps = [ ":cmc_test_schemas" ]
+  # These are only data-deps for the test, but they get included in both
+  data_deps = [ ":cmc_test_schemas" ]
 
   test_deps = [
     "//third_party/rust_crates:assert_matches",

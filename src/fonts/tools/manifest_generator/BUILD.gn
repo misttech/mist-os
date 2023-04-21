@@ -65,7 +65,7 @@ if (is_host) {
     source_root = "tests/tests.rs"
 
     # Must depend directly on these in order to have access to them in CQ
-    non_rust_deps = [ ":test_files" ]
+    data_deps = [ ":test_files" ]
 
     sources = [ "tests/tests.rs" ]
   }

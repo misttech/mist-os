@@ -53,7 +53,7 @@ if (is_host) {
       "//src/lib/assembly/structured_config",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     ]
-    non_rust_deps = [ ":test_asset_data" ]
+    data_deps = [ ":test_asset_data" ]
     configs += [ ":test_asset_paths" ]
     visibility = [ ":*" ]
   }

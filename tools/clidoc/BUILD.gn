@@ -34,7 +34,7 @@ if (is_host) {
     source_root = crate_source_root
     sources = crate_sources
     deps = crate_deps + [ "//third_party/rust_crates:tempfile" ]
-    non_rust_deps = [ ":clidoc_test_scripts($host_toolchain)" ]
+    data_deps = [ ":clidoc_test_scripts($host_toolchain)" ]
   }
 
   # Test data for generating reference docs.

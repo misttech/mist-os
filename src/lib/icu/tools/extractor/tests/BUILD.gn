@@ -19,7 +19,7 @@ if (is_host) {
     ]
 
     # Must depend directly on these in order to have access to them in CQ
-    non_rust_deps = [ ":test_files" ]
+    data_deps = [ ":test_files" ]
 
     sources = [ "tests.rs" ]
   }

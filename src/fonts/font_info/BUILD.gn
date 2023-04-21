@@ -42,9 +42,8 @@ rustc_test("font_info_test_bin") {
     "//third_party/rust_crates:anyhow",
   ]
   source_root = "tests/tests.rs"
-  non_rust_deps = []
   if (is_host) {
-    non_rust_deps += [ ":test_data" ]
+    data_deps = [ ":test_data" ]
   }
 
   sources = [ "tests/tests.rs" ]
