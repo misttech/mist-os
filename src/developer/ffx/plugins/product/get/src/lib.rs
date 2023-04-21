@@ -23,8 +23,6 @@ pub async fn pb_get(cmd: GetCommand) -> Result<()> {
     let mut output = stdout();
     let mut err_out = stderr();
     let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    // TODO(fxbug.dev/118921): Do not put a .context() on this because it will
-    // break ffx_bail!().
     pb_get_impl(&cmd, &mut ui).await
 }
 
@@ -52,8 +50,6 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
     };
     let local_dir = &cmd.out_dir;
     tracing::debug!("make_way_for_output {:?}", local_dir);
-    // TODO(fxbug.dev/118921): Do not put a .context() on this because it will
-    // break ffx_bail!().
     make_way_for_output(&local_dir, cmd.force).await?;
 
     let parent_dir = local_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;

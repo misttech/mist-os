@@ -41,8 +41,6 @@ async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     };
     let local_dir = &cmd.out_dir;
     tracing::debug!("make_way_for_output {:?}", local_dir);
-    // TODO(fxbug.dev/118921): Do not put a .context() on this because it will
-    // break ffx_bail!().
     make_way_for_output(&local_dir, cmd.force).await?;
 
     let parent_dir = local_dir.parent().ok_or_else(|| anyhow!("local dir has no parent"))?;
