@@ -52,7 +52,6 @@ impl Action for StartAction {
 }
 
 struct StartContext {
-    component_decl: cm_rust::ComponentDecl,
     runner: Arc<dyn Runner>,
     start_info: fcrunner::ComponentStartInfo,
     controller_server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
@@ -99,11 +98,11 @@ async fn do_start(
 
         Ok((
             StartContext {
-                component_decl: component_info.decl,
                 runner,
                 start_info,
                 controller_server_end,
             },
+            component_info.decl,
             pending_runtime,
             break_on_start,
         ))
@@ -112,14 +111,14 @@ async fn do_start(
 
     // Dispatch the Started and the DebugStarted event.
     let (start_context, pending_runtime) = match result {
-        Ok((start_context, mut pending_runtime, break_on_start)) => {
+        Ok((start_context, component_decl, mut pending_runtime, break_on_start)) => {
             component
                 .hooks
                 .dispatch(&Event::new_with_timestamp(
                     component,
                     EventPayload::Started {
                         runtime: RuntimeInfo::from_runtime(&mut pending_runtime),
-                        component_decl: start_context.component_decl.clone(),
+                        component_decl,
                     },
                     pending_runtime.timestamp,
                 ))

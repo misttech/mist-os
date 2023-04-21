@@ -516,10 +516,10 @@ impl ComponentInstance {
     ) -> BoxFuture<'a, Result<Arc<dyn Runner>, ModelError>> {
         async move {
             // Fetch component declaration.
-            let decl = {
+            let runner = {
                 let state = self.lock_state().await;
                 match *state {
-                    InstanceState::Resolved(ref s) => s.decl.clone(),
+                    InstanceState::Resolved(ref s) => s.decl.get_runner().cloned(),
                     InstanceState::Destroyed => {
                         return Err(ModelError::instance_destroyed(self.abs_moniker.clone()));
                     }
@@ -530,7 +530,7 @@ impl ComponentInstance {
             };
 
             // Find any explicit "use" runner declaration, resolve that.
-            if let Some(runner) = decl.get_runner() {
+            if let Some(runner) = runner {
                 // Open up a channel to the runner.
                 let (client_channel, server_channel) =
                     endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>();
@@ -804,10 +804,10 @@ impl ComponentInstance {
             return Ok(());
         }
         // Clean up isolated storage.
-        let decl = {
+        let uses = {
             let state = self.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => s.decl.clone(),
+                InstanceState::Resolved(ref s) => s.decl.uses.clone(),
                 _ => {
                     // The instance was never resolved and therefore never ran, it can't possibly
                     // have storage to clean up.
@@ -815,7 +815,7 @@ impl ComponentInstance {
                 }
             }
         };
-        for use_ in decl.uses.iter() {
+        for use_ in uses {
             if let UseDecl::Storage(use_storage) = use_ {
                 match routing::route_and_delete_storage(use_storage.clone(), &self).await {
                     Ok(()) => (),
