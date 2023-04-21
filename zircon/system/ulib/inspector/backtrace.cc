@@ -285,40 +285,38 @@ void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
                             const bool skip_markup_context) {
   constexpr bool kUseNewUnwinder = true;
 
+  if (!skip_markup_context) {
+    // TODO(fxbug.dev/125728): always dump the full module list for now and not just the modules
+    // involved in this stack trace, because the context might be re-used by other threads.
+    print_markup_context(f, process, {});
+  }
+
   std::vector<Frame> stack;
   if (kUseNewUnwinder) {
     stack = unwind_from_unwinder(process, thread);
   } else {
     stack = unwind_from_ngunwind(process, thread, dso_list, pc, sp, fp);
-  }
 
-  // Check the consistency between ngunwind's stack and SCS. Print both if they mismatch.
-  std::vector<Frame> scs = unwind_from_shadow_call_stack(process, thread);
+    // Check the consistency between ngunwind's stack and SCS. Print both if they mismatch.
+    std::vector<Frame> scs = unwind_from_shadow_call_stack(process, thread);
 
-  // The SCS should be a subsequence of the real stack, because some functions may have SCS disabled
-  // and we might drop one frame for recursive functions (see unwind_from_shadow_call_stack above).
-  auto scs_it = scs.begin();
-  for (auto& frame : stack) {
-    if (scs_it != scs.end() && scs_it->pc == frame.pc) {
-      scs_it++;
-    }
-  }
-
-  if (scs_it != scs.end()) {
-    if (!skip_markup_context) {
-      // Print all modules.
-      print_markup_context(f, process, {});
+    // The SCS should be a subsequence of the real stack, because some functions may have SCS
+    // disabled and we might drop one frame for recursive functions (see
+    // unwind_from_shadow_call_stack above).
+    auto scs_it = scs.begin();
+    for (auto& frame : stack) {
+      if (scs_it != scs.end() && scs_it->pc == frame.pc) {
+        scs_it++;
+      }
     }
 
-    print_stack(f, scs);
-    fprintf(
-        f,
-        "warning: the backtrace above is from the shadow call stack because the backtrace from "
-        "metadata-based unwinding is incomplete or corrupted. Here's the original backtrace:\n");
-  } else if (!skip_markup_context) {
-    // TODO(fxbug.dev/125728): always dump the full module list for now, because the context might
-    // be used by other threads.
-    print_markup_context(f, process, {});
+    if (scs_it != scs.end()) {
+      print_stack(f, scs);
+      fprintf(
+          f,
+          "warning: the backtrace above is from the shadow call stack because the backtrace from "
+          "metadata-based unwinding is incomplete or corrupted. Here's the original backtrace:\n");
+    }
   }
 
   print_stack(f, stack);
