@@ -85,7 +85,6 @@ group("system_tests") {
   deps = [
     "reboot_test:system_tests_reboot($host_toolchain)",
     "recovery_test:system_tests_recovery($host_toolchain)",
-    "tracking_test:system_tests_tracking($host_toolchain)",
     "upgrade_test:system_tests_upgrade($host_toolchain)",
   ]
 }

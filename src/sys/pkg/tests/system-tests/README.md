@@ -98,25 +98,6 @@ Or if you want to test a build, you can use:
   latest build published by that builder.
 * `--build-id 1234...` to test the specific build.
 
-### Tracking Testing
-
-The system tests support running tracking tests, where a device is
-continuously updated to the latest available version, or errs out if a problem
-occurs. This can be done by running:
-
-```sh
-% $(fx get-build-dir)/host_x64/system_tests_tracking \
-  --ssh-private-key ~/.ssh/fuchsia_ed25519 \
-  --downgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
-  --upgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs
-```
-
-The `--downgrade-build*` argument is optional, and only necessary if you want to
-start the tracking test from a known zero state.
-
-Note that at the moment the only supported upgrade mode is
-`--upgrade-builder-name $BUILDER_NAME`.
-
 ## Running the Tests
 
 When running the system tests, it's helpful to capture the serial logs, and
