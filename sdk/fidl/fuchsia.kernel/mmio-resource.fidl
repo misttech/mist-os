@@ -10,6 +10,6 @@ using zx;
 protocol MmioResource {
     /// Get an MMIO resource handle.
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

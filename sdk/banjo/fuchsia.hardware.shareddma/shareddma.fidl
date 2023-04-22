@@ -36,8 +36,8 @@ protocol SharedDma {
         type DmaType;
         size uint32;
     }) -> (resource struct {
-        s zx.status;
-        vmo zx.handle:VMO;
+        s zx.Status;
+        vmo zx.Handle:VMO;
     });
 
     /// Start DMA
@@ -74,7 +74,7 @@ protocol SharedDma {
         channel_id uint32;
         cb client_end:DmaNotifyCallback;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         size_per_notification uint32;
     });
 };

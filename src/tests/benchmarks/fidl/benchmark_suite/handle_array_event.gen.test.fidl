@@ -9,13 +9,13 @@ library test.benchmarkfidl;
 using zx;
 
 type HandleArrayEvent1 = resource struct {
-    handles array<zx.handle:EVENT, 1>;
+    handles array<zx.Handle:EVENT, 1>;
 };
 
 type HandleArrayEvent16 = resource struct {
-    handles array<zx.handle:EVENT, 16>;
+    handles array<zx.Handle:EVENT, 16>;
 };
 
 type HandleArrayEvent64 = resource struct {
-    handles array<zx.handle:EVENT, 64>;
+    handles array<zx.Handle:EVENT, 64>;
 };

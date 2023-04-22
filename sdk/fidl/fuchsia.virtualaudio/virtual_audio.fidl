@@ -62,7 +62,7 @@ type Configuration = table {
 
     /// External delay.
     /// If not specified, defaults to an arbitrary duration.
-    6: external_delay zx.duration;
+    6: external_delay zx.Duration;
 
     /// Supported ring buffer format ranges for this virtual audio device.
     /// This field is only valid for `device_type` `STREAM_CONFIG` and `DAI`.
@@ -175,7 +175,7 @@ type GainProperties = struct {
 };
 
 type PlugProperties = struct {
-    plug_change_time zx.time;
+    plug_change_time zx.Time;
     plugged bool;
     hardwired bool;
     can_notify bool;
@@ -191,7 +191,7 @@ protocol Device {
         frames_per_second uint32;
         sample_format uint32;
         num_channels uint32;
-        external_delay zx.duration;
+        external_delay zx.Duration;
     }) error Error;
 
     /// Notifies all subscribed listeners when the above format is set or changed.
@@ -199,7 +199,7 @@ protocol Device {
         frames_per_second uint32;
         sample_format uint32;
         num_channels uint32;
-        external_delay zx.duration;
+        external_delay zx.Duration;
     });
 
     /// Returns the current gain state for this device.
@@ -219,7 +219,7 @@ protocol Device {
     /// Returns details about the ring buffer. Returns `NO_RING_BUFFER` if the
     /// client has not yet created the ring buffer.
     GetBuffer() -> (resource struct {
-        ring_buffer zx.handle:VMO;
+        ring_buffer zx.Handle:VMO;
         num_ring_buffer_frames uint32;
         notifications_per_ring uint32;
     }) error Error;
@@ -227,7 +227,7 @@ protocol Device {
     /// Notifies all subscribed listeners when the above buffer has been
     /// created.
     -> OnBufferCreated(resource struct {
-        ring_buffer zx.handle:VMO;
+        ring_buffer zx.Handle:VMO;
         num_ring_buffer_frames uint32;
         notifications_per_ring uint32;
     });
@@ -244,7 +244,7 @@ protocol Device {
     /// streaming. This can only occur after a device is fully configured
     /// (format is set; ring buffer is established and fetched).
     -> OnStart(struct {
-        start_time zx.time;
+        start_time zx.Time;
     });
 
     /// Notifies all subscribed listeners when the device is commanded to Stop
@@ -253,7 +253,7 @@ protocol Device {
     /// already-set format and ring buffer are retained without change, but
     /// position will re-begin at 0, if the device is again Started.
     -> OnStop(struct {
-        stop_time zx.time;
+        stop_time zx.Time;
         ring_position uint32;
     });
 
@@ -262,7 +262,7 @@ protocol Device {
     /// This can only be called after the ring buffer is established. Returns
     /// `NOT_STARTED` if the device has not yet Started streaming.
     GetPosition() -> (struct {
-        monotonic_time zx.time;
+        monotonic_time zx.Time;
         ring_position uint32; // position in bytes
     }) error Error;
 
@@ -271,14 +271,14 @@ protocol Device {
     /// set by whoever opened the device,, though the frequency can be overriden
     /// by `SetNotificationFrequency`.
     -> OnPositionNotify(struct {
-        monotonic_time zx.time;
+        monotonic_time zx.Time;
         ring_position uint32; // position in bytes
     });
 
     /// Hot-plugs or hot-unplugs an active virtual device, at the specified
     /// time.
     ChangePlugState(struct {
-        plug_change_time zx.time;
+        plug_change_time zx.Time;
         plugged bool;
     }) -> () error Error;
 

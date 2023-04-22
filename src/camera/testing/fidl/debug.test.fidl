@@ -17,21 +17,21 @@ closed protocol Debug {
     /// Retrieves the available test pattern modes supported by the block.
     strict GetAvailableTestPatternModes() -> (struct {
         modes vector<uint32>:MAX_TEST_PATTERN_MODES;
-    }) error zx.status;
+    }) error zx.Status;
     /// Retrieves the test pattern mode the block is currently set to.
     strict GetCurrentTestPatternMode() -> (struct {
         value uint16;
-    }) error zx.status;
+    }) error zx.Status;
     /// Changes the block's test pattern mode.
     strict SetTestPatternMode(struct {
         mode uint16;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Retrieves the test pattern data being used.
     strict GetTestPatternData() -> (struct {
         data vector<uint32>:MAX_TEST_PATTERN_DATA;
-    }) error zx.status;
+    }) error zx.Status;
     /// Changes data passed into the test pattern. Only used by certain modes.
     strict SetTestPatternData(struct {
         data vector<uint32>:MAX_TEST_PATTERN_DATA;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

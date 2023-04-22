@@ -6,16 +6,16 @@ library banjo.examples.handles;
 using zx;
 
 type Container = resource struct {
-    a_handle zx.handle:CHANNEL;
-    another_handle zx.handle:CHANNEL;
+    a_handle zx.Handle:CHANNEL;
+    another_handle zx.Handle:CHANNEL;
 };
 
 @transport("Banjo")
 closed protocol Doer {
     strict DoSomething(resource struct {
-        the_handle zx.handle:CHANNEL;
+        the_handle zx.Handle:CHANNEL;
     }) -> ();
     strict DoSomethingElse(resource struct {
-        the_handle_too zx.handle:CHANNEL;
+        the_handle_too zx.Handle:CHANNEL;
     }) -> ();
 };

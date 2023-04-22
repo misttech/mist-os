@@ -30,7 +30,7 @@ type PlugState = table {
     1: plugged bool;
 
     /// Timestamps the information provided in the rest of the fields of this struct. Required.
-    2: plug_state_time zx.time;
+    2: plug_state_time zx.Time;
 };
 
 type PlugDetectCapabilities = strict enum {

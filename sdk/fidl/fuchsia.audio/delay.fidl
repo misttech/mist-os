@@ -13,6 +13,6 @@ protocol DelayWatcher {
     /// outstanding call, otherwise the channel may be closed.
     WatchDelay(table {}) -> (table {
         /// Optional. If not specified, the delay is unknown.
-        1: delay zx.duration;
+        1: delay zx.Duration;
     });
 };

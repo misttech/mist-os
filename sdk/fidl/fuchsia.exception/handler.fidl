@@ -14,7 +14,7 @@ protocol Handler {
     ///
     /// It's recommended clients call IsActive and wait for a response before
     /// sending an exception to the server with OnException because a
-    /// zx.handle:EXCEPTION can't be released by the client once it's sent
+    /// zx.Handle:EXCEPTION can't be released by the client once it's sent
     /// across the channel.
     ///
     /// Note: a response guarantees the server was active when it sent the
@@ -33,7 +33,7 @@ protocol Handler {
     /// `info` represents basic exception information as provided by the
     /// exception channel.
     OnException(resource struct {
-        exception zx.handle:EXCEPTION;
+        exception zx.Handle:EXCEPTION;
         info ExceptionInfo;
     }) -> ();
 };
@@ -58,15 +58,15 @@ type ExceptionInfo = struct {
 /// Both |process| and |thread| will be valid if present.
 type ProcessException = resource table {
     /// `exception` is guaranteed to be valid.
-    1: exception zx.handle:EXCEPTION;
+    1: exception zx.Handle:EXCEPTION;
     2: info ExceptionInfo;
 
     /// Both `process` and `thread` will be valid if present.
-    3: process zx.handle:PROCESS;
+    3: process zx.Handle:PROCESS;
 
     /// The thread that generated the exception.
     /// The process may have other threads that are not reflected here.
-    4: thread zx.handle:THREAD;
+    4: thread zx.Handle:THREAD;
 };
 
 /// What type of exception was triggered.

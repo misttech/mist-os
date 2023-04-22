@@ -19,7 +19,7 @@ protocol Tracker {
             note="Instead, use `fuchsia.input.interaction.observation.Aggregator`")
     ReportDiscreteActivity(struct {
         activity DiscreteActivity;
-        event_time zx.time;
+        event_time zx.Time;
     }) -> ();
 
     /// Reports the start of an ongoing activity such as media playback.
@@ -33,7 +33,7 @@ protocol Tracker {
     StartOngoingActivity(struct {
         activity_id OngoingActivityId;
         activity OngoingActivity;
-        start_time zx.time;
+        start_time zx.Time;
     }) -> ();
 
     /// Reports the end of an ongoing activity such as media playback.
@@ -45,6 +45,6 @@ protocol Tracker {
             note="Instead, use `fuchsia.input.interaction.observation.Aggregator`")
     EndOngoingActivity(struct {
         activity_id OngoingActivityId;
-        end_time zx.time;
+        end_time zx.Time;
     }) -> ();
 };

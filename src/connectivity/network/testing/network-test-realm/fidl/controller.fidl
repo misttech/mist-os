@@ -176,7 +176,7 @@ closed protocol Controller {
         target fuchsia.net.IpAddress;
         payload_length uint16;
         interface_name string:<fuchsia.net.interfaces.INTERFACE_NAME_LENGTH, optional>;
-        timeout zx.duration;
+        timeout zx.Duration;
     }) -> () error Error;
 
     /// Polls the specified socket address with UDP datagrams containing the specified payload
@@ -200,7 +200,7 @@ closed protocol Controller {
     strict PollUdp(struct {
         target fuchsia.net.SocketAddress;
         payload vector<uint8>:MAX_UDP_POLL_LENGTH;
-        timeout zx.duration;
+        timeout zx.Duration;
         num_retries uint16;
     }) -> (struct {
         payload vector<uint8>:MAX_UDP_POLL_LENGTH;

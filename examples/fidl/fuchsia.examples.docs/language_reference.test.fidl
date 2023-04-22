@@ -160,10 +160,10 @@ type Vectors = struct {
 // A record which contains some handles.
 type Handles = resource struct {
     // a handle of unspecified type
-    h zx.handle;
+    h zx.Handle;
 
     // an optional channel
-    c zx.handle:<CHANNEL, optional>;
+    c zx.Handle:<CHANNEL, optional>;
 };
 // [END handles]
 

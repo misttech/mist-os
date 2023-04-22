@@ -108,7 +108,7 @@ type CapabilityRequestedPayload = resource table {
 
     /// A handle to the server end of the channel to host
     /// capability.
-    2: capability zx.handle:CHANNEL;
+    2: capability zx.Handle:CHANNEL;
 };
 
 /// Payload for Purged events.
@@ -142,7 +142,7 @@ type StoppedPayload = table {
     /// protocol channel. This is the exit status of the component. The
     /// possible status values and their meaning are described in the definition
     /// of the ComponentController protocol.
-    1: status zx.status;
+    1: status zx.Status;
 };
 
 /// Payload for DebugStarted events.
@@ -158,7 +158,7 @@ type DebugStartedPayload = resource table {
     /// e.g., ELF debuggers can setup the exception channel on the job while holding
     /// the eventpair, then drop the eventpair to notify the runner that processes could
     /// be created. The other side is sent to the runner in ComponentStartInfo.
-    2: break_on_start zx.handle:EVENTPAIR;
+    2: break_on_start zx.Handle:EVENTPAIR;
 };
 
 /// A head providing metadata about a target component instance.
@@ -174,7 +174,7 @@ type EventHeader = table {
     3: component_url fuchsia.url.Url;
 
     /// Time when the event occurred.
-    4: timestamp zx.time;
+    4: timestamp zx.Time;
 };
 
 /// Contains all information about a single event

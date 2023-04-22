@@ -77,7 +77,7 @@ type ImagePipe2Args = resource struct {
 // TODO: specify resizing behavior.  Who can resize?  Client/Scenic/both/none?
 type MemoryArgs = resource struct {
     /// The VMO which backs this memory.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
 
     /// The amount of memory from `vmo` that should be utilized.
     allocation_size uint64;

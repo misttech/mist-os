@@ -13,10 +13,10 @@ protocol ProcessorCreator {
     /// + request `name` A string naming the processor to create. The meaning of this
     ///   name is up to the implementor.
     /// - response `processor_configuration` Description of the new processor.
-    /// * error A zx.status value indicating success or failure.
+    /// * error A zx.Status value indicating success or failure.
     Create(struct {
         name string:1024;
     }) -> (resource struct {
         processor_configuration ProcessorConfiguration;
-    }) error zx.status;
+    }) error zx.Status;
 };

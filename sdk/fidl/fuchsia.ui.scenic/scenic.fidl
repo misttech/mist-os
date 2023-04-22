@@ -90,7 +90,7 @@ protocol Scenic {
     /// Gets an event signaled with displayOwnedSignal or displayNotOwnedSignal
     /// when display ownership changes.
     GetDisplayOwnershipEvent() -> (resource struct {
-        ownership_event zx.handle:EVENT;
+        ownership_event zx.Handle:EVENT;
     });
 
     /// Take a screenshot and return the data in `img_data`. `img_data` will

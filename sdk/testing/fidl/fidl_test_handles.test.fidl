@@ -7,6 +7,6 @@ using zx;
 
 protocol Foo {
     Bar(resource struct {
-        h zx.handle;
+        h zx.Handle;
     });
 };

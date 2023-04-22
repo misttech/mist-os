@@ -55,20 +55,20 @@ protocol CombinedBufferCollectionToken {
     });
     @selector("fuchsia.sysmem/Node.SetDebugTimeoutLogDeadline")
     SetDebugTimeoutLogDeadlineV1(struct {
-        deadline zx.time;
+        deadline zx.Time;
     });
     @selector("fuchsia.sysmem/Node.SetVerboseLogging")
     SetVerboseLoggingV1();
     @selector("fuchsia.sysmem/Node.GetNodeRef")
     GetNodeRefV1() -> (resource struct {
-        node_ref zx.handle:EVENT;
+        node_ref zx.Handle:EVENT;
     });
     @selector("fuchsia.sysmem/Node.IsAlternateFor")
     IsAlternateForV1(resource struct {
-        node_ref zx.handle:EVENT;
+        node_ref zx.Handle:EVENT;
     }) -> (struct {
         is_alternate bool;
-    }) error zx.status;
+    }) error zx.Status;
 
     // fuchsia.sysmem/BufferCollectionToken, with de-conflicted names:
     //
@@ -93,7 +93,7 @@ protocol CombinedBufferCollectionToken {
     // Still handled, for clients that haven't been re-built yet.
     @selector("fuchsia.sysmem/BufferCollectionToken.SetDebugTimeoutLogDeadline")
     DeprecatedSetDebugTimeoutLogDeadlineV1(struct {
-        deadline zx.time;
+        deadline zx.Time;
     });
     @selector("fuchsia.sysmem/BufferCollectionToken.DuplicateSync")
     DuplicateSyncV1(struct {
@@ -130,20 +130,20 @@ protocol CombinedBufferCollectionToken {
     });
     @selector("fuchsia.sysmem2/Node.SetDebugTimeoutLogDeadline")
     SetDebugTimeoutLogDeadlineV2(table {
-        1: deadline zx.time;
+        1: deadline zx.Time;
     });
     @selector("fuchsia.sysmem2/Node.SetVerboseLogging")
     SetVerboseLoggingV2();
     @selector("fuchsia.sysmem2/Node.GetNodeRef")
     GetNodeRefV2() -> (resource table {
-        1: node_ref zx.handle:EVENT;
+        1: node_ref zx.Handle:EVENT;
     });
     @selector("fuchsia.sysmem2/Node.IsAlternateFor")
     IsAlternateForV2(resource table {
-        1: node_ref zx.handle:EVENT;
+        1: node_ref zx.Handle:EVENT;
     }) -> (table {
         1: is_alternate bool;
-    }) error zx.status;
+    }) error zx.Status;
 
     // fuchsia.sysmem2/BufferCollectionToken, with de-conflicted names:
     @selector("fuchsia.sysmem2/BufferCollectionToken.DuplicateSync")

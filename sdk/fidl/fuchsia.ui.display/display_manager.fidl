@@ -11,7 +11,7 @@ using zx;
 /// operations on displays in the DisplayManager protocol and other protocols
 /// (like Scenic).
 type DisplayRef = resource struct {
-    reference zx.handle:EVENT;
+    reference zx.Handle:EVENT;
 };
 
 // === Mode flags ===

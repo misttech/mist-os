@@ -61,7 +61,7 @@ protocol LegacyJoining {
     /// `port` specifies the local port that TCP or UDP commissioning traffic
     /// will be directed to.
     MakeJoinable(struct {
-        duration zx.duration;
+        duration zx.Duration;
         port uint16;
     }) -> ();
 };

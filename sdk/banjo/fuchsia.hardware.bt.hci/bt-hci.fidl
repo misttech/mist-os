@@ -27,17 +27,17 @@ protocol BtHci {
     /// receiving event packets.  Returns ZX_ERR_ALREADY_BOUND if the channel
     /// is already open.
     OpenCommandChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Open the two-way HCI ACL data channel.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
     OpenAclDataChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Opens a SCO channel on the provided handle. The zircon channel is
@@ -47,9 +47,9 @@ protocol BtHci {
     /// driver.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
     OpenScoChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Configure the HCI for a SCO connection with the indicated parameters.
@@ -62,7 +62,7 @@ protocol BtHci {
         encoding ScoEncoding;
         sample_rate ScoSampleRate;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Releases resources held by an active SCO connection. Must be called
@@ -71,7 +71,7 @@ protocol BtHci {
     /// driver.
     @async
     ResetSco() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Open an output-only channel for monitoring HCI traffic.
@@ -82,8 +82,8 @@ protocol BtHci {
     ///  - 0x01: The payload represents an event packet sent by the controller.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
     OpenSnoopChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

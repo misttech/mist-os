@@ -8,7 +8,7 @@ using zx;
 type HandleStruct = resource struct {
     foo string;
     bar int32;
-    baz zx.handle;
+    baz zx.Handle;
 };
 
 type NoHandleStruct = struct {
@@ -19,7 +19,7 @@ type NoHandleStruct = struct {
 
 type NumberHandleNumber = resource struct {
     n1 uint32;
-    h zx.handle;
+    h zx.Handle;
     n2 uint32;
 };
 
@@ -217,15 +217,15 @@ closed protocol TestServer {
     strict -> NeverEvent();
 
     strict SendEvent(resource struct {
-        h zx.handle:EVENT;
+        h zx.Handle:EVENT;
     });
     strict EchoChannelAsEvent(resource struct {
-        h zx.handle:CHANNEL;
+        h zx.Handle:CHANNEL;
     }) -> (resource struct {
-        h zx.handle:EVENT;
+        h zx.Handle:EVENT;
     });
     strict EventEvent(resource struct {
-        h zx.handle:EVENT;
+        h zx.Handle:EVENT;
     });
 
     strict SendErrorEvent(strict union {
@@ -239,10 +239,10 @@ closed protocol TestServer {
 
 closed protocol HandleRightsTestServer {
     strict SendEvent(resource struct {
-        h zx.handle:EVENT;
+        h zx.Handle:EVENT;
     });
     strict SendChannel(resource struct {
-        h zx.handle:CHANNEL;
+        h zx.Handle:CHANNEL;
     });
 };
 
@@ -291,9 +291,9 @@ closed protocol SimpleServer {
 };
 
 type ChannelWithDefaultRights = resource struct {
-    c zx.handle:<CHANNEL, zx.DEFAULT_CHANNEL_RIGHTS>;
+    c zx.Handle:<CHANNEL, zx.DEFAULT_CHANNEL_RIGHTS>;
 };
 
 type ChannelWithReducedRights = resource struct {
-    c zx.handle:<CHANNEL, zx.Rights.TRANSFER>;
+    c zx.Handle:<CHANNEL, zx.Rights.TRANSFER>;
 };

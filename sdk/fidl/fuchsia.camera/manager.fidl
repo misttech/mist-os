@@ -68,7 +68,7 @@ protocol Manager {
         request VideoStream;
         buffer_info fuchsia.sysmem.BufferCollectionInfo;
         stream server_end:Stream;
-        client_token zx.handle:EVENTPAIR;
+        client_token zx.Handle:EVENTPAIR;
     });
 
     /// Create a Stream with the specified access rights.  This may not succeed.
@@ -79,6 +79,6 @@ protocol Manager {
         request VideoStreamV2;
         buffer_info fuchsia.sysmem.BufferCollectionInfo;
         stream server_end:Stream;
-        client_token zx.handle:EVENTPAIR;
+        client_token zx.Handle:EVENTPAIR;
     });
 };

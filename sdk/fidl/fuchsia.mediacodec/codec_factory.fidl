@@ -660,6 +660,6 @@ protocol CodecFactory {
     /// have ZX_RIGHT_DUPLICATE (and must have ZX_RIGHT_TRANSFER to transfer
     /// without causing CodecFactory channel failure).
     AttachLifetimeTracking(resource struct {
-        codec_end zx.handle:EVENTPAIR;
+        codec_end zx.Handle:EVENTPAIR;
     });
 };

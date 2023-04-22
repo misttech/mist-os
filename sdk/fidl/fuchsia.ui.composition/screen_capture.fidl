@@ -56,7 +56,7 @@ type ScreenCaptureConfig = resource table {
 /// The arguments passed into the [`GetNextFrame`] call. All fields are necessary.
 type GetNextFrameArgs = resource table {
     /// The event that will signal when the requested frame has been rendered. Required.
-    1: event zx.handle:EVENT;
+    1: event zx.Handle:EVENT;
 };
 
 /// Metadata about the frame rendered by [`GetNextFrame`].

@@ -65,7 +65,7 @@ protocol Device {
         result EcStatus;
         /// Response bytes, which are command-code and -version specific.
         data vector<uint8>:MAX_COMMAND_SIZE;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 service Service {

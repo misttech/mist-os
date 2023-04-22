@@ -34,7 +34,7 @@ type UnreachabilityConfig = table {
     /// Referred to as "BaseReachableTime" by RFC 4861.
     ///
     /// Must be greater than 0.
-    1: base_reachable_time zx.duration;
+    1: base_reachable_time zx.Duration;
 
     /// Learn [`base_reachable_time`] during runtime from the neighbor discovery
     /// protocol, if supported.
@@ -64,7 +64,7 @@ type UnreachabilityConfig = table {
     /// Referred to as "RetransTimer" by RFC 4861.
     ///
     /// Must be greater than 0.
-    5: retransmit_timer zx.duration;
+    5: retransmit_timer zx.Duration;
 
     /// Learn [`retransmit_timer`] during runtime from the neighbor discovery
     /// protocol, if supported.
@@ -76,7 +76,7 @@ type UnreachabilityConfig = table {
     /// PROBE state.
     ///
     /// Must be greater than 0.
-    7: delay_first_probe_time zx.duration;
+    7: delay_first_probe_time zx.Duration;
 
     /// The number of reachability probes to send before concluding negative
     /// reachability and deleting the entry from the INCOMPLETE state.
@@ -97,7 +97,7 @@ type UnreachabilityConfig = table {
 
     /// If the target address is an anycast address, the stack SHOULD delay
     /// sending a response for a random time between 0 and this duration.
-   10: max_anycast_delay_time zx.duration;
+   10: max_anycast_delay_time zx.Duration;
 
     /// A node MAY send up to this amount of unsolicited reachability
     /// confirmations messages to all-nodes multicast address when a node
@@ -109,20 +109,20 @@ type UnreachabilityConfig = table {
 
 /// Default value for [`UnreachabilityConfig.base_reachable_time`] as
 /// recommended by RFC 4861 section 10.
-const DEFAULT_BASE_REACHABLE_TIME zx.duration = 30000000000; // 30 seconds
+const DEFAULT_BASE_REACHABLE_TIME zx.Duration = 30000000000; // 30 seconds
 
 /// Default value for [`UnreachabilityConfig.retransmit_timer`] as recommended
 /// by RFC 4861 section 10.
-const DEFAULT_RETRANSMIT_TIMER zx.duration = 1000000000; // 1 second
+const DEFAULT_RETRANSMIT_TIMER zx.Duration = 1000000000; // 1 second
 
 /// Default value for [`UnreachabilityConfig.delay_first_probe_time`] as
 /// recommended by RFC
 /// 4861 section 10.
-const DEFAULT_DELAY_FIRST_PROBE_TIME zx.duration = 5000000000; // 5 seconds
+const DEFAULT_DELAY_FIRST_PROBE_TIME zx.Duration = 5000000000; // 5 seconds
 
 /// Default value for [`UnreachabilityConfig.max_anycast_delay_time`] as
 /// recommended by RFC 4861 section 10.
-const DEFAULT_MAX_ANYCAST_DELAY_TIME zx.duration = 1000000000; // 1 second
+const DEFAULT_MAX_ANYCAST_DELAY_TIME zx.Duration = 1000000000; // 1 second
 
 /// Default value for [`UnreachabilityConfig.min_random_factor`] as recommended
 /// by RFC 4861 section 10.

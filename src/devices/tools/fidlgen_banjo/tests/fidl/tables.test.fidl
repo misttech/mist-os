@@ -14,7 +14,7 @@ type B = struct {
 };
 
 type C = resource struct {
-    baz zx.handle;
+    baz zx.Handle;
 };
 
 type D = resource struct {

@@ -92,7 +92,7 @@ protocol Socket {
     Describe() -> (resource table {
         /// Signals additional information about the state of the socket such as
         /// readiness or shutdown-ness.
-        1: event zx.handle:EVENTPAIR;
+        1: event zx.Handle:EVENTPAIR;
     });
 
     /// Receives a message from the socket.

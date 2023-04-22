@@ -21,7 +21,7 @@ protocol StreamBufferSet {
     /// invoked, otherwise the service will close the connection.
     AddPayloadBuffer(resource struct {
         id uint32;
-        payload_buffer zx.handle:VMO;
+        payload_buffer zx.Handle:VMO;
     });
 
     /// Removes a payload buffer from the current buffer set associated with the

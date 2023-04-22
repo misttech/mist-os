@@ -21,8 +21,8 @@ protocol Loader {
     LoadObject(struct {
         object_name string:1024;
     }) -> (resource struct {
-        rv zx.status;
-        object zx.handle:<VMO, optional>;
+        rv zx.Status;
+        object zx.Handle:<VMO, optional>;
     });
 
     /// The dynamic linker sends a `config` identifying its load
@@ -32,13 +32,13 @@ protocol Loader {
     Config(struct {
         config string:1024;
     }) -> (struct {
-        rv zx.status;
+        rv zx.Status;
     });
 
     /// Obtain a new loader service connection.
     Clone(resource struct {
         loader server_end:Loader;
     }) -> (struct {
-        rv zx.status;
+        rv zx.Status;
     });
 };

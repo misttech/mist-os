@@ -24,6 +24,6 @@ protocol RealmProxy {
     /// Connects [server_end] to the [protocol] from this proxy's namespace.
     ConnectToNamedProtocol(resource struct {
         protocol string:1000;
-        server_end zx.handle:CHANNEL;
+        server_end zx.Handle:CHANNEL;
     }) -> () error OperationError;
 };

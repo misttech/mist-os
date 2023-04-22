@@ -29,23 +29,23 @@ type Present2Args = resource table {
     /// the scene manager applies all enqueued operations associated with all
     /// prior calls to Present2 whose `requested_presentation_time` is on or
     /// before the frame's target presentation time.
-    1: requested_presentation_time zx.time;
+    1: requested_presentation_time zx.Time;
 
     /// Scenic will wait until all of a session's `acquire_fences` are ready
     /// before it will execute the presented commands.
-    2: acquire_fences vector<zx.handle:EVENT>;
+    2: acquire_fences vector<zx.Handle:EVENT>;
 
     /// `release_fences` is the list of events that will be signalled by Scenic when
     /// the following Present2 call's `acquire_fences` has been signalled, and
     /// the updated session state has been fully committed: future frames will be
     /// rendered using this state, and all frames generated using previous session
     /// states have been fully-rendered and presented to the display.
-    3: release_fences vector<zx.handle:EVENT>;
+    3: release_fences vector<zx.Handle:EVENT>;
 
     /// `requested_prediction_span` is the amount of time into the future Scenic
     /// will provide predictions for. A span of 0 is guaranteed to provide at
     /// least one future time.
-    4: requested_prediction_span zx.duration;
+    4: requested_prediction_span zx.Duration;
 };
 
 /// Client use Sessions to interact with a Scenic instance by enqueuing commands
@@ -167,8 +167,8 @@ protocol Session {
     @transitional
     Present(resource struct {
         presentation_time uint64;
-        acquire_fences vector<zx.handle:EVENT>;
-        release_fences vector<zx.handle:EVENT>;
+        acquire_fences vector<zx.Handle:EVENT>;
+        release_fences vector<zx.Handle:EVENT>;
     }) -> (struct {
         presentation_info fuchsia.images.PresentationInfo;
     });
@@ -217,7 +217,7 @@ protocol Session {
     ///
     /// A value of 0 is guaranteed to give at least one future presentation info.
     RequestPresentationTimes(struct {
-        requested_prediction_span zx.duration;
+        requested_prediction_span zx.Duration;
     }) -> (struct {
         request_presentation_times_info fuchsia.scenic.scheduling.FuturePresentationTimes;
     });

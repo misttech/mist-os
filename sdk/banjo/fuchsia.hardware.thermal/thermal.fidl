@@ -13,8 +13,8 @@ protocol Thermal {
     /// Pass a channel handle to the thermal driver to connect to its
     /// FIDL interface.
     Connect(resource struct {
-        chan zx.handle:CHANNEL;
+        chan zx.Handle:CHANNEL;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

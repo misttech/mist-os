@@ -44,7 +44,7 @@ protocol LinuxManager {
         label string:MAX;
     }) -> (struct {
         info LinuxGuestInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Linux guest info event.
     ///
@@ -60,7 +60,7 @@ protocol LinuxManager {
     /// Returns ZX_ERR_BAD_STATE if this is called while the VM is running.
     /// Returns ZX_ERR_IO if there was an IO failure while performing the
     /// operation.
-    WipeData() -> () error zx.status;
+    WipeData() -> () error zx.Status;
 
     /// Attempts to gracefully shut down a running guest. The caller must ensure that the guest
     /// has actually stopped (such as by waiting on a Guest client PEER_CLOSED signal and checking

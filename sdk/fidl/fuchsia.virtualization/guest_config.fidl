@@ -38,7 +38,7 @@ type BlockSpec = resource struct {
         /// File IO. All reads and writes go directly to disk as a flat file.
         1: file client_end:fuchsia.io.File;
         /// QCOW image. All reads and writes go to a QCOW image.
-        2: qcow zx.handle:CHANNEL;
+        2: qcow zx.Handle:CHANNEL;
         /// Block IO. All reads and writes go to a block server.
         3: block client_end:fuchsia.hardware.block.Block;
     };

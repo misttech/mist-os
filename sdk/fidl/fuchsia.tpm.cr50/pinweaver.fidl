@@ -75,7 +75,7 @@ type DelayScheduleEntry = struct {
     /// The delay before another authentication attempt is allowed. May either
     /// be a duration between 1 second and 49710 days to enforce a delay or
     /// duration::INFINITE to prevent further authentication attempts.
-    time_delay zx.duration;
+    time_delay zx.Duration;
 };
 
 /// Parameters to InsertLeaf method.
@@ -201,7 +201,7 @@ type LogReplayResponse = table {
 /// secret may be correct but the caller is locked out until `time_to_wait`
 /// has passed.
 type TryAuthRateLimited = table {
-    1: time_to_wait zx.duration;
+    1: time_to_wait zx.Duration;
 };
 
 /// The PinWeaver protocol defines the low level interface to the CR50

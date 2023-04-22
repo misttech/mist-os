@@ -43,6 +43,6 @@ protocol ProgressRenderer {
         /// Time to take to move slowly to percent_complete
         /// Optional, only used with status ACTIVE
         /// No value indicates an instant jump to percent_complete
-        3: elapsed_time zx.duration;
+        3: elapsed_time zx.Duration;
     }) -> ();
 };

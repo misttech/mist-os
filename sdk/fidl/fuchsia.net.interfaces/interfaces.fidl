@@ -25,7 +25,7 @@ type Empty = struct {};
 type PreferredLifetimeInfo = strict union {
     /// The end of the preferred lifetime.
     ///
-    /// The address/prefix should *not* be considered deprecated if `zx.time`
+    /// The address/prefix should *not* be considered deprecated if `zx.Time`
     /// is in the past. `preferred_until` is exchanged as a means to inform
     /// the deadline where deprecation is expected to happen.
     ///
@@ -36,9 +36,9 @@ type PreferredLifetimeInfo = strict union {
     /// lifetime no longer than that of the prefix according to
     /// [RFC 8415, section 6.3](https://datatracker.ietf.org/doc/html/rfc8415#section-6.3).
     ///
-    /// Must be greater than 0. If `zx.time.INFINITE`, the preferred lifetime
+    /// Must be greater than 0. If `zx.Time.INFINITE`, the preferred lifetime
     /// does not expire.
-    1: preferred_until zx.time;
+    1: preferred_until zx.Time;
 
     /// The address/prefix is deprecated.
     ///
@@ -76,13 +76,13 @@ type Properties = table {
         /// indicates that the address will always be valid. The value is
         /// derived from the monotonic clock.
         ///
-        /// As a `zx.time`, the value has
+        /// As a `zx.Time`, the value has
         /// [monotonic clock semantics](https://fuchsia.dev/fuchsia-src/concepts/time/monotonic),
         /// which implies that it has no meaning outside of the host on which it
         /// was generated and no meaning across host restarts.
         ///
         /// Optional; may be omitted due to disinterest.
-        2: valid_until zx.time;
+        2: valid_until zx.Time;
         // TODO(https://fxbug.dev/107618): Send this field to clients.
         /// Preferred lifetime information.
         ///

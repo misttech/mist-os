@@ -28,7 +28,7 @@ protocol InputReportsReader {
     /// again will return ZX_ERR_ALREADY_BOUND.
     ReadInputReports() -> (struct {
         reports vector<InputReport>:MAX_DEVICE_REPORT_COUNT;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// An `InputDevice` driver represents a single physical input device.
@@ -53,19 +53,19 @@ protocol InputDevice {
     /// if the output report does not follow the OutputDescriptor.
     SendOutputReport(struct {
         report OutputReport;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Get the feature report for a given device. This requests the state of
     /// the device's features.
     GetFeatureReport() -> (struct {
         report FeatureReport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Set the feature report for a given device. This sets the state of
     /// the device's features.
     SetFeatureReport(struct {
         report FeatureReport;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// For general cases, InputReportReader is the preferred way of getting
     /// InputReports. For devices that don't send InputReports naturally, this
@@ -76,5 +76,5 @@ protocol InputDevice {
         device_type DeviceType;
     }) -> (struct {
         report InputReport;
-    }) error zx.status;
+    }) error zx.Status;
 };

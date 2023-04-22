@@ -11,6 +11,6 @@ using zx;
 protocol InfoResource {
     /// Get an info resource handle.
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

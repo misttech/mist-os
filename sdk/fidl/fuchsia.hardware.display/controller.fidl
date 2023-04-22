@@ -48,7 +48,7 @@ protocol Controller {
         image_id uint64;
         index uint32;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
 
@@ -72,7 +72,7 @@ protocol Controller {
     /// If a client is reusing events, they must clear the signal
     /// before referencing the id again.
     ImportEvent(resource struct {
-        event zx.handle:EVENT;
+        event zx.Handle:EVENT;
         id uint64;
     });
 
@@ -94,7 +94,7 @@ protocol Controller {
     // configuration is applied which does not include the layer or until its
     // display is removed.
     CreateLayer() -> (struct {
-        res zx.status;
+        res zx.Status;
         layer_id uint64;
     });
 
@@ -393,7 +393,7 @@ protocol Controller {
     // signaled by the display driver.
     @transitional
     ApplyConfig2(resource struct {
-        signal_fences vector<zx.handle:EVENT>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
+        signal_fences vector<zx.Handle:EVENT>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
     });
 
     // Sets whether or not vsync events will be given to this client. Defaults
@@ -476,7 +476,7 @@ protocol Controller {
         collection_id uint64;
         collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
     // Release an imported buffer collection.
@@ -494,13 +494,13 @@ protocol Controller {
         collection_id uint64;
         config ImageConfig;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
     /// Returns true if Capture is supported on the platform.
     IsCaptureSupported() -> (struct {
         supported bool;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Imports a buffer collection backed VMO into the display controller. The VMO
     /// will be used by display controller to capture the image being displayed.
@@ -514,7 +514,7 @@ protocol Controller {
         index uint32;
     }) -> (struct {
         image_id uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Starts capture. Client must provide a valid signal_event_id and
     /// image_id. signal_event_id must have been imported into the driver
@@ -524,13 +524,13 @@ protocol Controller {
     StartCapture(struct {
         signal_event_id uint64;
         image_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Releases resources allocated for capture.
     /// Returns ZX_ERR_NOT_SUPPORTED if controller does not support capture
     ReleaseCapture(struct {
         image_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Set the minimum value of rgb channels. Valid range [0 255] inclusive. Returns
     /// ZX_ERR_NOT_SUPPORTED when the display hardware does not support this feature.
@@ -544,7 +544,7 @@ protocol Controller {
     /// wait for ApplyConfig(). It is, however, still stateful.
     SetMinimumRgb(struct {
         minimum_rgb uint8;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Power off/on the display panel.
     ///
@@ -568,5 +568,5 @@ protocol Controller {
     SetDisplayPower(struct {
         display_id uint64;
         power_on bool;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

@@ -19,25 +19,25 @@ protocol Device {
         mask uint8;
     }) -> (struct {
         value uint8;
-    }) error zx.status;
+    }) error zx.Status;
     ReadRegister16(struct {
         offset uint64;
         mask uint16;
     }) -> (struct {
         value uint16;
-    }) error zx.status;
+    }) error zx.Status;
     ReadRegister32(struct {
         offset uint64;
         mask uint32;
     }) -> (struct {
         value uint32;
-    }) error zx.status;
+    }) error zx.Status;
     ReadRegister64(struct {
         offset uint64;
         mask uint64;
     }) -> (struct {
         value uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Writes to the register at the specified MMIO offset in register width equal to 8, 16, 32, and
     /// 64 bit variants
@@ -51,22 +51,22 @@ protocol Device {
         offset uint64;
         mask uint8;
         value uint8;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     WriteRegister16(struct {
         offset uint64;
         mask uint16;
         value uint16;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     WriteRegister32(struct {
         offset uint64;
         mask uint32;
         value uint32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     WriteRegister64(struct {
         offset uint64;
         mask uint64;
         value uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 service Service {

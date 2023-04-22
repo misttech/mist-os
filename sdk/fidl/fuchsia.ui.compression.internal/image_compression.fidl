@@ -21,7 +21,7 @@ type ImageCompressionError = flexible enum {
 protocol ImageCompressor {
     EncodePng(resource table {
         /// VMO holding the image-to-be-encoded in packaged, BGRA_RAW format.
-        1: raw_vmo zx.handle:VMO;
+        1: raw_vmo zx.Handle:VMO;
 
         /// The width and height of the input image.
         2: image_dimensions fuchsia.math.SizeU;
@@ -29,6 +29,6 @@ protocol ImageCompressor {
         /// Resultant VMO in PNG format. This VMO's allocated size should be at
         /// least 4KB larger than the input image's width*height*pixel_size to
         /// account for format padding.
-        3: png_vmo zx.handle:VMO;
+        3: png_vmo zx.Handle:VMO;
     }) -> () error ImageCompressionError;
 };

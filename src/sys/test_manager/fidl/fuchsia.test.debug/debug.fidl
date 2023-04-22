@@ -36,7 +36,7 @@ closed protocol DebugDataProcessor {
 
 /// Container for a single VMO that is ready to be processed.
 type DebugVmo = resource struct {
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
     data_sink string:1024;
     test_url string:1024;
 };

@@ -27,7 +27,7 @@ protocol Resolver {
     /// unsuccessful resolution is indicated when both addresses are null.
     ResolveHostName(struct {
         host host_name;
-        timeout zx.duration;
+        timeout zx.Duration;
     }) -> (struct {
         v4_address box<fuchsia.net.Ipv4Address>;
         v6_address box<fuchsia.net.Ipv6Address>;
@@ -172,15 +172,15 @@ type Publication = struct {
 
     /// Time-to-live for PTR resource records.
     @allow_deprecated_struct_defaults
-    ptr_ttl zx.duration = DEFAULT_PTR_TTL;
+    ptr_ttl zx.Duration = DEFAULT_PTR_TTL;
 
     /// Time-to-live for SRV resource records.
     @allow_deprecated_struct_defaults
-    srv_ttl zx.duration = DEFAULT_SRV_TTL;
+    srv_ttl zx.Duration = DEFAULT_SRV_TTL;
 
     /// Time-to-live for TXT resource records.
     @allow_deprecated_struct_defaults
-    txt_ttl zx.duration = DEFAULT_TXT_TTL;
+    txt_ttl zx.Duration = DEFAULT_TXT_TTL;
 };
 
 @available(deprecated=9)
@@ -188,11 +188,11 @@ const DEFAULT_SRV_PRIORITY uint16 = 0;
 @available(deprecated=9)
 const DEFAULT_SRV_WEIGHT uint16 = 0;
 @available(deprecated=9)
-const DEFAULT_PTR_TTL zx.duration = 120000000000; // 2 minutes
+const DEFAULT_PTR_TTL zx.Duration = 120000000000; // 2 minutes
 @available(deprecated=9)
-const DEFAULT_SRV_TTL zx.duration = 120000000000; // 2 minutes
+const DEFAULT_SRV_TTL zx.Duration = 120000000000; // 2 minutes
 @available(deprecated=9)
-const DEFAULT_TXT_TTL zx.duration = 4500000000000; // 75 minutes
+const DEFAULT_TXT_TTL zx.Duration = 4500000000000; // 75 minutes
 
 /// Error values for instance publishing.
 @available(deprecated=9)

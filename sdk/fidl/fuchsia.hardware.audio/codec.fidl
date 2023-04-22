@@ -91,7 +91,7 @@ type CodecFormatInfo = table {
     /// for the chosen format. When precisely synchronizing presentation across multiple entities
     /// (e.g. devices), the external delay should be taken into account. Optional.
     /// If not included `external_delay` is unknown.
-    1: external_delay zx.duration;
+    1: external_delay zx.Duration;
 
     /// The driver's best estimate of the amount of time (in nanoseconds) it takes the hardware to
     /// actually start playback/capture after a `Start` command is issued.
@@ -99,7 +99,7 @@ type CodecFormatInfo = table {
     /// a power state change. This delay must be taken into account if not getting the initial audio
     /// samples played or captured is not acceptable. Optional.
     /// If not included `turn_on_delay` is unknown.
-    2: turn_on_delay zx.duration;
+    2: turn_on_delay zx.Duration;
 
     /// The driver's best estimate of the amount of time (in nanoseconds) it takes the hardware to
     /// actually stop playback/capture after a `Stop` command is issued.
@@ -107,7 +107,7 @@ type CodecFormatInfo = table {
     /// a power state change. This delay must be taken into account if playback/capture of samples
     /// after a 'Stop' command is not acceptable. Optional.
     /// If not included, the turn off delay is unknown.
-    3: turn_off_delay zx.duration;
+    3: turn_off_delay zx.Duration;
 };
 
 /// For an overview see
@@ -146,7 +146,7 @@ protocol Codec {
     /// If the driver can't successfully configure the codec to stop it will close the codec
     /// protocol channel, in this case the client may obtain a new codec protocol channel and retry.
     Stop() -> (struct {
-        start_time zx.time;
+        start_time zx.Time;
     });
 
     /// Start/Re-start the codec operation.
@@ -158,7 +158,7 @@ protocol Codec {
     /// If the driver can't successfully start the codec it will close the codec protocol channel,
     /// in this case the client may obtain a new codec protocol channel and retry.
     Start() -> (struct {
-        start_time zx.time;
+        start_time zx.Time;
     });
 
     /// Returns whether a codec is bridgeable.
@@ -178,7 +178,7 @@ protocol Codec {
     /// combinations of the parameters in DaiSupportedFormats may be supported.
     GetDaiFormats() -> (struct {
         formats vector<DaiSupportedFormats>:MAX_COUNT_FORMATS;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Sets the DAI format to be used in the interface between the controller and codec.
     /// Returns an error if not supported at the time of the request (e.g. for removable hardware).
@@ -186,7 +186,7 @@ protocol Codec {
         format DaiFormat;
     }) -> (struct {
         state CodecFormatInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Retrieves gain format.
     //

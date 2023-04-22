@@ -7,7 +7,7 @@ using fuchsia.io;
 using zx;
 
 /// Error codes for PackageResolver operations.
-// TODO(fxb/46003): Use this instead of zx.status for `GetHash`
+// TODO(fxb/46003): Use this instead of zx.Status for `GetHash`
 type ResolveError = strict enum : int32 {
     /// The resolver encountered an otherwise unspecified error while handling the request.
     INTERNAL = 1;
@@ -117,5 +117,5 @@ protocol PackageResolver {
         package_url PackageUrl;
     }) -> (struct {
         meta_far_blob_id BlobId;
-    }) error zx.status;
+    }) error zx.Status;
 };

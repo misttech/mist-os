@@ -185,7 +185,7 @@ type MountVmoResult = flexible union {
     1: success Success;
 
     /// Error reading the VMO.
-    2: vmo_read_failure zx.status;
+    2: vmo_read_failure zx.Status;
 
     3: parse_error ParseError;
 };

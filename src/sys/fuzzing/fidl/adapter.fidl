@@ -31,7 +31,7 @@ closed protocol TargetAdapter {
     /// used to provide test inputs to the adapter. The VMO must have the ZX_PROP_VMO_CONTENT_SIZE
     /// property set.
     strict Connect(resource struct {
-        eventpair zx.handle:EVENTPAIR;
-        test_input zx.handle:VMO;
+        eventpair zx.Handle:EVENTPAIR;
+        test_input zx.Handle:VMO;
     }) -> ();
 };

@@ -18,7 +18,7 @@ type DeviceInfo = struct {
 
     /// polling rate if applicable in usec
     @available(added=HEAD)
-    polling_rate zx.duration;
+    polling_rate zx.Duration;
 };
 
 /// `DeviceDescriptor` describes a physical input device. Some physical devices may

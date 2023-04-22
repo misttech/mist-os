@@ -30,12 +30,12 @@ protocol DeviceReportsReader {
         reports vector<@generated_name("Report") struct {
             /// The time the report was created, from the view of the monotonic
             /// clock.
-            time zx.time;
+            time zx.Time;
             /// The HID report data. This is guaranteed to always be a full HID
             /// report.
             data vector<uint8>:MAX_REPORT_DATA;
         }>:MAX_REPORTS_COUNT;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 // TODO(fxbug.dev/49329): This API doesn't follow best practices and needs to be
@@ -72,7 +72,7 @@ protocol Device {
     /// allocates a new FIFO for receiving input reports.
     GetDeviceReportsReader(resource struct {
         reader server_end:DeviceReportsReader;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Read one report out of the report FIFO. Only a single report will be
     /// returned in this API. `time` is the time the report was created, from
@@ -80,9 +80,9 @@ protocol Device {
     /// If status is ZX_ERR_SHOULD_WAIT the client can wait on the event
     /// from `GetReportsEvent`.
     ReadReport() -> (struct {
-        status zx.status;
+        status zx.Status;
         data vector<uint8>:MAX_REPORT_DATA;
-        time zx.time;
+        time zx.Time;
     });
 
     /// Read up to MAX_REPORT_DATA bytes of reports that have been sent from a device.
@@ -93,7 +93,7 @@ protocol Device {
     /// If there are no reports, this will return ZX_ERR_SHOULD_WAIT, and the client can
     /// wait on the event from `GetReportsEvent`.
     ReadReports() -> (struct {
-        status zx.status;
+        status zx.Status;
         data vector<uint8>:MAX_REPORT_DATA;
     });
 
@@ -102,8 +102,8 @@ protocol Device {
     /// reports in the Device's report FIFO. This event can be re-used each time
     /// the client wishes to know if there are reports in the FIFO.
     GetReportsEvent() -> (resource struct {
-        status zx.status;
-        event zx.handle:EVENT;
+        status zx.Status;
+        event zx.Handle:EVENT;
     });
 
     /// Send a request to the hardware for a given report described by type and id.
@@ -113,7 +113,7 @@ protocol Device {
         type ReportType;
         id ReportId;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         report vector<uint8>:MAX_REPORT_LEN;
     });
 
@@ -123,7 +123,7 @@ protocol Device {
         id ReportId;
         report vector<uint8>:MAX_REPORT_LEN;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Set the trace ID that is used for HID report flow events.

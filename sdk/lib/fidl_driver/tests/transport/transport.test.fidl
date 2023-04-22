@@ -47,9 +47,9 @@ protocol SendDriverTransportEndTest {
 @transport("Driver")
 protocol SendZirconHandleTest {
     SendZirconHandle(resource struct {
-        h zx.handle:EVENT;
+        h zx.Handle:EVENT;
     }) -> (resource struct {
-        h zx.handle:EVENT;
+        h zx.Handle:EVENT;
     });
 };
 
@@ -67,7 +67,7 @@ protocol OnErrorCloseHandlesTest {
     // The first string member is used to trigger an encoding error.
     SendZirconHandle(resource struct {
         s string:1;
-        h zx.handle:CHANNEL;
+        h zx.Handle:CHANNEL;
     });
 
     // The first string member is used to trigger an encoding error.

@@ -53,5 +53,5 @@ type DriverStartArgs = resource table {
 
     // TODO(https://fxbug.dev/94716) add link to reference for the contents
     /// Configuration passed to the driver.
-    7: config zx.handle:VMO;
+    7: config zx.Handle:VMO;
 };

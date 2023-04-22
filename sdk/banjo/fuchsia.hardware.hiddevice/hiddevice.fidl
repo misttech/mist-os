@@ -22,7 +22,7 @@ protocol HidReportListener {
     /// from the computer's monotonic clock.
     ReceiveReport(struct {
         report vector<uint8>:HID_MAX_REPORT_LEN;
-        report_time zx.time;
+        report_time zx.Time;
     });
 };
 
@@ -32,7 +32,7 @@ type HidDeviceInfo = struct {
     version uint32;
 
     /// polling rate if applicable in usec
-    polling_rate zx.duration;
+    polling_rate zx.Duration;
 };
 
 @transport("Banjo")
@@ -43,7 +43,7 @@ protocol HidDevice {
     RegisterListener(resource struct {
         listener client_end:HidReportListener;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Unregister the listener.
@@ -54,7 +54,7 @@ protocol HidDevice {
     });
 
     GetDescriptor() -> (struct {
-        s zx.status;
+        s zx.Status;
         descriptor vector<uint8>:HID_MAX_DESC_LEN;
     });
 
@@ -65,7 +65,7 @@ protocol HidDevice {
         rpt_type HidReportType;
         rpt_id uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         report vector<uint8>:HID_MAX_REPORT_LEN;
     });
 
@@ -76,6 +76,6 @@ protocol HidDevice {
         rpt_id uint8;
         report vector<uint8>:HID_MAX_REPORT_LEN;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

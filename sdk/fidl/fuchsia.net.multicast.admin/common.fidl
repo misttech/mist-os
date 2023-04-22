@@ -55,7 +55,7 @@ type RouteStats = table {
     /// The value is obtained from the system’s monotonic clock.
     ///
     /// Required.
-    1: last_used zx.time;
+    1: last_used zx.Time;
 };
 
 /// An event that can occur during multicast routing.

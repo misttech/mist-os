@@ -7,6 +7,6 @@ using zx;
 
 closed protocol Device {
     strict GetChannel() -> (resource struct {
-        ch zx.handle:CHANNEL;
+        ch zx.Handle:CHANNEL;
     });
 };

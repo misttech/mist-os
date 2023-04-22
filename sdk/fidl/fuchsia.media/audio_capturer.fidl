@@ -312,7 +312,7 @@ protocol AudioCapturer {
     /// and TRANSFER rights, and will refer to a zx::clock that is MONOTONIC and CONTINUOUS.
     ///
     GetReferenceClock() -> (resource struct {
-        reference_clock zx.handle:CLOCK;
+        reference_clock zx.Handle:CLOCK;
     });
 
     /// Sets the reference clock that controls this capturer's playback rate. If the input
@@ -328,7 +328,7 @@ protocol AudioCapturer {
     /// this as the stream's reference clock, then rate-adjust it subsequently as needed.
     ///
     SetReferenceClock(resource struct {
-        reference_clock zx.handle:<CLOCK, optional>;
+        reference_clock zx.Handle:<CLOCK, optional>;
     });
 
     /// Sets the usage of the capture stream.  This may be changed on the fly, but

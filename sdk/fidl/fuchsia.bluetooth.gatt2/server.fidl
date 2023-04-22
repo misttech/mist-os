@@ -154,7 +154,7 @@ protocol LocalService {
     // `confirmation` kernel object in order to wait on the signal from the other side.
     -> OnIndicateValue(resource struct {
         update ValueChangedParameters;
-        confirmation zx.handle:EVENTPAIR;
+        confirmation zx.Handle:EVENTPAIR;
     });
 
     /// Add credit for sending indications/notifications. Implementors are defined to start out with

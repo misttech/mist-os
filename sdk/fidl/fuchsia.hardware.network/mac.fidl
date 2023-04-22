@@ -61,7 +61,7 @@ protocol MacAddressing {
     SetMode(struct {
         mode MacFilterMode;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Adds multicast address to the list of multicast groups.
@@ -76,7 +76,7 @@ protocol MacAddressing {
     AddMulticastAddress(struct {
         address fuchsia.net.MacAddress;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// Removes multicast address from the list of multicast groups.
     ///
@@ -86,6 +86,6 @@ protocol MacAddressing {
     RemoveMulticastAddress(struct {
         address fuchsia.net.MacAddress;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

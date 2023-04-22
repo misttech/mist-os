@@ -10,6 +10,6 @@ using zx;
 protocol IoportResource {
     /// Get an IO Port resource handle.
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

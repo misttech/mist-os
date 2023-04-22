@@ -47,7 +47,7 @@ type AgentServiceRequest = resource table {
     1: service_name string:MAX;
 
     /// The channel that will be used to communicate with the requested service.
-    2: channel zx.handle:CHANNEL;
+    2: channel zx.Handle:CHANNEL;
 
     /// The component URL of the Agent that is to provide the specified service.
     /// If no handler is specified, the framework will perform resolution to

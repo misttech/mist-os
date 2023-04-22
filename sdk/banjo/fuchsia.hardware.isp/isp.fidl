@@ -20,7 +20,7 @@ type StreamType = strict enum : uint8 {
 protocol IspStreamShutdownCallback {
     // This is called by the ISP after completing all cleanup of a stream.
     ShutdownComplete(struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 
@@ -29,19 +29,19 @@ protocol IspStreamShutdownCallback {
 protocol OutputStream {
     // Starts the streaming of frames.
     Start() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Stops the streaming of frames.
     Stop() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Unlocks the specified frame, allowing the driver to reuse the memory.
     ReleaseFrame(struct {
         buffer_id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Shutdown the stream and release all resources that are no longer needed.
@@ -49,7 +49,7 @@ protocol OutputStream {
     Shutdown(resource struct {
         shutdown_callback client_end:IspStreamShutdownCallback;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };
 
@@ -73,7 +73,7 @@ protocol Isp {
         type StreamType;
         frame_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelFrameCallback;
     }) -> (resource struct {
-        s zx.status;
+        s zx.Status;
         st client_end:OutputStream;
     });
 
@@ -87,7 +87,7 @@ protocol Isp {
         min_frame_rate fuchsia.hardware.camera.FrameRate;
         max_frame_rate fuchsia.hardware.camera.FrameRate;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Changes the vendor-defined test pattern mode and sets any associated data.
@@ -100,13 +100,13 @@ protocol Isp {
         mode uint8;
         data vector<uint8>:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Sets the ISP driver's idea of default sensor mode.
     SetDefaultSensorMode(struct {
         mode uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

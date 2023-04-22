@@ -10,6 +10,6 @@ closed protocol Hooks {
     strict SetOnline(struct {
         online bool;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

@@ -93,5 +93,5 @@ protocol DeviceIdentification {
     SetDeviceIdentification(resource struct {
         records vector<DeviceIdentificationRecord>:MAX_RECORDS;
         token server_end:DeviceIdentificationHandle;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

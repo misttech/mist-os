@@ -38,7 +38,7 @@ type BandInfo = struct {
 type CreateIfaceRequest = resource struct {
     role fuchsia.wlan.common.WlanMacRole;
     // TODO(fxbug.dev/29547): Make `mlme_channel` mandatory once all drivers support the channel.
-    mlme_channel zx.handle:<CHANNEL, optional>;
+    mlme_channel zx.Handle:<CHANNEL, optional>;
     init_sta_addr ieee80211.MacAddr;
 };
 
@@ -56,16 +56,16 @@ protocol Phy {
     GetSupportedMacRoles() -> (struct {
         supported_mac_roles
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
-    }) error zx.status;
+    }) error zx.Status;
     CreateIface(resource struct {
         req CreateIfaceRequest;
     }) -> (struct {
         iface_id uint16;
-    }) error zx.status;
+    }) error zx.Status;
 
     DestroyIface(struct {
         req DestroyIfaceRequest;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     SetCountry(struct {
         req CountryCode;

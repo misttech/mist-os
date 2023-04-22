@@ -62,14 +62,14 @@ protocol Device {
         transactions vector<Transaction>:MAX_COUNT_TRANSACTIONS;
     }) -> (struct {
         read_data vector<ReadData>:MAX_COUNT_TRANSACTIONS;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the name of this I2C Device. Returns ZX_ERR_NOT_SUPPORTED if the
     /// name is unspecified or the empty string.
     @available(added=11)
     GetName() -> (struct {
         name string:MAX_I2C_NAME_LEN;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 service Service {

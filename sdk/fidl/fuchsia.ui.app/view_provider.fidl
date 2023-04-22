@@ -39,7 +39,7 @@ protocol ViewProvider {
     /// inter-process scene graph.
     @transitional
     CreateView(resource struct {
-        token zx.handle:EVENTPAIR;
+        token zx.Handle:EVENTPAIR;
         incoming_services server_end:<fuchsia.sys.ServiceProvider, optional>;
         outgoing_services client_end:<fuchsia.sys.ServiceProvider, optional>;
     });
@@ -59,7 +59,7 @@ protocol ViewProvider {
     /// will fail.
     @transitional
     CreateViewWithViewRef(resource struct {
-        token zx.handle:EVENTPAIR;
+        token zx.Handle:EVENTPAIR;
         view_ref_control fuchsia.ui.views.ViewRefControl;
         view_ref fuchsia.ui.views.ViewRef;
     });

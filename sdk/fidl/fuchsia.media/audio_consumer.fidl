@@ -44,7 +44,7 @@ protocol AudioConsumer {
     /// `stream_sink_request` request will be closed with an epitaph value of
     /// `ZX_ERR_INVALID_ARGS`.
     CreateStreamSink(resource struct {
-        buffers vector<zx.handle:VMO>:16;
+        buffers vector<zx.Handle:VMO>:16;
         stream_type AudioStreamType;
         compression box<Compression>;
         stream_sink_request server_end:StreamSink;
@@ -78,7 +78,7 @@ protocol AudioConsumer {
     /// The actual start time will be reflected in the updated status.
     Start(struct {
         flags AudioConsumerStartFlags;
-        reference_time zx.time;
+        reference_time zx.Time;
         media_time int64;
     });
 

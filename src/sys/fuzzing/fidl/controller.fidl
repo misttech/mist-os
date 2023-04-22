@@ -65,7 +65,7 @@ type Result = flexible enum : uint32 {
 /// overnet.
 type Input = resource struct {
     /// Socket that can be used to read the data.
-    socket zx.handle:SOCKET;
+    socket zx.Handle:SOCKET;
 
     /// The total amount of data to be transferred.
     size uint64;
@@ -105,7 +105,7 @@ protocol Controller {
     Configure(struct {
         options Options;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
     /// See `Options`. Gets the current values for the various execution and error detection
@@ -120,7 +120,7 @@ protocol Controller {
         corpus Corpus;
         input Input;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
     /// Returns a connected `corpus_reader` for either the "seed" or "live" corpus.
@@ -138,7 +138,7 @@ protocol Controller {
     WriteDictionary(resource struct {
         dictionary Input;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
     /// Returns the current dictionary as an Input, which may be empty.
@@ -171,7 +171,7 @@ protocol Controller {
     Fuzz() -> (resource struct {
         result Result;
         error_input Input;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Returns the result of running the target with a single `test_input`.
     /// Returns an error if transferring the input fails; see `Input` for details.
@@ -179,7 +179,7 @@ protocol Controller {
         test_input Input;
     }) -> (struct {
         result Result;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Attempts to find the smallest input that produces the same error as the given `test_input`,
     /// constrained by the configured `total_time` and/or `runs` options.
@@ -195,7 +195,7 @@ protocol Controller {
         test_input Input;
     }) -> (resource struct {
         minimized Input;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Attempts to replace bytes of the given `test_input` with "filler" bytes, e.g. \x00, \xFF,
     /// without changing the error produced.
@@ -206,7 +206,7 @@ protocol Controller {
         test_input Input;
     }) -> (resource struct {
         cleansed Input;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Attempts to shrink the corpora. Inputs from the seed corpus will be preserved. All other
     /// inputs will be sorted by amount of feedback produced and input size, and only those inputs
@@ -220,7 +220,7 @@ protocol Controller {
     /// Returns ZX_ERR_INVALID_ARGS if an input in the seed corpus causes an error. Skips inputs in
     /// the live corpus that cause errors.
     Merge() -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
     /// See `Status`. Returns various fuzzing metrics, e.g. total coverage, speed, etc.

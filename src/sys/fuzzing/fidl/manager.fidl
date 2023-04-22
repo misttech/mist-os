@@ -33,7 +33,7 @@ closed protocol Manager {
         fuzzer_url fuchsia.url.Url;
         controller server_end:Controller;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
     /// Forwards the fuzzer's output of the given type to the provided socket.
@@ -47,9 +47,9 @@ closed protocol Manager {
     strict GetOutput(resource struct {
         fuzzer_url fuchsia.url.Url;
         output TestOutput;
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
 
@@ -60,7 +60,7 @@ closed protocol Manager {
     strict Stop(struct {
         fuzzer_url fuchsia.url.Url;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 };
 

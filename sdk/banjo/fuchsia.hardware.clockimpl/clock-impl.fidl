@@ -19,17 +19,17 @@ protocol ClockImpl {
     Enable(struct {
         id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     Disable(struct {
         id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     IsEnabled(struct {
         id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         enabled bool;
     });
 
@@ -38,19 +38,19 @@ protocol ClockImpl {
         id uint32;
         hz uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     QuerySupportedRate(struct {
         id uint32;
         hz uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         hz uint64;
     });
     GetRate(struct {
         id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         hz uint64;
     });
 
@@ -59,18 +59,18 @@ protocol ClockImpl {
         id uint32;
         idx uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     GetNumInputs(struct {
         id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         n uint32;
     });
     GetInput(struct {
         id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         index uint32;
     });
 };

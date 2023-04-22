@@ -30,13 +30,13 @@ type Prefix = struct {
         /// be valid. If the value indicates a time in the past,
         /// the prefix is invalid and should not be used.
         ///
-        /// As a `zx.time`, the value has
+        /// As a `zx.Time`, the value has
         /// [monotonic clock semantics][monotonic], which implies
         /// that it has no meaning outside of the host on which it
         /// was generated and no meaning across host restarts.
         ///
         /// [monotonic]: https://fuchsia.dev/fuchsia-src/concepts/time/monotonic
-        valid_until zx.time;
+        valid_until zx.Time;
 
         /// The time after which the prefix will no longer be preferred.
         ///
@@ -46,13 +46,13 @@ type Prefix = struct {
         /// the prefix should be considered deprecated. The value must not
         /// refer to a time after [`valid_until`].
         ///
-        /// As a `zx.time`, the value has
+        /// As a `zx.Time`, the value has
         /// [monotonic clock semantics][monotonic],
         /// which implies that it has no meaning outside of the host on
         /// which it was generated and no meaning across host restarts.
         ///
         /// [monotonic]: https://fuchsia.dev/fuchsia-src/concepts/time/monotonic
-        preferred_until zx.time;
+        preferred_until zx.Time;
     };
 };
 
@@ -239,10 +239,10 @@ protocol Client {
     ///
     /// The server end of the protocol is closed after this method returns.
     ///
-    /// * error a `zx.status` if any of the addresses were not gracefully
+    /// * error a `zx.Status` if any of the addresses were not gracefully
     ///     released, e.g. the client times out waiting for Reply to Release,
     ///     or the interface is down and sending Release fails.
-    Shutdown() -> () error zx.status;
+    Shutdown() -> () error zx.Status;
 };
 
 /// Provides IPv6 prefixes acquired via Prefix delegation.

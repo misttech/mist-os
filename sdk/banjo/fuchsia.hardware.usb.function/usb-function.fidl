@@ -14,12 +14,12 @@ protocol UsbFunction {
     SetInterface(resource struct {
         interface client_end:UsbFunctionInterface;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Allocates a unique interface descriptor number.
     AllocInterface() -> (struct {
-        s zx.status;
+        s zx.Status;
         intf_num uint8;
     });
 
@@ -27,7 +27,7 @@ protocol UsbFunction {
     AllocEp(struct {
         direction uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         address uint8;
     });
 
@@ -36,21 +36,21 @@ protocol UsbFunction {
         ep_desc fuchsia.hardware.usb.descriptor.UsbEndpointDescriptor;
         ss_comp_desc fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Disables the specified endpoint.
     DisableEp(struct {
         address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Adds a string descriptor to the device configuration.
     AllocStringDesc(struct {
         string string:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         index uint8;
     });
 
@@ -66,14 +66,14 @@ protocol UsbFunction {
     EpSetStall(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Clears a stall condition for the specified endpoint.
     EpClearStall(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Returns the size needed for a |usb_request_t|, including private storage needed by the
@@ -86,7 +86,7 @@ protocol UsbFunction {
     CancelAll(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };
 
@@ -114,7 +114,7 @@ protocol UsbFunctionInterface {
         @buffer
         write vector<uint8>:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         @buffer
         read vector<uint8>:MAX;
     });
@@ -128,7 +128,7 @@ protocol UsbFunctionInterface {
         configured bool;
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Called to set an alternate setting for an interface due to a SET_INTERFACE control request.
@@ -138,6 +138,6 @@ protocol UsbFunctionInterface {
         interface uint8;
         alt_setting uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

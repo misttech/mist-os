@@ -37,7 +37,7 @@ protocol SyncTimeline {
     TriggerHostWait(resource struct {
         host_glsync_handle uint64;
         host_syncthread_handle uint64;
-        event zx.handle:EVENTPAIR;
+        event zx.Handle:EVENTPAIR;
     });
 };
 

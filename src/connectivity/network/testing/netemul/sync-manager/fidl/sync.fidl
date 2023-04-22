@@ -55,7 +55,7 @@ closed protocol Bus {
     /// Use `timeout` <= 0 for indefinite wait.
     strict WaitForClients(struct {
         clients vector<string:MAX>:MAX;
-        timeout zx.duration;
+        timeout zx.Duration;
     }) -> (struct {
         result bool;
         absent vector<string:MAX>:<MAX, optional>;
@@ -66,7 +66,7 @@ closed protocol Bus {
     /// Use `timeout` <= 0 for indefinite wait.
     strict WaitForEvent(struct {
         data Event;
-        timeout zx.duration;
+        timeout zx.Duration;
     }) -> (struct {
         result bool;
     });
@@ -91,7 +91,7 @@ closed protocol SyncManager {
     strict WaitForBarrierThreshold(struct {
         barrier_name string:MAX;
         threshold uint32;
-        timeout zx.duration;
+        timeout zx.Duration;
     }) -> (struct {
         result bool;
     });

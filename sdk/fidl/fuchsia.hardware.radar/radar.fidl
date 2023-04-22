@@ -57,7 +57,7 @@ type StatusCode = strict enum {
 
 type Burst = struct {
     vmo_id uint32;
-    timestamp zx.time;
+    timestamp zx.Time;
 };
 
 protocol RadarBurstReader {
@@ -78,7 +78,7 @@ protocol RadarBurstReader {
     @transitional
     GetBurstProperties() -> (struct {
         size uint32;
-        period zx.duration;
+        period zx.Duration;
     });
 
     /// Registers the VMOs for future use and associates them with vmo_ids,
@@ -100,7 +100,7 @@ protocol RadarBurstReader {
     /// *     `VMO_TOO_SMALL`: A VMO in `vmos` was smaller than the burst size.
     RegisterVmos(resource struct {
         vmo_ids vector<uint32>:VMO_VECTOR_MAX_COUNT;
-        vmos vector<zx.handle:VMO>:VMO_VECTOR_MAX_COUNT;
+        vmos vector<zx.Handle:VMO>:VMO_VECTOR_MAX_COUNT;
     }) -> () error StatusCode;
 
     /// Removes the associations with the given VMO IDs and returns the VMOs to
@@ -119,7 +119,7 @@ protocol RadarBurstReader {
     UnregisterVmos(struct {
         vmo_ids vector<uint32>:VMO_VECTOR_MAX_COUNT;
     }) -> (resource struct {
-        vmos vector<zx.handle:VMO>:VMO_VECTOR_MAX_COUNT;
+        vmos vector<zx.Handle:VMO>:VMO_VECTOR_MAX_COUNT;
     }) error StatusCode;
 
     /// Tells the driver to start sending bursts via `OnBurst()`.

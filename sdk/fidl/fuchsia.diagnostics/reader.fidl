@@ -54,7 +54,7 @@ type FormattedContent = flexible resource union {
     /// The VMO will contain up to 1mb of diagnostics data.
     /// The size will be in ZX_PROP_VMO_CONTENT_SIZE.
     @available(added=HEAD)
-    3: cbor zx.handle:<VMO>;
+    3: cbor zx.Handle:<VMO>;
 };
 
 /// Enum specifying the modes by which a user can connect to and stream diagnostics metrics.

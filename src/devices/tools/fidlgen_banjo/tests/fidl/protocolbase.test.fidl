@@ -9,22 +9,22 @@ using zx;
 @banjo_layout("ddk-protocol")
 closed protocol SynchronousBase {
     strict Status(struct {
-        status zx.status;
+        status zx.Status;
     }) -> (struct {
-        status zx.status;
-        status_2 zx.status;
+        status zx.Status;
+        status_2 zx.Status;
     });
     strict Time(struct {
-        time zx.time;
+        time zx.Time;
     }) -> (struct {
-        time zx.time;
-        time_2 zx.time;
+        time zx.Time;
+        time_2 zx.Time;
     });
     strict Duration(struct {
-        duration zx.duration;
+        duration zx.Duration;
     }) -> (struct {
-        duration zx.duration;
-        duration_2 zx.duration;
+        duration zx.Duration;
+        duration_2 zx.Duration;
     });
     strict Koid(struct {
         koid zx.Koid;
@@ -45,24 +45,24 @@ closed protocol SynchronousBase {
 closed protocol AsyncBase {
     @async
     strict Status(struct {
-        status zx.status;
+        status zx.Status;
     }) -> (struct {
-        status zx.status;
-        status_2 zx.status;
+        status zx.Status;
+        status_2 zx.Status;
     });
     @async
     strict Time(struct {
-        time zx.time;
+        time zx.Time;
     }) -> (struct {
-        time zx.time;
-        time_2 zx.time;
+        time zx.Time;
+        time_2 zx.Time;
     });
     @async
     strict Duration(struct {
-        duration zx.duration;
+        duration zx.Duration;
     }) -> (struct {
-        duration zx.duration;
-        duration_2 zx.duration;
+        duration zx.Duration;
+        duration_2 zx.Duration;
     });
     @async
     strict Koid(struct {
@@ -82,22 +82,22 @@ closed protocol AsyncBase {
 
 closed protocol WrongTransport {
     strict Status(struct {
-        status zx.status;
+        status zx.Status;
     }) -> (struct {
-        status zx.status;
-        status_2 zx.status;
+        status zx.Status;
+        status_2 zx.Status;
     });
     strict Time(struct {
-        time zx.time;
+        time zx.Time;
     }) -> (struct {
-        time zx.time;
-        time_2 zx.time;
+        time zx.Time;
+        time_2 zx.Time;
     });
     strict Duration(struct {
-        duration zx.duration;
+        duration zx.Duration;
     }) -> (struct {
-        duration zx.duration;
-        duration_2 zx.duration;
+        duration zx.Duration;
+        duration_2 zx.Duration;
     });
     strict Koid(struct {
         koid zx.Koid;
@@ -116,8 +116,8 @@ closed protocol WrongTransport {
 @transport("Driver")
 closed protocol DriverTransport {
     strict Status(struct {
-        status zx.status;
+        status zx.Status;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

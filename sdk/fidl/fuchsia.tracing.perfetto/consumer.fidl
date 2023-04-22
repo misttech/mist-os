@@ -19,6 +19,6 @@ protocol ConsumerConnector {
     /// Multiple producers may be connected simultaneously.
     // TODO(fxb/85561): Define error conditions and status codes.
     ConnectConsumer(resource struct {
-        consumer_socket zx.handle:SOCKET;
-    }) -> () error zx.status;
+        consumer_socket zx.Handle:SOCKET;
+    }) -> () error zx.Status;
 };

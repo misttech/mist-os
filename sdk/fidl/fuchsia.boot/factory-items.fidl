@@ -15,7 +15,7 @@ protocol FactoryItems {
     Get(struct {
         extra uint32;
     }) -> (resource struct {
-        payload zx.handle:<VMO, optional>;
+        payload zx.Handle:<VMO, optional>;
         length uint32;
     });
 };

@@ -44,7 +44,7 @@ protocol GraphCreator {
         /// be read immediately, otherwise the caller may miss their deadline.
         ///
         /// Optional. If not specified, the FIDL thread runs at a normal priority.
-        3: fidl_thread_deadline_profile zx.handle:PROFILE;
+        3: fidl_thread_deadline_profile zx.Handle:PROFILE;
 
         /// If specified, the graph will use synthetic clocks that are created
         /// and controlled over the given channel. This can be used to run the
@@ -461,19 +461,19 @@ protocol Graph {
         /// Deadline profile to apply to this thread.
         ///
         /// Optional. If not specified, the thread runs at a normal priority.
-        2: deadline_profile zx.handle:PROFILE;
+        2: deadline_profile zx.Handle:PROFILE;
 
         /// This thread will process audio in batches of size `period`.
         ///
         /// Required.
-        3: period zx.duration;
+        3: period zx.Duration;
 
         /// This thread is expected to use up to this much CPU time per
         /// `period`. If `deadline_profile` is specified, then `cpu_per_period`
         /// should match the profile's "capacity".
         ///
         /// Required.
-        4: cpu_per_period zx.duration;
+        4: cpu_per_period zx.Duration;
     }) -> (table {
         /// ID of the newly-created thread. Guaranteed to be unique.
         1: id ThreadId;
@@ -540,13 +540,13 @@ protocol Graph {
     /// * error Error from `zx_clock_create`
     CreateGraphControlledReferenceClock() -> (resource table {
         /// The new clock.
-        1: reference_clock zx.handle:CLOCK;
+        1: reference_clock zx.Handle:CLOCK;
 
         /// The graph will control `reference_clock` until `release_fence` is
         /// closed, at which point the clock can still be used but it will no
         /// longer be rate-adjusted.
-        2: release_fence zx.handle:EVENTPAIR;
-    }) error zx.status;
+        2: release_fence zx.Handle:EVENTPAIR;
+    }) error zx.Status;
 
     /// Starts a consumer or a producer at a specified time.
     ///
@@ -580,17 +580,17 @@ protocol Graph {
         /// The system time when the producer or consumer was actually started.
         ///
         /// Required.
-        1: system_time zx.time;
+        1: system_time zx.Time;
 
         /// The reference time when the producer or consumer was actually started.
         ///
         /// Required.
-        2: reference_time zx.time;
+        2: reference_time zx.Time;
 
         /// The stream time at which the producer or consumer was actually started.
         ///
         /// Required.
-        3: stream_time zx.duration;
+        3: stream_time zx.Duration;
 
         /// The packet timestamp that corresponds to `stream_time`.
         ///
@@ -628,17 +628,17 @@ protocol Graph {
         /// The system time when the producer or consumer was actually stopped.
         ///
         /// Required.
-        1: system_time zx.time;
+        1: system_time zx.Time;
 
         /// The reference time when the producer or consumer was actually stopped.
         ///
         /// Required.
-        2: reference_time zx.time;
+        2: reference_time zx.Time;
 
         /// The stream time at which the producer or consumer was actually stopped.
         ///
         /// Required.
-        3: stream_time zx.duration;
+        3: stream_time zx.Duration;
 
         /// The packet timestamp that corresponds to `stream_time`.
         ///

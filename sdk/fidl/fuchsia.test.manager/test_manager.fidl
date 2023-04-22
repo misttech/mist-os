@@ -153,7 +153,7 @@ type RunOptions = table {
     3: arguments vector<string:MAX>:MAX;
 
     /// Timeout in seconds for the entire suite.
-    4: timeout zx.duration;
+    4: timeout zx.Duration;
 
     /// glob case filter. This filter will match based on glob pattern
     /// [https://en.wikipedia.org/wiki/Glob_(programming)].
@@ -220,7 +220,7 @@ protocol RunController {
 
 type RunEvent = resource table {
     // The monotonic timestamp for the event.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
     2: payload RunEventPayload;
 };
 
@@ -266,7 +266,7 @@ protocol SuiteController {
 
 type SuiteEvent = resource table {
     // The monotonic timestamp for the event.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
     2: payload SuiteEventPayload;
 };
 
@@ -387,19 +387,19 @@ type SuiteStopped = struct {
 };
 
 type Artifact = flexible resource union {
-    1: stdout zx.handle:SOCKET;
-    2: stderr zx.handle:SOCKET;
+    1: stdout zx.Handle:SOCKET;
+    2: stderr zx.Handle:SOCKET;
     3: log Syslog;
     4: custom CustomArtifact;
     5: debug_data client_end:DebugDataIterator;
 };
 
 type Stdout = resource struct {
-    socket zx.handle:SOCKET;
+    socket zx.Handle:SOCKET;
 };
 
 type Stderr = resource struct {
-    socket zx.handle:SOCKET;
+    socket zx.Handle:SOCKET;
 };
 
 type Syslog = flexible resource union {
@@ -426,7 +426,7 @@ type CustomArtifact = resource table {
 /// is possible to clone and open new channels to the same directory.
 type DirectoryAndToken = resource struct {
     directory client_end:fuchsia.io.Directory;
-    token zx.handle:EVENTPAIR;
+    token zx.Handle:EVENTPAIR;
 };
 
 type CaseArtifact = resource struct {

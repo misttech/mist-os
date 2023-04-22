@@ -55,9 +55,9 @@ protocol MipiCsi {
         mipi_info MipiInfo;
         adap_info MipiAdapInfo;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     DeInit() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

@@ -12,7 +12,7 @@ using zx;
 /// connection between two Flatland instances. No messages will be sent over this channel, because
 /// it is only used as an unclonable object with peer.
 type ViewCreationToken = resource struct {
-    value zx.handle:CHANNEL;
+    value zx.Handle:CHANNEL;
 };
 
 /// Two Flatland instances may be connected in a parent-child relationship. The parent endpoint is
@@ -22,5 +22,5 @@ type ViewCreationToken = resource struct {
 /// connection between two Flatlands. No messages will be sent over this channel, because it is only
 /// used as an unclonable object with peer.
 type ViewportCreationToken = resource struct {
-    value zx.handle:CHANNEL;
+    value zx.Handle:CHANNEL;
 };

@@ -19,8 +19,8 @@ protocol HostVsockAcceptor {
         src_port uint32;
         port uint32;
     }) -> (resource struct {
-        socket zx.handle:SOCKET;
-    }) error zx.status;
+        socket zx.Handle:SOCKET;
+    }) error zx.Status;
 };
 
 // A host port and acceptor pair. When a guest attempts to initiate a connection on the given port,
@@ -39,7 +39,7 @@ protocol HostVsockEndpoint {
     ///
     /// Possible errors:
     ///     - ZX_ERR_ALREADY_BOUND: A client is already listening on this port.
-    Listen(Listener) -> () error zx.status;
+    Listen(Listener) -> () error zx.Status;
 
     /// Attempts to create a vsock connection to a guest on 'guest_port'. Uses a dynamically chosen
     /// ephemeral host port.
@@ -53,6 +53,6 @@ protocol HostVsockEndpoint {
     Connect(struct {
         guest_port uint32;
     }) -> (resource struct {
-        socket zx.handle:SOCKET;
-    }) error zx.status;
+        socket zx.Handle:SOCKET;
+    }) error zx.Status;
 };

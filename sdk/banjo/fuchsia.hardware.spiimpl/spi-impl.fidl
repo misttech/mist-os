@@ -29,7 +29,7 @@ protocol SpiImpl {
         chip_select uint32;
         txdata vector<uint8>:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         rxdata vector<uint8>:MAX;
     });
 
@@ -37,13 +37,13 @@ protocol SpiImpl {
     LockBus(struct {
         chip_select uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// Unlock the bus.
     UnlockBus(struct {
         chip_select uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// rights is a bit field containing SpiVmoRight values, and determines the read/write
@@ -51,19 +51,19 @@ protocol SpiImpl {
     RegisterVmo(resource struct {
         chip_select uint32;
         vmo_id uint32;
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         offset uint64;
         size uint64;
         rights uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     UnregisterVmo(struct {
         chip_select uint32;
         vmo_id uint32;
     }) -> (resource struct {
-        status zx.status;
-        vmo zx.handle:VMO;
+        status zx.Status;
+        vmo zx.Handle:VMO;
     });
 
     /// Release all VMOs registered to this chip_select. Called by the core driver after the client
@@ -78,7 +78,7 @@ protocol SpiImpl {
         offset uint64;
         size uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     ReceiveVmo(struct {
         chip_select uint32;
@@ -86,7 +86,7 @@ protocol SpiImpl {
         offset uint64;
         size uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     ExchangeVmo(struct {
         chip_select uint32;
@@ -96,6 +96,6 @@ protocol SpiImpl {
         rx_offset uint64;
         size uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

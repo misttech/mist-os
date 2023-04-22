@@ -113,7 +113,7 @@ protocol EthernetImpl {
     Query(struct {
         options uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         info EthernetInfo;
     });
 
@@ -126,7 +126,7 @@ protocol EthernetImpl {
     Start(resource struct {
         ifc client_end:EthernetIfc;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Request transmission of the packet in netbuf. The driver takes ownership of the netbuf and
@@ -148,7 +148,7 @@ protocol EthernetImpl {
         @in_out
         netbuf EthernetNetbuf;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         @mutable
         netbuf EthernetNetbuf;
     });
@@ -168,13 +168,13 @@ protocol EthernetImpl {
         @buffer
         data vector<uint8>:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Get the BTI handle (needed to pin DMA memory) for this device.
     /// This method is only valid on devices that advertise ETHERNET_FEATURE_DMA
     /// The caller takes ownership of the BTI handle.
     GetBti() -> (resource struct {
-        bti zx.handle:BTI;
+        bti zx.Handle:BTI;
     });
 };

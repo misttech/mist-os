@@ -9,6 +9,6 @@ protocol Clock {
     SetFrequencySource(struct {
         source uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

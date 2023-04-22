@@ -5,7 +5,8 @@
     "no_optional_structs",
     "output_index_json",
     "simple_empty_response_syntax",
-    "unknown_interactions"
+    "unknown_interactions",
+    "zx_select_case_sensitivity"
   ],
   "library_dependencies": [
     {

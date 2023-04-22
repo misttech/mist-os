@@ -9,7 +9,7 @@ using zx;
 @discoverable
 closed protocol Waiter {
     strict Ack(struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 

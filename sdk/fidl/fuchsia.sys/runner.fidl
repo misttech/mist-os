@@ -50,7 +50,7 @@ type Package = resource struct {
     /// component is stored in pkgfs, this directory will be the pkgfs
     /// directory containing the package.
     @available(removed=10)
-    directory zx.handle:<CHANNEL, optional>;
+    directory zx.Handle:<CHANNEL, optional>;
     @available(added=10)
     directory client_end:<fuchsia.io.Directory, optional>;
 

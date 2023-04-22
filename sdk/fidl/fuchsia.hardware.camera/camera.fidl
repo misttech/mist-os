@@ -17,7 +17,7 @@ protocol Device {
     /// camera2, two methods are available, corresponding to the two
     /// versions of the protocol.
     GetChannel(resource struct {
-        ch zx.handle:CHANNEL;
+        ch zx.Handle:CHANNEL;
     });
     GetChannel2(resource struct {
         server_end server_end:fuchsia.camera2.hal.Controller;

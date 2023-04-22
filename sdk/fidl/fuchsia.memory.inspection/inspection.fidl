@@ -60,6 +60,6 @@ protocol Collector {
     ///      the rest of the entries.
     ///    - The names of the VMOs are an index into the VMONames array.
     CollectJsonStats(resource struct {
-        socket zx.handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
+        socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };

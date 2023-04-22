@@ -41,7 +41,7 @@ type SdmmcBuffer = strict resource union {
     1: vmo_id uint32;
     /// An unregistered VMO of which the protocol implementation does not take ownership. The VMO is
     /// pinned upon entering Request and is unpinned before returning.
-    2: vmo zx.handle:VMO;
+    2: vmo zx.Handle:VMO;
 };
 
 type SdmmcBufferType = strict enum : uint32 {
@@ -128,32 +128,32 @@ protocol InBandInterrupt {
 protocol Sdmmc {
     /// Get host info.
     HostInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info SdmmcHostInfo;
     });
     /// Set signal voltage.
     SetSignalVoltage(struct {
         voltage SdmmcVoltage;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Set bus width.
     SetBusWidth(struct {
         bus_width SdmmcBusWidth;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Set bus frequency, zero means disable the clock to the card.
     SetBusFreq(struct {
         bus_freq uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Set mmc timing.
     SetTiming(struct {
         timing SdmmcTiming;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Issue a hw reset.
     HwReset() -> ();
@@ -161,7 +161,7 @@ protocol Sdmmc {
     PerformTuning(struct {
         cmd_idx uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Register the given callback to be called when an in-band interrupt is received from the
     /// card. Before calling the callback the protocol implementation will disable the in-band
@@ -171,7 +171,7 @@ protocol Sdmmc {
         @in_out
         interrupt_cb client_end:InBandInterrupt;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     AckInBandInterrupt();
 
@@ -188,20 +188,20 @@ protocol Sdmmc {
     RegisterVmo(resource struct {
         vmo_id uint32;
         client_id uint8;
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         offset uint64;
         size uint64;
         vmo_rights uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// The callee unmaps/unpins the VMO and returns ownership to the caller.
     UnregisterVmo(struct {
         vmo_id uint32;
         client_id uint8;
     }) -> (resource struct {
-        status zx.status;
-        vmo zx.handle:VMO;
+        status zx.Status;
+        vmo zx.Handle:VMO;
     });
 
     /// Perform the request. The protocol implementation chooses whether or not to use DMA depending
@@ -224,7 +224,7 @@ protocol Sdmmc {
     Request(resource struct {
         req SdmmcReq;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         response array<uint32, 4>;
     });
 };

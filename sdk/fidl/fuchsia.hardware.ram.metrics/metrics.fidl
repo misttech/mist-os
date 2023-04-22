@@ -26,7 +26,7 @@ type GrantedCyclesResult = struct {
 
 type BandwidthInfo = struct {
     // Time when the measurement started.
-    timestamp zx.time;
+    timestamp zx.Time;
     // Bus frequency in hertz (Hz) when the measurement started.
     frequency uint64;
     // Number of bytes per cycle.
@@ -64,7 +64,7 @@ protocol Device {
         config BandwidthMeasurementConfig;
     }) -> (struct {
         info BandwidthInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Retrieve the DDR Windowing tool results
     /// The windowing tool runs in the bootloader and stores results in a sticky register.
@@ -75,5 +75,5 @@ protocol Device {
     /// reading the sticky register.
     GetDdrWindowingResults() -> (struct {
         value uint32;
-    }) error zx.status;
+    }) error zx.Status;
 };

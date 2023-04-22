@@ -60,7 +60,7 @@ protocol SessionControl {
     /// enter an error state if the position is out of bounds. `position`
     /// is an offset from the beginning of the media.
     Seek(struct {
-        position zx.duration;
+        position zx.Duration;
     });
     /// Skips forward in media by the player's default skip amount.
     SkipForward();

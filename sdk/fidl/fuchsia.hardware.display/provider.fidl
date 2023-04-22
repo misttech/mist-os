@@ -22,7 +22,7 @@ protocol Provider {
     OpenVirtconController(resource struct {
         controller server_end:Controller;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Open a main client.
@@ -34,6 +34,6 @@ protocol Provider {
     OpenController(resource struct {
         controller server_end:Controller;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

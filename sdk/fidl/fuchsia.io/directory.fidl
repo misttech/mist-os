@@ -274,7 +274,7 @@ protocol Directory1 {
     ReadDirents(struct {
         max_bytes uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         dirents vector<uint8>:MAX_BUF;
     });
 
@@ -283,7 +283,7 @@ protocol Directory1 {
     /// This method does not require any rights, similar to ReadDirents.
     @selector("fuchsia.io1/Directory.Rewind")
     Rewind() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Acquires a token to a Directory which can be used to identify access to it at a later point
@@ -294,8 +294,8 @@ protocol Directory1 {
     /// `ZX_ERR_BAD_HANDLE`.
     @selector("fuchsia.io1/Directory.GetToken")
     GetToken() -> (resource struct {
-        s zx.status;
-        token zx.handle:optional;
+        s zx.Status;
+        token zx.Handle:optional;
     });
 
     /// Creates a link to an object named src by the name dst, within a directory represented by
@@ -312,10 +312,10 @@ protocol Directory1 {
     @selector("fuchsia.io1/Directory.Link")
     Link(resource struct {
         src string:MAX_FILENAME;
-        dst_parent_token zx.handle;
+        dst_parent_token zx.Handle;
         dst string:MAX_FILENAME;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Watches a directory, receiving events of added messages on the
@@ -330,6 +330,6 @@ protocol Directory1 {
         options uint32;
         watcher server_end:DirectoryWatcher;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

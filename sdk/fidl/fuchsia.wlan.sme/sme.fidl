@@ -93,7 +93,7 @@ type ScanResult = struct {
     compatibility box<Compatibility>;
     // Time of the scan result relative to when the system was powered on.
     // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
-    timestamp_nanos zx.time;
+    timestamp_nanos zx.Time;
     // Describes the BSS detected by the scan.
     bss_description fuchsia.wlan.internal.BssDescription;
 };
@@ -318,10 +318,10 @@ protocol MeshSme {
 protocol Telemetry {
     GetCounterStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceCounterStats;
-    }) error zx.status;
+    }) error zx.Status;
     GetHistogramStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceHistogramStats;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 protocol FeatureSupport {
@@ -329,26 +329,26 @@ protocol FeatureSupport {
     /// * see [`fuchsia.wlan.common/DiscoverySupport`]
     QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Return support for features related to the MAC sublayer.
     /// * see [`fuchsia.wlan.common/MacSublayerSupport`]
     QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Return support for features related to security/access control
     /// and data confidentiality.
     /// * see [`fuchsia.wlan.common/SecuritySupport`]
     QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Return support for features related to spectrum management.
     /// * see [`fuchsia.wlan.common/SpectrumManagementSupport`]
     QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 type LegacyPrivacySupport = struct {
@@ -384,7 +384,7 @@ protocol GenericSme {
     ///     * PEER_CLOSED: The underlying SME is shutting down.
     GetClientSme(resource struct {
         sme_server server_end:ClientSme;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Attempt to establish a new connection to an underlying AP SME.
     /// Connections may be established for the whole lifetime of the SME,
     /// but concurrent connections might lead to unexpected behavior.
@@ -393,7 +393,7 @@ protocol GenericSme {
     ///     * PEER_CLOSED: The underlying SME is shutting down.
     GetApSme(resource struct {
         sme_server server_end:ApSme;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Attempt to establish a new connection to telemetry information for the
     /// underlying SME.
     /// Connections may be established for the whole lifetime of the SME, and
@@ -403,7 +403,7 @@ protocol GenericSme {
     ///     * PEER_CLOSED: The underlying SME is shutting down.
     GetSmeTelemetry(resource struct {
         telemetry_server server_end:Telemetry;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Attempt to establish a new connection to feature support information for
     /// the underlying SME.
     /// Connections may be established for the whole lifetime of the SME, and
@@ -412,5 +412,5 @@ protocol GenericSme {
     ///     * PEER_CLOSED: The underlying SME is shutting down.
     GetFeatureSupport(resource struct {
         feature_support_server server_end:FeatureSupport;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

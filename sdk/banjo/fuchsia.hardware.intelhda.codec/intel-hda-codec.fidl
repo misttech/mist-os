@@ -10,7 +10,7 @@ using zx;
 protocol IhdaCodec {
     /// Fetch a zx_handle_t to a channel which can be used to communicate with the codec device.
     GetDriverChannel() -> (resource struct {
-        s zx.status;
-        channel zx.handle:CHANNEL;
+        s zx.Status;
+        channel zx.Handle:CHANNEL;
     });
 };

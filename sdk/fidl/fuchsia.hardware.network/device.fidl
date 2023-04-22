@@ -131,7 +131,7 @@ protocol Device {
     }) -> (resource struct {
         session client_end:Session;
         fifos Fifos;
-    }) error zx.status;
+    }) error zx.Status;
     /// Connects to a port the given `id`.
     ///
     /// + request `id` port to connect to.

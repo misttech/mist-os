@@ -11,7 +11,7 @@ type FactoryResetCountdownState = table {
     /// The time of when factory reset is scheduled to be triggered when a
     /// countdown for factory reset is in progress with respect to the monotonic
     /// clock. This field is left unpopulated if no reset is scheduled.
-    1: scheduled_reset_time zx.time;
+    1: scheduled_reset_time zx.Time;
 };
 
 /// Protocol to watch for changes when a factory reset countdown is started or

@@ -188,12 +188,12 @@ protocol Cr50 {
     CcdGetInfo() -> (struct {
         rc Cr50Rc;
         info box<CcdInfo>;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Lock case-closed debugging.
     CcdLock() -> (struct {
         rc Cr50Rc;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Put case-closed debugging into the OPEN state.
     /// See |CcdState| for a description of what each state means.
@@ -202,7 +202,7 @@ protocol Cr50 {
     }) -> (resource struct {
         rc Cr50Rc;
         presence_checker client_end:<PhysicalPresenceNotifier, optional>;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Put case-closed debugging into the UNLOCKED state.
     /// See |CcdState| for a description of what each state means.
@@ -211,13 +211,13 @@ protocol Cr50 {
     }) -> (resource struct {
         rc Cr50Rc;
         presence_checker client_end:<PhysicalPresenceNotifier, optional>;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the current state of the AP BIOS flash write protect.
     WpGetState() -> (struct {
         rc Cr50Rc;
         state WpState;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 type PhysicalPresenceState = flexible enum {
@@ -234,7 +234,7 @@ type PhysicalPresenceState = flexible enum {
 /// Union passed to OnChange() event handler of |PhysicalPresenceNotifier|.
 type PhysicalPresenceEvent = flexible union {
     /// An error occurred while polling the TPM.
-    1: err zx.status;
+    1: err zx.Status;
     /// Physical presence status.
     2: state PhysicalPresenceState;
 };

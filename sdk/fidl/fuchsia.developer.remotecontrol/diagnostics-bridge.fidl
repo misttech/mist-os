@@ -44,7 +44,7 @@ type InlineData = struct {
 
 type DiagnosticsData = strict resource union {
     1: inline InlineData;
-    2: socket zx.handle:SOCKET;
+    2: socket zx.Handle:SOCKET;
 };
 
 type ArchiveIteratorError = strict enum : uint32 {

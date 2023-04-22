@@ -47,7 +47,7 @@ const MAX_PATH_LENGTH uint64 = 4095;
 
 /// The type to identify a connection to a node.
 /// It represents a capability: a reference to a node with associated rights.
-alias Token = zx.handle:EVENT;
+alias Token = zx.Handle:EVENT;
 
 /// The type to identify a node, if the implementation supports some notion of
 /// unique node ID.

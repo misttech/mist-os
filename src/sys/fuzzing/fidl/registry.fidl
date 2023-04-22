@@ -42,9 +42,9 @@ closed protocol Registry {
     strict Connect(resource struct {
         fuzzer_url fuchsia.url.Url;
         controller server_end:Controller;
-        timeout zx.duration;
+        timeout zx.Duration;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 
     /// Removes the provider associated with the given URL from the registry and closes its channel.
@@ -54,6 +54,6 @@ closed protocol Registry {
     strict Disconnect(struct {
         fuzzer_url fuchsia.url.Url;
     }) -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 };

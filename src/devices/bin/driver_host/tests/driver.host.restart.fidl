@@ -10,5 +10,5 @@ closed protocol TestDevice {
     /// Get the pid of the driver.
     strict GetPid() -> (struct {
         pid zx.Koid;
-    }) error zx.status;
+    }) error zx.Status;
 };

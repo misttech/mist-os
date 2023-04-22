@@ -132,7 +132,7 @@ protocol Controller {
     /// later by `StageConfig()`.
     Initialize(struct {
         allocation Allocation;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Free all trace buffers and any other resources allocated for the trace.
     /// This is also done when the connection is closed.
@@ -151,7 +151,7 @@ protocol Controller {
     /// the values for subsequent use by `Start()`.
     StageConfig(struct {
         config Config;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Fetch performance monitor specification for a cpu, if it exists.
     /// Must be called with data collection off and after `StageConfig()`.
@@ -165,13 +165,13 @@ protocol Controller {
     GetBufferHandle(struct {
         descriptor uint32;
     }) -> (resource struct {
-        vmo zx.handle:<VMO, optional>;
+        vmo zx.Handle:<VMO, optional>;
     });
 
     /// Turn on data collection.
     /// Must be called after `Initialize()` + `StageConfig()` and with data
     /// collection off.
-    Start() -> () error zx.status;
+    Start() -> () error zx.Status;
 
     /// Turn off data collection.
     /// May be called any time after `Initialize()` has been called and before

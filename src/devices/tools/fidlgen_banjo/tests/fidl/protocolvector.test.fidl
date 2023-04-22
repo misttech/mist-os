@@ -66,9 +66,9 @@ closed protocol Vector {
         f64 vector<float64>:1;
     });
     strict Handle(resource struct {
-        u64 vector<zx.handle>:1;
+        u64 vector<zx.Handle>:1;
     }) -> (resource struct {
-        f64 vector<zx.handle>:1;
+        f64 vector<zx.Handle>:1;
     });
 };
 
@@ -133,9 +133,9 @@ closed protocol Vector2 {
         f64 vector<float64>:vector_size;
     });
     strict Handle(resource struct {
-        u64 vector<zx.handle>:vector_size;
+        u64 vector<zx.Handle>:vector_size;
     }) -> (resource struct {
-        f64 vector<zx.handle>:vector_size;
+        f64 vector<zx.Handle>:vector_size;
     });
 };
 
@@ -198,8 +198,8 @@ closed protocol VectorOfVectors {
         f64 vector<vector<float64>:4>:vector_size;
     });
     strict Handle(resource struct {
-        u64 vector<vector<zx.handle>:4>:vector_size;
+        u64 vector<vector<zx.Handle>:4>:vector_size;
     }) -> (resource struct {
-        f64 vector<vector<zx.handle>:4>:vector_size;
+        f64 vector<vector<zx.Handle>:4>:vector_size;
     });
 };

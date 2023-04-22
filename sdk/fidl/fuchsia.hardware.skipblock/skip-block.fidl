@@ -19,7 +19,7 @@ type PartitionInfo = struct {
 
 type ReadWriteOperation = resource struct {
     /// Memory object describing buffer to read into or write from.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
     /// VMO offset in bytes.
     vmo_offset uint64;
     /// Block # to begin operation from.
@@ -52,7 +52,7 @@ type WriteBytesMode = strict enum {
 
 type WriteBytesOperation = resource struct {
     /// Memory object describing buffer to write from.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
     /// VMO offset in bytes.
     vmo_offset uint64;
     /// Device offset in bytes to begin operation from.
@@ -77,7 +77,7 @@ protocol SkipBlock {
     /// The block count can shrink in the event that a bad block is grown. It is
     /// recommended to call this again after a bad block is grown.
     GetPartitionInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         partition_info PartitionInfo;
     });
 
@@ -85,7 +85,7 @@ protocol SkipBlock {
     Read(resource struct {
         op ReadWriteOperation;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Erases and writes the specified blocks from the provided vmo.
@@ -98,7 +98,7 @@ protocol SkipBlock {
     Write(resource struct {
         op ReadWriteOperation;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         bad_block_grown bool;
     });
 
@@ -115,7 +115,7 @@ protocol SkipBlock {
     WriteBytes(resource struct {
         op WriteBytesOperation;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         bad_block_grown bool;
     });
 
@@ -138,6 +138,6 @@ protocol SkipBlock {
     WriteBytesWithoutErase(resource struct {
         op WriteBytesOperation;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

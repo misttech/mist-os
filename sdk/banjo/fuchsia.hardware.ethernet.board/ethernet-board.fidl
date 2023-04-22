@@ -9,6 +9,6 @@ using zx;
 @banjo_layout("ddk-protocol")
 protocol EthBoard {
     ResetPhy() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

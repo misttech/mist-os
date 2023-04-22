@@ -32,7 +32,7 @@ protocol Factory {
     CreateCapturer(resource struct {
         request server_end:fuchsia.media.AudioCapturer;
     }) -> (resource struct {
-        reference_clock zx.handle:CLOCK;
+        reference_clock zx.Handle:CLOCK;
         stream_type fuchsia.media.AudioStreamType;
     });
 
@@ -59,7 +59,7 @@ protocol Factory {
     CreateRenderer(resource struct {
         renderer server_end:fuchsia.media.AudioRenderer;
     }) -> (resource struct {
-        reference_clock zx.handle:CLOCK;
+        reference_clock zx.Handle:CLOCK;
         stream_type fuchsia.media.AudioStreamType;
     });
 };

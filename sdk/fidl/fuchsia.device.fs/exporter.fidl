@@ -11,7 +11,7 @@ using zx;
 protocol Connector {
     /// Connect to the underlying protocol.
     Connect(resource struct {
-        server zx.handle:CHANNEL;
+        server zx.Handle:CHANNEL;
     });
 };
 
@@ -33,5 +33,5 @@ protocol Exporter {
 
         /// If this is present, then the device will be exported into "/dev/class/{class_name}/".
         class_name string:<fuchsia.io.MAX_NAME_LENGTH, optional>;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

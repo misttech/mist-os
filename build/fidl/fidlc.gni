@@ -32,6 +32,10 @@ template("fidlc") {
   experimental_flags = [
     "no_optional_structs",
     "unknown_interactions",
+
+    # TODO(fxbug.dev/109734): Remove once references to zx declarations are all
+    # camel-cased.
+    "zx_select_case_sensitivity",
   ]
 
   # TODO(fxbug.dev/112767): Remove once soft transition is done.

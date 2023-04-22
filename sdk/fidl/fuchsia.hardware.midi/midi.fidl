@@ -25,13 +25,13 @@ protocol Device {
     /// is_source.
     Read() -> (struct {
         event vector<uint8>:READ_SIZE;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Writes data to the midi device. Only applicable if GetInfo returns
     /// is_sink.
     Write(struct {
         data vector<uint8>:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 protocol Controller {

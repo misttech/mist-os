@@ -35,7 +35,7 @@ type PdevMmio = resource struct {
     offset zx.Off;
     /// Size of mmio region.
     size uint64;
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
 };
 
 @transport("Banjo")
@@ -44,34 +44,34 @@ protocol PDev {
     GetMmio(struct {
         index uint32;
     }) -> (resource struct {
-        s zx.status;
+        s zx.Status;
         mmio PdevMmio;
     });
     GetInterrupt(struct {
         index uint32;
         flags uint32;
     }) -> (resource struct {
-        s zx.status;
-        irq zx.handle:INTERRUPT;
+        s zx.Status;
+        irq zx.Handle:INTERRUPT;
     });
     GetBti(struct {
         index uint32;
     }) -> (resource struct {
-        s zx.status;
-        bti zx.handle:BTI;
+        s zx.Status;
+        bti zx.Handle:BTI;
     });
     GetSmc(struct {
         index uint32;
     }) -> (resource struct {
-        s zx.status;
-        smc zx.handle:RESOURCE;
+        s zx.Status;
+        smc zx.Handle:RESOURCE;
     });
     GetDeviceInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info PdevDeviceInfo;
     });
     GetBoardInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info PdevBoardInfo;
     });
 };

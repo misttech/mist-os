@@ -9,7 +9,7 @@ using zx;
 @discoverable
 @transport("Driver")
 closed protocol RuntimeCompositeProtocol {
-    strict Handshake() -> () error zx.status;
+    strict Handshake() -> () error zx.Status;
 };
 
 service Service {

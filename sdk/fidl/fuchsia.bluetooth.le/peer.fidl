@@ -35,7 +35,7 @@ type ScanData = table {
     6: uris vector<string:MAX_URI_LENGTH>:MAX;
 
     /// The monotonic time when this scan data was received.
-    7: timestamp zx.time;
+    7: timestamp zx.Time;
 };
 
 /// Represents a Bluetooth Low Energy peer that may act in the broadcaster, peripheral, or central
@@ -81,7 +81,7 @@ type Peer = table {
     /// was last updated (e.g. due to reception of an advertisement).
     ///
     /// This field is always present.
-    8: last_updated zx.time;
+    8: last_updated zx.Time;
 };
 
 /// Protocol that represents the connection to a peer. This can be used to interact with GATT

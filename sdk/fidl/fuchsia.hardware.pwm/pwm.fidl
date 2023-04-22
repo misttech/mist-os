@@ -17,12 +17,12 @@ type PwmConfig = struct {
 protocol Pwm {
     GetConfig() -> (struct {
         config PwmConfig;
-    }) error zx.status;
+    }) error zx.Status;
 
     SetConfig(struct {
         config PwmConfig;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
-    Enable() -> () error zx.status;
-    Disable() -> () error zx.status;
+    Enable() -> () error zx.Status;
+    Disable() -> () error zx.Status;
 };

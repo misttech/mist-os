@@ -112,7 +112,7 @@ protocol NodeController {
         /// binding.
         /// E.g: "gpt.cm", "meta/gpt.cm", "fuchsia-boot:///#meta/gpt.cm".
         2: driver_url_suffix string:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
 
     /// Event that is triggered when the associated `Node` is bound to a driver.

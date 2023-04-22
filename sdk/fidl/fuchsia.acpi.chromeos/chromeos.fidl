@@ -25,36 +25,36 @@ protocol Device {
     /// and configuration.
     GetHardwareId() -> (struct {
         hwid string:MAX_HWID_LEN;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the version of the active RW firmware.
     GetRwFirmwareVersion() -> (struct {
         version string:MAX_FW_VERSION_LEN;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the version of the RO firmware.
     GetRoFirmwareVersion() -> (struct {
         version string:MAX_FW_VERSION_LEN;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the offset and size of the VBoot configuration in the CMOS nvram.
     GetNvramMetadataLocation() -> (struct {
         offset uint32;
         size uint32;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the address of the flashmap in physical memory.
     GetFlashmapAddress() -> (struct {
         address uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the nvdata version.
     GetNvdataVersion() -> (struct {
         version uint32;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the currently booted firmware slot.
     GetActiveApFirmware() -> (struct {
         slot BootSlot;
-    }) error zx.status;
+    }) error zx.Status;
 };

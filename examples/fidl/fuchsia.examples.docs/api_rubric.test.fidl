@@ -191,7 +191,7 @@ protocol Listener {
 // [START events-1]
 protocol DeathWish {
     -> OnFatalError(struct {
-        error_code zx.status;
+        error_code zx.Status;
     });
 };
 // [END events-1]
@@ -240,7 +240,7 @@ type Image = struct {};
 // [START feed-forward]
 protocol Canvas {
     Flush() -> (struct {
-        code zx.status;
+        code zx.Status;
     });
     Clear();
     UploadImage(struct {
@@ -369,14 +369,14 @@ protocol TokenBasedGetter {
 protocol Exporter {
     ExportThing(resource struct {
         client_assigned_id uint32;
-        export_token zx.handle:EVENTPAIR;
+        export_token zx.Handle:EVENTPAIR;
     });
 };
 
 protocol Importer {
     ImportThing(resource struct {
         some_other_client_assigned_id uint32;
-        import_token zx.handle:EVENTPAIR;
+        import_token zx.Handle:EVENTPAIR;
     });
 };
 // [END eventpair]

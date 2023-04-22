@@ -72,7 +72,7 @@ protocol TestHarness {
     /// environment.
     ConnectToEnvironmentService(resource struct {
         service_name string;
-        request zx.handle:CHANNEL;
+        request zx.Handle:CHANNEL;
     });
 
     /// Parses a JSON modular configuration string into BasemgrConfig and
@@ -179,7 +179,7 @@ type EnvironmentServicesSpec = resource table {
     /// A directory of services to be provided to the test harness environment.
     ///
     /// Optional.
-    1: service_dir zx.handle:CHANNEL;
+    1: service_dir zx.Handle:CHANNEL;
 
     /// A list of services provided by components to inject into the test
     /// harness environment. Multiple services may be provided by the same

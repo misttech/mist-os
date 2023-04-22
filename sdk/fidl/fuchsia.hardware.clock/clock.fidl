@@ -25,9 +25,9 @@ protocol Device {
     // For debugging
     Enable(struct {
         clock uint32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     Disable(struct {
         clock uint32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

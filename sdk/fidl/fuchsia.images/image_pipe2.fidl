@@ -183,8 +183,8 @@ protocol ImagePipe2 {
     PresentImage(resource struct {
         image_id uint32;
         presentation_time uint64;
-        acquire_fences vector<zx.handle:EVENT>:MAX_ACQUIRE_RELEASE_FENCE_COUNT;
-        release_fences vector<zx.handle:EVENT>:MAX_ACQUIRE_RELEASE_FENCE_COUNT;
+        acquire_fences vector<zx.Handle:EVENT>:MAX_ACQUIRE_RELEASE_FENCE_COUNT;
+        release_fences vector<zx.Handle:EVENT>:MAX_ACQUIRE_RELEASE_FENCE_COUNT;
     }) -> (struct {
         presentation_info PresentationInfo;
     });

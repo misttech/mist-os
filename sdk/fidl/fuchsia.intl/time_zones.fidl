@@ -71,7 +71,7 @@ protocol TimeZones {
         time_zone_id TimeZoneId;
         /// The number of nanoseconds since the Unix epoch.
         /// For example, `at_time == 0` corresponds to 1970-01-01T00:00:00.000000000Z.
-        absolute_time zx.time;
+        absolute_time zx.Time;
     }) -> (struct {
         civil_time CivilTime;
     }) error TimeZonesError;
@@ -87,7 +87,7 @@ protocol TimeZones {
         /// Conversion options for civil times that cross a daylight savings transition.
         options CivilToAbsoluteTimeOptions;
     }) -> (struct {
-        absolute_time zx.time;
+        absolute_time zx.Time;
     }) error TimeZonesError;
 
     /// Retrieves details about a time zone at a specified one.
@@ -96,7 +96,7 @@ protocol TimeZones {
         time_zone_id TimeZoneId;
         /// The date and time at which to calculate values, in nanoseconds since the Unix epoch.
         /// For example, `at_time == 0` corresponds to 1970-01-01T00:00:00.000000000Z.
-        at_time zx.time;
+        at_time zx.Time;
     }) -> (struct {
         time_zone_info TimeZoneInfo;
     }) error TimeZonesError;
@@ -139,7 +139,7 @@ type TimeZoneInfo = table {
     /// The total offset (including Daylight Savings, if the time zone is in Daylight Savings Time)
     /// from UTC at the queried time (`at_time`). If the time zone is ahead of UTC, this will be a
     /// positive value; if behind UTC, a negative value.
-    2: total_offset_at_time zx.duration;
+    2: total_offset_at_time zx.Duration;
     /// Indicates whether the time zone is in Daylight Savings Time at the queried time
     /// (`at_time`).
     3: in_dst_at_time bool;

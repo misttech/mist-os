@@ -93,7 +93,7 @@ protocol PbusSysSuspend {
         enable_wake bool;
         suspend_reason uint8;
     }) -> (struct {
-        out_status zx.status;
+        out_status zx.Status;
         out_state uint8;
     });
 };
@@ -107,7 +107,7 @@ protocol PBus {
     DeviceAdd(struct {
         dev PbusDev;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Adds a device for binding a protocol implementation driver.
     /// These devices are added in the same devhost as the platform bus.
@@ -119,7 +119,7 @@ protocol PBus {
         proto_id uint32;
         dev PbusDev;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Called by protocol implementation drivers to register their protocol
     /// with the platform bus.
@@ -128,12 +128,12 @@ protocol PBus {
         @buffer
         protocol vector<uint8>:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Board drivers may use this to get information about the board, and to
     /// differentiate between multiple boards that they support.
     GetBoardInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info fuchsia.hardware.platform.device.PdevBoardInfo;
     });
     /// Board drivers may use this to set information about the board
@@ -142,18 +142,18 @@ protocol PBus {
     SetBoardInfo(struct {
         info PbusBoardInfo;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Board drivers may use this to set information about the bootloader.
     SetBootloaderInfo(struct {
         info PbusBootloaderInfo;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:PbusSysSuspend;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Deprecated, use AddComposite() instead.
     /// Adds a composite platform device to the bus. The platform device specified by |dev|
@@ -170,7 +170,7 @@ protocol PBus {
         fragments_count uint64;
         primary_fragment string:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Adds a composite platform device to the bus.
@@ -181,6 +181,6 @@ protocol PBus {
         fragment_count uint64;
         primary_fragment string:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

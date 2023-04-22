@@ -6,5 +6,5 @@ library banjo.examples.fidlhandle;
 using zx;
 
 type SomeStruct = resource struct {
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
 };

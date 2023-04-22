@@ -8,7 +8,7 @@ using zx;
 /// A range of bytes within a VMO.
 type Range = resource struct {
     /// The vmo that contains the bytes.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
 
     /// The offset of the first byte within the range relative to the start of
     /// the VMO.

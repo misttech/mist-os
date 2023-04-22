@@ -16,12 +16,12 @@ protocol Player {
 
     /// Sets a file channel to read from.
     SetFileSource(resource struct {
-        file_channel zx.handle:CHANNEL;
+        file_channel zx.Handle:CHANNEL;
     });
 
     /// Sets a file channel to read from.
     SetFileSourceWithOptions(resource struct {
-        file_channel zx.handle:CHANNEL;
+        file_channel zx.Handle:CHANNEL;
         options PlayerOptions;
     });
 
@@ -74,7 +74,7 @@ type PlayerOptions = table {
 /// Player status information.
 type PlayerStatus = struct {
     /// Duration of the content.
-    duration zx.duration;
+    duration zx.Duration;
 
     /// Whether the player can pause.
     can_pause bool;

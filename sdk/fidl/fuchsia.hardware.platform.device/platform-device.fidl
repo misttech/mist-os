@@ -34,7 +34,7 @@ type Mmio = resource table {
     1: offset zx.Off;
     /// Size of mmio region.
     2: size uint64;
-    3: vmo zx.handle:VMO;
+    3: vmo zx.Handle:VMO;
 };
 
 @discoverable
@@ -44,30 +44,30 @@ protocol Device {
 
     GetMmio(struct {
         index uint32;
-    }) -> (Mmio) error zx.status;
+    }) -> (Mmio) error zx.Status;
 
     GetInterrupt(struct {
         index uint32;
         flags uint32;
     }) -> (resource struct {
-        irq zx.handle:INTERRUPT;
-    }) error zx.status;
+        irq zx.Handle:INTERRUPT;
+    }) error zx.Status;
 
     GetBti(struct {
         index uint32;
     }) -> (resource struct {
-        bti zx.handle:BTI;
-    }) error zx.status;
+        bti zx.Handle:BTI;
+    }) error zx.Status;
 
     GetSmc(struct {
         index uint32;
     }) -> (resource struct {
-        smc zx.handle:RESOURCE;
-    }) error zx.status;
+        smc zx.Handle:RESOURCE;
+    }) error zx.Status;
 
-    GetDeviceInfo() -> (DeviceInfo) error zx.status;
+    GetDeviceInfo() -> (DeviceInfo) error zx.Status;
 
-    GetBoardInfo() -> (BoardInfo) error zx.status;
+    GetBoardInfo() -> (BoardInfo) error zx.Status;
 };
 
 service Service {

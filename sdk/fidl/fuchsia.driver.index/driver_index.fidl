@@ -110,7 +110,7 @@ protocol DriverIndex {
         args MatchDriverArgs;
     }) -> (struct {
         driver MatchedDriver;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// This function will block until base drivers are loaded.
     WaitForBaseDrivers() -> ();
@@ -123,7 +123,7 @@ protocol DriverIndex {
         args MatchDriverArgs;
     }) -> (struct {
         drivers vector<MatchedDriver>:MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Adds a composite node spec to the driver index. The driver index stores the
     /// composite node spec and maps it by the name. The stored composite node specs are
@@ -132,5 +132,5 @@ protocol DriverIndex {
     AddCompositeNodeSpec(fuchsia.driver.framework.CompositeNodeSpec) -> (struct {
         composite_driver MatchedCompositeInfo;
         node_names vector<string:MAX>:MAX;
-    }) error zx.status;
+    }) error zx.Status;
 };

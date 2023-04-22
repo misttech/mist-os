@@ -77,15 +77,15 @@ protocol AddressSpaceChildDriver {
     AllocateBlock(struct {
         size uint64;
     }) -> (resource struct {
-        res zx.status;
+        res zx.Status;
         paddr uint64;
-        vmo zx.handle:<VMO, optional>;
+        vmo zx.Handle:<VMO, optional>;
     });
     /// Free goldfish address space associated with given ID.
     DeallocateBlock(struct {
         paddr uint64;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
     /// Claim a region at `[offset, offset + size)` that is a subregion of a
@@ -97,8 +97,8 @@ protocol AddressSpaceChildDriver {
         offset uint64;
         size uint64;
     }) -> (resource struct {
-        res zx.status;
-        vmo zx.handle:<VMO, optional>;
+        res zx.Status;
+        vmo zx.Handle:<VMO, optional>;
     });
 
     /// Unclaim a hardware-shared region. This must correspond to an existing 
@@ -107,14 +107,14 @@ protocol AddressSpaceChildDriver {
     UnclaimSharedBlock(struct {
         offset uint64;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
     /// Ping (General notification for child drivers)
     Ping(struct {
         ping AddressSpaceChildDriverPingMessage;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
         ping AddressSpaceChildDriverPingMessage;
     });
 };

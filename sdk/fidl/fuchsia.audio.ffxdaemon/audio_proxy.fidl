@@ -170,7 +170,7 @@ type DeviceSelector = table {
 /// Cancels an AudioDaemonRecordRequest if no duration was specified.
 protocol AudioDaemonCanceler {
     /// Finish sending audio data back to the client.
-    Cancel() -> () error zx.status;
+    Cancel() -> () error zx.Status;
 };
 
 /// The main entry point for ffx audio.
@@ -182,7 +182,7 @@ protocol AudioDaemon {
         /// Socket for audio data. Should transmit entire file in WAV format.
         ///
         /// Required.
-        1: socket zx.handle:SOCKET;
+        1: socket zx.Handle:SOCKET;
 
         /// Play on device ring buffer or AudioRenderer.
         ///
@@ -197,13 +197,13 @@ protocol AudioDaemon {
         /// Information from daemon component for ffx plugin to display.
         ///
         /// Required.
-        1: stdout zx.handle:SOCKET;
+        1: stdout zx.Handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
         ///
         /// Required.
-        2: stderr zx.handle:SOCKET;
-    }) error zx.status;
+        2: stderr zx.Handle:SOCKET;
+    }) error zx.Status;
 
     /// Records audio data from either AudioCapturer or device ring buffer.
     /// Returns sockets containing audio data and errors back to host.
@@ -223,7 +223,7 @@ protocol AudioDaemon {
         /// If present, the record request is still cancelable via handle below.
         ///
         /// Optional.
-        3: duration zx.duration;
+        3: duration zx.Duration;
 
         /// Handle to signal when to stop sending data back to ffx client.
         ///
@@ -243,13 +243,13 @@ protocol AudioDaemon {
         /// Contains audio data in the form of a complete WAV file.
         ///
         /// Required.
-        1: stdout zx.handle:SOCKET;
+        1: stdout zx.Handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
         ///
         /// Required.
-        2: stderr zx.handle:SOCKET;
-    }) error zx.status;
+        2: stderr zx.Handle:SOCKET;
+    }) error zx.Status;
 
     /// Lists all available audio devices on target.
     ListDevices() -> (resource table {
@@ -257,7 +257,7 @@ protocol AudioDaemon {
         ///
         /// Required.
         1: devices vector<fuchsia.io.Path>:MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Returns details about a specific audio device.
     DeviceInfo(resource table {
@@ -271,7 +271,7 @@ protocol AudioDaemon {
         ///
         /// Required.
         1: device_info DeviceInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Sets the gain of the stream in decibels.
     DeviceSetGainState(resource table {
@@ -284,5 +284,5 @@ protocol AudioDaemon {
         ///
         /// Required.
         2: gain_state fuchsia.hardware.audio.GainState;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

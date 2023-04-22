@@ -160,22 +160,22 @@ type SrpServerRegistration = table {
     /// Total lease time.
     ///
     /// Required.
-    3: lease_time_total zx.duration;
+    3: lease_time_total zx.Duration;
 
     /// Total key lease time.
     ///
     /// Required.
-    4: key_lease_time_total zx.duration;
+    4: key_lease_time_total zx.Duration;
 
     /// Total remaining lease time.
     ///
     /// Required.
-    5: remaining_lease_time_total zx.duration;
+    5: remaining_lease_time_total zx.Duration;
 
     /// Total remaining key lease time.
     ///
     /// Required.
-    6: remaining_key_lease_time_total zx.duration;
+    6: remaining_key_lease_time_total zx.Duration;
 };
 
 /// State information about the SRP server.
@@ -369,5 +369,5 @@ type Telemetry = table {
     /// The uptime of the current instance.
     ///
     /// Required.
-   18: uptime zx.duration;
+   18: uptime zx.Duration;
 };

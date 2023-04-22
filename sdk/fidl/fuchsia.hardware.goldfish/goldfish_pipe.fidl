@@ -43,20 +43,20 @@ protocol Pipe {
     SetBufferSize(struct {
         size uint64;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
     /// Set event used to signal device state. Discards existing event
     /// after having transferred device state to the new event.
     SetEvent(resource struct {
-        event zx.handle:EVENT;
+        event zx.Handle:EVENT;
     });
 
     /// Acquire VMO for IO buffer. Can be called multiple times. Each call
     /// returns a new handle to the VMO.
     GetBuffer() -> (resource struct {
-        res zx.status;
-        vmo zx.handle:<VMO, optional>;
+        res zx.Status;
+        vmo zx.Handle:<VMO, optional>;
     });
 
     /// Attempt to read up to count bytes into IO buffer at specified offset.
@@ -65,7 +65,7 @@ protocol Pipe {
         count uint64;
         offset uint64;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
         actual uint64;
     });
 
@@ -75,7 +75,7 @@ protocol Pipe {
         count uint64;
         offset uint64;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
         actual uint64;
     });
 
@@ -98,7 +98,7 @@ protocol Pipe {
         read_count uint64;
         read_offset uint64;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
         actual uint64;
     });
 };

@@ -84,21 +84,21 @@ type RealmArgs = resource table {
 
     /// Specify the board name that drivers are aware of.
     /// Default: driver-integration-test
-    10: board_name string:MAX;
+   10: board_name string:MAX;
 
     // TODO(http://fxbug.dev/122149): This parameter should either be updated
     // or removed.
     /// Specify additional offers from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
-    11: offers vector<Offer>:MAX;
+   11: offers vector<Offer>:MAX;
 
     // TODO(http://fxbug.dev/122149): This parameter should either be updated
     // or removed.
     /// Specify services to expose from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
-    12: exposes vector<Expose>:MAX;
+   12: exposes vector<Expose>:MAX;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test
@@ -112,5 +112,5 @@ protocol Realm {
     /// * error `ZX_ERR_ALREADY_EXISTS` the realm has already had `Start` called.
     Start(resource struct {
         args RealmArgs;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

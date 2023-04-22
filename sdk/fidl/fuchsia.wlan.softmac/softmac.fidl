@@ -221,7 +221,7 @@ protocol WlanSoftmacIfc {
     ///   ZX_ERR_OUT_OF_RANGE: The scan request included a prohibited channel.
     ///       This may be due to the current country setting.
     NotifyScanComplete(table {
-        1: status zx.status;
+        1: status zx.Status;
         2: scan_id uint64;
     }) -> ();
 };
@@ -254,15 +254,15 @@ type WlanSoftmacStartActiveScanRequest = table {
     4: ies vector<uint8>:ieee80211.MAX_VHT_MPDU_BYTE_LEN_2;
 
     /// Minimum duration to spend on each channel during the scan.
-    5: min_channel_time zx.duration;
+    5: min_channel_time zx.Duration;
 
     /// Maximum duration to spend on each channel during the scan.
-    6: max_channel_time zx.duration;
+    6: max_channel_time zx.Duration;
 
     /// Minimum duration to spend on the home channel(s) between the dwell time on each channel
     /// where a home channel corresponds to channels the device should otherwise be present
     /// on while not scanning.
-    7: min_home_time zx.duration;
+    7: min_home_time zx.Duration;
 
     /// Minimum number of Probe Request frames to transmit per channel visit during a scan.
     /// The definition of a channel visit may differ between device drivers, but it is roughly
@@ -380,32 +380,32 @@ protocol WlanSoftmac {
 
     /// Obtain information about the device and supported features
     /// Safe to call when the softmac is not started.
-    Query() -> (WlanSoftmacQueryResponse) error zx.status;
+    Query() -> (WlanSoftmacQueryResponse) error zx.Status;
 
     /// Query the underlying device for feature support related to station
     /// discovery (e.g. scans and probes). Safe to call when the softmac is not
     /// started.
     QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Query the underlying device for information related to how it implements
     /// MAC-level functionality. Safe to call when the softmac is not started.
     QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Query the underlying device for features related to specific
     /// security modes. Safe to call when the softmac is not started.
     QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Query the underlying device for features related to spectrum usage, e.g.
     /// DFS. Safe to call when the softmac is not started.
     QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Start a softmac on the underlying device, using the given ifc to pass
     /// events upwards. Callbacks on ifc may be invoked from now until Stop()
@@ -423,8 +423,8 @@ protocol WlanSoftmac {
     Start(resource struct {
         ifc client_end:WlanSoftmacIfc;
     }) -> (resource struct {
-        sme_channel zx.handle:CHANNEL;
-    }) error zx.status;
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
 
     /// Shut down the softmac if it is running.
     /// Safe to call when the softmac is not running.
@@ -439,7 +439,7 @@ protocol WlanSoftmac {
     /// it was successfully transmitted.
     QueueTx(struct {
         packet WlanTxPacket;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Set the primary radio channel, e.g. in response to a channel switch event.
     /// If successful, this will trigger the channel switch immediately. This may
@@ -450,7 +450,7 @@ protocol WlanSoftmac {
     ///   ZX_ERR_NOT_SUPPORTED: The device cannot switch to the requested channel.
     SetChannel(table {
         1: channel fuchsia.wlan.common.WlanChannel;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Join a specific BSS in which we will participate.
     /// This applies regardless of if we are hosting the BSS or joining it
@@ -463,7 +463,7 @@ protocol WlanSoftmac {
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given bss config.
     JoinBss(struct {
         join_request fuchsia.wlan.internal.JoinBssRequest;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Enables hardware Beaconing. This API cannot be invoked while beaconing is active.
     /// DisableBeaconing() must be called before this API can be re-invoked. \
@@ -484,10 +484,10 @@ protocol WlanSoftmac {
 
         /// in TU
         3: beacon_interval uint16;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Disables hardware beaconing.
-    DisableBeaconing() -> () error zx.status;
+    DisableBeaconing() -> () error zx.Status;
 
     /// Install a key for encryption when transmitting or receiving protected
     /// frames.
@@ -495,7 +495,7 @@ protocol WlanSoftmac {
     /// Common errors include:
     ///   ZX_ERR_INVALID_ARGS: The given config does not specify a valid key.
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
-    InstallKey(WlanKeyConfiguration) -> () error zx.status;
+    InstallKey(WlanKeyConfiguration) -> () error zx.Status;
 
     /// Indicate the device of a successful association and configure additional
     /// parameters necessary to participate in that association.
@@ -505,12 +505,12 @@ protocol WlanSoftmac {
     ///       via WlanSoftmac.JoinBss().
     NotifyAssociationComplete(struct {
         assoc_cfg WlanAssociationConfig;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
     ClearAssociation(struct {
         peer_addr ieee80211.MacAddr;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Start a passive scan in the device driver. Scan results will be delivered
     /// as Beacon frames via WlanSoftmacIfc.Recv(). When complete,
@@ -538,18 +538,18 @@ protocol WlanSoftmac {
         1: channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
 
         /// Minimum duration to spend on each channel during the scan.
-        2: min_channel_time zx.duration;
+        2: min_channel_time zx.Duration;
 
         /// Maximum duration to spend on each channel during the scan.
-        3: max_channel_time zx.duration;
+        3: max_channel_time zx.Duration;
 
         /// Minimum duration to spend on the home channel(s) between the dwell time on
         /// each channel where a home channel corresponds to channels the device should
         /// otherwise be present on while not scanning.
-        4: min_home_time zx.duration;
+        4: min_home_time zx.Duration;
     }) -> (table {
         1: scan_id uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Start an active scan in the device driver. Scan results will be delivered
     /// as Beacon or Probe Response frames via WlanSoftmacIfc.Recv(). When
@@ -572,7 +572,7 @@ protocol WlanSoftmac {
     ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
     StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
         1: scan_id uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// If supported, cancel the ongoing scan corresponding to `scan_id` in the
     /// device driver, where `scan_id` is an identifier returned by
@@ -589,14 +589,14 @@ protocol WlanSoftmac {
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support scan cancellation.
     CancelScan(table {
         1: scan_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Indicate the device of modified WiFi Multimedia (WMM) parameters for a
     /// particular access category (AC).
     UpdateWmmParameters(table {
         1: ac ieee80211.WlanAccessCategory;
         2: params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 service Service {

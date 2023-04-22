@@ -38,7 +38,7 @@ closed protocol Drawing {
         cb client_end:banjo.examples.callback2.DrawCallback;
     }) -> ();
     strict DrawLots(resource struct {
-        commands zx.handle:VMO;
+        commands zx.Handle:VMO;
     }) -> (struct {
         result int32;
         p Point;
@@ -46,7 +46,7 @@ closed protocol Drawing {
     strict DrawArray(struct {
         points array<Point, 4>;
     }) -> (struct {
-        rv zx.status;
+        rv zx.Status;
     });
     strict Describe(struct {
         one string:64;

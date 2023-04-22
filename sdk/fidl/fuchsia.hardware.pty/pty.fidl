@@ -54,7 +54,7 @@ protocol Device {
         /// An optional event which transmits information about a device's state.
         ///
         /// The [`DeviceSignal`] values may be observed on this event.
-        1: event zx.handle:EVENTPAIR;
+        1: event zx.Handle:EVENTPAIR;
     });
 
     /// Open a client PTY device with a unique `id`. `client` should be a handle
@@ -70,7 +70,7 @@ protocol Device {
         id uint32;
         client server_end:Device;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// allowed on Client PTYs
@@ -80,13 +80,13 @@ protocol Device {
         clr uint32;
         set uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         features uint32;
     });
 
     /// Obtain the window size (in character cells)
     GetWindowSize() -> (struct {
-        status zx.status;
+        status zx.Status;
         size WindowSize;
     });
 
@@ -97,12 +97,12 @@ protocol Device {
     MakeActive(struct {
         client_pty_id uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Returns pending OOB events, simultaneously clearing them
     ReadEvents() -> (struct {
-        status zx.status;
+        status zx.Status;
         events uint32;
     });
 
@@ -112,6 +112,6 @@ protocol Device {
     SetWindowSize(struct {
         size WindowSize;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

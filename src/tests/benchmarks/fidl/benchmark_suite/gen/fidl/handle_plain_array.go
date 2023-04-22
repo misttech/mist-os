@@ -42,6 +42,6 @@ func fidlGenHandleArrayPlain(config config.Config) (string, error) {
 	size := config.GetInt("size")
 	return fmt.Sprintf(`
 type HandleArrayPlain%[1]d = resource struct{
-	handles array<zx.handle, %[1]d>;
+	handles array<zx.Handle, %[1]d>;
 };`, size), nil
 }

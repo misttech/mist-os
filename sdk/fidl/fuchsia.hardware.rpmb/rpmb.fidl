@@ -51,7 +51,7 @@ protocol Rpmb {
     });
     Request(resource struct {
         request Request;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 service Service {

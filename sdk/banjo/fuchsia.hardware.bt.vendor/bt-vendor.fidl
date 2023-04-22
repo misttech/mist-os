@@ -62,7 +62,7 @@ protocol BtVendor {
         command BtVendorCommand;
         params BtVendorParams;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         @buffer
         encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
     });

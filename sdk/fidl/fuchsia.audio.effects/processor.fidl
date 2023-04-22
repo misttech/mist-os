@@ -46,13 +46,13 @@ protocol Processor {
     /// + request `options` Extra options.
     /// - response `per_stage_metrics `Metrics about this process call, possibly
     ///     subdivided into multiple stages.
-    /// * error A zx.status value indicating success or failure.
+    /// * error A zx.Status value indicating success or failure.
     Process(struct {
         num_frames uint64;
         options ProcessOptions;
     }) -> (struct {
         per_stage_metrics vector<ProcessMetrics>:MAX_PROCESS_STAGES;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// An extensible container of options for Processor.Process.
@@ -87,23 +87,23 @@ type ProcessMetrics = table {
 
     /// Total wall-clock time from the moment the Process call is received to
     /// the moment a response is returned.
-    2: wall_time zx.duration;
+    2: wall_time zx.Duration;
 
     /// Total amount of time spent running on the CPU.
     /// See zx_info_task_runtime.cpu_time.
-    3: cpu_time zx.duration;
+    3: cpu_time zx.Duration;
 
     /// Total amount of time spent waiting to run. Only counts "ready" time.
     /// See zx_info_task_runtime.queue_time.
-    4: queue_time zx.duration;
+    4: queue_time zx.Duration;
 
     /// Total amount of time spent handling page faults.
     /// See zx_info_task_runtime.page_fault_time.
-    5: page_fault_time zx.duration;
+    5: page_fault_time zx.Duration;
 
     /// Total amount of time spent waiting on contended kernel locks.
     /// See zx_info_task_runtime.lock_contention_time.
-    6: kernel_lock_contention_time zx.duration;
+    6: kernel_lock_contention_time zx.Duration;
 };
 
 /// Configures a Processor.

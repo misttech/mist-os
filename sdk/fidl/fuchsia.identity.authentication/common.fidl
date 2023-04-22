@@ -89,14 +89,14 @@ alias PrekeyMaterial = vector<uint8>:PREKEY_MATERIAL_MAX_SIZE;
 /// authentication state.
 type PositiveEvent = table {
     /// The UTC time when the event completed.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
 };
 
 /// A negative authentication event may contribute to a decrease in
 /// authentication state.
 type NegativeEvent = table {
     /// The UTC time when the event completed.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
 };
 
 /// A attempted authentication event may contribute to an increase in
@@ -104,7 +104,7 @@ type NegativeEvent = table {
 /// Otherwise, it does not affect the authentication state.
 type AttemptedEvent = table {
     /// The UTC time when the event completed.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
 
     /// The id of the enrollment used to produce this attempt.
     2: enrollment_id EnrollmentId;

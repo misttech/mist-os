@@ -15,7 +15,7 @@ type WrappedValue = table {
 closed protocol Setter {
     strict Set(struct {
         wrapped_value WrappedValue;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 @discoverable
@@ -23,7 +23,7 @@ closed protocol Setter {
 closed protocol Getter {
     strict Get() -> (struct {
         value uint32;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 service Service {

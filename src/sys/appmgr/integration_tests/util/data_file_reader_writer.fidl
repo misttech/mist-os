@@ -23,7 +23,7 @@ closed protocol DataFileReaderWriter {
         path string;
         contents string;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     // Write the provided contents to a file at /tmp/<path> in the util's namespace, overwriting
@@ -32,7 +32,7 @@ closed protocol DataFileReaderWriter {
         path string;
         contents string;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     // Read the file at /tmp/<path> in the util's namespace and return its contents. If the file

@@ -156,13 +156,13 @@ type ServiceInstancePublication = table {
 
     /// Time-to-live for PTR resource records. If this value is not supplied, the default PTR TTL
     /// of 2 minutes is used. This value is rounded down to the nearest second.
-    5: ptr_ttl zx.duration;
+    5: ptr_ttl zx.Duration;
 
     /// Time-to-live for SRV resource records. If this value is not supplied, the default SRV TTL
     /// of 2 minutes is used. This value is rounded down to the nearest second.
-    6: srv_ttl zx.duration;
+    6: srv_ttl zx.Duration;
 
     /// Time-to-live for TXT resource records. If this value is not supplied, the default TXT TTL
     /// of 75 minutes is used. This value is rounded down to the nearest second.
-    7: txt_ttl zx.duration;
+    7: txt_ttl zx.Duration;
 };

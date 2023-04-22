@@ -60,7 +60,7 @@ protocol Device {
     Start(resource struct {
         cb client_end:Callbacks;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     // Will send a request to open a connection with the remote specified in the
     // `addr`. The `data` socket is stored and will be used for data transmission
@@ -70,9 +70,9 @@ protocol Device {
     // if the connection was successfully established or not.
     SendRequest(resource struct {
         addr Addr;
-        data zx.handle:SOCKET;
+        data zx.Handle:SOCKET;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     // Request a shutdown to begin for the connection indicated by the given `addr`.
     // This immediately stops any data from being sent on the connection, although
@@ -82,23 +82,23 @@ protocol Device {
     SendShutdown(struct {
         addr Addr;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     // Request a rst be sent to the host. The device will also release the resources
     // for any connection that may exist for `addr`.
     SendRst(struct {
         addr Addr;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     // Causes a 'response' to get sent to the host, gives the driver a `data` socket
     // to use for sending and receiving data on the established connection. It is
     // only correct to use this in response to a Callbacks.Request.
     SendResponse(resource struct {
         addr Addr;
-        data zx.handle:SOCKET;
+        data zx.Handle:SOCKET;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     // Query the current context id of the driver. The local CID is never needed
     // in interactions with the same device, and retrieving it is only useful for
@@ -115,10 +115,10 @@ protocol Device {
     // contents have finished sending Callbacks.SendVmoComplete will be called.
     SendVmo(resource struct {
         addr Addr;
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         off uint64;
         len uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

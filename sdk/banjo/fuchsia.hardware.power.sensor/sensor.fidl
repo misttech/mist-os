@@ -10,8 +10,8 @@ protocol PowerSensor {
     /// Tells the driver to start listening for fuchsia.hardware.power.sensor messages on server.
     /// See sdk/fidl/fuchsia.hardware.power.sensor/sensor.fidl.
     ConnectServer(resource struct {
-        server zx.handle:CHANNEL;
+        server zx.Handle:CHANNEL;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

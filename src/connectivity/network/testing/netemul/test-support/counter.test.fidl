@@ -18,7 +18,7 @@ closed protocol Counter {
     /// `protocol_name`.
     strict ConnectToProtocol(resource struct {
         protocol_name fuchsia.component.name;
-        request zx.handle:CHANNEL;
+        request zx.Handle:CHANNEL;
     });
     /// Opens the node found at `path` in the component's namespace with
     /// `flags`, and connects `request`.
@@ -33,7 +33,7 @@ closed protocol Counter {
     strict OpenInNamespace(resource struct {
         path string:fuchsia.component.MAX_PATH_LENGTH;
         flags fuchsia.io.OpenFlags;
-        request zx.handle:CHANNEL;
+        request zx.Handle:CHANNEL;
     });
     /// Opens the directory found at `path`.
     ///
@@ -42,5 +42,5 @@ closed protocol Counter {
     /// * error `ZX_ERR_IO` if there is some other unspecified error during I/O.
     strict TryOpenDirectory(struct {
         path string:fuchsia.component.MAX_PATH_LENGTH;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

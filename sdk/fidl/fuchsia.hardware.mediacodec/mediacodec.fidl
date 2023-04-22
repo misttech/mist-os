@@ -9,7 +9,7 @@ using zx;
 protocol Device {
     /// This method connects the caller with a fuchsia.mediacodec.CodecFactory.
     GetCodecFactory(resource struct {
-        request zx.handle:CHANNEL;
+        request zx.Handle:CHANNEL;
     });
 
     /// This method hands a service directory to the codec.  Currently the only service available

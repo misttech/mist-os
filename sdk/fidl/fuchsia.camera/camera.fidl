@@ -89,7 +89,7 @@ protocol Control {
     }) -> (struct {
         formats vector<VideoFormat>;
         total_format_count uint32;
-        status zx.status;
+        status zx.Status;
     });
 
     /// Sent by the client to indicate desired stream characteristics.
@@ -103,7 +103,7 @@ protocol Control {
         buffer_collection fuchsia.sysmem.BufferCollectionInfo;
         rate FrameRate;
         stream server_end:Stream;
-        stream_token zx.handle:EVENTPAIR;
+        stream_token zx.Handle:EVENTPAIR;
     });
 
     GetDeviceInfo() -> (struct {

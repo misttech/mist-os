@@ -31,6 +31,6 @@ protocol Listener {
     @available(deprecated=9, note="Instead, use `fuchsia.input.interaction.Notifier`")
     OnStateChanged(struct {
         state State;
-        transition_time zx.time;
+        transition_time zx.Time;
     }) -> ();
 };

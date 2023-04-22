@@ -138,7 +138,7 @@ protocol View {
         ip_version fuchsia.net.IpVersion;
     }) -> (struct {
         config UnreachabilityConfig;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// Modify the neighbor table and related interface configuration.
@@ -159,7 +159,7 @@ protocol Controller {
         interface fuchsia.net.InterfaceId;
         neighbor fuchsia.net.IpAddress;
         mac fuchsia.net.MacAddress;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Delete a dynamic or static entry.
     ///
@@ -173,7 +173,7 @@ protocol Controller {
     RemoveEntry(struct {
         interface fuchsia.net.InterfaceId;
         neighbor fuchsia.net.IpAddress;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Delete all dynamic and static entries belonging to an interface.
     ///
@@ -186,7 +186,7 @@ protocol Controller {
     ClearEntries(struct {
         interface fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Change the configuration of the neighbor discovery algorithm for an
     /// interface.
@@ -209,5 +209,5 @@ protocol Controller {
         interface fuchsia.net.InterfaceId;
         ip_version fuchsia.net.IpVersion;
         config UnreachabilityConfig;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

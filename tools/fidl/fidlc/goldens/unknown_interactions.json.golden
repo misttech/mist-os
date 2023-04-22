@@ -5,7 +5,8 @@
     "output_index_json",
     "simple_empty_response_syntax",
     "unknown_interactions",
-    "unknown_interactions_new_defaults"
+    "unknown_interactions_new_defaults",
+    "zx_select_case_sensitivity"
   ],
   "library_dependencies": [],
   "bits_declarations": [],

@@ -12,7 +12,7 @@ protocol Blobfs {
     SetCorruptBlobHandler(resource struct {
         handler client_end:CorruptBlobHandler;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 

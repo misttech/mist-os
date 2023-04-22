@@ -22,21 +22,21 @@ protocol Partition {
     /// Gets the type GUID of the partition (if one exists).
     /// If the partition has no type GUID, ZX_ERR_NOT_SUPPORTED is returned.
     GetTypeGuid() -> (struct {
-        status zx.status;
+        status zx.Status;
         guid box<Guid>;
     });
 
     /// Gets the instance GUID of the partition (if one exists).
     /// If the partition has no instance GUID, ZX_ERR_NOT_SUPPORTED is returned.
     GetInstanceGuid() -> (struct {
-        status zx.status;
+        status zx.Status;
         guid box<Guid>;
     });
 
     /// Gets the name of the partition (if one exists).
     /// If the partition has no name, ZX_ERR_NOT_SUPPORTED is returned.
     GetName() -> (struct {
-        status zx.status;
+        status zx.Status;
         name string:<NAME_LENGTH, optional>;
     });
 };

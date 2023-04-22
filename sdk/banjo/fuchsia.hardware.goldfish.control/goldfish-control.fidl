@@ -11,9 +11,9 @@ protocol GoldfishControl {
     /// Get color buffer for VMO. Fails if VMO is not associated with a color
     /// buffer.
     GetColorBuffer(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
     }) -> (struct {
-        ret zx.status;
+        ret zx.Status;
         cb uint32;
     });
 
@@ -24,15 +24,15 @@ protocol GoldfishControl {
     /// Returns ZX_ERR_INTERNAL if the device cannot create a fence or cannot
     /// trigger the wait.
     CreateSyncFence(resource struct {
-        event zx.handle:EVENTPAIR;
+        event zx.Handle:EVENTPAIR;
     }) -> (struct {
-        ret zx.status;
+        ret zx.Status;
     });
 
     /// Connect a channel to a goldfish-pipe FIDL server.
     ConnectToPipeDevice(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     }) -> (struct {
-        ret zx.status;
+        ret zx.Status;
     });
 };

@@ -28,9 +28,9 @@ protocol FacadeProvider {
     Execute(resource struct {
         facade string:MAX;
         command string:MAX;
-        params_blob zx.handle:VMO;
+        params_blob zx.Handle:VMO;
     }) -> (resource struct {
-        result_blob zx.handle:<VMO, optional>;
+        result_blob zx.Handle:<VMO, optional>;
         error string:<MAX, optional>;
     });
 

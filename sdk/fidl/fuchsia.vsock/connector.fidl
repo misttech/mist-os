@@ -10,7 +10,7 @@ using fuchsia.hardware.vsock;
 type ConnectionTransport = resource struct {
     /// `data` socket that is ultimately given to the underlying vsock driver and
     /// is where all incoming data can be received from.
-    data zx.handle:SOCKET;
+    data zx.Handle:SOCKET;
     /// `Connection` interface that is retained by a vsock service that can be
     /// used to manipulate the state of a connection or perform more complex
     /// operations than just sending and receiving on a socket.
@@ -26,11 +26,11 @@ protocol Connection {
     /// Send a VMO. The reply indicates that the VMO send has finished and that
     /// data may be queued on the socket again without causing races.
     SendVmo(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         off uint64;
         len uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 
@@ -57,7 +57,7 @@ protocol Connector {
         remote_port uint32;
         con ConnectionTransport;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         local_port uint32;
     });
     /// Registers a listener for a local port. There can only be one listener for
@@ -66,6 +66,6 @@ protocol Connector {
         local_port uint32;
         acceptor client_end:Acceptor;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

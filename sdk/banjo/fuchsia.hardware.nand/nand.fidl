@@ -58,10 +58,10 @@ type NandReadWrite = resource struct {
     command NandOp;
 
     /// vmo of data to read or write.
-    data_vmo zx.handle:VMO;
+    data_vmo zx.Handle:VMO;
 
     /// vmo of OOB data to read or write.
-    oob_vmo zx.handle:VMO;
+    oob_vmo zx.Handle:VMO;
 
     /// Number of pages to access.
     /// (0 is invalid).
@@ -91,7 +91,7 @@ type NandReadWriteBytes = resource struct {
     command NandOp;
 
     /// vmo of data to read or write.
-    data_vmo zx.handle:VMO;
+    data_vmo zx.Handle:VMO;
 
     /// Number of bytes to read or write.
     /// 0 is invalid.
@@ -151,7 +151,7 @@ protocol Nand {
         @in_out
         op NandOperation;
     }) -> (resource struct {
-        status zx.status;
+        status zx.Status;
         @mutable
         op NandOperation;
     });
@@ -161,7 +161,7 @@ protocol Nand {
     /// returned data should be saved somewhere else, along blocks that become
     /// bad after they've been in use.
     GetFactoryBadBlockList() -> (struct {
-        status zx.status;
+        status zx.Status;
         bad_blocks vector<uint32>:MAX;
     });
 };

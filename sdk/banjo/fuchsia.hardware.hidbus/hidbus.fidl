@@ -42,7 +42,7 @@ type HidInfo = struct {
     version uint32;
 
     /// polling rate if applicable in usec
-    polling_rate zx.duration;
+    polling_rate zx.Duration;
 };
 
 @transport("Banjo")
@@ -55,7 +55,7 @@ protocol HidbusIfc {
     IoQueue(struct {
         @buffer
         buf vector<uint8>:MAX;
-        timestamp zx.time;
+        timestamp zx.Time;
     }) -> ();
 };
 
@@ -67,7 +67,7 @@ protocol Hidbus {
     Query(struct {
         options uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         info HidInfo;
     });
     /// Start the hidbus device. The device may begin queueing hid reports via
@@ -76,14 +76,14 @@ protocol Hidbus {
     Start(resource struct {
         ifc client_end:HidbusIfc;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Stop the hidbus device. Safe to call if the hidbus is already stopped.
     Stop() -> ();
     GetDescriptor(struct {
         desc_type HidDescriptionType;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         @buffer
         data vector<uint8>:MAX;
     });
@@ -91,7 +91,7 @@ protocol Hidbus {
         rpt_type HidReportType;
         rpt_id uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         @buffer
         data vector<uint8>:MAX;
     });
@@ -101,27 +101,27 @@ protocol Hidbus {
         @buffer
         data vector<uint8>:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     GetIdle(struct {
         rpt_id uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         duration uint8;
     });
     SetIdle(struct {
         rpt_id uint8;
         duration uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     GetProtocol() -> (struct {
-        s zx.status;
+        s zx.Status;
         protocol HidProtocol;
     });
     SetProtocol(struct {
         protocol HidProtocol;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

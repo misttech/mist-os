@@ -63,18 +63,18 @@ protocol Device {
     SetConfig(struct {
         config Config;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Reads data from the serial port.
     Read() -> (struct {
         data vector<uint8>:MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Writes data to the serial port.
     Write(struct {
         data vector<uint8>:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 @discoverable

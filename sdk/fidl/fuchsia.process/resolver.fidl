@@ -18,7 +18,7 @@ const MAX_RESOLVE_NAME_SIZE uint32 = 2048;
 /// libraries appropriate for that process.
 ///
 /// This interface provides a protocol for resolving a name into both the
-/// `zx.handle:VMO` for the executable and the `fuchsia.ldsvc.Loader` for its
+/// `zx.Handle:VMO` for the executable and the `fuchsia.ldsvc.Loader` for its
 /// associated shared libraries.
 ///
 /// This interface is rarely used directly. Instead, `fdio_spawn` and
@@ -43,8 +43,8 @@ protocol Resolver {
     Resolve(struct {
         name string:MAX_RESOLVE_NAME_SIZE;
     }) -> (resource struct {
-        status zx.status;
-        executable zx.handle:<VMO, optional>;
+        status zx.Status;
+        executable zx.Handle:<VMO, optional>;
         ldsvc client_end:<fuchsia.ldsvc.Loader, optional>;
     });
 };

@@ -39,7 +39,7 @@ protocol DirectoryIterator {
             /// This `id` should be unique among all entries of a directory.
             4: id Id;
         }>:8192;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 // TODO(https://fxbug.dev/105608): Use a generated constant.
@@ -197,7 +197,7 @@ protocol Directory2 {
         /// The server end of a channel created for the new connection. The
         /// caller may proceed to send messages on the corresponding client end
         /// right away.
-        object_request zx.handle:CHANNEL;
+        object_request zx.Handle:CHANNEL;
     });
 
     /// Adds a new inotify filter for an object relative to this directory object.
@@ -226,7 +226,7 @@ protocol Directory2 {
         path Path;
         filter InotifyWatchMask;
         watch_descriptor uint32;
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> ();
 
     /// Removes a child node from the this directory's list of entries.
@@ -263,7 +263,7 @@ protocol Directory2 {
                 MUST_BE_DIRECTORY = 0x01;
             };
         };
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Initiates a directory listing operation over the input channel,
     /// starting at seek offset 0.
@@ -294,7 +294,7 @@ protocol Directory2 {
         src Name;
         dst_parent_token Token;
         dst Name;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     // TODO(https://fxbug.dev/77623): uncomment and implement.
     // /// Creates a link to a node named `src` by the name `dst`,
@@ -318,7 +318,7 @@ protocol Directory2 {
     //     src Name;
     //     dst_parent_token Token;
     //     dst Name;
-    // }) -> () error zx.status;
+    // }) -> () error zx.Status;
 
     /// Creates a symbolic link.
     ///
@@ -338,5 +338,5 @@ protocol Directory2 {
     CreateSymlink(struct {
         name Name;
         target SymlinkTarget;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

@@ -42,7 +42,7 @@ type StreamSinkProducer = resource table {
     /// Payload buffer used by packets on this StreamSink.
     ///
     /// Required.
-    4: payload_buffer zx.handle:VMO;
+    4: payload_buffer zx.Handle:VMO;
 
     /// Packet timestamps use "media time", which has
     /// `media_ticks_per_second.numerator` ticks every
@@ -77,7 +77,7 @@ type StreamSinkConsumer = resource table {
     /// Payload buffer used by packets on this StreamSink.
     ///
     /// Required.
-    4: payload_buffer zx.handle:VMO;
+    4: payload_buffer zx.Handle:VMO;
 
     /// Packet timestamps use "media time", which has
     /// `media_ticks_per_second.numerator` ticks every
@@ -105,7 +105,7 @@ type ReferenceClock = resource table {
     /// with ZX_RIGHT_READ. See "Clocks" under the description for [`Graph`].
     ///
     /// Required.
-    2: handle zx.handle:CLOCK;
+    2: handle zx.Handle:CLOCK;
 
     /// Domain of the clock, if known.
     ///
@@ -123,7 +123,7 @@ type ReferenceClock = resource table {
 type ExternalDelayWatcher = resource table {
     /// The initial delay value. Optional if `client_end` is specified,
     /// otherwise required.
-    1: initial_delay zx.duration;
+    1: initial_delay zx.Duration;
 
     /// A channel to query for delay updates. Optional.
     2: client_end client_end:fuchsia.audio.DelayWatcher;

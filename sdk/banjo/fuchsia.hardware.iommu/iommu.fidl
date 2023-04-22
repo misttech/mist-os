@@ -12,7 +12,7 @@ protocol Iommu {
         iommu_index uint32;
         bti_id uint32;
     }) -> (resource struct {
-        s zx.status;
-        handle zx.handle:BTI;
+        s zx.Status;
+        handle zx.Handle:BTI;
     });
 };

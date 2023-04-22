@@ -37,16 +37,16 @@ closed protocol CookieMaker {
     @async
     strict Bake(struct {
         token uint64;
-        time zx.time;
+        time zx.Time;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Synchronously deliver a cookie.
     /// Must be called only after Bake finishes.
     strict Deliver(struct {
         token uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };
 

@@ -8,7 +8,7 @@ using zx;
 
 type Metadata = resource struct {
     type uint32;
-    data zx.handle:VMO;
+    data zx.Handle:VMO;
 };
 
 /// This API communicates with the DFv1 parent device.
@@ -21,7 +21,7 @@ protocol Device {
     /// Get all of the metadata associated with this device.
     GetMetadata() -> (resource struct {
         metadata vector<Metadata>:MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Connect to a banjo protocol that this device is exposing.
     /// The caller needs to send a copy of their process koid so the callee can verify
@@ -32,7 +32,7 @@ protocol Device {
     }) -> (struct {
         ops uint64;
         context uint64;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// This represents a service that the compatibility driver will offer to

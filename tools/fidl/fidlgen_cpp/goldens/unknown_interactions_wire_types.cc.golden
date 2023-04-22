@@ -5,6 +5,7 @@
 // fidl_experiment = simple_empty_response_syntax
 // fidl_experiment = unknown_interactions
 // fidl_experiment = unknown_interactions_new_defaults
+// fidl_experiment = zx_select_case_sensitivity
 
 #include <fidl/test.unknowninteractions/cpp/wire_types.h>
 

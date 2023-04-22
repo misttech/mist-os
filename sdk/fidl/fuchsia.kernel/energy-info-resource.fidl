@@ -13,6 +13,6 @@ protocol EnergyInfoResource {
     /// Get an EnergyInfo resource handle.
     @available(added=HEAD)
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

@@ -76,13 +76,13 @@ closed protocol Startup {
     strict Start(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options StartOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Format the provided block device with this filesystem.
     strict Format(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options FormatOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Check the provided block device for filesystem consistency.
     /// Note that some filesystems (e.g. Fxfs) support online fsck, in which case they can be
@@ -90,5 +90,5 @@ closed protocol Startup {
     strict Check(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options CheckOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

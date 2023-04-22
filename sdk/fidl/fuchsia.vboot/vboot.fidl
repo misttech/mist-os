@@ -129,7 +129,7 @@ protocol FirmwareParam {
         key Key;
     }) -> (struct {
         result uint32;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Set |key| to |value|.
     /// Returns ZX_ERR_NOT_SUPPORTED if the given key is unsupported.
@@ -140,5 +140,5 @@ protocol FirmwareParam {
     Set(struct {
         key Key;
         value uint32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

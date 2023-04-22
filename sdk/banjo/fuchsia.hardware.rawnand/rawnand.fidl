@@ -13,7 +13,7 @@ protocol RawNand {
     ReadPageHwecc(struct {
         nandpage uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         @buffer
         data vector<uint8>:MAX;
         @buffer
@@ -31,7 +31,7 @@ protocol RawNand {
         oob vector<uint8>:MAX;
         nandpage uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Erase NAND block.
@@ -40,11 +40,11 @@ protocol RawNand {
     EraseBlock(struct {
         nandpage uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     GetNandInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info fuchsia.hardware.nandinfo.NandInfo;
     });
 };

@@ -15,7 +15,7 @@ type TestReport = struct {
 @banjo_layout("ddk-callback")
 protocol TestFuncCallback {
     Callback() -> (struct {
-        s zx.status;
+        s zx.Status;
         report TestReport;
     });
 };
@@ -25,17 +25,17 @@ protocol TestFuncCallback {
 protocol Test {
     /// Sets test output socket.
     SetOutputSocket(resource struct {
-        handle zx.handle:SOCKET;
+        handle zx.Handle:SOCKET;
     }) -> ();
 
     /// Gets test output socket.
     GetOutputSocket() -> (resource struct {
-        h zx.handle:SOCKET;
+        h zx.Handle:SOCKET;
     });
 
     /// Gets test channel.  This has per-test meaning.
     GetChannel() -> (resource struct {
-        h zx.handle:CHANNEL;
+        h zx.Handle:CHANNEL;
     });
 
     /// Sets test function.
@@ -45,7 +45,7 @@ protocol Test {
 
     /// Run tests, calls the function set in |SetTestFunc|.
     RunTests() -> (struct {
-        s zx.status;
+        s zx.Status;
         report TestReport;
     });
 

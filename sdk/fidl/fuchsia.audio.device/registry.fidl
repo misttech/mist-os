@@ -339,7 +339,7 @@ protocol Observer {
         1: state PlugState;
 
         /// The time (in CLOCK_MONOTONIC) of the most-recent change in plug state.
-        2: plug_time zx.time;
+        2: plug_time zx.Time;
     }) error ObserverWatchPlugStateError;
 
     /// Retrieve the device's reference clock.
@@ -347,7 +347,7 @@ protocol Observer {
     /// This clock will be in the domain specified in the device's `Info` table.
     GetReferenceClock() -> (resource table {
         /// The device's reference clock.
-        1: reference_clock zx.handle:CLOCK;
+        1: reference_clock zx.Handle:CLOCK;
     }) error ObserverGetReferenceClockError;
 };
 

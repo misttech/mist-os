@@ -59,7 +59,7 @@ protocol Converter {
     SetValues(resource struct {
         properties ConversionProperties;
     }) -> (struct {
-        res zx.status;
+        res zx.Status;
     });
 
     /// Submits a minimum value that all channels of all pixels rendered to the display

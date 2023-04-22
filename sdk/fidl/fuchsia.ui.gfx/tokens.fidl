@@ -17,7 +17,7 @@ using zx;
 /// resources created from the tokens.  For example, creating a `ViewHolder`
 /// resource from this token allows a client to embed another client's `View`.
 type ImportToken = resource struct {
-    value zx.handle:EVENTPAIR;
+    value zx.Handle:EVENTPAIR;
 };
 
 /// Token that uniquely identifies a root point for a subgraph in the global
@@ -33,5 +33,5 @@ type ImportToken = resource struct {
 /// resource from this token allows everything attached to the `View` to be
 /// embedded in another clients `ViewHolder`.
 type ExportToken = resource struct {
-    value zx.handle:EVENTPAIR;
+    value zx.Handle:EVENTPAIR;
 };

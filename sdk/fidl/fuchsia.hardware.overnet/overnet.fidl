@@ -9,7 +9,7 @@ protocol Callback {
     // Called when a new link is ready to be serviced. RCS should serve a circuit link over the
     // given socket.
     NewLink(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> ();
 };
 

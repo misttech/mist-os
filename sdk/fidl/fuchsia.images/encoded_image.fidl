@@ -7,7 +7,7 @@ using zx;
 
 type EncodedImage = resource struct {
     /// The vmo.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
     /// The size of the image in the vmo in bytes.
     size uint64;
 };

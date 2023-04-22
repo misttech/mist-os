@@ -34,7 +34,7 @@ const MAX_VIEW_COUNT uint32 = 300;
 /// A method of obtaining view tree snapshots for a particular view, the "context
 /// view", and its child views, if any. The returned data is a sequence of
 /// snapshots during the period of observation, which starts at the client's
-/// prior Watch() call's [`epoch_end`] (or zx.time 0), and ending at the
+/// prior Watch() call's [`epoch_end`] (or zx.Time 0), and ending at the
 /// current [`epoch_end`]. The timebase is ZX_CLOCK_MONOTONIC.
 ///
 /// Clients typically obtain a `ViewTreeWatcher` capability from within a test,
@@ -88,7 +88,7 @@ protocol ViewTreeWatcher {
 /// Response for fuchsia.ui.observation.geometry.ViewTreeWatcher.Watch.
 type WatchResponse = table {
     /// When the response is sent. Timebase is monotonic time.
-    1: epoch_end zx.time;
+    1: epoch_end zx.Time;
 
     /// A list of most recent updates for a particular view.
     2: updates vector<ViewTreeSnapshot>:BUFFER_SIZE;
@@ -101,7 +101,7 @@ type WatchResponse = table {
 /// A description of the context view and its descendant views, if any.
 type ViewTreeSnapshot = table {
     /// When the snapshot was taken. Timebase is monotonic time.
-    1: time zx.time;
+    1: time zx.Time;
 
     /// The context view (at element 0) and a complete list of its descendant views.
     ///

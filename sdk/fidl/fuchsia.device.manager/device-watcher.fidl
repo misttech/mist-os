@@ -13,6 +13,6 @@ protocol DeviceWatcher {
     /// If there is already an outstanding request then calling this again will return
     /// ZX_ERR_ALREADY_BOUND.
     NextDevice() -> (resource struct {
-        device zx.handle:CHANNEL;
-    }) error zx.status;
+        device zx.Handle:CHANNEL;
+    }) error zx.Status;
 };

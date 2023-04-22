@@ -252,7 +252,7 @@ closed protocol Validate {
     strict Initialize(struct {
         params InitializationParams;
     }) -> (resource struct {
-        vmo zx.handle:optional;
+        vmo zx.Handle:optional;
         result TestResult;
     });
 

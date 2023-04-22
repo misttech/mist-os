@@ -43,32 +43,32 @@ protocol RemoteControl {
     /// Connects to the root [`fuchsia.sys2/RealmExplorer`] protocol.
     RootRealmExplorer(resource struct {
         server server_end:sys2.RealmExplorer;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RealmQuery`] protocol.
     RootRealmQuery(resource struct {
         server server_end:sys2.RealmQuery;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/LifecycleController`] protocol.
     RootLifecycleController(resource struct {
         server server_end:sys2.LifecycleController;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RouteValidator`] protocol.
     RootRouteValidator(resource struct {
         server server_end:sys2.RouteValidator;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     // Connects to the [`fuchsia.kernel/Stats`] protocol
     KernelStats(resource struct {
         server server_end:kernel.Stats;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     // Connects to the [`fuchsia.boot/Arguments`] protocol
     BootArguments(resource struct {
         server server_end:boot.Arguments;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     IdentifyHost() -> (struct {
         response IdentifyHostResponse;
@@ -79,7 +79,7 @@ protocol RemoteControl {
     // If successful, returns information about the service connected to.
     Connect(resource struct {
         selector diagnostics.Selector;
-        service_chan zx.handle:CHANNEL;
+        service_chan zx.Handle:CHANNEL;
     }) -> (struct {
         match ServiceMatch;
     }) error ConnectError;
@@ -108,14 +108,14 @@ protocol RemoteControl {
     // argument.
     AddOvernetLink(resource struct {
         id uint64;
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> ();
 
     // Establishes a TCP connection to the given address and forwards traffic through the given
     // socket.
     ForwardTcp(resource struct {
         addr net.SocketAddress;
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> () error TunnelError;
 
     // Listens on a TCP port and forwards any incoming connections to newly-created sockets which
@@ -133,7 +133,7 @@ protocol RemoteControl {
 
 protocol ForwardCallback {
     Forward(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
         addr net.SocketAddress;
     });
 };

@@ -29,7 +29,7 @@ type WaterMarkInfo = resource struct {
     // Watermark Image Format - must be R8G8B8A8
     wm_image_format fuchsia.sysmem.ImageFormat_2;
     // Watermark VMO must have non-premultiplied alpha.
-    watermark_vmo zx.handle:VMO;
+    watermark_vmo zx.Handle:VMO;
     // The global alpha is multiplied with the input watermark per-pixel alpha to get the
     // watermark's actual alpha value.
     global_alpha float32;
@@ -66,7 +66,7 @@ protocol Ge2d {
         res_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelResChangeCallback;
         task_remove_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelRemoveTaskCallback;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         task_index uint32;
     });
 
@@ -85,7 +85,7 @@ protocol Ge2d {
         res_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelResChangeCallback;
         task_remove_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelRemoveTaskCallback;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         task_index uint32;
     });
 
@@ -101,7 +101,7 @@ protocol Ge2d {
         res_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelResChangeCallback;
         task_remove_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelRemoveTaskCallback;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         task_index uint32;
     });
 
@@ -120,7 +120,7 @@ protocol Ge2d {
         input_buffer_index uint32;
         capture_timestamp uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Releases the frame |buffer_index| from the |output_buffer_collection| to be
@@ -137,7 +137,7 @@ protocol Ge2d {
         task_index uint32;
         new_output_image_format_index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Similar to SetOutputResolution, this call sets the input and output resolution on all
@@ -146,7 +146,7 @@ protocol Ge2d {
         task_index uint32;
         new_image_format_index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Sets/Changes the crop rectangle (on a Resize Task). Typically called when

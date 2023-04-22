@@ -44,7 +44,7 @@ type Allocation = table {
     3: stack_trace_key uint64;
 
     /// Allocation timestamp.
-    4: timestamp zx.time;
+    4: timestamp zx.Time;
 };
 
 /// A stack trace.

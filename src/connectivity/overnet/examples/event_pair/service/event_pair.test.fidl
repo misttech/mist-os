@@ -8,6 +8,6 @@ using zx;
 @discoverable
 closed protocol Example {
     strict Pass(resource struct {
-        event_pair zx.handle:EVENTPAIR;
+        event_pair zx.Handle:EVENTPAIR;
     }) -> ();
 };

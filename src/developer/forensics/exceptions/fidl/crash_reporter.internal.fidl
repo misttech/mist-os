@@ -14,9 +14,9 @@ closed protocol CrashReporter {
     ///
     /// Returns the moniker of the component that crashed, if available.
     strict Send(resource struct {
-        exception zx.handle:<EXCEPTION, optional>;
-        crashed_process zx.handle:<PROCESS, optional>;
-        crashed_thread zx.handle:<THREAD, optional>;
+        exception zx.Handle:<EXCEPTION, optional>;
+        crashed_process zx.Handle:<PROCESS, optional>;
+        crashed_thread zx.Handle:<THREAD, optional>;
     }) -> (struct {
         moniker string:<fuchsia.component.MAX_MONIKER_LENGTH, optional>;
     });

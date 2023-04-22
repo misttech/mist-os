@@ -14,22 +14,22 @@ type PresentationInfo = table {
     /// and acquire fences reached in order to have their  content be
     /// presented at the corresponding `presentation_time`. The `latch_point`
     /// is guaranteed to be less than `presentation_time`.
-    1: latch_point zx.time;
+    1: latch_point zx.Time;
 
     /// The time in which the enqueued operations submitted before `latch_point`
     /// take visible effect. This time is usually but not necessarily vsync.
-    2: presentation_time zx.time;
+    2: presentation_time zx.Time;
 };
 
 /// The times we record for each Present2, expressed in nanoseconds in the
 /// `CLOCK_MONOTONIC` timebase.
 type PresentReceivedInfo = table {
     /// The time Scenic receives the Present2 call.
-    1: present_received_time zx.time;
+    1: present_received_time zx.Time;
 
     /// The time Scenic latched the Present2 call to. This is guaranteed to be
     /// greater than the `present_received_time`.
-    2: latched_time zx.time;
+    2: latched_time zx.Time;
 };
 
 /// The data type returned in `fuchsia.ui.scenic::RequestPresentationTimes`. See
@@ -56,7 +56,7 @@ type FramePresentedInfo = struct {
     /// The time the frame was presented to the user. This value was captured
     /// after the fact, differentiating it from the `presentation_time`s
     /// included in `FuturePresentationTimes`.
-    actual_presentation_time zx.time;
+    actual_presentation_time zx.Time;
 
     /// The presentation informations for each Present2() that comprised the
     /// content of this frame. These are ordered by present submission order.

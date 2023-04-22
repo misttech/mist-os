@@ -14,7 +14,7 @@ type FlatNamespace = resource struct {
 
     /// The directories mounted at each path in the namespace.
     @available(removed=10)
-    directories vector<zx.handle:CHANNEL>;
+    directories vector<zx.Handle:CHANNEL>;
     @available(added=10)
     directories vector<client_end:fuchsia.io.Directory>;
 };

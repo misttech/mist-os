@@ -111,7 +111,7 @@ type File = table {
 /// should fail with ACCESS_DENIED. If executable files are required, use ExecutableFile.
 type VmoFile = resource table {
     1: name string;
-    2: vmo zx.handle:VMO;
+    2: vmo zx.Handle:VMO;
 };
 
 /// Adds an executable file that supports opening as readable + executable. The file has a non-zero
@@ -177,6 +177,6 @@ protocol Io2Harness {
     ///     * [`fuchsia.io/Rights.UPDATE_ATTRIBUTES`].
     ///
     GetEmptyDirectory(resource struct {
-        directory_request zx.handle:CHANNEL;
+        directory_request zx.Handle:CHANNEL;
     });
 };

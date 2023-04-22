@@ -8,18 +8,18 @@ using zx;
 protocol Bus {
     /// Enables the virtual bus.
     Enable() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// Disables the virtual bus.
     Disable() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// Simulates a USB connected event.
     Connect() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// Simulates a USB connected event.
     Disconnect() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

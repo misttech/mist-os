@@ -25,7 +25,7 @@ protocol TpmDevice {
         vendor_id uint16;
         device_id uint16;
         revision_id uint8;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Execute a vendor command.
     /// This method will construct a header for the TPM command from the
@@ -40,7 +40,7 @@ protocol TpmDevice {
     }) -> (struct {
         result TpmRc;
         data vector<uint8>:MAX_VENDOR_COMMAND_LEN;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Execute a complete command.
     /// This method expects a complete command passed in data including
@@ -51,5 +51,5 @@ protocol TpmDevice {
         data vector<uint8>:MAX_COMMAND_LEN;
     }) -> (struct {
         data vector<uint8>:MAX_COMMAND_LEN;
-    }) error zx.status;
+    }) error zx.Status;
 };

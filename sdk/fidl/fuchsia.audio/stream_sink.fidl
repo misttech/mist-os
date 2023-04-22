@@ -19,7 +19,7 @@ protocol StreamSink {
         /// associated with the packet may be reused. Packets may be released in any order. The
         /// release fence may be duplicated by the service, so it must be sent with right
         /// `ZX_RIGHT_DUPLICATE`. This field is optional.
-        2: release_fence zx.handle:EVENTPAIR;
+        2: release_fence zx.Handle:EVENTPAIR;
     });
 
     /// Starts a new segment. Packets following this request and preceding the next such request
@@ -65,7 +65,7 @@ type Packet = table {
 
     /// Capture time for this packet as a system monotonic time value. This field is optional and
     /// may be set by capturers to indicate when this packet was captured.
-    3: capture_timestamp zx.time;
+    3: capture_timestamp zx.Time;
 
     /// Flags describing the packet. Omitting this field implies all flags are clear.
     4: flags PacketFlags;

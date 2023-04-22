@@ -40,12 +40,12 @@ protocol TpmImpl {
         count uint32;
     }) -> (struct {
         data vector<uint8>:TPM_MAX_DATA_TRANSFER;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Write |data| to |address| in |locality|.
     Write(struct {
         locality Locality;
         address RegisterAddress;
         data vector<uint8>:TPM_MAX_DATA_TRANSFER;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

@@ -64,7 +64,7 @@ protocol Flashmap {
         size uint32;
     }) -> (resource struct {
         range fuchsia.mem.Range;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Write |data| into area |name| at |offset| (within the area).
     /// This function will read back the written data, and fail if it was not
@@ -81,7 +81,7 @@ protocol Flashmap {
         name string:MAX_NAME_LEN;
         offset uint32;
         data fuchsia.mem.Buffer;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Erase the given region of flash. If |offset| or |size| are not erase-block-aligned, then
     /// the erase will fail.
@@ -97,7 +97,7 @@ protocol Flashmap {
         name string:MAX_NAME_LEN;
         offset uint32;
         range uint32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 @discoverable

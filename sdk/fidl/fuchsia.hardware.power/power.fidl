@@ -57,7 +57,7 @@ type BatteryInfo = struct {
 protocol Source {
     /// Get device info.
     GetPowerInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         info SourceInfo;
     });
 
@@ -65,13 +65,13 @@ protocol Source {
     /// asserted when power_info_t.state is changed. It is deasserted when the
     /// state is read via `GetPowerInfo`.
     GetStateChangeEvent() -> (resource struct {
-        status zx.status;
-        handle zx.handle:<EVENT, zx.Rights.WAIT>;
+        status zx.Status;
+        handle zx.Handle:<EVENT, zx.Rights.WAIT>;
     });
 
     /// Get battery info. Only supported if type == PowerType::BATTERY.
     GetBatteryInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         info BatteryInfo;
     });
 };

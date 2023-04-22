@@ -57,7 +57,7 @@ type FrameInfo = resource table {
     1: buffer_index uint32;
 
     /// The time that the buffer was populated with the frame.
-    2: capture_timestamp zx.time;
+    2: capture_timestamp zx.Time;
 
     /// The release token for |buffer_index|. The client drops the eventpair
     /// to signal to the server that |buffer_index| is free for writing.
@@ -67,7 +67,7 @@ type FrameInfo = resource table {
     /// on to all buffers in the buffer collection and then
     /// releases a buffer while hanging, the server will immediately return the
     /// latest frame.
-    3: buffer_release_token zx.handle:EVENTPAIR;
+    3: buffer_release_token zx.Handle:EVENTPAIR;
 };
 
 /// Provides a low-level streaming API for clients to use.

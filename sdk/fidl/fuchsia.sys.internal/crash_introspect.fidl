@@ -18,5 +18,5 @@ protocol CrashIntrospect {
         thread_koid zx.Koid;
     }) -> (struct {
         component_info SourceIdentity;
-    }) error zx.status;
+    }) error zx.Status;
 };

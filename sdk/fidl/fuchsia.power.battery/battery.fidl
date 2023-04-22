@@ -59,13 +59,13 @@ type HealthStatus = strict enum {
 /// The time remaining while actively charging or discharging.
 type TimeRemaining = flexible union {
     /// Representation of indeterminate state with zero duration.
-    1: indeterminate zx.duration;
+    1: indeterminate zx.Duration;
 
     /// Remaining battery life while discharging
-    2: battery_life zx.duration;
+    2: battery_life zx.Duration;
 
     /// Remaining time until full while charging
-    3: full_charge zx.duration;
+    3: full_charge zx.Duration;
 };
 
 /// Current battery state information
@@ -95,7 +95,7 @@ type BatteryInfo = table {
     7: time_remaining TimeRemaining;
 
     /// Timestamp to distinguish between latest and stale status
-    8: timestamp zx.time;
+    8: timestamp zx.Time;
 };
 
 /// Provider interface used to obtain battery status details

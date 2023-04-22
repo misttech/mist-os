@@ -17,8 +17,8 @@ protocol FastbootImpl {
     /// Returns ZX_ERR_UNAVAILABLE if another call is made while a previous one is being processed,
     /// or the FIDL is called too early during boot when the driver has not become ready.
     Send(resource struct {
-        data zx.handle:VMO;
-    }) -> () error zx.status;
+        data zx.Handle:VMO;
+    }) -> () error zx.Status;
 
     /// Receives at least `requested` bytes of data from the USB fastboot device.
     ///
@@ -42,6 +42,6 @@ protocol FastbootImpl {
     Receive(struct {
         requested uint64;
     }) -> (resource struct {
-        data zx.handle:VMO;
-    }) error zx.status;
+        data zx.Handle:VMO;
+    }) error zx.Status;
 };

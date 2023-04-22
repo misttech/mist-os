@@ -25,24 +25,24 @@ protocol Controller {
         device client_end:fuchsia.hardware.block.Block;
         name string:fuchsia.io.MAX_FILENAME;
         options MountOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Unmounts a previously mounted filesystem.
     Unmount(struct {
         name string:fuchsia.io.MAX_FILENAME;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Formats a block device with a particular filesystem format
     Format(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         name string:fuchsia.io.MAX_FILENAME;
         options FormatOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Checks the consistency of the filesystem formatted on
     /// the block device
     Check(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         name string:fuchsia.io.MAX_FILENAME;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

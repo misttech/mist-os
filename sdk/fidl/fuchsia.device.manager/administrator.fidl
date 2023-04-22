@@ -21,7 +21,7 @@ protocol Administrator {
     /// suspended. If there are no devices that live in storage, this function
     /// will immediatetly return.
     UnregisterSystemStorageForShutdown() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Tell DriverManager to go through the suspend process, but don't exit

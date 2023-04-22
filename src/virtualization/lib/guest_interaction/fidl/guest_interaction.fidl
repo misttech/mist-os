@@ -32,12 +32,12 @@ closed protocol CommandListener {
     /// Signal to a client that is attempting to exec inside of a guest whether
     /// or not the subprocess was successfully started.
     strict -> OnStarted(struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Signal to a client that the Exec request has completed.
     strict -> OnTerminated(struct {
-        status zx.status;
+        status zx.Status;
         return_code int32;
     });
 };
@@ -49,7 +49,7 @@ closed protocol Interaction {
         local_file client_end:fuchsia.io.File;
         remote_path string:GUEST_INTERACTION_MAX_LENGTH;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Pull a file from the guest under test and copy it to the specified
@@ -58,7 +58,7 @@ closed protocol Interaction {
         remote_path string:GUEST_INTERACTION_MAX_LENGTH;
         local_file client_end:fuchsia.io.File;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Execute command on the guest under test and return the resulting output,
@@ -66,9 +66,9 @@ closed protocol Interaction {
     strict ExecuteCommand(resource struct {
         command string:GUEST_INTERACTION_MAX_LENGTH;
         env vector<EnvironmentVariable>:GUEST_INTERACTION_MAX_LENGTH;
-        stdin zx.handle:<SOCKET, optional>;
-        stdout zx.handle:<SOCKET, optional>;
-        stderr zx.handle:<SOCKET, optional>;
+        stdin zx.Handle:<SOCKET, optional>;
+        stdout zx.Handle:<SOCKET, optional>;
+        stderr zx.Handle:<SOCKET, optional>;
         command_listener server_end:CommandListener;
     });
 };

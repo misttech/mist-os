@@ -13,7 +13,7 @@ using zx;
 /// `ViewHolder` resource using this token.  The other client must also create
 /// a `View` resource using the corresponding `ViewToken`.
 type ViewHolderToken = resource struct {
-    value zx.handle:EVENTPAIR;
+    value zx.Handle:EVENTPAIR;
 };
 
 /// Token that uniquely identifies a `View`, which is the root point for a
@@ -24,5 +24,5 @@ type ViewHolderToken = resource struct {
 /// creating a `View` resource using this token.  The other client must also
 /// create a `ViewHolder` resource using the corresponding `ViewHolderToken`.
 type ViewToken = resource struct {
-    value zx.handle:EVENTPAIR;
+    value zx.Handle:EVENTPAIR;
 };

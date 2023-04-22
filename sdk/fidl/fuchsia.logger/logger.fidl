@@ -75,7 +75,7 @@ type LogMessage = struct {
     pid uint64;
     tid uint64;
     /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
-    time zx.time;
+    time zx.Time;
     severity int32;
 
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h).
@@ -129,7 +129,7 @@ protocol LogSink {
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h)
     /// for what is expected to be received over the socket.
     Connect(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     });
 
     /// LogSink implementers will return to this hanging-get whenever the scope of
@@ -148,7 +148,7 @@ protocol LogSink {
     /// See [Encoding structured records](https://fuchsia.dev/fuchsia-src/reference/platform-spec/diagnostics/logs-encoding)
     /// for what is expected to be received over the socket.
     ConnectStructured(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     });
 };
 

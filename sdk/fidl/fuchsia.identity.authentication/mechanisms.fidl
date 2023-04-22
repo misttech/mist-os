@@ -66,7 +66,7 @@ type PasswordCondition = flexible union {
     /// (authentication) Too many incorrect password attempts have been made,
     /// the client must wait until the specified time before another attempt
     /// will be accepted.
-    1: wait_until zx.time;
+    1: wait_until zx.Time;
     /// (enrollment and authentication) The client should call `SetPassword`.
     2: set_password Empty;
 };

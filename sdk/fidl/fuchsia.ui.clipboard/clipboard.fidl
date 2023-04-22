@@ -28,7 +28,7 @@ type ClipboardMetadata = table {
     ///
     /// If the clipboard has not yet been modified, this will contain a past timestamp from around
     /// when the clipboard service was most recently launched.
-    1: last_modified zx.time;
+    1: last_modified zx.Time;
     // In future revisions, this will likely also contain a list of MIME types on the clipboard.
 };
 

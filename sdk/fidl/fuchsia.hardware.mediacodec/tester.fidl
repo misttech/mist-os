@@ -9,11 +9,11 @@ using zx;
 protocol Tester {
     /// Takes a directory handle from the client and installs that as /tmp in the driver so that debugging files can be written there.
     SetOutputDirectoryHandle(resource struct {
-        handle zx.handle:CHANNEL;
+        handle zx.Handle:CHANNEL;
     });
 
     /// Runs the full suite of tests. Test output will go to klog.
     RunTests() -> (struct {
-        result zx.status;
+        result zx.Status;
     });
 };

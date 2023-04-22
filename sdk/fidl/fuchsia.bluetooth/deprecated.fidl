@@ -21,7 +21,7 @@ type UInt16 = struct {
     value uint16;
 };
 
-@deprecated("Use protocol specific error enums and zx.status instead")
+@deprecated("Use protocol specific error enums and zx.Status instead")
 type ErrorCode = strict enum {
     UNKNOWN = 0;
     FAILED = 1;

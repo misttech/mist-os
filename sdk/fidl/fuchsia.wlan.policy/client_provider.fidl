@@ -162,7 +162,7 @@ type Bss = table {
 
     /// Time of the scan result relative to when the system was powered on.
     /// See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
-    4: timestamp_nanos zx.time;
+    4: timestamp_nanos zx.Time;
 };
 
 /// Iterator used by callers to retrieve saved network information.

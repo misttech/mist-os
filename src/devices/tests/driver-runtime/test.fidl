@@ -16,7 +16,7 @@ closed protocol TestDevice {
     /// Sets the test data that can be retrieved from this device using a runtime channel.
     strict SetTestData(struct {
         in vector<uint8>:MAX_TRANSFER_SIZE;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 closed protocol TestDeviceChild {
@@ -27,7 +27,7 @@ closed protocol TestDeviceChild {
         sync bool;
     }) -> (struct {
         out vector<uint8>:MAX_TRANSFER_SIZE;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 @discoverable

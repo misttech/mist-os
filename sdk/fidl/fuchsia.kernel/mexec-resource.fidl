@@ -14,6 +14,6 @@ protocol MexecResource {
     /// Get an MEXEC resource handle as `resource`.
     @available(added=HEAD)
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

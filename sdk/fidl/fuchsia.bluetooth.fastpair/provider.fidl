@@ -43,5 +43,5 @@ protocol Provider {
     ///   the service.
     Enable(resource struct {
         watcher client_end:ProviderWatcher;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

@@ -6,7 +6,7 @@ library llcpptest.handleraii.test;
 using zx;
 
 type HandleStruct = resource struct {
-    h zx.handle:EVENT;
+    h zx.Handle:EVENT;
 };
 
 type HandleStructStruct = resource struct {
@@ -14,9 +14,9 @@ type HandleStructStruct = resource struct {
 };
 
 type MultiFieldStruct = resource struct {
-    h1 zx.handle:EVENT;
+    h1 zx.Handle:EVENT;
     s HandleStruct;
-    h2 zx.handle:EVENT;
+    h2 zx.Handle:EVENT;
 };
 
 type HandleStructOptionalStruct = resource struct {
@@ -32,7 +32,7 @@ type ArrayStruct = resource struct {
 };
 
 type HandleUnion = strict resource union {
-    1: h1 zx.handle:EVENT;
+    1: h1 zx.Handle:EVENT;
     2: h2 HandleStruct;
 };
 
@@ -45,7 +45,7 @@ type HandleUnionOptionalStruct = resource struct {
 };
 
 type HandleTable = resource table {
-    1: h1 zx.handle:EVENT;
+    1: h1 zx.Handle:EVENT;
     2: h2 HandleStruct;
 };
 
@@ -55,7 +55,7 @@ type HandleTableStruct = resource struct {
 
 closed protocol HandleProvider {
     strict GetHandle() -> (resource struct {
-        value zx.handle:EVENT;
+        value zx.Handle:EVENT;
     });
     strict GetHandleStruct() -> (resource struct {
         value HandleStruct;
@@ -67,9 +67,9 @@ closed protocol HandleProvider {
         value MultiFieldStruct;
     });
     strict GetMultiArgs() -> (resource struct {
-        h1 zx.handle:EVENT;
+        h1 zx.Handle:EVENT;
         s HandleStruct;
-        h2 zx.handle:EVENT;
+        h2 zx.Handle:EVENT;
     });
     strict GetVectorStruct(struct {
         count uint32;
@@ -138,20 +138,20 @@ closed protocol HandleProvider {
     strict GetVectorOfHandle(struct {
         count uint32;
     }) -> (resource struct {
-        value vector<zx.handle:EVENT>;
+        value vector<zx.Handle:EVENT>;
     });
     strict GetVectorOfVectorOfHandle(struct {
         count1 uint32;
         count2 uint32;
     }) -> (resource struct {
-        value vector<vector<zx.handle:EVENT>>;
+        value vector<vector<zx.Handle:EVENT>>;
     });
     strict GetVectorOfVectorOfVectorOfHandle(struct {
         count1 uint32;
         count2 uint32;
         count3 uint32;
     }) -> (resource struct {
-        value vector<vector<vector<zx.handle:EVENT>>>;
+        value vector<vector<vector<zx.Handle:EVENT>>>;
     });
 
     strict GetVectorOfHandleStruct(struct {
@@ -174,13 +174,13 @@ closed protocol HandleProvider {
     });
 
     strict GetArrayOfHandle() -> (resource struct {
-        value array<zx.handle:EVENT, 2>;
+        value array<zx.Handle:EVENT, 2>;
     });
     strict GetArrayOfArrayOfHandle() -> (resource struct {
-        value array<array<zx.handle:EVENT, 2>, 3>;
+        value array<array<zx.Handle:EVENT, 2>, 3>;
     });
     strict GetArrayOfArrayOfArrayOfHandle() -> (resource struct {
-        value array<array<array<zx.handle:EVENT, 2>, 3>, 4>;
+        value array<array<array<zx.Handle:EVENT, 2>, 3>, 4>;
     });
 
     strict GetArrayOfHandleStruct() -> (resource struct {
@@ -196,11 +196,11 @@ closed protocol HandleProvider {
     strict GetMixed1(struct {
         count uint32;
     }) -> (resource struct {
-        value array<vector<zx.handle:EVENT>, 2>;
+        value array<vector<zx.Handle:EVENT>, 2>;
     });
     strict GetMixed2(struct {
         count uint32;
     }) -> (resource struct {
-        value vector<array<zx.handle:EVENT, 2>>;
+        value vector<array<zx.Handle:EVENT, 2>>;
     });
 };

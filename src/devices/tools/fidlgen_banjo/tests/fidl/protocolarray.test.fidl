@@ -67,9 +67,9 @@ closed protocol Array {
         f64 array<float64, 1>;
     });
     strict Handle(resource struct {
-        u64 array<zx.handle, 1>;
+        u64 array<zx.Handle, 1>;
     }) -> (resource struct {
-        f64 array<zx.handle, 1>;
+        f64 array<zx.Handle, 1>;
     });
 };
 
@@ -134,9 +134,9 @@ closed protocol Array2 {
         f64 array<float64, array_size>;
     });
     strict Handle(resource struct {
-        u64 array<zx.handle, array_size>;
+        u64 array<zx.Handle, array_size>;
     }) -> (resource struct {
-        f64 array<zx.handle, array_size>;
+        f64 array<zx.Handle, array_size>;
     });
 };
 
@@ -199,8 +199,8 @@ closed protocol ArrayofArrays {
         f64 array<array<float64, 4>, array_size>;
     });
     strict Handle(resource struct {
-        u64 array<array<zx.handle, 4>, array_size>;
+        u64 array<array<zx.Handle, 4>, array_size>;
     }) -> (resource struct {
-        f64 array<array<zx.handle, 4>, array_size>;
+        f64 array<array<zx.Handle, 4>, array_size>;
     });
 };

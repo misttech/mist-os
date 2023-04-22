@@ -10,7 +10,7 @@ using zx;
 protocol SourceManager {
     /// Creates a source that reads from a file.
     CreateFileSource(resource struct {
-        file_channel zx.handle:CHANNEL;
+        file_channel zx.Handle:CHANNEL;
         source_request server_end:Source;
     });
 
@@ -26,7 +26,7 @@ protocol SourceManager {
     /// the player, in the `PlayerStatus` as well. `can_pause` and `can_seek`, when
     /// false, constrain the capabilities of the player.
     CreateElementarySource(resource struct {
-        duration_ns zx.duration;
+        duration_ns zx.Duration;
         can_pause bool;
         can_seek bool;
         metadata box<fuchsia.media.Metadata>;
@@ -107,7 +107,7 @@ protocol ElementarySource {
 /// Source status information.
 type SourceStatus = struct {
     /// Duration of the content.
-    duration zx.duration;
+    duration zx.Duration;
 
     /// Whether the source can pause.
     can_pause bool;

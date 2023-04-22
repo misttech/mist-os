@@ -21,32 +21,32 @@ protocol UsbDci {
     SetInterface(resource struct {
         interface client_end:UsbDciInterface;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Configures an endpoint based on provided descriptors.
     ConfigEp(struct {
         ep_desc fuchsia.hardware.usb.descriptor.UsbEndpointDescriptor;
         ss_comp_desc fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Disables the specified endpoint.
     DisableEp(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Stalls the specified endpoint.
     EpSetStall(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Clears a stall condition for the specified endpoint.
     EpClearStall(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Returns the size needed for a |usb_request_t|, including private storage needed by the
     /// HCI driver.
@@ -57,7 +57,7 @@ protocol UsbDci {
     CancelAll(struct {
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };
 
@@ -71,7 +71,7 @@ protocol UsbDciInterface {
         @buffer
         write vector<uint8>:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         @buffer
         read vector<uint8>:MAX;
     });

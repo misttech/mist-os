@@ -32,6 +32,6 @@ protocol Keymap {
         /// The Wayland API takes a file descriptor, but Fuchsia's Wayland bridge
         /// handles the conversion between VMOs and file descriptors. Also, VMOs
         /// have a size, so we do not need to report it separately.
-        keymap_xkb_v1 zx.handle:VMO;
+        keymap_xkb_v1 zx.Handle:VMO;
     });
 };

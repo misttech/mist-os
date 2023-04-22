@@ -11,37 +11,37 @@ closed protocol TestDevice {
     /// or completed later by the caller with |CompleteChildInit|.
     strict AddChild(struct {
         init_complete bool;
-        init_status zx.status;
+        init_status zx.Status;
     }) -> (struct {
         child_id uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Removes the child device of the given |id|.
     strict RemoveChild(struct {
         child_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Asynchronously removes a child device.
     /// The remove must be completed with CompleteUnbind.
     strict AsyncRemoveChild(struct {
         child_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Replies to the child init hook.
     /// Returns an error if the child has no pending init.
     strict CompleteChildInit(struct {
         child_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Registers the client for device lifecycle events.
     strict SubscribeToLifecycle(resource struct {
         client server_end:Lifecycle;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Finishes an unbind started by AsyncRemoveChild.
     strict CompleteUnbind(struct {
         child_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 closed protocol Lifecycle {

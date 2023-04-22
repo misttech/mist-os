@@ -58,7 +58,7 @@ protocol Ramdisk {
     /// returned. `required_size` must be a multiple of `block_size`.
     Grow(struct {
         new_size uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 // TODO(smklein): Deduplicate GUID declarations with other FIDL interfaces.
@@ -83,23 +83,23 @@ protocol RamdiskController {
         type_guid box<Guid>;
     }) -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Initializes a new Ramdisk instance from a VMO. Uses a block size of `PAGE_SIZE`,
     /// and derives the block count from the size of the VMO.
     CreateFromVmo(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
     }) -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Same as CreateFromVmo, but with the given `block_size` and optional `type_guid`. If
     /// `block_size` is zero, `PAGE_SIZE` will be used as `block_size`.
     CreateFromVmoWithParams(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         block_size uint64;
         type_guid box<Guid>;
     }) -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
-    }) error zx.status;
+    }) error zx.Status;
 };

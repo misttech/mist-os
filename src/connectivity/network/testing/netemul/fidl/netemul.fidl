@@ -197,7 +197,7 @@ closed protocol ManagedRealm {
     strict ConnectToProtocol(resource struct {
         protocol_name fuchsia.component.name;
         child_name fuchsia.component.name:optional;
-        req zx.handle:CHANNEL;
+        req zx.Handle:CHANNEL;
     });
     /// Mounts new virtual device `device` on netemul's `devfs` instance within
     /// this realm.
@@ -214,7 +214,7 @@ closed protocol ManagedRealm {
     strict AddDevice(resource struct {
         path string:MAX;
         device client_end:fuchsia.netemul.network.DeviceProxy;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Removes virtual device mounted at `path`.
     ///
     /// + request `path` the path to virtual device to be removed from the
@@ -224,7 +224,7 @@ closed protocol ManagedRealm {
     ///     [`fuchsia.io/MAX_FILENAME`] bytes in length.
     strict RemoveDevice(struct {
         path string:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Connects to netemul's `devfs` instance for this realm.
     ///
     /// + request `devfs` request handle to the `devfs` directory.
@@ -242,7 +242,7 @@ closed protocol ManagedRealm {
     /// * error `ZX_ERR_INTERNAL` if the call to the service dependency fails.
     strict StartChildComponent(struct {
         child_name fuchsia.component.name;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Stops the specified child component in this realm. Stopping an already
     /// stopped child component is a no-op and returns success.
     ///
@@ -254,7 +254,7 @@ closed protocol ManagedRealm {
     /// * error `ZX_ERR_INTERNAL` if the call to the service dependency fails.
     strict StopChildComponent(struct {
         child_name fuchsia.component.name;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Request that the managed realm shut down.
     ///
     /// The realm will send an `OnShutdown` event when shutdown is complete and

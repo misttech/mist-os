@@ -30,7 +30,7 @@ protocol WlanPhyImpl {
     GetSupportedMacRoles() -> (table {
         1: supported_mac_roles
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Create a new interface with the specified role, returning the interface id. \
     /// Some common error codes are: \
@@ -43,13 +43,13 @@ protocol WlanPhyImpl {
         /// A handle to the direct MLME channel, if supported by the driver. This
         /// channel should be used by SME to communicate with MLME via the MLME
         /// protocol. This field is required.
-        2: mlme_channel zx.handle:CHANNEL;
+        2: mlme_channel zx.Handle:CHANNEL;
         /// The initial station address set from configuration layer. This field is optional.
         3: init_sta_addr ieee80211.MacAddr;
     }) -> (table {
         /// This field is always present.
         1: iface_id uint16;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Destroy the interface with the matching id. \
     /// Some common error codes are: \
@@ -58,22 +58,22 @@ protocol WlanPhyImpl {
     DestroyIface(table {
         /// This field is required.
         1: iface_id uint16;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Set country with a WlanPhyCountry. \
     /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified country code not supported. PHY state is left unchanged.
-    SetCountry(WlanPhyCountry) -> () error zx.status;
+    SetCountry(WlanPhyCountry) -> () error zx.Status;
 
     /// Set device to a world-safe country, i.e. a mode that conforms to all
     /// regulatory constraints globally. \
     /// Generally expected to succeed if the device is in a functional state.
-    ClearCountry() -> () error zx.status;
+    ClearCountry() -> () error zx.Status;
 
     /// Read currently configured country. Implementations are advised to read the
     /// country directly from the firmware, where possible. \
     /// Generally expected to succeed if the device is in a functional state.
-    GetCountry() -> (WlanPhyCountry) error zx.status;
+    GetCountry() -> (WlanPhyCountry) error zx.Status;
 
     /// Set Power Save mode on device. In most implementations this
     /// likely to be set in Firmware. \
@@ -82,14 +82,14 @@ protocol WlanPhyImpl {
     SetPowerSaveMode(table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Get current Power Save mode from device. In most implementation this
     /// likely to be retrieved from Firmware.
     GetPowerSaveMode() -> (table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 service Service {

@@ -73,12 +73,12 @@ protocol MuteControl {
     Mute(struct {
         device_id int32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     Unmute(struct {
         device_id int32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 

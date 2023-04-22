@@ -51,7 +51,7 @@ type SerialPortInfo = struct {
 @banjo_layout("ddk-protocol")
 protocol Serial {
     GetInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info SerialPortInfo;
     });
     /// Configures the given serial port.
@@ -59,6 +59,6 @@ protocol Serial {
         baud_rate uint32;
         flags uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

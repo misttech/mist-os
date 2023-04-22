@@ -22,9 +22,9 @@ protocol Provision {
     /// Returns the OwnershipStatus of the TPM.
     IsOwned() -> (struct {
         ownership OwnershipStatus;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// TakeOwnership is a one time setup call that is required on operating
     /// system install or after a factory reset.
-    TakeOwnership(table {}) -> () error zx.status;
+    TakeOwnership(table {}) -> () error zx.Status;
 };

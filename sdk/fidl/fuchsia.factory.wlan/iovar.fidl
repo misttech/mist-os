@@ -23,7 +23,7 @@ protocol Iovar {
         request vector<uint8>:MAX_BUFFER_SIZE;
     }) -> (struct {
         result vector<uint8>:MAX_BUFFER_SIZE;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// + request `iface_idx` interface index in the firmware
     /// + request `cmd` pre-defined command index specified by the manufacturer
@@ -33,5 +33,5 @@ protocol Iovar {
         iface_idx int32;
         cmd int32;
         request vector<uint8>:MAX_BUFFER_SIZE;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

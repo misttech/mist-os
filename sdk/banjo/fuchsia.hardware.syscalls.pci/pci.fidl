@@ -36,5 +36,5 @@ type PciBar = resource struct {
     type uint32;
     size uint64;
     address uint64;
-    handle zx.handle:VMO;
+    handle zx.Handle:VMO;
 };

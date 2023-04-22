@@ -86,7 +86,7 @@ type Event = table {
     /// The time when this event was observed.
     ///
     /// Required.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
 
     /// The event's data.
     ///

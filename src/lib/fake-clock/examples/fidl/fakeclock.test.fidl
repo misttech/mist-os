@@ -9,14 +9,14 @@ using zx;
 closed protocol Example {
     /// Gets the current monotonic time.
     strict GetMonotonic() -> (struct {
-        time zx.time;
+        time zx.Time;
     });
     /// Wait until the given absolute time, then return.
     strict WaitUntil(struct {
-        timeout zx.time;
+        timeout zx.Time;
     }) -> ();
     /// Wait for `duration` time, then return.
     strict WaitFor(struct {
-        duration zx.duration;
+        duration zx.Duration;
     }) -> ();
 };

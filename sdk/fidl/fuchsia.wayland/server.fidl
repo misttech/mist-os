@@ -34,6 +34,6 @@ protocol Server {
     /// the channel will be Wayland protocol messages. Each channel datagram will
     /// contain 1 or more complete Wayland messages.
     Connect(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 };

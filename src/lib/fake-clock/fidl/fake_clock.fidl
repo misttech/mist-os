@@ -10,29 +10,29 @@ using fuchsia.testing.deadline;
 closed protocol FakeClock {
     /// Gets the current time.
     strict Get() -> (struct {
-        time zx.time;
+        time zx.Time;
     });
     /// Registers the event handle `event` to be signaled with `ZX_EVENTPAIR_SIGNALED` when the
     /// provided `time` is reached by the fake clock.
     /// The `FakeClock` instance will retain this event (even after it's fired) for as long as the
     /// client-side of the provided event pair `event` is open.
     strict RegisterEvent(resource struct {
-        event zx.handle:EVENTPAIR;
-        time zx.time;
+        event zx.Handle:EVENTPAIR;
+        time zx.Time;
     });
     /// Reschedules an event to be signalled with `ZX_EVENTPAIR_SIGNALED` at the new deadline in
     /// `time`.
     /// `event` is a duplicate of the client-side of the event pair, and it's used to retrieve the
     /// originally registered event through its kernel object identifier.
     strict RescheduleEvent(resource struct {
-        event zx.handle:EVENTPAIR;
-        time zx.time;
+        event zx.Handle:EVENTPAIR;
+        time zx.Time;
     }) -> ();
     /// Cancels a previously registered event.
     /// `event` is a duplicate of the client-side of the event pair, and it's used to retrieve the
     /// originally registered event through its kernel object identifier.
     strict CancelEvent(resource struct {
-        event zx.handle:EVENTPAIR;
+        event zx.Handle:EVENTPAIR;
     }) -> ();
     /// Calculate and set a deadline associated with an id.
     /// The returned `deadline` is calculated as `duration` after the current fake time.
@@ -42,9 +42,9 @@ closed protocol FakeClock {
     /// test can wait for a deadline event.
     strict CreateNamedDeadline(struct {
         id fuchsia.testing.deadline.DeadlineId;
-        duration zx.duration;
+        duration zx.Duration;
     }) -> (struct {
-        deadline zx.time;
+        deadline zx.Time;
     });
 };
 
@@ -59,15 +59,15 @@ type DeadlineEventType = strict enum {
 /// A fake clock increment in a uniform random range.
 type RandomRange = struct {
     /// The lower bound (inclusive) for the random duration.
-    min_rand zx.duration;
+    min_rand zx.Duration;
     /// The upper bound (exclusive) for the random duration.
-    max_rand zx.duration;
+    max_rand zx.Duration;
 };
 
 /// A fake clock increment step.
 type Increment = strict union {
     /// Increments the fake clock by the `determined` duration.
-    1: determined zx.duration;
+    1: determined zx.Duration;
     /// Increments the fake clock by a random duration chosen uniformly from the range in `random`.
     2: random RandomRange;
 };
@@ -90,15 +90,15 @@ closed protocol FakeClockControl {
     /// RandomRange). Returns `ZX_ERR_ACCESS_DENIED` if called while the FakeClock is free-running.
     strict Advance(struct {
         increment Increment;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Resumes free-running increments on the fake clock.
     /// `real` is the period based on the real monotonic clock over which `increment` is going to be
     /// applied. Returns `ZX_ERR_INVALID_ARGS` if the provided `increment` is invalid (such as a
     /// badly formed RandomRange).
     strict ResumeWithIncrements(struct {
-        real zx.duration;
+        real zx.Duration;
         increment Increment;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Registers interest in a deadline event.
     /// `deadline_id` and `event_type` identify the named deadline and the event associated with
     /// the deadline. When the event occurs, FakeClock will signal `EVENTPAIR_SIGNALED` on
@@ -117,8 +117,8 @@ closed protocol FakeClockControl {
     strict AddStopPoint(resource struct {
         deadline_id fuchsia.testing.deadline.DeadlineId;
         event_type DeadlineEventType;
-        on_stop zx.handle:EVENTPAIR;
-    }) -> () error zx.status;
+        on_stop zx.Handle:EVENTPAIR;
+    }) -> () error zx.Status;
     /// Pauses free-running increments on the fake clock.
     strict Pause() -> ();
     /// Instructs the fake clock to make deadlines named `deadline_id` never expire.

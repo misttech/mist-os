@@ -20,7 +20,7 @@ closed protocol Leaf {
     strict AddChild(struct {
         name string:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 

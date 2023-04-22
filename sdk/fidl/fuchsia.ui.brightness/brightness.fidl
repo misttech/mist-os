@@ -34,7 +34,7 @@ protocol Control {
     /// target brightness will be set.
     SetManualBrightnessSmooth(struct {
         value brightness;
-        duration zx.duration;
+        duration zx.Duration;
     });
 
     /// Gets the current brightness in the range 0.0 to 1.0.
@@ -69,7 +69,7 @@ protocol Control {
     /// Gets the maximum supported backlight brightness in nits, if known.
     GetMaxAbsoluteBrightness() -> (struct {
         max_brightness float64;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// A tuple representing a point on the auto-brightness curve

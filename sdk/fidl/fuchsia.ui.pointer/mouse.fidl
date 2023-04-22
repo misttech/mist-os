@@ -57,7 +57,7 @@ protocol MouseSource {
 type MouseEvent = table {
     /// The time this event was observed.
     /// Required.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
 
     /// The parameters of the associated view and viewport, sufficient to
     /// correctly interpret the position, orientation, magnitude, and

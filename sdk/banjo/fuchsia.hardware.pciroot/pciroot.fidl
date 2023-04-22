@@ -38,7 +38,7 @@ type PciIrqRoutingEntry = struct {
 /// The vector is supplied because interrupt objects cannot be inspected with
 /// zx_get_object_info.
 type PciLegacyIrq = resource struct {
-    interrupt zx.handle:INTERRUPT;
+    interrupt zx.Handle:INTERRUPT;
     vector uint32;
 };
 
@@ -52,7 +52,7 @@ type PciPlatformInfo = resource struct {
     start_bus_num uint8;
     end_bus_num uint8;
     segment_group uint16;
-    ecam_vmo zx.handle:VMO;
+    ecam_vmo zx.Handle:VMO;
     legacy_irqs vector<PciLegacyIrq>:MAX;
     irq_routing vector<PciIrqRoutingEntry>:MAX;
     /// A vector of PciBdfs that are known to ACPI.
@@ -76,12 +76,12 @@ protocol Pciroot {
         bdf uint32;
         index uint32;
     }) -> (resource struct {
-        s zx.status;
-        bti zx.handle:BTI;
+        s zx.Status;
+        bti zx.Handle:BTI;
     });
     /// Get the platform information structure from the pciroot protocol to be used for bus init.
     GetPciPlatformInfo() -> (resource struct {
-        s zx.status;
+        s zx.Status;
         info PciPlatformInfo;
     });
 
@@ -97,7 +97,7 @@ protocol Pciroot {
         address PciBdf;
         offset uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint8;
     });
     /// Read 16 bytes from config space for device at bdf address |address|, offset |offset|.
@@ -105,7 +105,7 @@ protocol Pciroot {
         address PciBdf;
         offset uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint16;
     });
     /// Read 32 bytes from config space for device at bdf address |address|, offset |offset|.
@@ -113,7 +113,7 @@ protocol Pciroot {
         address PciBdf;
         offset uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint32;
     });
     /// Write 8 bytes to config space for device at bdf |address| offset |offset|.
@@ -122,7 +122,7 @@ protocol Pciroot {
         offset uint16;
         value uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Write 16 bytes to config space for device at bdf |address| offset |offset|.
     WriteConfig16(struct {
@@ -130,7 +130,7 @@ protocol Pciroot {
         offset uint16;
         value uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Write 32 bytes to config space for device at bdf |address| offset |offset|.
     WriteConfig32(struct {
@@ -138,7 +138,7 @@ protocol Pciroot {
         offset uint16;
         value uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Request address space reservations from platform bus to use for mapping bars / bridges
     /// |in_base| is an optional requested start address which should otherwise be 0. |size| is the
@@ -155,17 +155,17 @@ protocol Pciroot {
         type PciAddressSpace;
         low bool;
     }) -> (resource struct {
-        s zx.status;
+        s zx.Status;
         base uint64;
-        resource zx.handle:RESOURCE;
-        token zx.handle:EVENTPAIR;
+        resource zx.Handle:RESOURCE;
+        token zx.Handle:EVENTPAIR;
     });
     /// Allocate |msi_count| MSIs and return a handle to the backing MsiAllocation.
     AllocateMsi(struct {
         msi_count uint32;
         can_target_64bit bool;
     }) -> (resource struct {
-        s zx.status;
-        allocation zx.handle:MSI;
+        s zx.Status;
+        allocation zx.Handle:MSI;
     });
 };

@@ -444,7 +444,7 @@ type KeyEvent = table {
     /// Time in nanoseconds when the event was recorded, in the `CLOCK_MONOTONIC` time base.
     /// The timestamp is **required** on every key event, and users can expect that it
     /// will always be present.
-    1: timestamp zx.time;
+    1: timestamp zx.Time;
 
     /// Type of event.
     2: type KeyEventType;

@@ -18,6 +18,6 @@ protocol ServiceProvider {
     /// or able to provide the requested service, it should close the `channel`.
     ConnectToService(resource struct {
         service_name string;
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 };

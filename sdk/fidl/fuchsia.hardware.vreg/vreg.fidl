@@ -10,7 +10,7 @@ protocol Vreg {
     // Set the step which yields a voltage of min_uv + step_size_uv * step.
     SetVoltageStep(struct {
         step uint32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     // Get the current step.
     GetVoltageStep() -> (struct {

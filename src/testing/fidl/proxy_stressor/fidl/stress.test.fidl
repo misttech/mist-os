@@ -12,7 +12,7 @@ closed protocol Stressor {
     /// then returns the number of bytes written. The client should not read
     /// from the other end of the socket until this returns.
     strict StuffSocket(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> (struct {
         bytes_written uint32;
     });

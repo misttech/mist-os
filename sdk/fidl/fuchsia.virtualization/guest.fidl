@@ -106,7 +106,7 @@ protocol Guest {
     ///
     /// Returns error DEVICE_NOT_PRESENT if the guest was started without a console device.
     GetConsole() -> (resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) error GuestError;
 
     /// Get the socket for low-level guest debug logs.
@@ -115,7 +115,7 @@ protocol Guest {
     /// are determined by each guest, but will typically be a read-only socket
     /// with the guest kernel's serial logs.
     GetSerial() -> (resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     });
 
     /// Get the vsock endpoint for the guest.

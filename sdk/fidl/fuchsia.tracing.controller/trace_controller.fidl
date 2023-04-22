@@ -56,7 +56,7 @@ protocol Controller {
     /// are delimited by metadata records within the stream.
     InitializeTracing(resource struct {
         config TraceConfig;
-        output zx.handle:SOCKET;
+        output zx.Handle:SOCKET;
     });
 
     /// Requests to terminate tracing.

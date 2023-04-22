@@ -7,7 +7,7 @@ using fuchsia.hardware.camerahwaccel;
 using fuchsia.sysmem;
 
 type GdcConfigInfo = resource struct {
-    config_vmo zx.handle:VMO;
+    config_vmo zx.Handle:VMO;
     size uint32;
 };
 
@@ -33,7 +33,7 @@ protocol Gdc {
         res_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelResChangeCallback;
         task_remove_callback client_end:fuchsia.hardware.camerahwaccel.HwAccelRemoveTaskCallback;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         task_index uint32;
     });
 
@@ -54,7 +54,7 @@ protocol Gdc {
         input_buffer_index uint32;
         capture_timestamp uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Releases the frame |buffer_index| from the |output_buffer_collection| to be
@@ -71,6 +71,6 @@ protocol Gdc {
         task_index uint32;
         new_output_image_format_index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

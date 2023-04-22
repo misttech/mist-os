@@ -12,7 +12,7 @@ using zx;
 protocol RootJob {
     /// Get the root `job`.
     Get() -> (resource struct {
-        job zx.handle:JOB;
+        job zx.Handle:JOB;
     });
 };
 

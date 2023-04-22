@@ -28,16 +28,16 @@ type ProcessStats = struct {
     mem_scaled_shared_bytes uint64;
 
     /// The total amount of time this process was running on a CPU and not blocked.
-    cpu_time zx.duration;
+    cpu_time zx.Duration;
 
     // The total amount of time this process was ready but not actually using a CPU.
-    queue_time zx.duration;
+    queue_time zx.Duration;
 
     // The total amount of time this process spent handling page faults.
-    page_fault_time zx.duration;
+    page_fault_time zx.Duration;
 
     // The total amount of time this process spent waiting on contended kernel locks.
-    lock_contention_time zx.duration;
+    lock_contention_time zx.Duration;
 };
 
 // See |Monitor|. Used to indicate why an update was sent.
@@ -74,7 +74,7 @@ type Status = table {
     2: runs uint32;
 
     /// Time spent so far.
-    3: elapsed zx.duration;
+    3: elapsed zx.Duration;
 
     /// Number of program edges covered so far.
     4: covered_pcs uint64;

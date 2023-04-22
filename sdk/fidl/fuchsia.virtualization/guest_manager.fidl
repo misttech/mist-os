@@ -77,7 +77,7 @@ type GuestInfo = table {
     1: guest_status GuestStatus;
 
     /// Current uptime of the guest.
-    2: uptime zx.duration;
+    2: uptime zx.Duration;
 
     /// A subset of the config used to start the guest.
     3: guest_descriptor GuestDescriptor;

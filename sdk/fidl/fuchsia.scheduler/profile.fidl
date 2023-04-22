@@ -20,8 +20,8 @@ protocol ProfileProvider {
         priority uint32;
         name string:64;
     }) -> (resource struct {
-        status zx.status;
-        profile zx.handle:<PROFILE, optional>;
+        status zx.Status;
+        profile zx.Handle:<PROFILE, optional>;
     });
 
     /// Obtain a deadline profile handle.
@@ -34,8 +34,8 @@ protocol ProfileProvider {
         period uint64;
         name string:64;
     }) -> (resource struct {
-        status zx.status;
-        profile zx.handle:<PROFILE, optional>;
+        status zx.Status;
+        profile zx.Handle:<PROFILE, optional>;
     });
 
     /// Obtain a handle for a profile that sets CPU affinity.
@@ -45,17 +45,17 @@ protocol ProfileProvider {
     GetCpuAffinityProfile(struct {
         cpu_mask CpuSet;
     }) -> (resource struct {
-        status zx.status;
-        profile zx.handle:<PROFILE, optional>;
+        status zx.Status;
+        profile zx.Handle:<PROFILE, optional>;
     });
 
     /// Sets the given thread's profile based on the requested role. The exact
     /// parameters of the profile are system dependent and may vary based on
     /// device-specific tuning and/or runtime system goals.
     SetProfileByRole(resource struct {
-        thread zx.handle:THREAD;
+        thread zx.Handle:THREAD;
         role string:2048;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

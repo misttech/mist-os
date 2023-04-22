@@ -43,7 +43,7 @@ type MemoryStatsExtended = table {
 type PerCpuStats = table {
     1: cpu_number uint32;
     2: flags uint32;
-    3: idle_time zx.duration;
+    3: idle_time zx.Duration;
     4: reschedules uint64;
     5: context_switches uint64;
     6: irq_preempts uint64;
@@ -92,7 +92,7 @@ protocol Stats {
     /// Load is calculated as (100 - %idle), where %idle is the percentage value of idle_time (from
     /// PerCpuStats) over a time duration.
     GetCpuLoad(struct {
-        duration zx.duration;
+        duration zx.Duration;
     }) -> (struct {
         per_cpu_load vector<float32>:zx.MAX_CPUS;
     });

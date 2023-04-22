@@ -127,10 +127,10 @@ type FrameInfo = resource struct {
 
     /// The value of the system monotonic clock, measured at the time the hardware completed
     /// populating the buffer.
-    timestamp zx.time;
+    timestamp zx.Time;
 
     /// The client must close this when it has completed reading from the buffer.
-    release_fence zx.handle:EVENTPAIR;
+    release_fence zx.Handle:EVENTPAIR;
 };
 
 /// Metadata concerning a given frame.
@@ -146,14 +146,14 @@ type FrameInfo2 = resource table {
 
     /// The value of the system monotonic clock, measured at the time the hardware completed
     /// populating the buffer.
-    3: timestamp zx.time;
+    3: timestamp zx.Time;
 
     /// The value of the system monotonic clock, measured at the time the hardware completed
     /// populating the original buffer used to derive the contents of this buffer.
-    4: capture_timestamp zx.time;
+    4: capture_timestamp zx.Time;
 
     /// The client must close this when it has completed reading from the buffer.
-    5: release_fence zx.handle:EVENTPAIR;
+    5: release_fence zx.Handle:EVENTPAIR;
 };
 
 /// The frequency at which a Stream produces frames. The value is `numerator` / `denominator`, with

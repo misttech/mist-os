@@ -124,7 +124,7 @@ type RingBuffer = resource table {
     /// Reference clock for the ring buffer.
     ///
     /// Required.
-    5: reference_clock zx.handle:CLOCK;
+    5: reference_clock zx.Handle:CLOCK;
 
     /// Domain of `reference_clock`. See `fuchsia.hardware.audio.ClockDomain`.
     /// TODO(fxbug.dev/114923): If fuchsia.hardware.audio doesn't need to import

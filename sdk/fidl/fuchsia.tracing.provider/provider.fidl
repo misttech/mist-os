@@ -112,7 +112,7 @@ protocol Registry {
         @available(added=11)
         name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         started bool;
     });
 };
@@ -153,13 +153,13 @@ type ProviderConfig = resource struct {
     buffering_mode fuchsia.tracing.BufferingMode;
 
     /// The buffer to write trace records into.
-    buffer zx.handle:VMO;
+    buffer zx.Handle:VMO;
 
     /// When the trace provider observes `ZX_FIFO_PEER_CLOSED` on `fifo`, it
     /// must assume the trace manager has terminated abnormally (since `Stop`
     /// was not received as usual) and stop tracing automatically, discarding
     /// any in-flight trace data.
-    fifo zx.handle:FIFO;
+    fifo zx.Handle:FIFO;
 
     /// What trace categories to collect data for.
     @available(removed=11)

@@ -96,7 +96,7 @@ type FrameRateInfo = struct {
 /// Allows clients to get and set sensor constraints, sensor mode,
 /// and its dynamic operating state.
 ///
-/// Most methods provide a `zx.status` return value. This can be:
+/// Most methods provide a `zx.Status` return value. This can be:
 ///    ZX_OK                      - The operation was successful.
 ///    ZX_ERR_INTERNAL            - The sensor has not been initialized or has encountered an
 ///                                 otherwise unspecified error.
@@ -110,33 +110,33 @@ type FrameRateInfo = struct {
 protocol CameraSensor2 {
     /// Initializes the sensor.
     Init() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// De-Initializes the sensor.
     DeInit() -> ();
 
     /// Retrieves the sensor's ID.
     GetSensorId() -> (struct {
-        s zx.status;
+        s zx.Status;
         id uint32;
     });
 
     /// Retrieve a vector of available modes.
     GetAvailableModes() -> (struct {
-        s zx.status;
+        s zx.Status;
         modes vector<OperatingMode>:MAX;
     });
     /// Use a specific mode for the initialization sequence.
     SetMode(struct {
         mode uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Start streaming.
     /// Is safe to call this if streaming is already started.
     StartStreaming() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Stop streaming.
     /// It is safe to call this if streaming is already stopped.
@@ -146,51 +146,51 @@ protocol CameraSensor2 {
 
     /// Retrieve analog gain value.
     GetAnalogGain() -> (struct {
-        s zx.status;
+        s zx.Status;
         gain float32;
     });
     /// Changes analog gain value.
     SetAnalogGain(struct {
         gain float32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         gain float32;
     });
     /// Retrieve digital gain value.
     GetDigitalGain() -> (struct {
-        s zx.status;
+        s zx.Status;
         gain float32;
     });
     /// Changes digital gain value.
     SetDigitalGain(struct {
         gain float32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         gain float32;
     });
     /// Retrieve integration time value.
     GetIntegrationTime() -> (struct {
-        s zx.status;
+        s zx.Status;
         int_time float32;
     });
     /// Changes Integration Time.
     SetIntegrationTime(struct {
         int_time float32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         int_time float32;
     });
 
     /// Update the sensor with new parameters.
     Update() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // OTP
 
     /// Retrieve the total size of the data stored in the OTP module.
     GetOtpSize() -> (struct {
-        s zx.status;
+        s zx.Status;
         size uint32;
     });
     /// Retrieve the specified amount of OTP data at the offset and write them to
@@ -199,8 +199,8 @@ protocol CameraSensor2 {
         byte_count uint32;
         offset uint32;
     }) -> (resource struct {
-        s zx.status;
-        otp_data zx.handle:VMO;
+        s zx.Status;
+        otp_data zx.Handle:VMO;
     });
 
     // Test Controls
@@ -214,37 +214,37 @@ protocol CameraSensor2 {
     ///    5-255        - Reserved
     ///    256-65535    – Manufacturer specific
     GetTestPatternMode() -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint16;
     });
     /// Changes the sensor's test pattern mode.
     SetTestPatternMode(struct {
         mode uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Retrieves the test pattern data being used.
     GetTestPatternData() -> (struct {
-        s zx.status;
+        s zx.Status;
         data fuchsia.hardware.camera.ColorVal;
     });
     /// Changes data used by the test pattern. Only used by certain modes.
     SetTestPatternData(struct {
         data fuchsia.hardware.camera.ColorVal;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Retrieves the test cursor data being used.
     GetTestCursorData() -> (struct {
-        s zx.status;
+        s zx.Status;
         data fuchsia.hardware.camera.Rect;
     });
     /// Changes the sensor's cursor-related parameters.
     SetTestCursorData(struct {
         data fuchsia.hardware.camera.Rect;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Other Capabilities
@@ -255,7 +255,7 @@ protocol CameraSensor2 {
     GetExtensionValue(struct {
         id uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value ExtensionValueDataType;
     });
     /// This subset of the API provides implementers with the flexibility to provide custom
@@ -265,7 +265,7 @@ protocol CameraSensor2 {
         id uint64;
         value ExtensionValueDataType;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value ExtensionValueDataType;
     });
 };

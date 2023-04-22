@@ -23,7 +23,7 @@ protocol ServiceConsumer {
     ConnectToService(resource struct {
         node fuchsia.overnet.protocol.NodeId;
         service_name string:fuchsia.overnet.protocol.MAX_SERVICE_NAME_LENGTH;
-        chan zx.handle:CHANNEL;
+        chan zx.Handle:CHANNEL;
     });
 };
 
@@ -43,7 +43,7 @@ protocol ServicePublisher {
 protocol MeshController {
     /// Attach a socket as a new link.
     AttachSocketLink(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     });
 };
 
@@ -52,7 +52,7 @@ protocol ServiceProvider {
     /// Connect `chan` to the service (called in response to Overnet.ConnectToService).
     /// `info` provides additional data about the connection request.
     ConnectToService(resource struct {
-        chan zx.handle:CHANNEL;
+        chan zx.Handle:CHANNEL;
         info ConnectionInfo;
     });
 };

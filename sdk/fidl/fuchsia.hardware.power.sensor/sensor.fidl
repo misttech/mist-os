@@ -9,10 +9,10 @@ using zx;
 protocol Device {
     GetPowerWatts() -> (struct {
         power float32;
-    }) error zx.status;
+    }) error zx.Status;
     GetVoltageVolts() -> (struct {
         voltage float32;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 service Service {

@@ -65,19 +65,19 @@ protocol BlockVolume {
     Extend(struct {
         extent SliceExtent;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Shrinks a virtual partition.
     Shrink(struct {
         extent SliceExtent;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Returns the information about the volume manager.
     GetInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         manager VolumeManagerInfo;
         volume VolumeInfo;
     });
@@ -87,13 +87,13 @@ protocol BlockVolume {
     QuerySlices(struct {
         start vector<uint64>:MAX_SLICE_QUERY_REQUESTS;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         responses vector<SliceRegion>:MAX_SLICE_QUERY_REQUESTS;
     });
 
     /// Destroys the current partition, removing it from the Volume Manager, and
     /// freeing all underlying storage.
     Destroy() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

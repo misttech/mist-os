@@ -29,21 +29,21 @@ protocol Session {
 
     /// Returns a handle to the client end of the FIFO.
     GetFifo() -> (resource struct {
-        fifo zx.handle:<FIFO>;
-    }) error zx.status;
+        fifo zx.Handle:<FIFO>;
+    }) error zx.Status;
 
     /// Attaches a VMO to the session.
     ///
     /// Returns an identifer that can be used to refer to the VMO.
     AttachVmo(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
     }) -> (struct {
         // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
         // resolved.
         vmoid @generated_name("VmoId") struct {
             id uint16;
         };
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 type BlockInfo = struct {
@@ -84,7 +84,7 @@ protocol Block {
         // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
         // resolved.
         info BlockInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Returns stats about the block device on the provided buffer and optionally
     /// clears the counters.
@@ -109,7 +109,7 @@ protocol Block {
             /// The stats about flush commands.
             flush storage_metrics.CallStat;
         };
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Opens a new FIFO-based session on the block device.
     OpenSession(resource struct {
@@ -125,11 +125,11 @@ protocol Block {
     /// New code should use the FIFO interface along with the client libraries to
     /// read and write from block devices.
     ReadBlocks(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         length uint64;
         dev_offset uint64;
         vmo_offset uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Writes to a block device.
     ///
@@ -140,9 +140,9 @@ protocol Block {
     /// New code should use the FIFO interface along with the client libraries to
     /// read and write from block devices.
     WriteBlocks(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         length uint64;
         dev_offset uint64;
         vmo_offset uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

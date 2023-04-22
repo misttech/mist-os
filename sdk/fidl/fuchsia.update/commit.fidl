@@ -32,6 +32,6 @@ protocol CommitStatusProvider {
     ///
     /// - response `event` an EventPair with rights `ZX_RIGHTS_BASIC`.
     IsCurrentSystemCommitted() -> (resource struct {
-        event zx.handle:EVENTPAIR;
+        event zx.Handle:EVENTPAIR;
     });
 };

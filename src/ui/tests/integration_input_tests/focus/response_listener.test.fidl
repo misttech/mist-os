@@ -8,7 +8,7 @@ using zx;
 /// A set of focus-related data that is returned to the test for verification.
 type Data = table {
     /// The monotonic time (ns) the focus data was received by the client.
-    1: time_received zx.time;
+    1: time_received zx.Time;
 
     /// The current state of focus for the client.
     2: focus_status bool;

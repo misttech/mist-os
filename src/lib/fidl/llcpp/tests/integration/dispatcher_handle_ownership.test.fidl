@@ -6,7 +6,7 @@ library llcpptest.dispatcher.handle.ownership.test;
 using zx;
 
 type Resource = resource table {
-    1: handle zx.handle:EVENTPAIR;
+    1: handle zx.Handle:EVENTPAIR;
 };
 
 closed protocol Protocol {

@@ -122,7 +122,7 @@ type ComponentStartInfo = resource table {
     /// ELF debuggers can query the runtime_dir to decide whether to attach before
     /// they drop the other side of the eventpair, which is sent in the payload of
     /// the DebugStarted event in fuchsia.component.events.
-    8: break_on_start zx.handle:EVENTPAIR;
+    8: break_on_start zx.Handle:EVENTPAIR;
 };
 
 /// A protocol for binding and controlling the lifetime of a component instance

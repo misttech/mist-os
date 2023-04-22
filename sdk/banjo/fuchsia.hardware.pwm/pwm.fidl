@@ -41,7 +41,7 @@ protocol Pwm {
     /// @Returns : |s| : ZX_OK if success.
     /// @Returns : |config| : current config of PWM.
     GetConfig() -> (struct {
-        s zx.status;
+        s zx.Status;
         config PwmConfig;
     });
 
@@ -51,19 +51,19 @@ protocol Pwm {
     SetConfig(struct {
         config PwmConfig;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Enables the PWM.
     /// @Returns : |s| : ZX_OK if success.
     Enable() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Disables the PWM.
     /// @Returns : |s| : ZX_OK  if success.
     Disable() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };
 
@@ -77,7 +77,7 @@ protocol PwmImpl {
     GetConfig(struct {
         idx uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         config PwmConfig;
     });
 
@@ -89,7 +89,7 @@ protocol PwmImpl {
         idx uint32;
         config PwmConfig;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Enables the PWM.
@@ -98,7 +98,7 @@ protocol PwmImpl {
     Enable(struct {
         idx uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Disables the PWM.
@@ -107,6 +107,6 @@ protocol PwmImpl {
     Disable(struct {
         idx uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

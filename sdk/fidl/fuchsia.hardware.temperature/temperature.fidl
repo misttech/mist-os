@@ -9,7 +9,7 @@ using zx;
 protocol Device {
     /// Get the current temperature in degrees Celsius.
     GetTemperatureCelsius() -> (struct {
-        status zx.status;
+        status zx.Status;
         temp float32;
     });
 };

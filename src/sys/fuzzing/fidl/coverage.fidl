@@ -9,10 +9,10 @@ using zx;
 /// Represents an instrumented target process under test.
 type InstrumentedProcess = resource struct {
     /// An eventpair used to synchronize the start and end of code coverage collection.
-    eventpair zx.handle:EVENTPAIR;
+    eventpair zx.Handle:EVENTPAIR;
 
     /// A handle that can be used to monitor the target process for errors.
-    process zx.handle:PROCESS;
+    process zx.Handle:PROCESS;
 };
 
 /// Collects VMOs used to share code coverage from instrumented target processes.
@@ -62,14 +62,14 @@ closed protocol CoverageDataCollector {
     /// See also:
     ///     https://clang.llvm.org/docs/SanitizerCoverage.html#inline-8bit-counters
     strict AddLlvmModule(resource struct {
-        inline_8bit_counters zx.handle:VMO;
+        inline_8bit_counters zx.Handle:VMO;
     }) -> ();
 };
 
 /// Represents an instrumented target process or the code coverage it is sharing.
 type CoverageData = strict resource union {
     1: instrumented InstrumentedProcess;
-    2: inline_8bit_counters zx.handle:VMO;
+    2: inline_8bit_counters zx.Handle:VMO;
 };
 
 /// Provides the process handles and VMOs used to share code coverage to the fuzzing engine.

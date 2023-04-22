@@ -9,13 +9,13 @@ library test.benchmarkfidl;
 using zx;
 
 type HandleArrayPlain1 = resource struct {
-    handles array<zx.handle, 1>;
+    handles array<zx.Handle, 1>;
 };
 
 type HandleArrayPlain16 = resource struct {
-    handles array<zx.handle, 16>;
+    handles array<zx.Handle, 16>;
 };
 
 type HandleArrayPlain64 = resource struct {
-    handles array<zx.handle, 64>;
+    handles array<zx.Handle, 64>;
 };

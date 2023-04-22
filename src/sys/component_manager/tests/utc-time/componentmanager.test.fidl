@@ -8,7 +8,7 @@ using zx;
 @discoverable
 closed protocol TestOutcomeReport {
     strict Report(struct {
-        backstop zx.time;
-        current_time zx.time;
+        backstop zx.Time;
+        current_time zx.Time;
     }) -> ();
 };

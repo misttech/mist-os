@@ -34,7 +34,7 @@ protocol WlantapCtl {
         config WlantapPhyConfig;
         proxy server_end:WlantapPhy;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 
@@ -120,7 +120,7 @@ protocol WlantapPhy {
 
     ScanComplete(struct {
         scan_id uint64;
-        status zx.status;
+        status zx.Status;
     });
 
     // wlan_softmac_protocol_ops_t

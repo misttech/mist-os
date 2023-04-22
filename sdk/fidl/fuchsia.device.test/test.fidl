@@ -24,7 +24,7 @@ protocol Test {
     /// used as part of the Device protocol then Test output will be streamed to
     /// the socket set by SetOutputSocket().
     RunTests() -> (struct {
-        status zx.status;
+        status zx.Status;
         report TestReport;
     });
 };
@@ -35,12 +35,12 @@ protocol Device {
 
     /// Set a socket to stream test output to.
     SetOutputSocket(resource struct {
-        sock zx.handle:SOCKET;
+        sock zx.Handle:SOCKET;
     });
 
     /// Set a channel for the test to use in a test-specific manner.
     SetChannel(resource struct {
-        chan zx.handle:CHANNEL;
+        chan zx.Handle:CHANNEL;
     });
 
     /// Unload this device.
@@ -55,5 +55,5 @@ protocol RootDevice {
     /// Create a device with the given `name` that is a child of this device.
     CreateDevice(resource struct {
         name string:MAX_DEVICE_NAME_LEN;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

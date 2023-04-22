@@ -153,7 +153,7 @@ protocol Node {
     /// unspecified which deadline will take effect.
     @available(added=9)
     SetDebugTimeoutLogDeadline(struct {
-        deadline zx.time;
+        deadline zx.Time;
     });
 
     // SetVerboseLogging()
@@ -203,7 +203,7 @@ protocol Node {
     /// See also IsAlternateFor().
     @available(added=9)
     GetNodeRef() -> (resource struct {
-        node_ref zx.handle:EVENT;
+        node_ref zx.Handle:EVENT;
     });
 
     // IsAlternateFor()
@@ -288,10 +288,10 @@ protocol Node {
     ///     the calling Node or node_ref Node.
     @available(added=9)
     IsAlternateFor(resource struct {
-        node_ref zx.handle:EVENT;
+        node_ref zx.Handle:EVENT;
     }) -> (struct {
         is_alternate bool;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// A BufferCollectionToken is not a BufferCollection, but rather a way to
@@ -351,13 +351,13 @@ protocol BufferCollectionToken {
 
     @available(added=7, deprecated=8, removed=9)
     SetDebugTimeoutLogDeadline(struct {
-        deadline zx.time;
+        deadline zx.Time;
     });
     // Still handled, for clients that haven't been re-built yet.
     @available(added=9)
     @selector("SetDebugTimeoutLogDeadline")
     DeprecatedSetDebugTimeoutLogDeadline(struct {
-        deadline zx.time;
+        deadline zx.Time;
     });
 
     /// This method can be used to add more participants prior to creating a
@@ -595,7 +595,7 @@ protocol BufferCollection {
     /// A participant may only call SetConstraints() once.
     ///
     /// Sometimes the initiator is a participant only in the sense of wanting to
-    /// keep an eye on success/failure to populate with buffers, and zx.status
+    /// keep an eye on success/failure to populate with buffers, and zx.Status
     /// on failure.  In that case, `has_constraints` can be false, and
     /// `constraints` will be ignored.
     ///
@@ -644,7 +644,7 @@ protocol BufferCollection {
     ///
     /// `buffer_collection_info` has the VMO handles and other related info.
     WaitForBuffersAllocated() -> (resource struct {
-        status zx.status;
+        status zx.Status;
         buffer_collection_info BufferCollectionInfo_2;
     });
 
@@ -652,7 +652,7 @@ protocol BufferCollection {
     /// buffer collection has been allocated or failed, or `ZX_ERR_UNAVAILABLE`
     /// if WaitForBuffersAllocated would block.
     CheckBuffersAllocated() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     @available(added=7, deprecated=8, removed=9)
@@ -667,7 +667,7 @@ protocol BufferCollection {
     WaitForSingleBufferAllocated(struct {
         buffer_index uint64;
     }) -> (resource struct {
-        status zx.status;
+        status zx.Status;
         buffer_info SingleBufferInfo;
     });
     @available(added=7, deprecated=8, removed=9)
@@ -714,7 +714,7 @@ protocol BufferCollection {
     /// which case buffer[0].vmo will not be set.
     @available(added=7, deprecated=9)
     GetAuxBuffers() -> (resource struct {
-        status zx.status;
+        status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;
     });
 
@@ -855,7 +855,7 @@ protocol BufferCollection {
     /// must have ZX_RIGHT_DUPLICATE (and must have ZX_RIGHT_TRANSFER to
     /// transfer without causing CodecFactory channel failure).
     AttachLifetimeTracking(resource struct {
-        server_end zx.handle:EVENTPAIR;
+        server_end zx.Handle:EVENTPAIR;
         buffers_remaining uint32;
     });
 };

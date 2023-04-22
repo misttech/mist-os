@@ -160,7 +160,7 @@ protocol DisplayControllerInterface {
     /// display has no images displayed.
     OnDisplayVsync(struct {
         display_id uint64;
-        timestamp zx.time;
+        timestamp zx.Time;
         config_stamp box<ConfigStamp>;
     }) -> ();
 
@@ -168,7 +168,7 @@ protocol DisplayControllerInterface {
         display_id uint64;
         fmt_idx uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         fmt fuchsia.hardware.audiotypes.AudioTypesAudioStreamFormatRange;
     });
 };
@@ -404,7 +404,7 @@ protocol DisplayControllerImpl {
     SetDisplayCaptureInterface(resource struct {
         intf client_end:DisplayCaptureInterface;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Import a sysmem buffer collection token.
@@ -415,9 +415,9 @@ protocol DisplayControllerImpl {
         // TODO(fxbug.dev/89649): This is a client end channel of FIDL protocol
         // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
         // replaced with FIDL client end once banjo to FIDL migration finishes.
-        collection_token zx.handle:CHANNEL;
+        collection_token zx.Handle:CHANNEL;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Release an imported buffer collection.
@@ -426,7 +426,7 @@ protocol DisplayControllerImpl {
     ReleaseBufferCollection(struct {
         collection_id uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Imports an image from a imported BufferCollection into the driver.
@@ -443,7 +443,7 @@ protocol DisplayControllerImpl {
         collection_id uint64;
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Import BufferCollection backed VMO pointed to by `index`.
@@ -462,7 +462,7 @@ protocol DisplayControllerImpl {
         collection_id uint64;
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         capture_handle uint64;
     });
 
@@ -547,9 +547,9 @@ protocol DisplayControllerImpl {
 
     // Connects the handle to the sysmem service.
     GetSysmemConnection(resource struct {
-        sysmem_handle zx.handle:CHANNEL;
+        sysmem_handle zx.Handle:CHANNEL;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Set sysmem buffer collection contraints needed to ensure an image can be
@@ -561,7 +561,7 @@ protocol DisplayControllerImpl {
         config Image;
         collection_id uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     // Power off/on the display panel. Newly added displays are turned on by default.
@@ -573,7 +573,7 @@ protocol DisplayControllerImpl {
         display_id uint64;
         power_on bool;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Starts capture into the resource mapped by capture_handle (non-blocking)
@@ -589,7 +589,7 @@ protocol DisplayControllerImpl {
     StartCapture(struct {
         capture_handle uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Releases resources allocated by capture_handle.
@@ -601,7 +601,7 @@ protocol DisplayControllerImpl {
     ReleaseCapture(struct {
         capture_handle uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Returns true if display capture is supported and the previous capture is

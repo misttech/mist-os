@@ -8,9 +8,9 @@ using fuchsia.device;
 
 type TestStatusInfo = struct {
     /// Driver will respond to suspend hook with this status.
-    suspend_status zx.status;
+    suspend_status zx.Status;
     /// Driver will respond to resume hook with this status.
-    resume_status zx.status;
+    resume_status zx.Status;
     /// This is the out_power_state we want as a reply.
     out_power_state uint8;
     /// This is the out_perf_state we want as a reply.
@@ -23,25 +23,25 @@ closed protocol TestDevice {
         info vector<fuchsia.device.DevicePowerStateInfo>:MAX;
         perf_state_info vector<fuchsia.device.DevicePerformanceStateInfo>:MAX;
         make_visible bool;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Get current power state of the device
     strict GetCurrentDevicePowerState() -> (struct {
         cur_state fuchsia.device.DevicePowerState;
-    }) error zx.status;
+    }) error zx.Status;
     /// Get the suspend reason of the last suspend call
     strict GetCurrentSuspendReason() -> (struct {
         cur_suspend_reason uint8;
-    }) error zx.status;
+    }) error zx.Status;
     /// Get current auto suspend status and deepest_sleep_state
     strict GetCurrentDeviceAutoSuspendConfig() -> (struct {
         enabled bool;
         deepest_sleep_state fuchsia.device.DevicePowerState;
-    }) error zx.status;
+    }) error zx.Status;
     strict SetTestStatusInfo(struct {
         test_info TestStatusInfo;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     strict GetSuspendCompletionEvent() -> (resource struct {
-        event zx.handle:EVENT;
-    }) error zx.status;
+        event zx.Handle:EVENT;
+    }) error zx.Status;
 };

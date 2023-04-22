@@ -12,6 +12,6 @@ using zx;
 protocol JobProvider {
     /// Gets the root job associated with the realm.
     GetJob() -> (resource struct {
-        job zx.handle:JOB;
+        job zx.Handle:JOB;
     });
 };

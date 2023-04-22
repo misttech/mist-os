@@ -83,7 +83,7 @@ protocol Environment {
     /// `host_directory`.
     GetDirectory(resource struct {
         @available(removed=10)
-        directory_request zx.handle:CHANNEL;
+        directory_request zx.Handle:CHANNEL;
         @available(added=10)
         directory_request server_end:fuchsia.io.Directory;
     });

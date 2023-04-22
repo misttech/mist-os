@@ -20,9 +20,9 @@ using zx;
 ///  should provide the simulated fuzzing |feedback| using the second VMO. Both VMOs must have the
 /// ZX_PROP_VMO_CONTENT_SIZE property set.
 type SignaledBuffer = resource struct {
-    eventpair zx.handle:EVENTPAIR;
-    test_input zx.handle:VMO;
-    feedback zx.handle:VMO;
+    eventpair zx.Handle:EVENTPAIR;
+    test_input zx.Handle:VMO;
+    feedback zx.Handle:VMO;
 };
 
 /// Relays test data from unit test to test fuzzer.

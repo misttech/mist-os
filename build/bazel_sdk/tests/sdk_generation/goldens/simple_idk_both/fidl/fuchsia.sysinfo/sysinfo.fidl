@@ -24,7 +24,7 @@ type InterruptControllerInfo = struct {
 protocol SysInfo {
     /// Return the board name for the platform we are running on.
     GetBoardName() -> (struct {
-        status zx.status;
+        status zx.Status;
         name string:<BOARD_NAME_LEN, optional>;
     });
 
@@ -33,19 +33,19 @@ protocol SysInfo {
     /// Return the board revision for the board we are running on.
     @transitional("Adding Board Revision")
     GetBoardRevision() -> (struct {
-        status zx.status;
+        status zx.Status;
         revision uint32;
     });
 
     /// Return the bootloader vendor for the platform we are running on.
     GetBootloaderVendor() -> (struct {
-        status zx.status;
+        status zx.Status;
         vendor string:<BOOTLOADER_VENDOR_LEN, optional>;
     });
 
     /// Return interrupt controller information.
     GetInterruptControllerInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         info box<InterruptControllerInfo>;
     });
 };

@@ -13,7 +13,7 @@ protocol DriverChannelProtocol {};
 protocol ZirconChannelProtocol {};
 
 type MixedResources = resource table {
-    1: zircon_handle zx.handle:CHANNEL;
+    1: zircon_handle zx.Handle:CHANNEL;
     2: driver_handle fdf.handle:CHANNEL;
     3: zircon_client_end client_end:ZirconChannelProtocol;
     4: zircon_server_end server_end:ZirconChannelProtocol;

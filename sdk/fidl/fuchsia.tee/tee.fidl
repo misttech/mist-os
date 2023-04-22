@@ -52,7 +52,7 @@ type Buffer = resource table {
     /// calculate how large that output buffer should be, they can attempt the operation without
     /// a vmo and the Trusted Application will populate the size field so that the operation can
     /// be performed again with an appropriately sized buffer.
-    2: vmo zx.handle:VMO;
+    2: vmo zx.Handle:VMO;
     3: offset uint64;
     4: size uint64;
 };

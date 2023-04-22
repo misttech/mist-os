@@ -46,7 +46,7 @@ type RamNandInfo = resource struct {
     /// VMO to use as backing store for nand device. Size should match size of `nand_info`.
     /// If a vmo is not provided, the device will create its own buffer and initialize it to be
     /// empty (all 1s).
-    vmo zx.handle:<VMO, optional>;
+    vmo zx.Handle:<VMO, optional>;
 
     /// The desired "chip" configuration.
     nand_info Info;
@@ -71,7 +71,7 @@ protocol RamNandCtl {
     CreateDevice(resource struct {
         info RamNandInfo;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         name string:NAME_LEN;
     });
 };
@@ -79,6 +79,6 @@ protocol RamNandCtl {
 protocol RamNand {
     /// Removes the device.
     Unlink() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

@@ -71,7 +71,7 @@ protocol ComponentRegistry {
     GetVulkanSocket(struct {
         id ClientId;
     }) -> (resource struct {
-        socket zx.handle:<SOCKET, optional>;
+        socket zx.Handle:<SOCKET, optional>;
     }) error Error;
 };
 
@@ -93,6 +93,6 @@ protocol Connector {
     GetSocket(struct {
         global_id GlobalId;
     }) -> (resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) error Error;
 };

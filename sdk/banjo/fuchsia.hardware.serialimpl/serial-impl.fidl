@@ -28,7 +28,7 @@ protocol SerialNotify {
 @banjo_layout("ddk-protocol")
 protocol SerialImpl {
     GetInfo() -> (struct {
-        s zx.status;
+        s zx.Status;
         info fuchsia.hardware.serial.SerialPortInfo;
     });
     /// Configures the given serial port.
@@ -36,15 +36,15 @@ protocol SerialImpl {
         baud_rate uint32;
         flags uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     Enable(struct {
         enable bool;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     Read() -> (struct {
-        s zx.status;
+        s zx.Status;
         @buffer
         buf vector<uint8>:MAX;
     });
@@ -52,12 +52,12 @@ protocol SerialImpl {
         @buffer
         buf vector<uint8>:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         actual uint64;
     });
     SetNotifyCallback(resource struct {
         cb client_end:SerialNotify;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

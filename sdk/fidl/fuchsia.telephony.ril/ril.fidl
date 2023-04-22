@@ -55,7 +55,7 @@ protocol Setup {
     /// Implementation Detail: current services speak QMI but others will most likely speak other
     /// binary formats.
     ConnectTransport(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     }) -> () error RilError;
 };
 

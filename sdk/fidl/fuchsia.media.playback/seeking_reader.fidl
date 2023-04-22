@@ -12,7 +12,7 @@ protocol SeekingReader {
     // is expressed by using result. The size_in_bytes may be reported as
     // UNKNOWN_SIZE if the size of the content is unknown.
     Describe() -> (struct {
-        status zx.status;
+        status zx.Status;
         size uint64;
         can_seek bool;
     });
@@ -23,8 +23,8 @@ protocol SeekingReader {
     ReadAt(struct {
         position uint64;
     }) -> (resource struct {
-        status zx.status;
-        socket zx.handle:<SOCKET, optional>;
+        status zx.Status;
+        socket zx.Handle:<SOCKET, optional>;
     });
 };
 

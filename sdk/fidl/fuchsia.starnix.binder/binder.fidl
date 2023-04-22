@@ -32,7 +32,7 @@ type FileHandle = resource struct {
     /// The handle connecting to the file protocol. If not present, the file
     /// should behave as it is was a null file: all read must succeed with empty
     /// content and all write must succeed. See `fdio_fd_create_null()`.
-    file zx.handle:<optional>;
+    file zx.Handle:<optional>;
 
     /// The flags associated with the opened file.
     flags FileFlags;
@@ -45,7 +45,7 @@ protocol ProcessAccessor {
     /// using the vmo content size to determine the number of bytes to write.
     WriteMemory(resource struct {
         address uint64;
-        content zx.handle:VMO;
+        content zx.Handle:VMO;
     }) -> () error fuchsia.posix.Errno;
 
     /// Returns the `length` bytes of the memory of the process at `address` in
@@ -55,7 +55,7 @@ protocol ProcessAccessor {
         address uint64;
         length uint64;
     }) -> (resource struct {
-        content zx.handle:VMO;
+        content zx.Handle:VMO;
     }) error fuchsia.posix.Errno;
 
     /// Execute the given `request` and returns the associated `response`. Any
@@ -126,7 +126,7 @@ protocol Binder {
     /// client. `mapped_address` is the address where the vmo is mapped in the
     /// client address space.
     SetVmo(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         mapped_address uint64;
     });
     Ioctl(struct {

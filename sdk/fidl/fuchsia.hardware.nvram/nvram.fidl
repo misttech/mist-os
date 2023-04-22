@@ -23,7 +23,7 @@ protocol Device {
         size uint32;
     }) -> (struct {
         data vector<uint8>:NVRAM_MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Write |data| starting at |offset|.
     /// Returns ZX_ERR_OUT_OF_RANGE if the data extends past the end of the
@@ -31,5 +31,5 @@ protocol Device {
     Write(struct {
         offset uint32;
         data vector<uint8>:NVRAM_MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

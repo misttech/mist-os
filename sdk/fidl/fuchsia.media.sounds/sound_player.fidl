@@ -22,8 +22,8 @@ protocol Player {
         id uint32;
         file client_end:fuchsia.io.File;
     }) -> (struct {
-        duration zx.duration;
-    }) error zx.status;
+        duration zx.Duration;
+    }) error zx.Status;
 
     /// Adds a sound, in the form of a buffer containing raw PCM samples, to the collection
     /// maintained for the client. The service will retain a handle to the buffer's VMO until the

@@ -234,10 +234,10 @@ closed protocol FidlCodecTestProtocol {
     });
 
     strict Handle(resource struct {
-        ch zx.handle:CHANNEL;
+        ch zx.Handle:CHANNEL;
     });
     strict NullableHandle(resource struct {
-        ch zx.handle:<CHANNEL, optional>;
+        ch zx.Handle:<CHANNEL, optional>;
     });
     strict HandleStructMessage(resource struct {
         hs HandleStruct;
@@ -408,30 +408,30 @@ type ValueTable = table {
 };
 
 type HandleStruct = resource struct {
-    h1 zx.handle:CHANNEL;
-    h2 zx.handle:CHANNEL;
-    h3 zx.handle:CHANNEL;
+    h1 zx.Handle:CHANNEL;
+    h2 zx.Handle:CHANNEL;
+    h3 zx.Handle:CHANNEL;
 };
 
 type OptHandleStruct = resource struct {
-    sh1 zx.handle:<CHANNEL, optional>;
-    sh2 zx.handle:<CHANNEL, optional>;
+    sh1 zx.Handle:<CHANNEL, optional>;
+    sh2 zx.Handle:<CHANNEL, optional>;
 };
 
 type HandleTable = resource table {
-    1: h1 zx.handle:CHANNEL;
+    1: h1 zx.Handle:CHANNEL;
     2: s1 OptHandleStruct;
 };
 
 type TraversalOrder = resource struct {
     s box<OptHandleStruct>;
-    h1 zx.handle:<CHANNEL, optional>;
-    h2 zx.handle:<CHANNEL, optional>;
+    h1 zx.Handle:<CHANNEL, optional>;
+    h2 zx.Handle:<CHANNEL, optional>;
 };
 
 type TraversalStruct = resource struct {
     a uint32;
-    b zx.handle:<CHANNEL, optional>;
+    b zx.Handle:<CHANNEL, optional>;
 };
 
 type TraversalMain = resource struct {

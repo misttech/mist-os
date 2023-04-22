@@ -85,7 +85,7 @@ type arrays = resource struct {
     u64_0 array<uint64, 1>;
     f32_0 array<float32, 1>;
     f64_0 array<float64, 1>;
-    handle_0 array<zx.handle, 1>;
+    handle_0 array<zx.Handle, 1>;
     b_1 array<bool, arrays_size>;
     i8_1 array<int8, arrays_size>;
     i16_1 array<int16, arrays_size>;
@@ -97,7 +97,7 @@ type arrays = resource struct {
     u64_1 array<uint64, arrays_size>;
     f32_1 array<float32, arrays_size>;
     f64_1 array<float64, arrays_size>;
-    handle_1 array<zx.handle, arrays_size>;
+    handle_1 array<zx.Handle, arrays_size>;
 };
 
 type arrays_2d = resource struct {
@@ -112,7 +112,7 @@ type arrays_2d = resource struct {
     u64 array<array<uint64, 2>, arrays_size>;
     f32 array<array<float32, 2>, arrays_size>;
     f64 array<array<float64, 2>, arrays_size>;
-    handle_handle array<array<zx.handle, 2>, arrays_size>;
+    handle_handle array<array<zx.Handle, 2>, arrays_size>;
 };
 
 // Arbitrary, but must be small enough such that a single message doesn't exceed
@@ -131,7 +131,7 @@ type vectors = resource struct {
     u64_0 vector<uint64>;
     f32_0 vector<float32>;
     f64_0 vector<float64>;
-    handle_0 vector<zx.handle>;
+    handle_0 vector<zx.Handle>;
     b_1 vector<vector<bool>:2>;
     i8_1 vector<vector<int8>:2>;
     i16_1 vector<vector<int16>:2>;
@@ -143,7 +143,7 @@ type vectors = resource struct {
     u64_1 vector<vector<uint64>:2>;
     f32_1 vector<vector<float32>:2>;
     f64_1 vector<vector<float64>:2>;
-    handle_1 vector<vector<zx.handle>:2>;
+    handle_1 vector<vector<zx.Handle>:2>;
     b_sized_0 vector<bool>:1;
     i8_sized_0 vector<int8>:1;
     i16_sized_0 vector<int16>:1;
@@ -155,7 +155,7 @@ type vectors = resource struct {
     u64_sized_0 vector<uint64>:1;
     f32_sized_0 vector<float32>:1;
     f64_sized_0 vector<float64>:1;
-    handle_sized_0 vector<zx.handle>:1;
+    handle_sized_0 vector<zx.Handle>:1;
     b_sized_1 vector<bool>:vectors_size;
     i8_sized_1 vector<int8>:vectors_size;
     i16_sized_1 vector<int16>:vectors_size;
@@ -167,7 +167,7 @@ type vectors = resource struct {
     u64_sized_1 vector<uint64>:vectors_size;
     f32_sized_1 vector<float32>:vectors_size;
     f64_sized_1 vector<float64>:vectors_size;
-    handle_sized_1 vector<zx.handle>:vectors_size;
+    handle_sized_1 vector<zx.Handle>:vectors_size;
     b_sized_2 vector<vector<bool>:2>:vectors_size;
     i8_sized_2 vector<vector<int8>:2>:vectors_size;
     i16_sized_2 vector<vector<int16>:2>:vectors_size;
@@ -179,7 +179,7 @@ type vectors = resource struct {
     u64_sized_2 vector<vector<uint64>:2>:vectors_size;
     f32_sized_2 vector<vector<float32>:2>:vectors_size;
     f64_sized_2 vector<vector<float64>:2>:vectors_size;
-    handle_sized_2 vector<vector<zx.handle>:2>:vectors_size;
+    handle_sized_2 vector<vector<zx.Handle>:2>:vectors_size;
     b_nullable_0 vector<bool>:<1, optional>;
     i8_nullable_0 vector<int8>:<1, optional>;
     i16_nullable_0 vector<int16>:<1, optional>;
@@ -191,7 +191,7 @@ type vectors = resource struct {
     u64_nullable_0 vector<uint64>:<1, optional>;
     f32_nullable_0 vector<float32>:<1, optional>;
     f64_nullable_0 vector<float64>:<1, optional>;
-    handle_nullable_0 vector<zx.handle>:<1, optional>;
+    handle_nullable_0 vector<zx.Handle>:<1, optional>;
     b_nullable_1 vector<vector<bool>:2>:optional;
     i8_nullable_1 vector<vector<int8>:2>:optional;
     i16_nullable_1 vector<vector<int16>:2>:optional;
@@ -203,7 +203,7 @@ type vectors = resource struct {
     u64_nullable_1 vector<vector<uint64>:2>:optional;
     f32_nullable_1 vector<vector<float32>:2>:optional;
     f64_nullable_1 vector<vector<float64>:2>:optional;
-    handle_nullable_1 vector<vector<zx.handle>:2>:optional;
+    handle_nullable_1 vector<vector<zx.Handle>:2>:optional;
     b_nullable_sized_0 vector<bool>:<1, optional>;
     i8_nullable_sized_0 vector<int8>:<1, optional>;
     i16_nullable_sized_0 vector<int16>:<1, optional>;
@@ -215,7 +215,7 @@ type vectors = resource struct {
     u64_nullable_sized_0 vector<uint64>:<1, optional>;
     f32_nullable_sized_0 vector<float32>:<1, optional>;
     f64_nullable_sized_0 vector<float64>:<1, optional>;
-    handle_nullable_sized_0 vector<zx.handle>:<1, optional>;
+    handle_nullable_sized_0 vector<zx.Handle>:<1, optional>;
     b_nullable_sized_1 vector<bool>:<vectors_size, optional>;
     i8_nullable_sized_1 vector<int8>:<vectors_size, optional>;
     i16_nullable_sized_1 vector<int16>:<vectors_size, optional>;
@@ -227,7 +227,7 @@ type vectors = resource struct {
     u64_nullable_sized_1 vector<uint64>:<vectors_size, optional>;
     f32_nullable_sized_1 vector<float32>:<vectors_size, optional>;
     f64_nullable_sized_1 vector<float64>:<vectors_size, optional>;
-    handle_nullable_sized_1 vector<zx.handle>:<vectors_size, optional>;
+    handle_nullable_sized_1 vector<zx.Handle>:<vectors_size, optional>;
     b_nullable_sized_2 vector<vector<bool>:2>:<vectors_size, optional>;
     i8_nullable_sized_2 vector<vector<int8>:2>:<vectors_size, optional>;
     i16_nullable_sized_2 vector<vector<int16>:2>:<vectors_size, optional>;
@@ -239,40 +239,40 @@ type vectors = resource struct {
     u64_nullable_sized_2 vector<vector<uint64>:2>:<vectors_size, optional>;
     f32_nullable_sized_2 vector<vector<float32>:2>:<vectors_size, optional>;
     f64_nullable_sized_2 vector<vector<float64>:2>:<vectors_size, optional>;
-    handle_nullable_sized_2 vector<vector<zx.handle>:2>:<vectors_size, optional>;
+    handle_nullable_sized_2 vector<vector<zx.Handle>:2>:<vectors_size, optional>;
 };
 
 // We don't test handle types that don't support duplication
 // (supports_duplication in zx/object_traits.h) or that require special
 // privileges to create.
 type handles = resource struct {
-    handle_handle zx.handle;
-    process_handle zx.handle:PROCESS;
-    thread_handle zx.handle:THREAD;
-    vmo_handle zx.handle:VMO;
-    event_handle zx.handle:EVENT;
-    port_handle zx.handle:PORT;
-    socket_handle zx.handle:SOCKET;
-    eventpair_handle zx.handle:EVENTPAIR;
-    job_handle zx.handle:JOB;
-    vmar_handle zx.handle:VMAR;
-    fifo_handle zx.handle:FIFO;
-    timer_handle zx.handle:TIMER;
-    nullable_handle_handle zx.handle:optional;
-    nullable_process_handle zx.handle:<PROCESS, optional>;
-    nullable_thread_handle zx.handle:<THREAD, optional>;
-    nullable_vmo_handle zx.handle:<VMO, optional>;
-    nullable_channel_handle zx.handle:<CHANNEL, optional>;
-    nullable_event_handle zx.handle:<EVENT, optional>;
-    nullable_port_handle zx.handle:<PORT, optional>;
-    nullable_interrupt_handle zx.handle:<INTERRUPT, optional>;
-    nullable_log_handle zx.handle:<LOG, optional>;
-    nullable_socket_handle zx.handle:<SOCKET, optional>;
-    nullable_eventpair_handle zx.handle:<EVENTPAIR, optional>;
-    nullable_job_handle zx.handle:<JOB, optional>;
-    nullable_vmar_handle zx.handle:<VMAR, optional>;
-    nullable_fifo_handle zx.handle:<FIFO, optional>;
-    nullable_timer_handle zx.handle:<TIMER, optional>;
+    handle_handle zx.Handle;
+    process_handle zx.Handle:PROCESS;
+    thread_handle zx.Handle:THREAD;
+    vmo_handle zx.Handle:VMO;
+    event_handle zx.Handle:EVENT;
+    port_handle zx.Handle:PORT;
+    socket_handle zx.Handle:SOCKET;
+    eventpair_handle zx.Handle:EVENTPAIR;
+    job_handle zx.Handle:JOB;
+    vmar_handle zx.Handle:VMAR;
+    fifo_handle zx.Handle:FIFO;
+    timer_handle zx.Handle:TIMER;
+    nullable_handle_handle zx.Handle:optional;
+    nullable_process_handle zx.Handle:<PROCESS, optional>;
+    nullable_thread_handle zx.Handle:<THREAD, optional>;
+    nullable_vmo_handle zx.Handle:<VMO, optional>;
+    nullable_channel_handle zx.Handle:<CHANNEL, optional>;
+    nullable_event_handle zx.Handle:<EVENT, optional>;
+    nullable_port_handle zx.Handle:<PORT, optional>;
+    nullable_interrupt_handle zx.Handle:<INTERRUPT, optional>;
+    nullable_log_handle zx.Handle:<LOG, optional>;
+    nullable_socket_handle zx.Handle:<SOCKET, optional>;
+    nullable_eventpair_handle zx.Handle:<EVENTPAIR, optional>;
+    nullable_job_handle zx.Handle:<JOB, optional>;
+    nullable_vmar_handle zx.Handle:<VMAR, optional>;
+    nullable_fifo_handle zx.Handle:<FIFO, optional>;
+    nullable_timer_handle zx.Handle:<TIMER, optional>;
 };
 
 // Arbitrary.
@@ -455,8 +455,8 @@ type ArraysStruct = resource struct {
     float64s array<float64, arrays_size>;
     enums array<default_enum, arrays_size>;
     bits array<default_bits, arrays_size>;
-    handles array<zx.handle, arrays_size>;
-    nullable_handles array<zx.handle:optional, arrays_size>;
+    handles array<zx.Handle, arrays_size>;
+    nullable_handles array<zx.Handle:optional, arrays_size>;
     strings array<string, arrays_size>;
     nullable_strings array<string:optional, arrays_size>;
     structs array<this_is_a_struct, arrays_size>;
@@ -485,8 +485,8 @@ type VectorsStruct = resource struct {
     float64s vector<float64>:vectors_size;
     enums vector<default_enum>:vectors_size;
     bits vector<default_bits>:vectors_size;
-    handles vector<zx.handle>:vectors_size;
-    nullable_handles vector<zx.handle:optional>:vectors_size;
+    handles vector<zx.Handle>:vectors_size;
+    nullable_handles vector<zx.Handle:optional>:vectors_size;
     strings vector<string>:vectors_size;
     nullable_strings vector<string:optional>:vectors_size;
     structs vector<this_is_a_struct>:vectors_size;
@@ -515,7 +515,7 @@ type AllTypesTable = resource table {
    11: float64_member float64;
    12: enum_member default_enum;
    13: bits_member default_bits;
-   14: handle_member zx.handle;
+   14: handle_member zx.Handle;
    15: string_member string;
    16: struct_member this_is_a_struct;
    17: union_member this_is_a_union;
@@ -540,7 +540,7 @@ type AllTypesXunion = flexible resource union {
    11: float64_member float64;
    12: enum_member default_enum;
    13: bits_member default_bits;
-   14: handle_member zx.handle;
+   14: handle_member zx.Handle;
    15: string_member string;
    16: struct_member this_is_a_struct;
    17: union_member this_is_a_union;

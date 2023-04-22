@@ -283,7 +283,7 @@ type PresentArgs = resource table {
     /// enqueued operations associated with all squashable calls to [`Present`] whose
     /// `requested_presentation_time` is on or before the frame's target presentation time.
     ///
-    1: requested_presentation_time zx.time;
+    1: requested_presentation_time zx.Time;
 
     /// Flatland will wait until all of a Flatland instance's `acquire_fences` are ready before it
     /// will execute the presented commands. Not signaling `acquire_fences` will block the current
@@ -291,7 +291,7 @@ type PresentArgs = resource table {
     ///
     /// The default `acquire_fences` value is the empty vector.
     // TODO(fxbug.dev/85551): delete.
-    2: acquire_fences vector<zx.handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
+    2: acquire_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 
     /// Flatland will signal all `release_fences` when the resources and shared buffers from this
     /// [`Present`] are no longer in use. Callers should not modify shared resources, such as
@@ -302,7 +302,7 @@ type PresentArgs = resource table {
     ///
     /// The default `release_fences` value is the empty vector.
     // TODO(fxbug.dev/85551): delete.
-    3: release_fences vector<zx.handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
+    3: release_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 
     /// If `unsquashable` is true, then the update is guaranteed to be uniquely shown for at
     /// least one vsync interval.
@@ -320,7 +320,7 @@ type PresentArgs = resource table {
     ///
     /// The default `server_wait_fences` value is the empty vector.
     // TODO(fxbug.dev/85551): change ordinal to 2.
-    5: server_wait_fences vector<zx.handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
+    5: server_wait_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 
     /// (read this one carefully, it may be counter-intuitive)
     ///
@@ -346,7 +346,7 @@ type PresentArgs = resource table {
     // TODO(fxbug.dev/85551): change ordinal to 3.
     // TODO(fxbug.dev/85563): when fixed, update documentation re: when it is safe to modify buffers
     //                        upon channel closure.
-    6: server_signal_fences vector<zx.handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
+    6: server_signal_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 };
 
 /// A user-defined identifier for future presentation info. A maximum of 8

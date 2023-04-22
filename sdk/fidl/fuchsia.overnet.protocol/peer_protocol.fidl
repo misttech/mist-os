@@ -84,7 +84,7 @@ type StreamControl = strict union {
     /// This should be the last message sent on a drain stream.
     3: end_transfer Empty;
     /// Shutdown the stream with some status.
-    4: shutdown zx.status;
+    4: shutdown zx.Status;
 };
 
 /// Body for [`fuchsia.overnet.protocol/StreamControl.begin_transfer`].

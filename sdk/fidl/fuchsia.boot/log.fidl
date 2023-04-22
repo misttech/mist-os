@@ -10,7 +10,7 @@ using zx;
 protocol ReadOnlyLog {
     /// Get read-only handle to the kernel `log`.
     Get() -> (resource struct {
-        log zx.handle:LOG;
+        log zx.Handle:LOG;
     });
 };
 
@@ -19,6 +19,6 @@ protocol ReadOnlyLog {
 protocol WriteOnlyLog {
     /// Get write-only handle to the kernel `log`.
     Get() -> (resource struct {
-        log zx.handle:LOG;
+        log zx.Handle:LOG;
     });
 };

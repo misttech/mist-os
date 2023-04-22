@@ -28,7 +28,7 @@ closed protocol Crypt {
         wrapping_key_id uint64;
         wrapped_key vector<uint8>:48;
         unwrapped_key vector<uint8>:32;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Unwraps a key that is wrapped by the key identified by `wrapping_key_id`.  `owner` must be
     /// the same as that passed to `CreateKey`.  This can fail due to permission reasons, but an
@@ -40,7 +40,7 @@ closed protocol Crypt {
         key vector<uint8>:48;
     }) -> (struct {
         unwrapped_key vector<uint8>:32;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 type CryptSettings = table {
@@ -56,21 +56,21 @@ closed protocol CryptManagement {
     strict AddWrappingKey(struct {
         wrapping_key_id uint64;
         key vector<uint8>:32;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Updates the key which will be used for wrapping keys (Crypt::CreateKey).  `purpose`
     /// describes which active key to modify.
     strict SetActiveKey(struct {
         purpose KeyPurpose;
         wrapping_key_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Forgets a wrapping key, preventing its use for future key-unwrapping.  All future calls to
     /// Crypt::UnwrapKeys with that wrapping key ID will fail.
     /// If either the data or metadata part of the key is active, an error is returned.
     strict ForgetWrappingKey(struct {
         wrapping_key_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 type MountOptions = resource struct {
@@ -95,19 +95,19 @@ closed protocol Volume {
     strict Mount(resource struct {
         outgoing_directory server_end:fuchsia.io.Directory;
         options MountOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Check the volume for consistency.  If the volume is encrypted, `options.crypt` should
     /// provide all key access for the given volume.
     strict Check(resource struct {
         options CheckOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Set the limit in bytes on the volume. Setting it lower than current usage is accepted but
     /// will prevent further increases.
     strict SetLimit(struct {
         bytes uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 /// A token used for paging through tracked projects. One may be returned by the `ProjectId.List`
@@ -132,14 +132,14 @@ closed protocol ProjectId {
         project_id uint64;
         bytes uint64;
         nodes uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Stop tracking a project id. This will return  ZX_ERR_NOT_FOUND if the project isn't
     /// currently tracked. It will succeed even if the project is still in use more by one or more
     /// nodes.
     strict Clear(struct {
         project_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Apply project id to a node_id from a GetAttrs call. This will return ZX_ERR_NOT_FOUND if
     /// node doesn't exist, ZX_ERR_ALREADY_EXISTS if there is already a `project_id` applied to
@@ -147,7 +147,7 @@ closed protocol ProjectId {
     strict SetForNode(struct {
         node_id uint64;
         project_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Get the project id based on a given node_id from a GetAttrs call.This will return
     /// ZX_ERR_NOT_FOUND if the node doesn't exist, and a `project_id` of zero if one is not
@@ -156,14 +156,14 @@ closed protocol ProjectId {
         node_id uint64;
     }) -> (struct {
         project_id uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Remove any project id marker for a given node_id from a GetAttrs call. This will return
     /// ZX_ERR_NOT_FOUND if the node doesn't exist, or success if the node is found to currently
     /// have no project id applied to it.
     strict ClearForNode(struct {
         node_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Fetches project id numbers currently tracked with a limit or with non-zero usage from lowest
     /// to highest. If `token` is null, start at the beginning, if `token` is populated with a
@@ -174,7 +174,7 @@ closed protocol ProjectId {
     }) -> (struct {
         entries vector<uint64>:MAX;
         next_token box<ProjectIterToken>;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Looks up the limit and usage for a tracked `project_id`. If the `project_id` does not have
     /// a limit set, or non-zero usage it will return ZX_ERR_NOT_FOUND.
@@ -183,7 +183,7 @@ closed protocol ProjectId {
     }) -> (struct {
         limit BytesAndNodes;
         usage BytesAndNodes;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// fuchsia.fxfs.Volumes is only used for creating volumes.  Other operations (e.g. enumeration and
@@ -202,11 +202,11 @@ closed protocol Volumes {
         name string:fuchsia.io.MAX_FILENAME;
         crypt client_end:<Crypt, optional>;
         outgoing_directory server_end:fuchsia.io.Directory;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Permanently deletes a volume identified by `name`.  If the volume is mounted, this call will
     /// fail.
     strict Remove(resource struct {
         name string:fuchsia.io.MAX_FILENAME;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

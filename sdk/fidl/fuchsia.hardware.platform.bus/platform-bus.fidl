@@ -120,7 +120,7 @@ protocol SysSuspend {
         enable_wake bool;
         suspend_reason uint8;
     }) -> (struct {
-        out_status zx.status;
+        out_status zx.Status;
         out_state uint8;
     });
 };
@@ -133,7 +133,7 @@ protocol PlatformBus {
     /// devhosts.
     NodeAdd(struct {
         node Node;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Adds a device for binding a protocol implementation driver.
     /// These devices are added in the same devhost as the platform bus.
@@ -145,7 +145,7 @@ protocol PlatformBus {
     ProtocolNodeAdd(struct {
         proto_id uint32;
         node Node;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Called by protocol implementation drivers to register their protocol
     /// with the platform bus.
@@ -155,29 +155,29 @@ protocol PlatformBus {
         /// This is the *_protocol_t buffer. In the future we will probably pass
         /// a FIDL client end.
         protocol vector<uint8>:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
 
     /// Board drivers may use this to get information about the board, and to
     /// differentiate between multiple boards that they support.
     GetBoardInfo() -> (struct {
         info TemporaryBoardInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Board drivers may use this to set information about the board
     /// (like the board revision number).
     /// Platform device drivers can access this via `pdev_get_board_info()`.
     SetBoardInfo(struct {
         info BoardInfo;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     /// Board drivers may use this to set information about the bootloader.
     SetBootloaderInfo(struct {
         info BootloaderInfo;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:SysSuspend;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Adds a composite platform device to the bus.
     /// This will not implicitly include the platform device specified by |dev|
@@ -187,14 +187,14 @@ protocol PlatformBus {
         node Node;
         fragments vector<fuchsia.device.manager.DeviceFragment>:MAX;
         primary_fragment string:<MAX, optional>;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Adds a composite node specification to the bus. This will add a platform device
     /// specified by |node| and insert a parent into the spec that matches the device.
     AddCompositeNodeSpec(struct {
         node Node;
         spec fuchsia.driver.framework.CompositeNodeSpec;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Super deprecated, use AddComposite() instead.
     /// Adds a composite platform device to the bus. The platform device specified by |dev|
@@ -207,7 +207,7 @@ protocol PlatformBus {
         node Node;
         fragments vector<fuchsia.device.manager.DeviceFragment>:MAX;
         primary_fragment string:<MAX, optional>;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 service Service {

@@ -27,7 +27,7 @@ using zx;
 /// considered as "in-focus" down the View hierarchy. When a View is destroyed,
 /// Scenic signals to all FocusChain holders that the ViewRef is now invalid.
 type ViewRef = resource struct {
-    reference zx.handle:EVENTPAIR;
+    reference zx.Handle:EVENTPAIR;
 };
 
 /// A ViewRefControl is the peer to a ViewRef. Their `reference`s are linked.
@@ -45,7 +45,7 @@ type ViewRef = resource struct {
 /// not remove or modify the ViewRefControl's capabilities; otherwise the View
 /// is not created.
 type ViewRefControl = resource struct {
-    reference zx.handle:EVENTPAIR;
+    reference zx.Handle:EVENTPAIR;
 };
 
 /// Convenience data type to self-identify the view, during view creation.

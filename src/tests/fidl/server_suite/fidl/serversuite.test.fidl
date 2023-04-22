@@ -196,7 +196,7 @@ closed protocol ClosedTarget {
 
     strict GetHandleRights(resource struct {
         // Plain handle, there should be no rights or type checking.
-        handle zx.handle;
+        handle zx.Handle;
     }) -> (struct {
             // Rights should be obtained by calling zx_object_get_info on |handle|
             // with topic ZX_INFO_HANDLE_BASIC.
@@ -204,7 +204,7 @@ closed protocol ClosedTarget {
     });
 
     strict GetSignalableEventRights(resource struct {
-        handle zx.handle:<EVENT, zx.Rights.SIGNAL>;
+        handle zx.Handle:<EVENT, zx.Rights.SIGNAL>;
     }) -> (struct {
         // Rights should be obtained by calling zx_object_get_info on |handle|
         // with topic ZX_INFO_HANDLE_BASIC.
@@ -212,10 +212,10 @@ closed protocol ClosedTarget {
     });
 
     strict EchoAsTransferableSignalableEvent(resource struct {
-        handle zx.handle;
+        handle zx.Handle;
     }) -> (resource struct {
         // The response handle should be the same as the request handle.
-        handle zx.handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.SIGNAL>;
+        handle zx.Handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.SIGNAL>;
     });
 
     strict ByteVectorSize(struct {
@@ -225,7 +225,7 @@ closed protocol ClosedTarget {
     });
 
     strict HandleVectorSize(resource struct {
-        vec vector<zx.handle:EVENT>;
+        vec vector<zx.Handle:EVENT>;
     }) -> (struct {
         n uint32;
     });
@@ -239,7 +239,7 @@ closed protocol ClosedTarget {
     strict CreateNHandleVector(resource struct {
         n uint32;
     }) -> (resource struct {
-        vec vector<zx.handle:EVENT>;
+        vec vector<zx.Handle:EVENT>;
     });
 };
 

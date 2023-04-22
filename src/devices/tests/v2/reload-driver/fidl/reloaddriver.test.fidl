@@ -13,6 +13,6 @@ closed protocol Waiter {
     strict Ack(struct {
         from_node string:MAX_FROM_LENGTH;
         from_name string:MAX_FROM_LENGTH;
-        status zx.status;
+        status zx.Status;
     });
 };

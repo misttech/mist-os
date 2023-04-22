@@ -58,7 +58,7 @@ protocol File {
         flags uint32;
     }) -> (resource struct {
         buffer box<fuchsia.mem.Buffer>;
-    }) error zx.status;
+    }) error zx.Status;
 };
 // [END good-docs-2]
 

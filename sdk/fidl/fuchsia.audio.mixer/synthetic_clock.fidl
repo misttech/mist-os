@@ -43,7 +43,7 @@ protocol SyntheticClockRealm {
         4: control server_end:SyntheticClock;
     }) -> (resource table {
         /// A handle for this synthetic clock. This handle may be passed to our
-        /// parent [`Graph`] wherever a `zx.handle:CLOCK` is needed. The
+        /// parent [`Graph`] wherever a `zx.Handle:CLOCK` is needed. The
         /// [`Graph`] will recognized this handle until [`ForgetClock`] is
         /// called.
         ///
@@ -51,7 +51,7 @@ protocol SyntheticClockRealm {
         /// It does not have `ZX_RIGHT_READ` or `ZX_RIGHT_WRITE` and cannot
         /// be read or updated directly. The clock's value is meaningless. To
         /// read the clock, use the `control`, below.
-        1: handle zx.handle:CLOCK;
+        1: handle zx.Handle:CLOCK;
     }) error CreateClockError;
 
     /// Forgets about a synthetic clock. This releases internal resources and
@@ -67,8 +67,8 @@ protocol SyntheticClockRealm {
         /// The clock to forget.
         ///
         /// Required.
-        1: handle zx.handle:CLOCK;
-    }) -> (table {}) error zx.status;
+        1: handle zx.Handle:CLOCK;
+    }) -> (table {}) error zx.Status;
 
     /// Observes a synthetic clock. This can observe any clock created by this
     /// realm, including clocks created by [`CreateClock`] as well as clocks
@@ -81,7 +81,7 @@ protocol SyntheticClockRealm {
         /// The clock to observe.
         ///
         /// Required.
-        1: handle zx.handle:CLOCK;
+        1: handle zx.Handle:CLOCK;
 
         /// A channel to observe the clock. Since this only observes the clock,
         /// the only legal method is [`SyntheticClock.Now`] -- it is illegal to
@@ -89,11 +89,11 @@ protocol SyntheticClockRealm {
         ///
         /// Required.
         2: observe server_end:SyntheticClock;
-    }) -> (table {}) error zx.status;
+    }) -> (table {}) error zx.Status;
 
     /// Reads the current synthetic monotonic time.
     Now(table {}) -> (table {
-        1: now zx.time;
+        1: now zx.Time;
     });
 
     /// Advances synthetic monotonic time by the given duration, which must be
@@ -103,15 +103,15 @@ protocol SyntheticClockRealm {
     /// * error `ZX_ERR_INVALID_ARGS` if the duration is not positive
     AdvanceBy(table {
         /// Required.
-        1: duration zx.duration;
-    }) -> (table {}) error zx.status;
+        1: duration zx.Duration;
+    }) -> (table {}) error zx.Status;
 };
 
 /// Reads and adjusts a synthetic clock.
 protocol SyntheticClock {
     /// Reads the clock's current time.
     Now(table {}) -> (table {
-        1: now zx.time;
+        1: now zx.Time;
     });
 
     /// Sets the clock's rate adjustment, in parts-per-million, relative to the
@@ -120,7 +120,7 @@ protocol SyntheticClock {
     SetRate(table {
         /// Required.
         1: rate_adjust_ppm int32;
-    }) -> (table {}) error zx.status;
+    }) -> (table {}) error zx.Status;
 };
 
 type CreateClockError = flexible enum {

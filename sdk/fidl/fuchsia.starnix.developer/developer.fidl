@@ -26,6 +26,6 @@ protocol Manager {
         port uint32;
 
         /// The socket handle that will be used by the container.
-        bridge_socket zx.handle:SOCKET;
+        bridge_socket zx.Handle:SOCKET;
     });
 };

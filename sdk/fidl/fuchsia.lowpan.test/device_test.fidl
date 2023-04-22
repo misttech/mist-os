@@ -180,7 +180,7 @@ type NeighborInfo = table {
     ///
     /// Describes when this neighbor was last seen.
     /// Resolution is roughly +/- 1sec.
-    3: age zx.duration;
+    3: age zx.Duration;
 
     /// True if this neighbor is considered a child and is thus
     /// entirely dependent on this device for routing.

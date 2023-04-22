@@ -96,5 +96,5 @@ type Entry = table {
     /// Timestamp when this entry has changed `state`.
     ///
     /// Required.
-    5: updated_at zx.time;
+    5: updated_at zx.Time;
 };

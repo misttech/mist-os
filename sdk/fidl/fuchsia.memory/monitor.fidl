@@ -16,14 +16,14 @@ protocol Monitor {
     /// Writes to `socket` a JSON capture as a well-formed UTF-8 string.
     @deprecated("Use fuchsia.memory.inspection.Collector")
     WriteJsonCapture(resource struct {
-        socket zx.handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
+        socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 
     /// Writes to `socket` a JSON capture of the memory usage and the memory
     /// bucket definition, as a well-formed UTF-8 string.
     @deprecated("Use fuchsia.memory.inspection.Collector")
     WriteJsonCaptureAndBuckets(resource struct {
-        socket zx.handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
+        socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
 };
 

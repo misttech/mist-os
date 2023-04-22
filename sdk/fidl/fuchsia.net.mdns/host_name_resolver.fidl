@@ -22,7 +22,7 @@ protocol HostNameResolver {
     ///   if not.
     ResolveHostName(struct {
         host host_name;
-        timeout zx.duration;
+        timeout zx.Duration;
         options HostNameResolutionOptions;
     }) -> (struct {
         addresses vector<HostAddress>:MAX_ADDRESSES;
@@ -63,5 +63,5 @@ type HostAddress = struct {
 
     /// Time-to-live of the relevant A or AAAA resource. In the case of the local host or local
     /// proxy hosts, this value will be 2 minutes, the default A/AAAA TTL.
-    ttl zx.duration;
+    ttl zx.Duration;
 };

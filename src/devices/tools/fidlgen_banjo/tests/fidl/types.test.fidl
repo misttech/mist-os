@@ -45,9 +45,9 @@ type primitive_types = struct {
 };
 
 type zx_types = struct {
-    status zx.status;
-    time zx.time;
-    duration zx.duration;
+    status zx.Status;
+    time zx.Time;
+    duration zx.Duration;
     ticks zx.Ticks;
     koid zx.Koid;
     offset zx.Off;
@@ -92,7 +92,7 @@ type arrays = resource struct {
     u64_0 array<uint64, 1>;
     f32_0 array<float32, 1>;
     f64_0 array<float64, 1>;
-    handle_0 array<zx.handle, 1>;
+    handle_0 array<zx.Handle, 1>;
 
     b_1 array<bool, arrays_size>;
     i8_1 array<int8, arrays_size>;
@@ -105,7 +105,7 @@ type arrays = resource struct {
     u64_1 array<uint64, arrays_size>;
     f32_1 array<float32, arrays_size>;
     f64_1 array<float64, arrays_size>;
-    handle_1 array<zx.handle, arrays_size>;
+    handle_1 array<zx.Handle, arrays_size>;
 
     b_2 array<array<bool, 4>, arrays_size>;
     i8_2 array<array<int8, 4>, arrays_size>;
@@ -118,7 +118,7 @@ type arrays = resource struct {
     u64_2 array<array<uint64, 4>, arrays_size>;
     f32_2 array<array<float32, 4>, arrays_size>;
     f64_2 array<array<float64, 4>, arrays_size>;
-    handle_2 array<array<zx.handle, 4>, arrays_size>;
+    handle_2 array<array<zx.Handle, 4>, arrays_size>;
 };
 
 const vectors_size uint32 = 32;
@@ -135,7 +135,7 @@ type vectors = resource struct {
     u64_0 vector<uint64>;
     f32_0 vector<float32>;
     f64_0 vector<float64>;
-    handle_0 vector<zx.handle>;
+    handle_0 vector<zx.Handle>;
 
     b_1 vector<vector<bool>:4>;
     i8_1 vector<vector<int8>:4>;
@@ -148,7 +148,7 @@ type vectors = resource struct {
     u64_1 vector<vector<uint64>:4>;
     f32_1 vector<vector<float32>:4>;
     f64_1 vector<vector<float64>:4>;
-    handle_1 vector<vector<zx.handle>:4>;
+    handle_1 vector<vector<zx.Handle>:4>;
 
     b_sized_0 vector<bool>:1;
     i8_sized_0 vector<int8>:1;
@@ -161,7 +161,7 @@ type vectors = resource struct {
     u64_sized_0 vector<uint64>:1;
     f32_sized_0 vector<float32>:1;
     f64_sized_0 vector<float64>:1;
-    handle_sized_0 vector<zx.handle>:1;
+    handle_sized_0 vector<zx.Handle>:1;
 
     b_sized_1 vector<bool>:vectors_size;
     i8_sized_1 vector<int8>:vectors_size;
@@ -174,7 +174,7 @@ type vectors = resource struct {
     u64_sized_1 vector<uint64>:vectors_size;
     f32_sized_1 vector<float32>:vectors_size;
     f64_sized_1 vector<float64>:vectors_size;
-    handle_sized_1 vector<zx.handle>:vectors_size;
+    handle_sized_1 vector<zx.Handle>:vectors_size;
 
     b_sized_2 vector<vector<bool>:4>:vectors_size;
     i8_sized_2 vector<vector<int8>:4>:vectors_size;
@@ -187,7 +187,7 @@ type vectors = resource struct {
     u64_sized_2 vector<vector<uint64>:4>:vectors_size;
     f32_sized_2 vector<vector<float32>:4>:vectors_size;
     f64_sized_2 vector<vector<float64>:4>:vectors_size;
-    handle_sized_2 vector<vector<zx.handle>:4>:vectors_size;
+    handle_sized_2 vector<vector<zx.Handle>:4>:vectors_size;
 
     b_nullable_0 vector<bool>:<1, optional>;
     i8_nullable_0 vector<int8>:<1, optional>;
@@ -200,7 +200,7 @@ type vectors = resource struct {
     u64_nullable_0 vector<uint64>:<1, optional>;
     f32_nullable_0 vector<float32>:<1, optional>;
     f64_nullable_0 vector<float64>:<1, optional>;
-    handle_nullable_0 vector<zx.handle>:<1, optional>;
+    handle_nullable_0 vector<zx.Handle>:<1, optional>;
 
     b_nullable_1 vector<vector<bool>:4>:optional;
     i8_nullable_1 vector<vector<int8>:4>:optional;
@@ -213,7 +213,7 @@ type vectors = resource struct {
     u64_nullable_1 vector<vector<uint64>:4>:optional;
     f32_nullable_1 vector<vector<float32>:4>:optional;
     f64_nullable_1 vector<vector<float64>:4>:optional;
-    handle_nullable_1 vector<vector<zx.handle>:4>:optional;
+    handle_nullable_1 vector<vector<zx.Handle>:4>:optional;
 
     b_nullable_sized_0 vector<bool>:<1, optional>;
     i8_nullable_sized_0 vector<int8>:<1, optional>;
@@ -226,7 +226,7 @@ type vectors = resource struct {
     u64_nullable_sized_0 vector<uint64>:<1, optional>;
     f32_nullable_sized_0 vector<float32>:<1, optional>;
     f64_nullable_sized_0 vector<float64>:<1, optional>;
-    handle_nullable_sized_0 vector<zx.handle>:<1, optional>;
+    handle_nullable_sized_0 vector<zx.Handle>:<1, optional>;
 
     b_nullable_sized_1 vector<bool>:<vectors_size, optional>;
     i8_nullable_sized_1 vector<int8>:<vectors_size, optional>;
@@ -239,7 +239,7 @@ type vectors = resource struct {
     u64_nullable_sized_1 vector<uint64>:<vectors_size, optional>;
     f32_nullable_sized_1 vector<float32>:<vectors_size, optional>;
     f64_nullable_sized_1 vector<float64>:<vectors_size, optional>;
-    handle_nullable_sized_1 vector<zx.handle>:<vectors_size, optional>;
+    handle_nullable_sized_1 vector<zx.Handle>:<vectors_size, optional>;
 
     b_nullable_sized_2 vector<vector<bool>:4>:<vectors_size, optional>;
     i8_nullable_sized_2 vector<vector<int8>:4>:<vectors_size, optional>;
@@ -252,56 +252,56 @@ type vectors = resource struct {
     u64_nullable_sized_2 vector<vector<uint64>:4>:<vectors_size, optional>;
     f32_nullable_sized_2 vector<vector<float32>:4>:<vectors_size, optional>;
     f64_nullable_sized_2 vector<vector<float64>:4>:<vectors_size, optional>;
-    handle_nullable_sized_2 vector<vector<zx.handle>:4>:<vectors_size, optional>;
+    handle_nullable_sized_2 vector<vector<zx.Handle>:4>:<vectors_size, optional>;
 };
 
 @awesome
 type handles = resource struct {
-    handle_handle zx.handle;
-    process_handle zx.handle:PROCESS;
-    thread_handle zx.handle:THREAD;
-    vmo_handle zx.handle:VMO;
-    channel_handle zx.handle:CHANNEL;
-    event_handle zx.handle:EVENT;
-    port_handle zx.handle:PORT;
-    interrupt_handle zx.handle:INTERRUPT;
-    socket_handle zx.handle:SOCKET;
-    resource_handle zx.handle:RESOURCE;
-    eventpair_handle zx.handle:EVENTPAIR;
-    job_handle zx.handle:JOB;
-    vmar_handle zx.handle:VMAR;
-    fifo_handle zx.handle:FIFO;
-    guest_handle zx.handle:GUEST;
-    timer_handle zx.handle:TIMER;
-    profile_handle zx.handle:PROFILE;
-    vcpu_handle zx.handle:VCPU;
-    iommu_handle zx.handle:IOMMU;
-    pager_handle zx.handle:PAGER;
-    pmt_handle zx.handle:PMT;
-    clock_handle zx.handle:CLOCK;
+    handle_handle zx.Handle;
+    process_handle zx.Handle:PROCESS;
+    thread_handle zx.Handle:THREAD;
+    vmo_handle zx.Handle:VMO;
+    channel_handle zx.Handle:CHANNEL;
+    event_handle zx.Handle:EVENT;
+    port_handle zx.Handle:PORT;
+    interrupt_handle zx.Handle:INTERRUPT;
+    socket_handle zx.Handle:SOCKET;
+    resource_handle zx.Handle:RESOURCE;
+    eventpair_handle zx.Handle:EVENTPAIR;
+    job_handle zx.Handle:JOB;
+    vmar_handle zx.Handle:VMAR;
+    fifo_handle zx.Handle:FIFO;
+    guest_handle zx.Handle:GUEST;
+    timer_handle zx.Handle:TIMER;
+    profile_handle zx.Handle:PROFILE;
+    vcpu_handle zx.Handle:VCPU;
+    iommu_handle zx.Handle:IOMMU;
+    pager_handle zx.Handle:PAGER;
+    pmt_handle zx.Handle:PMT;
+    clock_handle zx.Handle:CLOCK;
 
-    nullable_handle_handle zx.handle:optional;
-    nullable_process_handle zx.handle:<PROCESS, optional>;
-    nullable_thread_handle zx.handle:<THREAD, optional>;
-    nullable_vmo_handle zx.handle:<VMO, optional>;
-    nullable_channel_handle zx.handle:<CHANNEL, optional>;
-    nullable_event_handle zx.handle:<EVENT, optional>;
-    nullable_port_handle zx.handle:<PORT, optional>;
-    nullable_interrupt_handle zx.handle:<INTERRUPT, optional>;
-    nullable_socket_handle zx.handle:<SOCKET, optional>;
-    nullable_resource_handle zx.handle:<RESOURCE, optional>;
-    nullable_eventpair_handle zx.handle:<EVENTPAIR, optional>;
-    nullable_job_handle zx.handle:<JOB, optional>;
-    nullable_vmar_handle zx.handle:<VMAR, optional>;
-    nullable_fifo_handle zx.handle:<FIFO, optional>;
-    nullable_guest_handle zx.handle:<GUEST, optional>;
-    nullable_timer_handle zx.handle:<TIMER, optional>;
-    nullable_profile_handle zx.handle:<PROFILE, optional>;
-    nullable_vcpu_handle zx.handle:<VCPU, optional>;
-    nullable_iommu_handle zx.handle:<IOMMU, optional>;
-    nullable_pager_handle zx.handle:<PAGER, optional>;
-    nullable_pmt_handle zx.handle:<PMT, optional>;
-    nullable_clock_handle zx.handle:<CLOCK, optional>;
+    nullable_handle_handle zx.Handle:optional;
+    nullable_process_handle zx.Handle:<PROCESS, optional>;
+    nullable_thread_handle zx.Handle:<THREAD, optional>;
+    nullable_vmo_handle zx.Handle:<VMO, optional>;
+    nullable_channel_handle zx.Handle:<CHANNEL, optional>;
+    nullable_event_handle zx.Handle:<EVENT, optional>;
+    nullable_port_handle zx.Handle:<PORT, optional>;
+    nullable_interrupt_handle zx.Handle:<INTERRUPT, optional>;
+    nullable_socket_handle zx.Handle:<SOCKET, optional>;
+    nullable_resource_handle zx.Handle:<RESOURCE, optional>;
+    nullable_eventpair_handle zx.Handle:<EVENTPAIR, optional>;
+    nullable_job_handle zx.Handle:<JOB, optional>;
+    nullable_vmar_handle zx.Handle:<VMAR, optional>;
+    nullable_fifo_handle zx.Handle:<FIFO, optional>;
+    nullable_guest_handle zx.Handle:<GUEST, optional>;
+    nullable_timer_handle zx.Handle:<TIMER, optional>;
+    nullable_profile_handle zx.Handle:<PROFILE, optional>;
+    nullable_vcpu_handle zx.Handle:<VCPU, optional>;
+    nullable_iommu_handle zx.Handle:<IOMMU, optional>;
+    nullable_pager_handle zx.Handle:<PAGER, optional>;
+    nullable_pmt_handle zx.Handle:<PMT, optional>;
+    nullable_clock_handle zx.Handle:<CLOCK, optional>;
 };
 
 const strings_size uint32 = 32;
@@ -385,7 +385,7 @@ type union_types = strict resource union {
    20: u64_0 array<uint64, 1>;
    21: f32_0 array<float32, 1>;
    22: f64_0 array<float64, 1>;
-   23: handle_0 array<zx.handle, 1>;
+   23: handle_0 array<zx.Handle, 1>;
 
    24: str string;
    25: s this_is_a_struct;

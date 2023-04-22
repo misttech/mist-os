@@ -132,7 +132,7 @@ type ReleaseResourceCmd = struct {
 /// so.
 type ExportResourceCmdDeprecated = resource struct {
     id uint32;
-    token zx.handle:EVENTPAIR;
+    token zx.Handle:EVENTPAIR;
 };
 
 /// Import a resource that was exported via ExportResourceCmd().  `token` is
@@ -159,7 +159,7 @@ type ExportResourceCmdDeprecated = resource struct {
 // act as a plain white texture).
 type ImportResourceCmdDeprecated = resource struct {
     id uint32;
-    token zx.handle:EVENTPAIR;
+    token zx.Handle:EVENTPAIR;
     spec ImportSpec;
 };
 

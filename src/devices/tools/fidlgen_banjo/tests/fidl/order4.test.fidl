@@ -6,9 +6,9 @@ library banjo.examples.order4;
 using zx;
 
 type One = resource struct {
-    one_handle vector<zx.handle>;
+    one_handle vector<zx.Handle>;
 };
 
 type Two = resource struct {
-    two_handle array<zx.handle, 1>;
+    two_handle array<zx.Handle, 1>;
 };

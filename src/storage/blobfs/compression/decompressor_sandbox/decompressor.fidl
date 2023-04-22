@@ -41,7 +41,7 @@ type DecompressResponse = struct {
     /// Decompressed size in bytes.
     size uint64;
     /// Operation status.
-    status zx.status;
+    status zx.Status;
 
     /// Padding out to the same length as `DecompressRangeRequest`. Values must be zero.
     reserved array<int8, 24>;
@@ -54,10 +54,10 @@ closed protocol DecompressorCreator {
     /// for requests is read from `compressed_vmo` and results written to
     /// `decompressed_vmo`.
     strict Create(resource struct {
-        server_end zx.handle:FIFO;
-        compressed_vmo zx.handle:VMO;
-        decompressed_vmo zx.handle:VMO;
+        server_end zx.Handle:FIFO;
+        compressed_vmo zx.Handle:VMO;
+        decompressed_vmo zx.Handle:VMO;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

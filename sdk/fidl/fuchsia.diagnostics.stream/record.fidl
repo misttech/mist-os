@@ -21,7 +21,7 @@ const MAX_TEXT_ARG_LENGTH uint32 = 32768;
 @max_handles("0")
 type Record = struct {
     /// The monotonic time at which the record was generated.
-    timestamp zx.time;
+    timestamp zx.Time;
     /// Severity of the record.
     severity fuchsia.diagnostics.Severity;
     /// The key-value pairs which make up this record.

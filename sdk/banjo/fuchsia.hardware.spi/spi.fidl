@@ -14,13 +14,13 @@ protocol Spi {
     Transmit(struct {
         txdata vector<uint8>:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
     /// Half-duplex receive data from a SPI device; always reads the full size requested.
     Receive(struct {
         size uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         rxdata vector<uint8>:MAX;
     });
     /// Full-duplex SPI transaction. Received data will exactly equal the length of the transmit
@@ -28,7 +28,7 @@ protocol Spi {
     Exchange(struct {
         txdata vector<uint8>:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         rxdata vector<uint8>:MAX;
     });
 };

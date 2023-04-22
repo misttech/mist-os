@@ -20,13 +20,13 @@ protocol Device {
     /// `ZX_ERR_INTERNAL` error.
     Get() -> (struct {
         rtc Time;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Set the RTC time.
     /// If the RTC time is not valid, the driver will return an `ZX_ERR_OUT_OF_RANGE` error.
     Set(struct {
         rtc Time;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

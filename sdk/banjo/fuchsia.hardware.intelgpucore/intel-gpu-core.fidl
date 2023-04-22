@@ -25,7 +25,7 @@ protocol IntelGpuCore {
     ReadPciConfig16(struct {
         addr uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint16;
     });
 
@@ -34,7 +34,7 @@ protocol IntelGpuCore {
     MapPciMmio(struct {
         pci_bar uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         @buffer
         @callee_allocated
         buf vector<uint8>:MAX;
@@ -44,15 +44,15 @@ protocol IntelGpuCore {
     UnmapPciMmio(struct {
         pci_bar uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Returns a bus transaction initiator.
     GetPciBti(struct {
         index uint32;
     }) -> (resource struct {
-        s zx.status;
-        bti zx.handle:BTI;
+        s zx.Status;
+        bti zx.Handle:BTI;
     });
 
     /// Registers the given |callback| to be invoked with parameter |data| when an interrupt occurs
@@ -61,12 +61,12 @@ protocol IntelGpuCore {
         callback client_end:IntelGpuCoreInterrupt;
         interrupt_mask uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Un-registers a previously registered interrupt callback.
     UnregisterInterruptCallback() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Returns the size of the GTT (global translation table) in bytes.
@@ -79,7 +79,7 @@ protocol IntelGpuCore {
     GttAlloc(struct {
         page_count uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         addr uint64;
     });
 
@@ -87,24 +87,24 @@ protocol IntelGpuCore {
     GttFree(struct {
         addr uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Clears the page table entries for the GTT allocation given by |addr|.
     GttClear(struct {
         addr uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Inserts page tables entries for the GTT allocation given by |addr| for the vmo represented by
     /// handle |buffer|, at the given |page_offset| and |page_count|. Takes ownership of |buffer|.
     GttInsert(resource struct {
         addr uint64;
-        buffer zx.handle:VMO;
+        buffer zx.Handle:VMO;
         page_offset uint64;
         page_count uint64;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

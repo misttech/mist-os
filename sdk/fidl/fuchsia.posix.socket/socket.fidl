@@ -634,7 +634,7 @@ protocol DatagramSocket {
 
     Describe() -> (resource table {
         /// `ZX_SOCKET_DATAGRAM` on which data is sent and received.
-        1: socket zx.handle:SOCKET;
+        1: socket zx.Handle:SOCKET;
         /// Size of the buffer used to receive Tx metadata.
         2: tx_meta_buf_size uint64;
         /// Size of the buffer used to receive Rx metadata.
@@ -680,7 +680,7 @@ protocol DatagramSocket {
         /// The structure is invalid if any of the elements' peer is closed.
         /// Datagrams sent with the associated metadata after invalidation will be
         /// silently dropped.
-        2: validity vector<zx.handle:<EVENTPAIR, zx.RIGHTS_BASIC>>:FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS;
+        2: validity vector<zx.Handle:<EVENTPAIR, zx.RIGHTS_BASIC>>:FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS;
         /// The maximum datagram size that can be sent.
         ///
         /// Datagrams exceeding this will be silently dropped.
@@ -694,7 +694,7 @@ protocol DatagramSocket {
         /// Represents the validity of this structure.
         ///
         /// The structure is invalid if the peer is closed.
-        1: validity zx.handle:<EVENTPAIR, zx.RIGHTS_BASIC>;
+        1: validity zx.Handle:<EVENTPAIR, zx.RIGHTS_BASIC>;
         /// Identifies whether the `SO_TIMESTAMP` or `SO_TIMESTAMPNS` control messages are
         /// requested.
         2: timestamp TimestampOption;
@@ -737,7 +737,7 @@ protocol SynchronousDatagramSocket {
     Describe() -> (resource table {
         /// Signals additional information about the state of the socket such as
         /// readiness or shutdown-ness.
-        1: event zx.handle:EVENTPAIR;
+        1: event zx.Handle:EVENTPAIR;
     });
 
     /// Receives a message from the socket.
@@ -801,7 +801,7 @@ protocol StreamSocket {
 
     Describe() -> (resource table {
         /// `ZX_SOCKET_STREAM` on which data is sent and received.
-        1: socket zx.handle:SOCKET;
+        1: socket zx.Handle:SOCKET;
     });
 
     /// Begins listening for new incoming connections. At most `backlog`
@@ -1162,21 +1162,21 @@ protocol Provider {
         index uint64;
     }) -> (struct {
         name fuchsia.net.interfaces.Name;
-    }) error zx.status;
+    }) error zx.Status;
     /// Looks up an interface by its name and returns its index. Returns
     /// `ZX_ERR_NOT_FOUND` if the specified name doesn't exist.
     InterfaceNameToIndex(struct {
         name fuchsia.net.interfaces.Name;
     }) -> (struct {
         index uint64;
-    }) error zx.status;
+    }) error zx.Status;
     /// Looks up an interface by its name and returns its flags. Returns
     /// `ZX_ERR_NOT_FOUND` if the specified name doesn't exist.
     InterfaceNameToFlags(struct {
         name fuchsia.net.interfaces.Name;
     }) -> (struct {
         flags InterfaceFlags;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Requests a list of [`fuchsia.posix.socket.InterfaceAddresses`]
     /// describing the network interfaces on the system.

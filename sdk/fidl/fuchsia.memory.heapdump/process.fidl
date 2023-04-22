@@ -20,9 +20,9 @@ protocol SnapshotSinkV1 {};
 protocol Registry {
     /// Binds the given process to the registry and share the relevant resources.
     RegisterV1(resource struct {
-        process zx.handle:<PROCESS, zx.RIGHTS_BASIC | zx.RIGHTS_IO | zx.Rights.GET_PROPERTY>;
-        allocations_vmo zx.handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
-        resources_vmo zx.handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
+        process zx.Handle:<PROCESS, zx.RIGHTS_BASIC | zx.RIGHTS_IO | zx.Rights.GET_PROPERTY>;
+        allocations_vmo zx.Handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
+        resources_vmo zx.Handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
         snapshot_sink server_end:SnapshotSinkV1;
     });
 };

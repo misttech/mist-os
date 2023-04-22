@@ -33,7 +33,7 @@ type FileInfo = resource table {
     /// - The filesystem supports signalling readability/writability events.
     ///
     /// The [`FileSignal`] values may be observed on this event.
-    2: observer zx.handle:EVENT;
+    2: observer zx.Handle:EVENT;
 
     /// An optional stream object, which can be used to read to and write from
     /// the file.
@@ -41,7 +41,7 @@ type FileInfo = resource table {
     /// Reading and writing the file using the stream object can be up to 20x
     /// faster than reading and writing the file using the Read and Write
     /// operations in the [`File`] protocol.
-    3: stream zx.handle:STREAM;
+    3: stream zx.Handle:STREAM;
 };
 
 // TODO(https://fxbug.dev/105608): Use a generated constant.
@@ -75,7 +75,7 @@ protocol File {
         offset int64;
     }) -> (struct {
         offset_from_start uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Reads up to 'count' bytes at the provided offset.
     /// Does not affect the seek offset.
@@ -100,7 +100,7 @@ protocol File {
         offset uint64;
     }) -> (struct {
         data Transfer;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Writes data at the provided offset.
     /// Does not affect the seek offset.
@@ -129,7 +129,7 @@ protocol File {
         offset uint64;
     }) -> (struct {
         actual_count uint64;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Shrinks or grows the file size to 'length' bytes.
     ///
@@ -142,9 +142,9 @@ protocol File {
     @selector("fuchsia.io/File.Resize")
     Resize(struct {
         length uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
-    /// Acquires a [`zx.handle:VMO`] representing this file, if there is one,
+    /// Acquires a [`zx.Handle:VMO`] representing this file, if there is one,
     /// with the requested access rights.
     ///
     /// Implementations are not required to implement files backed by VMOs so
@@ -156,8 +156,8 @@ protocol File {
     /// implementation is free to choose the semantics of the returned VMO.
     ///
     /// + request `flags` a [`VmoFlags`] indicating the desired mode of access.
-    /// - response `vmo` the requested [`zx.handle:VMO`].
-    /// * error a [`zx.status`] value indicating the failure.
+    /// - response `vmo` the requested [`zx.Handle:VMO`].
+    /// * error a [`zx.Status`] value indicating the failure.
     ///
     /// This method requires the following rights:
     ///
@@ -209,8 +209,8 @@ protocol File {
             SHARED_BUFFER = 0x00020000;
         };
     }) -> (resource struct {
-        vmo zx.handle:VMO;
-    }) error zx.status;
+        vmo zx.Handle:VMO;
+    }) error zx.Status;
 };
 
 protocol Readable {
@@ -237,7 +237,7 @@ protocol Readable {
         count uint64;
     }) -> (struct {
         data Transfer;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 protocol Writable {
@@ -269,7 +269,7 @@ protocol Writable {
         data Transfer;
     }) -> (struct {
         actual_count uint64;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// The reference point for updating the seek offset. See [`File.Seek`].

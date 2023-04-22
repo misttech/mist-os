@@ -16,7 +16,7 @@ protocol BlockWatcher {
     ///
     /// Returns ZX_ERR_BAD_STATE if the block watcher is paused more than once.
     Pause() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Resumes the block watcher. This will return when the block watcher is once again processing
@@ -24,7 +24,7 @@ protocol BlockWatcher {
     ///
     /// Returns ZX_ERR_BAD_STATE if the watcher isn't paused.
     Resume() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 
@@ -47,19 +47,19 @@ protocol Admin {
         device client_end:fuchsia.hardware.block.Block;
         name string:fuchsia.io.MAX_FILENAME;
         options MountOptions;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Unmounts a previously mounted filesystem.
     Unmount(struct {
         name string:fuchsia.io.MAX_FILENAME;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Returns the device path for the filesystem with the given fs_id.
     GetDevicePath(struct {
         fs_id uint64;
     }) -> (struct {
         path fuchsia.io.Path;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Writes `filename` into the data partition with contents from `payload`, formatting the data
     /// partition if it isn't already formatted.  Overwrites file if it already exists.
@@ -68,8 +68,8 @@ protocol Admin {
     /// in recovery builds where fshost is running with the `fvm_ramdisk` flag set.
     WriteDataFile(resource struct {
         filename fuchsia.io.Path;
-        payload zx.handle:VMO;
-    }) -> () error zx.status;
+        payload zx.Handle:VMO;
+    }) -> () error zx.Status;
 
     /// Reprovision the first non-ramdisk FVM volume, and format/mount the blob partition.
     /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`.
@@ -84,9 +84,9 @@ protocol Admin {
     /// and unseal the zxcrypt volume.
     WipeStorage(resource struct {
         blobfs_root server_end:<fuchsia.io.Directory>;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Wipes the data volume which will get reinitialised upon next boot.  This is not
     /// cryptographically secure; the caller should take care to reset hardware keys.
-    ShredDataVolume() -> () error zx.status;
+    ShredDataVolume() -> () error zx.Status;
 };

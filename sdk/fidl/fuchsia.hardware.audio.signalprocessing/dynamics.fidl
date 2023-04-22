@@ -122,13 +122,13 @@ type DynamicsBandState = table {
     /// If not included, the attack time is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.ATTACK` is not set in `supported_controls`.
-    8: attack zx.duration;
+    8: attack zx.Duration;
 
     /// Release time. Optional.
     /// If not included, the release time is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.RELEASE` is not set in `supported_controls`.
-    9: release zx.duration;
+    9: release zx.Duration;
 
     /// Output (a.k.a. make up or post) gain value in dB. Optional.
     /// If not included, the output gain is unspecified.
@@ -152,7 +152,7 @@ type DynamicsBandState = table {
     /// If not included, the look-ahead time is unspecified.
     /// A client must not include this field in a `SetElement` if
     /// `DynamicsSupportedControls.LOOKAHEAD` is not set in `supported_controls`.
-   13: lookahead zx.duration;
+   13: lookahead zx.Duration;
 
     /// Linked channels (a.k.a. Stereo linked for 2-channel systems). Optional.
     /// If not included, the linked channels option is unspecified.

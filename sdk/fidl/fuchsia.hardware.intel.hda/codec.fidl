@@ -12,6 +12,6 @@ protocol CodecDevice {
     // of the legacy custom format, this method can be updated to use an
     // interface request instead of returning a channel.
     GetChannel() -> (resource struct {
-        ch zx.handle:CHANNEL;
+        ch zx.Handle:CHANNEL;
     });
 };

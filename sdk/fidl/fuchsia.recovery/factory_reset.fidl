@@ -12,6 +12,6 @@ protocol FactoryReset {
     /// Request an immediate factory reset. If unsuccessful will return an
     /// error.
     Reset() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

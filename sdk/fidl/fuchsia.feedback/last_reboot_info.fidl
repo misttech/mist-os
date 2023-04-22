@@ -32,7 +32,7 @@ type LastReboot = table {
     2: reason RebootReason;
 
     /// The uptime of the device before it rebooted.
-    3: uptime zx.duration;
+    3: uptime zx.Duration;
 };
 
 /// Reasons why a device last rebooted.

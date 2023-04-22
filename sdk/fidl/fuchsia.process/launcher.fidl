@@ -15,7 +15,7 @@ using zx;
 /// This structure represents one such handle and its associated identifier.
 type HandleInfo = resource struct {
     /// The handle to use for this process argument.
-    handle zx.handle;
+    handle zx.Handle;
 
     /// Process argument identifier.
     ///
@@ -44,10 +44,10 @@ type NameInfo = resource struct {
 /// The information needed to launch a process.
 type LaunchInfo = resource struct {
     /// The executable to run in the process.
-    executable zx.handle:VMO;
+    executable zx.Handle:VMO;
 
     /// The job in which to create the process.
-    job zx.handle:JOB;
+    job zx.Handle:JOB;
 
     /// The name to assign to the created process.
     name string:zx.MAX_NAME_LEN;
@@ -58,17 +58,17 @@ type LaunchInfo = resource struct {
 /// To start the process, call `zx_process_start` with the arguments provided.
 type ProcessStartData = resource struct {
     /// The process that was created.
-    process zx.handle:PROCESS;
+    process zx.Handle:PROCESS;
 
     /// The vmar object that was created when the process was created.
     ///
     /// See <https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create.md>.
-    root_vmar zx.handle:VMAR;
+    root_vmar zx.Handle:VMAR;
 
     /// The initial thread for the process.
     ///
     /// Should be passed to `zx_process_start` when starting the process.
-    thread zx.handle:THREAD;
+    thread zx.Handle:THREAD;
 
     /// The address of the initial entry point in the process.
     ///
@@ -83,7 +83,7 @@ type ProcessStartData = resource struct {
     /// The bootstrap channel to pass to the process on startup.
     ///
     /// Should be passed to `zx_process_start` when starting the process.
-    bootstrap zx.handle:CHANNEL;
+    bootstrap zx.Handle:CHANNEL;
 
     /// The base address of the vDSO to pass to the process on startup.
     ///
@@ -120,8 +120,8 @@ protocol Launcher {
     Launch(resource struct {
         info LaunchInfo;
     }) -> (resource struct {
-        status zx.status;
-        process zx.handle:<PROCESS, optional>;
+        status zx.Status;
+        process zx.Handle:<PROCESS, optional>;
     });
 
     /// Creates the process described by `info` but does not start it.
@@ -136,7 +136,7 @@ protocol Launcher {
     CreateWithoutStarting(resource struct {
         info LaunchInfo;
     }) -> (resource struct {
-        status zx.status;
+        status zx.Status;
         data box<ProcessStartData>;
     });
 

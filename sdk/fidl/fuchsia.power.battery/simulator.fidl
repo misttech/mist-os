@@ -49,7 +49,7 @@ protocol BatterySimulatorController {
     /// Sets Time Remaining to full charge / depletion
     /// This should be called after DisconnectRealBattery
     SetTimeRemaining(struct {
-        duration zx.duration;
+        duration zx.Duration;
     });
 
     /// Disconnect the real battery connection

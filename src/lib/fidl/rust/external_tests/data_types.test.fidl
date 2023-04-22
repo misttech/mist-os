@@ -67,5 +67,5 @@ type ResourceRecord = resource table {
 };
 
 type StructWithHandles = resource struct {
-    v vector<zx.handle:CHANNEL>;
+    v vector<zx.Handle:CHANNEL>;
 };

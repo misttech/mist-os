@@ -54,7 +54,7 @@ protocol Frobinator {
         yo string;
     }) error uint32;
     SendEventHandle(resource struct {
-        event zx.handle:<EVENT, zx.DEFAULT_EVENT_RIGHTS>;
+        event zx.Handle:<EVENT, zx.DEFAULT_EVENT_RIGHTS>;
     });
     SendProtocol(resource struct {
         ep client_end:EmptyProtocol;

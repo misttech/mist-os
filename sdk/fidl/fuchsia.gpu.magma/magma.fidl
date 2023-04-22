@@ -76,8 +76,8 @@ protocol Device {
         query_id QueryId;
     }) -> (strict resource union {
         1: simple_result uint64;
-        2: buffer_result zx.handle:VMO;
-    }) error zx.status;
+        2: buffer_result zx.Handle:VMO;
+    }) error zx.Status;
 
     /// Creates a connection to the device comprised of two IPC channels.
     /// The primary channel is for the Primary protocol (see below).  The notification channel is
@@ -120,7 +120,7 @@ protocol TestDevice {
     compose CombinedDevice;
 
     GetUnitTestStatus() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 
@@ -200,11 +200,11 @@ alias PerformanceCounterTriggerId = uint32;
 alias PerformanceCounterSet = vector<uint64>:64;
 
 /// If a system driver error occurs, or if the client sends a message that the client should have
-/// known is invalid, the connection will be closed and a zx.status sent via epitaph.
+/// known is invalid, the connection will be closed and a zx.Status sent via epitaph.
 protocol Primary {
     /// Imports an object for use in the system driver.
     ImportObject2(resource struct {
-        object zx.handle;
+        object zx.Handle;
         object_type ObjectType;
         object_id ObjectId;
     });
@@ -310,7 +310,7 @@ protocol Primary {
     /// have been returned by PerformanceCounterAccess.GetPerformanceCountToken() from the matching
     /// device.
     EnablePerformanceCounterAccess(resource struct {
-        access_token zx.handle:EVENT;
+        access_token zx.Handle:EVENT;
     });
 
     /// Returns true if any EnablePerformanceCounterAccess message has succeeded.
@@ -387,7 +387,7 @@ protocol PerformanceCounterAccess {
     /// This access token is not used as an event, but is instead passed to
     /// Primary.EnablePerformanceCounterAccess.
     GetPerformanceCountToken() -> (resource struct {
-        access_token zx.handle:EVENT;
+        access_token zx.Handle:EVENT;
     });
 };
 
@@ -405,7 +405,7 @@ protocol PerformanceCounterEvents {
         3: buffer_offset uint32;
 
         /// Required.
-        4: timestamp zx.time;
+        4: timestamp zx.Time;
 
         /// Required.
         5: flags ResultFlags;

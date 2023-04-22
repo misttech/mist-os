@@ -49,7 +49,7 @@ protocol Dai {
     /// the parameters in SupportedFormats may be supported.
     GetDaiFormats() -> (struct {
         dai_formats vector<DaiSupportedFormats>:MAX_COUNT_DAI_FORMATS;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Retrieves the ring buffer formats supported by the DAI, if not available at the time the DAI
     /// may reply with an error status and the client may retry at a later time.
@@ -57,7 +57,7 @@ protocol Dai {
     /// the parameters in `SupportedFormats` may be supported.
     GetRingBufferFormats() -> (struct {
         ring_buffer_formats vector<SupportedFormats>:MAX_COUNT_FORMATS;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// `CreateRingBuffer` is sent by clients to select both a DAI format and a ring buffer format
     /// based on information that the driver provides in `GetDaiFormats` and `GetRingBufferFormats`,

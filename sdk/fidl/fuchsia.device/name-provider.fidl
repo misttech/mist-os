@@ -17,5 +17,5 @@ protocol NameProvider {
     /// Return the name of this Fuchsia device.
     GetDeviceName() -> (struct {
         name string:DEVICE_NAME_MAX;
-    }) error zx.status;
+    }) error zx.Status;
 };

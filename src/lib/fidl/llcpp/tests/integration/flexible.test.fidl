@@ -7,14 +7,14 @@ using zx;
 
 type FlexibleXUnion = flexible resource union {
     1: want_more_than_30_bytes array<uint8, 30>;
-    2: want_more_than_4_handles array<zx.handle:optional, 4>;
+    2: want_more_than_4_handles array<zx.Handle:optional, 4>;
 };
 
 /// Only one of the fields will be set by the server. This allows
 /// the transaction to infer which field is present. See flexible_test.cc.
 type FlexibleTable = resource table {
     1: want_more_than_30_bytes_at_ordinal_3 array<uint8, 30>;
-    2: want_more_than_4_handles_at_ordinal_4 array<zx.handle:optional, 4>;
+    2: want_more_than_4_handles_at_ordinal_4 array<zx.Handle:optional, 4>;
 };
 
 /// The server will be implemented manually to purposefully return xunion/tables

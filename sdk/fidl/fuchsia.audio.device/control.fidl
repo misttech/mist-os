@@ -44,7 +44,7 @@ type RingBufferProperties = table {
     /// reenabling all channels. The value must be non-negative.
     ///
     /// Required.
-    2: turn_on_delay zx.duration;
+    2: turn_on_delay zx.Duration;
 };
 
 type DelayInfo = table {
@@ -52,14 +52,14 @@ type DelayInfo = table {
     /// the chosen format. This duration must be non-negative.
     ///
     /// Required.
-    1: internal_delay zx.duration;
+    1: internal_delay zx.Duration;
 
     /// The amount of pipeline delay beyond the interconnect (subsequent to the
     /// DMA "read" position for output devices, or prior to the DMA "write"
     /// position for input devices). This duration must be non-negative.
     ///
     /// Required.
-    2: external_delay zx.duration;
+    2: external_delay zx.Duration;
 };
 
 /// A `ControlCreator` interface creates `Control` instances. Each `Control` binds
@@ -236,7 +236,7 @@ protocol RingBuffer {
         /// this does not include the effects of `turn_on_delay` on streams.
         ///
         /// Required.
-        1: set_time zx.time;
+        1: set_time zx.Time;
     }) error RingBufferSetActiveChannelsError;
 
     /// Start the ring buffer, beginning at the first frame of the ring buffer.
@@ -244,7 +244,7 @@ protocol RingBuffer {
         /// The CLOCK_MONOTONIC time when the stream was started.
         ///
         /// Required.
-        1: start_time zx.time;
+        1: start_time zx.Time;
     }) error RingBufferStartError;
 
     /// Stop the ring buffer.

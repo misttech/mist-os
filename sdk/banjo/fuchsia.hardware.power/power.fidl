@@ -22,16 +22,16 @@ protocol Power {
         min_needed_voltage uint32;
         max_supported_voltage uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Unregister the callee for this power domain. The callee will no longer be considered as
     /// a dependent of this power domain.
     UnregisterPowerDomain() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Get Supported Voltage Range. min and max are in micorVolts(uV)
     GetSupportedVoltageRange() -> (struct {
-        s zx.status;
+        s zx.Status;
         min uint32;
         max uint32;
     });
@@ -41,19 +41,19 @@ protocol Power {
     RequestVoltage(struct {
         voltage uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         actual_voltage uint32;
     });
     /// Get current voltage in uV.
     GetCurrentVoltage(struct {
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         current_voltage uint32;
     });
     /// Get power domain status
     GetPowerDomainStatus() -> (struct {
-        s zx.status;
+        s zx.Status;
         status PowerDomainStatus;
     });
     /// Write to ctrl register of PMIC
@@ -61,13 +61,13 @@ protocol Power {
         reg_addr uint32;
         value uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Read ctrl register of PMIC
     ReadPmicCtrlReg(struct {
         reg_addr uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint32;
     });
 };

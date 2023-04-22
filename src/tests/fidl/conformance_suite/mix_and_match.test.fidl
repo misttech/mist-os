@@ -56,7 +56,7 @@ type NodeAttributes = struct {
 };
 
 type FileGetAttrResponse = struct {
-    s zx.status;
+    s zx.Status;
     attributes NodeAttributes;
 };
 

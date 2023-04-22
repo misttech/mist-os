@@ -10,20 +10,20 @@ protocol Hci {
     /// is closed in the event of an error opening the hci channel or if the hci
     /// channel is already associated with a handle to another zircon channel.
     OpenCommandChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 
     /// Opens a acl data channel on the provided handle. The zircon channel is
     /// closed in the event of an error opening the hci channel or if the hci
     /// channel is already associated with a handle to another zircon channel.
     OpenAclDataChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 
     /// Opens a snoop channel on the provided handle. The zircon channel is
     /// closed in the event of an error opening the hci channel or if the hci
     /// channel is already associated with a handle to another zircon channel.
     OpenSnoopChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 };

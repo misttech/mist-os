@@ -12,6 +12,6 @@ protocol TpmImpl {
     /// on |server|.
     /// See //sdk/fidl/fuchsia.hardware.tpmimpl/tpmimpl.fidl.
     ConnectServer(resource struct {
-        server zx.handle:CHANNEL;
+        server zx.Handle:CHANNEL;
     }) -> ();
 };

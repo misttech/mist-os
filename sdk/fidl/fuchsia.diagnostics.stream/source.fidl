@@ -31,7 +31,7 @@ protocol Source {
     ///
     /// `latest` should be read-only.
     -> OnBufferInit(resource struct {
-        latest zx.handle:VMO;
+        latest zx.Handle:VMO;
     });
 
     /// Asks the connected retriever to finish working with `buffer`, usually because the `Source`

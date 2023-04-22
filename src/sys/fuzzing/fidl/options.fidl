@@ -41,7 +41,7 @@ type Options = table {
 
     /// If non-zero, fuzz for this duration and then exit normally. If zero, fuzz indefinitely.
     /// Defaults to 0.
-    2: max_total_time zx.duration;
+    2: max_total_time zx.Duration;
 
     // PRNG seed to use when generating inputs. The same seed for the same target should produce the
     // same inputs. If zero, the current ticks will be used. Defaults to 0.
@@ -68,7 +68,7 @@ type Options = table {
 
     /// If non-zero, any run that takes longer than this duration will raise a TIMEOUT error.
     /// Use 0 to disable the limit. Defaults to 20 minutes.
-    9: run_limit zx.duration;
+    9: run_limit zx.Duration;
 
     /// If non-zero, any allocation over this size in bytes will raise a BAD_MALLOC error. Use 0 to
     /// disable the limit. Defaults to 2 GB.
@@ -81,7 +81,7 @@ type Options = table {
     /// If non-zero, purge the sanitizer's allocator quarantine and reclaim memory periodically
     /// between runs after an interval of this many seconds. Use 0 to disable allocator purging.
     /// Default to 1.
-   12: purge_interval zx.duration;
+   12: purge_interval zx.Duration;
 
     /// Exit code used by the instrumented process if it encounters a bad allocation. Set this
     /// if the target already uses the default for another reason. Defaults to 2000.
@@ -101,7 +101,7 @@ type Options = table {
 
     /// If non-zero, the engine will periodically update any added monitors after this duration.
     /// Defaults to 20.
-   17: pulse_interval zx.duration;
+   17: pulse_interval zx.Duration;
 
     /// If true, allow a debugger like `zxdb` to be attached to an instrumented process. This may
     /// interfere with the engine's ability to detect exceptions and is not recommended when

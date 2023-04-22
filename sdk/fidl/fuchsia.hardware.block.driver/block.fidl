@@ -92,7 +92,7 @@ type BlockFifoRequest = struct {
 };
 
 type BlockFifoResponse = struct {
-    status zx.status;
+    status zx.Status;
     reqid Reqid;
     /// Only valid if transmitted in request.
     group Groupid;
@@ -115,7 +115,7 @@ type BlockReadWrite = resource struct {
     extra uint32;
 
     /// VMO of data to read or write.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
 
     /// Transfer length in blocks (0 is invalid).
     length uint32;
@@ -209,7 +209,7 @@ protocol Common {
         @in_out
         txn BlockOp;
     }) -> (resource struct {
-        status zx.status;
+        status zx.Status;
         @mutable
         op BlockOp;
     });

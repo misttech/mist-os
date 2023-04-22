@@ -27,7 +27,7 @@ protocol Device {
         state uint32;
     }) -> (struct {
         info CpuPerformanceStateInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Returns the number of logical cores contained within this performance
     /// domain.

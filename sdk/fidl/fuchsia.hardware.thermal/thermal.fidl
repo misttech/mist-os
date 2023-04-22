@@ -99,13 +99,13 @@ protocol Device {
 
     /// Get information about the device's current state.
     GetInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         info box<ThermalInfo>;
     });
 
     /// Get information about the device's thermal capabilities and trip points.
     GetDeviceInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         info box<ThermalDeviceInfo>;
     });
 
@@ -114,21 +114,21 @@ protocol Device {
     GetDvfsInfo(struct {
         power_domain PowerDomain;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         info box<OperatingPoint>;
     });
 
     /// Get an event to get trip point notifications on. `ZX_USER_SIGNAL_`0 is changed when either
     /// trip point is reached. It is deasserted when the state is read via GetInfo.
     GetStateChangeEvent() -> (resource struct {
-        status zx.status;
-        handle zx.handle:<EVENT, optional>;
+        status zx.Status;
+        handle zx.Handle:<EVENT, optional>;
     });
 
     /// Get a port to get trip point notification packets.
     GetStateChangePort() -> (resource struct {
-        status zx.status;
-        handle zx.handle:<PORT, optional>;
+        status zx.Status;
+        handle zx.Handle:<PORT, optional>;
     });
 
     /// Sets a trip point in degrees Celsius. When the sensor reaches the trip point temperature the
@@ -137,14 +137,14 @@ protocol Device {
         id uint32;
         temp float32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Get the current operating point index.
     GetDvfsOperatingPoint(struct {
         power_domain PowerDomain;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         op_idx uint16;
     });
 
@@ -153,12 +153,12 @@ protocol Device {
         op_idx uint16;
         power_domain PowerDomain;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Get the current fan level.
     GetFanLevel() -> (struct {
-        status zx.status;
+        status zx.Status;
         fan_level uint32;
     });
 
@@ -166,6 +166,6 @@ protocol Device {
     SetFanLevel(struct {
         fan_level uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

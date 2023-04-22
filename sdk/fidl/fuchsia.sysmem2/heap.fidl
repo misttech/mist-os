@@ -49,8 +49,8 @@ protocol Heap {
     AllocateVmo(struct {
         size uint64;
     }) -> (resource struct {
-        s zx.status;
-        vmo zx.handle:<VMO, optional>;
+        s zx.Status;
+        vmo zx.Handle:<VMO, optional>;
     });
 
     /// Create resources and associate heap-specific resources with the
@@ -74,10 +74,10 @@ protocol Heap {
     /// alive beyond all sysmem participant usages of the vmo; instead
     /// the heap can get the vmo's koid for the heap's mapping.
     CreateResource(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         buffer_settings SingleBufferSettings;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         id uint64;
     });
 

@@ -59,7 +59,7 @@ type Color = struct {
 
 // [START resource_structs]
 type EventStruct = resource struct {
-    event zx.handle:<EVENT, optional>;
+    event zx.Handle:<EVENT, optional>;
 };
 // [END resource_structs]
 

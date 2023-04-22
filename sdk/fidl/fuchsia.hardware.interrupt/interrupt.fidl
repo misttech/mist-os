@@ -9,8 +9,8 @@ using zx;
 protocol Provider {
     /// Get the interrupt represented by this provider.
     Get() -> (resource struct {
-        interrupt zx.handle:INTERRUPT;
-    }) error zx.status;
+        interrupt zx.Handle:INTERRUPT;
+    }) error zx.Status;
 };
 
 service Service {

@@ -10,7 +10,7 @@ type CopyableStruct = struct {
 };
 
 type MoveOnlyStruct = resource struct {
-    h zx.handle:optional;
+    h zx.Handle:optional;
 };
 
 type VectorStruct = struct {
@@ -39,7 +39,7 @@ type TestUnion = strict resource union {
 type TestXUnion = flexible resource union {
     1: primitive int32;
     2: copyable CopyableStruct;
-    3: h zx.handle;
+    3: h zx.Handle;
 };
 
 type TestStrictXUnion = strict union {
@@ -170,7 +170,7 @@ type TestResourceTable = resource table {
 };
 
 type HandleStruct = resource struct {
-    h zx.handle:EVENT;
+    h zx.Handle:EVENT;
 };
 
 type TestHandleTable = resource table {
@@ -178,7 +178,7 @@ type TestHandleTable = resource table {
 };
 
 type NonInlinableHandleStruct = resource struct {
-    h zx.handle:EVENT;
+    h zx.Handle:EVENT;
     i int64;
 };
 
@@ -221,7 +221,7 @@ protocol MsgWrapper {
 
 protocol TypesTest {
     NonNullableChannel(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 };
 

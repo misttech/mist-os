@@ -56,13 +56,13 @@ type AddDeviceAction = resource struct {
     properties vector<uint64>:MAX_PROPERTIES_LEN;
 
     /// The expected return status from device_add()
-    expect_status zx.status;
+    expect_status zx.Status;
 };
 
 /// What a hook should do.
 type Action = strict resource union {
     /// Return this status.
-    1: return_status zx.status;
+    1: return_status zx.Status;
 
     /// Create a new thread with a processing loop.
     2: create_thread server_end:MockDeviceThread;

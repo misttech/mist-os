@@ -65,12 +65,12 @@ open protocol Store {
         /// `zx.Rights.WRITE` (via `zx.RIGHTS_IO`) so that the VMO may be filled with exported data,
         /// and `zx.Rights.SET_PROPERTY` (via `zx.RIGHTS_PROPERTY`) so that it may be resized to
         /// truncate any remaining empty buffer.
-        empty zx.handle:<VMO, zx.RIGHTS_BASIC | zx.RIGHTS_PROPERTY | zx.RIGHTS_IO>;
+        empty zx.Handle:<VMO, zx.RIGHTS_BASIC | zx.RIGHTS_PROPERTY | zx.RIGHTS_IO>;
     }) -> (resource struct {
         /// The `zx.Rights.WRITE` and `zx.Rights.SET_PROPERTY` rights have been removed from the now
         /// filled VMO. No one, not even the client that requested the export, is able to modify
         /// this VMO going forward.
-        filled zx.handle:<VMO, zx.RIGHTS_BASIC | zx.Rights.GET_PROPERTY | zx.Rights.READ>;
+        filled zx.Handle:<VMO, zx.RIGHTS_BASIC | zx.Rights.GET_PROPERTY | zx.Rights.READ>;
     }) error ExportError;
     // [END diff_3]
 };

@@ -66,7 +66,7 @@ protocol Node2 {
     /// This method does not require any rights.
     @available(removed=9)
     @selector("fuchsia.io/Node.Close")
-    Close() -> () error zx.status;
+    Close() -> () error zx.Status;
 
     /// An event produced eagerly by the server if requested by
     /// [`NodeFlags.GET_REPRESENTATION`]. This event will be the first message
@@ -132,7 +132,7 @@ protocol Node2 {
     // @selector("fuchsia.io/Node.GetToken")
     // GetToken2() -> (resource struct {
     //     token Token;
-    // }) error zx.status;
+    // }) error zx.Status;
 
     /// Acquires information about the connection.
     ///
@@ -210,7 +210,7 @@ protocol Node2 {
             /// This `id` should be unique among all entries of a directory.
             6: id Id;
         };
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Updates information about the node.
     ///
@@ -219,7 +219,7 @@ protocol Node2 {
     ///
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
     @selector("fuchsia.io/Node.UpdateAttributes")
-    UpdateAttributes(MutableNodeAttributes) -> () error zx.status;
+    UpdateAttributes(MutableNodeAttributes) -> () error zx.Status;
 
     /// Synchronizes updates to the node to the underlying media, if it exists.
     ///
@@ -231,5 +231,5 @@ protocol Node2 {
     ///
     /// This method does not require any rights.
     @selector("fuchsia.io/Node.Sync")
-    Sync() -> () error zx.status;
+    Sync() -> () error zx.Status;
 };

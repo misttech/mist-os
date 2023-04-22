@@ -94,7 +94,7 @@ protocol Node1 {
     /// (the same as would be returned by `Describe`).
     @selector("fuchsia.io1/Node.OnOpen")
     -> OnOpen(resource struct {
-        s zx.status;
+        s zx.Status;
         info @generated_name("NodeInfoDeprecated") strict resource union {
             /// No protocol information was supplied by the connection.
             1: service struct {};
@@ -107,12 +107,12 @@ protocol Node1 {
                 /// connection that does not have the capability to read.
                 ///
                 /// The "`FILE_SIGNAL_`" values may be observed on this event.
-                event zx.handle:<EVENT, optional>;
+                event zx.Handle:<EVENT, optional>;
 
                 /// A placeholder for future stream support.
                 ///
                 /// Currently, servers are required not to send a handle in this field.
-                stream zx.handle:<STREAM, optional>;
+                stream zx.Handle:<STREAM, optional>;
             };
 
             /// The connection composes [`Directory`].
@@ -131,7 +131,7 @@ protocol Node1 {
     /// This method does not require any rights.
     @selector("fuchsia.io1/Node.GetAttr")
     GetAttr() -> (struct {
-        s zx.status;
+        s zx.Status;
         attributes NodeAttributes;
     });
 
@@ -144,7 +144,7 @@ protocol Node1 {
         flags NodeAttributeFlags;
         attributes NodeAttributes;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Acquires the `Directory.Open` rights and flags used to access this file.
@@ -152,7 +152,7 @@ protocol Node1 {
     /// This method does not require any rights.
     @selector("fuchsia.io1/Node.NodeGetFlags")
     GetFlags() -> (struct {
-        s zx.status;
+        s zx.Status;
         flags OpenFlags;
     });
 
@@ -165,13 +165,13 @@ protocol Node1 {
     SetFlags(struct {
         flags OpenFlags;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Query the filesystem for filesystem-specific information.
     @selector("fuchsia.io.admin/DirectoryAdmin.QueryFilesystem")
     QueryFilesystem() -> (struct {
-        s zx.status;
+        s zx.Status;
         info box<@generated_name("FilesystemInfo") struct {
             /// The number of data bytes which may be stored in a filesystem. This does not count
             /// metadata or other filesystem overhead like block rounding.

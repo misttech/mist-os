@@ -23,9 +23,9 @@ protocol ValueEcho {
 /// Replies with the handle requested.
 protocol ResourceEcho {
     Echo(resource struct {
-        h zx.handle;
+        h zx.Handle;
     }) -> (resource struct {
-        h zx.handle;
+        h zx.Handle;
     });
 };
 
@@ -37,7 +37,7 @@ protocol ValueOneWay {
 
 protocol ResourceOneWay {
     OneWay(resource struct {
-        h zx.handle;
+        h zx.Handle;
     });
 };
 
@@ -49,7 +49,7 @@ protocol ValueEvent {
 
 protocol ResourceEvent {
     -> OnResourceEvent(resource struct {
-        h zx.handle;
+        h zx.Handle;
     });
 };
 

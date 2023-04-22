@@ -26,7 +26,7 @@ protocol Publisher {
     /// it has completed all writes to the VMO.
     Publish(resource struct {
         data_sink string:fuchsia.io.MAX_NAME_LENGTH;
-        data zx.handle:VMO;
-        vmo_token zx.handle:EVENTPAIR;
+        data zx.Handle:VMO;
+        vmo_token zx.Handle:EVENTPAIR;
     });
 };

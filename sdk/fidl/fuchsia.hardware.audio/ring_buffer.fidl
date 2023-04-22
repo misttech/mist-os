@@ -30,7 +30,7 @@ type DelayInfo = table {
     /// `driver_transfer_bytes`.
     ///
     /// Required.
-    1: internal_delay zx.duration;
+    1: internal_delay zx.Duration;
 
     /// The driver's best estimate of the delay external to the hardware it abstracts for
     /// the chosen format.
@@ -52,7 +52,7 @@ type DelayInfo = table {
     /// to copy data in and out of the ring buffer, specified via `RingBufferProperties`
     /// `driver_transfer_bytes`.
     ///
-    2: external_delay zx.duration;
+    2: external_delay zx.Duration;
 };
 
 /// Properties of the ring buffer. These values don't change once the ring buffer is created.
@@ -67,7 +67,7 @@ type RingBufferProperties = table {
     // Not needed anymore since the functionality is available via `WatchDelayInfo` below.
     // Should match `DelayInfo` `external_delay` until it's removed.
     @available(deprecated=9)
-    1: external_delay zx.duration;
+    1: external_delay zx.Duration;
 
     /// Size (in bytes) representing a temporary buffer used by the driver in order to consume or
     /// generate the ring buffer contents. Required.
@@ -129,7 +129,7 @@ type RingBufferProperties = table {
     /// as in a Bluetooth driver. This delay must be taken into account if not getting the initial
     /// audio samples played or captured is not acceptable.
     /// If not included `turn_on_delay` is unknown.
-    4: turn_on_delay zx.duration;
+    4: turn_on_delay zx.Duration;
 
     /// Size (in bytes) representing a temporary buffer used by the driver/HW in order to transfer
     /// (consume or produce) the ring buffer contents.
@@ -290,7 +290,7 @@ type RingBufferPositionInfo = struct {
     /// playback/capture pointer reached the position indicated by `position`.
     /// `turn_on_delay` impact should not be incorporated into 'timestamp'.
     /// No delays indicated in `DelayInfo` should be incorporated.
-    timestamp zx.time;
+    timestamp zx.Time;
 
     /// The playback/capture pointer position (in bytes) in the ring buffer at time
     /// `timestamp` as estimated by the driver.
@@ -356,7 +356,7 @@ protocol RingBuffer {
         clock_recovery_notifications_per_ring uint32;
     }) -> (resource struct {
         num_frames uint32;
-        ring_buffer zx.handle:VMO;
+        ring_buffer zx.Handle:VMO;
     }) error GetVmoError;
 
     /// Start the ring buffer. The `start_time` value (in the CLOCK_MONOTONIC timeline) indicates
@@ -367,7 +367,7 @@ protocol RingBuffer {
     /// If `Start` is called while this RingBuffer is already started, the channel must be closed
     /// with an error `ZX_ERR_BAD_STATE` returned.
     Start() -> (struct {
-        start_time zx.time;
+        start_time zx.Time;
     });
 
     /// Stop the ring buffer. Once this call's response is received, no further position
@@ -403,8 +403,8 @@ protocol RingBuffer {
     SetActiveChannels(struct {
         active_channels_bitmask uint64;
     }) -> (struct {
-        set_time zx.time;
-    }) error zx.status;
+        set_time zx.Time;
+    }) error zx.Status;
 
     /// Get information about delays via a hanging get. The driver will immediately reply to the
     /// first `WatchDelayInfo` sent by the client. The driver will not respond to subsequent client

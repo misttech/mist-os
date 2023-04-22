@@ -8,9 +8,9 @@ using zx;
 
 // Task associated with a running component.
 type Task = flexible resource union {
-    1: job zx.handle:JOB;
-    2: process zx.handle:PROCESS;
-    3: thread zx.handle:THREAD;
+    1: job zx.Handle:JOB;
+    2: process zx.Handle:PROCESS;
+    3: thread zx.Handle:THREAD;
 };
 
 // Contains handles for tasks of the running component. This is emitted by

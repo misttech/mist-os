@@ -251,7 +251,7 @@ type TxResult = struct {
     /// getting a confirmation that the frame was sent) or stopped.
     /// - `ZX_ERR_INTERNAL` or any other unlisted errors will be reported as a
     /// generic [`fuchsia.hardware.network/TxReturnFlags.TX_RET_ERROR`].
-    status zx.status;
+    status zx.Status;
 };
 
 @transport("Driver")
@@ -573,7 +573,7 @@ protocol NetworkDeviceImpl {
     Init(resource struct {
         iface client_end:NetworkDeviceIfc;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Starts the device's data path.
     ///
@@ -593,7 +593,7 @@ protocol NetworkDeviceImpl {
     /// specific error.
     @async
     Start() -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Stops the network device.
     ///
@@ -668,9 +668,9 @@ protocol NetworkDeviceImpl {
     @async
     PrepareVmo(resource struct {
         id VmoId;
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Device may dispose of all references to the VMO referenced by `id`.
     ///

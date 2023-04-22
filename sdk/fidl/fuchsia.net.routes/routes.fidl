@@ -95,5 +95,5 @@ protocol State {
             /// the next hop is the gateway.
             2: gateway Destination;
         };
-    }) error zx.status;
+    }) error zx.Status;
 };

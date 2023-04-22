@@ -8,6 +8,6 @@ using zx;
 @discoverable
 closed protocol Example {
     strict Pass(resource struct {
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> ();
 };

@@ -21,7 +21,7 @@ protocol Items {
         type uint32;
         extra uint32;
     }) -> (resource struct {
-        payload zx.handle:<VMO, optional>;
+        payload zx.Handle:<VMO, optional>;
         length uint32;
     });
 
@@ -37,17 +37,17 @@ protocol Items {
         }>;
     }) -> (resource struct {
         retrieved_items vector<resource struct {
-            payload zx.handle:VMO;
+            payload zx.Handle:VMO;
             length uint32;
             extra uint32;
         }>:MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Gets the `payload` for a `ZBI_TYPE_BOOTLOADER_FILE` boot item.
     /// Note: ZX_PROP_VMO_CONTENT_SIZE will be set to the actual file content size
     GetBootloaderFile(struct {
         filename string:MAX_FILE_NAME_LENGTH;
     }) -> (resource struct {
-        payload zx.handle:<VMO, optional>;
+        payload zx.Handle:<VMO, optional>;
     });
 };

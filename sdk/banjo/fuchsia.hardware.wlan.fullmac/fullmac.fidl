@@ -194,7 +194,7 @@ type WlanFullmacScanResult = struct {
     txn_id uint64;
     // Time of the scan result relative to when the system was powered on.
     // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
-    timestamp_nanos zx.time;
+    timestamp_nanos zx.Time;
     bss fuchsia.wlan.internal.BssDescription;
 };
 
@@ -302,7 +302,7 @@ type WlanFullmacAssocResp = struct {
 };
 
 type WlanFullmacDisassocConfirm = struct {
-    status zx.status;
+    status zx.Status;
 };
 
 type WlanFullmacDisassocIndication = struct {
@@ -659,7 +659,7 @@ protocol WlanFullmacImplIfc {
         frame WlanFullmacSaeFrame;
     }) -> ();
     OnWmmStatusResp(struct {
-        status zx.status;
+        status zx.Status;
         wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
     }) -> ();
 };
@@ -671,8 +671,8 @@ protocol WlanFullmacImpl {
     Start(resource struct {
         ifc client_end:WlanFullmacImplIfc;
     }) -> (resource struct {
-        status zx.status;
-        sme_channel zx.handle:CHANNEL;
+        status zx.Status;
+        sme_channel zx.Handle:CHANNEL;
     });
     Stop() -> ();
 
@@ -760,7 +760,7 @@ protocol WlanFullmacImpl {
     SetMulticastPromisc(struct {
         enable bool;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
 

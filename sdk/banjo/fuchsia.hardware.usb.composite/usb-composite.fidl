@@ -16,7 +16,7 @@ protocol UsbComposite {
     });
     /// Returns the USB descriptors following the interface's existing descriptors.
     GetAdditionalDescriptorList() -> (struct {
-        s zx.status;
+        s zx.Status;
         desc vector<uint8>:MAX;
     });
     /// Marks the interface as claimed and appends the interface descriptor to the
@@ -25,6 +25,6 @@ protocol UsbComposite {
         desc fuchsia.hardware.usb.descriptor.UsbInterfaceDescriptor;
         length uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

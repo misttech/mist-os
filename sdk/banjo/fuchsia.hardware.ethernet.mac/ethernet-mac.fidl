@@ -13,7 +13,7 @@ protocol EthMacCallbacks {
     ConfigPhy(struct {
         mac array<uint8, MAC_ARRAY_LENGTH>;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };
 
@@ -23,18 +23,18 @@ protocol EthMac {
     MdioRead(struct {
         reg uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         val uint32;
     });
     MdioWrite(struct {
         reg uint32;
         val uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     RegisterCallbacks(resource struct {
         cb client_end:EthMacCallbacks;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

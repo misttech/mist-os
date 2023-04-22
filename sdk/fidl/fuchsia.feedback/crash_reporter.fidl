@@ -26,7 +26,7 @@ protocol CrashReporter {
     @available(deprecated=11, note="use FileReport")
     File(resource struct {
         report CrashReport;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Files a crash `report` and gives the final result of the operation.
     ///
@@ -58,7 +58,7 @@ type CrashReport = resource table {
     1: program_name string:MAX_PROGRAM_NAME_LENGTH;
 
     /// How long the program was running before it crashed.
-    6: program_uptime zx.duration;
+    6: program_uptime zx.Duration;
 
     /// The specific report that depends on the type of crashes.
     ///

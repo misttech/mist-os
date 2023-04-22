@@ -35,6 +35,6 @@ protocol Mailbox {
         channel MailboxChannel;
         mdata MailboxDataBuf;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

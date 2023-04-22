@@ -13,26 +13,26 @@ protocol PowerImpl {
     GetPowerDomainStatus(struct {
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         status fuchsia.hardware.power.PowerDomainStatus;
     });
     /// Enable a power domain
     EnablePowerDomain(struct {
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Disable a power domain
     DisablePowerDomain(struct {
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Get Supported Voltage Range. min and max are in uV.
     GetSupportedVoltageRange(struct {
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         min uint32;
         max uint32;
     });
@@ -41,14 +41,14 @@ protocol PowerImpl {
         index uint32;
         voltage uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         actual_voltage uint32;
     });
     /// Get current voltage in uV.
     GetCurrentVoltage(struct {
         index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         current_voltage uint32;
     });
     /// Write to ctrl register of PMIC
@@ -57,14 +57,14 @@ protocol PowerImpl {
         reg_addr uint32;
         value uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Read ctrl register of PMIC
     ReadPmicCtrlReg(struct {
         index uint32;
         reg_addr uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         value uint32;
     });
 };

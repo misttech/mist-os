@@ -27,14 +27,14 @@ type I2cImplOp = struct {
 @banjo_layout("ddk-protocol")
 protocol I2cImpl {
     GetMaxTransferSize() -> (struct {
-        s zx.status;
+        s zx.Status;
         size uint64;
     });
     /// Sets the bitrate for the i2c bus in KHz units.
     SetBitrate(struct {
         bitrate uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// |Transact| assumes that all ops buf are not null.
     /// |Transact| assumes that all ops length are not zero.
@@ -42,6 +42,6 @@ protocol I2cImpl {
     Transact(struct {
         op vector<I2cImplOp>:MAX;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

@@ -68,8 +68,8 @@ type TypeSpecificElement = flexible union {
 };
 
 type Latency = flexible union {
-    /// Latency added to the pipeline as a zx.duration.
-    1: latency_time zx.duration;
+    /// Latency added to the pipeline as a zx.Duration.
+    1: latency_time zx.Duration;
 
     /// Latency added to the pipeline as a number of frames.
     2: latency_frames uint32;
@@ -197,7 +197,7 @@ protocol SignalProcessing {
     SetElementState(struct {
         processing_element_id uint64;
         state ElementState;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 
     /// Sets the topology to be used using an id to the vector returned by `GetTopologies`.
     /// If `GetTopologies` returns more than one `Topology`, `SetTopology` must be called to put the
@@ -210,7 +210,7 @@ protocol SignalProcessing {
     /// driver state. See `SetElementState` for further discussion.
     SetTopology(struct {
         topology_id uint64;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 /// For an overview see
@@ -220,7 +220,7 @@ protocol Reader {
     /// Must return one or more processing elements, or ZX_ERR_NOT_SUPPORTED.
     GetElements() -> (struct {
         processing_elements vector<Element>:MAX_COUNT_PROCESSING_ELEMENTS;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the processing element state via a hanging get. For a given `processing_element_id`,
     /// the driver will reply to the first `WatchElement` sent by the client.
@@ -243,5 +243,5 @@ protocol Reader {
     /// more topologies.
     GetTopologies() -> (struct {
         topologies vector<Topology>:MAX_COUNT_TOPOLOGIES;
-    }) error zx.status;
+    }) error zx.Status;
 };

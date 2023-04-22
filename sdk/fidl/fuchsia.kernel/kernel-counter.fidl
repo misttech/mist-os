@@ -12,7 +12,7 @@ protocol Counter {
     /// Retrives a VMO containining summarized kcounter data. The vmo returned
     /// in `buffer` is in "inspect-vmo" format, documented elsewhere.
     GetInspectVmo() -> (resource struct {
-        status zx.status;
+        status zx.Status;
         buffer fuchsia.mem.Buffer;
     });
 
@@ -20,6 +20,6 @@ protocol Counter {
     /// data may not be updated if it was already recently updated (updates are
     /// limited to an unspecified rate, but approximately every few seconds).
     UpdateInspectVmo() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };

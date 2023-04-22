@@ -61,6 +61,6 @@ protocol View {
     /// The View's implementation should pass the `view_token` to Scenic
     /// using a `fuchsia.ui.view.CreateViewCmd`.
     Attach(resource struct {
-        view_token zx.handle:EVENTPAIR;
+        view_token zx.Handle:EVENTPAIR;
     });
 };

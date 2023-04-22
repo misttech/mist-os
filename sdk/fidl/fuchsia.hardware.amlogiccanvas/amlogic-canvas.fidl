@@ -52,16 +52,16 @@ protocol Device {
     /// `offset` is the relative address for image data within `vmo`.
     /// `info` describes the canvas layout (see CanvasInfo for details).
     Config(resource struct {
-        vmo zx.handle:VMO;
+        vmo zx.Handle:VMO;
         offset uint64;
         info CanvasInfo;
     }) -> (struct {
         canvas_idx uint8;
-    }) error zx.status;
+    }) error zx.Status;
     /// Frees up a canvas.
     Free(struct {
         canvas_idx uint8;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 service Service {

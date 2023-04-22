@@ -11,6 +11,6 @@ using zx;
 protocol Aggregator {
     /// Reports a discrete activity such as a keystroke.
     ReportDiscreteActivity(struct {
-        event_time zx.time;
+        event_time zx.Time;
     }) -> ();
 };

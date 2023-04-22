@@ -94,7 +94,7 @@ protocol MouseInputListener {
         /// The monotonic time (ns) the mouse event was received by the client.
         /// Note that this value should be used with caution. Some reporters may not be
         /// capable of ns-level precision, but still report in ns-level units.
-        3: time_received zx.time;
+        3: time_received zx.Time;
 
         /// Name of the component to help distinguish responses from multiple components.
         ///

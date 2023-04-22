@@ -17,5 +17,5 @@ protocol Device {
     /// Runs the tests
     Run() -> (struct {
         results TestResults;
-    }) error zx.status;
+    }) error zx.Status;
 };

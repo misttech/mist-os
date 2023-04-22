@@ -17,9 +17,9 @@ protocol Device {
     ///  * The server implementation must not use an IOMMU-backed BTI handle, as the physical
     ///    address of the VMO being pinned must be stable.
     GetSecureMemoryPhysicalAddress(resource struct {
-        secure_mem zx.handle:VMO;
+        secure_mem zx.Handle:VMO;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         paddr uint64;
     });
 };

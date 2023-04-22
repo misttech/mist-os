@@ -290,7 +290,7 @@ protocol DriverDevelopment {
         driver_path string:fuchsia.device.manager.DEVICE_PATH_MAX;
     }) -> (struct {
         count uint32;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Returns the list of devices that are running on the system.
     ///
@@ -322,7 +322,7 @@ protocol DriverDevelopment {
     BindAllUnboundNodes() -> (struct {
         /// List of new bindings that happened as a result of this.
         binding_result vector<NodeBindingInfo>:BINDING_RESULT_MAX;
-    }) error zx.status;
+    }) error zx.Status;
 
     // TODO(fxbug.dev/107895): Remove this method once it is no longer being
     // used.
@@ -341,5 +341,5 @@ protocol DriverDevelopment {
     /// not guaranteed to be removed by the time this returns.
     RemoveTestNode(struct {
         name string:fuchsia.device.manager.DEVICE_PATH_MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

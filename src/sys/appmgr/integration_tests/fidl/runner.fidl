@@ -18,13 +18,13 @@ closed protocol MockComponent {
     });
     strict ConnectToService(resource struct {
         service_name string;
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 
     // Set backend service directory which can be used by `PublishService` to
     // publish mock services.
     strict SetServiceDirectory(resource struct {
-        channel zx.handle:CHANNEL;
+        channel zx.Handle:CHANNEL;
     });
 
     // Publishes `service_name` and connects to |backend service directory| when

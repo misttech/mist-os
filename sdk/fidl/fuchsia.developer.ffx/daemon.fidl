@@ -62,6 +62,6 @@ protocol Daemon {
     /// function directly, you should reconsider your actions.
     ConnectToProtocol(resource struct {
         name fuchsia.io.Name;
-        server_end zx.handle:CHANNEL;
+        server_end zx.Handle:CHANNEL;
     }) -> () error DaemonError;
 };

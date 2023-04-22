@@ -37,7 +37,7 @@ type UsbFlowTrace = struct {
 type UsbResponse = struct {
     /// Status of transaction.
     /// ZX_ERR_IO_INVALID indicates that the device stalled the transfer.
-    status zx.status;
+    status zx.Status;
     /// Number of bytes actually transferred (on success).
     actual zx.Off;
     /// Number of consecutive requests that were silently completed immediately prior to this
@@ -54,7 +54,7 @@ type UsbRequest = resource struct {
     setup fuchsia.hardware.usb.descriptor.UsbSetup;
 
     /// VMO handle for payload.
-    vmo_handle zx.handle:VMO;
+    vmo_handle zx.Handle:VMO;
     size uint64;
     /// Offset of the start of data from first page address of the vmo.
     offset zx.Off;
@@ -62,7 +62,7 @@ type UsbRequest = resource struct {
     /// Add offset to get actual data.
     virt uint64;
 
-    pmt zx.handle;
+    pmt zx.Handle;
     /// Phys addresses of the payload.
     @mutable
     phys vector<uint64>:MAX;

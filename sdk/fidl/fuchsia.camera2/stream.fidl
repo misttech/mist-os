@@ -111,7 +111,7 @@ protocol Stream {
         x_max float32;
         y_max float32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Change the image format of the stream. This is called when clients want
@@ -120,7 +120,7 @@ protocol Stream {
     SetImageFormat(struct {
         image_format_index uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 
     /// Get the image formats that this stream supports.

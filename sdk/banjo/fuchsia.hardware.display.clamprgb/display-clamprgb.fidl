@@ -16,6 +16,6 @@ protocol DisplayClampRgbImpl {
     SetMinimumRgb(struct {
         minimum_rgb uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

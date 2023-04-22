@@ -7,5 +7,5 @@ using zx;
 
 closed protocol TestInspect {
     /// Modify the device's inspect data
-    strict ModifyInspect() -> () error zx.status;
+    strict ModifyInspect() -> () error zx.Status;
 };

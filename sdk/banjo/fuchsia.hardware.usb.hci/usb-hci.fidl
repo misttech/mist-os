@@ -38,7 +38,7 @@ protocol UsbHci {
         ss_com_desc fuchsia.hardware.usb.descriptor.UsbSsEpCompDescriptor;
         enable bool;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Returns the current frame (in milliseconds), used for isochronous transfers.
     GetCurrentFrame() -> (struct {
@@ -51,7 +51,7 @@ protocol UsbHci {
         desc fuchsia.hardware.usb.hubdescriptor.UsbHubDescriptor;
         multi_tt bool;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Called by the USB hub driver when a new device is attached.
     HubDeviceAdded(struct {
@@ -59,35 +59,35 @@ protocol UsbHci {
         port uint32;
         speed fuchsia.hardware.usb.descriptor.UsbSpeed;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Called by the USB hub driver when a device has been removed.
     HubDeviceRemoved(struct {
         device_id uint32;
         port uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Called by the USB hub driver when a device has been reset.
     HubDeviceReset(struct {
         device_id uint32;
         port uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Resets an endpoint on the specified device.
     ResetEndpoint(struct {
         device_id uint32;
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Resets the specified device.
     ResetDevice(struct {
         hub_address uint32;
         device_id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Returns the maximum size of a packet that can be queued on the specified endpoint.
     GetMaxTransferSize(struct {
@@ -101,7 +101,7 @@ protocol UsbHci {
         device_id uint32;
         ep_address uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Returns the size needed for a |usb_request_t|, including private storage needed by the
     /// HCI driver.

@@ -44,8 +44,8 @@ protocol GoldfishPipe {
     /// command structure is returned in |vmo|.
     Create() -> (resource struct {
         id int32;
-        vmo zx.handle:VMO;
-    }) error zx.status;
+        vmo zx.Handle:VMO;
+    }) error zx.Status;
 
     /// Destroy a previously created pipe connection.
     Destroy(struct {
@@ -61,8 +61,8 @@ protocol GoldfishPipe {
     /// Otherwise returns `ZX_OK`.
     SetEvent(resource struct {
         id int32;
-        pipe_event zx.handle:EVENT;
-    }) -> () error zx.status;
+        pipe_event zx.Handle:EVENT;
+    }) -> () error zx.Status;
 
     /// Open pipe connection. This must be called before any other
     /// commands are issued and will cause the physical address of the
@@ -80,19 +80,19 @@ protocol GoldfishPipe {
 
     /// Get BTI that can be used create IO buffers for read/write commands.
     GetBti() -> (resource struct {
-        bti zx.handle:BTI;
-    }) error zx.status;
+        bti zx.Handle:BTI;
+    }) error zx.Status;
 
     /// Create a sysmem connection - used to implement fuchsia.hardware.sysmem.
     ConnectSysmem(resource struct {
-        connection zx.handle:CHANNEL;
-    }) -> () error zx.status;
+        connection zx.Handle:CHANNEL;
+    }) -> () error zx.Status;
 
     /// Register a sysmem heap.
     RegisterSysmemHeap(resource struct {
         heap uint64;
-        connection zx.handle:CHANNEL;
-    }) -> () error zx.status;
+        connection zx.Handle:CHANNEL;
+    }) -> () error zx.Status;
 };
 
 service Service {

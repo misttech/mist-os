@@ -8,7 +8,7 @@ using zx;
 /// `InputReport` is a single report that is created by an input device.
 type InputReport = table {
     /// `event_time` is in nanoseconds when the event was recorded.
-    1: event_time zx.time;
+    1: event_time zx.Time;
     /// `mouse` is the report generated if the device contains a mouse.
     2: mouse MouseInputReport;
     /// `sensor` is the report generated if the device contains a sensor.

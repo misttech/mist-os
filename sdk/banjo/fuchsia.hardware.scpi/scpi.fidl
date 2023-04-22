@@ -29,31 +29,31 @@ protocol Scpi {
     GetSensor(struct {
         name string:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         sensor_id uint32;
     });
     GetSensorValue(struct {
         sensor_id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         sensor_value uint32;
     });
     GetDvfsInfo(struct {
         power_domain uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         opps ScpiOpp;
     });
     GetDvfsIdx(struct {
         power_domain uint8;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
         index uint16;
     });
     SetDvfsIdx(struct {
         power_domain uint8;
         index uint16;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

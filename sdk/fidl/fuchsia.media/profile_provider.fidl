@@ -39,18 +39,18 @@ protocol ProfileProvider {
     /// Returns the period and capacity (actually maximum runtime) that was applied, either of which
     /// may be zero to indicate not applicable.
     RegisterHandlerWithCapacity(resource struct {
-        thread_handle zx.handle:THREAD;
+        thread_handle zx.Handle:THREAD;
         name string:64;
-        period zx.duration;
+        period zx.Duration;
         capacity float32;
     }) -> (struct {
-        period zx.duration;
-        capacity zx.duration;
+        period zx.Duration;
+        capacity zx.Duration;
     });
 
     /// Reset a thread's scheduling profile to the default.
     UnregisterHandler(resource struct {
-        thread_handle zx.handle:THREAD;
+        thread_handle zx.Handle:THREAD;
         name string:64;
     }) -> ();
 };

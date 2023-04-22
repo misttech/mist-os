@@ -11,6 +11,6 @@ using zx;
 protocol CpuResource {
     /// Get a CPU resource handle.
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

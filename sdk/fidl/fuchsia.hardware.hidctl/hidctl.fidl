@@ -30,6 +30,6 @@ protocol Device {
         config HidCtlConfig;
         rpt_desc vector<uint8>:MAX_RPT_DESC_LEN;
     }) -> (resource struct {
-        report_socket zx.handle:SOCKET;
+        report_socket zx.Handle:SOCKET;
     });
 };

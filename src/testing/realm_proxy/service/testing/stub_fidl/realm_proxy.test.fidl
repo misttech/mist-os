@@ -22,6 +22,6 @@ protocol EventPairHolder {
     /// When this service goes away, the client's side of the event pair will
     /// be signaled with PEER_CLOSED.
     Hold(resource struct {
-        event_pair zx.handle:EVENTPAIR;
+        event_pair zx.Handle:EVENTPAIR;
     });
 };

@@ -23,7 +23,7 @@ protocol UsbBus {
         desc fuchsia.hardware.usb.hubdescriptor.UsbHubDescriptor;
         multi_tt bool;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Informs the USB bus that a new device has been added.
     DeviceAdded(struct {
@@ -32,7 +32,7 @@ protocol UsbBus {
         port uint32;
         speed UsbSpeed;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Informs the USB bus that a device has been removed.
     DeviceRemoved(struct {
@@ -40,7 +40,7 @@ protocol UsbBus {
         hub_device uint64;
         port uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Used by USB hub driver to register its USB hub protocol with the USB bus driver.
     SetHubInterface(resource struct {
@@ -48,7 +48,7 @@ protocol UsbBus {
         usb_device uint64;
         hub client_end:fuchsia.hardware.usb.hub.UsbHubInterface;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Queues a USB request with the host stack.
     RequestQueue(resource struct {
@@ -69,13 +69,13 @@ protocol UsbBusInterface {
         hub_id uint32;
         speed UsbSpeed;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Notifies the USB bus driver that a device has been removed.
     RemoveDevice(struct {
         device_id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Used by the HCI controller to reset a port on a USB hub.
     ResetPort(struct {
@@ -83,12 +83,12 @@ protocol UsbBusInterface {
         port uint32;
         enumerating bool;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
     /// Used by the HCI controller to reinitialize a device after it has been reset.
     ReinitializeDevice(struct {
         device_id uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

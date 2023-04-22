@@ -39,17 +39,17 @@ type StartInfo = resource struct {
 
     /// The guest associated with a device. This handle should be used to setup
     /// device traps, and then be released before device operation begins.
-    guest zx.handle:<GUEST, optional>;
+    guest zx.Handle:<GUEST, optional>;
 
     /// The event associated with a device interrupt. This is how the device will
     /// notify the guest of events it should process.
     ///
     /// The meaning of the different signals that can be raised on the event are
     /// documented by the EVENT_* constants above.
-    event zx.handle:EVENT;
+    event zx.Handle:EVENT;
 
     /// The VMO used to represent guest physical memory.
-    vmo zx.handle:VMO;
+    vmo zx.Handle:VMO;
 };
 
 protocol VirtioDevice {
@@ -86,7 +86,7 @@ protocol VirtioBalloon {
 
     /// Get memory statistics from the balloon device.
     GetMemStats() -> (struct {
-        status zx.status;
+        status zx.Status;
         mem_stats vector<fuchsia.virtualization.MemStat>:optional;
     });
 };
@@ -112,7 +112,7 @@ protocol VirtioConsole {
     /// Start the console device. This uses `socket` to handle input and output.
     Start(resource struct {
         start_info StartInfo;
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
     }) -> ();
 };
 
@@ -154,10 +154,10 @@ protocol VirtioMagma {
     /// Start the magma device.
     Start(resource struct {
         start_info StartInfo;
-        vmar zx.handle:VMAR;
+        vmar zx.Handle:VMAR;
         wayland_importer client_end:<VirtioWaylandImporter, optional>;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 
@@ -170,7 +170,7 @@ protocol VirtioNet {
         start_info StartInfo;
         mac_address fuchsia.net.MacAddress;
         enable_bridge bool;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 @discoverable
@@ -223,7 +223,7 @@ protocol VirtioVsock {
         start_info StartInfo;
         guest_cid uint32;
         listeners vector<fuchsia.virtualization.Listener>:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 /// Sufficient to contain the opaque image info.
@@ -234,8 +234,8 @@ const VIRTIO_WAYLAND_MAX_IMAGE_INFO_SIZE uint32 = 128;
 /// An image corresponds to a single buffer collection, and also contains some
 /// opaque image info needed by VirtioMagma.
 type VirtioImage = resource struct {
-    vmo zx.handle:VMO;
-    token zx.handle:<EVENTPAIR, optional>;
+    vmo zx.Handle:VMO;
+    token zx.Handle:<EVENTPAIR, optional>;
     info vector<uint8>:VIRTIO_WAYLAND_MAX_IMAGE_INFO_SIZE;
 };
 
@@ -251,7 +251,7 @@ protocol VirtioWaylandImporter {
     ExportImage(struct {
         vfd_id uint32;
     }) -> (resource struct {
-        status zx.status;
+        status zx.Status;
         image box<VirtioImage>;
     });
 };
@@ -263,7 +263,7 @@ protocol VirtioWayland {
     /// Start the wayland device using the built-in wayland server.
     Start(resource struct {
         start_info StartInfo;
-        vmar zx.handle:VMAR;
+        vmar zx.Handle:VMAR;
         sysmem_allocator client_end:fuchsia.sysmem.Allocator;
         scenic_allocator client_end:fuchsia.ui.composition.Allocator;
     }) -> ();
@@ -271,7 +271,7 @@ protocol VirtioWayland {
     /// Start the wayland device using the provided wayland server.
     StartWithWaylandServer(resource struct {
         start_info StartInfo;
-        vmar zx.handle:VMAR;
+        vmar zx.Handle:VMAR;
         wayland_server client_end:<fuchsia.wayland.Server, optional>;
         sysmem_allocator client_end:fuchsia.sysmem.Allocator;
         scenic_allocator client_end:fuchsia.ui.composition.Allocator;

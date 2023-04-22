@@ -34,14 +34,14 @@ closed protocol Echo {
         response EchoMe;
     });
     strict EchoHandle(resource struct {
-        req zx.handle;
+        req zx.Handle;
     }) -> (resource struct {
-        response zx.handle;
+        response zx.Handle;
     });
     strict EchoChannel(resource struct {
-        req zx.handle:CHANNEL;
+        req zx.Handle:CHANNEL;
     }) -> (resource struct {
-        response zx.handle:CHANNEL;
+        response zx.Handle:CHANNEL;
     });
     strict EchoStruct(struct {
         req EchoMore;

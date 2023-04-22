@@ -265,9 +265,9 @@ type Resource = flexible resource union {
     /// A region of physical memory.
     1: mmio fuchsia.mem.Range;
     /// An interrupt.
-    2: irq zx.handle:INTERRUPT;
+    2: irq zx.Handle:INTERRUPT;
     /// An I/O port.
-    3: pio zx.handle:RESOURCE;
+    3: pio zx.Handle:RESOURCE;
 };
 
 /// Result of evaluating an object, returned by Device.EvaluateObject().
@@ -293,7 +293,7 @@ protocol Device {
         /// This ID is not necessarily constant between boots of the same system,
         /// but it remains stable for a single boot.
         bus_id uint32;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the interrupt at `index` for this device.
     /// Errors:
@@ -303,8 +303,8 @@ protocol Device {
     MapInterrupt(struct {
         index uint64;
     }) -> (resource struct {
-        irq zx.handle:INTERRUPT;
-    }) error zx.status;
+        irq zx.Handle:INTERRUPT;
+    }) error zx.Status;
 
     /// Get the I/O port at `index` for this device.
     /// Errors:
@@ -313,8 +313,8 @@ protocol Device {
     GetPio(struct {
         index uint32;
     }) -> (resource struct {
-        pio zx.handle:RESOURCE;
-    }) error zx.status;
+        pio zx.Handle:RESOURCE;
+    }) error zx.Status;
 
     /// Get the MMIO region at `index` for this device.
     /// Errors:
@@ -325,7 +325,7 @@ protocol Device {
         index uint32;
     }) -> (resource struct {
         mmio fuchsia.mem.Range;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Get the BTI at `index` for this device.
     ///
@@ -337,8 +337,8 @@ protocol Device {
     GetBti(struct {
         index uint32;
     }) -> (resource struct {
-        bti zx.handle:BTI;
-    }) error zx.status;
+        bti zx.Handle:BTI;
+    }) error zx.Status;
 
     /// Evaluate the object at the given |path|, relative to this device, with |parameters| as
     /// arguments.

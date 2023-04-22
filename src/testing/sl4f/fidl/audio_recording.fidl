@@ -44,13 +44,13 @@ closed protocol AudioRecordingControl {
         index int32;
     }) -> () error AudioRecordingError;
 
-    /// Returns the captured audio data in `zx.handle.VMO`.
+    /// Returns the captured audio data in `zx.Handle.VMO`.
     ///
     /// User should have first called `StartOutputSave` and `StopOutputSave`.
     ///
     /// + request `audio_data` vmo containing the full captured audio data.
     strict GetOutputAudio() -> (resource struct {
-        audio_data zx.handle:VMO;
+        audio_data zx.Handle:VMO;
     });
 
     /// Starts inject audio data stored at `index`.

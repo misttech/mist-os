@@ -25,7 +25,7 @@ protocol Tables {
     /// Return the list of ACPI tables present in the system.
     ListTableEntries() -> (struct {
         entries vector<TableInfo>:MAX_ACPI_TABLE_ENTRIES;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// Write the raw content of the named ACPI table into the given VMO.
     ///
@@ -39,8 +39,8 @@ protocol Tables {
     ReadNamedTable(resource struct {
         name AcpiTableSignature;
         instance uint32;
-        result zx.handle:VMO;
+        result zx.Handle:VMO;
     }) -> (struct {
         size uint32;
-    }) error zx.status;
+    }) error zx.Status;
 };

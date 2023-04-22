@@ -42,7 +42,7 @@ protocol SystemStateTransition {
     /// Returns
     /// * ZX_ERR_BAD_STATE: The termination system state is not set to MEXEC.
     GetMexecZbis() -> (resource struct {
-        kernel_zbi zx.handle:VMO;
-        data_zbi zx.handle:VMO;
-    }) error zx.status;
+        kernel_zbi zx.Handle:VMO;
+        data_zbi zx.Handle:VMO;
+    }) error zx.Status;
 };

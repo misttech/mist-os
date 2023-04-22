@@ -57,7 +57,7 @@ type SdioRwTxn = resource struct {
     write bool;
     use_dma bool;
     /// Used if use_dma is true
-    dma_vmo zx.handle:<VMO, optional>;
+    dma_vmo zx.Handle:<VMO, optional>;
     /// Used if use_dma is false
     virt vector<uint8>:<MAX_TRANSFER_SIZE, optional>;
     /// offset into dma_vmo or virt
@@ -69,40 +69,40 @@ protocol Device {
         hw_info SdioHwInfo;
         /// The function number of this device.
         function uint8;
-    }) error zx.status;
-    EnableFn() -> () error zx.status;
-    DisableFn() -> () error zx.status;
-    EnableFnIntr() -> () error zx.status;
-    DisableFnIntr() -> () error zx.status;
+    }) error zx.Status;
+    EnableFn() -> () error zx.Status;
+    DisableFn() -> () error zx.Status;
+    EnableFnIntr() -> () error zx.Status;
+    DisableFnIntr() -> () error zx.Status;
     UpdateBlockSize(struct {
         blk_sz uint16;
         deflt bool;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
     GetBlockSize() -> (struct {
         cur_blk_size uint16;
-    }) error zx.status;
+    }) error zx.Status;
     DoRwTxn(resource struct {
         txn SdioRwTxn;
     }) -> (resource struct {
         txn SdioRwTxn;
-    }) error zx.status;
+    }) error zx.Status;
     DoRwByte(struct {
         write bool;
         addr uint32;
         write_byte uint8;
     }) -> (struct {
         read_byte uint8;
-    }) error zx.status;
+    }) error zx.Status;
     GetInBandIntr() -> (resource struct {
-        irq zx.handle:INTERRUPT;
-    }) error zx.status;
+        irq zx.Handle:INTERRUPT;
+    }) error zx.Status;
     /// The following functions access the card common control registers (CCCR) on function 0.
     /// Aborts an I/O operation occurring on the specified function.
-    IoAbort() -> () error zx.status;
+    IoAbort() -> () error zx.Status;
     /// Returns true if an interrupt is pending for function fn_idx, false otherwise.
     IntrPending() -> (struct {
         pending bool;
-    }) error zx.status;
+    }) error zx.Status;
     /// Reads or writes to a vendor CCCR register. addr must be in [0xF0, 0xFF].
     DoVendorControlRwByte(struct {
         write bool;
@@ -110,5 +110,5 @@ protocol Device {
         write_byte uint8;
     }) -> (struct {
         read_byte uint8;
-    }) error zx.status;
+    }) error zx.Status;
 };

@@ -19,7 +19,7 @@ type UserActionEvent = table {
 
     /// Required timestamp of the event occurrence. See TimeTicks in
     /// https://cs.chromium.org/chromium/src/base/time/time.h
-    2: time zx.time;
+    2: time zx.Time;
 };
 
 type Histogram = table {

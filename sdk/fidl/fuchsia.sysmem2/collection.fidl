@@ -161,7 +161,7 @@ protocol Node {
     ///
     /// All table fields are currently required.
     SetDebugTimeoutLogDeadline(table {
-        1: deadline zx.time;
+        1: deadline zx.Time;
     });
 
     // SetVerboseLogging
@@ -211,7 +211,7 @@ protocol Node {
     ///
     /// All table fields are currently required.
     GetNodeRef() -> (resource table {
-        1: node_ref zx.handle:EVENT;
+        1: node_ref zx.Handle:EVENT;
     });
 
     // IsAlternateFor
@@ -299,10 +299,10 @@ protocol Node {
     ///
     /// All table fields are currently required.
     IsAlternateFor(resource table {
-        1: node_ref zx.handle:EVENT;
+        1: node_ref zx.Handle:EVENT;
     }) -> (table {
         1: is_alternate bool;
-    }) error zx.status;
+    }) error zx.Status;
 };
 
 /// A `BufferCollectionToken` is not a `BufferCollection`, but rather a way to
@@ -553,20 +553,20 @@ protocol BufferCollection {
     /// `buffer_collection_info` has the VMO handles and other related info.
     WaitForAllBuffersAllocated() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// If the buffer collection has been allocated, returns an empty table
     /// (empty for now).
     ///
     /// If the buffer collection failed allocation, returns the same failure
-    /// zx.status as WaitForAllBuffersAllocated would return.
+    /// zx.Status as WaitForAllBuffersAllocated would return.
     ///
     /// If the buffer collection hasn't attempted allocation yet, returns
     /// `ZX_ERR_UNAVAILABLE`.  This means that WaitForAllBuffersAllocated
     /// would block (not respond quickly).
     CheckAllBuffersAllocated() -> (table {
             // nothing here yet
-            }) error zx.status;
+            }) error zx.Status;
 
     /// Create a new token, for trying to add a new participant to an existing
     /// logical buffer collection, if the existing collection's buffer counts,
@@ -705,7 +705,7 @@ protocol BufferCollection {
     ///
     /// All table fields are currently required.
     AttachLifetimeTracking(resource table {
-        1: server_end zx.handle:EVENTPAIR;
+        1: server_end zx.Handle:EVENTPAIR;
         2: buffers_remaining uint32;
     });
 };

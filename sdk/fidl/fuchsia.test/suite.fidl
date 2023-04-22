@@ -86,10 +86,10 @@ protocol CaseListener {
 /// Standard out/err handles from test case.
 type StdHandles = resource table {
     /// stdout handle.
-    1: out zx.handle:SOCKET;
+    1: out zx.Handle:SOCKET;
 
     /// stderr handle.
-    2: err zx.handle:SOCKET;
+    2: err zx.Handle:SOCKET;
 };
 
 /// Listens to updates from test runs.

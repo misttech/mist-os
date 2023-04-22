@@ -9,5 +9,5 @@ closed protocol TestDevice {
     /// Call load_firmware and make sure it worked.
     strict LoadFirmware(struct {
         path string:MAX;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };

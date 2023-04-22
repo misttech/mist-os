@@ -74,14 +74,14 @@ type ChannelParameters = table {
     /// packets as flushable without any particular flush timeout.
     /// Range: 1ms - 1,279ms (or ∞). Rounded down.
     /// Optional. If not provided, no flush timeout and packets are not flushable.
-    4: flush_timeout zx.duration;
+    4: flush_timeout zx.Duration;
 };
 
 /// A channel opened to a peer.
 type Channel = resource table {
     /// Socket interface for sending/receiving SDUs on the channel.
     /// Always present.
-    1: socket zx.handle:SOCKET;
+    1: socket zx.Handle:SOCKET;
     /// Channel mode accepted by the peer.
     /// Always present.
     2: channel_mode ChannelMode;
@@ -93,7 +93,7 @@ type Channel = resource table {
     4: ext_direction client_end:AudioDirectionExt;
     // Duration after which packets are dropped from the controller.
     // Present only if a flush timeout was successfully configured.
-    5: flush_timeout zx.duration;
+    5: flush_timeout zx.Duration;
     /// L2CAP parameter extension. See `L2capParametersExt`.
     /// Always present for L2CAP Channels, never present for other Channels.
     6: ext_l2cap client_end:L2capParametersExt;

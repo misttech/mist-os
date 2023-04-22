@@ -13,23 +13,23 @@ type AddressProperties = table {
     /// Information about the preferred lifetime of the address.
     ///
     /// If not set, interpreted as
-    /// `PreferredLifetimeInfo.preferred_lifetime_end = zx.time.INFINITE`.
+    /// `PreferredLifetimeInfo.preferred_lifetime_end = zx.Time.INFINITE`.
     1: preferred_lifetime_info fuchsia.net.interfaces.PreferredLifetimeInfo;
 
     /// The end of the valid lifetime of the address.
     ///
-    /// The address should *not* be considered invalid if `zx.time` is in the
+    /// The address should *not* be considered invalid if `zx.Time` is in the
     /// past. `valid_lifetime_end` is exchanged as a means to inform the
     /// deadline where invalidation is expected to happen.
     ///
     /// Refers to the valid lifetime of the address, as defined in
     /// [RFC 4862, section 2](https://tools.ietf.org/html/rfc4862#section-2).
     ///
-    /// Must be greater than 0. If `zx.time.INFINITE`, the valid lifetime does
+    /// Must be greater than 0. If `zx.Time.INFINITE`, the valid lifetime does
     /// not expire.
     ///
-    /// If not set, interpreted as `zx.time.INFINITE`.
-    2: valid_lifetime_end zx.time;
+    /// If not set, interpreted as `zx.Time.INFINITE`.
+    2: valid_lifetime_end zx.Time;
 };
 
 /// Assignment state of an IP address.

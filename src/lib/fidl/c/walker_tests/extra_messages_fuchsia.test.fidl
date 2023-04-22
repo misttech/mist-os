@@ -18,14 +18,14 @@ closed protocol LinearizerTest {
 };
 
 type StructWithHandle = resource struct {
-    h zx.handle;
+    h zx.Handle;
     foo int32;
 };
 
 type StructWithManyHandles = resource struct {
-    h1 zx.handle;
-    h2 zx.handle;
-    hs vector<zx.handle>:2;
+    h1 zx.Handle;
+    h2 zx.Handle;
+    hs vector<zx.Handle>:2;
 };
 
 type TableOfStructWithHandle = resource table {

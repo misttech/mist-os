@@ -38,13 +38,13 @@ type SdhciQuirk = strict enum : uint64 {
 protocol Sdhci {
     // TODO: should be replaced with a generic busdev mechanism
     GetInterrupt() -> (resource struct {
-        s zx.status;
-        irq zx.handle:INTERRUPT;
+        s zx.Status;
+        irq zx.Handle:INTERRUPT;
     });
     /// mmio size minus offset must be at least 512 bytes as per the SDHCI specification.
     GetMmio() -> (resource struct {
-        s zx.status;
-        mmio zx.handle:VMO;
+        s zx.Status;
+        mmio zx.Handle:VMO;
         offset zx.Off;
     });
     /// Gets a handle to the bus transaction initiator for the device. The caller
@@ -52,8 +52,8 @@ protocol Sdhci {
     GetBti(struct {
         index uint32;
     }) -> (resource struct {
-        s zx.status;
-        bti zx.handle:BTI;
+        s zx.Status;
+        bti zx.Handle:BTI;
     });
 
     GetBaseClock() -> (struct {

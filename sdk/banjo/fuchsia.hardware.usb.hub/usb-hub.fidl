@@ -12,6 +12,6 @@ protocol UsbHubInterface {
     ResetPort(struct {
         port uint32;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

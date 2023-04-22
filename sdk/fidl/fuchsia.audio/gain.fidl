@@ -87,7 +87,7 @@ type GainUpdateMethod = flexible union {
 /// duration, using the specified function.
 type RampedGain = table {
     1: target_gain_db float32;
-    2: duration zx.duration;
+    2: duration zx.Duration;
     3: function RampFunction;
 };
 

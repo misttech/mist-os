@@ -47,6 +47,6 @@ protocol DotmatrixDisplay {
     SetScreen(struct {
         screen_buffer vector<uint8>:MAX;
     }) -> (struct {
-        s zx.status;
+        s zx.Status;
     });
 };

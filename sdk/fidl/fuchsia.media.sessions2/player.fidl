@@ -38,7 +38,7 @@ protocol PlayerControl {
     /// is an offset from the beginning of the media. If this method is not supported as indicated
     /// by the absence of the `SEEK` flag in `PlayerCapabilities`, this method does nothing.
     Seek(struct {
-        position zx.duration;
+        position zx.Duration;
     });
 
     /// Skips forward in media by the player's default skip amount. If this method is not supported
@@ -121,7 +121,7 @@ type PlayerStatus = table {
     ///
     /// If this value is omitted, the duration is unknown, not applicable or unchanged. Initially,
     /// the duration is assumed to be unknown.
-    1: duration zx.duration;
+    1: duration zx.Duration;
 
     /// Whether the playing media is live (such as television or a live stream).
     ///

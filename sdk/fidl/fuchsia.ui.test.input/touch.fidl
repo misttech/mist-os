@@ -59,7 +59,7 @@ protocol TouchInputListener {
         /// The monotonic time (ns) the pointer data was received by the reporter.
         /// Note that this value should be used with caution. Some reporters may not be
         /// capable of ns-level precision, but still report in ns-level units.
-        3: time_received zx.time;
+        3: time_received zx.Time;
 
         /// The number of physical pixels, per logical pixel, as reported by the reporter.
         4: device_pixel_ratio float64;

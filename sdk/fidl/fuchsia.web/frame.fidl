@@ -507,7 +507,7 @@ protocol Frame {
     @transitional
     Close(table {
         /// Optional.
-        1: timeout zx.duration;
+        1: timeout zx.Duration;
     });
 };
 

@@ -66,12 +66,12 @@ protocol VolumeManager {
         name string:partition.NAME_LENGTH;
         flags uint32;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Gets the VolumeManagerInfo describing this instance of the `VolumeManager`.
     GetInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         info box<VolumeManagerInfo>;
     });
 
@@ -94,7 +94,7 @@ protocol VolumeManager {
         old_guid partition.Guid;
         new_guid partition.Guid;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Retrieves the allocation limit for the partition. A return value of 0 indicates that there
@@ -109,7 +109,7 @@ protocol VolumeManager {
     GetPartitionLimit(struct {
         guid partition.Guid;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         slice_count uint64;
     });
 
@@ -128,7 +128,7 @@ protocol VolumeManager {
         guid partition.Guid;
         slice_count uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Renames the specified partition. Any existing devices that include the name of the partition
@@ -137,7 +137,7 @@ protocol VolumeManager {
     SetPartitionName(struct {
         guid partition.Guid;
         name string:<partition.NAME_LENGTH>;
-    }) -> () error zx.status;
+    }) -> () error zx.Status;
 };
 
 /// An arbitrary cap on the number of slices which may be requested when querying
@@ -167,14 +167,14 @@ protocol Volume {
     QuerySlices(struct {
         start_slices vector<uint64>:MAX_SLICE_REQUESTS;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
         response array<VsliceRange, MAX_SLICE_REQUESTS>;
         response_count uint64;
     });
 
     /// Returns the information about this volume and the volume manager it is embedded in.
     GetVolumeInfo() -> (struct {
-        status zx.status;
+        status zx.Status;
         manager box<VolumeManagerInfo>;
         volume box<VolumeInfo>;
     });
@@ -188,7 +188,7 @@ protocol Volume {
         start_slice uint64;
         slice_count uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Shrinks a virtual partition. Returns `ZX_OK` if ANY slices are
@@ -197,13 +197,13 @@ protocol Volume {
         start_slice uint64;
         slice_count uint64;
     }) -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 
     /// Destroys the current partition, removing it from the VolumeManager, and
     /// freeing all underlying storage. The connection to the volume is also closed.
     Destroy() -> (struct {
-        status zx.status;
+        status zx.Status;
     });
 };
 

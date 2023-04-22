@@ -81,7 +81,7 @@ protocol Launcher {
         /// The moniker of the component that dash should be scoped to
         moniker string:MAX;
         /// The raw socket to connect to the dash process
-        socket zx.handle:SOCKET;
+        socket zx.Handle:SOCKET;
         /// A list of package URLs whose directories will also be loaded into the dash namespace.
         /// The path preference is determined by the order of this vector.
         tool_urls vector<fuchsia.url.Url>:<MAX_URLS>;

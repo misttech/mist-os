@@ -10,6 +10,6 @@ using zx;
 protocol RootResource {
     /// Get the root `resource`.
     Get() -> (resource struct {
-        resource zx.handle:RESOURCE;
+        resource zx.Handle:RESOURCE;
     });
 };

@@ -38,7 +38,7 @@ closed protocol Interop {
         node Node;
     }) -> (struct {
         node Node;
-    }) error zx.status;
+    }) error zx.Status;
 
     /// [`OneWay`] tests one way calls.
     strict OneWay(struct {
