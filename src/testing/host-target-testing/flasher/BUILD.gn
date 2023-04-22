@@ -9,8 +9,8 @@ if (is_host) {
   go_library("flasher") {
     testonly = true
     deps = [
+      "../ffx",
       "//third_party/golibs:golang.org/x/crypto",
-      "//tools/lib/logger",
     ]
     sources = [
       "flasher.go",

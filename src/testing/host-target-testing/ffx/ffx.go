@@ -8,19 +8,45 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
+	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
 type FFXTool struct {
 	ffxToolPath string
+	isolateDir  string
+	stdout      io.Writer
 }
 
-func NewFFXTool(ffxToolPath string) *FFXTool {
+func NewFFXTool(ffxToolPath string) (*FFXTool, error) {
+	return NewFFXToolWithStdout(ffxToolPath, nil)
+}
+
+func NewFFXToolWithStdout(ffxToolPath string, stdout io.Writer) (*FFXTool, error) {
+	isolateDir, err := os.MkdirTemp("", "systemTestIsoDir*")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(ffxToolPath); err != nil {
+		return nil, fmt.Errorf("error accessing %v: %w", ffxToolPath, err)
+	}
 	return &FFXTool{
 		ffxToolPath: ffxToolPath,
-	}
+		isolateDir:  isolateDir,
+		stdout:      stdout,
+	}, nil
+}
+
+func (f *FFXTool) SetStdout(stdout io.Writer) {
+	f.stdout = stdout
+}
+
+func (f *FFXTool) Close() error {
+	return os.RemoveAll(f.isolateDir)
 }
 
 type targetEntry struct {
@@ -103,4 +129,41 @@ func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (f *FFXTool) TargetAdd(ctx context.Context, target string) error {
+	args := []string{"target", "add", "--nowait", target}
+	return f.runFFXCmd(ctx, args...)
+}
+
+func (f *FFXTool) Flash(ctx context.Context, target, FlashManifest string, args ...string) error {
+	var finalArgs []string
+	if target != "" {
+		finalArgs = []string{"--target", target}
+	}
+	finalArgs = append(finalArgs, []string{"target", "flash"}...)
+	finalArgs = append(finalArgs, args...)
+	finalArgs = append(finalArgs, FlashManifest)
+	return f.runFFXCmd(ctx, finalArgs...)
+}
+
+func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
+	path, err := exec.LookPath(f.ffxToolPath)
+	if err != nil {
+		return err
+	}
+	logger.Infof(ctx, "running: %s %q", path, args)
+	cmd := exec.CommandContext(ctx, path, args...)
+	if f.stdout != nil {
+		cmd.Stdout = f.stdout
+	} else {
+		cmd.Stdout = os.Stdout
+	}
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, fmt.Sprintf("FFX_ISOLATE_DIR=%s", f.isolateDir))
+
+	cmdRet := cmd.Run()
+	logger.Infof(ctx, "finished running %s %q: %q", path, args, cmdRet)
+	return cmdRet
 }

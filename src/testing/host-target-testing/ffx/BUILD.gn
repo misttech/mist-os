@@ -8,7 +8,10 @@ import("//build/go/go_test.gni")
 if (is_host) {
   go_library("ffx") {
     testonly = true
-    deps = [ "../util" ]
+    deps = [
+      "../util",
+      "//tools/lib/logger",
+    ]
     sources = [
       "ffx.go",
       "ffx_test.go",

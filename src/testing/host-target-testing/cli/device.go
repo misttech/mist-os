@@ -65,9 +65,19 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 		c.SerialSocketPath = environmentSerialPath
 	}
 
-	c.ffx = ffx.NewFFXTool(c.ffxPath)
-
 	return c
+}
+
+func (c *DeviceConfig) FFXTool() (*ffx.FFXTool, error) {
+	if c.ffx == nil {
+		ffx, err := ffx.NewFFXTool(c.ffxPath)
+		if err != nil {
+			return nil, err
+		}
+		c.ffx = ffx
+	}
+
+	return c.ffx, nil
 }
 
 // newDeviceFinder constructs a DeviceFinder in order to help `device.Client` discover and resolve
@@ -99,11 +109,12 @@ func (c *DeviceConfig) DeviceResolver(ctx context.Context) (device.DeviceResolve
 		return device.NewDeviceFinderResolver(ctx, deviceFinder, c.deviceName)
 
 	case FfxResolver:
-		if _, err := os.Stat(c.ffxPath); err != nil {
-			return nil, fmt.Errorf("error accessing %v: %w", c.ffxPath, err)
+		ffx, err := c.FFXTool()
+		if err != nil {
+			return nil, err
 		}
 
-		return device.NewFfxResolver(ctx, c.ffx, c.deviceName)
+		return device.NewFfxResolver(ctx, ffx, c.deviceName)
 
 	default:
 		return nil, fmt.Errorf("Invalid device-resolver mode %v", c.deviceResolverMode)

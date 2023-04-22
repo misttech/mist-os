@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/flasher"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
@@ -42,8 +43,8 @@ type Build interface {
 	// GetBootserver returns the path to the bootserver used for paving.
 	GetBootserver(ctx context.Context) (string, error)
 
-	// GetFfx returns the path to the ffx used for flashing.
-	GetFfx(ctx context.Context) (string, error)
+	// GetFfx returns the FFXTool used for flashing.
+	GetFfx(ctx context.Context) (*ffx.FFXTool, error)
 
 	// GetFlashManifest returns the path to the flash manifest used for flashing.
 	GetFlashManifest(ctx context.Context) (string, error)
@@ -87,12 +88,12 @@ func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
 	return buildPaver.BootserverPath, nil
 }
 
-func (b *ArtifactsBuild) GetFfx(ctx context.Context) (string, error) {
+func (b *ArtifactsBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
 	buildFlasher, err := b.getFlasher(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return buildFlasher.FfxToolPath, nil
+	return buildFlasher.Ffx, nil
 }
 
 func (b *ArtifactsBuild) GetFlashManifest(ctx context.Context) (string, error) {
@@ -314,7 +315,11 @@ func (b *ArtifactsBuild) getFlasher(ctx context.Context) (*flasher.BuildFlasher,
 		return nil, fmt.Errorf("failed to make ffxPath executable: %w", err)
 	}
 
-	return flasher.NewBuildFlasher(ffxPath, flashManifest, false, flasher.SSHPublicKey(b.sshPublicKey))
+	ffx, err := ffx.NewFFXTool(ffxPath)
+	if err != nil {
+		return nil, err
+	}
+	return flasher.NewBuildFlasher(ffx, flashManifest, false, flasher.SSHPublicKey(b.sshPublicKey))
 }
 
 func (b *ArtifactsBuild) GetSshPublicKey() ssh.PublicKey {
@@ -381,8 +386,9 @@ func (b *FuchsiaDirBuild) GetBootserver(ctx context.Context) (string, error) {
 	return filepath.Join(b.dir, "host_x64/bootserver_new"), nil
 }
 
-func (b *FuchsiaDirBuild) GetFfx(ctx context.Context) (string, error) {
-	return filepath.Join(b.dir, "host_x64/ffx"), nil
+func (b *FuchsiaDirBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
+	ffxPath := filepath.Join(b.dir, "host_x64/ffx")
+	return ffx.NewFFXTool(ffxPath)
 }
 
 func (b *FuchsiaDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
@@ -407,8 +413,12 @@ func (b *FuchsiaDirBuild) GetPaver(ctx context.Context) (paver.Paver, error) {
 }
 
 func (b *FuchsiaDirBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
+	ffx, err := b.GetFfx(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return flasher.NewBuildFlasher(
-		filepath.Join(b.dir, "host_x64/ffx"),
+		ffx,
 		filepath.Join(b.dir, "flash.json"),
 		false,
 		flasher.SSHPublicKey(b.sshPublicKey),
@@ -459,8 +469,9 @@ func (b *ProductBundleDirBuild) GetBootserver(ctx context.Context) (string, erro
 	return "", nil
 }
 
-func (b *ProductBundleDirBuild) GetFfx(ctx context.Context) (string, error) {
-	return filepath.Join(b.dir, "ffx"), nil
+func (b *ProductBundleDirBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
+	ffxPath := filepath.Join(b.dir, "ffx")
+	return ffx.NewFFXTool(ffxPath)
 }
 
 func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
@@ -499,8 +510,12 @@ func (b *ProductBundleDirBuild) GetPaver(ctx context.Context) (paver.Paver, erro
 }
 
 func (b *ProductBundleDirBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
+	ffx, err := b.GetFfx(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return flasher.NewBuildFlasher(
-		filepath.Join(b.dir, "ffx"),
+		ffx,
 		b.dir,
 		true,
 		flasher.SSHPublicKey(b.sshPublicKey),
@@ -562,7 +577,7 @@ func (b *OmahaBuild) GetBootserver(ctx context.Context) (string, error) {
 	return b.build.GetBootserver(ctx)
 }
 
-func (b *OmahaBuild) GetFfx(ctx context.Context) (string, error) {
+func (b *OmahaBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
 	return b.build.GetFfx(ctx)
 }
 
@@ -672,7 +687,7 @@ func (b *OmahaBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
 		return nil, fmt.Errorf("failed to create vbmeta: %w", err)
 	}
 
-	ffxToolPath, err := b.GetFfx(ctx)
+	ffx, err := b.GetFfx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -689,7 +704,7 @@ func (b *OmahaBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
 	if fileInfo.IsDir() {
 		// We are using Product Bundle instead of flash.json
 		os.Rename(destVbmetaPath, srcVbmetaPath)
-		return flasher.NewBuildFlasher(ffxToolPath, flashManifest, true, flasher.SSHPublicKey(b.GetSshPublicKey()))
+		return flasher.NewBuildFlasher(ffx, flashManifest, true, flasher.SSHPublicKey(b.GetSshPublicKey()))
 	}
 
 	content, err := os.ReadFile(flashManifest)
@@ -710,7 +725,7 @@ func (b *OmahaBuild) GetFlasher(ctx context.Context) (flasher.Flasher, error) {
 		return nil, err
 	}
 
-	return flasher.NewBuildFlasher(ffxToolPath, updatedFlashManifest, false, flasher.SSHPublicKey(b.GetSshPublicKey()))
+	return flasher.NewBuildFlasher(ffx, updatedFlashManifest, false, flasher.SSHPublicKey(b.GetSshPublicKey()))
 }
 
 func (b *OmahaBuild) GetSshPublicKey() ssh.PublicKey {

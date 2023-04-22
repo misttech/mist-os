@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -46,7 +47,11 @@ func createAndRunFlasher(t *testing.T, options ...BuildFlasherOption) string {
 	var output bytes.Buffer
 	options = append(options, Stdout(&output))
 	flash_manifest := "dir/flash.json"
-	flasher, err := NewBuildFlasher(ffxPath, flash_manifest, false, options...)
+	ffx, err := ffx.NewFFXTool(ffxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flasher, err := NewBuildFlasher(ffx, flash_manifest, false, options...)
 	if err != nil {
 		t.Fatal(err)
 	}
