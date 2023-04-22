@@ -22,32 +22,14 @@ struct msghdr {
   void* msg_name;
   socklen_t msg_namelen;
   struct iovec* msg_iov;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __BIG_ENDIAN
-  int __pad1;
-#endif
   int msg_iovlen;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __LITTLE_ENDIAN
-  int __pad1;
-#endif
   void* msg_control;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __BIG_ENDIAN
-  int __pad2;
-#endif
   socklen_t msg_controllen;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __LITTLE_ENDIAN
-  int __pad2;
-#endif
   int msg_flags;
 };
 
 struct cmsghdr {
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __BIG_ENDIAN
-  int __pad1;
-#endif
   socklen_t cmsg_len;
-#if __LONG_MAX > 0x7fffffff && __BYTE_ORDER == __LITTLE_ENDIAN
-  int __pad1;
-#endif
   int cmsg_level;
   int cmsg_type;
 };
@@ -224,25 +206,14 @@ struct linger {
 #endif
 
 #ifndef SO_RCVTIMEO
-#if __LONG_MAX == 0x7fffffff
-#define SO_RCVTIMEO 66
-#define SO_SNDTIMEO 67
-#else
 #define SO_RCVTIMEO 20
 #define SO_SNDTIMEO 21
 #endif
-#endif
 
 #ifndef SO_TIMESTAMP
-#if __LONG_MAX == 0x7fffffff
-#define SO_TIMESTAMP 63
-#define SO_TIMESTAMPNS 64
-#define SO_TIMESTAMPING 65
-#else
 #define SO_TIMESTAMP 29
 #define SO_TIMESTAMPNS 35
 #define SO_TIMESTAMPING 37
-#endif
 #endif
 
 #define SO_SECURITY_AUTHENTICATION 22
