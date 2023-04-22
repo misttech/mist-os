@@ -28,6 +28,9 @@
 #include <lk/init.h>
 #include <lk/main.h>
 
+// include this at least once in C++ code to make sure the static assert is valid
+#include <phys/arch/arch-handoff-asm.h>
+
 #define LOCAL_TRACE 0
 
 // TODO-rvbringup: move secondary cpu stuff to mp.cc
