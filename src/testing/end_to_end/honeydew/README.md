@@ -106,17 +106,8 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 ```
 
 ### Access the affordances
-
-#### Component affordance
-```python
->>> emu.component.search("wlanstack.cm")
-True
-```
-
-#### Bluetooth affordance
-```python
->>> fd_1p.bluetooth.request_discovery(True)
-```
+* [Component affordance](markdowns/component.md)
+* [Bluetooth affordance](markdowns/bluetooth.md)
 
 ### Device object destruction
 ```python
@@ -140,7 +131,7 @@ follow the below instructions every time HoneyDew code is changed:
   [python virtual environment] (activate virtual environment and run
   `pip install pylint`) or at system level (`pip install --user pylint`)
 * Verify `pylint` is properly installed by running `pylint --help`
-* Run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+* Run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `pylint`
 
 #### type-checking
 * Ensure code is [mypy] and [pytype] compliant
@@ -150,14 +141,14 @@ follow the below instructions every time HoneyDew code is changed:
     [python virtual environment] (activate virtual environment and run
     `pip install mypy`) or at system level (`pip install --user mypy`)
   * Verify `mypy` is properly installed by running `mypy --help`
-  * Run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+  * Run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `mypy`
 * For `pytype`,
   * `pytype` module is not yet available under [Fuchsia third-party]. So for the
     time being you need to [pip] install `pytype` inside a
     [python virtual environment] (activate virtual environment and run
     `pip install pytype`) or at system level (`pip install --user pytype`)
   * Verify `pytype` is properly installed by running `pytype --help`
-  * Run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+  * Run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/` and fix all the issues pointed by `pytype`
 
 ### Code Coverage
 It is a hard requirement that HoneyDew code is well tested using a combination
