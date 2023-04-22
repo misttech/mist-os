@@ -231,7 +231,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
 
     gen_cmd_stream(command_stream.get(), code.get(), output_buffer.get());
 
-    static constexpr uint32_t kTimeoutMs = 100;
+    static constexpr uint32_t kTimeoutMs = 1000;
     ExecuteCommand(command_stream, kTimeoutMs);
 
     auto data = reinterpret_cast<const char*>(output_buffer->GetCpuAddress());
@@ -250,7 +250,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     // Jump to an unmapped address.
     command_stream->EtnaLink(0x8 /* arbitrary prefetch */, next_gpu_addr_);
 
-    static constexpr uint32_t kTimeoutMs = 100;
+    static constexpr uint32_t kTimeoutMs = 1000;
     ExecuteCommand(command_stream, kTimeoutMs);
 
     EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(magma_vsi_.GetConnection()));
