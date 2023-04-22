@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.blobfs/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.update.verify/cpp/wire.h>
 #include <fuchsia/blobfs/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -1319,6 +1320,60 @@ TEST_P(BlobfsIntegrationTest, ReaddirAfterUnlinkingFileWithOpenHandleShouldNotRe
   ASSERT_EQ(lseek(fd.get(), 0, SEEK_SET), 0);
   EXPECT_EQ(read(fd.get(), buf.data(), bytes_to_check), bytes_to_check);
   EXPECT_EQ(memcmp(buf.data(), info->data.get(), bytes_to_check), 0);
+}
+
+TEST_P(BlobfsIntegrationTest, HealthCheckDuringBlobWrite) {
+  std::unique_ptr<BlobInfo> info = GenerateRandomBlob(fs().mount_path(), 1 << 5);
+  fbl::unique_fd fd;
+
+  fidl::UnownedClientEnd export_dir = fs().ServiceDirectory();
+  zx::result client_end = component::ConnectAt<fuchsia_update_verify::BlobfsVerifier>(export_dir);
+  ASSERT_TRUE(client_end.is_ok()) << "Opening verify service failed with "
+                                  << client_end.status_string();
+
+  {
+    fidl::WireResult result =
+        fidl::WireCall(client_end.value())->Verify(fuchsia_update_verify::wire::VerifyOptions{});
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    ASSERT_TRUE(result->is_ok());
+  }
+
+  fd.reset(open(info->path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
+  ASSERT_TRUE(fd) << "Open failed: " << strerror(errno);
+
+  {
+    fidl::WireResult result =
+        fidl::WireCall(client_end.value())->Verify(fuchsia_update_verify::wire::VerifyOptions{});
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    ASSERT_TRUE(result->is_ok());
+  }
+
+  ASSERT_EQ(ftruncate(fd.get(), info->size_data), 0);
+
+  {
+    fidl::WireResult result =
+        fidl::WireCall(client_end.value())->Verify(fuchsia_update_verify::wire::VerifyOptions{});
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    ASSERT_TRUE(result->is_ok());
+  }
+
+  ASSERT_EQ(StreamAll(write, fd.get(), info->data.get(), info->size_data), 0);
+
+  {
+    fidl::WireResult result =
+        fidl::WireCall(client_end.value())->Verify(fuchsia_update_verify::wire::VerifyOptions{});
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    ASSERT_TRUE(result->is_ok());
+  }
+
+  VerifyContents(fd.get(), info->data.get(), info->size_data);
+
+  {
+    fidl::WireResult result =
+        fidl::WireCall(client_end.value())->Verify(fuchsia_update_verify::wire::VerifyOptions{});
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    ASSERT_TRUE(result->is_ok());
+  }
 }
 
 class BlobfsMetricIntegrationTest : public FdioTest {

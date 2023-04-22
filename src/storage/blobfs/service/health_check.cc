@@ -37,6 +37,10 @@ void HealthCheckService::Verify(VerifyRequestView request, VerifyCompleter::Sync
       // Skip blobs that are scheduled for deletion.
       return ZX_OK;
     }
+    if (blob->FileSize() == 0) {
+      // Skip the null blob, or blobs which aren't in the readable state.
+      return ZX_OK;
+    }
     // If we run multithreaded, the blob cound transition to deleted between the above
     // DeletionQueued() check and this Verify() call. That should be OK as it only means we check a
     // blob that we didn't need to. If we need 100% correctness, we'll need to add a
