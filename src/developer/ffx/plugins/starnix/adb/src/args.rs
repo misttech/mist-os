@@ -14,9 +14,11 @@ use {argh::FromArgs, ffx_core::ffx_command};
 )]
 
 pub struct AdbStarnixCommand {
-    /// the container in which to connect to adb
-    #[argh(option, short = 'g', default = "String::from(\"bionic\")")]
-    pub container: String,
+    /// the moniker of the container running adbd
+    /// (defaults to looking for a container in the current session)
+    #[argh(option, short = 'm')]
+    pub moniker: Option<String>,
+
     /// which port to serve the adb server on
     #[argh(option, short = 'p', default = "5556")]
     pub port: u16,

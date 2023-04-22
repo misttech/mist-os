@@ -3,14 +3,19 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Result},
+    anyhow::{anyhow, bail, Context, Result},
     async_net::{TcpListener, TcpStream},
+    component_debug::cli,
     ffx_core::ffx_plugin,
     ffx_starnix_adb_args::AdbStarnixCommand,
-    fidl_fuchsia_starnix_developer::ManagerProxy,
-    fuchsia_async as fasync,
+    fidl::Status,
+    fidl_fuchsia_developer_remotecontrol as rc,
+    fidl_fuchsia_starnix_container::ControllerMarker,
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     futures::io::AsyncReadExt,
     futures::stream::StreamExt,
+    lazy_static::lazy_static,
+    regex::Regex,
     signal_hook::{consts::signal::SIGINT, iterator::Signals},
 };
 
@@ -31,11 +36,72 @@ async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket
     Ok(())
 }
 
-#[ffx_plugin(
-    "starnix_enabled",
-    ManagerProxy = "core/starnix_runner:expose:fuchsia.starnix.developer.Manager"
-)]
-pub async fn adb_starnix(manager_proxy: ManagerProxy, command: AdbStarnixCommand) -> Result<()> {
+const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Returns the absolute moniker for the container in the session, if there is one.
+async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<String> {
+    lazy_static! {
+        // Example: /core/session-manager/session:session/elements:5udqa81zlypamvgu/container
+        static ref SESSION_CONTAINER: Regex =
+            Regex::new(r"^/core/session-manager/session:session/elements:\w+/container$")
+                .unwrap();
+    }
+
+    let (query_proxy, query_server_end) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
+        .context("creating query proxy")?;
+    rcs_proxy
+        .root_realm_query(query_server_end)
+        .await?
+        .map_err(|i| Status::ok(i).unwrap_err())
+        .context("opening realm query")?;
+
+    let instances = cli::list::get_instances_matching_filter(None, &query_proxy).await?;
+    let containers: Vec<_> = instances
+        .into_iter()
+        .filter(|i| {
+            let moniker = i.moniker.to_string();
+            (*SESSION_CONTAINER).is_match(&moniker)
+        })
+        .collect();
+
+    if containers.is_empty() {
+        bail!("unable to find Starnix container in the session.\nPlease specify a container with --moniker");
+    }
+
+    if containers.len() > 1 {
+        bail!("found multiple Starnix containers in the session.\nPlease specify the container you want with --moniker");
+    }
+
+    Ok(containers[0].moniker.to_string())
+}
+
+async fn find_moniker(
+    rcs_proxy: &rc::RemoteControlProxy,
+    command: &AdbStarnixCommand,
+) -> Result<String> {
+    if let Some(moniker) = &command.moniker {
+        return Ok(moniker.clone());
+    }
+    find_session_container(&rcs_proxy).await
+}
+
+fn moniker_to_selector(moniker: String) -> String {
+    let moniker = if moniker.starts_with('/') { &moniker[1..] } else { &moniker };
+    return format!("{}:expose:fuchsia.starnix.container.Controller", moniker.replace(":", "\\:"));
+}
+
+#[ffx_plugin("starnix_enabled")]
+pub async fn adb_starnix(
+    rcs_proxy: rc::RemoteControlProxy,
+    command: AdbStarnixCommand,
+) -> Result<()> {
+    let (controller_proxy, controller_server_end) =
+        fidl::endpoints::create_proxy::<ControllerMarker>().context("failed to create proxy")?;
+
+    let selector = moniker_to_selector(find_moniker(&rcs_proxy, &command).await?);
+    rcs::connect_with_timeout(TIMEOUT, &selector, &rcs_proxy, controller_server_end.into_channel())
+        .await?;
+
     println!("adb_starnix - listening");
 
     let mut signals = Signals::new(&[SIGINT]).unwrap();
@@ -60,8 +126,8 @@ pub async fn adb_starnix(manager_proxy: ManagerProxy, command: AdbStarnixCommand
         let stream = stream?;
         let (sbridge, cbridge) = fidl::Socket::create_stream();
 
-        manager_proxy
-            .vsock_connect(&command.container, ADB_DEFAULT_PORT, sbridge)
+        controller_proxy
+            .vsock_connect(ADB_DEFAULT_PORT, sbridge)
             .map_err(|e| anyhow!("Error connecting to adbd: {:?}", e))?;
 
         fasync::Task::spawn(async move {
