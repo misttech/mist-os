@@ -35,6 +35,12 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.hardware.radar/RadarBurstReader.OnBurst2",
+        "ordinal": "6469924000145088208",
+        "type": " -> (fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request payload)"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.hardware.radar/RadarBurstReader.RegisterVmos",
         "ordinal": "2154263285602135949",
         "type": "(vector<uint32>:300 vmo_ids,vector<zx/handle:VMO>:300 vmos) -> (fuchsia.hardware.radar/RadarBurstReader_RegisterVmos_Result result)"
@@ -66,6 +72,23 @@
     {
         "kind": "protocol",
         "name": "fuchsia.hardware.radar/RadarBurstReader"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request.burst",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.radar/Burst"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request.error",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.radar/StatusCode"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request",
+        "strictness": "flexible"
     },
     {
         "kind": "protocol/member",

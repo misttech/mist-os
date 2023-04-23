@@ -161,7 +161,7 @@ protocol RadarBurstReader {
 
     // TODO(fxbug.dev/99924): Remove this after `OnBurst()` has the same
     // signature and all users have been migrated.
-    @available(added=HEAD)
+    @available(added=12)
     -> OnBurst2(flexible union {
         1: burst Burst;
         2: error StatusCode;
