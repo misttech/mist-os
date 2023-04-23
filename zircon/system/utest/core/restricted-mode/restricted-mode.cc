@@ -1,24 +1,13 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fdio.h>
 #include <lib/fit/defer.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/resource.h>
-#include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <zircon/syscalls-next.h>
-#include <zircon/syscalls.h>
 #include <zircon/testonly-syscalls.h>
-#include <zircon/types.h>
 
-#include <thread>
-
-#include <pretty/hexdump.h>
 #include <zxtest/zxtest.h>
 
 #if defined(__x86_64__) || defined(__aarch64__)
@@ -59,8 +48,8 @@ TEST(RestrictedMode, BindState) {
 
   // Map the vmo and verify the state follows.
   zx_vaddr_t ptr = 0;
-  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, getpagesize(),
-                                       &ptr));
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
+                                       zx_system_get_page_size(), &ptr));
   zx_restricted_state_t* state2 = reinterpret_cast<zx_restricted_state*>(ptr);
 
   // Read the state out of the vmo and compare with memory map.
@@ -79,7 +68,7 @@ TEST(RestrictedMode, BindState) {
   EXPECT_EQ(0, memcmp(state2, &state, sizeof(state)));
 
   // Teardown the mapping.
-  zx::vmar::root_self()->unmap(ptr, getpagesize());
+  zx::vmar::root_self()->unmap(ptr, zx_system_get_page_size());
 }
 
 TEST(RestrictedMode, UnbindState) {

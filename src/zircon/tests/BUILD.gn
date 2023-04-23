@@ -15,7 +15,6 @@ group("tests") {
     "processor:tests",
     "profile:tests",
     "register-state:tests",
-    "restricted-mode:tests",
     "status:tests",
     "stress-tests:tests",
     "thread-initial-state:tests",
