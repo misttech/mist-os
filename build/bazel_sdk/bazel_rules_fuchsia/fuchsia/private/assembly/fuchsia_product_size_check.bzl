@@ -11,8 +11,11 @@ load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 _SIZE_CHECKER_RUNNER_SH = """
 set -e
 
+mkdir -p $FFX_ISOLATE_DIR
 $FFX \
     --config "assembly_enabled=true" \
+    "--isolate-dir" \
+    $FFX_ISOLATE_DIR \
     assembly \
     size-check \
     product \
@@ -27,15 +30,18 @@ def _fuchsia_product_size_check_impl(ctx):
 
     size_file = ctx.actions.declare_file(ctx.label.name + "_size_breakdown.txt")
     visualization_dir = ctx.actions.declare_file(ctx.label.name + "_visualization")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
+
     ctx.actions.run_shell(
         inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
-        outputs = [size_file, visualization_dir],
+        outputs = [size_file, visualization_dir, ffx_isolate_dir],
         command = _SIZE_CHECKER_RUNNER_SH,
         env = {
             "FFX": fuchsia_toolchain.ffx.path,
+            "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
             "IMAGES_PATH": images_out.path + "/images.json",
             "SIZE_FILE": size_file.path,
-            "VISUALIZATION_DIR": visualization_dir.path
+            "VISUALIZATION_DIR": visualization_dir.path,
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
