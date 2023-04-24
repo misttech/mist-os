@@ -13,6 +13,7 @@
 #include <ddk/metadata/pwm.h>
 #include <soc/aml-a311d/a311d-pwm.h>
 
+#include "src/devices/board/drivers/vim3/vim3-pwm-bind.h"
 #include "vim3-gpios.h"
 #include "vim3.h"
 
@@ -79,6 +80,30 @@ zx_status_t Vim3::PwmInit() {
     zxlogf(ERROR, "%s: NodeAdd Pwm(pwm_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
+  }
+
+  // Add a composite device for pwm init driver.
+  const zx_device_prop_t props[] = {
+      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_AMLOGIC},
+      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_AMLOGIC_A311D},
+      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_AMLOGIC_PWM_INIT},
+  };
+
+  const composite_device_desc_t comp_desc = {
+      .props = props,
+      .props_count = std::size(props),
+      .fragments = pwm_init_fragments,
+      .fragments_count = std::size(pwm_init_fragments),
+      .primary_fragment = "pwm",
+      .spawn_colocated = true,
+      .metadata_list = nullptr,
+      .metadata_count = 0,
+  };
+
+  zx_status_t status = DdkAddComposite("pwm-init", &comp_desc);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: DdkAddComposite failed: %d", __func__, status);
+    return status;
   }
 
   return ZX_OK;

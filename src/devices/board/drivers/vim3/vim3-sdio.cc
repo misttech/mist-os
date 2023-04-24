@@ -13,9 +13,11 @@
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-sdmmc.h>
+#include <wifi/wifi-config.h>
 
 #include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3-sdio-bind.h"
+#include "src/devices/board/drivers/vim3/vim3-wifi-bind.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
@@ -49,6 +51,27 @@ static aml_sdmmc_config_t config = {
     .max_freq = 200'000'000,
     .version_3 = true,
     .prefs = 0,
+    .use_new_tuning = true,
+};
+
+constexpr wifi_config_t wifi_config = {
+    .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+    .clm_needed = false,
+    .iovar_table =
+        {
+            {IOVAR_CMD_TYPE, {.iovar_cmd = BRCMF_C_SET_PM}, 0},
+            {IOVAR_LIST_END_TYPE, {{0}}, 0},
+        },
+    .cc_table =
+        {
+            {"WW", 1},   {"AU", 923}, {"CA", 901}, {"US", 843}, {"GB", 889}, {"BE", 889},
+            {"BG", 889}, {"CZ", 889}, {"DK", 889}, {"DE", 889}, {"EE", 889}, {"IE", 889},
+            {"GR", 889}, {"ES", 889}, {"FR", 889}, {"HR", 889}, {"IT", 889}, {"CY", 889},
+            {"LV", 889}, {"LT", 889}, {"LU", 889}, {"HU", 889}, {"MT", 889}, {"NL", 889},
+            {"AT", 889}, {"PL", 889}, {"PT", 889}, {"RO", 889}, {"SI", 889}, {"SK", 889},
+            {"FI", 889}, {"SE", 889}, {"EL", 889}, {"IS", 889}, {"LI", 889}, {"TR", 889},
+            {"CH", 889}, {"NO", 889}, {"JP", 2},   {"", 0},
+        },
 };
 
 static const std::vector<fpbus::Metadata> sdio_metadata{
@@ -57,11 +80,19 @@ static const std::vector<fpbus::Metadata> sdio_metadata{
         .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
                                      reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
     }},
+    {{
+        .type = DEVICE_METADATA_WIFI_CONFIG,
+        .data = std::vector<uint8_t>(
+            reinterpret_cast<const uint8_t*>(&wifi_config),
+            reinterpret_cast<const uint8_t*>(&wifi_config) + sizeof(wifi_config)),
+    }},
 };
 
 zx_status_t Vim3::SdioInit() {
+  zx_status_t status;
+
   fpbus::Node sdio_dev;
-  sdio_dev.name() = "aml_sdio";
+  sdio_dev.name() = "vim3-sdio";
   sdio_dev.vid() = PDEV_VID_AMLOGIC;
   sdio_dev.pid() = PDEV_PID_GENERIC;
   sdio_dev.did() = PDEV_DID_AMLOGIC_SDMMC_A;
@@ -93,6 +124,30 @@ zx_status_t Vim3::SdioInit() {
     zxlogf(ERROR, "%s: AddComposite Sdio(sdio_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
+  }
+
+  // Add a composite device for wifi driver.
+  const zx_device_prop_t props[] = {
+      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_BROADCOM},
+      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_BCM4359},
+      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_BCM_WIFI},
+  };
+
+  const composite_device_desc_t comp_desc = {
+      .props = props,
+      .props_count = std::size(props),
+      .fragments = wifi_fragments,
+      .fragments_count = std::size(wifi_fragments),
+      .primary_fragment = "sdio-function-1",
+      .spawn_colocated = true,
+      .metadata_list = nullptr,
+      .metadata_count = 0,
+  };
+
+  status = DdkAddComposite("wifi", &comp_desc);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: wifi DdkAddComposite failed: %d", __func__, status);
+    return status;
   }
 
   return ZX_OK;

@@ -83,6 +83,9 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(VIM3_HPD_IN),
     DECL_GPIO_PIN(VIM3_FUSB302_INT),
     DECL_GPIO_PIN(VIM3_TOUCH_PANEL_INTERRUPT),
+    DECL_GPIO_PIN(VIM3_WIFI_WAKE_HOST),
+    DECL_GPIO_PIN(VIM3_WIFI_32K),
+    DECL_GPIO_PIN(VIM3_BT_EN),
 };
 
 static const std::vector<fpbus::Metadata> gpio_metadata{

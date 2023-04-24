@@ -108,6 +108,7 @@ typedef struct cc_entry {
 
 typedef struct wifi_config {
   uint32_t oob_irq_mode;  //{edge or level etc}
+  bool clm_needed = true;
   iovar_entry_t iovar_table[MAX_IOVAR_ENTRIES];
   cc_entry_t cc_table[MAX_CC_TABLE_ENTRIES];
 } wifi_config_t;

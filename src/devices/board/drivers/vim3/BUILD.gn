@@ -28,6 +28,7 @@ driver_bind_rules("vim3-sdio-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -65,6 +66,29 @@ driver_bind_rules("vim3-cpu-bind") {
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.power",
+  ]
+}
+
+driver_bind_rules("vim3-wifi-bind") {
+  rules = "vim3-wifi.bind"
+  header_output = "vim3-wifi-bind.h"
+  bind_output = "vim3-wifi-bind.bc"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform.a311d",
+    "//src/devices/bind/fuchsia.broadcom.sdio",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.sdio",
+  ]
+}
+
+driver_bind_rules("vim3-pwm-bind") {
+  rules = "vim3-pwm.bind"
+  header_output = "vim3-pwm-bind.h"
+  bind_output = "vim3-pwm-bind.bc"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform.a311d",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 
@@ -116,8 +140,10 @@ fuchsia_driver("vim3-driver") {
     ":vim3-cpu-bind_header",
     ":vim3-emmc-bind_header",
     ":vim3-mali-bind_header",
+    ":vim3-pwm-bind_header",
     ":vim3-sdio-bind_header",
     ":vim3-video-bind_header",
+    ":vim3-wifi-bind_header",
     "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",

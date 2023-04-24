@@ -35,6 +35,13 @@
 // USB Power Enable for USB 2.0 and USB 3.0 ports
 #define VIM3_USB_PWR A311D_GPIOA(6)
 
+// WIFI
+#define VIM3_WIFI_WAKE_HOST A311D_GPIOX(7)
+#define VIM3_WIFI_32K A311D_GPIOX(16)
+
+// BT
+#define VIM3_BT_EN A311D_GPIOX(17)
+
 // Make the GPIO expander indices start after the SoC GPIOs to avoid any overlap.
 #define VIM3_EXPANDER_GPIO_START (A311D_GPIOE_START + A311D_GPIOE_COUNT)
 #define VIM3_EXPANDER_GPIO(n) (VIM3_EXPANDER_GPIO_START + (n))

@@ -25,8 +25,10 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet",
       "sys/platform/05:00:7/aml_sd/aml-sd-emmc",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
       "sys/platform/05:06:1c/aml_nna",
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:06:17/mali/aml-gpu",

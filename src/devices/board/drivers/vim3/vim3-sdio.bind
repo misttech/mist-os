@@ -8,6 +8,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.amlogic.platform.a311d;
 using fuchsia.gpio;
 using fuchsia.platform;
+using fuchsia.pwm;
 
 primary node "pdev" {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -20,4 +21,8 @@ primary node "pdev" {
 node "gpio-wifi-power-on" {
   fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_6;
+}
+
+node "pwm" {
+  fuchsia.BIND_INIT_STEP == fuchsia.pwm.BIND_INIT_STEP.PWM;
 }

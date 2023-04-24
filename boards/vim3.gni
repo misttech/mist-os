@@ -33,6 +33,7 @@ _common_bootfs_deps = [
   "//src/devices/power/drivers/aml-pwm-regulator",
   "//src/devices/power/drivers/fusb302",
   "//src/devices/pwm/drivers/aml-pwm",
+  "//src/devices/pwm/drivers/aml-pwm-init",
   "//src/devices/registers/drivers/registers",
   "//src/devices/rtc/drivers/nxp",
   "//src/devices/thermal/drivers/aml-thermal",
@@ -57,6 +58,9 @@ board_driver_package_labels += [
   "//src/graphics/drivers/msd-arm-mali:msd-system",
   "//src/graphics/drivers/msd-vsi-vip",
   "//src/media/drivers/amlogic_decoder",
+  "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3",
+  "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
+  "//bundles/packages/prod:wlan_fullmac_core_drivers",
 ]
 
 board_package_labels += [

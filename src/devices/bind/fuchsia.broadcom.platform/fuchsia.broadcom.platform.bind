@@ -11,6 +11,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_VID {
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   BCM4356 = 1,
   BCM43458 = 2,
+  BCM4359 = 3,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
