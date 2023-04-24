@@ -42,8 +42,11 @@ class SdmmcDevice {
   zx_status_t SdmmcStopTransmission(uint32_t* status = nullptr);
   zx_status_t SdmmcWaitForState(uint32_t state);
   // Retries a block read/write request. STOP_TRANSMISSION is issued after every attempt that
-  // results in an error, but not after the request succeeds.
-  zx_status_t SdmmcIoRequestWithRetries(const sdmmc_req_t& request, uint32_t* retries);
+  // results in an error, but not after the request succeeds. Optionally supply a leading
+  // SET BLOCK COUNT command for pre-defined transfer mode.
+  zx_status_t SdmmcIoRequestWithRetries(
+      const sdmmc_req_t& request, uint32_t* retries,
+      const std::optional<sdmmc_req_t>& set_block_count = std::nullopt);
 
   // SD ops
   zx_status_t SdSendOpCond(uint32_t flags, uint32_t* ocr);

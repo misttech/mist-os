@@ -202,30 +202,37 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
     return st;
   }
 
+  // TODO(fxbug.dev/124654): Consider enabling for SD as well.
+  const bool pre_defined_transfer_mode = !is_sd_;
+
   uint32_t cmd_idx = 0;
   uint32_t cmd_flags = 0;
-
+  std::optional<sdmmc_req_t> set_block_count;
+  bool manual_stop_transmission = false;
+  // For single-block transfers, we could get higher performance by using SDMMC_READ_BLOCK/
+  // SDMMC_WRITE_BLOCK without the need to SDMMC_SET_BLOCK_COUNT or SDMMC_STOP_TRANSMISSION.
+  // However, we always do multiple-block transfers for simplicity (FUA access requires
+  // SDMMC_SET_BLOCK_COUNT, which adds to the complexity).
   if (kBlockOp(txn.command) == BLOCK_OP_READ) {
-    if (txn.length > 1) {
-      cmd_idx = SDMMC_READ_MULTIPLE_BLOCK;
-      cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS;
-      if (sdmmc_.host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
-        cmd_flags |= SDMMC_CMD_AUTO12;
-      }
-    } else {
-      cmd_idx = SDMMC_READ_BLOCK;
-      cmd_flags = SDMMC_READ_BLOCK_FLAGS;
-    }
+    cmd_idx = SDMMC_READ_MULTIPLE_BLOCK;
+    cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS;
   } else {
-    if (txn.length > 1) {
-      cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK;
-      cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS;
-      if (sdmmc_.host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
-        cmd_flags |= SDMMC_CMD_AUTO12;
-      }
+    cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK;
+    cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS;
+  }
+  if (pre_defined_transfer_mode) {
+    // TODO(fxbug.dev/123882): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
+    // performance.
+    set_block_count = {
+        .cmd_idx = SDMMC_SET_BLOCK_COUNT,
+        .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
+        .arg = static_cast<uint32_t>(txn.length),  // TODO(fxbug.dev/123882): Support FUA.
+    };
+  } else {
+    if (sdmmc_.host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
+      cmd_flags |= SDMMC_CMD_AUTO12;
     } else {
-      cmd_idx = SDMMC_WRITE_BLOCK;
-      cmd_flags = SDMMC_WRITE_BLOCK_FLAGS;
+      manual_stop_transmission = true;
     }
   }
 
@@ -256,7 +263,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
   };
 
   uint32_t retries = 0;
-  st = sdmmc_.SdmmcIoRequestWithRetries(req, &retries);
+  st = sdmmc_.SdmmcIoRequestWithRetries(req, &retries, set_block_count);
   io_retries_.Add(retries);
   if (st != ZX_OK) {
     zxlogf(ERROR, "do_txn error %d", st);
@@ -264,9 +271,9 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
   }
 
   // SdmmcIoRequestWithRetries sends STOP_TRANSMISSION (cmd12) when an error occurs, so it only
-  // needs to be sent here if the request succeeded, there was more than one block, and the
-  // controller doesn't support auto cmd12.
-  if (st == ZX_OK && txn.length > 1 && !(req.cmd_flags & SDMMC_CMD_AUTO12)) {
+  // needs to be sent here if SET_BLOCK_COUNT isn't used, the request succeeded, and the controller
+  // doesn't support auto cmd12.
+  if (st == ZX_OK && manual_stop_transmission) {
     zx_status_t stop_st = sdmmc_.SdmmcStopTransmission();
     if (stop_st != ZX_OK) {
       zxlogf(WARNING, "do_txn stop transmission error %d", stop_st);

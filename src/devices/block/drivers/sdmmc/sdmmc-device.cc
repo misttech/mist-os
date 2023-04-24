@@ -137,11 +137,20 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
   return ZX_ERR_TIMED_OUT;
 }
 
-zx_status_t SdmmcDevice::SdmmcIoRequestWithRetries(const sdmmc_req_t& request, uint32_t* retries) {
+zx_status_t SdmmcDevice::SdmmcIoRequestWithRetries(
+    const sdmmc_req_t& request, uint32_t* retries,
+    const std::optional<sdmmc_req_t>& set_block_count) {
   zx_status_t st;
   for (uint32_t i = 0; i < kTryAttempts; i++) {
     if (i > 0) {
       (*retries)++;
+    }
+
+    if (set_block_count.has_value()) {
+      uint32_t unused_response[4];
+      if ((st = Request(set_block_count.value(), unused_response)) != ZX_OK) {
+        continue;
+      }
     }
 
     sdmmc_req_t req = request;
