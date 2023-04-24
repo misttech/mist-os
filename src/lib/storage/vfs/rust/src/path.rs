@@ -178,6 +178,16 @@ impl AsRef<str> for Path {
     }
 }
 
+/// Validates a file name.  `name` *must* not be '.' or '..'.
+pub fn validate_name(name: &str) -> bool {
+    name.len() as u64 <= fio::MAX_FILENAME
+        && !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains('/')
+        && !name.contains('\0')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -651,5 +661,20 @@ mod tests {
         assert_eq!(path.as_ref(), "c/");
         path.next();
         assert_eq!(path.as_ref(), ".");
+    }
+
+    #[test]
+    fn test_validate_name() {
+        assert!(!validate_name(
+            std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize + 1]).unwrap()
+        ));
+        assert!(!validate_name("."));
+        assert!(!validate_name(".."));
+        assert!(!validate_name("a/b"));
+        assert!(!validate_name("a\0b"));
+
+        assert!(validate_name(std::str::from_utf8(&vec![65; fio::MAX_FILENAME as usize]).unwrap()));
+        assert!(validate_name(".a"));
+        assert!(validate_name("..a"));
     }
 }

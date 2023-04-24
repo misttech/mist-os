@@ -124,4 +124,9 @@ pub trait MutableDirectory: Directory + Send + Sync {
         src_name: Path,
         dst_name: Path,
     ) -> Result<(), Status>;
+
+    /// Creates a symbolic link.
+    async fn create_symlink(&self, _name: String, _target: Vec<u8>) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
 }

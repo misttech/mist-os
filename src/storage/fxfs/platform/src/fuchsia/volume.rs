@@ -10,6 +10,7 @@ use {
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         node::{FxNode, GetResult, NodeCache},
         pager::{Pager, PagerExecutor},
+        symlink::FxSymlink,
         vmo_data_buffer::VmoDataBuffer,
         volumes_directory::VolumesDirectory,
     },
@@ -198,6 +199,7 @@ impl FxVolume {
                         parent,
                         Directory::open_unchecked(self.clone(), object_id),
                     )) as Arc<dyn FxNode>,
+                    ObjectDescriptor::Symlink => Arc::new(FxSymlink::new(self.clone(), object_id)),
                     _ => bail!(FxfsError::Inconsistent),
                 };
                 placeholder.commit(&node);

@@ -1354,13 +1354,8 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> GetProperties for StoreObjec
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         // Take a read guard since we need to return a consistent view of all object properties.
         let fs = self.store().filesystem();
-        let _guard = fs
-            .read_lock(&[LockKey::object_attribute(
-                self.store().store_object_id,
-                self.object_id,
-                self.attribute_id,
-            )])
-            .await;
+        let _guard =
+            fs.read_lock(&[LockKey::object(self.store().store_object_id, self.object_id)]).await;
         let item = self
             .store()
             .tree

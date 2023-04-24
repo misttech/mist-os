@@ -217,7 +217,7 @@ pub enum FsckError {
     AllocatedSizeMismatch(u64, u64, u64, u64),
     AllocationForNonexistentOwner(Allocation),
     AllocationMismatch(Allocation, Allocation),
-    AttributeOnDirectory(u64, u64),
+    AttributeNotOnFile(u64, u64),
     ConflictingTypeForLink(u64, u64, Value, Value),
     ExtentExceedsLength(u64, u64, u64, u64, Value),
     ExtraAllocations(Vec<Allocation>),
@@ -271,8 +271,8 @@ impl FsckError {
             FsckError::AllocationMismatch(expected, actual) => {
                 format!("Expected allocation {:?} but found allocation {:?}", expected, actual)
             }
-            FsckError::AttributeOnDirectory(store_id, object_id) => {
-                format!("Directory {} in store {} had attributes", object_id, store_id)
+            FsckError::AttributeNotOnFile(store_id, object_id) => {
+                format!("Object {} in store {} has unexpected attributes", object_id, store_id)
             }
             FsckError::ConflictingTypeForLink(store_id, object_id, expected, actual) => {
                 format!(
@@ -420,8 +420,8 @@ impl FsckError {
             FsckError::AllocationMismatch(expected, actual) => {
                 error!(?expected, ?actual, "Unexpected allocation");
             }
-            FsckError::AttributeOnDirectory(store_id, oid) => {
-                error!(store_id, oid, "Attribute for directory");
+            FsckError::AttributeNotOnFile(store_id, oid) => {
+                error!(store_id, oid, "Attribute on unexpected type");
             }
             FsckError::ConflictingTypeForLink(store_id, oid, expected, actual) => {
                 error!(store_id, oid, ?expected, ?actual, "Bad link");

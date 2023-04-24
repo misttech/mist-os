@@ -26,7 +26,7 @@ pub enum ObjectDescriptor {
     Directory,
     /// A volume, which is the root of a distinct object store containing Files and Directories.
     Volume,
-    /// A symbolic link, which is only used for FUSE.
+    /// A symbolic link.
     Symlink,
 }
 
@@ -59,8 +59,6 @@ pub enum ObjectKeyData {
     /// configured limit and the usage tracking which are ordered after the `project_id` to provide
     /// locality of the two related values.
     Project { project_id: u64, property: ProjectProperty },
-    /// A symlink of an object.
-    Symlink,
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize)]
@@ -137,11 +135,6 @@ impl ObjectKey {
     /// Creates an ObjectKey for a child.
     pub fn child(object_id: u64, name: &str) -> Self {
         Self { object_id, data: ObjectKeyData::Child { name: name.to_owned() } }
-    }
-
-    /// Creates an ObjectKey for a symlink.
-    pub fn symlink(object_id: u64) -> Self {
-        Self { object_id, data: ObjectKeyData::Symlink }
     }
 
     /// Creates a graveyard entry.
@@ -319,6 +312,13 @@ pub enum ObjectKind {
         sub_dirs: u64,
     },
     Graveyard,
+    Symlink {
+        /// The number of references to this symbolic link.
+        refs: u64,
+        /// `link` is the target of the link and has no meaning within Fxfs; clients are free to
+        /// interpret it however they like.
+        link: Vec<u8>,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeHash)]
@@ -398,9 +398,6 @@ pub enum ObjectValue {
     Trim,
     /// Tracking a bytes and nodes pair. Added to support tracking Project ID usage and limits.
     BytesAndNodes { bytes: i64, nodes: i64 },
-    /// A symlink of an object. |object_id| is the ID of the target, |object_descriptor| describes
-    /// the target and |link| is the link path.
-    Symlink { link: String },
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned)]
@@ -453,10 +450,17 @@ impl ObjectValue {
     pub fn child(object_id: u64, object_descriptor: ObjectDescriptor) -> ObjectValue {
         ObjectValue::Child { object_id, object_descriptor }
     }
-
     /// Creates an ObjectValue for an object symlink.
-    pub fn symlink(link: impl Into<String>) -> ObjectValue {
-        ObjectValue::Symlink { link: link.into() }
+    pub fn symlink(
+        link: impl Into<Vec<u8>>,
+        creation_time: Timestamp,
+        modification_time: Timestamp,
+        project_id: u64,
+    ) -> ObjectValue {
+        ObjectValue::Object {
+            kind: ObjectKind::Symlink { refs: 1, link: link.into() },
+            attributes: ObjectAttributes { creation_time, modification_time, project_id },
+        }
     }
 }
 

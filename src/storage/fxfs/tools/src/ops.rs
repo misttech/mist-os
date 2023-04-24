@@ -61,13 +61,13 @@ pub async fn print_ls(dir: &Directory<ObjectStore>) -> Result<(), Error> {
             }
             ObjectDescriptor::Volume => unimplemented!(),
             ObjectDescriptor::Symlink => {
-                let link = dir.read_symlink(object_id).await?.expect("read_symlink failed");
+                let link = dir.store().read_symlink(object_id).await?;
                 let mtime = Utc::now();
                 println!(
                     "l---------    1 nobody   nogroup           0 {:>12} {} -> {}",
                     mtime.format(DATE_FMT),
                     name,
-                    link
+                    String::from_utf8_lossy(&link),
                 );
             }
         }

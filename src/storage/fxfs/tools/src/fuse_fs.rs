@@ -297,35 +297,31 @@ impl FuseFs {
     }
 
     /// Get the type of an object with specified id.
-    pub async fn get_object_type(&self, object_id: u64) -> FxfsResult<Option<ObjectDescriptor>> {
+    pub async fn get_object_type(&self, object_id: u64) -> FxfsResult<ObjectDescriptor> {
         {
             // If the requested object exists in the handle cache, then it must be a file.
             if self.object_handle_cache.clone().read().await.contains_key(&object_id) {
                 info!("Cache hit for handle of object {}", object_id);
-                return Ok(Some(ObjectDescriptor::File));
+                return Ok(ObjectDescriptor::File);
             }
         }
 
-        let object_result = self.default_store.tree().find(&ObjectKey::object(object_id)).await?;
-        if let Some(object) = object_result {
-            match object.value {
-                ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. } => {
-                    Ok(Some(ObjectDescriptor::Directory))
-                }
-                ObjectValue::Object { kind: ObjectKind::File { .. }, .. } => {
-                    Ok(Some(ObjectDescriptor::File))
-                }
-                _ => Ok(None),
-            }
-        } else {
-            if let Some(symlink) =
-                self.default_store.tree().find(&ObjectKey::symlink(object_id)).await?
-            {
-                if symlink.value != ObjectValue::None {
-                    return Ok(Some(ObjectDescriptor::Symlink));
-                }
-            }
-            Ok(None)
+        match self
+            .default_store
+            .tree()
+            .find(&ObjectKey::object(object_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?
+            .value
+        {
+            ObjectValue::Object { kind, .. } => Ok(match kind {
+                ObjectKind::Directory { .. } => ObjectDescriptor::Directory,
+                ObjectKind::File { .. } => ObjectDescriptor::File,
+                ObjectKind::Symlink { .. } => ObjectDescriptor::Symlink,
+                _ => Err(FxfsError::Inconsistent)?,
+            }),
+            ObjectValue::None => Err(FxfsError::NotFound.into()),
+            _ => Err(FxfsError::Inconsistent.into()),
         }
     }
 

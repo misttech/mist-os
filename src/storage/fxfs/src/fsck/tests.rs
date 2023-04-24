@@ -1132,7 +1132,7 @@ async fn test_attribute_on_directory() {
     test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
         .await
         .expect_err("Fsck should fail");
-    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::AttributeOnDirectory(..)), ..]);
+    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::AttributeNotOnFile(..)), ..]);
 }
 
 #[fuchsia::test]

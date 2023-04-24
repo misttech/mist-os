@@ -16,7 +16,7 @@ use crate::{
         mutable::entry_constructor::NewEntryType,
     },
     execution_scope::ExecutionScope,
-    path::Path,
+    path::{validate_name, Path},
     token_registry::{TokenInterface, TokenRegistry, Tokenizable},
 };
 
@@ -155,8 +155,22 @@ impl MutableConnection {
             | fio::DirectoryRequest::Watch { .. }) => {
                 return this.as_mut().base.handle_request(request).await;
             }
-            fio::DirectoryRequest::CreateSymlink { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+            fio::DirectoryRequest::CreateSymlink { responder, name, target, .. } => {
+                if !this.base.options.rights.contains(fio::Operations::MODIFY_DIRECTORY) {
+                    responder.send(&mut Err(zx::Status::ACCESS_DENIED.into_raw()))?;
+                } else if !validate_name(&name) {
+                    responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?;
+                } else {
+                    responder.send(
+                        &mut this
+                            .as_mut()
+                            .base
+                            .directory
+                            .create_symlink(name, target)
+                            .await
+                            .map_err(|s| s.into_raw()),
+                    )?;
+                }
             }
         }
         Ok(ConnectionState::Alive)

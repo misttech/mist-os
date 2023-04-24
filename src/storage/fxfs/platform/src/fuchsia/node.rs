@@ -32,7 +32,7 @@ use {
 // TODO(fxbug.dev/122161) Dynamically adjust the cache size in response to memory pressure events.
 const DIRECTORY_CACHE_SIZE: usize = 12;
 
-/// FxNode is a node in the filesystem hierarchy (either a file or directory).
+/// FxNode is a node in the filesystem hierarchy
 #[async_trait]
 pub trait FxNode: IntoAny + Send + Sync + 'static {
     fn object_id(&self) -> u64;
@@ -301,7 +301,7 @@ impl<N: FxNode + ?Sized> OpenedNode<N> {
     /// Takes the wrapped node.  The caller takes responsibility for dropping the open count.
     pub fn take(self) -> Arc<N> {
         let this = std::mem::ManuallyDrop::new(self);
-        unsafe { std::mem::transmute_copy(&this.0) }
+        unsafe { std::ptr::read(&this.0) }
     }
 
     /// Returns true if this is an instance of T.

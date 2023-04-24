@@ -30,6 +30,7 @@ use {
     std::{
         ffi::{OsStr, OsString},
         io::Write,
+        os::unix::ffi::OsStrExt,
         sync::Arc,
         time::Duration,
         vec::IntoIter,
@@ -210,44 +211,40 @@ impl FuseFs {
     /// Return NotFound if `inode` does not exist.
     /// Return NotFile if `inode` is a directory.
     async fn read_fxfs(&self, inode: u64, offset: u64, size: u32) -> FxfsResult<ReplyData> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::File {
-                let handle = self.get_object_handle(inode).await?;
-                let mut out: Vec<u8> = Vec::new();
-                let align = offset % self.fs.block_size();
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            let handle = self.get_object_handle(inode).await?;
+            let mut out: Vec<u8> = Vec::new();
+            let align = offset % self.fs.block_size();
 
-                let mut buf = handle.allocate_buffer(handle.block_size() as usize);
-                // Round down for the block alignment.
-                let mut ofs = offset - align;
-                let len = size as u64 + align + ofs;
+            let mut buf = handle.allocate_buffer(handle.block_size() as usize);
+            // Round down for the block alignment.
+            let mut ofs = offset - align;
+            let len = size as u64 + align + ofs;
 
-                loop {
-                    let bytes = handle.read(ofs, buf.as_mut()).await?;
-                    if len - ofs > bytes as u64 {
-                        // Read `bytes` size of content from buf.
-                        ofs += bytes as u64;
-                        out.write_all(&buf.as_ref().as_slice()[..bytes])?;
-                        if bytes as u64 != handle.block_size() {
-                            break;
-                        }
-                    } else {
-                        // Read the remaining content from buf.
-                        out.write_all(&buf.as_ref().as_slice()[..(len - ofs) as usize])?;
+            loop {
+                let bytes = handle.read(ofs, buf.as_mut()).await?;
+                if len - ofs > bytes as u64 {
+                    // Read `bytes` size of content from buf.
+                    ofs += bytes as u64;
+                    out.write_all(&buf.as_ref().as_slice()[..bytes])?;
+                    if bytes as u64 != handle.block_size() {
                         break;
                     }
-                }
-                let out: Vec<u8> = if (align as usize) < out.len() {
-                    out.drain((align as usize)..).collect()
                 } else {
-                    vec![]
-                };
-
-                Ok(ReplyData { data: out.into() })
-            } else {
-                Err(FxfsError::NotFile.into())
+                    // Read the remaining content from buf.
+                    out.write_all(&buf.as_ref().as_slice()[..(len - ofs) as usize])?;
+                    break;
+                }
             }
+            let out: Vec<u8> = if (align as usize) < out.len() {
+                out.drain((align as usize)..).collect()
+            } else {
+                vec![]
+            };
+
+            Ok(ReplyData { data: out.into() })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 
@@ -256,21 +253,17 @@ impl FuseFs {
     /// Return NotFile if `inode` is a directory.
     /// Return NotFound if `inode` does not exist.
     async fn write_fxfs(&self, inode: u64, offset: u64, data: &[u8]) -> FxfsResult<ReplyWrite> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::File {
-                let handle = self.get_object_handle(inode).await?;
-                let mut buf = handle.allocate_buffer(data.len());
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            let handle = self.get_object_handle(inode).await?;
+            let mut buf = handle.allocate_buffer(data.len());
 
-                buf.as_mut_slice().copy_from_slice(data);
-                handle.write_or_append(Some(offset), buf.as_ref()).await?;
-                handle.flush().await?;
+            buf.as_mut_slice().copy_from_slice(data);
+            handle.write_or_append(Some(offset), buf.as_ref()).await?;
+            handle.flush().await?;
 
-                Ok(ReplyWrite { written: data.len() as u32 })
-            } else {
-                Err(FxfsError::NotFile.into())
-            }
+            Ok(ReplyWrite { written: data.len() as u32 })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 
@@ -279,16 +272,12 @@ impl FuseFs {
     /// Return NotFile if `inode` is a directory.
     /// Return NotFound if `inode` does not exist.
     async fn release_fxfs(&self, inode: u64) -> FxfsResult<()> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::File {
-                // Remove the handle from cache because the file is released.
-                self.release_object_handle(inode).await;
-                Ok(())
-            } else {
-                Err(FxfsError::NotFile.into())
-            }
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            // Remove the handle from cache because the file is released.
+            self.release_object_handle(inode).await;
+            Ok(())
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 
@@ -296,66 +285,59 @@ impl FuseFs {
     /// Return Ok with `inode`'s attributes if successful.
     /// Return NotFound if `inode` does not exist.
     async fn getattr_fxfs(&self, inode: u64) -> FxfsResult<ReplyAttr> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            Ok(ReplyAttr { ttl: TTL, attr: self.create_object_attr(inode, object_type).await? })
-        } else {
-            Err(FxfsError::NotFound.into())
-        }
+        Ok(ReplyAttr {
+            ttl: TTL,
+            attr: self.create_object_attr(inode, self.get_object_type(inode).await?).await?,
+        })
     }
 
     /// Set attributes of an object with id `inode` including its timestamps and object size.
     /// Return Ok with `inode`'s new attributes if successful.
     /// Return NotFound if `inode` does not exist.
     async fn setattr_fxfs(&self, inode: u64, set_attr: SetAttr) -> FxfsResult<ReplyAttr> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            let ctime: Option<Timestamp> = match set_attr.ctime {
-                Some(t) => Some(to_fxfs_time(t)),
-                None => None,
-            };
-            let mtime: Option<Timestamp> = match set_attr.mtime {
-                Some(t) => Some(to_fxfs_time(t)),
-                None => None,
-            };
+        let object_type = self.get_object_type(inode).await?;
+        let ctime: Option<Timestamp> = match set_attr.ctime {
+            Some(t) => Some(to_fxfs_time(t)),
+            None => None,
+        };
+        let mtime: Option<Timestamp> = match set_attr.mtime {
+            Some(t) => Some(to_fxfs_time(t)),
+            None => None,
+        };
 
-            if object_type == ObjectDescriptor::File {
-                let handle = self.get_object_handle(inode).await?;
-                let mut transaction = self
-                    .fs
-                    .clone()
-                    .new_transaction(
-                        &[LockKey::object(
-                            self.default_store.store_object_id(),
-                            handle.object_id(),
-                        )],
-                        Options::default(),
-                    )
-                    .await?;
-                handle.write_timestamps(&mut transaction, ctime, mtime).await?;
-                transaction.commit().await?;
+        if object_type == ObjectDescriptor::File {
+            let handle = self.get_object_handle(inode).await?;
+            let mut transaction = self
+                .fs
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(self.default_store.store_object_id(), handle.object_id())],
+                    Options::default(),
+                )
+                .await?;
+            handle.write_timestamps(&mut transaction, ctime, mtime).await?;
+            transaction.commit().await?;
 
-                // Truncate the file size if size attribute needs to be set.
-                if let Some(size) = set_attr.size {
-                    handle.truncate(size).await?;
-                    handle.flush().await?;
-                }
-            } else if object_type == ObjectDescriptor::Directory {
-                let mut transaction = self
-                    .fs
-                    .clone()
-                    .new_transaction(
-                        &[LockKey::object(self.default_store.store_object_id(), inode)],
-                        Options::default(),
-                    )
-                    .await?;
-                let dir = self.open_dir(inode).await?;
-                dir.update_attributes(&mut transaction, ctime, mtime, 0).await?;
-                transaction.commit().await?;
+            // Truncate the file size if size attribute needs to be set.
+            if let Some(size) = set_attr.size {
+                handle.truncate(size).await?;
+                handle.flush().await?;
             }
-
-            Ok(ReplyAttr { ttl: TTL, attr: self.create_object_attr(inode, object_type).await? })
-        } else {
-            Err(FxfsError::NotFound.into())
+        } else if object_type == ObjectDescriptor::Directory {
+            let mut transaction = self
+                .fs
+                .clone()
+                .new_transaction(
+                    &[LockKey::object(self.default_store.store_object_id(), inode)],
+                    Options::default(),
+                )
+                .await?;
+            let dir = self.open_dir(inode).await?;
+            dir.update_attributes(&mut transaction, ctime, mtime, 0).await?;
+            transaction.commit().await?;
         }
+
+        Ok(ReplyAttr { ttl: TTL, attr: self.create_object_attr(inode, object_type).await? })
     }
 
     /// Synchronize the filesystem contents.
@@ -367,11 +349,8 @@ impl FuseFs {
     /// Return Ok if `inode` exists.
     /// Return NotFound if `inode` does not exist.
     async fn access_fxfs(&self, inode: u64) -> FxfsResult<()> {
-        if let Some(_) = self.get_object_type(inode).await? {
-            Ok(())
-        } else {
-            Err(FxfsError::NotFound.into())
-        }
+        self.get_object_type(inode).await?;
+        Ok(())
     }
 
     /// Create a file called `name` under `parent` directory.
@@ -419,19 +398,13 @@ impl FuseFs {
     /// Return NotFound if `inode` does not exist.
     /// Return NotFile if `inode` is a directory.
     async fn open_fxfs(&self, inode: u64) -> FxfsResult<ReplyOpen> {
-        let object_type = self.get_object_type(inode).await?;
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            // Store the object handle in cache.
+            self.load_object_handle(inode).await?;
 
-        if let Some(descriptor) = object_type {
-            if descriptor == ObjectDescriptor::File {
-                // Store the object handle in cache.
-                self.load_object_handle(inode).await?;
-
-                Ok(ReplyOpen { fh: 0, flags: 0 })
-            } else {
-                Err(FxfsError::NotFile.into())
-            }
+            Ok(ReplyOpen { fh: 0, flags: 0 })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 
@@ -440,14 +413,10 @@ impl FuseFs {
     /// Return NotDir if `inode` is not a directory.
     /// Return NotFound if `inode` does not exist.
     async fn opendir_fxfs(&self, inode: u64) -> FxfsResult<ReplyOpen> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::Directory {
-                Ok(ReplyOpen { fh: 0, flags: 0 })
-            } else {
-                Err(FxfsError::NotDir.into())
-            }
+        if self.get_object_type(inode).await? == ObjectDescriptor::Directory {
+            Ok(ReplyOpen { fh: 0, flags: 0 })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotDir.into())
         }
     }
 
@@ -461,49 +430,45 @@ impl FuseFs {
         parent: u64,
         offset: i64,
     ) -> FxfsResult<ReplyDirectory<Iter<IntoIter<Result<DirectoryEntry>>>>> {
-        if let Some(object_type) = self.get_object_type(parent).await? {
-            if object_type == ObjectDescriptor::Directory {
-                let dir = self.open_dir(parent).await?;
-                let mut pre_children = vec![
-                    (parent, FileType::Directory, OsString::from("."), 1),
-                    // The attributes of ".." directory are automatically set by FUSE.
-                    (parent, FileType::Directory, OsString::from(".."), 2),
-                ];
+        if self.get_object_type(parent).await? == ObjectDescriptor::Directory {
+            let dir = self.open_dir(parent).await?;
+            let mut pre_children = vec![
+                (parent, FileType::Directory, OsString::from("."), 1),
+                // The attributes of ".." directory are automatically set by FUSE.
+                (parent, FileType::Directory, OsString::from(".."), 2),
+            ];
 
-                let layer_set = dir.store().tree().layer_set();
-                let mut merger = layer_set.merger();
-                let mut iter = dir.iter(&mut merger).await?;
-                // Start the offset from 3 because the first two are "." and ".." directories.
-                let mut entry_ofs = 3i64;
+            let layer_set = dir.store().tree().layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = dir.iter(&mut merger).await?;
+            // Start the offset from 3 because the first two are "." and ".." directories.
+            let mut entry_ofs = 3i64;
 
-                while let Some((name, object_id, descriptor)) = iter.get() {
-                    let file_type = match descriptor {
-                        ObjectDescriptor::File => FileType::RegularFile,
-                        ObjectDescriptor::Directory => FileType::Directory,
-                        ObjectDescriptor::Symlink => FileType::Symlink,
-                        // Volumes are treated as Directories for now when reading directory.
-                        ObjectDescriptor::Volume => FileType::Directory,
-                    };
+            while let Some((name, object_id, descriptor)) = iter.get() {
+                let file_type = match descriptor {
+                    ObjectDescriptor::File => FileType::RegularFile,
+                    ObjectDescriptor::Directory => FileType::Directory,
+                    ObjectDescriptor::Symlink => FileType::Symlink,
+                    // Volumes are treated as Directories for now when reading directory.
+                    ObjectDescriptor::Volume => FileType::Directory,
+                };
 
-                    pre_children.push((object_id, file_type, OsString::from(name), entry_ofs));
-                    entry_ofs += 1;
-                    iter.advance().await?;
-                }
-
-                let pre_children = stream::iter(pre_children.into_iter());
-                let children = pre_children
-                    .map(|(inode, kind, name, offset)| DirectoryEntry { inode, kind, name, offset })
-                    .skip(offset as _)
-                    .map(Ok)
-                    .collect::<Vec<_>>()
-                    .await;
-
-                Ok(ReplyDirectory { entries: stream::iter(children) })
-            } else {
-                Err(FxfsError::NotDir.into())
+                pre_children.push((object_id, file_type, OsString::from(name), entry_ofs));
+                entry_ofs += 1;
+                iter.advance().await?;
             }
+
+            let pre_children = stream::iter(pre_children.into_iter());
+            let children = pre_children
+                .map(|(inode, kind, name, offset)| DirectoryEntry { inode, kind, name, offset })
+                .skip(offset as _)
+                .map(Ok)
+                .collect::<Vec<_>>()
+                .await;
+
+            Ok(ReplyDirectory { entries: stream::iter(children) })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotDir.into())
         }
     }
 
@@ -516,66 +481,61 @@ impl FuseFs {
         parent: u64,
         offset: u64,
     ) -> FxfsResult<ReplyDirectoryPlus<Iter<IntoIter<Result<DirectoryEntryPlus>>>>> {
-        if let Some(object_type) = self.get_object_type(parent).await? {
-            if object_type == ObjectDescriptor::Directory {
-                let parent_attr =
-                    self.create_object_attr(parent, ObjectDescriptor::Directory).await?;
-                let dir = self.open_dir(parent).await?;
-                let mut pre_children = vec![
-                    (parent, FileType::Directory, OsString::from("."), parent_attr, 1),
-                    // The attributes of ".." directory are automatically set by FUSE.
-                    (parent, FileType::Directory, OsString::from(".."), parent_attr, 2),
-                ];
+        if self.get_object_type(parent).await? == ObjectDescriptor::Directory {
+            let parent_attr = self.create_object_attr(parent, ObjectDescriptor::Directory).await?;
+            let dir = self.open_dir(parent).await?;
+            let mut pre_children = vec![
+                (parent, FileType::Directory, OsString::from("."), parent_attr, 1),
+                // The attributes of ".." directory are automatically set by FUSE.
+                (parent, FileType::Directory, OsString::from(".."), parent_attr, 2),
+            ];
 
-                let layer_set = dir.store().tree().layer_set();
-                let mut merger = layer_set.merger();
-                let mut iter = dir.iter(&mut merger).await?;
-                // Start the offset from 3 because the first two are "." and ".." directories.
-                let mut entry_ofs = 3i64;
+            let layer_set = dir.store().tree().layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = dir.iter(&mut merger).await?;
+            // Start the offset from 3 because the first two are "." and ".." directories.
+            let mut entry_ofs = 3i64;
 
-                while let Some((name, object_id, descriptor)) = iter.get() {
-                    let file_type = match descriptor {
-                        ObjectDescriptor::File => FileType::RegularFile,
-                        ObjectDescriptor::Directory => FileType::Directory,
-                        ObjectDescriptor::Symlink => FileType::Symlink,
-                        // Volumes are treated as Directories for now when reading directory.
-                        ObjectDescriptor::Volume => FileType::Directory,
-                    };
-                    let child_attr = self.create_object_attr(object_id, descriptor.clone()).await?;
-                    pre_children.push((
-                        object_id,
-                        file_type,
-                        OsString::from(name),
-                        child_attr,
-                        entry_ofs,
-                    ));
-                    entry_ofs += 1;
-                    iter.advance().await.unwrap();
-                }
-
-                let pre_children = stream::iter(pre_children.into_iter());
-                let children = pre_children
-                    .map(|(inode, kind, name, attr, offset)| DirectoryEntryPlus {
-                        inode,
-                        generation: 0,
-                        kind,
-                        name,
-                        offset,
-                        attr,
-                        entry_ttl: TTL,
-                        attr_ttl: TTL,
-                    })
-                    .skip(offset as _)
-                    .map(Ok)
-                    .collect::<Vec<_>>()
-                    .await;
-
-                Ok(ReplyDirectoryPlus { entries: stream::iter(children) })
-            } else {
-                Err(FxfsError::NotDir.into())
+            while let Some((name, object_id, descriptor)) = iter.get() {
+                let file_type = match descriptor {
+                    ObjectDescriptor::File => FileType::RegularFile,
+                    ObjectDescriptor::Directory => FileType::Directory,
+                    ObjectDescriptor::Symlink => FileType::Symlink,
+                    // Volumes are treated as Directories for now when reading directory.
+                    ObjectDescriptor::Volume => FileType::Directory,
+                };
+                let child_attr = self.create_object_attr(object_id, descriptor.clone()).await?;
+                pre_children.push((
+                    object_id,
+                    file_type,
+                    OsString::from(name),
+                    child_attr,
+                    entry_ofs,
+                ));
+                entry_ofs += 1;
+                iter.advance().await.unwrap();
             }
+
+            let pre_children = stream::iter(pre_children.into_iter());
+            let children = pre_children
+                .map(|(inode, kind, name, attr, offset)| DirectoryEntryPlus {
+                    inode,
+                    generation: 0,
+                    kind,
+                    name,
+                    offset,
+                    attr,
+                    entry_ttl: TTL,
+                    attr_ttl: TTL,
+                })
+                .skip(offset as _)
+                .map(Ok)
+                .collect::<Vec<_>>()
+                .await;
+
+            Ok(ReplyDirectoryPlus { entries: stream::iter(children) })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotDir.into())
         }
     }
 
@@ -585,17 +545,13 @@ impl FuseFs {
     /// Return NotFile if `inode` is a directory.
     /// Return NotFound if `inode` does not exist.
     async fn fallocate_fxfs(&self, inode: u64, offset: u64, length: u64) -> FxfsResult<()> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::File {
-                let handle = self.get_object_handle(inode).await?;
-                handle.truncate(offset + length).await?;
-                handle.flush().await?;
-                Ok(())
-            } else {
-                Err(FxfsError::NotFile.into())
-            }
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            let handle = self.get_object_handle(inode).await?;
+            handle.truncate(offset + length).await?;
+            handle.flush().await?;
+            Ok(())
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 
@@ -607,29 +563,25 @@ impl FuseFs {
     /// Return NotFound if `inode` does not exist.
     async fn lseek_fxfs(&self, inode: u64, offset: u64, whence: u32) -> FxfsResult<ReplyLSeek> {
         let whence = whence as i32;
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::File {
-                let offset = if whence == libc::SEEK_CUR || whence == libc::SEEK_SET {
-                    offset
-                } else if whence == libc::SEEK_END {
-                    let content_size = self
-                        .get_object_properties(inode, ObjectDescriptor::File)
-                        .await?
-                        .data_attribute_size;
-                    if content_size >= offset {
-                        content_size - offset
-                    } else {
-                        0
-                    }
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            let offset = if whence == libc::SEEK_CUR || whence == libc::SEEK_SET {
+                offset
+            } else if whence == libc::SEEK_END {
+                let content_size = self
+                    .get_object_properties(inode, ObjectDescriptor::File)
+                    .await?
+                    .data_attribute_size;
+                if content_size >= offset {
+                    content_size - offset
                 } else {
-                    return Err(FxfsError::InvalidArgs.into());
-                };
-                Ok(ReplyLSeek { offset })
+                    0
+                }
             } else {
-                Err(FxfsError::NotFile.into())
-            }
+                return Err(FxfsError::InvalidArgs.into());
+            };
+            Ok(ReplyLSeek { offset })
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 
@@ -657,12 +609,7 @@ impl FuseFs {
     /// Return Ok with link of the symlink in bytes.
     /// Return NotFound if `inode` does not exist or `inode` is not a symlink.
     async fn readlink_fxfs(&self, inode: u64) -> FxfsResult<ReplyData> {
-        if let Some(link) = self.root_dir().await?.read_symlink(inode).await? {
-            let out: Vec<u8> = link.as_bytes().to_vec();
-            Ok(ReplyData { data: out.into() })
-        } else {
-            Err(FxfsError::NotFound.into())
-        }
+        Ok(ReplyData { data: self.default_store.read_symlink(inode).await?.into() })
     }
 
     /// Create a symlink called `name` under `parent` linking to `link`.
@@ -686,9 +633,8 @@ impl FuseFs {
             )
             .await?;
 
-        let symlink_id = dir
-            .create_symlink(&mut transaction, link.osstr_to_str()?, name.osstr_to_str()?)
-            .await?;
+        let symlink_id =
+            dir.create_symlink(&mut transaction, link.as_bytes(), name.osstr_to_str()?).await?;
 
         transaction.commit().await?;
         Ok(ReplyEntry {
@@ -710,47 +656,43 @@ impl FuseFs {
         new_parent: u64,
         new_name: &OsStr,
     ) -> FxfsResult<ReplyEntry> {
-        if let Some(object_type) = self.get_object_type(inode).await? {
-            if object_type == ObjectDescriptor::File {
-                let dir = self.open_dir(new_parent).await?;
+        if self.get_object_type(inode).await? == ObjectDescriptor::File {
+            let dir = self.open_dir(new_parent).await?;
 
-                let mut transaction = self
-                    .fs
-                    .clone()
-                    .new_transaction(
-                        &[
-                            LockKey::object(self.default_store.store_object_id(), dir.object_id()),
-                            LockKey::object(self.default_store.store_object_id(), inode),
-                        ],
-                        Options::default(),
-                    )
-                    .await?;
-                if dir.lookup(new_name.osstr_to_str()?).await?.is_none() {
-                    dir.insert_child(
-                        &mut transaction,
-                        new_name.osstr_to_str()?,
-                        inode,
-                        ObjectDescriptor::File,
-                    )
-                    .await?;
+            let mut transaction = self
+                .fs
+                .clone()
+                .new_transaction(
+                    &[
+                        LockKey::object(self.default_store.store_object_id(), dir.object_id()),
+                        LockKey::object(self.default_store.store_object_id(), inode),
+                    ],
+                    Options::default(),
+                )
+                .await?;
+            if dir.lookup(new_name.osstr_to_str()?).await?.is_none() {
+                dir.insert_child(
+                    &mut transaction,
+                    new_name.osstr_to_str()?,
+                    inode,
+                    ObjectDescriptor::File,
+                )
+                .await?;
 
-                    // Increase the number of refs to the file by 1.
-                    self.default_store.adjust_refs(&mut transaction, inode, 1).await?;
-                    transaction.commit().await?;
+                // Increase the number of refs to the file by 1.
+                self.default_store.adjust_refs(&mut transaction, inode, 1).await?;
+                transaction.commit().await?;
 
-                    Ok(ReplyEntry {
-                        ttl: TTL,
-                        attr: self.create_object_attr(inode, ObjectDescriptor::File).await?,
-                        generation: 0,
-                    })
-                } else {
-                    Err(FxfsError::AlreadyExists.into())
-                }
+                Ok(ReplyEntry {
+                    ttl: TTL,
+                    attr: self.create_object_attr(inode, ObjectDescriptor::File).await?,
+                    generation: 0,
+                })
             } else {
-                Err(FxfsError::NotFile.into())
+                Err(FxfsError::AlreadyExists.into())
             }
         } else {
-            Err(FxfsError::NotFound.into())
+            Err(FxfsError::NotFile.into())
         }
     }
 }
@@ -1214,7 +1156,7 @@ mod tests {
             Errno, FileType, Result, SetAttr, Timestamp,
         },
         futures::stream::StreamExt,
-        fxfs::{filesystem::Filesystem as FxFs, object_store::ObjectDescriptor},
+        fxfs::{errors::FxfsError, filesystem::Filesystem as FxFs, object_store::ObjectDescriptor},
         std::ffi::OsStr,
     };
 
@@ -1487,12 +1429,12 @@ mod tests {
             .expect("create file failed");
         let unlink_res = fs.unlink(new_fake_request(), dir.object_id(), OsStr::new("foo")).await;
         let lookup_res = dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap();
-        let type_res =
-            fs.get_object_type(file_reply.attr.ino).await.expect("get_object_type failed");
+        assert!(FxfsError::NotFound.matches(
+            &fs.get_object_type(file_reply.attr.ino).await.expect_err("get_object_type succeeded")
+        ));
 
         assert_eq!(unlink_res, Ok(()));
         assert_eq!(lookup_res, None);
-        assert_eq!(type_res, None);
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
@@ -1508,12 +1450,14 @@ mod tests {
 
         let unlink_res = fs.unlink(new_fake_request(), dir.object_id(), OsStr::new("link")).await;
         let lookup_res = dir.lookup(OsStr::new("link").osstr_to_str().unwrap()).await.unwrap();
-        let type_res =
-            fs.get_object_type(symlin_reply.attr.ino).await.expect("get_object_type failed");
+        assert!(FxfsError::NotFound.matches(
+            &fs.get_object_type(symlin_reply.attr.ino)
+                .await
+                .expect_err("get_object_type succeeded")
+        ));
 
         assert_eq!(unlink_res, Ok(()));
         assert_eq!(lookup_res, None);
-        assert_eq!(type_res, None);
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
@@ -3800,9 +3744,10 @@ mod tests {
             .expect("lookup failed");
         assert_eq!(lookup_reply.attr.ino, symlink_reply.attr.ino);
 
-        let type_res =
-            fs.get_object_type(symlink_reply.attr.ino).await.expect("get_object_type failed");
-        assert_eq!(type_res, Some(ObjectDescriptor::Symlink));
+        assert_eq!(
+            fs.get_object_type(symlink_reply.attr.ino).await.expect("get_object_type failed"),
+            ObjectDescriptor::Symlink
+        );
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
@@ -3849,9 +3794,10 @@ mod tests {
             .expect("lookup failed");
         assert_eq!(lookup_reply.attr.ino, create_reply.attr.ino);
 
-        let type_res =
-            fs.get_object_type(hardlink_reply.attr.ino).await.expect("get_object_type failed");
-        assert_eq!(type_res, Some(ObjectDescriptor::File));
+        assert_eq!(
+            fs.get_object_type(hardlink_reply.attr.ino).await.expect("get_object_type failed"),
+            ObjectDescriptor::File
+        );
 
         fs.fs.close().await.expect("failed to close filesystem");
     }
@@ -4036,9 +3982,9 @@ mod tests {
         let fs = FuseFs::open_file_backed("/tmp/fuse_file_test", String::new()).await;
         let dir = fs.root_dir().await.expect("root_dir failed");
 
-        let (_child_id, _child_descriptor) =
+        let (_child_id, child_descriptor) =
             dir.lookup(OsStr::new("foo").osstr_to_str().unwrap()).await.unwrap().unwrap();
-        assert_eq!(_child_descriptor, ObjectDescriptor::File);
+        assert_eq!(child_descriptor, ObjectDescriptor::File);
 
         fs.fs.close().await.expect("failed to close filesystem");
     }

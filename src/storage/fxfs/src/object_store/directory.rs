@@ -295,33 +295,23 @@ impl<S: HandleOwner> Directory<S> {
         Ok(handle)
     }
 
-    /// Returns the link of a symlink object.
-    pub async fn read_symlink(&self, object_id: u64) -> Result<Option<String>, Error> {
-        trace_duration!("Directory::lookup");
-        if self.is_deleted() {
-            return Ok(None);
-        }
-        match self.store().tree().find(&ObjectKey::symlink(object_id)).await? {
-            None | Some(ObjectItem { value: ObjectValue::None, .. }) => Ok(None),
-            Some(ObjectItem { value: ObjectValue::Symlink { link }, .. }) => Ok(Some(link)),
-            Some(item) => Err(anyhow!(FxfsError::Inconsistent)
-                .context(format!("Unexpected item in lookup: {:?}", item))),
-        }
-    }
-
-    pub async fn add_symlink<'a>(
+    pub async fn create_symlink(
         &self,
-        transaction: &mut Transaction<'a>,
-        link: &str,
+        transaction: &mut Transaction<'_>,
+        link: &[u8],
         name: &str,
-        symlink_id: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<u64, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
+        // Limit the length of link that might be too big to put in the tree.
+        // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/limits.h.html.
+        // See _POSIX_SYMLINK_MAX.
+        ensure!(link.len() <= 256, FxfsError::BadPath);
+        let symlink_id = self.store().get_next_object_id().await?;
         transaction.add(
             self.store().store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::symlink(symlink_id),
-                ObjectValue::symlink(link),
+            Mutation::insert_object(
+                ObjectKey::object(symlink_id),
+                ObjectValue::symlink(link, Timestamp::now(), Timestamp::now(), 0),
             ),
         );
         transaction.add(
@@ -332,28 +322,12 @@ impl<S: HandleOwner> Directory<S> {
             ),
         );
         self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await?;
-        Ok(())
-    }
-
-    pub async fn create_symlink<'a>(
-        &self,
-        transaction: &mut Transaction<'a>,
-        link: &str,
-        name: &str,
-    ) -> Result<u64, Error> {
-        ensure!(!self.is_deleted(), FxfsError::Deleted);
-        // Limit the length of link that might be too big to put in the tree.
-        // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/limits.h.html.
-        // See _POSIX_SYMLINK_MAX.
-        ensure!(link.len() <= 256, FxfsError::BadPath);
-        let symlink_id = self.store().get_next_object_id().await?;
-        self.add_symlink(transaction, link, name, symlink_id).await?;
         Ok(symlink_id)
     }
 
-    pub async fn add_child_volume<'a>(
+    pub async fn add_child_volume(
         &self,
-        transaction: &mut Transaction<'a>,
+        transaction: &mut Transaction<'_>,
         volume_name: &str,
         store_object_id: u64,
     ) -> Result<(), Error> {
@@ -665,7 +639,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
         Some((old_id, ObjectDescriptor::Symlink)) => {
             transaction.add(
                 dst.0.store().store_object_id(),
-                Mutation::replace_or_insert_object(ObjectKey::symlink(old_id), ObjectValue::None),
+                Mutation::replace_or_insert_object(ObjectKey::object(old_id), ObjectValue::None),
             );
             ReplacedChild::None
         }
@@ -1456,7 +1430,7 @@ mod tests {
                 Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
 
             let symlink_id = dir
-                .create_symlink(&mut transaction, "link", "foo")
+                .create_symlink(&mut transaction, b"link", "foo")
                 .await
                 .expect("create_symlink failed");
             transaction.commit().await.expect("commit failed");
@@ -1487,18 +1461,17 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        let dir =
-            Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        let store = fs.root_store();
+        let dir = Directory::create(&mut transaction, &store).await.expect("create failed");
 
         let symlink_id = dir
-            .create_symlink(&mut transaction, "link", "foo")
+            .create_symlink(&mut transaction, b"link", "foo")
             .await
             .expect("create_symlink failed");
         transaction.commit().await.expect("commit failed");
 
-        let link =
-            dir.read_symlink(symlink_id).await.expect("read_symlink failed").expect("not found");
-        assert_eq!(link, "link".to_owned());
+        let link = store.read_symlink(symlink_id).await.expect("read_symlink failed");
+        assert_eq!(&link, b"link");
         fs.close().await.expect("Close failed");
     }
 
@@ -1512,17 +1485,21 @@ mod tests {
             .new_transaction(&[], Options::default())
             .await
             .expect("new_transaction failed");
-        dir = Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
+        let store = fs.root_store();
+        dir = Directory::create(&mut transaction, &store).await.expect("create failed");
 
         let symlink_id = dir
-            .create_symlink(&mut transaction, "link", "foo")
+            .create_symlink(&mut transaction, b"link", "foo")
             .await
             .expect("create_symlink failed");
         transaction.commit().await.expect("commit failed");
         transaction = fs
             .clone()
             .new_transaction(
-                &[LockKey::object(fs.root_store().store_object_id(), dir.object_id())],
+                &[
+                    LockKey::object(store.store_object_id(), dir.object_id()),
+                    LockKey::object(store.store_object_id(), symlink_id),
+                ],
                 Options::default(),
             )
             .await
@@ -1536,7 +1513,8 @@ mod tests {
         transaction.commit().await.expect("commit failed");
 
         assert_eq!(dir.lookup("foo").await.expect("lookup failed"), None);
-        assert_eq!(dir.read_symlink(symlink_id).await.expect("read_symlink failed"), None);
+        assert!(FxfsError::NotFound
+            .matches(&store.read_symlink(symlink_id).await.expect_err("read_symlink succeeded")));
         fs.close().await.expect("Close failed");
     }
 }

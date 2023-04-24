@@ -65,9 +65,10 @@ unsafe impl Sync for ScannedDir {}
 
 #[derive(Debug)]
 enum ScannedObject {
-    File(ScannedFile),
     Directory(ScannedDir),
+    File(ScannedFile),
     Graveyard,
+    Symlink,
     // A tombstoned object, which should have no other records associated with it.
     Tombstone,
 }
@@ -140,7 +141,7 @@ impl<'a> ScannedStore<'a> {
                         kind: ObjectKind::File { refs, allocated_size },
                         attributes: ObjectAttributes { project_id, .. },
                     } => {
-                        if project_id > &0 {
+                        if *project_id > 0 {
                             self.used_project_ids.insert(*project_id, key.object_id);
                             let entry = self.total_project_usages.entry(*project_id).or_default();
                             entry.0 += i64::try_from(*allocated_size).unwrap();
@@ -169,7 +170,7 @@ impl<'a> ScannedStore<'a> {
                         kind: ObjectKind::Directory { sub_dirs },
                         attributes: ObjectAttributes { project_id, .. },
                     } => {
-                        if project_id > &0 {
+                        if *project_id > 0 {
                             self.used_project_ids.insert(*project_id, key.object_id);
                             let entry = self.total_project_usages.entry(*project_id).or_default();
                             // Increment only nodes.
@@ -201,6 +202,18 @@ impl<'a> ScannedStore<'a> {
                                 key.object_id,
                             ))?;
                         }
+                    }
+                    ObjectValue::Object {
+                        kind: ObjectKind::Symlink { .. },
+                        attributes: ObjectAttributes { project_id, .. },
+                    } => {
+                        if *project_id > 0 {
+                            self.used_project_ids.insert(*project_id, key.object_id);
+                            let entry = self.total_project_usages.entry(*project_id).or_default();
+                            // Increment only nodes.
+                            entry.1 += 1;
+                        }
+                        self.objects.insert(key.object_id, ScannedObject::Symlink);
                     }
                     _ => {
                         self.fsck.error(FsckError::MalformedObjectRecord(
@@ -251,8 +264,8 @@ impl<'a> ScannedStore<'a> {
                             Some(ScannedObject::File(ScannedFile { attributes, .. })) => {
                                 attributes.push((attribute_id, *size));
                             }
-                            Some(ScannedObject::Directory(..)) => {
-                                self.fsck.error(FsckError::AttributeOnDirectory(
+                            Some(ScannedObject::Directory(..) | ScannedObject::Symlink) => {
+                                self.fsck.error(FsckError::AttributeNotOnFile(
                                     self.store_id,
                                     key.object_id,
                                 ))?;
@@ -391,7 +404,6 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
-            ObjectKeyData::Symlink { .. } => unimplemented!(),
             ObjectKeyData::GraveyardEntry { .. } => {}
         }
         Ok(())
@@ -436,6 +448,7 @@ impl<'a> ScannedStore<'a> {
                 let expected = match s {
                     ScannedObject::Directory(_) => ObjectDescriptor::Directory,
                     ScannedObject::File(_) | ScannedObject::Graveyard => ObjectDescriptor::File,
+                    ScannedObject::Symlink => ObjectDescriptor::Symlink,
                     ScannedObject::Tombstone => unreachable!(),
                 };
                 if &expected != object_descriptor {
@@ -449,7 +462,7 @@ impl<'a> ScannedStore<'a> {
             }
         }
         match self.objects.get_mut(&parent_id) {
-            Some(ScannedObject::File(..) | ScannedObject::Graveyard) => {
+            Some(ScannedObject::File(..) | ScannedObject::Graveyard | ScannedObject::Symlink) => {
                 self.fsck.error(FsckError::ObjectHasChildren(self.store_id, parent_id))?;
             }
             Some(ScannedObject::Directory(ScannedDir { sub_dirs, .. })) => {
@@ -755,6 +768,7 @@ pub(super) async fn scan_store(
     let mut num_objects = 0;
     let mut files = 0;
     let mut directories = 0;
+    let mut symlinks = 0;
     let mut tombstones = 0;
     let mut other = 0;
     let mut stack = Vec::new();
@@ -853,6 +867,7 @@ pub(super) async fn scan_store(
                 }
             }
             ScannedObject::Graveyard => other += 1,
+            ScannedObject::Symlink => symlinks += 1,
             ScannedObject::Tombstone => {
                 tombstones += 1;
                 num_objects -= 1;
@@ -863,8 +878,8 @@ pub(super) async fn scan_store(
         fsck.error(FsckError::ObjectCountMismatch(store_id, store.object_count(), num_objects))?;
     }
     fsck.verbose(format!(
-        "Store {} has {} files, {} dirs, {} tombstones, {} other objects",
-        store_id, files, directories, tombstones, other
+        "Store {store_id} has {files} files, {directories} dirs, {symlinks} symlinks, \
+         {tombstones} tombstones, {other} other objects",
     ));
 
     Ok(())

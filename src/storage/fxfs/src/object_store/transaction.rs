@@ -679,9 +679,6 @@ impl<'a> Transaction<'a> {
                     // Merges are all handled like atomic +/- and serialized by the tree locks.
                     Operation::Merge => {}
                 },
-                ObjectKeyData::Symlink => {
-                    // TODO(fxbug.dev/122976): Check lock requirements.
-                }
             }
         }
     }
