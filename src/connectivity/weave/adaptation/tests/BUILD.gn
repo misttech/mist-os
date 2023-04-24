@@ -129,13 +129,14 @@ resource("weavestack-adaptation-resources") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-config_data("weavestack-adaptation-config") {
-  for_pkg = "weavestack-adaptation-unittests"
+resource("weavestack-adaptation-config") {
   sources = [
     "testdata/default_environment.json",
     "testdata/device_info.json",
     "testdata/device_info_alt.json",
   ]
+  outputs =
+      [ "weavestack-adaptation-unittests-config-data/{{source_file_part}}" ]
 }
 
 group("common_test_deps") {

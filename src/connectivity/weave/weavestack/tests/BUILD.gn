@@ -36,12 +36,12 @@ executable("unittests") {
   ]
 }
 
-config_data("config") {
-  for_pkg = "weavestack-unittests"
+resource("config") {
   sources = [
     "testdata/default_environment.json",
     "testdata/device_info.json",
   ]
+  outputs = [ "weavestack-unittests/{{source_file_part}}" ]
 }
 
 resource("data") {

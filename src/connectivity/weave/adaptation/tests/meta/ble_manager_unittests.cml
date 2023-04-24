@@ -6,7 +6,7 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
 
-        // Depends on config_data which is a system capability.
+        // Depends on system bluetooth capabilities.
         "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -21,10 +21,11 @@
             ],
         },
         {
-            directory: "config-data",
+            directory: "pkg",
+            from: "framework",
             rights: [ "r*" ],
             path: "/config/data",
-            subdir: "weavestack-adaptation-unittests",
+            subdir: "weavestack-adaptation-unittests-config-data",
         },
     ],
 }
