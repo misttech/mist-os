@@ -11,9 +11,4 @@
         runner: "rust_test_runner",
         binary: "bin/dhcp_client_bin_test",
     },
-    use: [
-        {
-            protocol: [ "fuchsia.posix.socket.packet.Provider" ],
-        },
-    ],
 }

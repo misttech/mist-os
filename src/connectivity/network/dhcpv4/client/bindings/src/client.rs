@@ -2,14 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::cell::RefCell;
+
+use assert_matches::assert_matches;
 use async_trait::async_trait;
+use fidl::endpoints;
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp::{
-    ClientExitReason, ClientRequestStream, ClientWatchConfigurationResponse,
+    self as fdhcp, ClientExitReason, ClientRequestStream, ClientWatchConfigurationResponse,
     ConfigurationToRequest, NewClientParams,
 };
+use fidl_fuchsia_net_ext::IntoExt as _;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
 use futures::{channel::mpsc, TryStreamExt as _};
+use net_types::{
+    ip::{Ipv4, PrefixLength},
+    Witness as _,
+};
 use rand::SeedableRng as _;
-use std::cell::RefCell;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
@@ -83,23 +95,31 @@ struct Clock;
 
 #[async_trait(?Send)]
 impl dhcp_client_core::deps::Clock for Clock {
-    type Instant = fuchsia_async::Time;
+    type Instant = fasync::Time;
 
     fn now(&self) -> Self::Instant {
-        fuchsia_async::Time::now()
+        fasync::Time::now()
     }
 
     async fn wait_until(&self, time: Self::Instant) {
-        fuchsia_async::Timer::new(time).await
+        fasync::Timer::new(time).await
     }
 }
 
 /// Encapsulates all DHCP client state.
 struct Client {
     config: dhcp_client_core::client::ClientConfig,
-    core: dhcp_client_core::client::State<fuchsia_async::Time>,
+    core: dhcp_client_core::client::State<fasync::Time>,
     rng: rand::rngs::StdRng,
     stop_receiver: mpsc::UnboundedReceiver<()>,
+    current_lease: Option<Lease>,
+}
+
+#[derive(Debug, Clone)]
+struct Lease {
+    // TODO(https://fxbug.dev/126084): Handle duplicate address detection and
+    // address-already-exists errors.
+    _address_state_provider: fnet_interfaces_admin::AddressStateProviderProxy,
 }
 
 impl Client {
@@ -135,7 +155,102 @@ impl Client {
             preferred_lease_time_secs: None,
             requested_ip_address: None,
         };
-        Ok(Self { core: dhcp_client_core::client::State::default(), rng, config, stop_receiver })
+        Ok(Self {
+            core: dhcp_client_core::client::State::default(),
+            rng,
+            config,
+            stop_receiver,
+            current_lease: None,
+        })
+    }
+
+    fn handle_newly_acquired_lease(
+        &mut self,
+        dhcp_client_core::client::NewlyAcquiredLease {
+            ip_address,
+            start_time,
+            lease_time,
+            parameters,
+        }: dhcp_client_core::client::NewlyAcquiredLease<fasync::Time>,
+    ) -> Result<ClientWatchConfigurationResponse, Error> {
+        let Self { core: _, rng: _, config: _, stop_receiver: _, current_lease } = self;
+
+        let mut dns_servers: Option<Vec<_>> = None;
+        let mut routers: Option<Vec<_>> = None;
+        let mut prefix_len: Option<PrefixLength<Ipv4>> = None;
+        let mut unrequested_options = Vec::new();
+
+        for option in parameters {
+            match option {
+                dhcp_protocol::DhcpOption::SubnetMask(len) => {
+                    assert_eq!(prefix_len.replace(len), None);
+                }
+                dhcp_protocol::DhcpOption::DomainNameServer(list) => {
+                    assert_eq!(dns_servers.replace(list.into()), None);
+                }
+                dhcp_protocol::DhcpOption::Router(list) => {
+                    assert_eq!(routers.replace(list.into()), None);
+                }
+                _ => {
+                    unrequested_options.push(option);
+                }
+            }
+        }
+
+        if !unrequested_options.is_empty() {
+            panic!("Received options from core that we didn't ask for: {unrequested_options:#?}");
+        }
+
+        let prefix_len = prefix_len
+            .expect(
+                "subnet mask should be present \
+                because it was specified to core as required",
+            )
+            .get();
+
+        let (asp_proxy, asp_server_end) = endpoints::create_proxy::<
+            fnet_interfaces_admin::AddressStateProviderMarker,
+        >()
+        .expect("should never get FIDL error while creating AddressStateProvider endpoints");
+
+        assert_matches!(
+            current_lease.replace(Lease { _address_state_provider: asp_proxy }),
+            None,
+            "should not currently have a lease"
+        );
+
+        Ok(ClientWatchConfigurationResponse {
+            address: Some(fdhcp::Address {
+                address: Some(fnet::Ipv4AddressWithPrefix {
+                    addr: ip_address.get().into_ext(),
+                    prefix_len,
+                }),
+                address_parameters: Some(fnet_interfaces_admin::AddressParameters {
+                    initial_properties: Some(fnet_interfaces_admin::AddressProperties {
+                        preferred_lifetime_info: None,
+                        valid_lifetime_end: Some(
+                            zx::Time::from(start_time + lease_time.into()).into_nanos(),
+                        ),
+                        ..fnet_interfaces_admin::AddressProperties::EMPTY
+                    }),
+                    add_subnet_route: Some(true),
+                    ..fnet_interfaces_admin::AddressParameters::EMPTY
+                }),
+                address_state_provider: Some(asp_server_end),
+                ..fdhcp::Address::EMPTY
+            }),
+            dns_servers: dns_servers.map(|list| {
+                list.into_iter()
+                    .map(|addr| net_types::ip::Ipv4Addr::from(addr).into_ext())
+                    .collect()
+            }),
+            routers: routers.map(|list| {
+                list.into_iter()
+                    .map(|addr| net_types::ip::Ipv4Addr::from(addr).into_ext())
+                    .collect()
+            }),
+            ..ClientWatchConfigurationResponse::EMPTY
+        })
     }
 
     async fn watch_configuration(
@@ -144,17 +259,26 @@ impl Client {
     ) -> Result<ClientWatchConfigurationResponse, Error> {
         let clock = Clock;
         loop {
-            let Self { core, rng, config, stop_receiver } = self;
-            *core = match core.run(config, packet_socket_provider, rng, &clock, stop_receiver).await
-            {
+            let Self { core, rng, config, stop_receiver, current_lease: _ } = self;
+            match core.run(config, packet_socket_provider, rng, &clock, stop_receiver).await {
                 Err(e) => return Err(Error::Core(e)),
                 Ok(step) => match step {
-                    dhcp_client_core::client::Step::NextState(core) => core,
+                    dhcp_client_core::client::Step::NextState(next_core) => {
+                        *core = next_core;
+                    }
                     dhcp_client_core::client::Step::Exit(reason) => match reason {
                         dhcp_client_core::client::ExitReason::GracefulShutdown => {
                             return Err(Error::Exit(ClientExitReason::GracefulShutdown))
                         }
                     },
+                    dhcp_client_core::client::Step::NewLeaseAndNextState(
+                        newly_acquired_lease,
+                        next_core,
+                    ) => {
+                        *core = next_core;
+
+                        return self.handle_newly_acquired_lease(newly_acquired_lease);
+                    }
                 },
             };
         }

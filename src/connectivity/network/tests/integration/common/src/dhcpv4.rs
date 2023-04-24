@@ -11,6 +11,7 @@ use dhcpv4::protocol::IntoFidlExt as _;
 use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_declare::{fidl_ip_v4, net::prefix_length_v4, std_ip_v4};
+use net_types::ip::{Ipv4, PrefixLength};
 
 /// Encapsulates a minimal configuration needed to test a DHCP client/server combination.
 pub struct TestConfig {
@@ -59,11 +60,14 @@ impl TestConfig {
     }
 }
 
+/// Default prefix length of default configuration's address pool.
+pub const DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH: PrefixLength<Ipv4> = prefix_length_v4!(25);
+
 /// Default configuration.
 pub const DEFAULT_TEST_CONFIG: TestConfig = TestConfig {
     server_addr: fidl_ip_v4!("192.168.0.1"),
     managed_addrs: dhcpv4::configuration::ManagedAddresses {
-        mask: dhcpv4::configuration::SubnetMask::new(prefix_length_v4!(25)),
+        mask: dhcpv4::configuration::SubnetMask::new(DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH),
         pool_range_start: std_ip_v4!("192.168.0.2"),
         pool_range_stop: std_ip_v4!("192.168.0.5"),
     },

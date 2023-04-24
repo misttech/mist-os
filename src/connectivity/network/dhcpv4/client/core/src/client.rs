@@ -11,7 +11,7 @@ use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
 use futures::{
     channel::mpsc, pin_mut, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _,
 };
-use net_types::{ethernet::Mac, Witness as _};
+use net_types::{ethernet::Mac, SpecifiedAddr, Witness as _};
 use rand::Rng as _;
 use std::{net::Ipv4Addr, num::NonZeroU32, time::Duration};
 
@@ -43,12 +43,17 @@ pub enum State<I> {
     /// The Requesting state (broadcasting DHCPREQUESTs and receiving DHCPACKs
     /// and DHCPNAKs).
     Requesting(Requesting<I>),
+    /// The Bound state (we actively have a lease and are waiting to transition
+    /// to Renewing).
+    Bound(Bound<I>),
 }
 
 /// The next step to take after running the core state machine for one step.
 pub enum Step<I> {
     /// Transition to another state.
     NextState(State<I>),
+    /// Yield a newly-acquired lease, and transition to another state.
+    NewLeaseAndNextState(NewlyAcquiredLease<I>, State<I>),
     /// Exit the client.
     Exit(ExitReason),
 }
@@ -88,9 +93,25 @@ impl<I: deps::Instant> State<I> {
                     RequestingOutcome::GracefulShutdown => {
                         Ok(Step::Exit(ExitReason::GracefulShutdown))
                     }
-                    RequestingOutcome::Bound(_) => todo!(
-                        "TODO(https://fxbug.dev/125104): Yield acquired leases through bindings."
-                    ),
+                    RequestingOutcome::Bound(bound, parameters) => {
+                        let Bound {
+                            yiaddr,
+                            server_identifier: _,
+                            ip_address_lease_time,
+                            renewal_time: _,
+                            rebinding_time: _,
+                            start_time,
+                        } = &bound;
+                        Ok(Step::NewLeaseAndNextState(
+                            NewlyAcquiredLease {
+                                ip_address: *yiaddr,
+                                start_time: *start_time,
+                                lease_time: *ip_address_lease_time,
+                                parameters,
+                            },
+                            State::Bound(bound),
+                        ))
+                    }
                     RequestingOutcome::Nak(nak) => {
                         // Per RFC 2131 section 3.1: "If the client receives a
                         // DHCPNAK message, the client restarts the
@@ -99,6 +120,16 @@ impl<I: deps::Instant> State<I> {
                         Ok(Step::NextState(State::Init(Init::default())))
                     }
                 }
+            }
+            State::Bound(bound) => {
+                let _: &Bound<_> = bound;
+
+                // TODO(https://fxbug.dev/125443): Implement Bound state.
+                // In order to unblock testing, rather than panicking here with
+                // a todo!, we instead just block until a shutdown request comes
+                // in.
+                stop_receiver.select_next_some().await;
+                Ok(Step::Exit(ExitReason::GracefulShutdown))
             }
         }
     }
@@ -490,7 +521,7 @@ fn validate_message(
 pub(crate) enum RequestingOutcome<I> {
     RanOutOfRetransmits,
     GracefulShutdown,
-    Bound(Bound<I>),
+    Bound(Bound<I>, Vec<dhcp_protocol::DhcpOption>),
     Nak(crate::parse::FieldsToRetainFromNak),
 }
 
@@ -594,7 +625,38 @@ impl<I: deps::Instant> Requesting<I> {
 
         match fields_to_retain {
             crate::parse::IncomingMessageDuringRequesting::Ack(ack) => {
-                Ok(RequestingOutcome::Bound(Bound { ack, start_time: *start_time }))
+                let crate::parse::FieldsToRetainFromAck {
+                    yiaddr,
+                    server_identifier,
+                    ip_address_lease_time_secs,
+                    renewal_time_value_secs,
+                    rebinding_time_value_secs,
+                    parameters,
+                } = ack;
+                Ok(RequestingOutcome::Bound(
+                    Bound {
+                        yiaddr,
+                        server_identifier: server_identifier.unwrap_or({
+                            let crate::parse::FieldsFromOfferToUseInRequest {
+                                server_identifier,
+                                ip_address_lease_time_secs: _,
+                                ip_address_to_request: _,
+                            } = fields_from_offer_to_use_in_request;
+                            *server_identifier
+                        }),
+                        ip_address_lease_time: Duration::from_secs(
+                            ip_address_lease_time_secs.get().into(),
+                        ),
+                        renewal_time: renewal_time_value_secs
+                            .map(u64::from)
+                            .map(Duration::from_secs),
+                        rebinding_time: rebinding_time_value_secs
+                            .map(u64::from)
+                            .map(Duration::from_secs),
+                        start_time: *start_time,
+                    },
+                    parameters,
+                ))
             }
             crate::parse::IncomingMessageDuringRequesting::Nak(nak) => {
                 Ok(RequestingOutcome::Nak(nak))
@@ -629,8 +691,26 @@ fn build_request(
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4.1
 #[derive(Debug, PartialEq)]
 pub struct Bound<I> {
-    ack: crate::parse::FieldsToRetainFromAck,
+    yiaddr: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    server_identifier: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    ip_address_lease_time: Duration,
     start_time: I,
+    renewal_time: Option<Duration>,
+    rebinding_time: Option<Duration>,
+}
+
+/// A newly-acquired DHCP lease.
+pub struct NewlyAcquiredLease<I> {
+    /// The IP address acquired.
+    pub ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
+    /// The start time of the lease.
+    pub start_time: I,
+    /// The length of the lease.
+    pub lease_time: Duration,
+    /// Configuration parameters acquired from the server. Guaranteed to be a
+    /// subset of the parameters requested in the `parameter_request_list` in
+    /// `ClientConfig`.
+    pub parameters: Vec<dhcp_protocol::DhcpOption>,
 }
 
 #[cfg(test)]
@@ -1379,22 +1459,17 @@ mod test {
         .chain(test_parameter_values())
         .collect(),
     } => RequestingOutcome::Bound(Bound {
-        ack: crate::parse::FieldsToRetainFromAck {
-            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
-                .try_into()
-                .expect("should be specified"),
-            server_identifier: Some(net_types::ip::Ipv4Addr::from(SERVER_IP)
-                .try_into()
-                .expect("should be specified")),
-            ip_address_lease_time_secs: DEFAULT_LEASE_LENGTH_SECONDS
-                .try_into()
-                .expect("should be nonzero"),
-            renewal_time_value_secs: None,
-            rebinding_time_value_secs: None,
-            parameters: test_parameter_values().into_iter().collect(),
-        },
+        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+            .try_into()
+            .expect("should be specified"),
+        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+            .try_into()
+            .expect("should be specified"),
+        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+        renewal_time: None,
+        rebinding_time: None,
         start_time: std::time::Duration::from_secs(0),
-    }) ; "transitions to Bound after receiving DHCPACK")]
+    }, test_parameter_values().into_iter().collect()) ; "transitions to Bound after receiving DHCPACK")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: YIADDR,
         options: [
