@@ -10,7 +10,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-namespace i915 {
+namespace ddk_mock {
 
 namespace {
 
@@ -377,4 +377,4 @@ TEST_F(MockMmioRangeTest, CheckAllAccessesReplayedIncomplete) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace ddk_mock

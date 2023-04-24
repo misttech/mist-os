@@ -71,7 +71,7 @@ class PowerControllerTest : public ::testing::Test {
   constexpr static int kRealClockTestTimeout = 1'000'000;
 
   constexpr static int kMmioRangeSize = 0x140000;
-  MockMmioRange mmio_range_{kMmioRangeSize, MockMmioRange::Size::k32};
+  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
   ScopedValueChange<int> previous_timeout_change_;
@@ -86,7 +86,7 @@ class PowerControllerTest : public ::testing::Test {
 };
 
 TEST_F(PowerControllerTest, TransactImmediateSuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x9abc'def0, .write = true},
       {.address = kMailboxData1Offset, .value = 0x1234'5678, .write = true},
@@ -109,7 +109,7 @@ TEST_F(PowerControllerTest, TransactImmediateSuccess) {
 }
 
 TEST_F(PowerControllerTest, TransactSuccessAfterDelay) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x9abc'def0, .write = true},
       {.address = kMailboxData1Offset, .value = 0x1234'5678, .write = true},
@@ -134,7 +134,7 @@ TEST_F(PowerControllerTest, TransactSuccessAfterDelay) {
 }
 
 TEST_F(PowerControllerTest, TransactCommandTimeout) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x9abc'def0, .write = true},
       {.address = kMailboxData1Offset, .value = 0x1234'5678, .write = true},
@@ -157,7 +157,7 @@ TEST_F(PowerControllerTest, TransactCommandTimeout) {
 }
 
 TEST_F(PowerControllerTest, TransactCommandZeroTimeout) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x9abc'def0, .write = true},
       {.address = kMailboxData1Offset, .value = 0x1234'5678, .write = true},
@@ -180,7 +180,7 @@ TEST_F(PowerControllerTest, TransactSuccessAfterPriorCommandDelay) {
   previous_timeout_change_.reset();
   previous_timeout_change_ =
       PowerController::OverridePreviousCommandTimeoutUsForTesting(kLargeTimeout);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0x8000'0007},
       {.address = kMailboxInterfaceOffset, .value = 0x8000'0007},
       {.address = kMailboxInterfaceOffset, .value = 0x0000'0007},
@@ -208,7 +208,7 @@ TEST_F(PowerControllerTest, TransactSuccessAfterPriorAndCurrentCommandDelay) {
   previous_timeout_change_.reset();
   previous_timeout_change_ =
       PowerController::OverridePreviousCommandTimeoutUsForTesting(kLargeTimeout);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0x8000'0007},
       {.address = kMailboxInterfaceOffset, .value = 0x8000'0007},
       {.address = kMailboxInterfaceOffset, .value = 0x0000'0007},
@@ -237,7 +237,7 @@ TEST_F(PowerControllerTest, TransactSuccessAfterPriorAndCurrentCommandDelay) {
 TEST_F(PowerControllerTest, TransactPreviousCommandTimeout) {
   previous_timeout_change_.reset();
   previous_timeout_change_ = PowerController::OverridePreviousCommandTimeoutUsForTesting(0);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0x8042'4140},
   }));
   PowerController power_controller(&mmio_buffer_);
@@ -253,7 +253,7 @@ TEST_F(PowerControllerTest, TransactPreviousCommandTimeout) {
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelNoRetrySuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -270,7 +270,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelNoRetrySuccess) {
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetrySuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -287,7 +287,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetrySuccess) {
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetryRefused) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -307,7 +307,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetryReplyTimeou
   voltage_level_reply_timeout_change_.reset();
   voltage_level_reply_timeout_change_ =
       PowerController::OverrideVoltageLevelRequestReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -325,7 +325,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetryReplyTimeou
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryImmediateSuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -342,7 +342,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryImmediateSuccess) {
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetrySuccessAfterRetries) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -380,7 +380,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutBeforeRetry) {
   voltage_level_timeout_change_.reset();
   voltage_level_timeout_change_ =
       PowerController::OverrideVoltageLevelRequestTotalTimeoutUsForTesting(0);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -436,7 +436,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryReplyTimeout) {
   voltage_level_reply_timeout_change_.reset();
   voltage_level_reply_timeout_change_ =
       PowerController::OverrideVoltageLevelRequestReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -454,7 +454,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryReplyTimeout) {
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnNoRetrySuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -471,7 +471,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnNoRetrySuccess
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetrySuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -488,7 +488,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetrySucces
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetryRefused) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -508,7 +508,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetryReplyT
   typec_blocking_reply_timeout_change_.reset();
   typec_blocking_reply_timeout_change_ =
       PowerController::OverrideTypeCColdBlockingChangeReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -526,7 +526,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetryReplyT
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryImmediateSuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -543,7 +543,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryImmediate
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetrySuccessAfterRetries) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -581,7 +581,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutBe
   typec_blocking_timeout_change_.reset();
   typec_blocking_timeout_change_ =
       PowerController::OverrideTypeCColdBlockingChangeTotalTimeoutUsForTesting(0);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -637,7 +637,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffOnRetryReplyT
   typec_blocking_reply_timeout_change_.reset();
   typec_blocking_reply_timeout_change_ =
       PowerController::OverrideTypeCColdBlockingChangeReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0001, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -655,7 +655,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffOnRetryReplyT
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseNoRetrySuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -672,7 +672,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseNoRetrySuccess)
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetrySuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -689,7 +689,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetrySuccess) 
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetryRefused) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -709,7 +709,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetryReplyTime
   system_agent_enablement_reply_timeout_change_.reset();
   system_agent_enablement_reply_timeout_change_ =
       PowerController::OverrideSystemAgentEnablementChangeReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0003, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -727,7 +727,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetryReplyTime
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryImmediateSuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -744,7 +744,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryImmediateS
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetrySuccessAfterRetries) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -782,7 +782,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutBef
   system_agent_enablement_timeout_change_.reset();
   system_agent_enablement_timeout_change_ =
       PowerController::OverrideSystemAgentEnablementChangeTotalTimeoutUsForTesting(0);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -838,7 +838,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryReplyTimeo
   system_agent_enablement_reply_timeout_change_.reset();
   system_agent_enablement_reply_timeout_change_ =
       PowerController::OverrideSystemAgentEnablementChangeReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -854,7 +854,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryReplyTimeo
 }
 
 TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeSuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -872,7 +872,7 @@ TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeSuccess) {
 }
 
 TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeError) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -892,7 +892,7 @@ TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeTimeout) {
   memory_latency_reply_timeout_change_.reset();
   memory_latency_reply_timeout_change_ =
       PowerController::OverrideGetMemoryLatencyReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -916,7 +916,7 @@ TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsKabyLake) {
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsSuccess) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -944,7 +944,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsSuccess) {
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneFailure) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -961,7 +961,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneFailure) {
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoFailure) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -990,7 +990,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneTimeout) {
   memory_latency_reply_timeout_change_.reset();
   memory_latency_reply_timeout_change_ =
       PowerController::OverrideGetMemoryLatencyReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -1010,7 +1010,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoTimeout) {
   memory_latency_reply_timeout_change_.reset();
   memory_latency_reply_timeout_change_ =
       PowerController::OverrideGetMemoryLatencyReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -1075,7 +1075,7 @@ TEST(MemorySubsystemInfoAgentPointTest, CreateFromMailboxDataTigerLake) {
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeSuccessNoPoints) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -1094,7 +1094,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeSuccessNoPoints) {
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeSuccessOnePoint) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -1129,7 +1129,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeSuccessOnePoint) {
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeSuccessThreePoints) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -1194,7 +1194,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeSuccessThreePoints) {
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointOneFailure) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       // Based on the MMIO list in the SuccessOnePoint test.
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
@@ -1220,7 +1220,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointOneFailure) {
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoFailure) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       // Based on the MMIO list in the SuccessThreePoints test.
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
@@ -1258,7 +1258,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeGlobalInfoTimeout) {
   memory_subsystem_info_reply_timeout_change_.reset();
   memory_subsystem_info_reply_timeout_change_ =
       PowerController::OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
       {.address = kMailboxData1Offset, .value = 0x0000'0000, .write = true},
@@ -1278,7 +1278,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointOneTimeout) {
   memory_subsystem_info_reply_timeout_change_.reset();
   memory_subsystem_info_reply_timeout_change_ =
       PowerController::OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       // Based on the MMIO list in the PointOneFailure test.
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},
@@ -1307,7 +1307,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoTimeout) {
   memory_subsystem_info_reply_timeout_change_.reset();
   memory_subsystem_info_reply_timeout_change_ =
       PowerController::OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(1);
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       // Based on the MMIO list in the PointTwoFailure test.
       {.address = kMailboxInterfaceOffset, .value = 0},
       {.address = kMailboxData0Offset, .value = 0x0000'0000, .write = true},

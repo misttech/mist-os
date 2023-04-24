@@ -19,7 +19,7 @@
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace ddk_mock {
 
 // An MMIO range that responds to a list of pre-determined memory accesses.
 //
@@ -218,6 +218,6 @@ class MockMmioRange {
   const Size default_access_size_;
 };
 
-}  // namespace i915
+}  // namespace ddk_mock
 
 #endif  // SRC_DEVICES_TESTING_MOCK_MMIO_RANGE_INCLUDE_MOCK_MMIO_RANGE_MOCK_MMIO_RANGE_H_

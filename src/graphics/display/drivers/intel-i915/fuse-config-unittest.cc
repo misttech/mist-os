@@ -26,7 +26,7 @@ class FuseConfigTest : public ::testing::Test {
 
  protected:
   constexpr static int kMmioRangeSize = 0x60000;
-  MockMmioRange mmio_range_{kMmioRangeSize, MockMmioRange::Size::k32};
+  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
 

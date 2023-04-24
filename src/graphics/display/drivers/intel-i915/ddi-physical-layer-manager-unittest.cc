@@ -228,10 +228,10 @@ TEST(DdiManagerTigerLake, ParseVbtTable_Dell5420) {
   // - DDI_TC_2:Type-C DDI with Type-C port
 
   constexpr static int kMmioRangeSize = 0x200000;
-  MockMmioRange mmio_range{kMmioRangeSize, MockMmioRange::Size::k32};
+  ddk_mock::MockMmioRange mmio_range{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer{mmio_range.GetMmioBuffer()};
 
-  mmio_range.Expect(MockMmioRange::AccessList({
+  mmio_range.Expect(ddk_mock::MockMmioRange::AccessList({
       // Access pattern from ComboDdiTigerLakeTest.InitializeDdiADell5420.
       {.address = kPortCompDw3AOffset, .value = 0xc0606b25},
       {.address = kPortCompDw1AOffset, .value = 0x81000400},
@@ -331,7 +331,7 @@ TEST(DdiManagerTigerLake, ParseVbtTable_NUC11PAHi5) {
   // - DDI_TC_6: Type-C DDI with Type-C port
 
   constexpr static int kMmioRangeSize = 0x200000;
-  MockMmioRange mmio_range{kMmioRangeSize, MockMmioRange::Size::k32};
+  ddk_mock::MockMmioRange mmio_range{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer{mmio_range.GetMmioBuffer()};
 
   TestPower power(&mmio_buffer);

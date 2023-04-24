@@ -40,7 +40,7 @@ class DisplayPllTigerLakeTest : public ::testing::Test {
   constexpr static int kLargeTimeout = 1'000'000'000;
 
   constexpr static int kMmioRangeSize = 0x140000;
-  MockMmioRange mmio_range_{kMmioRangeSize, MockMmioRange::Size::k32};
+  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
   ScopedValueChange<int> lock_wait_timeout_change_;
@@ -48,7 +48,7 @@ class DisplayPllTigerLakeTest : public ::testing::Test {
 };
 
 TEST_F(DisplayPllTigerLakeTest, EnableHdmi) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kDpll0EnableOffset, .value = 0x00000000},
       {.address = kDpll0EnableOffset, .value = 0x08000000, .write = true},
       // Should wait until the powered on bit is set.
@@ -84,7 +84,7 @@ TEST_F(DisplayPllTigerLakeTest, EnableHdmi) {
 }
 
 TEST_F(DisplayPllTigerLakeTest, EnableDisplayPort) {
-  mmio_range_.Expect(MockMmioRange::AccessList({
+  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kDpll0EnableOffset, .value = 0x00000000},
       {.address = kDpll0EnableOffset, .value = 0x08000000, .write = true},
       // Should wait until the powered on bit is set.
