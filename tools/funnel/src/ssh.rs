@@ -57,9 +57,11 @@ fn build_ssh_args(target: TargetInfo, repo_port: u32) -> Result<Vec<String>> {
         format!("-o RemoteForward 9080 [{target_ip}]:80"),
         // UMA log requests to port 8888 on the remote are forwarded to target port 8888.
         format!("-o RemoteForward 8888 [{target_ip}]:8888"),
+        // Some targets use Fastboot over TCP which listens on 5554
+        format!("-o RemoteForward 5554 [{target_ip}]:5554"),
     ];
 
-    // TODO: remote forwards
+    // TODO: additional forwards
 
     Ok(res)
 }
