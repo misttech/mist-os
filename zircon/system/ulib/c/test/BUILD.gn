@@ -214,6 +214,11 @@ zbi_test_executable("libc-unittests-standalone") {
 
 kernel_zbi_test("boot-libc-unittests") {
   deps = [ ":libc-unittests-standalone" ]
+
+  # TODO(fxbug.dev/125966) Remove timeout when llvm-libc functions are optimized.
+  if (target_cpu == "riscv64") {
+    timeout = 1200
+  }
 }
 
 test("gwp-asan-test") {
