@@ -592,13 +592,13 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             for m in mocks:
                 stack.enter_context(m)
             prepare_status = r.prepare()
+            remote_command = list(r.remote_compile_command())
 
         self.assertEqual(prepare_status, 0)  # success
         self.assertEqual(r.remote_compiler, remote_compiler)
         a = r.remote_action
-        self.assertEqual(list(r.remote_compile_command()), a.local_command)
         self.assertEqual(
-            a.local_command,
+            remote_command,
             _strs(
                 [
                     remote_compiler,
@@ -610,6 +610,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                     f'-Clink-arg={libcxx_norm}',  # normalized
                     f'-Clink-arg=-fuse-ld=lld',
                     f'-Clink-arg=--ld-path={remote_ld_path}',  # added by wrapper
+                    f'--sysroot=../some/random/sysroot',
                 ]))
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)

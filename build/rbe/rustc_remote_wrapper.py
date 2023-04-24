@@ -379,6 +379,19 @@ class RustRemoteAction(object):
             # else
             yield tok
 
+        # TODO(http://fxbug.dev/105799): relocate rust sysroot to
+        # be indepedent of host-platform to make remote commands
+        # match for better caching.
+        # The rust sysroot is home to the standard libraries for
+        # all target platforms.
+        # Fuchsia currently uses the default sysroot location which is
+        # based on the *host* compiler path, but the remote compiler's
+        # default sysroot will be different.
+        # Inform the remote compiler to use the location of the sysroot
+        # of the *host* compiler.
+        fuchsia_use_host_rust_sysroot = self._rust_action.default_rust_sysroot()
+        yield f'--sysroot={fuchsia_use_host_rust_sysroot}'
+
     def _cleanup(self):
         for f in self._cleanup_files:
             f.unlink(missing_ok=True)  # does remove or rmdir
