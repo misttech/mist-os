@@ -174,6 +174,43 @@ class TestMsdVsiDevice : public drm_test_info {
     return true;
   }
 
+  struct etna_bo* CreateBuffer(uint32_t size, uint32_t flags) {
+    auto etna_buffer = std::make_unique<TestMsdVsiDevice::EtnaBuffer>();
+
+    std::unique_ptr<magma::PlatformBuffer> buffer =
+        magma::PlatformBuffer::Create(size, "EtnaBuffer");
+    if (!buffer)
+      return DRETP(nullptr, "failed to alloc buffer size %u", size);
+
+    if (flags & DRM_ETNA_GEM_CACHE_UNCACHED)
+      buffer->SetCachePolicy(MAGMA_CACHE_POLICY_WRITE_COMBINING);
+
+    uint64_t page_count = buffer->size() / PAGE_SIZE;
+
+    etna_buffer->gpu_addr = next_gpu_addr(to_uint32(buffer->size()));
+
+    etna_buffer->msd_buffer = std::make_unique<MsdVsiBuffer>(std::move(buffer));
+
+    std::shared_ptr<GpuMapping> gpu_mapping;
+    magma::Status status =
+        AddressSpace::MapBufferGpu(address_space(), etna_buffer->msd_buffer, etna_buffer->gpu_addr,
+                                   0, page_count, &gpu_mapping);
+
+    if (!status.ok()) {
+      return DRETP(nullptr, "failed to map buffer");
+    }
+
+    if (!address_space()->AddMapping(gpu_mapping))
+      return DRETP(nullptr, "couldn't add mapping to address space");
+
+    EtnaBuffer* ptr = etna_buffer.get();
+
+    // We track buffers here for cleanup because the third_party code doesn't release them.
+    buffers_.push_back(std::move(etna_buffer));
+
+    return ptr;
+  }
+
   uint32_t next_gpu_addr(uint32_t size) {
     uint32_t next = next_gpu_addr_;
     next_gpu_addr_ += size;
@@ -200,6 +237,7 @@ class TestMsdVsiDevice : public drm_test_info {
 
   std::shared_ptr<MsdVsiContext> context_;
   std::shared_ptr<AddressSpace> address_space_;
+  std::vector<std::unique_ptr<EtnaBuffer>> buffers_;
   uint32_t next_gpu_addr_ = 0x10000;
 };
 
@@ -256,35 +294,10 @@ void etna_stall(struct etna_cmd_stream* stream, uint32_t from, uint32_t to) {
 // Create a buffer and map it into the gpu address space.
 struct etna_bo* etna_bo_new(void* dev, uint32_t size, uint32_t flags) {
   DLOG("bo new size %u flags 0x%x", size, flags);
-  auto etna_buffer = std::make_unique<TestMsdVsiDevice::EtnaBuffer>();
-
-  std::unique_ptr<magma::PlatformBuffer> buffer = magma::PlatformBuffer::Create(size, "EtnaBuffer");
-  if (!buffer)
-    return DRETP(nullptr, "failed to alloc buffer size %u", size);
-
-  if (flags & DRM_ETNA_GEM_CACHE_UNCACHED)
-    buffer->SetCachePolicy(MAGMA_CACHE_POLICY_WRITE_COMBINING);
 
   auto etna_device = static_cast<TestMsdVsiDevice::EtnaDevice*>(dev);
-  uint64_t page_count = buffer->size() / PAGE_SIZE;
 
-  etna_buffer->gpu_addr = etna_device->test->next_gpu_addr(to_uint32(buffer->size()));
-
-  etna_buffer->msd_buffer = std::make_unique<MsdVsiBuffer>(std::move(buffer));
-
-  std::shared_ptr<GpuMapping> gpu_mapping;
-  magma::Status status =
-      AddressSpace::MapBufferGpu(etna_device->test->address_space(), etna_buffer->msd_buffer,
-                                 etna_buffer->gpu_addr, 0, page_count, &gpu_mapping);
-
-  if (!status.ok()) {
-    return DRETP(nullptr, "failed to map buffer");
-  }
-
-  if (!etna_device->test->address_space()->AddMapping(gpu_mapping))
-    return DRETP(nullptr, "couldn't add mapping to address space");
-
-  return etna_buffer.release();
+  return etna_device->test->CreateBuffer(size, flags);
 }
 
 void* etna_bo_map(struct etna_bo* bo) {
