@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use netstack_testing_common::realms::TestSandboxExt as _;
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 
 use assert_matches::assert_matches;
 use fidl::endpoints;
@@ -14,8 +14,8 @@ use fidl_fuchsia_net_dhcp::{
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_netemul_network as fnetemul_network;
-use fuchsia_async as fasync;
 use futures::{join, FutureExt, TryStreamExt};
+use netstack_testing_macros::netstack_test;
 
 const MAC: net_types::ethernet::Mac = net_declare::net_mac!("00:00:00:00:00:01");
 
@@ -24,14 +24,15 @@ struct SingleInterfaceTestRealm<'a> {
     iface: netemul::TestInterface<'a>,
 }
 
-async fn create_single_interface_test_realm(
-    sandbox: &netemul::TestSandbox,
-) -> SingleInterfaceTestRealm<'_> {
+async fn create_single_interface_test_realm<'a, N: Netstack>(
+    sandbox: &'a netemul::TestSandbox,
+    name: &'a str,
+) -> SingleInterfaceTestRealm<'a> {
     let network =
         sandbox.create_network("dhcp-test-network").await.expect("create network should succeed");
     let realm: netemul::TestRealm<'_> = sandbox
-        .create_netstack_realm_with::<netstack_testing_common::realms::Netstack2, _, _>(
-            "dhcp-test-realm-a",
+        .create_netstack_realm_with::<N, _, _>(
+            format!("client-realm-{name}"),
             std::iter::once(fnetemul::ChildDef::from(
                 &netstack_testing_common::realms::KnownServiceProvider::DhcpClient,
             )),
@@ -54,11 +55,11 @@ async fn create_single_interface_test_realm(
     SingleInterfaceTestRealm { realm, iface }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn client_provider_two_overlapping_clients_on_same_interface() {
+#[netstack_test]
+async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let SingleInterfaceTestRealm { realm, iface } =
-        create_single_interface_test_realm(&sandbox).await;
+        create_single_interface_test_realm::<N>(&sandbox, name).await;
 
     let proxy = realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let iface = &iface;
@@ -112,12 +113,12 @@ async fn client_provider_two_overlapping_clients_on_same_interface() {
     )
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn client_provider_two_non_overlapping_clients_on_same_interface() {
+#[netstack_test]
+async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
     let SingleInterfaceTestRealm { realm, iface } =
-        create_single_interface_test_realm(&sandbox).await;
+        create_single_interface_test_realm::<N>(&sandbox, name).await;
 
     let proxy = realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let iface = &iface;
@@ -161,12 +162,12 @@ async fn client_provider_two_non_overlapping_clients_on_same_interface() {
     }
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn client_provider_double_watch() {
+#[netstack_test]
+async fn client_provider_double_watch<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
     let SingleInterfaceTestRealm { realm, iface } =
-        create_single_interface_test_realm(&sandbox).await;
+        create_single_interface_test_realm::<N>(&sandbox, name).await;
 
     let proxy = realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let iface = &iface;
@@ -205,12 +206,12 @@ async fn client_provider_double_watch() {
     )
 }
 
-#[fasync::run_singlethreaded(test)]
-async fn client_provider_shutdown() {
+#[netstack_test]
+async fn client_provider_shutdown<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
     let SingleInterfaceTestRealm { realm, iface } =
-        create_single_interface_test_realm(&sandbox).await;
+        create_single_interface_test_realm::<N>(&sandbox, name).await;
 
     let proxy = realm.connect_to_protocol::<ClientProviderMarker>().unwrap();
     let iface = &iface;

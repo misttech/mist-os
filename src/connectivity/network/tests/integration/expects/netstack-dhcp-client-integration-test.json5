@@ -12,7 +12,7 @@
         {
             type: "expect_pass_with_err_logs",
             matchers: [
-                "client_provider_two_overlapping_clients_on_same_interface",
+                "client_provider_two_overlapping_clients_on_same_interface_ns[23]",
             ],
         },
     ],
