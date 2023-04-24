@@ -179,7 +179,7 @@ impl fmt::Display for Signal {
 /// architecture's sigset_t type so UserRef<SigSet> can be used for system calls.
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, Default, AsBytes, Eq, FromBytes, PartialEq)]
-pub struct SigSet(std::os::raw::c_ulong);
+pub struct SigSet(pub std::os::raw::c_ulong);
 assert_eq_size!(SigSet, sigset_t);
 
 impl SigSet {
@@ -217,29 +217,5 @@ impl From<Signal> for SigSet {
     /// Constructs a sigset consisting of one signal value.
     fn from(value: Signal) -> Self {
         SigSet(value.mask() as std::os::raw::c_ulong)
-    }
-}
-
-impl From<sigset_t> for SigSet {
-    #[cfg(target_arch = "x86_64")]
-    fn from(value: sigset_t) -> Self {
-        SigSet(value)
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    fn from(value: sigset_t) -> Self {
-        SigSet(value.sig[0])
-    }
-}
-
-impl From<SigSet> for sigset_t {
-    #[cfg(target_arch = "x86_64")]
-    fn from(val: SigSet) -> Self {
-        val.0
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    fn from(val: SigSet) -> Self {
-        sigset_t { sig: [val.0] }
     }
 }

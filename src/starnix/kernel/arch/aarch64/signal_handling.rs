@@ -116,6 +116,18 @@ impl SignalStackFrame {
     }
 }
 
+impl From<sigset_t> for SigSet {
+    fn from(value: sigset_t) -> Self {
+        SigSet(value.sig[0])
+    }
+}
+
+impl From<SigSet> for sigset_t {
+    fn from(val: SigSet) -> Self {
+        sigset_t { sig: [val.0] }
+    }
+}
+
 pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &SignalStackFrame) {
     let uctx = &signal_stack_frame.context.uc_mcontext;
     // `zx_thread_state_general_regs_t` stores the link register separately from the other general

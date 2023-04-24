@@ -110,6 +110,18 @@ impl SignalStackFrame {
     }
 }
 
+impl From<sigset_t> for SigSet {
+    fn from(value: sigset_t) -> Self {
+        SigSet(value)
+    }
+}
+
+impl From<SigSet> for sigset_t {
+    fn from(val: SigSet) -> Self {
+        val.0
+    }
+}
+
 /// Aligns the stack pointer to be 16 byte aligned, and then misaligns it by 8 bytes.
 ///
 /// This is done because x86-64 functions expect the stack to be misaligned by 8 bytes,
