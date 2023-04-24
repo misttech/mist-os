@@ -34,8 +34,6 @@
 #define ASSERT_OK(x) ASSERT_EQ(ZX_OK, (x))
 #define EXPECT_OK(x) EXPECT_EQ(ZX_OK, (x))
 
-namespace sysmem = fuchsia_sysmem;
-
 namespace {
 constexpr uint32_t kBytesPerRowDivisor = 1024;
 constexpr uint32_t kImageHeight = 32;
@@ -132,8 +130,9 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
                             BindSharedCollectionCompleter::Sync& completer) override {
-    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
-        sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8};
+    const std::vector<fuchsia_sysmem::wire::PixelFormatType> kPixelFormatTypes = {
+        fuchsia_sysmem::wire::PixelFormatType::kBgra32,
+        fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8};
 
     auto buffer_collection_id = next_buffer_collection_id_++;
     active_buffer_collections_[buffer_collection_id] = {
@@ -348,9 +347,9 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   EXPECT_EQ(sysmem_.mock_allocators().size(), 1u);
   const MockAllocator& allocator = sysmem_.mock_allocators().front();
 
-  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
-  zx::result token2_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
@@ -458,7 +457,7 @@ TEST(IntelI915Display, ImportImage) {
 
   // Import buffer collection.
   constexpr uint64_t kBufferCollectionId = 1u;
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
       kBufferCollectionId, token_endpoints->client.TakeChannel()));
@@ -524,7 +523,7 @@ TEST(IntelI915Display, ImportImage) {
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -548,7 +547,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemNoneFormat) {
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -572,7 +571,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemNoneFormat) {
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidFormat) {
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -596,7 +595,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidFormat) {
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   constexpr uint64_t kBufferCollectionId = 1u;
@@ -698,7 +697,7 @@ TEST_F(IntegrationTest, SysmemImport) {
 
   // Import buffer collection.
   constexpr uint64_t kBufferCollectionId = 1u;
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
       kBufferCollectionId, token_endpoints->client.TakeChannel()));
@@ -737,7 +736,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   // Import buffer collection.
   constexpr uint64_t kBufferCollectionId = 1u;
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
       kBufferCollectionId, token_endpoints->client.TakeChannel()));
