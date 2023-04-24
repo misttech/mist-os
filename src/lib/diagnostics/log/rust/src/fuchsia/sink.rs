@@ -126,7 +126,7 @@ mod tests {
     use tracing::{debug, error, info, trace, warn};
     use tracing_subscriber::{layer::SubscriberExt, Registry};
 
-    const TARGET: &str = "diagnostics_log_lib_test::sink::tests";
+    const TARGET: &str = "diagnostics_log_lib_test::fuchsia::sink::tests";
 
     async fn init_sink(tags: &[&str], metatags: &[Metatag]) -> fidl::Socket {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
@@ -254,7 +254,7 @@ mod tests {
             };
             expected_error.arguments.push(Argument {
                 name: "file".into(),
-                value: Value::Text("src/lib/diagnostics/log/rust/src/sink.rs".into()),
+                value: Value::Text("src/lib/diagnostics/log/rust/src/fuchsia/sink.rs".into()),
             });
             expected_error
                 .arguments

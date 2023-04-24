@@ -7,7 +7,10 @@ import("//build/rust/rustc_library.gni")
 group("tests") {
   testonly = true
 
-  deps = [ ":diagnostics-log-tests" ]
+  deps = [
+    ":diagnostics-log-tests",
+    ":rust_test($host_toolchain)",
+  ]
 }
 
 rustc_library("rust") {
@@ -17,32 +20,41 @@ rustc_library("rust") {
 
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//sdk/lib/syslog:client_includes",
-    "//src/lib/diagnostics/log/encoding/rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-core",
     "//third_party/rust_crates:tracing-log",
     "//third_party/rust_crates:tracing-subscriber",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
-  ]
+  if (is_fuchsia) {
+    deps += [
+      "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
+      "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+      "//sdk/lib/syslog:client_includes",
+      "//src/lib/diagnostics/log/encoding/rust",
+      "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-async",
+      "//src/lib/fuchsia-component",
+      "//src/lib/fuchsia-runtime",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//third_party/rust_crates:lazy_static",
+      "//third_party/rust_crates:tracing-core",
+    ]
+
+    test_deps = [
+      "//src/lib/fuchsia-async",
+      "//third_party/rust_crates:futures",
+    ]
+  } else {
+    test_deps = [ "//third_party/rust_crates:regex" ]
+  }
 
   sources = [
-    "src/filter.rs",
+    "src/fuchsia/filter.rs",
+    "src/fuchsia/mod.rs",
+    "src/fuchsia/sink.rs",
     "src/lib.rs",
-    "src/sink.rs",
+    "src/portable/mod.rs",
   ]
 }
 
