@@ -359,7 +359,7 @@ template("package_tool_repository_publish") {
   if (delivery_blob_type != false) {
     _publish_opts += [
       "--delivery-blob-type",
-      "${repository_publish_delivery_blob_type}",
+      "${delivery_blob_type}",
     ]
   }
 
