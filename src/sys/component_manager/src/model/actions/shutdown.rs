@@ -280,7 +280,13 @@ struct ShutdownInfo {
 
 impl fmt::Debug for ShutdownInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "moniker: '{:?}'", self.ref_)
+        write!(f, "{{server: {{{:?}}}, ", self.component.abs_moniker.to_string())?;
+        write!(f, "clients: [")?;
+        for dep in &self.dependents {
+            write!(f, "{{{:?}}}, ", dep)?;
+        }
+        write!(f, "]}}")?;
+        Ok(())
     }
 }
 
