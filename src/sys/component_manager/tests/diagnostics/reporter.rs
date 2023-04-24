@@ -4,21 +4,25 @@
 
 use {
     diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect},
-    fidl_fuchsia_sys2 as fsys, fuchsia_fs,
+    fidl::endpoints::create_proxy,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_fs,
 };
 
 async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64 {
-    let (_, resolved) = realm_query.get_instance_info(moniker).await.unwrap().unwrap();
-    let resolved = resolved.unwrap();
-    let execution = resolved.execution.unwrap();
-    let runtime_dir = execution.runtime_dir.unwrap();
-    let runtime_dir = runtime_dir.into_proxy().unwrap();
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
-        &runtime_dir,
-        "elf/job_id",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .expect("Failed to open file.");
+    let (file_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
+    let server_end = server_end.into_channel().into();
+    realm_query
+        .open(
+            moniker,
+            fsys::OpenDirType::RuntimeDir,
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            "elf/job_id",
+            server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
     let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
     let contents = res.expect("Unable to read file.");
     contents.parse::<u64>().unwrap()

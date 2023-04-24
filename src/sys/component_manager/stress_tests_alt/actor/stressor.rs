@@ -10,20 +10,20 @@ use {
 };
 
 pub struct Stressor {
-    realm_explorer: fsys::RealmExplorerProxy,
+    realm_query: fsys::RealmQueryProxy,
     lifecycle_controller: fsys::LifecycleControllerProxy,
 }
 
 impl Stressor {
     pub fn from_namespace() -> Self {
-        let realm_explorer = connect_to_protocol::<fsys::RealmExplorerMarker>().unwrap();
+        let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
         let lifecycle_controller =
             connect_to_protocol::<fsys::LifecycleControllerMarker>().unwrap();
-        Self { realm_explorer, lifecycle_controller }
+        Self { realm_query, lifecycle_controller }
     }
 
     pub async fn get_instances_in_realm(&self) -> Vec<String> {
-        let iterator = self.realm_explorer.get_all_instance_infos().await.unwrap().unwrap();
+        let iterator = self.realm_query.get_all_instances().await.unwrap().unwrap();
         let iterator = iterator.into_proxy().unwrap();
 
         let mut instances = vec![];
@@ -36,7 +36,7 @@ impl Stressor {
             instances.append(&mut slice);
         }
 
-        instances.into_iter().map(|i| i.moniker).collect()
+        instances.into_iter().map(|i| i.moniker.unwrap()).collect()
     }
 
     pub async fn create_child(

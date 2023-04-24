@@ -13,6 +13,7 @@
 //! If the call is successful, then the boot resolver was correctly routed.
 
 use {
+    fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
     futures::prelude::*,
@@ -99,12 +100,19 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
     // Get to the Trigger protocol exposed by the root component in this nested component manager
     let realm_query =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (_, resolved) = realm_query.get_instance_info(".").await.unwrap().unwrap();
-    let exposed_dir = resolved.unwrap().exposed_dir.into_proxy().unwrap();
-    let trigger =
-        fuchsia_component::client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(
-            &exposed_dir,
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let server_end = server_end.into_channel().into();
+    realm_query
+        .open(
+            ".",
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            ftest::TriggerMarker::DEBUG_NAME,
+            server_end,
         )
+        .await
+        .unwrap()
         .unwrap();
 
     let out = trigger.run().await.expect("trigger failed");

@@ -30,7 +30,7 @@
             to: "#actors",
         },
         {
-            protocol: "fuchsia.sys2.RealmExplorer",
+            protocol: "fuchsia.sys2.RealmQuery",
             from: "#dynamic_children_root",
             to: "#actors",
         },

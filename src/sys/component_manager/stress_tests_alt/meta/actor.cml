@@ -16,7 +16,7 @@
             from: "parent",
         },
         {
-            protocol: "fuchsia.sys2.RealmExplorer",
+            protocol: "fuchsia.sys2.RealmQuery",
             from: "parent",
         },
     ],

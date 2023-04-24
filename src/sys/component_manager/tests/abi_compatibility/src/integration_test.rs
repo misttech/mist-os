@@ -252,10 +252,8 @@ async fn resolve_components_against_allow_all_policy() {
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_some());
-        assert_eq!(info.state, fsys::InstanceState::Resolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_some());
     }
     // Test resolution of a component with an unsupported abi revision
     {
@@ -267,10 +265,8 @@ async fn resolve_components_against_allow_all_policy() {
             resolver_response,
             Some(fresolution::Component { abi_revision: Some(u64::MAX), .. })
         );
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_some());
-        assert_eq!(info.state, fsys::InstanceState::Resolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_some());
     }
     // Test resolution of a component with a supported abi revision
     {
@@ -283,10 +279,8 @@ async fn resolve_components_against_allow_all_policy() {
             resolver_response.abi_revision.unwrap(),
             version_history::LATEST_VERSION.abi_revision.into()
         );
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_some());
-        assert_eq!(info.state, fsys::InstanceState::Resolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_some());
     }
 }
 
@@ -319,10 +313,8 @@ async fn resolve_components_against_enforce_presence_policy() {
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_none());
-        assert_eq!(info.state, fsys::InstanceState::Unresolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_none());
     }
     // Test resolution of a component with an unsupported abi revision
     {
@@ -334,10 +326,8 @@ async fn resolve_components_against_enforce_presence_policy() {
             resolver_response,
             Some(fresolution::Component { abi_revision: Some(u64::MAX), .. })
         );
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_some());
-        assert_eq!(info.state, fsys::InstanceState::Resolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_some());
     }
     // Test resolution of a component with a supported abi revision
     {
@@ -350,10 +340,8 @@ async fn resolve_components_against_enforce_presence_policy() {
             resolver_response.abi_revision.unwrap(),
             version_history::LATEST_VERSION.abi_revision.into()
         );
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_some());
-        assert_eq!(info.state, fsys::InstanceState::Resolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_some());
     }
 }
 
@@ -386,10 +374,8 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_none());
-        assert_eq!(info.state, fsys::InstanceState::Unresolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_none());
     }
     // Test resolution of a component with an unsupported abi revision
     {
@@ -401,10 +387,8 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
             resolver_response,
             Some(fresolution::Component { abi_revision: Some(u64::MAX), .. })
         );
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_none());
-        assert_eq!(info.state, fsys::InstanceState::Unresolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_none());
     }
     // Test resolution of a component with a supported abi revision
     {
@@ -417,9 +401,7 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
             resolver_response.abi_revision.unwrap(),
             version_history::LATEST_VERSION.abi_revision.into()
         );
-        let (info, resolved_state) =
-            realm_query.get_instance_info(child_moniker).await.unwrap().unwrap();
-        assert!(resolved_state.is_some());
-        assert_eq!(info.state, fsys::InstanceState::Resolved);
+        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
+        assert!(instance.resolved_info.is_some());
     }
 }

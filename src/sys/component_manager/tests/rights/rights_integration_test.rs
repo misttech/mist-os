@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fidl_test_components as ftest, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl::endpoints::{create_proxy, ProtocolMarker},
+    fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fuchsia_async as fasync,
     fuchsia_component_test::*,
 };
 
@@ -58,14 +60,20 @@ async fn run_test(url: &str, expected_result: &str) {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (_, resolved) = realm_query.get_instance_info(".").await.unwrap().unwrap();
-    let exposed_dir = resolved.unwrap().exposed_dir.into_proxy().unwrap();
-    let trigger =
-        fuchsia_component::client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(
-            &exposed_dir,
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let server_end = server_end.into_channel().into();
+    realm_query
+        .open(
+            ".",
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            ftest::TriggerMarker::DEBUG_NAME,
+            server_end,
         )
+        .await
+        .unwrap()
         .unwrap();
-
     let result = trigger.run().await.expect("trigger failed");
     assert_eq!(result, expected_result, "Results did not match");
 }
@@ -212,12 +220,19 @@ async fn route_directories_from_component_manager_namespace() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
         .expect("failed to connect to RealmQuery");
-    let (_, resolved) = realm_query.get_instance_info(".").await.unwrap().unwrap();
-    let exposed_dir = resolved.unwrap().exposed_dir.into_proxy().unwrap();
-    let trigger =
-        fuchsia_component::client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(
-            &exposed_dir,
+    let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
+    let server_end = server_end.into_channel().into();
+    realm_query
+        .open(
+            ".",
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            ftest::TriggerMarker::DEBUG_NAME,
+            server_end,
         )
+        .await
+        .unwrap()
         .unwrap();
 
     let result = trigger.run().await.expect("trigger failed");

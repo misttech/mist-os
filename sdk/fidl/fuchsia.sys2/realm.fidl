@@ -241,7 +241,7 @@ protocol RealmQuery {
     /// Gets the detailed information of a particular instance identified by its relative moniker.
     /// This response contains handles to resources of the instance. As a result, component manager
     /// pays a non-trivial cost when this method is invoked.
-    @available(added=11, deprecated=11, removed=12, note="Use GetInstance instead", legacy=true)
+    @available(added=11, deprecated=11, removed=12, note="Use GetInstance instead")
     GetInstanceInfo(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
@@ -288,7 +288,7 @@ protocol ManifestBytesIterator {
 // ------------------------------------------------------------
 
 /// Describes the current state of instance
-@available(added=11, deprecated=11, removed=12, legacy=true)
+@available(added=11, deprecated=11, removed=12)
 type InstanceState = strict enum {
     /// The component is created, but has not been resolved by component manager.
     /// Most information about this component is unknown.
@@ -303,7 +303,7 @@ type InstanceState = strict enum {
 
 /// Basic information about a component instance.
 /// This object contains information that is readily available to component manager.
-@available(added=11, deprecated=11, removed=12, note="Use Instance instead", legacy=true)
+@available(added=11, deprecated=11, removed=12, note="Use Instance instead")
 type InstanceInfo = struct {
     /// The path to this instance relative to the scope root.
     moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
@@ -319,7 +319,7 @@ type InstanceInfo = struct {
 };
 
 /// The detailed resolved state of a component instance
-@available(added=11, deprecated=11, removed=12, note="Use ResolvedInfo instead", legacy=true)
+@available(added=11, deprecated=11, removed=12, note="Use ResolvedInfo instead")
 type ResolvedState = resource struct {
     /// All `use` declarations as defined in the component manifest.
     uses vector<fuchsia.component.decl.Use>:MAX;
@@ -349,7 +349,7 @@ type ResolvedState = resource struct {
 };
 
 /// The detailed execution state of a component instance
-@available(added=11, deprecated=11, removed=12, note="Use ExecutionInfo instead", legacy=true)
+@available(added=11, deprecated=11, removed=12, note="Use ExecutionInfo instead")
 type ExecutionState = resource struct {
     /// The outgoing directory of this instance, if one exists.
     out_dir client_end:<fuchsia.io.Directory, optional>;
@@ -392,7 +392,7 @@ type ExecutionDirectories = resource struct {
 };
 
 /// An iterator over basic information of all instances in the realm
-@available(added=11, deprecated=11, removed=12, note="Use InstanceIterator instead", legacy=true)
+@available(added=11, deprecated=11, removed=12, note="Use InstanceIterator instead")
 protocol InstanceInfoIterator {
     Next() -> (struct {
         infos vector<InstanceInfo>:MAX;
@@ -409,7 +409,7 @@ type RealmQueryError = flexible enum {
 };
 
 /// Errors that can be returned by the RealmExplorer API.
-@available(added=11, deprecated=11, removed=12, legacy=true)
+@available(added=11, deprecated=11, removed=12)
 type RealmExplorerError = flexible enum {
     /// Could not find the scope root instance.
     // TODO(https://fxbug.dev/108532): Close the connection when this error occurs.
@@ -423,12 +423,7 @@ protocol RealmExplorer {
     /// When the server receives this call, it will take a snapshot of the current component
     /// topology and relays that over the iterator. Any changes to the topology *after* this method
     /// call is received by the server will not be shown by the iterator.
-    @available(
-            added=11,
-            deprecated=11,
-            removed=12,
-            note="Use RealmQuery.GetAllInstances instead",
-            legacy=true)
+    @available(added=11, deprecated=11, removed=12, note="Use RealmQuery.GetAllInstances instead")
     GetAllInstanceInfos() -> (resource struct {
         iterator client_end:InstanceInfoIterator;
     }) error RealmExplorerError;

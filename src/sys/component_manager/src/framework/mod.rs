@@ -7,6 +7,5 @@ pub mod hub;
 pub mod lifecycle_controller;
 pub mod pkg_dir;
 pub mod realm;
-pub mod realm_explorer;
 pub mod realm_query;
 pub mod route_validator;

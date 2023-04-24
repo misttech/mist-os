@@ -9,9 +9,9 @@ use {
         matcher::EventMatcher,
         sequence::{EventSequence, Ordering},
     },
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_proxy, ProtocolMarker},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_component,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
 };
 
@@ -55,13 +55,19 @@ pub async fn start_policy_test(
     // Get to the Realm protocol
     let realm_query =
         instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (_, resolved) = realm_query.get_instance_info("./root").await.unwrap().unwrap();
-    let exposed_dir = resolved.unwrap().exposed_dir.into_proxy().unwrap();
-
-    let realm =
-        fuchsia_component::client::connect_to_protocol_at_dir_root::<fcomponent::RealmMarker>(
-            &exposed_dir,
+    let (realm, server_end) = create_proxy::<fcomponent::RealmMarker>().unwrap();
+    let server_end = server_end.into_channel().into();
+    realm_query
+        .open(
+            "./root",
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            fcomponent::RealmMarker::DEBUG_NAME,
+            server_end,
         )
+        .await
+        .unwrap()
         .unwrap();
 
     Ok((instance, realm, event_stream))

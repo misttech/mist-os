@@ -15,26 +15,23 @@ async fn static_child() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
     // echo server is unresolved
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Unresolved);
-    assert!(state.is_none());
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    assert!(instance.resolved_info.is_none());
 
     lifecycle_controller.resolve_instance("./echo_server").await.unwrap().unwrap();
 
     // echo server is resolved
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     let (binder, server) = fidl::endpoints::create_proxy().unwrap();
     lifecycle_controller.start_instance("./echo_server", server).await.unwrap().unwrap();
 
     // echo server is running
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Started);
-    let state = state.unwrap();
-    state.execution.unwrap();
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_some());
 
     // Check that the binder protocol is still alive
     let mut event_stream = binder.take_event_stream();
@@ -45,10 +42,9 @@ async fn static_child() {
     lifecycle_controller.stop_instance("./echo_server").await.unwrap().unwrap();
 
     // echo server is not running
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     // the binder of the component should be closed by now
     assert!(fut.await.is_none());
@@ -61,8 +57,8 @@ async fn dynamic_child() {
 
     // dynamic echo server doesn't exist
     let error =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
-    assert_eq!(error, fsys::RealmQueryError::InstanceNotFound);
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
+    assert_eq!(error, fsys::GetInstanceError::InstanceNotFound);
 
     lifecycle_controller
         .create_instance(
@@ -81,19 +77,17 @@ async fn dynamic_child() {
         .unwrap();
 
     // dynamic echo server is unresolved
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Unresolved);
-    assert!(state.is_none());
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    assert!(instance.resolved_info.is_none());
 
     lifecycle_controller.resolve_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
 
     // dynamic echo server is resolved
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     let (binder, server) = fidl::endpoints::create_proxy().unwrap();
     lifecycle_controller
@@ -103,11 +97,10 @@ async fn dynamic_child() {
         .unwrap();
 
     // dynamic echo server is running
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Started);
-    let state = state.unwrap();
-    state.execution.unwrap();
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_some());
 
     // Check that the binder protocol is still alive
     let mut event_stream = binder.take_event_stream();
@@ -118,11 +111,10 @@ async fn dynamic_child() {
     lifecycle_controller.stop_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
 
     // dynamic echo server is not running
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     // the binder of the component should be closed by now
     assert!(fut.await.is_none());
@@ -141,6 +133,6 @@ async fn dynamic_child() {
 
     // dynamic echo server doesn't exist
     let error =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
-    assert_eq!(error, fsys::RealmQueryError::InstanceNotFound);
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
+    assert_eq!(error, fsys::GetInstanceError::InstanceNotFound);
 }

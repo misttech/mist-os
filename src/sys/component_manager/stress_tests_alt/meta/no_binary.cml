@@ -26,7 +26,7 @@
             from: "framework",
         },
         {
-            protocol: "fuchsia.sys2.RealmExplorer",
+            protocol: "fuchsia.sys2.RealmQuery",
             from: "framework",
         },
     ],

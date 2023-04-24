@@ -14,7 +14,6 @@ async fn component_manager_namespace() {
     let non_hanging_nodes = [
         "/svc/fuchsia.sys2.LifecycleController",
         "/svc/fuchsia.sys2.RouteValidator",
-        "/svc/fuchsia.sys2.RealmExplorer",
         "/svc/fuchsia.sys2.StorageAdmin",
     ];
 

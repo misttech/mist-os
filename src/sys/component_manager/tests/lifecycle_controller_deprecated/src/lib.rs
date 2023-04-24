@@ -13,33 +13,29 @@ async fn static_child() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
     // echo server is unresolved
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Unresolved);
-    assert!(state.is_none());
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    assert!(instance.resolved_info.is_none());
 
     lifecycle_controller.resolve("./echo_server").await.unwrap().unwrap();
 
     // echo server is resolved
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     lifecycle_controller.start("./echo_server").await.unwrap().unwrap();
 
     // echo server is running
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Started);
-    let state = state.unwrap();
-    state.execution.unwrap();
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_some());
 
     lifecycle_controller.stop("./echo_server", false).await.unwrap().unwrap();
 
     // echo server is not running
-    let (info, state) = realm_query.get_instance_info("./echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance = realm_query.get_instance("./echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 }
 
 #[fuchsia::test]
@@ -49,8 +45,8 @@ async fn dynamic_child() {
 
     // dynamic echo server doesn't exist
     let error =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
-    assert_eq!(error, fsys::RealmQueryError::InstanceNotFound);
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
+    assert_eq!(error, fsys::GetInstanceError::InstanceNotFound);
 
     lifecycle_controller
         .create_child(
@@ -69,37 +65,33 @@ async fn dynamic_child() {
         .unwrap();
 
     // dynamic echo server is unresolved
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Unresolved);
-    assert!(state.is_none());
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    assert!(instance.resolved_info.is_none());
 
     lifecycle_controller.resolve("./servers:dynamic_echo_server").await.unwrap().unwrap();
 
     // dynamic echo server is resolved
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     lifecycle_controller.start("./servers:dynamic_echo_server").await.unwrap().unwrap();
 
     // dynamic echo server is running
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Started);
-    let state = state.unwrap();
-    state.execution.unwrap();
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_some());
 
     lifecycle_controller.stop("./servers:dynamic_echo_server", false).await.unwrap().unwrap();
 
     // dynamic echo server is not running
-    let (info, state) =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap();
-    assert_eq!(info.state, fsys::InstanceState::Resolved);
-    let state = state.unwrap();
-    assert!(state.execution.is_none());
+    let instance =
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap();
+    let resolved_info = instance.resolved_info.unwrap();
+    assert!(resolved_info.execution_info.is_none());
 
     lifecycle_controller
         .destroy_child(
@@ -115,6 +107,6 @@ async fn dynamic_child() {
 
     // dynamic echo server doesn't exist
     let error =
-        realm_query.get_instance_info("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
-    assert_eq!(error, fsys::RealmQueryError::InstanceNotFound);
+        realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
+    assert_eq!(error, fsys::GetInstanceError::InstanceNotFound);
 }

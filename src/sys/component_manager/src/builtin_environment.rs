@@ -42,8 +42,8 @@ use {
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
             binder::BinderCapabilityHost, hub::Hub, lifecycle_controller::LifecycleController,
-            pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_explorer::RealmExplorer,
-            realm_query::RealmQuery, route_validator::RouteValidator,
+            pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_query::RealmQuery,
+            route_validator::RouteValidator,
         },
         model::events::registry::EventSubscription,
         model::{
@@ -357,7 +357,6 @@ pub struct BuiltinEnvironment {
     pub realm_capability_host: Arc<RealmCapabilityHost>,
     pub storage_admin_capability_host: Arc<StorageAdmin>,
     pub hub: Option<Arc<Hub>>,
-    pub realm_explorer: Option<Arc<RealmExplorer>>,
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
     pub route_validator: Option<Arc<RouteValidator>>,
@@ -767,14 +766,6 @@ impl BuiltinEnvironment {
         let stop_notifier = Arc::new(RootStopNotifier::new());
         model.root().hooks.install(stop_notifier.hooks()).await;
 
-        let realm_explorer = if runtime_config.enable_introspection {
-            let realm_explorer = Arc::new(RealmExplorer::new(model.clone()));
-            model.root().hooks.install(realm_explorer.hooks()).await;
-            Some(realm_explorer)
-        } else {
-            None
-        };
-
         let realm_query = if runtime_config.enable_introspection {
             let realm_query = Arc::new(RealmQuery::new(model.clone()));
             model.root().hooks.install(realm_query.hooks()).await;
@@ -889,7 +880,6 @@ impl BuiltinEnvironment {
             realm_capability_host,
             storage_admin_capability_host,
             hub,
-            realm_explorer,
             realm_query,
             lifecycle_controller,
             route_validator,
