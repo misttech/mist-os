@@ -5,12 +5,11 @@
 use {
     anyhow::{format_err, Error},
     argh::FromArgs,
+    component_debug::dirs::*,
     fidl_ermine_tools as fermine, fidl_fuchsia_identity_account as faccount,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::client::{
-        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_root,
-        connect_to_protocol_at_path,
-    },
+    fuchsia_component::client::connect_to_protocol_at_path,
+    std::convert::TryInto,
 };
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -110,13 +109,11 @@ async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMar
     realm_query: &fsys::RealmQueryProxy,
     moniker: &str,
 ) -> Result<P::Proxy, Error> {
-    let resolved_dirs = realm_query
-        .get_instance_directories(moniker)
-        .await?
-        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
-        .ok_or(format_err!("{} is not resolved", moniker))?;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-    connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+    let moniker = moniker.try_into()?;
+    let proxy =
+        connect_to_instance_protocol_at_dir_root::<P>(&moniker, OpenDirType::Exposed, realm_query)
+            .await?;
+    Ok(proxy)
 }
 
 /// Connects to a discoverable protocol at the component instance supplied by `moniker`.
@@ -125,13 +122,15 @@ async fn connect_to_exposed_named_protocol<P: fidl::endpoints::DiscoverableProto
     moniker: &str,
     protocol_name: &str,
 ) -> Result<P::Proxy, Error> {
-    let resolved_dirs = realm_query
-        .get_instance_directories(moniker)
-        .await?
-        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
-        .ok_or(format_err!("{} could not be resolved", moniker))?;
-    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-    connect_to_named_protocol_at_dir_root::<P>(&exposed_dir, protocol_name)
+    let moniker = moniker.try_into()?;
+    let proxy = connect_to_instance_protocol_at_path::<P>(
+        &moniker,
+        OpenDirType::Exposed,
+        protocol_name,
+        realm_query,
+    )
+    .await?;
+    Ok(proxy)
 }
 
 async fn get_account_id(realm_query: &fsys::RealmQueryProxy) -> Result<u64, Error> {
