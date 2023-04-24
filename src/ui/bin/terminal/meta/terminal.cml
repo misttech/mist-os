@@ -68,10 +68,6 @@
                 "fuchsia.wlan.policy.ClientProvider",
             ],
         },
-        {
-            protocol: "fuchsia.starnix.developer.Manager",
-            availability: "optional",
-        },
     ],
     expose: [
         {

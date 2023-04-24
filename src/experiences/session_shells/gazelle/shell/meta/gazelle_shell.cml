@@ -147,7 +147,6 @@
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",
                 "fuchsia.space.Manager",
-                "fuchsia.starnix.developer.Manager",
                 "fuchsia.sys.Environment",
                 "fuchsia.ui.input3.KeyEventInjector",
                 "fuchsia.update.channelcontrol.ChannelControl",

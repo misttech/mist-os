@@ -7,17 +7,10 @@
         runner: "elf",
         binary: "bin/starnix_runner",
     },
-    children: [
-        {
-            name: "stardroid",
-            url: "fuchsia-pkg://fuchsia.com/stardroid#meta/stardroid.cm",
-            environment: "#container-env",
-        },
-    ],
     collections: [
         {
             name: "playground",
-            environment: "#starnix-env",
+            environment: "#playground-env",
             durability: "single_run",
         },
         {
@@ -32,10 +25,7 @@
             path: "/svc/fuchsia.component.runner.ComponentRunner",
         },
         {
-            protocol: [
-                "fuchsia.component.runner.ComponentRunner",
-                "fuchsia.starnix.developer.Manager",
-            ],
+            protocol: [ "fuchsia.component.runner.ComponentRunner" ],
         },
         {
             directory: "kernels",
@@ -44,12 +34,6 @@
         },
     ],
     use: [
-        {
-            protocol: "fuchsia.starnix.container.Controller",
-            from: "#stardroid",
-            path: "/stardroid/fuchsia.starnix.container.Controller",
-            dependency: "weak",
-        },
         {
             protocol: "fuchsia.component.Realm",
             from: "framework",
@@ -67,10 +51,7 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: [
-                "#kernels",
-                "#stardroid",
-            ],
+            to: [ "#kernels" ],
         },
         {
             protocol: [
@@ -81,10 +62,7 @@
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "parent",
-            to: [
-                "#kernels",
-                "#stardroid",
-            ],
+            to: [ "#kernels" ],
             availability: "optional",
         },
         {
@@ -101,36 +79,12 @@
     expose: [
         {
             runner: "starnix",
-            from: "#stardroid",
-            as: "stardroid",
-        },
-        {
-            runner: "starnix",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.starnix.developer.Manager",
             from: "self",
         },
     ],
     environments: [
         {
-            name: "starnix-env",
-            extends: "realm",
-            runners: [
-                {
-                    runner: "starnix",
-                    from: "#stardroid",
-                    as: "stardroid",
-                },
-                {
-                    runner: "starnix",
-                    from: "self",
-                },
-            ],
-        },
-        {
-            name: "container-env",
+            name: "playground-env",
             extends: "realm",
             runners: [
                 {

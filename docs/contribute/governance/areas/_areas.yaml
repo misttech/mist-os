@@ -160,9 +160,9 @@
       Currently this covers the Starnix (Linux binary compatibility) APIs.
     </p>
   examples:
-    - fidl: 'fuchsia.starnix.developer'
+    - fidl: 'fuchsia.starnix.container'
       description: |
-        Protocols for starting a component containing an unmodified Linux binary.
+        Protocols for controlling a container of unmodified Linux binaries.
 
 - name: 'Graphics'
   api_primary: 'jbauman@google.com'

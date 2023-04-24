@@ -18,12 +18,6 @@
                     runner: "starnix",
                     from: "#starnix_runner",
                 },
-                {
-                    // The stardroid runner will be removed soon in favor of
-                    // the starnix runner above.
-                    runner: "stardroid",
-                    from: "#starnix_runner",
-                },
             ],
         },
     ],

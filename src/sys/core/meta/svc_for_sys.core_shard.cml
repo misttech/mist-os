@@ -114,10 +114,6 @@
             from: "#overnetstack",
         },
         {
-            protocol: "fuchsia.starnix.developer.Manager",
-            from: "#starnix_runner",
-        },
-        {
             protocol: "fuchsia.hardware.serial.DeviceProxy",
             from: "#debug_serial",
         },

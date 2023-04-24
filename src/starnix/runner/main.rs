@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Error};
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, Proxy, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fidl_fuchsia_starnix_developer as fstardev;
 use fuchsia_async as fasync;
 use fuchsia_component::client::{self as fclient, connect_to_protocol};
 use fuchsia_zircon as zx;
@@ -38,12 +36,6 @@ async fn main() -> Result<(), Error> {
 
     let svc_dir = vfs::directory::immutable::simple();
     svc_dir.add_entry(
-        fstardev::ManagerMarker::PROTOCOL_NAME,
-        vfs::service::host(move |requests| async move {
-            serve_starnix_manager(requests).await.expect("Error serving starnix manager.");
-        }),
-    )?;
-    svc_dir.add_entry(
         frunner::ComponentRunnerMarker::PROTOCOL_NAME,
         vfs::service::host(move |requests| {
             let kernels_dir = kernels_dir.clone();
@@ -68,21 +60,6 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn serve_starnix_manager(
-    mut request_stream: fstardev::ManagerRequestStream,
-) -> Result<(), Error> {
-    while let Some(event) = request_stream.try_next().await? {
-        match event {
-            fstardev::ManagerRequest::VsockConnect { container, port, bridge_socket, .. } => {
-                connect_to_vsock(port, bridge_socket, &container).unwrap_or_else(|e| {
-                    tracing::error!("failed to connect to vsock {:?}", e);
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
 pub async fn serve_component_runner(
     mut request_stream: frunner::ComponentRunnerRequestStream,
     kernels_dir: Arc<vfs::directory::immutable::Simple>,
@@ -95,19 +72,6 @@ pub async fn serve_component_runner(
         }
     }
     Ok(())
-}
-
-/// Connects `bridge_socket` to the vsocket at `port` in the specified container.
-///
-/// Returns an error if the FIDL connection to the container failed.
-fn connect_to_vsock(port: u32, bridge_socket: fidl::Socket, container: &str) -> Result<(), Error> {
-    let service_prefix = "/".to_string() + container;
-    let container =
-        fclient::connect_to_protocol_at::<fstarcontainer::ControllerMarker>(&service_prefix)?;
-
-    container
-        .vsock_connect(port, bridge_socket)
-        .context("Failed to call vsock connect on container")
 }
 
 /// Creates a new instance of `starnix_kernel`.

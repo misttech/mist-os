@@ -81,11 +81,5 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
-        {
-            protocol: "fuchsia.starnix.developer.Manager",
-            from: "#starnix-manager",
-            to: "#session-manager",
-            source_availability: "unknown",
-        },
     ],
 }

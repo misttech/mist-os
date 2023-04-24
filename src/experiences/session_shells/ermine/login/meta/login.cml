@@ -194,7 +194,6 @@
                 "fuchsia.pkg.rewrite.Engine",
                 "fuchsia.process.Resolver",
                 "fuchsia.space.Manager",
-                "fuchsia.starnix.developer.Manager",
                 "fuchsia.sys.Environment",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
