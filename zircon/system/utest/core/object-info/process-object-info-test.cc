@@ -418,7 +418,7 @@ TEST_F(ProcessGetInfoTest, InfoProcessHandleTableInsufficientRights) {
 }
 
 TEST_F(ProcessGetInfoTest, InfoProcessHandleTableEmpty) {
-  // An empty process does not have any handles, but the syscall suceeds.
+  // An empty process does not have any handles, but the syscall succeeds.
   zx::vmar vmar;
   zx::process process;
   ASSERT_OK(zx::process::create(*zx::job::default_job(), "", 0u, 0u, &process, &vmar));
