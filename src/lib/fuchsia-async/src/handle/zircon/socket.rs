@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState};
+use super::{
+    on_signals::OnSignals,
+    rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
+};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::io::{self, AsyncRead, AsyncWrite};
 use futures::{future::poll_fn, ready, stream::Stream, task::Context};
@@ -39,6 +42,11 @@ impl Socket {
     /// Returns true if the socket received the `OBJECT_PEER_CLOSED` signal.
     pub fn is_closed(&self) -> bool {
         self.0.is_closed()
+    }
+
+    /// Returns a future that completes when the socket received the `OBJECT_PEER_CLOSED` signal.
+    pub fn on_closed(&self) -> OnSignals<'_> {
+        self.0.on_closed()
     }
 
     /// Attempt to read from the socket, registering for wakeup if the socket doesn't have any
@@ -252,6 +260,7 @@ mod tests {
             io::{AsyncReadExt as _, AsyncWriteExt as _},
             stream::TryStreamExt,
             task::noop_waker_ref,
+            FutureExt,
         },
     };
 
@@ -353,6 +362,7 @@ mod tests {
 
         let (s1, s2) = zx::Socket::create_stream();
         let async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
+        let on_closed_fut = async_s2.on_closed();
 
         drop(s1);
 
@@ -364,6 +374,7 @@ mod tests {
             panic!("Expected future to be ready and Ok");
         }
         assert!(async_s2.is_closed());
+        assert_eq!(on_closed_fut.now_or_never(), Some(Ok(zx::Signals::CHANNEL_PEER_CLOSED)));
     }
 
     #[test]
