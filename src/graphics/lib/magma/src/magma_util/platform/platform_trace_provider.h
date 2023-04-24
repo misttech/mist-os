@@ -20,6 +20,7 @@ class PlatformTraceProvider {
 
   // Returns null if tracing is not enabled.
   static PlatformTraceProvider* Get();
+  static void Shutdown();
 
   static std::unique_ptr<PlatformTraceProvider> CreateForTesting();
 };

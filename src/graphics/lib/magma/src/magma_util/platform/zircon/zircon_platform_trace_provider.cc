@@ -37,7 +37,7 @@ ZirconPlatformTraceProvider::~ZirconPlatformTraceProvider() {
 
 bool ZirconPlatformTraceProvider::Initialize(uint32_t channel) {
   zx::channel zx_channel(channel);
-  zx_status_t status = loop_.StartThread();
+  zx_status_t status = loop_.StartThread("magma trace provider");
   if (status != ZX_OK)
     return DRETF(false, "Failed to start async loop");
   trace_provider_ =
@@ -45,11 +45,15 @@ bool ZirconPlatformTraceProvider::Initialize(uint32_t channel) {
   return true;
 }
 
+// static
 PlatformTraceProvider* PlatformTraceProvider::Get() {
   if (!g_platform_trace)
     g_platform_trace = std::make_unique<ZirconPlatformTraceProvider>();
   return g_platform_trace.get();
 }
+
+// static
+void PlatformTraceProvider::Shutdown() { g_platform_trace.reset(); }
 
 // static
 std::unique_ptr<PlatformTraceProvider> PlatformTraceProvider::CreateForTesting() {

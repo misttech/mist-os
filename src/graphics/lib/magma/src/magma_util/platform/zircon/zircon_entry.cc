@@ -77,6 +77,8 @@ void GpuDevice::DdkRelease() {
 
   delete this;
   MAGMA_LOG(INFO, "Finished device_release");
+
+  magma::PlatformTraceProvider::Shutdown();
 }
 
 zx_status_t GpuDevice::Init() {
