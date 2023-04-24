@@ -1201,10 +1201,9 @@ EOF
 # Fail if any differences are found.
 test "$status" -ne 0 || test "$compare" = 0 || {
   # Backup remote outputs.
-  for f in "${outputs[@]}"
+  for f in "${relative_outputs[@]}"
   do
-    out_rel="${f#$build_subdir/}"
-    mv "$out_rel"{,.remote}
+    mv "$f"{,.remote}
   done
 
   # Run locally.
@@ -1228,16 +1227,15 @@ test "$status" -ne 0 || test "$compare" = 0 || {
 
   # Compare outputs.
   output_diffs=()
-  for f in "${outputs[@]}"
+  for f in "${relative_outputs[@]}"
   do
-    out_rel="${f#$build_subdir/}"
-    if cmp "$out_rel"{,.remote}
+    if cmp "$f"{,.remote}
     then
       # Reclaim space when outputs match.
-      rm -f "$out_rel".remote
+      rm -f "$f".remote
     else
       # cmp already reports that files differ.
-      output_diffs+=("$out_rel")
+      output_diffs+=("$f")
     fi
   done
 
