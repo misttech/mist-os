@@ -227,14 +227,7 @@ TEST_F(ProcessGetInfoTest, InfoProcessMapsUnstartedSuceeds) {
   EXPECT_OK(process.get_info(ZX_INFO_PROCESS_MAPS, &maps, 0, &actual, &avail));
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_InfoProcessMapsSmokeTest DISABLED_InfoProcessMapsSmokeTest
-#else
-#define MAYBE_InfoProcessMapsSmokeTest InfoProcessMapsSmokeTest
-#endif
-// Tests that ZX_INFO_PROCESS_MAPS seems to work.
-TEST_F(ProcessGetInfoTest, MAYBE_InfoProcessMapsSmokeTest) {
+TEST_F(ProcessGetInfoTest, InfoProcessMapsSmokeTest) {
   const MappingInfo& test_info = GetInfo();
   const zx::process& process = GetProcess();
 
@@ -253,10 +246,12 @@ TEST_F(ProcessGetInfoTest, MAYBE_InfoProcessMapsSmokeTest) {
   ASSERT_GE(actual, 2u, "Root aspace/vmar missing?");
   EXPECT_EQ(maps[0].type, static_cast<uint32_t>(ZX_INFO_MAPS_TYPE_ASPACE));
   EXPECT_EQ(maps[0].depth, 0u, "ASpace depth");
-  EXPECT_GT(maps[0].size, 1llu << 40, "ASpace size");
+  // An arbitrary yet reasonable lower bound for aspace size (128GiB).
+  EXPECT_GT(maps[0].size, 128llu << 30, "ASpace size");
   EXPECT_EQ(maps[1].type, static_cast<uint32_t>(ZX_INFO_MAPS_TYPE_VMAR));
   EXPECT_EQ(maps[1].depth, 1u, "Root VMAR depth");
-  EXPECT_GT(maps[1].size, 1llu << 40, "Root VMAR size");
+  // Root vmar should be <= to the aspace size.
+  EXPECT_LE(maps[1].size, maps[0].size, "Root VMAR size");
 
   // Look for the VMAR and all of the mappings we created.
 
