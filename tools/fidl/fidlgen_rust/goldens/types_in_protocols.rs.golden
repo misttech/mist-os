@@ -1494,8 +1494,8 @@ pub trait ProtocolProxyInterface: Send + Sync {
         vector_int64: &[i64],
         vector_float32: &[f32],
         vector_float64: &[f64],
-        vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        vector_string: &[String],
+        vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error>;
     type TwoWayVectorBasicResponseFut: std::future::Future<
             Output = Result<
@@ -1528,8 +1528,8 @@ pub trait ProtocolProxyInterface: Send + Sync {
         vector_int64: &[i64],
         vector_float32: &[f32],
         vector_float64: &[f64],
-        vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        vector_string: &[String],
+        vector_opt_string: &[Option<String>],
     ) -> Self::TwoWayVectorBasicResponseFut;
     fn r#one_way_vector_compound(
         &self,
@@ -1980,8 +1980,8 @@ impl ProtocolSynchronousProxy {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorBasic, false>(
             (
@@ -1995,8 +1995,8 @@ impl ProtocolSynchronousProxy {
                 vector_int64,
                 vector_float32,
                 vector_float64,
-                fidl::encoding::Iterator(vector_string),
-                fidl::encoding::Iterator(vector_opt_string),
+                vector_string,
+                vector_opt_string,
             ),
             0x4f907dde77464657,
             fidl::encoding::DynamicFlags::empty(),
@@ -2014,8 +2014,8 @@ impl ProtocolSynchronousProxy {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
         ___deadline: zx::Time,
     ) -> Result<
         (
@@ -2046,8 +2046,8 @@ impl ProtocolSynchronousProxy {
                 vector_int64,
                 vector_float32,
                 vector_float64,
-                fidl::encoding::Iterator(vector_string),
-                fidl::encoding::Iterator(vector_opt_string),
+                vector_string,
+                vector_opt_string,
             ),
             0x7860cb3ed8362e74,
             fidl::encoding::DynamicFlags::empty(),
@@ -2645,8 +2645,8 @@ impl ProtocolProxy {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         ProtocolProxyInterface::r#one_way_vector_basic(
             self,
@@ -2676,8 +2676,8 @@ impl ProtocolProxy {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> fidl::client::QueryResponseFut<(
         Vec<u8>,
         Vec<u16>,
@@ -3308,8 +3308,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         self.client.send::<VectorBasic, false>(
             (
@@ -3323,8 +3323,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 vector_int64,
                 vector_float32,
                 vector_float64,
-                fidl::encoding::Iterator(vector_string),
-                fidl::encoding::Iterator(vector_opt_string),
+                vector_string,
+                vector_opt_string,
             ),
             0x4f907dde77464657,
             fidl::encoding::DynamicFlags::empty(),
@@ -3356,8 +3356,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Self::TwoWayVectorBasicResponseFut {
         fn _decode(
             mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
@@ -3419,8 +3419,8 @@ impl ProtocolProxyInterface for ProtocolProxy {
                 vector_int64,
                 vector_float32,
                 vector_float64,
-                fidl::encoding::Iterator(vector_string),
-                fidl::encoding::Iterator(vector_opt_string),
+                vector_string,
+                vector_opt_string,
             ),
             0x7860cb3ed8362e74,
             fidl::encoding::DynamicFlags::empty(),
@@ -6330,8 +6330,8 @@ impl ProtocolControlHandle {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         self.inner.send::<VectorBasic, false>(
             (
@@ -6345,8 +6345,8 @@ impl ProtocolControlHandle {
                 vector_int64,
                 vector_float32,
                 vector_float64,
-                fidl::encoding::Iterator(vector_string),
-                fidl::encoding::Iterator(vector_opt_string),
+                vector_string,
+                vector_opt_string,
             ),
             0,
             0x3f9d405e7191eff6,
@@ -7008,8 +7008,8 @@ impl ProtocolTwoWayVectorBasicResponder {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
             vector_uint8,
@@ -7046,8 +7046,8 @@ impl ProtocolTwoWayVectorBasicResponder {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         let r = self.send_raw(
             vector_uint8,
@@ -7079,8 +7079,8 @@ impl ProtocolTwoWayVectorBasicResponder {
         mut vector_int64: &[i64],
         mut vector_float32: &[f32],
         mut vector_float64: &[f64],
-        mut vector_string: &mut dyn ExactSizeIterator<Item = &str>,
-        mut vector_opt_string: &mut dyn ExactSizeIterator<Item = Option<&str>>,
+        mut vector_string: &[String],
+        mut vector_opt_string: &[Option<String>],
     ) -> Result<(), fidl::Error> {
         let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
@@ -7099,8 +7099,8 @@ impl ProtocolTwoWayVectorBasicResponder {
                 vector_int64,
                 vector_float32,
                 vector_float64,
-                fidl::encoding::Iterator(vector_string),
-                fidl::encoding::Iterator(vector_opt_string),
+                vector_string,
+                vector_opt_string,
             ),
         };
 

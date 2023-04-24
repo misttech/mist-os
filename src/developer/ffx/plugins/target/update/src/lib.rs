@@ -284,7 +284,7 @@ mod tests {
             args::channel::Command::List(args::channel::List {}),
             |cmd| match cmd {
                 ChannelControlRequest::GetTargetList { responder } => {
-                    responder.send(&mut vec![].into_iter()).unwrap();
+                    responder.send(&[]).unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             },
@@ -299,7 +299,9 @@ mod tests {
             args::channel::Command::List(args::channel::List {}),
             |cmd| match cmd {
                 ChannelControlRequest::GetTargetList { responder } => {
-                    responder.send(&mut vec!["some-channel", "other-channel"].into_iter()).unwrap();
+                    responder
+                        .send(&["some-channel".to_owned(), "other-channel".to_owned()])
+                        .unwrap();
                 }
                 request => panic!("Unexpected request: {:?}", request),
             },

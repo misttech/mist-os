@@ -31,9 +31,7 @@ async fn run_context_service(stream: fet::ContextRequestStream) {
                     for (key, value) in env::vars() {
                         environ.push(format!("{}={}", key, value));
                     }
-                    responder
-                        .send(&mut environ.iter().map(|s| &s[..]))
-                        .expect("failed to send environ");
+                    responder.send(&environ).expect("failed to send environ");
                 }
             }
             Ok(())

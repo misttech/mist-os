@@ -424,14 +424,14 @@ where
             }
             ChannelControlRequest::GetTargetList { responder } => {
                 let server = server.borrow();
-                let channel_names: Vec<&str> = match &server.channel_configs {
+                let channel_names: Vec<String> = match &server.channel_configs {
                     Some(channel_configs) => {
-                        channel_configs.known_channels.iter().map(|cfg| cfg.name.as_ref()).collect()
+                        channel_configs.known_channels.iter().map(|cfg| cfg.name.clone()).collect()
                     }
                     None => Vec::new(),
                 };
                 responder
-                    .send(&mut channel_names.into_iter())
+                    .send(&channel_names)
                     .context("error sending channel list response from ChannelControl")?;
             }
         }

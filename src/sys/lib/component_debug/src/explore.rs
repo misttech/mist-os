@@ -128,15 +128,11 @@ pub async fn launch_with_socket(
     ns_layout: DashNamespaceLayout,
     launcher_proxy: &fdash::LauncherProxy,
 ) -> Result<()> {
-    // The launch_with_socket() FIDL call requires a `&mut dyn
-    // ExactSizeIterator<Item = &str>` to be passed in, even though the Rust
-    // declaration in launch.rs is given as a `Vec<String>`.
-    let urls: &mut dyn ExactSizeIterator<Item = &str> = &mut tools_urls.iter().map(|s| s.as_str());
     launcher_proxy
         .launch_with_socket(
             &moniker.to_string(),
             pty_server,
-            urls,
+            &tools_urls,
             command.as_deref(),
             ns_layout.into(),
         )

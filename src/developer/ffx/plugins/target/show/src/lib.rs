@@ -557,9 +557,12 @@ mod tests {
         fidl::endpoints::spawn_stream_handler(move |req| async move {
             match req {
                 ArgumentsRequest::Collect { responder, .. } => {
-                    let x = vec!["fake_boot_key=fake_boot_value", "fake_valueless_boot_key"];
-
-                    responder.send(&mut x.into_iter()).unwrap();
+                    responder
+                        .send(&[
+                            "fake_boot_key=fake_boot_value".to_owned(),
+                            "fake_valueless_boot_key".to_owned(),
+                        ])
+                        .unwrap();
                 }
                 _ => {}
             }

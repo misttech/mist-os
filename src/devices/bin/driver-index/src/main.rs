@@ -790,14 +790,11 @@ mod tests {
 
     async fn get_driver_info_proxy(
         development_proxy: &fdd::DriverIndexProxy,
-        driver_filter: &[&str],
+        driver_filter: &[String],
     ) -> Vec<fdd::DriverInfo> {
         let (info_iterator, info_iterator_server) =
             fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>().unwrap();
-
-        development_proxy
-            .get_driver_info(&mut driver_filter.iter().map(|i| *i), info_iterator_server)
-            .unwrap();
+        development_proxy.get_driver_info(driver_filter, info_iterator_server).unwrap();
 
         let mut driver_infos = Vec::new();
         loop {
@@ -3843,7 +3840,8 @@ mod tests {
         let test_task = async move {
             // We should not find this before registering it.
             let driver_infos =
-                get_driver_info_proxy(&development_proxy, &[component_manifest_url]).await;
+                get_driver_info_proxy(&development_proxy, &[component_manifest_url.to_string()])
+                    .await;
             assert_eq!(0, driver_infos.len());
 
             // Short delay since the resolver server starts at the same time.
@@ -3856,7 +3854,8 @@ mod tests {
 
             // Now that it's registered we should find it.
             let driver_infos =
-                get_driver_info_proxy(&development_proxy, &[component_manifest_url]).await;
+                get_driver_info_proxy(&development_proxy, &[component_manifest_url.to_string()])
+                    .await;
             assert_eq!(1, driver_infos.len());
             assert_eq!(&driver_library_url.to_string(), driver_infos[0].libname.as_ref().unwrap());
         }

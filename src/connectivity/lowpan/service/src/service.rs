@@ -224,13 +224,8 @@ impl<S: Sync> ServeTo<DeviceWatcherRequestStream> for LowpanService<S> {
 
                             *locked_device_list = Some(self.get_devices());
 
-                            let (added, removed) = (locked_device_list.clone().unwrap(), vec![]);
-                            responder
-                                .send(
-                                    &mut added.iter().map(String::as_str),
-                                    &mut removed.iter().map(String::as_str),
-                                )
-                                .context("error sending response")?;
+                            let (added, removed) = (locked_device_list.clone().unwrap(), []);
+                            responder.send(&added, &removed).context("error sending response")?;
                         } else {
                             // This is a follow-up call.
                             let current_devices = loop {
@@ -290,12 +285,7 @@ impl<S: Sync> ServeTo<DeviceWatcherRequestStream> for LowpanService<S> {
                             // can use it the next time this method is called.
                             *locked_device_list = Some(current_devices);
 
-                            responder
-                                .send(
-                                    &mut added.iter().map(String::as_str),
-                                    &mut removed.iter().map(String::as_str),
-                                )
-                                .context("error sending response")?;
+                            responder.send(&added, &removed).context("error sending response")?;
                         }
                     }
                 }

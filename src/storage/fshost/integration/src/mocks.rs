@@ -120,7 +120,7 @@ async fn run_boot_args(mut stream: fboot::ArgumentsRequestStream, netboot: bool)
                 responder.send(None).unwrap();
             }
             fboot::ArgumentsRequest::GetStrings { keys, responder } => {
-                responder.send(&mut keys.into_iter().map(|_| None)).unwrap();
+                responder.send(&vec![None; keys.len()]).unwrap();
             }
             fboot::ArgumentsRequest::GetBool { key: _, defaultval, responder } => {
                 responder.send(defaultval).unwrap();

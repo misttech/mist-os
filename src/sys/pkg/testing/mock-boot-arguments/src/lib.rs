@@ -49,16 +49,16 @@ impl MockBootArgumentsService {
                     }
                 }
                 fidl_fuchsia_boot::ArgumentsRequest::GetStrings { keys, responder } => {
-                    let mut values: Vec<Option<&str>> = vec![];
+                    let mut values: Vec<Option<String>> = vec![];
                     for key in keys {
                         if let Some(value) = self.args.get(&key) {
-                            values.push(value.as_deref());
+                            values.push(value.clone());
                         } else {
                             values.push(None);
                         }
                     }
                     responder
-                        .send(&mut values.into_iter())
+                        .send(&values)
                         .expect("Error sending boot_arguments strings response.");
                 }
                 req => {
@@ -99,8 +99,8 @@ mod tests {
                 .unwrap();
         fasync::Task::spawn(mock.handle_request_stream(stream)).detach();
 
-        let keys = vec!["some-key", "missing-key", "some-key-2"];
-        let values = proxy.get_strings(&mut keys.into_iter()).await.unwrap();
+        let keys = &["some-key".to_string(), "missing-key".to_string(), "some-key-2".to_string()];
+        let values = proxy.get_strings(keys).await.unwrap();
         assert_eq!(
             values,
             vec![Some("some-value".to_string()), None, Some("some-value-2".to_string())]

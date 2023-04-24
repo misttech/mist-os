@@ -26,9 +26,8 @@ pub fn spawn_inspect_server(mut stream: InspectRequestStream, node: NodeObject) 
                         responder.send(&mut object)?;
                     }
                     InspectRequest::ListChildren { responder } => {
-                        let mut names = get_children_names(&node);
-                        names.sort();
-                        responder.send(&mut names.into_iter())?;
+                        let names = get_children_names(&node);
+                        responder.send(&names)?;
                     }
                     InspectRequest::OpenChild { child_name, child_channel, responder } => {
                         let stream = child_channel.into_stream()?;
@@ -74,15 +73,11 @@ pub fn spawn_inspect_server(mut stream: InspectRequestStream, node: NodeObject) 
     .detach();
 }
 
-fn get_children_names(node: &NodeObject) -> Vec<&str> {
+fn get_children_names(node: &NodeObject) -> Vec<String> {
     match node {
-        NodeObject::Table(table) => {
-            table.rows.iter().map(|row| row.node_name.as_ref()).collect::<Vec<&str>>()
-        }
-        NodeObject::Row(row) => {
-            row.cells.iter().map(|cell| cell.node_name.as_ref()).collect::<Vec<&str>>()
-        }
-        NodeObject::Root(table) => vec![table.node_name.as_ref()],
+        NodeObject::Table(table) => table.rows.iter().map(|row| row.node_name.clone()).collect(),
+        NodeObject::Row(row) => row.cells.iter().map(|cell| cell.node_name.clone()).collect(),
+        NodeObject::Root(table) => vec![table.node_name.clone()],
         _ => vec![],
     }
 }

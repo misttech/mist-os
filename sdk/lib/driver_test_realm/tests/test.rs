@@ -12,7 +12,7 @@ use {
 
 async fn get_driver_info(
     service: &fdd::DriverDevelopmentProxy,
-    driver_filter: &mut dyn ExactSizeIterator<Item = &str>,
+    driver_filter: &[String],
 ) -> Result<Vec<fdd::DriverInfo>> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
@@ -61,7 +61,7 @@ async fn test_empty_args() -> Result<()> {
     let driver_dev =
         instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
 
-    let info = get_driver_info(&driver_dev, &mut std::iter::empty()).await?;
+    let info = get_driver_info(&driver_dev, &[]).await?;
     assert!(info
         .iter()
         .any(|d| d.url == Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string())));
@@ -90,7 +90,7 @@ async fn test_pkg_dir() -> Result<()> {
     let driver_dev =
         instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
 
-    let info = get_driver_info(&driver_dev, &mut std::iter::empty()).await?;
+    let info = get_driver_info(&driver_dev, &[]).await?;
     assert!(info
         .iter()
         .any(|d| d.url == Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string())));

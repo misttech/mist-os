@@ -30,9 +30,7 @@ async fn run_util_server(mut stream: UtilRequestStream) -> Result<(), Error> {
         match req {
             UtilRequest::GetArguments { responder } => {
                 let args: Vec<String> = env::args().collect();
-                responder
-                    .send(&mut args.iter().map(String::as_ref))
-                    .context("error sending response")?
+                responder.send(&args).context("error sending response")?
             }
             UtilRequest::GetArgumentCount { responder } => {
                 responder.send(env::args().len() as u64).context("error sending response")?

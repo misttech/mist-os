@@ -126,9 +126,7 @@ fn iterate(
 
                             // Send the page. At the end of this scope, the `held_store` lock gets
                             // dropped, and therefore released.
-                            responder
-                                .send(&mut current_page.iter().map(String::as_str))
-                                .context("error sending reply")?;
+                            responder.send(&current_page).context("error sending reply")?;
                             println!("Iterator page sent");
                         }
                     }

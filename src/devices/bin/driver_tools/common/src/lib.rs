@@ -106,11 +106,7 @@ pub async fn get_device_info(
         fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
 
     service
-        .get_device_info(
-            &mut device_filter.iter().map(String::as_str),
-            iterator_server,
-            exact_match,
-        )
+        .get_device_info(device_filter, iterator_server, exact_match)
         .context("FIDL call to get device info failed")?;
 
     let mut info_result = Vec::new();
@@ -134,7 +130,7 @@ pub async fn get_driver_info(
         fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
 
     service
-        .get_driver_info(&mut driver_filter.iter().map(String::as_str), iterator_server)
+        .get_driver_info(driver_filter, iterator_server)
         .context("FIDL call to get driver info failed")?;
 
     let mut info_result = Vec::new();

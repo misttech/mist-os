@@ -39,9 +39,10 @@ async fn main() -> Result<(), Error> {
                             responder.send()?;
                         }
                         ChannelControlRequest::GetTargetList { responder } => {
-                            responder.send(
-                                &mut vec!["fake-current-channel", "other-channel"].into_iter(),
-                            )?;
+                            responder.send(&[
+                                "fake-current-channel".to_owned(),
+                                "other-channel".to_owned(),
+                            ])?;
                         }
                     }
                 }

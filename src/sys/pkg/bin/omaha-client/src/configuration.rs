@@ -310,8 +310,14 @@ impl VbMetaData {
         Self::from_proxy(proxy).await
     }
     async fn from_proxy(proxy: ArgumentsProxy) -> Result<Self, Error> {
-        let keys = vec!["omaha_app_id", "ota_channel", "ota_realm", "product_id", "omaha_url"];
-        let mut res = proxy.get_strings(&mut keys.into_iter()).await?;
+        let keys = &[
+            "omaha_app_id".to_owned(),
+            "ota_channel".to_owned(),
+            "ota_realm".to_owned(),
+            "product_id".to_owned(),
+            "omaha_url".to_owned(),
+        ];
+        let mut res = proxy.get_strings(keys).await?;
         if res.len() != 5 {
             Err(anyhow!("Remote endpoint returned {} values, expected 5", res.len()))
         } else {
@@ -558,14 +564,14 @@ mod tests {
                         keys,
                         vec!["omaha_app_id", "ota_channel", "ota_realm", "product_id", "omaha_url"]
                     );
-                    let vec: Vec<Option<&str>> = vec![
-                        Some("test-appid"),
-                        Some("test-channel"),
-                        Some("test-realm"),
-                        Some("test-product"),
-                        Some("test-url"),
+                    let values = &[
+                        Some("test-appid".to_owned()),
+                        Some("test-channel".to_owned()),
+                        Some("test-realm".to_owned()),
+                        Some("test-product".to_owned()),
+                        Some("test-url".to_owned()),
                     ];
-                    responder.send(&mut vec.into_iter()).expect("send failed");
+                    responder.send(values).expect("send failed");
                 }
                 request => panic!("Unexpected request: {request:?}"),
             }
@@ -584,8 +590,8 @@ mod tests {
             match stream.next().await.unwrap() {
                 Ok(ArgumentsRequest::GetStrings { keys, responder }) => {
                     assert_eq!(keys.len(), 5);
-                    let ret: Vec<Option<&str>> = vec![None; 5];
-                    responder.send(&mut ret.into_iter()).expect("send failed");
+                    const NONE: Option<String> = None;
+                    responder.send(&[NONE; 5]).expect("send failed");
                 }
                 request => panic!("Unexpected request: {request:?}"),
             }

@@ -159,12 +159,10 @@ struct BootloaderArgs {
 
 impl BootloaderArgs {
     async fn load_from_proxy(arguments_proxy: ArgumentsProxy) -> Result<BootloaderArgs, Error> {
-        let keys = vec!["omaha_app_id", "omaha_url", "ota_channel"];
+        let keys = &["omaha_app_id".to_owned(), "omaha_url".to_owned(), "ota_channel".to_owned()];
         let num_keys = keys.len();
-        let boot_args: Vec<Option<String>> = arguments_proxy
-            .get_strings(&mut keys.into_iter())
-            .await
-            .context("No boot args available.")?;
+        let boot_args: Vec<Option<String>> =
+            arguments_proxy.get_strings(keys).await.context("No boot args available.")?;
         if boot_args.len() != num_keys {
             bail!("Boot args returned {} values, expected {}", boot_args.len(), num_keys);
         }

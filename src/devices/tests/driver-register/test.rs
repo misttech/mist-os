@@ -59,13 +59,13 @@ async fn set_up_test_driver_realm(
 
 fn send_get_driver_info_request(
     service: &fdd::DriverDevelopmentProxy,
-    driver_filter: &[&str],
+    driver_filter: &[String],
 ) -> Result<fdd::DriverInfoIteratorProxy> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
 
     service
-        .get_driver_info(&mut driver_filter.iter().map(|i| *i), iterator_server)
+        .get_driver_info(driver_filter, iterator_server)
         .context("FIDL call to get driver info failed")?;
 
     Ok(iterator)
@@ -73,7 +73,7 @@ fn send_get_driver_info_request(
 
 async fn get_driver_info(
     service: &fdd::DriverDevelopmentProxy,
-    driver_filter: &[&str],
+    driver_filter: &[String],
 ) -> Result<Vec<fdd::DriverInfo>> {
     let iterator = send_get_driver_info_request(service, driver_filter)?;
 

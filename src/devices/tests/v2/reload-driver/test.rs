@@ -43,14 +43,14 @@ async fn waiter_component(
 
 fn send_get_device_info_request(
     service: &fdd::DriverDevelopmentProxy,
-    device_filter: &[&str],
+    device_filter: &[String],
     exact_match: bool,
 ) -> Result<fdd::DeviceInfoIteratorProxy> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
 
     service
-        .get_device_info(&mut device_filter.iter().map(|i| *i), iterator_server, exact_match)
+        .get_device_info(device_filter, iterator_server, exact_match)
         .context("FIDL call to get device info failed")?;
 
     Ok(iterator)
@@ -58,7 +58,7 @@ fn send_get_device_info_request(
 
 async fn get_device_info(
     service: &fdd::DriverDevelopmentProxy,
-    device_filter: &[&str],
+    device_filter: &[String],
     exact_match: bool,
 ) -> Result<Vec<fdd::DeviceInfo>> {
     let iterator = send_get_device_info_request(service, device_filter, exact_match)?;

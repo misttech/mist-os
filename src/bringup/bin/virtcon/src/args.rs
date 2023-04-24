@@ -57,14 +57,14 @@ impl VirtualConsoleArgs {
             boot_animation = values[4];
         }
 
-        let string_keys = vec![
-            "virtcon.colorscheme",
-            "virtcon.keymap",
-            "virtcon.display_rotation",
-            "virtcon.font_size",
-            "virtcon.dpi",
-            "virtcon.scrollback_rows",
-            "virtcon.buffer_count",
+        let string_keys = &[
+            "virtcon.colorscheme".to_owned(),
+            "virtcon.keymap".to_owned(),
+            "virtcon.display_rotation".to_owned(),
+            "virtcon.font_size".to_owned(),
+            "virtcon.dpi".to_owned(),
+            "virtcon.scrollback_rows".to_owned(),
+            "virtcon.buffer_count".to_owned(),
         ];
         let mut color_scheme = ColorScheme::default();
         let mut keymap = DEFAULT_KEYMAP.to_string();
@@ -73,7 +73,7 @@ impl VirtualConsoleArgs {
         let mut dpi = vec![];
         let mut scrollback_rows = DEFAULT_SCROLLBACK_ROWS;
         let mut buffer_count = DEFAULT_BUFFER_COUNT;
-        if let Ok(values) = boot_args.get_strings(&mut string_keys.into_iter()).await {
+        if let Ok(values) = boot_args.get_strings(string_keys).await {
             if let Some(value) = values[0].as_ref() {
                 color_scheme = ColorScheme::from_str(value)?;
             }
@@ -152,8 +152,8 @@ mod tests {
                 match req {
                     ArgumentsRequest::GetStrings { keys, responder } => {
                         let vec: Vec<_> =
-                            keys.into_iter().map(|key| env.get(&key).map(|s| &s[..])).collect();
-                        responder.send(&mut vec.into_iter()).unwrap();
+                            keys.into_iter().map(|key| env.get(&key).map(|s| s.clone())).collect();
+                        responder.send(&vec).unwrap();
                     }
                     ArgumentsRequest::GetBools { keys, responder } => {
                         let vec: Vec<_> = keys

@@ -409,12 +409,7 @@ impl<T: Driver> ServeTo<DeviceRequestStream> for T {
                     self.get_supported_network_types()
                         .err_into::<Error>()
                         .and_then(|response| {
-                            ready(
-                                responder
-                                    .unwrap()
-                                    .send(&mut response.iter().map(String::as_str))
-                                    .map_err(Error::from),
-                            )
+                            ready(responder.unwrap().send(&response).map_err(Error::from))
                         })
                         .await
                         .context("error in get_supported_network_types request")?;

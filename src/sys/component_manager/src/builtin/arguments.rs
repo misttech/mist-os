@@ -249,8 +249,9 @@ impl BuiltinCapability for Arguments {
                     _ => responder.send(None),
                 }?,
                 fboot::ArgumentsRequest::GetStrings { keys, responder } => {
-                    let mut vec = keys.into_iter().map(|x| self.var(x).ok());
-                    responder.send(&mut vec)?
+                    let vec: Vec<_> =
+                        keys.into_iter().map(|x| self.var(x).ok().map(String::from)).collect();
+                    responder.send(&vec)?
                 }
                 fboot::ArgumentsRequest::GetBool { key, defaultval, responder } => {
                     responder.send(self.get_bool_arg(key, defaultval))?
@@ -276,7 +277,7 @@ impl BuiltinCapability for Arguments {
                         );
                         responder.control_handle().shutdown_with_epitaph(Status::INTERNAL);
                     } else {
-                        responder.send(&mut vec.iter().map(|x| x.as_str()))?
+                        responder.send(&vec)?
                     }
                 }
             }
@@ -510,16 +511,15 @@ mod tests {
             Arguments::new_from_sources(Env::mock_new(vars), None, None, None).await?,
         )?;
 
-        let req = vec!["test_arg_1", "test_arg_2", "test_arg_3"];
-        let res = proxy.get_strings(&mut req.iter().map(|x| *x)).await?;
+        let req = &["test_arg_1".to_owned(), "test_arg_2".to_owned(), "test_arg_3".to_owned()];
+        let res = proxy.get_strings(req).await?;
         let panicker = || panic!("got None, expected Some(str)");
         assert_eq!(res[0].as_ref().unwrap_or_else(panicker), "hello");
         assert_eq!(res[1].as_ref().unwrap_or_else(panicker), "another var");
         assert_eq!(res[2], None);
         assert_eq!(res.len(), 3);
 
-        let empty_vec = Vec::new();
-        let res = proxy.get_strings(&mut empty_vec.into_iter()).await?;
+        let res = proxy.get_strings(&[]).await?;
         assert_eq!(res.len(), 0);
         Ok(())
     }

@@ -823,8 +823,7 @@ impl StorageAdmin {
         while let Some(request) = iterator_stream.try_next().await? {
             let fsys::StorageIteratorRequest::Next { responder } = request;
             let monikers: Vec<_> = storage_users.by_ref().take(MAX_MONIKERS_RETURNED).collect();
-            let mut str_monikers = monikers.iter().map(String::as_str);
-            responder.send(&mut str_monikers)?;
+            responder.send(&monikers)?;
         }
         Ok(())
     }

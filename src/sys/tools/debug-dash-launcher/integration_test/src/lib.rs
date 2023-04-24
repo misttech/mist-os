@@ -12,8 +12,7 @@ pub async fn unknown_tools_package() {
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
-    let v = vec!["fuchsia-pkg://fuchsia.com/bar".to_string()];
-    let urls: &mut dyn ExactSizeIterator<Item = &str> = &mut v.iter().map(|s| s.as_str());
+    let urls = &["fuchsia-pkg://fuchsia.com/bar".to_string()];
     let err = launcher
         .launch_with_socket(
             ".",
@@ -40,7 +39,7 @@ pub async fn bad_moniker() {
         .launch_with_socket(
             "!@#$%^&*(",
             stdio_server,
-            &mut std::iter::empty(),
+            &[],
             None,
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -61,7 +60,7 @@ pub async fn instance_not_found() {
         .launch_with_socket(
             "./does_not_exist",
             stdio_server,
-            &mut std::iter::empty(),
+            &[],
             None,
             fdash::DashNamespaceLayout::NestAllInstanceDirs,
         )
@@ -77,8 +76,7 @@ pub async fn bad_url() {
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
-    let v = vec!["fuchsia-pkg://fuchsia.com/!@#$%^&*(".to_string()];
-    let urls: &mut dyn ExactSizeIterator<Item = &str> = &mut v.iter().map(|s| s.as_str());
+    let urls = &["fuchsia-pkg://fuchsia.com/!@#$%^&*(".to_string()];
     let err = launcher
         .launch_with_socket(
             ".",

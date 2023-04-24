@@ -27,7 +27,7 @@ pub trait FacadeProvider {
     fn get_facades(&self) -> Box<dyn Iterator<Item = &Arc<dyn Facade>> + '_>;
 
     /// Returns an iterator over all of the facade names.
-    fn get_facade_names(&self) -> Box<dyn ExactSizeIterator<Item = &str> + '_>;
+    fn get_facade_names(&self) -> Vec<String>;
 
     /// Invoked on FacadeProvider.GetFacades(). Sends the list of hosted facades back to the client on
     /// subsequent calls to FacadeIterator.GetNext() over the channel given to GetFacades().
@@ -47,11 +47,11 @@ pub trait FacadeProvider {
             if let Some(FacadeIteratorRequest::GetNext { responder }) = iterator.try_next().await? {
                 // NOTE: if the list of facade names would exceed the channel buffer size,
                 // they should be split over back-to-back responses to GetNext().
-                responder.send(&mut self.get_facade_names())?;
+                responder.send(&self.get_facade_names())?;
                 if let Some(FacadeIteratorRequest::GetNext { responder }) =
                     iterator.try_next().await?
                 {
-                    responder.send(&mut std::iter::empty())?; // Indicates completion.
+                    responder.send(&[])?; // Indicates completion.
                 }
             }
             Ok::<(), Error>(())
@@ -274,8 +274,8 @@ mod tests {
             Box::new(self.facades.values())
         }
 
-        fn get_facade_names(&self) -> Box<dyn ExactSizeIterator<Item = &str> + '_> {
-            Box::new(self.facades.keys().map(|string| string.as_str()))
+        fn get_facade_names(&self) -> Vec<String> {
+            self.facades.keys().cloned().collect()
         }
     }
 

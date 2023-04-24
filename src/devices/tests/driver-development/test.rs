@@ -62,7 +62,11 @@ fn send_get_device_info_request(
         fidl::endpoints::create_proxy::<fdd::DeviceInfoIteratorMarker>()?;
 
     service
-        .get_device_info(&mut device_filter.iter().map(|i| *i), iterator_server, exact_match)
+        .get_device_info(
+            &device_filter.iter().copied().map(String::from).collect::<Vec<_>>(),
+            iterator_server,
+            exact_match,
+        )
         .context("FIDL call to get device info failed")?;
 
     Ok(iterator)
@@ -95,7 +99,10 @@ fn send_get_driver_info_request(
         fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
 
     service
-        .get_driver_info(&mut driver_filter.iter().map(|i| *i), iterator_server)
+        .get_driver_info(
+            &driver_filter.iter().copied().map(String::from).collect::<Vec<_>>(),
+            iterator_server,
+        )
         .context("FIDL call to get driver info failed")?;
 
     Ok(iterator)

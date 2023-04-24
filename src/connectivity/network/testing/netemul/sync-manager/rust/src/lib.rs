@@ -82,7 +82,7 @@ impl Bus {
     /// Waits for the specified client to join the bus.
     pub async fn wait_for_client(&self, client: &str) -> Result {
         let (success, absent) =
-            self.bus.wait_for_clients(&mut std::iter::once(client), /* no timeout */ 0).await?;
+            self.bus.wait_for_clients(&[client.to_owned()], /* no timeout */ 0).await?;
         if !success {
             let absent = absent.expect("absent clients not set in response");
             return Err(Error::ClientsNotPresentOnBus(absent));

@@ -14,22 +14,19 @@ pub async fn debugcmd(
     proxy: fdebug::DebugProxy,
     cmd: ffx_power_manager_args::PowerManagerDebugCommand,
 ) -> Result<()> {
-    proxy
-        .message(&cmd.node_name, &cmd.command, &mut cmd.args.iter().map(|s| s.as_ref()))
-        .await?
-        .map_err(|e| match e {
-            fdebug::MessageError::Generic => ffx_error!("Generic error occurred"),
-            fdebug::MessageError::InvalidNodeName => {
-                ffx_error!("Invalid node name '{}'", cmd.node_name)
-            }
-            fdebug::MessageError::UnsupportedCommand => {
-                ffx_error!("Unsupported command '{}' for node '{}'", cmd.command, cmd.node_name)
-            }
-            fdebug::MessageError::InvalidCommandArgs => {
-                ffx_error!("Invalid arguments for command '{}'", cmd.command)
-            }
-            e => ffx_error!("Unknown error: {:?}", e),
-        })?;
+    proxy.message(&cmd.node_name, &cmd.command, &cmd.args).await?.map_err(|e| match e {
+        fdebug::MessageError::Generic => ffx_error!("Generic error occurred"),
+        fdebug::MessageError::InvalidNodeName => {
+            ffx_error!("Invalid node name '{}'", cmd.node_name)
+        }
+        fdebug::MessageError::UnsupportedCommand => {
+            ffx_error!("Unsupported command '{}' for node '{}'", cmd.command, cmd.node_name)
+        }
+        fdebug::MessageError::InvalidCommandArgs => {
+            ffx_error!("Invalid arguments for command '{}'", cmd.command)
+        }
+        e => ffx_error!("Unknown error: {:?}", e),
+    })?;
     Ok(())
 }
 

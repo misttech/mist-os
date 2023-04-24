@@ -156,10 +156,10 @@ fn spawn_tree_name_iterator_server(values: Vec<String>, mut stream: TreeNameIter
                             }
                         }
                         if result.is_empty() {
-                            responder.send(&mut vec![].into_iter())?;
+                            responder.send(&[])?;
                             return Ok(());
                         }
-                        responder.send(&mut result.iter().map(|s| s.as_ref()))?;
+                        responder.send(&result)?;
                     }
                 }
             }

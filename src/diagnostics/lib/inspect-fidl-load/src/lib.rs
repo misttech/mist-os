@@ -193,7 +193,7 @@ mod tests {
                             responder.send(&mut object.object.clone())?;
                         }
                         InspectRequest::ListChildren { responder } => {
-                            responder.send(&mut object.children.iter().map(|s| s.as_ref()))?;
+                            responder.send(&object.children.iter().cloned().collect::<Vec<_>>())?;
                         }
                         InspectRequest::OpenChild { child_name, child_channel, responder } => {
                             let stream = child_channel.into_stream()?;

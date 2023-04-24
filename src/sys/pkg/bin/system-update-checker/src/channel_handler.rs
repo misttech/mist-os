@@ -74,9 +74,7 @@ impl ChannelHandler {
                 }
                 ChannelControlRequest::GetTargetList { responder } => {
                     let channel_names = self.target_channel_manager.get_channel_list().await?;
-                    responder
-                        .send(&mut channel_names.iter().map(|s| s.as_str()))
-                        .context("sending GetTargetList response")?;
+                    responder.send(&channel_names).context("sending GetTargetList response")?;
                 }
                 ChannelControlRequest::SetTarget { channel, responder } => {
                     self.target_channel_manager.set_target_channel(channel);

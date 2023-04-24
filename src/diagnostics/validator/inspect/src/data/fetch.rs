@@ -206,10 +206,10 @@ mod tests {
                                 .take(MAX_TREE_NAME_LIST_SIZE)
                                 .collect::<Vec<String>>();
                             if result.is_empty() {
-                                responder.send(&mut vec![].into_iter())?;
+                                responder.send(&[])?;
                                 return Ok(());
                             }
-                            responder.send(&mut result.iter().map(|s| s.as_ref()))?;
+                            responder.send(&result)?;
                         }
                     }
                 }

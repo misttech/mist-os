@@ -309,7 +309,7 @@ impl Service {
     fn list_tiles(&mut self, responder: ControllerListTilesResponder) {
         let iter = self.tiles.iter();
         let keys = iter.clone().map(|(k, _)| *k);
-        let mut urls = iter.clone().map(|(_, tile)| tile.url.as_str());
+        let urls: Vec<_> = iter.clone().map(|(_, tile)| tile.url.clone()).collect();
         let tile_count: u32 = self.tiles.len().try_into().unwrap();
 
         let spec = default_gridspec(tile_count, self.logical_width, self.logical_height);
@@ -320,7 +320,7 @@ impl Service {
         let focusabilities: Vec<_> = iter.clone().map(|(_, tile)| tile.focusable).collect();
         if let Err(e) = responder.send(
             &keys.collect::<Vec<u32>>(),
-            &mut urls,
+            &urls,
             &mut sizes.iter_mut(),
             &focusabilities,
         ) {

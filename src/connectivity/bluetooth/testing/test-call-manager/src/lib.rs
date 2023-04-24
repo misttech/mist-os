@@ -680,16 +680,7 @@ impl TestCallManager {
                 responder.send(Some(&self.inner.lock().await.manager.operator))?;
             }
             PeerHandlerRequest::SubscriberNumberInformation { responder, .. } => {
-                responder.send(
-                    &mut self
-                        .inner
-                        .lock()
-                        .await
-                        .manager
-                        .subscriber_numbers
-                        .iter()
-                        .map(AsRef::as_ref),
-                )?;
+                responder.send(&self.inner.lock().await.manager.subscriber_numbers)?;
             }
             PeerHandlerRequest::SetNrecMode { enabled, responder, .. } => {
                 let mut inner = self.inner.lock().await;
