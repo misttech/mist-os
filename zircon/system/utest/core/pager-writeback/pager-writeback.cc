@@ -756,14 +756,7 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
 }
 
 // Tests that ZX_PAGER_OP_FAIL can fail DIRTY page requests and propagate the failure up.
-//
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_FailDirtyRequests DISABLED_FailDirtyRequests
-#else
-#define MAYBE_FailDirtyRequests FailDirtyRequests
-#endif
-TEST(PagerWriteback, MAYBE_FailDirtyRequests) {
+TEST(PagerWriteback, FailDirtyRequests) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5129,14 +5122,7 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnMappingRead, 0) {
 }
 
 // Tests that a VMO is not marked modified when a write is failed by failing a DIRTY request.
-//
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_NotModifiedOnFailedDirtyRequest DISABLED_NotModifiedOnFailedDirtyRequest
-#else
-#define MAYBE_NotModifiedOnFailedDirtyRequest NotModifiedOnFailedDirtyRequest
-#endif
-TEST(PagerWriteback, MAYBE_NotModifiedOnFailedDirtyRequest) {
+TEST(PagerWriteback, NotModifiedOnFailedDirtyRequest) {
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 

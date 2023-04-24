@@ -82,16 +82,7 @@ void WaitForThreadState(zx_handle_t thread_handle, zx_thread_state_t state) {
 // Test current behavior when transferring a channel with pending calls out of the current process.
 // TODO(fxbug.dev/34013): This test ensures that currently undefined behavior does not change
 // unexpectedly. Once the behavior is properly undefined, this test should be updated.
-//
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_TransferChannelWithPendingCallInSourceProcess \
-  DISABLED_TransferChannelWithPendingCallInSourceProcess
-#else
-#define MAYBE_TransferChannelWithPendingCallInSourceProcess \
-  TransferChannelWithPendingCallInSourceProcess
-#endif
-TEST(ChannelInternalTest, MAYBE_TransferChannelWithPendingCallInSourceProcess) {
+TEST(ChannelInternalTest, TransferChannelWithPendingCallInSourceProcess) {
   if (getenv("NO_NEW_PROCESS")) {
     ZXTEST_SKIP("Running without the ZX_POL_NEW_PROCESS policy, skipping test case.");
   }
