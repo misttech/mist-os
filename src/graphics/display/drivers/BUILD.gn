@@ -9,7 +9,7 @@ group("tests") {
     "aml-canvas:tests",
     "aml-hdmi:tests",
     "amlogic-display:tests",
-    "display:tests",
+    "coordinator:tests",
     "dsi-dw:tests",
     "fake:tests",
     "goldfish-display:tests",

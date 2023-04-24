@@ -13,7 +13,7 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
-#include "src/graphics/display/drivers/display/controller.h"
+#include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
 

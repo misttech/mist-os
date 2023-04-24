@@ -1,0 +1,101 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/drivers.gni")
+
+driver_bind_rules("coordinator_bind") {
+  rules = "coordinator.bind"
+  header_output = "coordinator-bind.h"
+
+  # TODO(fxbug.com/122937): Rename to "display-coordinator.bindbc".
+  bind_output = "display.bindbc"
+  tests = "bind_tests.json"
+  deps = [ "//src/devices/bind/fuchsia.hardware.display" ]
+}
+
+fuchsia_driver("coordinator-driver") {
+  output_name = "display"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  deps = [
+    ":shared",
+    "//sdk/lib/syslog/cpp:backend",
+    "//src/devices/lib/driver",
+  ]
+}
+
+fuchsia_driver_component("coordinator") {
+  # TODO(fxbug.com/122937): Rename component to "display-coordinator".
+  component_name = "display"
+  deps = [ ":coordinator-driver" ]
+  info = "coordinator-info.json"
+  manifest = "meta/display-coordinator.cml"
+}
+
+# Also used by test/.
+source_set("shared") {
+  visibility = [
+    "../fake:mock-display-device-tree",
+    "./*",
+  ]
+  configs += [ "//build/config:all_source" ]
+  sources = [
+    "client.cc",
+    "controller.cc",
+    "display-info.cc",
+    "eld.cc",
+    "fence.cc",
+    "image.cc",
+    "layer.cc",
+    "util.cc",
+  ]
+  public_deps = [
+    ":coordinator_bind",
+    "//sdk/banjo/fuchsia.hardware.audiotypes:fuchsia.hardware.audiotypes_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.display.clamprgb:fuchsia.hardware.display.clamprgb_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/lib/fidl",
+    "//src/devices/lib/audio",
+    "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/edid",
+    "//src/lib/async-watchdog",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//src/lib/eld",
+    "//src/lib/fsl",
+    "//src/media/audio/drivers/lib/audio-proto-utils",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/image-format",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/pretty",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/zx",
+  ]
+
+  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+}
+
+source_set("preferred-scanout-image-type") {
+  sources = [ "preferred-scanout-image-type.h" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":coordinator_bind_test",
+    "tests",
+  ]
+}

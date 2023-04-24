@@ -31,7 +31,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/drivers/display/preferred-scanout-image-type.h"
+#include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 

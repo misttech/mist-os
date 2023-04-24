@@ -9,7 +9,7 @@
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 
-#include "src/graphics/display/drivers/display/preferred-scanout-image-type.h"
+#include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/lib/escher/flib/fence.h"
 #include "src/ui/lib/escher/impl/naive_image.h"

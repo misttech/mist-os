@@ -10,7 +10,7 @@ group("drivers") {
     "drivers/aml-canvas",
     "drivers/aml-hdmi:aml-hdmi",
     "drivers/amlogic-display",
-    "drivers/display",
+    "drivers/coordinator",
     "drivers/dsi-dw",
     "drivers/goldfish-display",
     "drivers/intel-i915",

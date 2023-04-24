@@ -92,7 +92,7 @@ interaction improves code coverage, makes tests deterministic, and tightens the
 feedback loop on most bugs.
 
 We will follow the same strategy for the common display controller code in
-`src/graphics/display/drivers/display`.
+`src/graphics/display/drivers/coordinator`.
 
 Sometimes it is not possible to separate these two types of code, e.g. when
 testing self-contained hardware functionality like TLB management. In those
@@ -105,7 +105,7 @@ but before `MakeVisible`.
 > "Driver" code will be exercised in conformance tests running on target
 > hardware.
 
-`src/graphics/display/drivers/display/test` currently contains test fixtures and
+`src/graphics/display/drivers/coordinator/test` currently contains test fixtures and
 helper classes for exercising the display core and a driver. At the moment, only
 the `fake-display` driver can be used.
 

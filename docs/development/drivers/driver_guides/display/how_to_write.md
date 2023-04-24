@@ -150,8 +150,8 @@ namespace fancy_display {
 class Device;
 using DeviceType = ddk::Device<Device>
 
-// A Device exposes a single display controller for use by the core display
-// driver in src/graphics/display/drivers/display.
+// A Device exposes a single display controller for use by the display
+// coordinator driver in src/graphics/display/drivers/coordinator.
 //
 // This object is constructed once for each device that matches this
 // driver's bind rules.
@@ -242,9 +242,9 @@ ZIRCON_DRIVER(fancy_display, fancy_display_ops, "zircon", "0.1");
 
 Display drivers are required to implement the `DisplayControllerImpl`
 [protocol][dcimpl], which exposes hardware layers and implements vsync
-notifications. A shared [display-core][display-core] driver wraps all the
-device-specific drivers on the system and handles client multiplexing, resource
-tracking, fences, etc.
+notifications. A [display-coordinator][display-coordinator] driver multiplexes
+between all the device-specific drivers on the system and the display driver
+stack clients, which are the system compositor and Virtcon.
 
 ### Implementation tips
 
@@ -292,7 +292,7 @@ basic bootloader driver. In most cases, your roadmap will be:
 <!--xrefs-->
 [dcimpl]: /sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
 [ddk-tl]: /docs/development/drivers/concepts/driver_development/using-ddktl.md
-[display-core]: /src/graphics/display/drivers/display/
+[display-coordinator]: /src/graphics/display/drivers/coordinator/
 [driver-binding]: /docs/development/drivers/concepts/device_driver_model/driver-binding.md
 [intel-bind]: /src/graphics/display/drivers/intel-i915/intel-i915.bind
 [license-policies]: /docs/contribute/governance/policy/open-source-licensing-policies.md
