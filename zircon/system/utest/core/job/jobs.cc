@@ -282,13 +282,7 @@ TEST(JobTest, PolicyTimerSlackValid) {
   ASSERT_OK(job_child.set_policy(ZX_JOB_POL_RELATIVE, ZX_JOB_POL_TIMER_SLACK, &policy, 1));
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_KillTest DISABLED_KillTest
-#else
-#define MAYBE_KillTest KillTest
-#endif
-TEST(JobTest, MAYBE_KillTest) {
+TEST(JobTest, KillTest) {
   zx_handle_t job_parent = zx_job_default();
   ASSERT_NE(job_parent, ZX_HANDLE_INVALID);
 
@@ -421,14 +415,7 @@ TEST(JobTest, CloseJobRemovesFromTree) {
 }
 
 // Make sure a chain of jobs killed from the top cascades properly.
-//
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_KillJobChain DISABLED_KillJobChain
-#else
-#define MAYBE_KillJobChain KillJobChain
-#endif
-TEST(JobTest, MAYBE_KillJobChain) {
+TEST(JobTest, KillJobChain) {
   zx_handle_t jobs[5];
   zx_handle_t parent = zx_job_default();
   for (zx_handle_t& job : jobs) {
@@ -460,13 +447,7 @@ TEST(JobTest, MAYBE_KillJobChain) {
   ASSERT_OK(zx_handle_close_many(jobs, std::size(jobs)));
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_OneCriticalProcessKillsOneJob DISABLED_OneCriticalProcessKillsOneJob
-#else
-#define MAYBE_OneCriticalProcessKillsOneJob OneCriticalProcessKillsOneJob
-#endif
-TEST(JobTest, MAYBE_OneCriticalProcessKillsOneJob) {
+TEST(JobTest, OneCriticalProcessKillsOneJob) {
   // 1 job, |job|.
   // 1 process, |process|.
   // |process| is a child of |job|.
@@ -490,13 +471,7 @@ TEST(JobTest, MAYBE_OneCriticalProcessKillsOneJob) {
   EXPECT_EQ(job_info.return_code, ZX_TASK_RETCODE_CRITICAL_PROCESS_KILL);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_ManyCriticalProcessesKillOneJob DISABLED_ManyCriticalProcessesKillOneJob
-#else
-#define MAYBE_ManyCriticalProcessesKillOneJob ManyCriticalProcessesKillOneJob
-#endif
-TEST(JobTest, MAYBE_ManyCriticalProcessesKillOneJob) {
+TEST(JobTest, ManyCriticalProcessesKillOneJob) {
   // 1 job, |job|.
   // 2 processes, |process1| and |process2|.
   // |process1| and |process2| are children of |job|.
@@ -528,13 +503,7 @@ TEST(JobTest, MAYBE_ManyCriticalProcessesKillOneJob) {
   EXPECT_EQ(process_info.return_code, ZX_TASK_RETCODE_CRITICAL_PROCESS_KILL);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_OneCriticalProcessKillsJobTree DISABLED_OneCriticalProcessKillsJobTree
-#else
-#define MAYBE_OneCriticalProcessKillsJobTree OneCriticalProcessKillsJobTree
-#endif
-TEST(JobTest, MAYBE_OneCriticalProcessKillsJobTree) {
+TEST(JobTest, OneCriticalProcessKillsJobTree) {
   // 2 jobs, |job1| and |job2|.
   // 2 processes, |process1| and |process2|.
   // |job2| is a child of |job1|.
@@ -568,15 +537,7 @@ TEST(JobTest, MAYBE_OneCriticalProcessKillsJobTree) {
   EXPECT_EQ(job_info2.return_code, ZX_TASK_RETCODE_CRITICAL_PROCESS_KILL);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_OneCriticalProcessKillsOneJobIfRetcodeNonzero \
-  DISABLED_OneCriticalProcessKillsOneJobIfRetcodeNonzero
-#else
-#define MAYBE_OneCriticalProcessKillsOneJobIfRetcodeNonzero \
-  OneCriticalProcessKillsOneJobIfRetcodeNonzero
-#endif
-TEST(JobTest, MAYBE_OneCriticalProcessKillsOneJobIfRetcodeNonzero) {
+TEST(JobTest, OneCriticalProcessKillsOneJobIfRetcodeNonzero) {
   // 1 job, |job|.
   // 1 process, |process|.
   // |process| is a child of |job|.
@@ -599,13 +560,7 @@ TEST(JobTest, MAYBE_OneCriticalProcessKillsOneJobIfRetcodeNonzero) {
   EXPECT_EQ(observed, ZX_JOB_NO_PROCESSES | ZX_JOB_NO_JOBS | ZX_JOB_NO_CHILDREN);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_CriticalProcessNotInAncestor DISABLED_CriticalProcessNotInAncestor
-#else
-#define MAYBE_CriticalProcessNotInAncestor CriticalProcessNotInAncestor
-#endif
-TEST(JobTest, MAYBE_CriticalProcessNotInAncestor) {
+TEST(JobTest, CriticalProcessNotInAncestor) {
   // 1 job, |job|.
   // 1 process, |process|.
   // |process| is not a child of |job|.
@@ -620,13 +575,7 @@ TEST(JobTest, MAYBE_CriticalProcessNotInAncestor) {
   ASSERT_OK(process.kill());
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_CriticalProcessAlreadySet DISABLED_CriticalProcessAlreadySet
-#else
-#define MAYBE_CriticalProcessAlreadySet CriticalProcessAlreadySet
-#endif
-TEST(JobTest, MAYBE_CriticalProcessAlreadySet) {
+TEST(JobTest, CriticalProcessAlreadySet) {
   // 1 job, |job|.
   // 1 process, |process|.
   // |process| is a child of |job|.
@@ -672,13 +621,7 @@ TEST(JobTest, SetJobOomKillBit) {
       ZX_ERR_INVALID_ARGS);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_WaitTest DISABLED_WaitTest
-#else
-#define MAYBE_WaitTest WaitTest
-#endif
-TEST(JobTest, MAYBE_WaitTest) {
+TEST(JobTest, WaitTest) {
   zx_handle_t job_parent = zx_job_default();
   ASSERT_NE(job_parent, ZX_HANDLE_INVALID);
 
@@ -808,23 +751,11 @@ static void TestJobGetInfoRuntime(const uint32_t topic) {
             ZX_ERR_ACCESS_DENIED);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_GetInfoRuntime DISABLED_GetInfoRuntime
-#else
-#define MAYBE_GetInfoRuntime GetInfoRuntime
-#endif
-TEST(JobTest, MAYBE_GetInfoRuntime) {
+TEST(JobTest, GetInfoRuntime) {
   TestJobGetInfoRuntime<zx_info_task_runtime_t>(ZX_INFO_TASK_RUNTIME);
 }
 
-// TODO(fxbug.dev/125661): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_GetInfoRuntimeV1 DISABLED_GetInfoRuntimeV1
-#else
-#define MAYBE_GetInfoRuntimeV1 GetInfoRuntimeV1
-#endif
-TEST(JobTest, MAYBE_GetInfoRuntimeV1) {
+TEST(JobTest, GetInfoRuntimeV1) {
   TestJobGetInfoRuntime<zx_info_task_runtime_v1_t>(ZX_INFO_TASK_RUNTIME_V1);
 }
 
