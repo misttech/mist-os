@@ -10,6 +10,14 @@ import("//zircon/tools/zither/zither_golden_files.gni")
 fidl("zbi") {
   sources = [ "driver-config.fidl" ]
   enable_zither = true
+
+  zither = {
+    c = {
+      # The C backend is used to generate checked-in headers within this
+      # include namespace.
+      output_namespace = "zircon/boot"
+    }
+  }
 }
 
 # Depended on by //zircon/public/sysroot/sdk:sysroot_sdk.
