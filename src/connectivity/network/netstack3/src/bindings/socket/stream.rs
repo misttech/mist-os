@@ -23,7 +23,7 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Peered as _};
-use futures::StreamExt as _;
+use futures::{FutureExt as _, StreamExt as _};
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     ZonedAddr,
@@ -750,21 +750,30 @@ fn spawn_send_task<I: IpExt>(
     id: ConnectionId<I>,
 ) {
     fasync::Task::spawn(async move {
-        watcher
-            .for_each(|()| async {
-                let observed = fasync::OnSignals::new(&*socket, zx::Signals::SOCKET_READABLE)
-                    .await
-                    .expect("failed to observe signals on zircon socket");
-                assert!(observed.contains(zx::Signals::SOCKET_READABLE));
-                let mut ctx = ctx.clone();
-                let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-                netstack3_core::transport::tcp::socket::do_send::<I, _>(
-                    sync_ctx,
-                    non_sync_ctx,
-                    id.into(),
-                );
-            })
-            .await
+        let watcher = watcher.peekable();
+        futures::pin_mut!(watcher);
+        while let Some(()) = watcher.next().await {
+            // Wait until either the zircon socket is readable or the watcher
+            // has received another notification. This allows the watcher
+            // stream's ending to interrupt a blocking wait for the socket to
+            // become readable.
+            let mut readable =
+                fasync::OnSignals::new(&*socket, zx::Signals::SOCKET_READABLE).fuse();
+            let observed = futures::select! {
+                result = readable => result.expect("failed to observe signals on zircon socket"),
+                // Only peek at the next result so we can allow the next
+                // iteration of the while loop to take ownership of it.
+                _ = watcher.as_mut().peek() => continue,
+            };
+            assert!(observed.contains(zx::Signals::SOCKET_READABLE));
+            let mut ctx = ctx.clone();
+            let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+            netstack3_core::transport::tcp::socket::do_send::<I, _>(
+                sync_ctx,
+                non_sync_ctx,
+                id.into(),
+            );
+        }
     })
     .detach();
 }

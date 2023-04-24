@@ -15,10 +15,23 @@
         {
             type: "expect_failure",
             matchers: [
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
 
                 // Netstack3 does not support dual-stack TCP sockets yet.
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV4Loopback_ConnectV4MappedLoopback",
