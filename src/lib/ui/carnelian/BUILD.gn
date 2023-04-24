@@ -50,6 +50,7 @@ rustc_library("carnelian") {
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//src/graphics/display/lib/rust/display-utils",
     "//src/graphics/lib/compute/forma",
     "//src/graphics/lib/compute/rive-rs",
     "//src/lib/async-utils",

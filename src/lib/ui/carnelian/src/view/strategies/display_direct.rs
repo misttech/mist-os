@@ -21,12 +21,11 @@ use crate::{
 };
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
+use display_utils::PixelFormat;
 use euclid::size2;
 use fidl_fuchsia_hardware_display::{ControllerEvent, ControllerProxy, ImageConfig};
 use fuchsia_async::{self as fasync, OnSignals};
-use fuchsia_framebuffer::{
-    sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId, PixelFormat,
-};
+use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
 use fuchsia_zircon::{
     self as zx, AsHandleRef, Duration, Event, HandleBased, Signals, Status, Time,
@@ -281,7 +280,7 @@ impl DisplayDirectViewStrategy {
     async fn allocate_display_resources(
         collection_id: u64,
         size: IntSize,
-        pixel_format: fuchsia_framebuffer::PixelFormat,
+        pixel_format: display_utils::PixelFormat,
         render_frame_count: usize,
         display: &Display,
     ) -> Result<DisplayResources, Error> {

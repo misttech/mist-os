@@ -12,11 +12,11 @@ use crate::{
     Point, ViewAssistantContext,
 };
 use anyhow::Error;
+use display_utils::PixelFormat;
 use euclid::{
     default::{Point2D, Rect, Size2D, Transform2D, Vector2D},
     point2, size2,
 };
-use fuchsia_framebuffer::PixelFormat;
 use std::{io::Read, mem, ops::Add, u32};
 /// Rendering context and API start point.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

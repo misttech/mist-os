@@ -5,13 +5,13 @@
 use std::{convert::TryFrom, error, fmt, fmt::Debug, hash::Hash, io::Read, ops::Add, u32};
 
 use anyhow::Error;
+use display_utils::PixelFormat;
 use euclid::{
     default::{Point2D, Rect, Size2D, Transform2D, Vector2D},
     point2, size2,
 };
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_sysmem::BufferCollectionTokenMarker;
-use fuchsia_framebuffer::PixelFormat;
 
 use crate::{color::Color, drawing::DisplayRotation, Point, ViewAssistantContext};
 

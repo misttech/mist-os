@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{ensure, format_err, Context as _, Error};
+use display_utils::{get_bytes_per_pixel, PixelFormat};
 use fidl::endpoints::{self, ClientEnd};
 use fidl_fuchsia_hardware_display::{
     ConfigStamp, ControllerEvent, ControllerMarker, ControllerProxy, ImageConfig,
@@ -29,104 +30,6 @@ use std::ops::Range;
 pub mod sysmem;
 
 use sysmem::BufferCollectionAllocator;
-
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_NONE: u32 = 0;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_RGB_565: u32 = 131073;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_RGB_332: u32 = 65538;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_RGB_2220: u32 = 65539;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_ARGB_8888: u32 = 262148;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_RGB_x888: u32 = 262149;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_MONO_8: u32 = 65543;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_GRAY_8: u32 = 65543;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_MONO_1: u32 = 6;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_ABGR_8888: u32 = 262154;
-#[allow(non_camel_case_types, non_upper_case_globals)]
-const ZX_PIXEL_FORMAT_BGR_x888: u32 = 262155;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum PixelFormat {
-    Abgr8888,
-    Argb8888,
-    BgrX888,
-    Gray8,
-    Mono1,
-    Mono8,
-    Rgb2220,
-    Rgb332,
-    Rgb565,
-    RgbX888,
-    Unknown,
-}
-
-impl Default for PixelFormat {
-    fn default() -> PixelFormat {
-        PixelFormat::Unknown
-    }
-}
-
-impl From<u32> for PixelFormat {
-    fn from(pixel_format: u32) -> Self {
-        #[allow(non_upper_case_globals)]
-        match pixel_format {
-            ZX_PIXEL_FORMAT_ABGR_8888 => PixelFormat::Abgr8888,
-            ZX_PIXEL_FORMAT_ARGB_8888 => PixelFormat::Argb8888,
-            ZX_PIXEL_FORMAT_BGR_x888 => PixelFormat::BgrX888,
-            ZX_PIXEL_FORMAT_MONO_1 => PixelFormat::Mono1,
-            ZX_PIXEL_FORMAT_MONO_8 => PixelFormat::Mono8,
-            ZX_PIXEL_FORMAT_RGB_2220 => PixelFormat::Rgb2220,
-            ZX_PIXEL_FORMAT_RGB_332 => PixelFormat::Rgb332,
-            ZX_PIXEL_FORMAT_RGB_565 => PixelFormat::Rgb565,
-            ZX_PIXEL_FORMAT_RGB_x888 => PixelFormat::RgbX888,
-            // ZX_PIXEL_FORMAT_GRAY_8 is an alias for ZX_PIXEL_FORMAT_MONO_8
-            ZX_PIXEL_FORMAT_NONE => PixelFormat::Unknown,
-            _ => PixelFormat::Unknown,
-        }
-    }
-}
-
-impl Into<u32> for PixelFormat {
-    fn into(self) -> u32 {
-        match self {
-            PixelFormat::Abgr8888 => ZX_PIXEL_FORMAT_ABGR_8888,
-            PixelFormat::Argb8888 => ZX_PIXEL_FORMAT_ARGB_8888,
-            PixelFormat::BgrX888 => ZX_PIXEL_FORMAT_BGR_x888,
-            PixelFormat::Mono1 => ZX_PIXEL_FORMAT_MONO_1,
-            PixelFormat::Mono8 => ZX_PIXEL_FORMAT_MONO_8,
-            PixelFormat::Rgb2220 => ZX_PIXEL_FORMAT_RGB_2220,
-            PixelFormat::Rgb332 => ZX_PIXEL_FORMAT_RGB_332,
-            PixelFormat::Rgb565 => ZX_PIXEL_FORMAT_RGB_565,
-            PixelFormat::RgbX888 => ZX_PIXEL_FORMAT_RGB_x888,
-            PixelFormat::Gray8 => ZX_PIXEL_FORMAT_GRAY_8,
-            PixelFormat::Unknown => ZX_PIXEL_FORMAT_NONE,
-        }
-    }
-}
-
-impl Into<fidl_fuchsia_sysmem::PixelFormatType> for PixelFormat {
-    fn into(self) -> fidl_fuchsia_sysmem::PixelFormatType {
-        match self {
-            PixelFormat::Abgr8888 => fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
-            PixelFormat::Argb8888 => fidl_fuchsia_sysmem::PixelFormatType::Bgra32,
-            PixelFormat::RgbX888 => fidl_fuchsia_sysmem::PixelFormatType::Bgra32,
-            PixelFormat::BgrX888 => fidl_fuchsia_sysmem::PixelFormatType::R8G8B8A8,
-            _ => fidl_fuchsia_sysmem::PixelFormatType::Invalid,
-        }
-    }
-}
-
-fn pixel_format_bytes(pixel_format: u32) -> usize {
-    ((pixel_format >> 16) & 7) as usize
-}
 
 pub type ImageId = u64;
 pub type CollectionId = u64;
@@ -684,7 +587,7 @@ impl FrameBuffer {
                 ));
             }
         }
-        let pixel_size_bytes = pixel_format_bytes(pixel_format) as u32;
+        let pixel_size_bytes = get_bytes_per_pixel(pixel_format.into())? as u32;
         Ok(Config {
             display_id: display_id,
             width: width,
@@ -866,7 +769,7 @@ impl FrameBuffer {
     }
 
     pub fn get_config_for_format(&self, format: PixelFormat) -> Config {
-        let pixel_size_bytes = pixel_format_bytes(format.into()) as u32;
+        let pixel_size_bytes = get_bytes_per_pixel(format).expect("bytes per pixel") as u32;
         Config {
             display_id: self.config.display_id,
             width: self.config.width,

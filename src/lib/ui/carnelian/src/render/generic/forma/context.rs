@@ -5,6 +5,7 @@
 use std::{cell::RefCell, collections::HashMap, io::Read, mem, ptr, u32};
 
 use anyhow::Error;
+use display_utils::PixelFormat;
 use euclid::default::{Rect, Size2D};
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_sysmem::{
@@ -15,7 +16,7 @@ use fidl_fuchsia_sysmem::{
     FORMAT_MODIFIER_LINEAR,
 };
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_framebuffer::{sysmem::set_allocator_name, PixelFormat};
+use fuchsia_framebuffer::sysmem::set_allocator_name;
 use fuchsia_trace::{duration_begin, duration_end};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys;
@@ -198,7 +199,7 @@ impl FormaContext {
 
 impl Context<Forma> for FormaContext {
     fn pixel_format(&self) -> PixelFormat {
-        fuchsia_framebuffer::PixelFormat::RgbX888
+        PixelFormat::RgbX888
     }
 
     fn path_builder(&self) -> Option<FormaPathBuilder> {

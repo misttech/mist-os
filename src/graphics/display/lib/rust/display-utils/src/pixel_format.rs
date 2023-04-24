@@ -4,6 +4,7 @@
 
 #![allow(non_upper_case_globals)]
 
+use thiserror::Error;
 use {fidl_fuchsia_sysmem as sysmem, std::fmt, std::str};
 
 // TODO(fxbug.dev/85320): This module is intended to provide some amount of compatibility between
@@ -194,6 +195,30 @@ impl str::FromStr for PixelFormat {
     }
 }
 
+#[derive(Debug, Error, PartialEq)]
+pub enum GetBytesPerPixelError {
+    #[error("Unsupported format: {0}")]
+    UnsupportedFormat(PixelFormat),
+}
+
+/// Get number of bytes per pixel for given `pixel_format`.
+/// Currently only packed pixel formats are supported. Planar formats (e.g.
+/// NV12) are not supported.
+pub fn get_bytes_per_pixel(pixel_format: PixelFormat) -> Result<usize, GetBytesPerPixelError> {
+    match pixel_format {
+        PixelFormat::Mono8 | PixelFormat::Gray8 | PixelFormat::Rgb332 | PixelFormat::Rgb2220 => {
+            Ok(1)
+        }
+        PixelFormat::Rgb565 => Ok(2),
+        PixelFormat::Rgb888 => Ok(3),
+        PixelFormat::Bgr888X
+        | PixelFormat::RgbX888
+        | PixelFormat::Argb8888
+        | PixelFormat::Abgr8888 => Ok(4),
+        _ => Err(GetBytesPerPixelError::UnsupportedFormat(pixel_format)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +276,31 @@ mod tests {
         assert_eq!(PixelFormat::from_str("ABGR8888"), Ok(PixelFormat::Abgr8888));
         assert_eq!(PixelFormat::from_str("ARGB8888"), Ok(PixelFormat::Argb8888));
         assert_eq!(PixelFormat::from_str("NV12"), Ok(PixelFormat::Nv12));
+    }
+
+    #[fuchsia::test]
+    fn get_bytes_per_pixel_valid() {
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Mono8), Ok(1));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Gray8), Ok(1));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Rgb332), Ok(1));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Rgb2220), Ok(1));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Rgb565), Ok(2));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Rgb888), Ok(3));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Bgr888X), Ok(4));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::RgbX888), Ok(4));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Argb8888), Ok(4));
+        assert_eq!(get_bytes_per_pixel(PixelFormat::Abgr8888), Ok(4));
+    }
+
+    #[fuchsia::test]
+    fn get_bytes_per_pixel_invalid() {
+        assert_eq!(
+            get_bytes_per_pixel(PixelFormat::Nv12),
+            Err(GetBytesPerPixelError::UnsupportedFormat(PixelFormat::Nv12))
+        );
+        assert_eq!(
+            get_bytes_per_pixel(PixelFormat::Unknown),
+            Err(GetBytesPerPixelError::UnsupportedFormat(PixelFormat::Unknown))
+        );
     }
 }
