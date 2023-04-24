@@ -56,19 +56,15 @@ impl ModularFacade {
     }
 
     /// Returns the state of the currently running basemgr instance, or None if not running.
-    async fn get_basemgr_runtime_state(&self) -> Option<BasemgrRuntimeState> {
-        let result = if let Ok((info, _)) =
-            self.realm_query.get_instance_info(SESSION_MONIKER).await.ok()?
-        {
-            if info.state == fsys::InstanceState::Started {
-                Some(BasemgrRuntimeState::V2Session)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        result
+    async fn get_basemgr_runtime_state(&self) -> Result<Option<BasemgrRuntimeState>, Error> {
+        Ok(self
+            .realm_query
+            .get_instance(SESSION_MONIKER)
+            .await?
+            .ok()
+            .and_then(|instance| instance.resolved_info)
+            .and_then(|info| info.execution_info)
+            .map(|_| BasemgrRuntimeState::V2Session))
     }
 
     /// Restarts the currently running session.
@@ -81,7 +77,7 @@ impl ModularFacade {
 
     /// Facade to kill basemgr from Sl4f.
     pub async fn kill_basemgr(&self) -> Result<KillBasemgrResult, Error> {
-        if self.get_basemgr_runtime_state().await.is_none() {
+        if self.get_basemgr_runtime_state().await?.is_none() {
             return Ok(KillBasemgrResult::NoBasemgrToKill);
         }
 
@@ -114,7 +110,7 @@ impl ModularFacade {
         let req: StartBasemgrRequest = from_value(args)?;
 
         // If basemgr is running, shut it down before starting a new one.
-        if self.get_basemgr_runtime_state().await.is_some() {
+        if self.get_basemgr_runtime_state().await?.is_some() {
             self.kill_basemgr().await?;
         }
 
@@ -140,7 +136,7 @@ impl ModularFacade {
 
     /// Facade that returns true if basemgr is running.
     pub async fn is_basemgr_running(&self) -> Result<bool, Error> {
-        Ok(self.get_basemgr_runtime_state().await.is_some())
+        Ok(self.get_basemgr_runtime_state().await?.is_some())
     }
 }
 
@@ -156,8 +152,8 @@ mod tests {
         },
         anyhow::Error,
         assert_matches::assert_matches,
-        fidl::endpoints::{create_endpoints, spawn_stream_handler},
-        fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession, fidl_fuchsia_sys2 as fsys,
+        fidl::endpoints::spawn_stream_handler,
+        fidl_fuchsia_session as fsession, fidl_fuchsia_sys2 as fsys,
         futures::Future,
         lazy_static::lazy_static,
         serde_json::json,
@@ -229,38 +225,32 @@ mod tests {
         })?;
 
         let realm_query = spawn_stream_handler(move |realm_query_request| async move {
-            let (exposed_dir, _) = create_endpoints::<fio::DirectoryMarker>();
-            let (ns_dir, _) = create_endpoints::<fio::DirectoryMarker>();
-
             match realm_query_request {
-                fsys::RealmQueryRequest::GetInstanceInfo { moniker, responder } => {
+                fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
                     assert_eq!(moniker, SESSION_MONIKER.to_string());
                     let mut result = if is_basemgr_running {
-                        let info = fsys::InstanceInfo {
-                            moniker: SESSION_MONIKER.to_string(),
-                            url: "fake".to_string(),
+                        Ok(fsys::Instance {
+                            moniker: Some(SESSION_MONIKER.to_string()),
+                            url: Some("fake".to_string()),
                             instance_id: None,
-                            state: fsys::InstanceState::Started,
-                        };
-                        let resolved = Some(Box::new(fsys::ResolvedState {
-                            uses: vec![],
-                            exposes: vec![],
-                            config: None,
-                            pkg_dir: None,
-                            exposed_dir,
-                            ns_dir,
-                            execution: None,
-                        }));
-                        Ok((info, resolved))
+                            resolved_info: Some(fsys::ResolvedInfo {
+                                resolved_url: Some("fake".to_string()),
+                                execution_info: Some(fsys::ExecutionInfo {
+                                    start_reason: Some("fake".to_string()),
+                                    ..fsys::ExecutionInfo::EMPTY
+                                }),
+                                ..fsys::ResolvedInfo::EMPTY
+                            }),
+                            ..fsys::Instance::EMPTY
+                        })
                     } else {
-                        let info = fsys::InstanceInfo {
-                            moniker: SESSION_MONIKER.to_string(),
-                            url: "fake".to_string(),
+                        Ok(fsys::Instance {
+                            moniker: Some(SESSION_MONIKER.to_string()),
+                            url: Some("fake".to_string()),
                             instance_id: None,
-                            state: fsys::InstanceState::Unresolved,
-                        };
-                        let resolved = None;
-                        Ok((info, resolved))
+                            resolved_info: None,
+                            ..fsys::Instance::EMPTY
+                        })
                     };
                     let _ = responder.send(&mut result);
                 }
