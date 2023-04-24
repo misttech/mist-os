@@ -389,13 +389,11 @@ TEST(ProcessShared, InfoProcessMaps) {
   ASSERT_OK(
       shared_process.get_info(ZX_INFO_PROCESS_MAPS, (void*)maps, buffer_size, &actual, &avail));
 
-  // We expect 5 entries here:
+  // We expect 3 entries here:
   // 1. The root vmar of the shared process' shared address space.
   // 2. The vm aspace of the shared process' shared address space (identical to the vmar).
-  // 3. The root vmar of the shared process' restricted address space.
-  // 4. The vm aspace of the shared process' restricted address space (identical to the vmar).
-  // 5. The VMO we mapped into the shared address space.
-  ASSERT_EQ(actual, 5);
+  // 3. The VMO we mapped into the shared address space.
+  ASSERT_EQ(actual, 3);
   ASSERT_EQ(avail, actual);
 
   // Assert that the base addresses are in non-descending order for the shared process.
@@ -408,8 +406,11 @@ TEST(ProcessShared, InfoProcessMaps) {
   // Assert that the base addresses are in non-descending order for the restricted process.
   ASSERT_OK(
       restricted_process.get_info(ZX_INFO_PROCESS_MAPS, (void*)maps, buffer_size, &actual, &avail));
-  // We expect 6 entries here. 5 are identical to the ones in the shared address space, but we have
-  // an additional one for the VMO we mapped into the restricted address space.
+  // We expect 6 entries here. 3 are identical to the ones in the shared address space, but we have
+  // the following additional entries:
+  // 1. The root VMAR of the restricted address space.
+  // 2. The vm aspace of restricted address space (identical to the vmar).
+  // 3. The VM we mapped into the restricted address space.
   ASSERT_EQ(actual, 6);
   ASSERT_EQ(avail, actual);
   prev_base = 0;
