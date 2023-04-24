@@ -16,6 +16,7 @@ use {
     fuchsia_async::{self as fasync, net::UdpSocket},
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
     futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _},
+    net_declare::net::prefix_length_v4,
     net_types::ethernet::Mac,
     packet::{serialize::InnerPacketBuilder, Serializer},
     packet_formats::{ipv4::Ipv4PacketBuilder, udp::UdpPacketBuilder},
@@ -46,7 +47,7 @@ fn default_parameters() -> configuration::ServerParameters {
             max_seconds: DEFAULT_LEASE_DURATION_SECONDS,
         },
         managed_addrs: dhcpv4::configuration::ManagedAddresses {
-            mask: configuration::SubnetMask::new(0).unwrap(),
+            mask: configuration::SubnetMask::new(prefix_length_v4!(0)),
             pool_range_start: Ipv4Addr::UNSPECIFIED,
             pool_range_stop: Ipv4Addr::UNSPECIFIED,
         },
@@ -781,7 +782,7 @@ mod tests {
                 max_seconds: 86400,
             },
             managed_addrs: dhcpv4::configuration::ManagedAddresses {
-                mask: dhcpv4::configuration::SubnetMask::new(25).unwrap(),
+                mask: dhcpv4::configuration::SubnetMask::new(prefix_length_v4!(25)),
                 pool_range_start: std_ip_v4!("192.168.0.0"),
                 pool_range_stop: std_ip_v4!("192.168.0.0"),
             },

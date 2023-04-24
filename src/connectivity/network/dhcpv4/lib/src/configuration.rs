@@ -11,7 +11,7 @@ use anyhow::Context;
 #[cfg(target_os = "fuchsia")]
 use std::convert::Infallible as Never;
 
-use net_types::ip::{Ipv4, PrefixLength};
+use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -164,12 +164,14 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::AddressPool> for ManagedAddresses {
             ..
         } = fidl
         {
-            let mask = SubnetMask::new(prefix_length).ok_or_else(|| {
-                anyhow::format_err!(
-                    "failed to create subnet mask from prefix_length={}",
-                    prefix_length
-                )
-            })?;
+            let mask = PrefixLength::new(prefix_length).map(SubnetMask::new).map_err(
+                |net_types::ip::PrefixTooLongError| {
+                    anyhow::format_err!(
+                        "failed to create subnet mask from prefix_length={}",
+                        prefix_length
+                    )
+                },
+            )?;
             let pool_range_start = Ipv4Addr::from_fidl(pool_range_start);
             let pool_range_stop = Ipv4Addr::from_fidl(pool_range_stop);
             let addresses_candidate = Self { mask, pool_range_start, pool_range_stop };
@@ -294,56 +296,79 @@ impl From<serde_json::Error> for ConfigError {
     }
 }
 
-const U32_BITS: u8 = (std::mem::size_of::<u32>() * 8) as u8;
-
 /// A bitmask which represents the boundary between the Network part and Host part of an IPv4
 /// address.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SubnetMask {
-    /// The set high-order bits of the mask.
-    ones: u8,
+    // The PrefixLength representing the subnet mask.
+    prefix_length: PrefixLength<Ipv4>,
+}
+
+mod serde_impls {
+    use net_types::ip::PrefixLength;
+    use serde::{de::Error as _, Deserialize, Serialize};
+
+    // In order to preserve compatibility with a previous representation of
+    // `SubnetMask`, we implement Serialize and Deserialize by forwarding those
+    // methods to derived impls on the old representation.
+    #[derive(Serialize, Deserialize)]
+    struct SubnetMask {
+        ones: u8,
+    }
+
+    impl Serialize for super::SubnetMask {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let Self { prefix_length } = self;
+            SubnetMask { ones: prefix_length.get() }.serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for super::SubnetMask {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let SubnetMask { ones } = Deserialize::deserialize(deserializer)?;
+            Ok(super::SubnetMask {
+                prefix_length: PrefixLength::new(ones).map_err(
+                    |net_types::ip::PrefixTooLongError| {
+                        D::Error::custom(format!("{ones} too long to be IPv4 prefix length"))
+                    },
+                )?,
+            })
+        }
+    }
 }
 
 impl SubnetMask {
     /// Constructs a new `SubnetMask`.
-    ///
-    /// `ones` must not be larger than 32 (the size of an IPv4 address in bits).
-    pub const fn new(ones: u8) -> Option<Self> {
-        if ones <= U32_BITS {
-            Some(SubnetMask { ones })
-        } else {
-            None
-        }
+    pub const fn new(prefix_length: PrefixLength<Ipv4>) -> Self {
+        SubnetMask { prefix_length }
     }
 
     /// Returns a byte-array representation of the `SubnetMask` in Network (Big-Endian) byte-order.
     pub fn octets(&self) -> [u8; 4] {
-        self.to_u32().to_be_bytes()
+        let Self { prefix_length } = self;
+        prefix_length.get_mask().ipv4_bytes()
     }
 
     fn to_u32(&self) -> u32 {
-        let n = u32::max_value();
-        // overflowing_shl() will not shift arguments >= the bit length of the calling value, so we
-        // must special case a mask with 0 ones.
-        if self.ones == 0 {
-            0
-        } else {
-            // overflowing_shl() must be used here for panic safety.
-            let (n, _overflow) = n.overflowing_shl((U32_BITS - self.ones) as u32);
-            n
-        }
+        u32::from_be_bytes(self.octets())
     }
 
     /// Returns the count of the set high-order bits of the `SubnetMask`.
     pub fn ones(&self) -> u8 {
-        self.ones
+        let Self { prefix_length } = self;
+        prefix_length.get()
     }
 
     /// Returns the network address resulting from masking the argument.
     pub fn apply_to(&self, target: &Ipv4Addr) -> Ipv4Addr {
-        let subnet_mask_bits = self.to_u32();
-        let target_bits = u32::from_be_bytes(target.octets());
-        Ipv4Addr::from(target_bits & subnet_mask_bits)
+        let Self { prefix_length } = self;
+        net_types::ip::Ipv4Addr::from(*target).mask(prefix_length.get()).into()
     }
 
     /// Computes the broadcast address for the argument.
@@ -363,13 +388,12 @@ impl TryFrom<Ipv4Addr> for SubnetMask {
     type Error = anyhow::Error;
 
     fn try_from(mask: Ipv4Addr) -> Result<Self, Self::Error> {
-        let mask: u32 = mask.into();
-        let ones = mask.count_ones();
-        if ones + mask.trailing_zeros() != 32 {
-            Err(anyhow::format_err!("mask did not have consecutive ones {:b}", mask))
-        } else {
-            Ok(SubnetMask { ones: ones as u8 })
-        }
+        Ok(SubnetMask {
+            prefix_length: PrefixLength::try_from_subnet_mask(net_types::ip::Ipv4Addr::from(mask))
+                .map_err(|net_types::ip::NotSubnetMaskError| {
+                    anyhow::anyhow!("{mask} is not a valid subnet mask")
+                })?,
+        })
     }
 }
 
@@ -397,8 +421,8 @@ impl From<SubnetMask> for Ipv4Addr {
 
 impl From<SubnetMask> for PrefixLength<Ipv4> {
     fn from(value: SubnetMask) -> Self {
-        PrefixLength::try_from_subnet_mask(Ipv4Addr::from(value).into())
-            .expect("known to be valid subnet mask")
+        let SubnetMask { prefix_length } = value;
+        prefix_length
     }
 }
 
@@ -406,7 +430,7 @@ impl From<SubnetMask> for PrefixLength<Ipv4> {
 mod tests {
     use super::*;
     use crate::server::tests::{random_ipv4_generator, random_mac_generator};
-    use net_declare::{fidl_ip_v4, std_ip_v4};
+    use net_declare::{fidl_ip_v4, net_prefix_length_v4, std_ip_v4};
 
     /// Asserts that the supplied Result is an err whose error string contains `substr`.
     ///
@@ -436,43 +460,18 @@ mod tests {
         assert_eq!(
             SubnetMask::try_from(std_ip_v4!("255.255.255.0"))
                 .expect("failed to create /24 subnet mask"),
-            SubnetMask { ones: 24 }
+            SubnetMask { prefix_length: net_prefix_length_v4!(24) }
         );
         assert_eq!(
             SubnetMask::try_from(std_ip_v4!("255.255.255.255"))
                 .expect("failed to create /32 subnet mask"),
-            SubnetMask { ones: 32 }
+            SubnetMask { prefix_length: net_prefix_length_v4!(32) }
         );
     }
 
     #[test]
     fn try_from_ipv4addr_with_nonconsecutive_ones_returns_err() {
         assert!(SubnetMask::try_from(std_ip_v4!("255.255.255.1")).is_err());
-    }
-
-    #[test]
-    fn subnet_mask_new() {
-        for ones in 0..=U32_BITS {
-            assert_eq!(SubnetMask::new(ones), Some(SubnetMask { ones }),);
-        }
-        for ones in U32_BITS + 1..u8::MAX {
-            assert_eq!(SubnetMask::new(ones), None);
-        }
-    }
-
-    #[test]
-    fn into_ipv4addr_returns_ipv4addr() {
-        let mask: Ipv4Addr =
-            SubnetMask::new(24).expect("expected 24 to be a valid subnet mask").into();
-        assert_eq!(mask, std_ip_v4!("255.255.255.0"));
-
-        let mask: Ipv4Addr =
-            SubnetMask::new(0).expect("expected 0 to be a valid subnet mask").into();
-        assert_eq!(mask, Ipv4Addr::UNSPECIFIED);
-
-        let mask: Ipv4Addr =
-            SubnetMask::new(32).expect("expected 32 to be a valid subnet mask").into();
-        assert_eq!(mask, std_ip_v4!("255.255.255.255"));
     }
 
     #[test]

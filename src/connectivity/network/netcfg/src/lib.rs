@@ -44,8 +44,8 @@ use async_utils::stream::{TryFlattenUnorderedExt as _, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use fuchsia_fs::OpenFlags;
 use futures::{stream::BoxStream, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use net_declare::fidl_ip_v4;
-use net_types::ip::IpAddress as _;
+use net_declare::{fidl_ip_v4, net::prefix_length_v4};
+use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace, warn};
 
@@ -90,7 +90,7 @@ const PERSISTED_INTERFACE_CONFIG_FILEPATH: &str = "/data/net_interfaces.cfg.json
 const THIS_DIRECTORY: &str = ".";
 
 /// The prefix length for the address assigned to a WLAN AP interface.
-const WLAN_AP_PREFIX_LEN: u8 = 29;
+const WLAN_AP_PREFIX_LEN: PrefixLength<Ipv4> = prefix_length_v4!(29);
 
 /// The address for the network the WLAN AP interface is a part of.
 const WLAN_AP_NETWORK_ADDR: fnet::Ipv4Address = fidl_ip_v4!("192.168.255.248");
@@ -1978,7 +1978,7 @@ impl<'a> NetCfg<'a> {
         let ipv4 = fnet::Ipv4Address { addr: interface_addr_as_u32.to_be_bytes() };
         let addr = fidl_fuchsia_net::Subnet {
             addr: fnet::IpAddress::Ipv4(ipv4.clone()),
-            prefix_len: WLAN_AP_PREFIX_LEN,
+            prefix_len: WLAN_AP_PREFIX_LEN.get(),
         };
 
         let () = control
@@ -2104,9 +2104,7 @@ impl<'a> NetCfg<'a> {
             .context("error setting DHCP LeaseLength parameter")
             .map_err(errors::Error::NonFatal)?;
 
-        let host_mask = ::dhcpv4::configuration::SubnetMask::new(WLAN_AP_PREFIX_LEN)
-            .ok_or_else(|| anyhow!("error creating host mask from prefix length"))
-            .map_err(errors::Error::NonFatal)?;
+        let host_mask = ::dhcpv4::configuration::SubnetMask::new(WLAN_AP_PREFIX_LEN);
         let broadcast_addr =
             host_mask.broadcast_of(&std::net::Ipv4Addr::from_fidl(WLAN_AP_NETWORK_ADDR));
         let broadcast_addr_as_u32: u32 = broadcast_addr.into();
@@ -2120,7 +2118,7 @@ impl<'a> NetCfg<'a> {
         let dhcp_pool_end = fnet::Ipv4Address { addr: (broadcast_addr_as_u32 - 1).to_be_bytes() };
 
         let v = fnet_dhcp::AddressPool {
-            prefix_length: Some(WLAN_AP_PREFIX_LEN),
+            prefix_length: Some(WLAN_AP_PREFIX_LEN.get()),
             range_start: Some(dhcp_pool_start),
             range_stop: Some(dhcp_pool_end),
             ..fnet_dhcp::AddressPool::EMPTY

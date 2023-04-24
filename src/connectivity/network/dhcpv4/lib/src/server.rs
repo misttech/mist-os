@@ -1681,7 +1681,7 @@ pub mod tests {
             server_ips,
             lease_length,
             managed_addrs: ManagedAddresses {
-                mask: SubnetMask::new(24).unwrap(),
+                mask: SubnetMask::new(prefix_length_v4!(24)),
                 pool_range_start: net_declare::std::ip_v4!("192.168.0.0"),
                 pool_range_stop: net_declare::std::ip_v4!("192.168.0.0"),
             },
@@ -4155,7 +4155,7 @@ pub mod tests {
                 max_seconds: 60 * 60 * 24 * 7,
             },
             managed_addrs: ManagedAddresses {
-                mask: SubnetMask::new(24).unwrap(),
+                mask: SubnetMask::new(prefix_length_v4!(24)),
                 pool_range_start: client_ip,
                 pool_range_stop: net_declare::std::ip_v4!("192.168.0.2"),
             },
