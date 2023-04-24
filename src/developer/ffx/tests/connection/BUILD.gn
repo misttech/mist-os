@@ -52,7 +52,7 @@ fuchsia_package("ffx_connection_test_components") {
 group("tests") {
   deps = [
     ":ffx_connection_test($host_toolchain)",
-    ":ffx_connection_test_components",
+    ":ffx_connection_test_components($target_toolchain)",
   ]
   testonly = true
 }

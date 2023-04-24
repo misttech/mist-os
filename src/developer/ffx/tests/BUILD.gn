@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "connection:tests" ]
+  deps = [
+    "connection:tests",
+    "target:tests",
+  ]
   testonly = true
 }

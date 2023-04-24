@@ -115,6 +115,6 @@ group("tests") {
     "lib:tests($host_toolchain)",
     "logger:tests($host_toolchain)",
     "plugins/package:tests($host_toolchain)",
-    "tests",
+    "tests($host_toolchain)",
   ]
 }

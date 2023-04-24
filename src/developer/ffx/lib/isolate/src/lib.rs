@@ -70,6 +70,7 @@ pub struct CommandOutput {
 /// Isolate provides an abstraction around an isolated configuration environment for `ffx`.
 pub struct Isolate {
     tmpdir: TempDir,
+    log_dir: PathBuf,
     env_ctx: ffx_config::EnvironmentContext,
 }
 
@@ -136,7 +137,9 @@ impl Isolate {
 
         let mut mdns_discovery = true;
         let mut target_addr = None;
-        if let Ok(addr) = std::env::var("FUCHSIA_DEVICE_ADDR") {
+        if let Some(addr) =
+            std::env::var("FUCHSIA_DEVICE_ADDR").ok().filter(|addr| !addr.is_empty())
+        {
             // When run in infra, disable mdns discovery.
             // TODO(fxbug.dev/44710): Remove when we have proper network isolation.
             target_addr = Option::Some(Cow::Owned(addr.to_string() + &":0".to_string()));
@@ -208,7 +211,7 @@ impl Isolate {
         // due to issues with caching.  Until this is fixed (TODO(fxb/124465)),
         // callers should call `ffx_config::cache_invalidate()` if they will be
         // querying config values, e.g. "log.dir".
-        Ok(Isolate { tmpdir, env_ctx })
+        Ok(Isolate { tmpdir, log_dir, env_ctx })
     }
 
     /// Simple wrapper around [`Isolate::new_with_search`] for situations where all you
@@ -256,6 +259,10 @@ impl Isolate {
         context: &EnvironmentContext,
     ) -> Result<Self> {
         Self::new_with_search(name, SearchContext::Build { build_root }, ssh_key, context).await
+    }
+
+    pub fn log_dir(&self) -> &Path {
+        &self.log_dir
     }
 
     pub fn ascendd_path(&self) -> PathBuf {
