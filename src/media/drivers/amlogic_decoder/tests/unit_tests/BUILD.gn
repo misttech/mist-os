@@ -10,10 +10,15 @@ executable("amlogic-decoder-unittest-bin") {
   deps = [
     "../..:sources",
     "../..:test_support",
+    "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
   ]
   sources = [

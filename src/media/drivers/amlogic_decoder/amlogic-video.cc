@@ -1082,7 +1082,9 @@ void AmlogicVideo::InitializeInterrupts() {
       zx_time_t time;
       zx_status_t status = zx_interrupt_wait(vdec0_interrupt_handle_.get(), &time);
       if (status != ZX_OK) {
-        DECODE_ERROR("vdec0_interrupt_thread_ zx_interrupt_wait() failed - status: %d", status);
+        if (status != ZX_ERR_CANCELED) {
+          DECODE_ERROR("vdec0_interrupt_thread_ zx_interrupt_wait() failed - status: %d", status);
+        }
         return;
       }
       std::lock_guard<std::mutex> lock(video_decoder_lock_);
