@@ -38,11 +38,11 @@ use {
     fuchsia_cobalt_builders::MetricEventExt,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     futures::{lock::Mutex, prelude::*},
-    log::info,
     std::{
         convert::TryFrom,
         time::{Duration, Instant},
     },
+    tracing::info,
 };
 
 const CONCURRENCY_LIMIT: Option<usize> = None;
