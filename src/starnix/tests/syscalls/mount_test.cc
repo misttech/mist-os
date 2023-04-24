@@ -86,7 +86,9 @@ class MountTest : public ::testing::Test {
   void TearDown() override {
     // Clean up after the tests so that other tests that care about mount state
     // don't fail.
-    RecursiveUnmount(tmp_.c_str());
+    if (!skip_mount_tests) {
+      RecursiveUnmount(tmp_.c_str());
+    }
   }
 
   /// All paths used in test functions are relative to the temp directory. This function makes the
