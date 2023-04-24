@@ -634,4 +634,62 @@ TEST(PropertyDecoderTest, ResolvePathNoAlias) {
   EXPECT_TRUE(empty_suffix.empty());
 }
 
+TEST(PropertyDecoderTest, CellCountsAreCached) {
+  // This test relies on manipulating the underlying data, to verify
+  // at which point are the properties actually cached.
+  PropertyBuilder builder;
+  builder.Add("#address-cells", 1);
+  builder.Add("#size-cells", 2);
+  builder.Add("#interrupt-cells", 3);
+  auto properties = builder.Build();
+
+  devicetree::PropertyDecoder decoder(properties);
+  {
+    auto address_cells = decoder.num_address_cells();
+    ASSERT_TRUE(address_cells);
+    EXPECT_EQ(*address_cells, 1);
+
+    auto size_cells = decoder.num_size_cells();
+    ASSERT_TRUE(size_cells);
+    EXPECT_EQ(*size_cells, 2);
+
+    auto interrupt_cells = decoder.num_interrupt_cells();
+    ASSERT_TRUE(interrupt_cells);
+    EXPECT_EQ(*interrupt_cells, 3);
+  }
+  // Update the underlying propeties, if the property is not cached, it should
+  // return the updated value.
+  PropertyBuilder mod_builder;
+  mod_builder.Add("#address-cells", 3);
+  mod_builder.Add("#size-cells", 4);
+  mod_builder.Add("#interrupt-cells", 5);
+  std::ignore = mod_builder.Build();
+  // copy contents to the previous property block.
+  builder.property_block = mod_builder.property_block;
+
+  // Safe check that the underlying properties have been updated.
+  {
+    auto address_cells = decoder.FindProperty("#address-cells");
+    ASSERT_TRUE(address_cells);
+    auto val = address_cells->AsUint32();
+    ASSERT_TRUE(val);
+    EXPECT_EQ(*val, 3);
+  }
+
+  // Now double check address cell still has the previous value.
+  {
+    auto address_cells = decoder.num_address_cells();
+    ASSERT_TRUE(address_cells);
+    EXPECT_EQ(*address_cells, 1);
+
+    auto size_cells = decoder.num_size_cells();
+    ASSERT_TRUE(size_cells);
+    EXPECT_EQ(*size_cells, 2);
+
+    auto interrupt_cells = decoder.num_interrupt_cells();
+    ASSERT_TRUE(interrupt_cells);
+    EXPECT_EQ(*interrupt_cells, 3);
+  }
+}
+
 }  // namespace

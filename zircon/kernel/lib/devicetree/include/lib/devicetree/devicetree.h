@@ -225,7 +225,7 @@ class Properties {
 
    private:
     // Only to be called by Properties::begin and Properties::end().
-    iterator(ByteView position, std::string_view string_block)
+    constexpr iterator(ByteView position, std::string_view string_block)
         : position_(position), string_block_(string_block) {}
     friend class Properties;
 
@@ -235,9 +235,9 @@ class Properties {
     std::string_view string_block_;
   };
 
-  iterator begin() const { return iterator{property_block_, string_block_}; }
+  constexpr iterator begin() const { return iterator{property_block_, string_block_}; }
 
-  iterator end() const { return iterator{{property_block_.end(), 0}, string_block_}; }
+  constexpr iterator end() const { return iterator{{property_block_.end(), 0}, string_block_}; }
 
  private:
   const ByteView property_block_;
@@ -338,9 +338,10 @@ class PropertyDecoder {
                                      const std::optional<Properties>& aliases)
       : parent_(parent),
         properties_(std::move(properties)),
-        aliases_(aliases ? &*aliases : nullptr) {}
+        aliases_(aliases ? &*aliases : nullptr),
+        cell_counts_(properties_.begin()) {}
   explicit constexpr PropertyDecoder(PropertyDecoder* parent, Properties properties)
-      : parent_(parent), properties_(std::move(properties)) {}
+      : parent_(parent), properties_(std::move(properties)), cell_counts_(properties_.begin()) {}
   explicit constexpr PropertyDecoder(Properties properties)
       : PropertyDecoder(nullptr, std::move(properties)) {}
 
@@ -378,7 +379,64 @@ class PropertyDecoder {
   // Underlying |Properties| object.
   constexpr const Properties& properties() const { return properties_; }
 
+  // Cached special '#' properties.
+  constexpr std::optional<uint32_t> num_address_cells() const {
+    return cell_counts_.LookUp(cell_counts_.address, properties_.end());
+  }
+  constexpr std::optional<uint32_t> num_size_cells() const {
+    return cell_counts_.LookUp(cell_counts_.size, properties_.end());
+  }
+  constexpr std::optional<uint32_t> num_interrupt_cells() const {
+    return cell_counts_.LookUp(cell_counts_.interrupt, properties_.end());
+  }
+
  private:
+  struct CellCounts {
+    explicit constexpr CellCounts() = default;
+    explicit constexpr CellCounts(Properties::iterator start) : next(start) {}
+
+    void TryToPopulate() {
+      const auto& [name, value] = *(next++);
+
+      // Not a special property.
+      if (name[0] != '#') {
+        return;
+      }
+
+      if (!address && name == "#address-cells") {
+        address = value.AsUint32();
+        return;
+      }
+
+      if (!size && name == "#size-cells") {
+        size = value.AsUint32();
+        return;
+      }
+
+      if (!interrupt && name == "#interrupt-cells") {
+        interrupt = value.AsUint32();
+        return;
+      }
+    }
+
+    constexpr std::optional<uint32_t>& LookUp(std::optional<uint32_t>& cell_count,
+                                              Properties::iterator end) {
+      while (!cell_count && next != end) {
+        TryToPopulate();
+      }
+      return cell_count;
+    }
+
+    // Points to the next property to keep searching for unseen cacheable
+    // properties when trying to query them on demand.
+    Properties::iterator next;
+
+    // Actual properties.
+    std::optional<uint32_t> address;
+    std::optional<uint32_t> size;
+    std::optional<uint32_t> interrupt;
+  };
+
   template <size_t... Is, typename... PropertyNames>
   constexpr std::array<std::optional<PropertyValue>, sizeof...(PropertyNames)> FindProperties(
       std::index_sequence<Is...> is, PropertyNames&&... property_names) const {
@@ -394,22 +452,35 @@ class PropertyDecoder {
       return result[index].has_value();
     };
 
-    for (auto property : properties_) {
-      // Like an if/elseif branch, where |matched| determines whether the branch
-      // should be evaluated or not.
+    // Like an if/elseif branch, where |matched| determines whether the branch
+    // should be evaluated or not.
+    Visit([&](auto property) {
       bool matched = false;
       std::ignore = ((!matched && try_populate(property_names, Is, property, matched)) && ...);
-      if (count == sizeof...(PropertyNames)) {
+      return count != sizeof...(PropertyNames);
+    });
+
+    return result;
+  }
+
+  template <typename Visitor>
+  constexpr void Visit(Visitor&& visitor) const {
+    for (auto it = properties_.begin(); it != properties_.end(); ++it) {
+      // If we reach the last processed cell count iterator, bump it to
+      // avoid doing duplicate iteration later.
+      if (cell_counts_.next == it) {
+        cell_counts_.TryToPopulate();
+      }
+      if (!visitor(*it)) {
         break;
       }
     }
-
-    return result;
   }
 
   PropertyDecoder* parent_ = nullptr;
   Properties properties_;
   const Properties* aliases_ = nullptr;
+  mutable CellCounts cell_counts_;
 };
 
 // Represents a devicetree. This class does not dynamically allocate
