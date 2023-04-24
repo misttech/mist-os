@@ -23,7 +23,9 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/connectivity/bluetooth/lib/async-helpers",
     "//src/connectivity/bluetooth/lib/battery-client",
+    "//src/connectivity/bluetooth/lib/bt-a2dp",
     "//src/connectivity/bluetooth/lib/bt-rfcomm",
+    "//src/connectivity/bluetooth/lib/fuchsia-audio-codec",
     "//src/connectivity/bluetooth/lib/fuchsia-audio-dai",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/profile-client",
@@ -172,6 +174,7 @@ group("bt-hfp-audio-gateway") {
 }
 
 fuchsia_test_component("test-component") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "meta/bt-hfp-audio-gateway-tests.cml"
   deps = [ ":bin_test" ]
 }

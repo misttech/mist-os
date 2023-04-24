@@ -34,6 +34,16 @@
             to: [ "#bt-hfp-audio-gateway" ],
         },
         {
+            protocol: "fuchsia.sysmem.Allocator",
+            from: "#sysmem_connector",
+            to: "#bt-hfp-audio-gateway",
+        },
+        {
+            protocol: "fuchsia.mediacodec.CodecFactory",
+            from: "#codec_factory",
+            to: "#bt-hfp-audio-gateway",
+        },
+        {
             protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
             from: "#bluetooth-core",
             to: [ "#bt-hfp-audio-gateway" ],

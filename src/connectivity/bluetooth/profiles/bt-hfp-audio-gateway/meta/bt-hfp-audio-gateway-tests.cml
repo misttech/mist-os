@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/media/codec/factory/meta/include_codecfactory.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/client.shard.cml",
+        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -21,6 +23,19 @@
             protocol: [ "fuchsia.bluetooth.internal.a2dp.Controller" ],
             from: "#mock-a2dp-controller",
         },
+
+        // See `include_codecfactory.shard.cml` which defines `#codec-factory` which provides this
+        // capability.
+        {
+            protocol: [ "fuchsia.mediacodec.CodecFactory" ],
+            from: "#codec-factory",
+        },
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+            ],
+        },
     ],
     offer: [
         {
@@ -29,4 +44,9 @@
             to: [ "#mock-a2dp-controller" ],
         },
     ],
+    facets: {
+        "fuchsia.test": {
+            "deprecated-allowed-packages": [ "codec_factory" ],
+        },
+    },
 }

@@ -78,7 +78,6 @@ async fn main() -> Result<(), Error> {
         }
         Ok(audio) => audio,
     };
-
     let mut hfp = Hfp::new(
         profile_client,
         profile_svc,

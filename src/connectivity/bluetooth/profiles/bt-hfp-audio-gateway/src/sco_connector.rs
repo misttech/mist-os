@@ -61,6 +61,7 @@ const COMMON_SCO_PARAMS: bredr::ScoConnectionParameters = bredr::ScoConnectionPa
     io_coding_format: Some(bredr::CodingFormat::LinearPcm),
     io_frame_size: Some(16),
     io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
+    path: Some(bredr::DataPath::Offload),
     ..bredr::ScoConnectionParameters::EMPTY
 };
 
@@ -92,11 +93,16 @@ pub(crate) fn parameter_sets_for_codec(
     use bredr::HfpParameterSet::*;
     match codec_id {
         CodecId::MSBC => {
+            let (air_coding_format, io_bandwidth) = if in_band_sco {
+                (Some(bredr::CodingFormat::Transparent), Some(16000))
+            } else {
+                // IO bandwidth to match an 16khz audio rate. (x2 for input + output)
+                (Some(bredr::CodingFormat::Msbc), Some(32000))
+            };
             let params_fn = |set| bredr::ScoConnectionParameters {
                 parameter_set: Some(set),
-                air_coding_format: Some(bredr::CodingFormat::Msbc),
-                // IO bandwidth to match an 16khz audio rate. (x2 for input + output)
-                io_bandwidth: Some(32000),
+                air_coding_format,
+                io_bandwidth,
                 ..params_with_data_path(COMMON_SCO_PARAMS.clone(), in_band_sco)
             };
             // TODO(b/200305833): Disable MsbcT1 for now as it results in bad audio
@@ -139,7 +145,7 @@ impl ScoConnector {
             &mut params.into_iter(),
             client,
         )?;
-        let connection = match requests.next().await {
+        match requests.next().await {
             Some(Ok(bredr::ScoConnectionReceiverRequest::Connected {
                 connection,
                 params,
@@ -147,15 +153,12 @@ impl ScoConnector {
             })) => {
                 let params = params.try_into().map_err(|_| ScoConnectError::ScoInvalidArguments)?;
                 let proxy = connection.into_proxy().map_err(|_| ScoConnectError::ScoFailed)?;
-                ScoConnection { params, proxy }
+                Ok(ScoConnection { params, proxy })
             }
-            Some(Ok(bredr::ScoConnectionReceiverRequest::Error { error, .. })) => {
-                return Err(error.into())
-            }
-            Some(Err(e)) => return Err(e.into()),
-            None => return Err(ScoConnectError::ScoCanceled),
-        };
-        Ok(connection)
+            Some(Ok(bredr::ScoConnectionReceiverRequest::Error { error, .. })) => Err(error.into()),
+            Some(Err(e)) => Err(e.into()),
+            None => Err(ScoConnectError::ScoCanceled),
+        }
     }
 
     fn parameters_for_codecs(&self, codecs: Vec<CodecId>) -> Vec<bredr::ScoConnectionParameters> {
@@ -274,8 +277,8 @@ pub(crate) mod tests {
             vec![
                 bredr::ScoConnectionParameters {
                     parameter_set: Some(HfpParameterSet::MsbcT2),
-                    air_coding_format: Some(bredr::CodingFormat::Msbc),
-                    io_bandwidth: Some(32000),
+                    air_coding_format: Some(bredr::CodingFormat::Transparent),
+                    io_bandwidth: Some(16000),
                     path: Some(bredr::DataPath::Host),
                     ..COMMON_SCO_PARAMS
                 },

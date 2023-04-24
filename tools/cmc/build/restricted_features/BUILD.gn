@@ -30,6 +30,7 @@ group("allow_non_hermetic_packages") {
     "//src/chromium/web_runner_tests:*",
     "//src/connectivity/bluetooth/lib/fuchsia-audio-codec:*",
     "//src/connectivity/bluetooth/profiles/bt-a2dp:*",
+    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:*",
     "//src/connectivity/bluetooth/profiles/tests/bt-a2dp-loopback:*",
     "//src/connectivity/bluetooth/profiles/tests/bt-a2dp-source-integration-tests:*",
     "//src/connectivity/network/testing/netemul/runner/tests:*",

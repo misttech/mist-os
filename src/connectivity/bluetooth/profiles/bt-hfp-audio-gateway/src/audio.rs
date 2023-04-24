@@ -16,6 +16,8 @@ pub enum AudioError {
     AlreadyStarted,
     #[error("AudioCore Error: {:?}", .source)]
     AudioCore { source: anyhow::Error },
+    #[error("FIDL Error: {:?}", .0)]
+    Fidl(#[from] fidl::Error),
     #[error("Audio is not started")]
     NotStarted,
     #[error("Could not find suitable devices")]

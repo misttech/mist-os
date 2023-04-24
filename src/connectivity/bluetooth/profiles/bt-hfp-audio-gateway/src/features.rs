@@ -119,6 +119,46 @@ impl std::fmt::Display for CodecId {
     }
 }
 
+impl CodecId {
+    pub fn is_supported(&self) -> bool {
+        match self {
+            &CodecId::MSBC | &CodecId::CVSD => true,
+            _ => false,
+        }
+    }
+
+    pub fn oob_bytes(&self) -> Vec<u8> {
+        use bt_a2dp::media_types::{
+            SbcAllocation, SbcBlockCount, SbcChannelMode, SbcCodecInfo, SbcSamplingFrequency,
+            SbcSubBands,
+        };
+        match self {
+            &CodecId::MSBC => SbcCodecInfo::new(
+                SbcSamplingFrequency::FREQ16000HZ,
+                SbcChannelMode::MONO,
+                SbcBlockCount::SIXTEEN,
+                SbcSubBands::EIGHT,
+                SbcAllocation::LOUDNESS,
+                26,
+                26,
+            )
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+            // CVSD has no oob_bytes
+            _ => vec![],
+        }
+    }
+
+    pub fn mime_type(&self) -> &str {
+        match self {
+            &CodecId::MSBC => "audio/msbc",
+            &CodecId::CVSD => "audio/cvsd",
+            _ => unimplemented!(),
+        }
+    }
+}
+
 pub fn codecs_to_string(codecs: &Vec<CodecId>) -> String {
     let codecs_string: Vec<String> = codecs.iter().map(ToString::to_string).collect();
     let codecs_string: Vec<&str> = codecs_string.iter().map(AsRef::as_ref).collect();
