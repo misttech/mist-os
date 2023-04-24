@@ -39,6 +39,13 @@ inter-package dependencies (subpackages). Whereas packages are currently not
 allowed to depend on other packages, this RFC amends the restriction to be that
 packages may not depend on other packages except through containment.
 
+Note that while the initial motivating use cases discussed in this RFC are all
+testing-related, subpackages are likely to be useful in other scenarios as
+well. Subpackages will be available for testing first, as we will be able to
+cut corners for testing in ways that would not be acceptable in production.
+Schedule considerations aside, the intent is to fully support subpackages in
+both test and production scenarios.
+
 ### Why now?
 
 The most prevalent current use cases driving the need for inter-package

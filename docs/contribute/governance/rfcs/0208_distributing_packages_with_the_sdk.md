@@ -37,6 +37,15 @@ will be distributed from the Fuchsia platform repository and how
 those packages will be included as subpackages in downstream
 repositories.
 
+Note that while this RFC focuses on the specific case where these packages are
+subpackaged into tests, this is a **generic mechanism** for distributing
+packages via the SDK. Product owners may want to include Fuchsia-team-authored
+components in their sessions in production, for example. The first packages
+distributed via the SDK will likely be for tests, as we may be able to cut
+corners for testing in ways that would not be acceptable in production.
+Schedule considerations aside, the intent is to fully support distribution of
+packages for both test and production scenarios.
+
 ## Stakeholders
 
 _Facilitator:_
