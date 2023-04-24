@@ -99,7 +99,7 @@ int RunDfv2(driver_manager_config::Config config,
         }
     // TODO(https://fxbug.dev/125244): Find a better way to set this config.
 #if __has_feature(address_sanitizer)
-        fidl::WireResult result = fidl::WireCall(client.value())->Config("asan");
+        fidl::WireResult result = fidl::WireCall(client.value())->Config("asan-ubsan");
         if (!result.ok()) {
           return zx::error(result.status());
         }
