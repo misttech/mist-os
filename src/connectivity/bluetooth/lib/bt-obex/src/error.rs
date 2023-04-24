@@ -20,10 +20,14 @@ pub enum PacketError {
     DataLength,
     #[error("Invalid data: {}", .0)]
     Data(String),
-    #[error("Invalid header identifier: {:?}", .0)]
+    #[error("Invalid header identifier: {}", .0)]
     Identifier(u8),
+    #[error("Invalid packet OpCode: {}", .0)]
+    OpCode(u8),
     #[error("Invalid header encoding")]
     HeaderEncoding,
+    #[error("Invalid response code: {}", .0)]
+    ResponseCode(u8),
     #[error("Field is RFA.")]
     Reserved,
     /// An error from another source
