@@ -59,6 +59,7 @@ extern "C" {
 /// [processargs.h]: https://fuchsia.googlesource.com/fuchsia/+/HEAD/zircon/system/public/zircon/processargs.h
 #[repr(u8)]
 #[derive(FromPrimitive, Copy, Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum HandleType {
     /// Handle to our own process.
     ///
@@ -203,9 +204,6 @@ pub enum HandleType {
     ///
     /// Equivalent to PA_USER2.
     User2 = 0xF2,
-
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 /// Metadata information for a handle in a processargs message. Contains a handle type and an
