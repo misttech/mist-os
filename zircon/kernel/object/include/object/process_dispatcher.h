@@ -106,7 +106,7 @@ class ProcessDispatcher final
   // The type of address space used to initialize a ProcessDispatcher for a shared process.
   enum class SharedAspaceType {
     // Top half: a new shareable address space
-    // Bottom half: a new restricted address space
+    // Bottom half: nothing
     New,
     // Top half: shared address space from another process
     // Bottom half: a new restricted address space
