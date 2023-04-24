@@ -103,10 +103,8 @@ def validate_same_json(source_file, dest_file):
     with open(source_file, "r+") as sf, open(dest_file, "r+") as df:
         source = sorting(json.load(sf))
         dest = sorting(json.load(df))
-        # Update the json to be sorted form, to better demonstrate the differences
-        json.dump(source, sf)
-        json.dump(dest, df)
-        return source == dest
+
+    return source == dest
 
 
 def main():
