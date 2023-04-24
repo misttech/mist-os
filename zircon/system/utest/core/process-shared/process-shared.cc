@@ -350,3 +350,71 @@ TEST(ProcessShared, InfoTaskStats) {
   ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
   ASSERT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
 }
+
+TEST(ProcessShared, InfoProcessMaps) {
+  // Create a shared process.
+  zx::process shared_process;
+  zx::vmar shared_vmar;
+  static constexpr char kSharedName[] = "shared_process";
+  ASSERT_OK(zx::process::create(*zx::job::default_job(), kSharedName, sizeof(kSharedName),
+                                ZX_PROCESS_SHARED, &shared_process, &shared_vmar));
+
+  // Create a process that will be used to test restricted mode mapping.
+  zx::process restricted_process;
+  zx::vmar restricted_vmar;
+  static constexpr char kNameRestrictedProc[] = "restricted_process";
+  ASSERT_OK(zx_process_create_shared(
+      shared_process.get(), 0, kNameRestrictedProc, sizeof(kNameRestrictedProc),
+      restricted_process.reset_and_get_address(), restricted_vmar.reset_and_get_address()));
+
+  // Create a VMO and map it into the shared address space.
+  zx_vaddr_t vaddr{};
+  const size_t kSize = zx_system_get_page_size();
+  zx::vmo shared_vmo;
+  ASSERT_OK(zx::vmo::create(kSize, 0u, &shared_vmo));
+  ASSERT_OK(shared_vmar.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, shared_vmo, 0, kSize, &vaddr));
+
+  // Create a VMO and map it into the restricted address space.
+  zx::vmo restricted_vmo;
+  ASSERT_OK(zx::vmo::create(kSize, 0u, &restricted_vmo));
+  ASSERT_OK(
+      restricted_vmar.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, restricted_vmo, 0, kSize, &vaddr));
+
+  // Verify that ZX_INFO_PROCESS_MAPS returns the correct mappings in the
+  // correct ordering for both the shared process and the restricted process.
+  size_t actual;
+  size_t avail;
+  size_t buffer_size = 6 * sizeof(zx_info_maps_t);
+  zx_info_maps_t maps[6]{};
+  ASSERT_OK(
+      shared_process.get_info(ZX_INFO_PROCESS_MAPS, (void*)maps, buffer_size, &actual, &avail));
+
+  // We expect 5 entries here:
+  // 1. The root vmar of the shared process' shared address space.
+  // 2. The vm aspace of the shared process' shared address space (identical to the vmar).
+  // 3. The root vmar of the shared process' restricted address space.
+  // 4. The vm aspace of the shared process' restricted address space (identical to the vmar).
+  // 5. The VMO we mapped into the shared address space.
+  ASSERT_EQ(actual, 5);
+  ASSERT_EQ(avail, actual);
+
+  // Assert that the base addresses are in non-descending order for the shared process.
+  zx_vaddr_t prev_base = 0;
+  for (size_t i = 0; i < actual; i++) {
+    EXPECT_GE(maps[i].base, prev_base);
+    prev_base = maps[i].base;
+  }
+
+  // Assert that the base addresses are in non-descending order for the restricted process.
+  ASSERT_OK(
+      restricted_process.get_info(ZX_INFO_PROCESS_MAPS, (void*)maps, buffer_size, &actual, &avail));
+  // We expect 6 entries here. 5 are identical to the ones in the shared address space, but we have
+  // an additional one for the VMO we mapped into the restricted address space.
+  ASSERT_EQ(actual, 6);
+  ASSERT_EQ(avail, actual);
+  prev_base = 0;
+  for (size_t i = 0; i < actual; i++) {
+    EXPECT_GE(maps[i].base, prev_base);
+    prev_base = maps[i].base;
+  }
+}

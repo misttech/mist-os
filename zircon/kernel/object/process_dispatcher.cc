@@ -720,6 +720,22 @@ zx_status_t ProcessDispatcher::GetAspaceMaps(user_out_ptr<zx_info_maps_t> maps, 
   *actual_out = 0;
   *available_out = 0;
 
+  // Get the restricted_aspace_ first because it lives in the lower portion of the memory,
+  // and this API should return a sorted map.
+  size_t actual_r = 0;
+  size_t available_r = 0;
+  if (restricted_aspace_) {
+    zx_status_t status = GetVmAspaceMaps(restricted_aspace_, maps, max, &actual_r, &available_r);
+    if (status != ZX_OK) {
+      return status;
+    }
+    DEBUG_ASSERT(max >= actual_r);
+    max -= actual_r;
+    if (maps) {
+      maps = maps.element_offset(actual_r);
+    }
+  }
+
   // Do not check the state_ since we need to call GetVmAspaceMaps without the dispatcher lock held,
   // and so any check will become stale anyway. Should the process be dead, or transition to the
   // dead state during the operation, then the associated aspace will also be destroyed, which will
@@ -727,20 +743,9 @@ zx_status_t ProcessDispatcher::GetAspaceMaps(user_out_ptr<zx_info_maps_t> maps, 
   size_t actual = 0;
   size_t available = 0;
   zx_status_t status = GetVmAspaceMaps(shareable_state_->aspace(), maps, max, &actual, &available);
-  DEBUG_ASSERT(max >= actual);
-  if (status != ZX_OK) {
-    return status;
-  }
 
-  size_t actual2 = 0;
-  size_t available2 = 0;
-  if (restricted_aspace_) {
-    user_out_ptr<zx_info_maps_t> maps_offset = maps ? maps.element_offset(actual) : maps;
-    status = GetVmAspaceMaps(restricted_aspace_, maps_offset, max - actual, &actual2, &available2);
-  }
-
-  *actual_out = actual + actual2;
-  *available_out = available + available2;
+  *actual_out = actual + actual_r;
+  *available_out = available + available_r;
 
   return status;
 }
