@@ -256,7 +256,7 @@ protocol RealmQuery {
     /// Gets all directories relevant to a particular instance identified by its moniker.
     /// This response contains directory handles served by component manager. As a result,
     /// component manager pays a non-trivial cost when this method is invoked.
-    @available(added=11, deprecated=11, removed=12, note="Use CloneDirectory instead", legacy=true)
+    @available(added=11, deprecated=11, removed=12, note="Use Open instead")
     GetInstanceDirectories(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {
@@ -362,7 +362,7 @@ type ExecutionState = resource struct {
 };
 
 /// The directories available because the component instance is in resolved state
-@available(added=11, deprecated=11, removed=12, legacy=true)
+@available(added=11, deprecated=11, removed=12)
 type ResolvedDirectories = resource struct {
     /// The package directory containing the component manifest, if one exists.
     /// This directory has the same permissions given by the package resolver
@@ -382,7 +382,7 @@ type ResolvedDirectories = resource struct {
 };
 
 /// The directories available because the component instance is running
-@available(added=11, deprecated=11, removed=12, legacy=true)
+@available(added=11, deprecated=11, removed=12)
 type ExecutionDirectories = resource struct {
     /// The outgoing directory of this instance, if one exists.
     out_dir client_end:<fuchsia.io.Directory, optional>;
