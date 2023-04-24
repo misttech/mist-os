@@ -178,8 +178,9 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
         }
 
         if (touch_input_listener_) {
-          // Only report ADD and CHANGE events for minimality; add more if necessary.
-          if (phase == EventPhase::ADD || phase == EventPhase::CHANGE) {
+          // Only report ADD/CHANGE/REMOVE events for minimality; add more if necessary.
+          if (phase == EventPhase::ADD || phase == EventPhase::CHANGE ||
+              phase == EventPhase::REMOVE) {
             // The raw pointer event's coordinates are in pips (logical pixels). The test
             // expects coordinates in physical pixels. The former is transformed into the latter
             // with the scale factor provided in the metrics event.
@@ -188,6 +189,7 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
             fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
             request.set_local_x(logical[0] * metrics_.scale_x)
                 .set_local_y(logical[1] * metrics_.scale_y)
+                .set_phase(pointer.phase())
                 .set_time_received(zx_clock_get_monotonic())
                 .set_component_name("touch-gfx-client");
             touch_input_listener_->ReportTouchInput(std::move(request));

@@ -20,6 +20,7 @@
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
+#include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/policy/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
@@ -131,7 +132,7 @@ using ChildName = std::string;
 constexpr zx::duration kTimeout = zx::min(5);
 
 // Maximum distance between two physical pixel coordinates so that they are considered equal.
-constexpr float kEpsilon = 0.5f;
+constexpr double kEpsilon = 0.5f;
 
 // Number of move events to generate for swipe gestures.
 constexpr auto kMoveEventCount = 5;
@@ -149,6 +150,17 @@ constexpr auto kDisplayHeight = 800;
 using time_utc = zx::basic_time<1>;
 
 constexpr auto kMockResponseListener = "response_listener";
+
+void ExpectLocationAndPhase(
+    const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
+    double expected_y, fuchsia::ui::pointer::EventPhase expected_phase) {
+  auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
+  auto actual_x = pixel_scale * e.local_x();
+  auto actual_y = pixel_scale * e.local_y();
+  EXPECT_NEAR(expected_x, actual_x, kEpsilon);
+  EXPECT_NEAR(expected_y, actual_y, kEpsilon);
+  EXPECT_EQ(expected_phase, e.phase());
+}
 
 struct UIStackConfig {
   bool use_scene_manager = false;
@@ -199,6 +211,7 @@ enum class SwipeGesture {
 
 struct ExpectedSwipeEvent {
   double x = 0, y = 0;
+  fuchsia::ui::pointer::EventPhase phase;
 };
 
 struct InjectSwipeParams {
@@ -228,10 +241,11 @@ void AssertSwipeEvents(
     const auto& actual_x = actual_events[i].local_x();
     const auto& actual_y = actual_events[i].local_y();
 
-    const auto& [expected_x, expected_y] = expected_events[i];
+    const auto& [expected_x, expected_y, expected_phase] = expected_events[i];
 
     EXPECT_NEAR(actual_x, expected_x, kEpsilon);
     EXPECT_NEAR(actual_y, expected_y, kEpsilon);
+    EXPECT_EQ(actual_events[i].phase(), expected_phase);
   }
 }
 
@@ -246,8 +260,16 @@ InjectSwipeParams GetLeftSwipeParams() {
     expected_events.push_back({
         .x = static_cast<double>(kDisplayHeight) / 2,
         .y = i * tap_distance,
+        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
     });
   }
+
+  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events.push_back({
+      .x = expected_events.back().x,
+      .y = expected_events.back().y,
+      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+  });
 
   return {.direction = SwipeGesture::LEFT,
           .begin_x = kDisplayWidth,
@@ -266,8 +288,16 @@ InjectSwipeParams GetRightSwipeParams() {
     expected_events.push_back({
         .x = static_cast<double>(kDisplayHeight) / 2,
         .y = i * tap_distance,
+        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
     });
   }
+
+  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events.push_back({
+      .x = expected_events.back().x,
+      .y = expected_events.back().y,
+      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+  });
 
   return {.direction = SwipeGesture::RIGHT,
           .begin_x = 0,
@@ -286,8 +316,16 @@ InjectSwipeParams GetUpwardSwipeParams() {
     expected_events.push_back({
         .x = i * tap_distance,
         .y = static_cast<double>(kDisplayWidth) / 2,
+        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
     });
   }
+
+  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events.push_back({
+      .x = expected_events.back().x,
+      .y = expected_events.back().y,
+      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+  });
 
   return {.direction = SwipeGesture::UP,
           .begin_x = kDisplayWidth / 2,
@@ -306,8 +344,16 @@ InjectSwipeParams GetDownwardSwipeParams() {
     expected_events.push_back({
         .x = i * tap_distance,
         .y = static_cast<double>(kDisplayWidth) / 2,
+        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
     });
   }
+
+  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events.push_back({
+      .x = expected_events.back().x,
+      .y = expected_events.back().y,
+      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+  });
 
   return {.direction = SwipeGesture::DOWN,
           .begin_x = kDisplayWidth / 2,
@@ -413,8 +459,8 @@ class TouchInputBase : public ui_testing::PortableUITest,
   // next to the base ones added.
   virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
 
-  bool LastEventReceivedMatches(float expected_x, float expected_y,
-                                const std::string& component_name) {
+  bool LastEventReceivedMatchesLocation(float expected_x, float expected_y,
+                                        const std::string& component_name) {
     const auto& events_received = response_state_->events_received();
     if (events_received.empty()) {
       return false;
@@ -436,6 +482,25 @@ class TouchInputBase : public ui_testing::PortableUITest,
     return CompareDouble(actual_x, expected_x, pixel_scale) &&
            CompareDouble(actual_y, expected_y, pixel_scale) &&
            actual_component_name == component_name;
+  }
+
+  bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase,
+                                     const std::string& component_name) {
+    const auto& events_received = response_state_->events_received();
+    if (events_received.empty()) {
+      return false;
+    }
+
+    const auto& last_event = events_received.back();
+    const auto actual_phase = last_event.phase();
+    auto actual_component_name = last_event.component_name();
+
+    FX_LOGS(INFO) << "Expecting event for component " << component_name << " at phase ("
+                  << static_cast<uint32_t>(phase) << ")";
+    FX_LOGS(INFO) << "Received event for component " << actual_component_name << " at phaase ("
+                  << static_cast<uint32_t>(actual_phase) << ")";
+
+    return phase == actual_phase && actual_component_name == component_name;
   }
 
   void InjectInput(TapLocation tap_location) {
@@ -603,10 +668,18 @@ TEST_P(CppInputTestIp, CppClientTap) {
 
   InjectInput(TapLocation::kTopLeft);
   RunLoopUntil([this] {
-    return LastEventReceivedMatches(/*expected_x=*/static_cast<float>(display_height()) / 4.f,
-                                    /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-                                    static_cast<std::string>(GetViewProvider()));
+    return LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase::REMOVE,
+                                         static_cast<std::string>(GetViewProvider()));
   });
+
+  const auto& events_received = this->response_state()->events_received();
+  ASSERT_EQ(events_received.size(), 2u);
+  ExpectLocationAndPhase(events_received[0], static_cast<float>(display_height()) / 4.f,
+                         static_cast<float>(display_width()) / 4.f,
+                         fuchsia::ui::pointer::EventPhase::ADD);
+  ExpectLocationAndPhase(events_received[1], static_cast<float>(display_height()) / 4.f,
+                         static_cast<float>(display_width()) / 4.f,
+                         fuchsia::ui::pointer::EventPhase::REMOVE);
 }
 
 class CppSwipeTest : public CppInputTestIpBase<InjectSwipeParams> {
@@ -637,11 +710,11 @@ TEST_P(CppSwipeTest, CppClientSwipeTest) {
   // the swipe also gets rotated by 90 degrees.
   InjectEdgeToEdgeSwipe(direction, begin_x, begin_y);
 
-  //  Client sends a response for 1 Down and |swipe_length| Move PointerEventPhase events.
+  //  Client sends a response for 1 Down, 1 Up and |swipe_length| Move PointerEventPhase events.
   RunLoopUntil([this] {
     FX_LOGS(INFO) << "Events received = " << response_state()->events_received().size();
-    FX_LOGS(INFO) << "Events expected = " << kMoveEventCount + 1;
-    return response_state()->events_received().size() >= static_cast<uint32_t>(kMoveEventCount + 1);
+    FX_LOGS(INFO) << "Events expected = " << kMoveEventCount + 2;
+    return response_state()->events_received().size() >= static_cast<uint32_t>(kMoveEventCount + 2);
   });
 
   const auto& actual_events = response_state()->events_received();
@@ -862,9 +935,10 @@ TEST_P(WebEngineTestIp, ChromiumTap) {
 
   TryInject();
   RunLoopUntil([this] {
-    return LastEventReceivedMatches(/*expected_x=*/static_cast<float>(display_height()) / 4.f,
-                                    /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-                                    /*component_name=*/"one-chromium");
+    return LastEventReceivedMatchesLocation(
+        /*expected_x=*/static_cast<float>(display_height()) / 4.f,
+        /*expected_y=*/static_cast<float>(display_width()) / 4.f,
+        /*component_name=*/"one-chromium");
   });
 }
 

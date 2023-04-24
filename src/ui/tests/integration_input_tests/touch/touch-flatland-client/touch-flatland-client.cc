@@ -163,9 +163,10 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
         }
         if (touch_input_listener_) {
           fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
-          // Only report ADD and CHANGE events for minimality; add more if necessary.
+          // Only report ADD/CHANGE/REMOVE events for minimality; add more if necessary.
           if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD ||
-              pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::CHANGE) {
+              pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::CHANGE ||
+              pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
             auto logical = ViewportToViewCoordinates(pointer_sample.position_in_viewport(),
                                                      view_params_->viewport_to_view_transform);
 
@@ -174,6 +175,7 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
             // with the DPR values received from |GetLayout|.
             request.set_local_x(logical[0] * device_pixel_ratio_.x)
                 .set_local_y(logical[1] * device_pixel_ratio_.y)
+                .set_phase(pointer_sample.phase())
                 .set_time_received(zx_clock_get_monotonic())
                 .set_component_name("touch-flatland-client");
             touch_input_listener_->ReportTouchInput(std::move(request));
