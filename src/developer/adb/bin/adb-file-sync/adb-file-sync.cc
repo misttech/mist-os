@@ -12,6 +12,7 @@
 
 #include <vector>
 
+#include "fidl/fuchsia.sys2/cpp/common_types.h"
 #include "src/developer/adb/third_party/adb-file-sync/file_sync_service.h"
 #include "src/developer/adb/third_party/adb-file-sync/util.h"
 
@@ -135,7 +136,7 @@ zx::result<zx::channel> AdbFileSync::ConnectToComponent(std::string name,
   }
 
   // Connect to component
-  auto result = realm_query_->GetInstanceDirectories(component_moniker);
+  auto result = realm_query_->ConstructNamespace(component_moniker);
   if (result.is_error()) {
     FX_LOGS(ERROR) << "RealmQuery failed " << result.error_value().FormatDescription();
     return zx::error(result.error_value().is_domain_error()
@@ -143,12 +144,12 @@ zx::result<zx::channel> AdbFileSync::ConnectToComponent(std::string name,
                          : result.error_value().framework_error().status());
   }
 
-  if (!result->resolved_dirs()) {
+  if (result->namespace_().empty()) {
     FX_LOGS(ERROR) << "RealmQuery did not return any directories.";
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  for (auto& entry : result->resolved_dirs()->ns_entries()) {
+  for (auto& entry : result->namespace_()) {
     if ("/" + (*out_path)[0] == entry.path()) {
       out_path->erase(out_path->begin());
       return zx::success(entry.directory()->TakeChannel());

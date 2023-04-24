@@ -156,21 +156,16 @@ class LocalRealmQueryImpl : public fuchsia::sys2::testing::RealmQuery_TestBase,
     FX_LOGS(ERROR) << "Not implemented " << name;
   }
 
-  void GetInstanceDirectories(std::string moniker,
-                              GetInstanceDirectoriesCallback callback) override {
+  void ConstructNamespace(::std::string moniker, ConstructNamespaceCallback callback) override {
     EXPECT_EQ(moniker, "./" + kComponent);
 
-    auto resolved_dirs = fuchsia::sys2::ResolvedDirectories::New();
-    resolved_dirs->ns_entries.emplace_back();
-    resolved_dirs->ns_entries.back()
+    auto ns_entries = std::vector<fuchsia::component::runner::ComponentNamespaceEntry>();
+    ns_entries.emplace_back();
+    ns_entries.back()
         .set_path("/" + kTest)
         .set_directory(fidl::InterfaceHandle<fuchsia::io::Directory>(ns_directory_->BindServer()));
-    resolved_dirs->exposed_dir =
-        fidl::InterfaceHandle<fuchsia::io::Directory>(exposed_dir_.BindServer());  // Not used
-    resolved_dirs->pkg_dir =
-        fidl::InterfaceHandle<fuchsia::io::Directory>(pkg_dir_.BindServer());  // Not used
-    callback(fuchsia::sys2::RealmQuery_GetInstanceDirectories_Result::WithResponse(
-        fuchsia::sys2::RealmQuery_GetInstanceDirectories_Response(std::move(resolved_dirs))));
+    callback(fuchsia::sys2::RealmQuery_ConstructNamespace_Result::WithResponse(
+        fuchsia::sys2::RealmQuery_ConstructNamespace_Response(std::move(ns_entries))));
   }
 
  private:
