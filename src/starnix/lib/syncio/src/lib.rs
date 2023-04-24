@@ -679,7 +679,7 @@ impl Zxio {
         msg.msg_iovlen = 1;
 
         msg.msg_control = cmsg.as_mut_ptr() as *mut std::os::raw::c_void;
-        msg.msg_controllen = cmsg.len();
+        msg.msg_controllen = cmsg.len() as u32;
 
         let mut out_code = 0;
         let mut out_actual = 0;
