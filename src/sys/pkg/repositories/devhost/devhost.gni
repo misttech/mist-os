@@ -136,12 +136,10 @@ template("devhost_repository_publish") {
                              "visibility",
                            ])
 
-    if (!defined(deps)) {
-      deps = []
-    }
-    deps += [
+    repo_deps = [
       ":${target_name}_prepare_repository_keys",
       ":${target_name}_prepare_repository_root_metadata",
+      "//src/sys/pkg/bin/package-tool:host",
     ]
 
     if (!defined(inputs)) {

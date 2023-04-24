@@ -312,6 +312,10 @@ declare_args() {
 #
 #   output_blob_manifest_path (optional)
 #     If set, write the blob manifest of all staged blobs to the given path.
+#
+#   repo_deps (optional)
+#     A list of GN dependencies that the package publishing tool & repository depends on.
+#     This should not be the deps of the contents of the repository, but of the repository itself.
 template("package_tool_repository_publish") {
   assert(defined(invoker.output_repository_dir) &&
              invoker.output_repository_dir != "",
@@ -328,6 +332,59 @@ template("package_tool_repository_publish") {
   assert(defined(invoker.package_list_manifests),
          "package_list_manifests must be defined")
 
+  _publish_opts = [
+    "--time-versioning",
+    "--copy-mode",
+    repository_publish_blob_copy_mode,
+  ]
+
+  if (defined(invoker.initial_trusted_root_metadata)) {
+    assert(invoker.initial_trusted_root_metadata != "",
+           "initial_trusted_root_metadata cannot be empty")
+    _publish_opts += [
+      "--trusted-root",
+      rebase_path(invoker.initial_trusted_root_metadata, root_build_dir),
+    ]
+  }
+
+  if (defined(invoker.output_blob_manifest_path)) {
+    assert(invoker.output_blob_manifest_path != "",
+           "output_blob_manifest_path cannot be empty")
+    _publish_opts += [
+      "--blob-manifest",
+      rebase_path(invoker.output_blob_manifest_path, root_build_dir),
+    ]
+  }
+
+  if (delivery_blob_type != false) {
+    _publish_opts += [
+      "--delivery-blob-type",
+      "${repository_publish_delivery_blob_type}",
+    ]
+  }
+
+  # Expose build-time package publishing arguments to devshell commands. (`fx publish`)
+  publish_tool_opts_dep = "${target_name}_tool_opts"
+  generated_file(publish_tool_opts_dep) {
+    outputs = [ "${_output_repository_dir}/publish_tool_opts" ]
+    contents = _publish_opts
+  }
+
+  group("${target_name}_repo_deps") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    public_deps = [ ":${publish_tool_opts_dep}" ]
+    if (defined(invoker.repo_deps)) {
+      public_deps += invoker.repo_deps
+    }
+    if (delivery_blob_type != false) {
+      public_deps += [ "//src/storage/tools/blobfs-compression:blobfs-compression($host_toolchain)" ]
+    }
+  }
+
   compiled_action(target_name) {
     tool = "//src/sys/pkg/bin/package-tool"
     tool_output_name = "package-tool"
@@ -340,6 +397,12 @@ template("package_tool_repository_publish") {
                              "visibility",
                              "metadata",
                            ])
+
+    if (!defined(deps)) {
+      deps = []
+    }
+
+    deps += [ ":${target_name}_repo_deps" ]
 
     # The contents of these folders is dynamic, and managed entirely by this action.
     hermetic_action_ignored_prefixes =
@@ -362,38 +425,13 @@ template("package_tool_repository_publish") {
       "--depfile",
       rebase_path(depfile, root_build_dir),
       "--clean",
-      "--time-versioning",
-      "--copy-mode",
-      repository_publish_blob_copy_mode,
     ]
 
-    if (defined(invoker.initial_trusted_root_metadata)) {
-      assert(invoker.initial_trusted_root_metadata != "",
-             "initial_trusted_root_metadata cannot be empty")
-      args += [
-        "--trusted-root",
-        rebase_path(invoker.initial_trusted_root_metadata, root_build_dir),
-      ]
-    }
-
     if (defined(invoker.output_blob_manifest_path)) {
-      assert(invoker.output_blob_manifest_path != "",
-             "output_blob_manifest_path cannot be empty")
-      args += [
-        "--blob-manifest",
-        rebase_path(invoker.output_blob_manifest_path, root_build_dir),
-      ]
       outputs += [ invoker.output_blob_manifest_path ]
     }
 
     if (delivery_blob_type != false) {
-      args += [
-        "--delivery-blob-type",
-        "${delivery_blob_type}",
-      ]
-
-      deps += [ "//src/storage/tools/blobfs-compression:blobfs-compression($host_toolchain)" ]
-
       inputs += [ "$root_build_dir/host_x64/blobfs-compression" ]
     }
 
@@ -405,6 +443,8 @@ template("package_tool_repository_publish") {
         ]
       }
     }
+
+    args += _publish_opts
 
     args += [ rebase_path(_output_repository_dir, root_build_dir) ]
   }
