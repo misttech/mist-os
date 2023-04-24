@@ -69,22 +69,24 @@ pub fn ffx_plugin_is_machine_supported(
 }
 
 {% if includes_subcommands %}
-struct SuiteAdapterTool;
 struct SuiteAdapter {
     cmd: {{suite_args_lib}}::FfxPluginCommand,
     injector: std::sync::Arc<dyn ffx_core::Injector>,
 }
 
 #[fho::macro_deps::async_trait(?Send)]
-impl fho::FfxTool for SuiteAdapterTool {
-    type Main = SuiteAdapter;
+impl fho::FfxTool for SuiteAdapter {
     type Command = {{suite_args_lib}}::FfxPluginCommand;
 
-    fn forces_stdout_log() -> bool {
-        false
+    fn forces_stdout_log(&self) -> bool {
+      false
     }
 
-    async fn from_env(env: fho::FhoEnvironment, cmd: Self::Command) -> fho::Result<Self::Main> {
+    fn supports_machine_output(&self) -> bool {
+      ffx_plugin_is_machine_supported(&self.cmd)
+    }
+
+    async fn from_env(env: fho::FhoEnvironment, cmd: Self::Command) -> fho::Result<Self> {
         let injector = env.injector.clone();
         Ok(SuiteAdapter { cmd, injector })
     }
@@ -92,7 +94,7 @@ impl fho::FfxTool for SuiteAdapterTool {
 
 #[fho::macro_deps::async_trait(?Send)]
 impl fho::FfxMain for SuiteAdapter {
-    type Writer = fho::SimpleWriter;
+    type Writer = ();
     async fn main(self, _writer:  Self::Writer) -> fho::Result<()> {
         ffx_plugin_impl(&self.injector, self.cmd).await
     }
@@ -101,6 +103,6 @@ impl fho::FfxMain for SuiteAdapter {
 pub async fn fho_suite_main() {
   use fho::FfxTool;
 
-  SuiteAdapterTool::execute_tool().await
+  SuiteAdapter::execute_tool().await
 }
 {% endif %}

@@ -78,7 +78,7 @@ impl ToolEnv {
         FhoEnvironment { injector: Arc::new(self.injector), context, ffx: self.ffx_cmd_line }
     }
 
-    pub async fn build_tool<T: FfxTool>(self, context: EnvironmentContext) -> Result<T::Main> {
+    pub async fn build_tool<T: FfxTool>(self, context: EnvironmentContext) -> Result<T> {
         let tool_cmd = ToolCommand::<T>::from_args(
             &Vec::from_iter(self.ffx_cmd_line.cmd_iter()),
             &Vec::from_iter(self.ffx_cmd_line.subcmd_iter()),
@@ -94,7 +94,7 @@ impl ToolEnv {
         self,
         cmd: T::Command,
         context: EnvironmentContext,
-    ) -> Result<T::Main> {
+    ) -> Result<T> {
         let env = self.make_environment(context);
         T::from_env(env, cmd).await
     }

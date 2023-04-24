@@ -251,8 +251,6 @@ impl ToTokens for NamedFieldStruct<'_> {
         let res = quote_spanned! {span=>
             #(#try_from_env_type_assertions)*
             #struct_decl {
-                type Main = Self;
-
                 #command_field_decl
                 async fn from_env(
                     _env: fho::FhoEnvironment,
@@ -274,8 +272,12 @@ impl ToTokens for NamedFieldStruct<'_> {
                     })
                 }
 
-                fn forces_stdout_log() -> bool {
+                fn forces_stdout_log(&self) -> bool {
                     #forces_stdout_logs
+                }
+
+                fn supports_machine_output(&self) -> bool {
+                    <<Self as fho::FfxMain>::Writer as fho::ToolIO>::is_machine_supported()
                 }
             }
         };
