@@ -42,6 +42,6 @@ fuchsia_test_package("examples") {
   test_components = [ ":tun-rust-example" ]
   deps = [
     "//src/connectivity/network/netstack:component-debug",
-    "//src/connectivity/network/tun/network-tun:component-v2",
+    "//src/connectivity/network/tun/network-tun:component",
   ]
 }

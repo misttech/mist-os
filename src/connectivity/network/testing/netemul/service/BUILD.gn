@@ -57,7 +57,7 @@ fuchsia_component("netemul-sandbox") {
   deps = [
     ":bin",
     "//src/connectivity/network/testing/netemul/network-context",
-    "//src/connectivity/network/tun/network-tun:component-v2",
+    "//src/connectivity/network/tun/network-tun:component",
   ]
 }
 
@@ -74,7 +74,7 @@ fuchsia_test_component("netemul-sandbox-tests") {
     "//src/connectivity/network/testing/netemul/test-support:counter",
     "//src/connectivity/network/testing/netemul/test-support:counter-without-program",
     "//src/connectivity/network/testing/netemul/test-support:devfs-subdir-user",
-    "//src/connectivity/network/tun/network-tun:component-v2",
+    "//src/connectivity/network/tun/network-tun:component",
   ]
 }
 

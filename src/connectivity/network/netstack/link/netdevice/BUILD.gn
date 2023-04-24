@@ -46,7 +46,7 @@ fuchsia_unittest_component("netstack-link-netdevice-test-component") {
 }
 
 fuchsia_test_package("netstack-link-netdevice-gotests") {
-  deps = [ "//src/connectivity/network/tun/network-tun:component-v2" ]
+  deps = [ "//src/connectivity/network/tun/network-tun:component" ]
 
   test_components = [ ":netstack-link-netdevice-test-component" ]
 }

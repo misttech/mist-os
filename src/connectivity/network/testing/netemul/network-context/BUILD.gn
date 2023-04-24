@@ -32,7 +32,7 @@ fuchsia_component("network-test") {
   manifest = "meta/network-test.cml"
   deps = [
     "lib:network_test_bin",
-    "//src/connectivity/network/tun/network-tun:component-v2",
+    "//src/connectivity/network/tun/network-tun:component",
   ]
 }
 

@@ -82,7 +82,7 @@ fuchsia_test_package("netdev-rust-client-tests") {
     ":tun-test-component",
     ":netdev-rust-client-unittest-component",
   ]
-  deps = [ "//src/connectivity/network/tun/network-tun:component-v2" ]
+  deps = [ "//src/connectivity/network/tun/network-tun:component" ]
 }
 
 group("tests") {

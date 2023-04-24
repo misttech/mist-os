@@ -55,7 +55,7 @@ fuchsia_unittest_component("cpp-test-component") {
 
 fuchsia_test_package("netdev-cpp-client-tests") {
   test_components = [ ":cpp-test-component" ]
-  deps = [ "//src/connectivity/network/tun/network-tun:component-v2" ]
+  deps = [ "//src/connectivity/network/tun/network-tun:component" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

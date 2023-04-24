@@ -56,7 +56,7 @@ foreach(test, filter_tests) {
 }
 
 _common_test_package_deps = [
-  # netemul-sandbox-v2 is used to create hermetic test realms.
+  # netemul-sandbox is used to create hermetic test realms.
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
   # netstack is under test.
