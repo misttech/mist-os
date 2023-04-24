@@ -40,6 +40,31 @@ pub fn merge(
     if files.is_empty() {
         return Err(Error::invalid_args(format!("no files provided")));
     }
+
+    let json_str = if files.iter().all(|f| f.to_str().unwrap().ends_with(".cml")) {
+        let mut document = util::read_cml(&files.pop().unwrap())?;
+        for file in &files {
+            let mut include_document = util::read_cml(&file)?;
+            document.merge_from(&mut include_document, &file)?;
+        }
+        serde_json::to_string_pretty(&document)?
+    } else {
+        // Perform a simple JSON merge algorithm for .cmx files.
+        // TODO(fxbug.dev/102390): Delete once appmgr is gone.
+        let mut res = json!({});
+        for filename in &files {
+            let v: Value = json_or_json5_from_file(filename)?;
+            merge_json(&mut res, &v).map_err(|e| {
+                Error::parse(
+                    format!("Multiple manifests set the same key: {}", e),
+                    None,
+                    Some(filename.as_path()),
+                )
+            })?;
+        }
+        serde_json::to_string_pretty(&res)?
+    };
+
     let mut res = json!({});
     for filename in &files {
         let v: Value = json_or_json5_from_file(filename)?;
@@ -58,7 +83,7 @@ pub fn merge(
             .truncate(true)
             .write(true)
             .open(output_path)?
-            .write_all(format!("{:#}", res).as_bytes())?;
+            .write_all(json_str.as_bytes())?;
     } else {
         println!("{:#}", res);
     }
@@ -221,6 +246,38 @@ mod tests {
         let mut buffer = String::new();
         File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
         let expected_json = json!({"foo": 1, "bar": 2});
+        assert_eq!(buffer, format!("{:#}", expected_json));
+    }
+
+    #[test]
+    fn test_merge_cml() {
+        let tmp_dir = TempDir::new().unwrap();
+
+        let input = vec![
+            (tmp_dir.path().join("1.cml"), "{use: [{ protocol: [\"bar\"]}]}"),
+            (tmp_dir.path().join("2.cml"), "{use: [{ protocol: [\"foo\", \"bar\"]}]}"),
+        ];
+        let mut filenames = vec![];
+        for (fname, contents) in &input {
+            File::create(fname).unwrap().write_all(contents.as_bytes()).unwrap();
+            filenames.push(fname.clone());
+        }
+
+        let output_file_path = tmp_dir.path().join("output.json");
+        merge(filenames, Some(output_file_path.clone()), None, None).expect("failed to merge");
+
+        let mut buffer = String::new();
+        File::open(&output_file_path).unwrap().read_to_string(&mut buffer).unwrap();
+        let expected_json = json!({
+            "use": [
+                {
+                    "protocol": "foo"
+                },
+                {
+                    "protocol": "bar"
+                }
+            ]
+        });
         assert_eq!(buffer, format!("{:#}", expected_json));
     }
 

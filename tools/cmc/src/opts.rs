@@ -20,7 +20,7 @@ pub struct Opt {
 #[derive(StructOpt, Debug)]
 pub enum Commands {
     #[structopt(name = "validate")]
-    /// validate that one or more cmx files are valid
+    /// validate that one or more cml files are valid
     Validate {
         #[structopt(name = "FILE", parse(from_os_str))]
         /// files to process
@@ -77,7 +77,7 @@ pub enum Commands {
     },
 
     #[structopt(name = "merge")]
-    /// merge the listed cmx files
+    /// merge the listed cml or cmx files
     Merge {
         #[structopt(name = "FILE", parse(from_os_str))]
         /// files to process

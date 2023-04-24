@@ -135,7 +135,7 @@ template("fshost_integration_test") {
         binary = "bin/${_test_bin}"
       }
     }
-    outputs = [ "${target_out_dir}/${_shard_target}.json" ]
+    outputs = [ "${target_out_dir}/${_shard_target}.cml" ]
     output_conversion = "json"
     visibility = [ ":*" ]
   }

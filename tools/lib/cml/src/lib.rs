@@ -1161,17 +1161,13 @@ impl Document {
             }
         }
 
-        for (key, value) in other_program.info.iter() {
-            if let Some(_) = my_program.info.insert(key.clone(), value.clone()) {
-                return Err(Error::validate(format!(
-                    "manifest include had a conflicting `program.{}`: {}",
-                    key,
-                    include_path.display()
-                )));
-            }
-        }
-
-        Ok(())
+        Self::merge_maps_with_options(
+            &mut my_program.info,
+            &other_program.info,
+            "program",
+            include_path,
+            Some(vec!["environ"]),
+        )
     }
 
     fn merge_maps<'s, Source, Dest>(
@@ -1179,6 +1175,24 @@ impl Document {
         include_map: Source,
         outer_key: &str,
         include_path: &path::Path,
+    ) -> Result<(), Error>
+    where
+        Source: IntoIterator<Item = (&'s String, &'s Value)>,
+        Dest: ValueMap,
+    {
+        Self::merge_maps_with_options(self_map, include_map, outer_key, include_path, None)
+    }
+
+    /// If `allow_array_concatenation_keys` is None, all arrays present in both
+    /// `self_map` and `include_map` will be concatenated in the result. If it
+    /// is set to Some(vec), only those keys specified will allow concatenation,
+    /// with any others returning an error.
+    fn merge_maps_with_options<'s, Source, Dest>(
+        self_map: &mut Dest,
+        include_map: Source,
+        outer_key: &str,
+        include_path: &path::Path,
+        allow_array_concatenation_keys: Option<Vec<&str>>,
     ) -> Result<(), Error>
     where
         Source: IntoIterator<Item = (&'s String, &'s Value)>,
@@ -1215,8 +1229,21 @@ impl Document {
                     }
                 },
                 Some(Value::Array(self_nested_vec)) => match value {
-                    // The include value is an array and can be merged
+                    // The include value is an array and can be merged, unless
+                    // `allow_array_concatenation_keys` is used and the key is not included.
                     Value::Array(include_nested_vec) => {
+                        if let Some(allowed_keys) = &allow_array_concatenation_keys {
+                            if !allowed_keys.contains(&key.as_str()) {
+                                // This key wasn't present in `allow_array_concatenation_keys` and so
+                                // merging is disallowed.
+                                return Err(Error::validate(format!(
+                                    "manifest include had a conflicting `{}.{}`: {}",
+                                    outer_key,
+                                    key,
+                                    include_path.display()
+                                )));
+                            }
+                        }
                         let mut new_values = include_nested_vec.clone();
                         self_nested_vec.append(&mut new_values);
                     }
@@ -1491,7 +1518,7 @@ pub struct Environment {
 
     /// The number of milliseconds to wait, after notifying a component in this environment that it
     /// should terminate, before forcibly killing it.
-    #[serde(rename(deserialize = "__stop_timeout_ms"))]
+    #[serde(rename = "__stop_timeout_ms")]
     #[reference_doc(json_type = "number")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_timeout_ms: Option<StopTimeoutMs>,
@@ -3577,6 +3604,16 @@ mod tests {
         some.merge_from(&mut other, &Path::new("some/path")).unwrap();
         let expected =
             document(json!({ "program": { "binary": "bin/hello_world", "runner": "elf" } }));
+        assert_eq!(some.program, expected.program);
+    }
+
+    #[test]
+    fn test_merge_from_program_overlapping_environ() {
+        // It's ok to merge `program.environ` by concatenating the arrays together.
+        let mut some = document(json!({ "program": { "environ": ["1"] } }));
+        let mut other = document(json!({ "program": { "environ": ["2"] } }));
+        some.merge_from(&mut other, &Path::new("some/path")).unwrap();
+        let expected = document(json!({ "program": { "environ": ["1", "2"] } }));
         assert_eq!(some.program, expected.program);
     }
 
