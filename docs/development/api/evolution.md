@@ -22,15 +22,22 @@ The following sections explain how to manage this lifecycle as an API developer.
 
 Always annotate new FIDL APIs with an
 [@available](/docs/reference/fidl/language/versioning.md)
-attribute. Unstable APIs should be added at the HEAD API level. For example:
+attribute. Unstable APIs should be added at the `HEAD`
+API level. Note that partners using the SDK cannot target
+the `HEAD` API level, by design.
+
+For example:
 
 ```fidl
 @available(added=HEAD)
 library fuchsia.examples.docs;
 ```
 
-Stable APIs should be added at the
+Stable APIs should be `added` at the
 [in-development API level](/build/config/fuchsia/platform_version.json).
+This means that starting at the current in-development API
+level, this API is available and will not change without
+the appropriate deprecation flows.
 For example:
 
 ```fidl
