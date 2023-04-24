@@ -360,7 +360,12 @@ pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new_with_permanent_entries(kernel, BpfFs);
-        fs.set_root(BpfFsDir);
+        let node = FsNode::new_root(BpfFsDir);
+        {
+            let mut info = node.info_write();
+            info.mode |= FileMode::ISVTX;
+        }
+        fs.set_root_node(node);
         Ok(fs)
     }
 }
@@ -410,7 +415,7 @@ impl FsNodeOps for BpfFsDir {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        Ok(node.fs().create_node(BpfFsDir, mode, owner))
+        Ok(node.fs().create_node(BpfFsDir, mode | FileMode::ISVTX, owner))
     }
 
     fn mknod(
