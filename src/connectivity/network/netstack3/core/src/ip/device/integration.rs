@@ -295,7 +295,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ip
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
-        _remote: SpecifiedAddr<Ipv4Addr>,
+        _remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<SpecifiedAddr<Ipv4Addr>> {
         device::IpDeviceStateContext::<Ipv4, _>::with_ip_device_addresses(
             self,
@@ -360,7 +360,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ip
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
-        remote: SpecifiedAddr<Ipv6Addr>,
+        remote: Option<SpecifiedAddr<Ipv6Addr>>,
     ) -> Option<SpecifiedAddr<Ipv6Addr>> {
         device::IpDeviceStateContext::<Ipv6, _>::with_ip_device_addresses(
             self,
@@ -727,7 +727,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> RsContext<C
             device_id,
             |addrs| {
                 crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
-                    dst_ip,
+                    Some(dst_ip),
                     device_id,
                     addrs.iter().map(move |a| (a, device_id.clone())),
                 )

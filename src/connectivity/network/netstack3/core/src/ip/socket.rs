@@ -622,7 +622,7 @@ pub(crate) mod ipv6_source_address_selection {
         Instant: 'a,
         I: Iterator<Item = (&'a Ipv6AddressEntry<Instant>, D)>,
     >(
-        remote_ip: SpecifiedAddr<Ipv6Addr>,
+        remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         outbound_device: &D,
         addresses: I,
     ) -> Option<UnicastAddr<Ipv6Addr>> {
@@ -649,7 +649,7 @@ pub(crate) mod ipv6_source_address_selection {
 
     /// Comparison operator used by `select_ipv6_source_address`.
     fn select_ipv6_source_address_cmp<Instant, D: PartialEq>(
-        remote_ip: SpecifiedAddr<Ipv6Addr>,
+        remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         outbound_device: &D,
         a: &Ipv6AddressEntry<Instant>,
         a_device: &D,
@@ -664,7 +664,9 @@ pub(crate) mod ipv6_source_address_selection {
         // Assertions required in order for this implementation to be valid.
 
         // Required by the implementation of Rule 1.
-        debug_assert!(!(a_addr == remote_ip && b_addr == remote_ip));
+        if let Some(remote_ip) = remote_ip {
+            debug_assert!(!(a_addr == remote_ip && b_addr == remote_ip));
+        }
 
         // Tentative addresses are not valid source addresses since they are
         // not considered assigned.
@@ -679,10 +681,14 @@ pub(crate) mod ipv6_source_address_selection {
 
     // Assumes that `a` and `b` are not both equal to `remote_ip`.
     fn rule_1(
-        remote_ip: SpecifiedAddr<Ipv6Addr>,
+        remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         a: SpecifiedAddr<Ipv6Addr>,
         b: SpecifiedAddr<Ipv6Addr>,
     ) -> Ordering {
+        let remote_ip = match remote_ip {
+            Some(remote_ip) => remote_ip,
+            None => return Ordering::Equal,
+        };
         if (a == remote_ip) != (b == remote_ip) {
             // Rule 1: Prefer same address.
             //
@@ -727,10 +733,14 @@ pub(crate) mod ipv6_source_address_selection {
     }
 
     fn rule_8<Instant>(
-        remote_ip: SpecifiedAddr<Ipv6Addr>,
+        remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         a: &Ipv6AddressEntry<Instant>,
         b: &Ipv6AddressEntry<Instant>,
     ) -> Ordering {
+        let remote_ip = match remote_ip {
+            Some(remote_ip) => remote_ip,
+            None => return Ordering::Equal,
+        };
         // Per RFC 6724 Section 2.2:
         //
         //   We define the common prefix length CommonPrefixLen(S, D) of a
@@ -766,6 +776,7 @@ pub(crate) mod ipv6_source_address_selection {
 
     #[cfg(test)]
     mod tests {
+        use net_declare::net_ip_v6;
         use net_types::ip::AddrSubnet;
 
         use super::*;
@@ -776,26 +787,18 @@ pub(crate) mod ipv6_source_address_selection {
             // Test the comparison operator used by `select_ipv6_source_address`
             // by separately testing each comparison condition.
 
-            let remote = SpecifiedAddr::new(Ipv6Addr::from_bytes([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 1,
-            ]))
-            .unwrap();
-            let local0 = SpecifiedAddr::new(Ipv6Addr::from_bytes([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 2,
-            ]))
-            .unwrap();
-            let local1 = SpecifiedAddr::new(Ipv6Addr::from_bytes([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 3,
-            ]))
-            .unwrap();
+            let remote = SpecifiedAddr::new(net_ip_v6!("2001:0db8:1::")).unwrap();
+            let local0 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:2::")).unwrap();
+            let local1 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:3::")).unwrap();
             let dev0 = &0;
             let dev1 = &1;
             let dev2 = &2;
 
             // Rule 1: Prefer same address
-            assert_eq!(rule_1(remote, remote, local0), Ordering::Greater);
-            assert_eq!(rule_1(remote, local0, remote), Ordering::Less);
-            assert_eq!(rule_1(remote, local0, local1), Ordering::Equal);
+            assert_eq!(rule_1(Some(remote), remote, local0), Ordering::Greater);
+            assert_eq!(rule_1(Some(remote), local0, remote), Ordering::Less);
+            assert_eq!(rule_1(Some(remote), local0, local1), Ordering::Equal);
+            assert_eq!(rule_1(None, local0, local1), Ordering::Equal);
 
             // Rule 3: Avoid deprecated states
             assert_eq!(rule_3(false, true), Ordering::Greater);
@@ -811,9 +814,9 @@ pub(crate) mod ipv6_source_address_selection {
 
             // Rule 8: Use longest matching prefix.
             {
-                let new_addr_entry = |bytes, prefix_len| {
+                let new_addr_entry = |addr, prefix_len| {
                     Ipv6AddressEntry::<()>::new(
-                        AddrSubnet::new(Ipv6Addr::from_bytes(bytes), prefix_len).unwrap(),
+                        AddrSubnet::new(addr, prefix_len).unwrap(),
                         Ipv6DadState::Assigned,
                         AddrConfig::Manual,
                     )
@@ -824,32 +827,31 @@ pub(crate) mod ipv6_source_address_selection {
                 // the subnet prefix length.
 
                 // 4 leading 0x01 bytes.
-                let remote = SpecifiedAddr::new(Ipv6Addr::from_bytes([
-                    1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ]))
-                .unwrap();
+                let remote = SpecifiedAddr::new(net_ip_v6!("1111::")).unwrap();
                 // 3 leading 0x01 bytes.
-                let local0 = new_addr_entry([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 64);
+                let local0 = new_addr_entry(net_ip_v6!("1110::"), 64);
                 // 2 leading 0x01 bytes.
-                let local1 = new_addr_entry([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 64);
+                let local1 = new_addr_entry(net_ip_v6!("1100::"), 64);
 
-                assert_eq!(rule_8(remote, &local0, &local1), Ordering::Greater);
-                assert_eq!(rule_8(remote, &local1, &local0), Ordering::Less);
-                assert_eq!(rule_8(remote, &local0, &local0), Ordering::Equal);
-                assert_eq!(rule_8(remote, &local1, &local1), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), &local0, &local1), Ordering::Greater);
+                assert_eq!(rule_8(Some(remote), &local1, &local0), Ordering::Less);
+                assert_eq!(rule_8(Some(remote), &local0, &local0), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), &local1, &local1), Ordering::Equal);
+                assert_eq!(rule_8(None, &local0, &local1), Ordering::Equal);
 
                 // Second, test that the common prefix length is capped at the
                 // subnet prefix length.
 
                 // 3 leading 0x01 bytes, but a subnet prefix length of 8 (1 byte).
-                let local0 = new_addr_entry([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8);
+                let local0 = new_addr_entry(net_ip_v6!("1110::"), 8);
                 // 2 leading 0x01 bytes, but a subnet prefix length of 8 (1 byte).
-                let local1 = new_addr_entry([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8);
+                let local1 = new_addr_entry(net_ip_v6!("1100::"), 8);
 
-                assert_eq!(rule_8(remote, &local0, &local1), Ordering::Equal);
-                assert_eq!(rule_8(remote, &local1, &local0), Ordering::Equal);
-                assert_eq!(rule_8(remote, &local0, &local0), Ordering::Equal);
-                assert_eq!(rule_8(remote, &local1, &local1), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), &local0, &local1), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), &local1, &local0), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), &local0, &local0), Ordering::Equal);
+                assert_eq!(rule_8(Some(remote), &local1, &local1), Ordering::Equal);
+                assert_eq!(rule_8(None, &local0, &local1), Ordering::Equal);
             }
 
             {
@@ -864,7 +866,7 @@ pub(crate) mod ipv6_source_address_selection {
                 // If no rules apply, then the two address entries are equal.
                 assert_eq!(
                     select_ipv6_source_address_cmp(
-                        remote,
+                        Some(remote),
                         dev0,
                         &new_addr_entry(*local0),
                         dev1,
@@ -874,6 +876,54 @@ pub(crate) mod ipv6_source_address_selection {
                     Ordering::Equal
                 );
             }
+        }
+
+        #[test]
+        fn test_select_ipv6_source_address_no_remote() {
+            // Verify that source address selection correctly applies all
+            // applicable rules when the remote is `None`.
+            let dev0 = &0;
+            let dev1 = &1;
+            let dev2 = &2;
+
+            let local0 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:2::")).unwrap();
+            let local1 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:3::")).unwrap();
+
+            let new_addr_entry = |addr, deprecated| {
+                let mut entry = Ipv6AddressEntry::<()>::new(
+                    AddrSubnet::new(addr, 128).unwrap(),
+                    Ipv6DadState::Assigned,
+                    AddrConfig::Manual,
+                );
+                entry.deprecated = deprecated;
+                entry
+            };
+
+            // Verify that Rule 3 still applies (avoid deprecated states).
+            assert_eq!(
+                select_ipv6_source_address_cmp(
+                    None,
+                    dev0,
+                    &new_addr_entry(*local0, false),
+                    dev1,
+                    &new_addr_entry(*local1, true),
+                    dev2,
+                ),
+                Ordering::Greater
+            );
+
+            // Verify that Rule 5 still applies (Prefer outgoing interface).
+            assert_eq!(
+                select_ipv6_source_address_cmp(
+                    None,
+                    dev0,
+                    &new_addr_entry(*local0, false),
+                    dev0,
+                    &new_addr_entry(*local1, false),
+                    dev1
+                ),
+                Ordering::Greater
+            );
         }
     }
 }

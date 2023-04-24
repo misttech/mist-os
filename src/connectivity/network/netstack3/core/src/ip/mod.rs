@@ -544,7 +544,7 @@ pub(crate) trait IpDeviceStateContext<I: Ip, C>: DeviceIdContext<AnyDevice> {
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
-        remote: SpecifiedAddr<I::Addr>,
+        remote: Option<SpecifiedAddr<I::Addr>>,
     ) -> Option<SpecifiedAddr<I::Addr>>;
 
     /// Returns the hop limit.
@@ -674,7 +674,7 @@ fn get_local_addr<
     sync_ctx: &mut SC,
     local_ip: Option<SpecifiedAddr<I::Addr>>,
     device: &SC::DeviceId,
-    remote_addr: SpecifiedAddr<I::Addr>,
+    remote_addr: Option<SpecifiedAddr<I::Addr>>,
 ) -> Result<SpecifiedAddr<I::Addr>, IpSockRouteError> {
     if let Some(local_ip) = local_ip {
         is_local_assigned_address(sync_ctx, device, local_ip)
@@ -759,7 +759,7 @@ impl<
                         None => addr,
                     },
                     LocalDelivery::StrongForDevice(device) => {
-                        get_local_addr(self, local_ip, device, addr)?
+                        get_local_addr(self, local_ip, device, Some(addr))?
                     }
                 };
                 Ok(IpSockRoute {
@@ -774,7 +774,7 @@ impl<
                 .with_ip_routing_table(|sync_ctx, table| {
                     let mut matching_with_addr =
                         table.lookup_filter_map(sync_ctx, device, *addr, |sync_ctx, d| {
-                            Some(get_local_addr(sync_ctx, local_ip, d, addr))
+                            Some(get_local_addr(sync_ctx, local_ip, d, Some(addr)))
                         });
 
                     let first_error = match matching_with_addr.next() {

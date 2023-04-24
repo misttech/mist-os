@@ -229,7 +229,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         let src_ip = crate::ip::IpDeviceStateContext::<Ipv6, _>::get_local_addr_for_remote(
             self,
             &device_id.clone().into(),
-            dst_ip,
+            Some(dst_ip),
         );
         let src_ip = match src_ip {
             Some(s) => s,
