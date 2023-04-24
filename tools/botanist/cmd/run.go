@@ -191,7 +191,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 			if r.ffxExperimentLevel == 4 {
 				csoValue = "only"
 			}
-			if err := ffx.Run(ctx, "config", "set", "overnet.cso", csoValue); err != nil {
+			if err := ffx.Run(ctx, "config", "set", "overnet.cso", csoValue, "-l", "global"); err != nil {
 				return cleanup, err
 			}
 		}
