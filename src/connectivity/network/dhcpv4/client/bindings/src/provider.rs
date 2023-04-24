@@ -151,6 +151,11 @@ pub(crate) async fn serve_client_provider(
                         });
                     Ok(())
                 }
+                ClientProviderRequest::CheckPresence { responder } => {
+                    // This is a no-op method, so ignore any errors.
+                    let _: Result<(), fidl::Error> = responder.send();
+                    Ok(())
+                }
             }
         })
         .await

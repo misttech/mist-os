@@ -662,10 +662,15 @@ impl<'a> NetCfg<'a> {
         let dhcp_server = optional_svc_connect::<fnet_dhcp::Server_Marker>(&svc_dir)
             .await
             .context("could not connect to DHCP Server")?;
-        let dhcpv4_client_provider =
-            optional_svc_connect::<fnet_dhcp::ClientProviderMarker>(&svc_dir)
+        let dhcpv4_client_provider = {
+            let provider = optional_svc_connect::<fnet_dhcp::ClientProviderMarker>(&svc_dir)
                 .await
                 .context("could not connect to DHCPv4 client provider")?;
+            match provider {
+                Some(provider) => dhcpv4::probe_for_presence(&provider).await.then_some(provider),
+                None => None,
+            }
+        };
         let dhcpv6_client_provider = if enable_dhcpv6 {
             let dhcpv6_client_provider = svc_connect::<fnet_dhcpv6::ClientProviderMarker>(&svc_dir)
                 .await
@@ -3165,6 +3170,9 @@ mod tests {
                     assert_eq!(params, dhcpv4::NEW_CLIENT_PARAMS,);
                     request.into_stream().expect("error converting client server end to stream")
                 }
+                fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
+                    unreachable!("only called at startup")
+                }
             };
 
             let responder = expect_watch_dhcpv4_configuration(&mut client_req_stream);
@@ -3399,6 +3407,9 @@ mod tests {
                 assert_eq!(interface_id, INTERFACE_ID);
                 assert_eq!(params, dhcpv4::NEW_CLIENT_PARAMS,);
                 request.into_stream().expect("error converting client server end to stream")
+            }
+            fnet_dhcp::ClientProviderRequest::CheckPresence { responder: _ } => {
+                unreachable!("only called at startup")
             }
         };
 

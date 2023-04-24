@@ -47,6 +47,14 @@ pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<u64, Configuration
 pub(super) type ConfigurationStream =
     HangingGetStream<fnet_dhcp::ClientProxy, fnet_dhcp::ClientWatchConfigurationResponse>;
 
+pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy) -> bool {
+    match provider.check_presence().await {
+        Ok(()) => true,
+        Err(fidl::Error::ClientChannelClosed { status: _, protocol_name: _ }) => false,
+        Err(e) => panic!("unexpected error while probing: {e}"),
+    }
+}
+
 pub(super) async fn update_configuration(
     interface_id: u64,
     ClientState { client: _, routers: configured_routers }: &mut ClientState,
