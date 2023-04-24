@@ -223,18 +223,6 @@ def reclient_canonical_working_dir(build_subdir: Path) -> Path:
     return Path(*new_components) if new_components else Path('')
 
 
-def remove_working_dir_abspaths(line: str, build_subdir: Path) -> str:
-    # Two substutions are necesssary to accommodate both cases
-    # of rewrapper --canonicalize_working_dir={true,false}.
-    # TODO: if the caller knows whether which case applies, then
-    # you only need to apply one of the following substitutions.
-    local_working_dir_abs = _REMOTE_PROJECT_ROOT / build_subdir
-    canonical_working_dir = _REMOTE_PROJECT_ROOT / reclient_canonical_working_dir(
-        build_subdir)
-    return line.replace(str(local_working_dir_abs) + os.path.sep, '').replace(
-        str(canonical_working_dir) + os.path.sep, '')
-
-
 def _file_lines_matching(path: Path, substr: str) -> Iterable[str]:
     with open(path) as f:
         for line in f:
@@ -245,7 +233,7 @@ def _file_lines_matching(path: Path, substr: str) -> Iterable[str]:
 def _transform_file_by_lines(
         src: Path, dest: Path, line_transform: Callable[[str], str]):
     with open(src) as f:
-        new_lines = [line_transform(line) for line in f]
+        new_lines = [line_transform(line.rstrip('\n')) for line in f]
 
     _write_lines_to_file(dest, new_lines)
 
@@ -256,12 +244,12 @@ def _rewrite_file_by_lines_in_place(
 
 
 def remove_working_dir_abspaths_from_depfile_in_place(
-        depfile: Path, build_subdir: Path):
+        depfile: Path, working_dir_abs: Path):
     # TODO(http://fxbug.dev/124714): This transformation would be more robust
     # if we properly lexed a depfile and operated on tokens instead of lines.
     _rewrite_file_by_lines_in_place(
         depfile,
-        lambda line: remove_working_dir_abspaths(line, build_subdir),
+        lambda line: line.replace(str(working_dir_abs) + os.path.sep, ''),
     )
 
 
@@ -532,6 +520,7 @@ class RemoteAction(object):
         fsatrace_path: Optional[Path] = None,
         diagnose_nonzero: bool = False,
         check_determinism: bool = False,
+        post_remote_run_success_action: Callable[[], int] = None,
     ):
         """RemoteAction constructor.
 
@@ -585,6 +574,7 @@ class RemoteAction(object):
         self._remote_disable = disable
         self._check_determinism = check_determinism
         self._options = (options or [])
+        self._post_remote_run_success_action = post_remote_run_success_action
 
         # Detect some known rewrapper options
         self._rewrapper_known_options, _ = _REWRAPPER_ARG_PARSER.parse_known_args(
@@ -609,7 +599,7 @@ class RemoteAction(object):
         self._fsatrace_path = fsatrace_path  # relative to working dir
         if self._fsatrace_path:
             self._inputs.extend([self._fsatrace_path, self._fsatrace_so])
-            self._output_files.append(self._fsatrace_remote_log)
+            self._output_files.append(self._fsatrace_remote_trace)
 
         self._cleanup_files = []
 
@@ -648,11 +638,11 @@ class RemoteAction(object):
         return self.exec_root_rel / _REMOTE_LOG_SCRIPT
 
     @property
-    def _fsatrace_local_log(self) -> Path:
+    def _fsatrace_local_trace(self) -> Path:
         return Path(self._default_auxiliary_file_basename + '.local-fsatrace')
 
     @property
-    def _fsatrace_remote_log(self) -> Path:
+    def _fsatrace_remote_trace(self) -> Path:
         return Path(self._default_auxiliary_file_basename + '.remote-fsatrace')
 
     @property
@@ -702,8 +692,12 @@ class RemoteAction(object):
         return self._save_temps
 
     @property
-    def working_dir(self) -> Path:
+    def working_dir(self) -> Path:  # absolute
         return self._working_dir
+
+    @property
+    def remote_working_dir(self) -> Path:  # absolute
+        return _REMOTE_PROJECT_ROOT / self.remote_build_subdir
 
     @property
     def remote_disable(self) -> bool:
@@ -730,7 +724,7 @@ class RemoteAction(object):
         return cl_utils.relpath(self.exec_root, start=self.working_dir)
 
     @property
-    def build_subdir(self) -> Path:
+    def build_subdir(self) -> Path:  # relative
         """This is the relative path from the exec_root to the current working dir.
 
         Note that this intentionally uses Path.relative_to(), which requires
@@ -740,6 +734,12 @@ class RemoteAction(object):
           ValueError if self.exec_root is not a parent of self.working_dir.
         """
         return self.working_dir.relative_to(self.exec_root)
+
+    @property
+    def remote_build_subdir(self) -> Path:  # relative
+        if self.canonicalize_working_dir:
+            return reclient_canonical_working_dir(self.build_subdir)
+        return self.build_subdir
 
     @property
     def inputs_relative_to_working_dir(self) -> Sequence[Path]:
@@ -841,7 +841,8 @@ class RemoteAction(object):
         # likely to be interested in fsatrace entries attributed
         # to the logging wrapper.
         if self._fsatrace_path:
-            yield from self._fsatrace_command_prefix(self._fsatrace_remote_log)
+            yield from self._fsatrace_command_prefix(
+                self._fsatrace_remote_trace)
 
         yield from self.local_command
 
@@ -872,16 +873,18 @@ class RemoteAction(object):
             yield from self._generate_check_determinism_prefix()
 
         if self._fsatrace_path:
-            yield from self._fsatrace_command_prefix(self._fsatrace_local_log)
+            yield from self._fsatrace_command_prefix(self._fsatrace_local_trace)
 
         yield from self.local_command
 
-    def _generate_launch_command(self) -> Iterable[str]:
+    @property
+    def local_launch_command(self) -> Sequence[str]:
+        return list(self._generate_local_launch_command())
+
+    @property
+    def remote_launch_command(self) -> Sequence[str]:
         """Generates the rewrapper command, one token at a time."""
-        if not self._remote_disable:
-            yield from self._generate_remote_launch_command()
-        else:
-            yield from self._generate_local_launch_command()
+        return list(self._generate_remote_launch_command())
 
     @property
     def launch_command(self) -> Sequence[str]:
@@ -891,7 +894,9 @@ class RemoteAction(object):
         the original command.
         In remote disabled mode, this is just the original command.
         """
-        return list(self._generate_launch_command())
+        if self.remote_disable:
+            return self.local_launch_command
+        return self.remote_launch_command
 
     def _make_download_stubs(self):
         make_download_stubs(
@@ -946,7 +951,14 @@ class RemoteAction(object):
                 #   contents takes time.
                 if not self.download_outputs:
                     self._make_download_stubs()
+
+                if not self.remote_disable and self._post_remote_run_success_action:
+                    post_run_status = self._post_remote_run_success_action()
+                    if post_run_status != 0:
+                        return post_run_status
+
                 return result.returncode
+
             if not self.diagnose_nonzero:
                 return result.returncode
 
@@ -1020,23 +1032,42 @@ class RemoteAction(object):
                         str(self.working_dir) + os.path.sep, ''),
                 )
 
-    def _compare_fsatraces(self) -> int:
+    def local_fsatrace_transform(self, line: str) -> str:
+        return line.replace(str(self.exec_root) + os.path.sep, '').replace(
+            str(self.build_subdir), '${build_subdir}')
+
+    def remote_fsatrace_transform(self, line: str) -> str:
+        return line.replace(str(_REMOTE_PROJECT_ROOT) + os.path.sep,
+                            '').replace(
+                                str(self.remote_build_subdir),
+                                '${build_subdir}')
+
+    def _compare_fsatraces_select_logs(
+        self,
+        local_trace: Path,
+        remote_trace: Path,
+    ) -> int:
         msg("Comparing local (-) vs. remote (+) file access traces.")
         # Normalize absolute paths.
-        local_norm = Path(str(self._fsatrace_local_log) + '.norm')
-        remote_norm = Path(str(self._fsatrace_remote_log) + '.norm')
+        local_norm = Path(str(local_trace) + '.norm')
+        remote_norm = Path(str(remote_trace) + '.norm')
         _transform_file_by_lines(
-            self._fsatrace_local_log,
+            local_trace,
             local_norm,
-            lambda line: line.replace(str(self.exec_root) + os.path.sep, ''),
+            lambda line: self.local_fsatrace_transform(line),
         )
         _transform_file_by_lines(
-            self._fsatrace_remote_log,
+            remote_trace,
             remote_norm,
-            lambda line: line.replace(
-                str(_REMOTE_PROJECT_ROOT) + os.path.sep, ''),
+            lambda line: self.remote_fsatrace_transform(line),
         )
         return _text_diff(local_norm, remote_norm)
+
+    def _compare_fsatraces(self) -> int:
+        return self._compare_fsatraces_select_logs(
+            local_trace=self._fsatrace_local_trace,
+            remote_trace=self._fsatrace_remote_trace,
+        )
 
     def _run_locally(self) -> int:
         # Run the job locally.

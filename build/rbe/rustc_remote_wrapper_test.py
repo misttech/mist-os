@@ -651,6 +651,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
 
         self.assertEqual(prepare_status, 0)  # success
         a = r.remote_action
+        self.assertIsNotNone(a._post_remote_run_success_action)
         remote_inputs = set(a.inputs_relative_to_working_dir)
         remote_output_files = set(a.output_files_relative_to_working_dir)
         self.assertEqual(
@@ -660,8 +661,8 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         run_mocks = [
             mock.patch.object(
                 remote_action.RemoteAction,
-                'run_with_main_args',
-                return_value=0),
+                '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(0)),
             mock.patch.object(
                 rustc_remote_wrapper.RustRemoteAction,
                 '_depfile_exists',

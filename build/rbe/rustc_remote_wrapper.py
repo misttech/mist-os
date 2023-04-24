@@ -591,6 +591,7 @@ class RustRemoteAction(object):
             output_dirs=remote_output_dirs,
             working_dir=self.working_dir,
             exec_root=self.exec_root,
+            post_remote_run_success_action=self._post_remote_success_action,
         )
         self._prepare_status = 0  # exit code success
         return self._prepare_status
@@ -703,6 +704,12 @@ class RustRemoteAction(object):
         # Defined for easy mocking.
         return self.depfile and self.depfile.exists()
 
+    def _post_remote_success_action(self) -> int:
+        if self._depfile_exists():
+            self._rewrite_depfile()
+        # TODO: if downloads were skipped, need to force-download depfile
+        return 0
+
     def _rewrite_depfile(self):
         """Rewrite depfile without working dir absolute paths.
 
@@ -722,7 +729,7 @@ class RustRemoteAction(object):
         separately.
         """
         remote_action.remove_working_dir_abspaths_from_depfile_in_place(
-            self.depfile, self.remote_action.build_subdir)
+            self.depfile, self.remote_action.remote_working_dir)
 
     def run_remote(self) -> int:
         prepare_status = self.prepare()
@@ -733,8 +740,6 @@ class RustRemoteAction(object):
             return self.remote_action.run_with_main_args(self._main_args)
 
         finally:
-            if self._depfile_exists():
-                self._rewrite_depfile()
             self._cleanup()
 
     def run_local(self) -> int:

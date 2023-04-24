@@ -32,6 +32,11 @@ def _write_file_contents(path: Path, contents: str):
         f.write(contents)
 
 
+def _read_file_contents(path: Path) -> str:
+    with open(path, 'r') as f:
+        return f.read()
+
+
 def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]
 
@@ -96,6 +101,24 @@ class TextDiffTests(unittest.TestCase):
         command = args[0]  # list
         self.assertEqual(command[0], 'diff')
         self.assertEqual(command[-2:], ['file1.txt', 'file2.txt'])
+
+    def test_matches(self):  # no mocking
+        with tempfile.TemporaryDirectory() as td:
+            f1 = Path(td) / 'left.txt'
+            f2 = Path(td) / 'right.txt'
+            contents = 'The quick brown fox\njumped over the lazy\ndogs.\n'
+            _write_file_contents(f1, contents)
+            _write_file_contents(f2, contents)
+            self.assertEqual(remote_action._text_diff(f1, f2), 0)
+
+    def test_not_matches(self):  # no mocking
+        with tempfile.TemporaryDirectory() as td:
+            f1 = Path(td) / 'left.txt'
+            f2 = Path(td) / 'right.txt'
+            contents = 'The quick brown fox\njumped over the lazy\ndogs.\n'
+            _write_file_contents(f1, contents)
+            _write_file_contents(f2, contents.replace('m', 'M'))
+            self.assertEqual(remote_action._text_diff(f1, f2), 1)
 
 
 class FilesUnderDirTests(unittest.TestCase):
@@ -173,6 +196,20 @@ class FileLinesMatchingTests(unittest.TestCase):
             )
 
 
+class TransformFileByLines(unittest.TestCase):
+
+    def test_no_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            f1 = Path(td) / 'in.txt'
+            f2 = Path(td) / 'out.txt'
+            _write_file_contents(
+                f1, 'aa\n\n\nbb\ncc dd\n\ne f \n gh ij\n  k  l  \n')
+            remote_action._transform_file_by_lines(f1, f2, lambda x: x)
+            s1 = _read_file_contents(f1)
+            s2 = _read_file_contents(f2)
+            self.assertEqual(s1, s2)
+
+
 class ReclientCanonicalWorkingDirTests(unittest.TestCase):
 
     def test_empty(self):
@@ -197,37 +234,19 @@ class ReclientCanonicalWorkingDirTests(unittest.TestCase):
 
 class RemoveWorkingDirAbspathsTests(unittest.TestCase):
 
-    def test_blank_no_change(self):
-        for t in ('', '\n'):
+    def test_depfile(self):
+        with tempfile.TemporaryDirectory() as td:
+            depfile = Path(td) / 'dep.d'
+
+            wd = Path('/home/base/out/inside/here')
+            _write_file_contents(
+                depfile, f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n')
+            remote_action.remove_working_dir_abspaths_from_depfile_in_place(
+                depfile, wd)
             self.assertEqual(
-                remote_action.remove_working_dir_abspaths(t, Path('build-out')),
-                t)
-
-    def test_phony_dep_with_local_build_dir(self):
-        self.assertEqual(
-            remote_action.remove_working_dir_abspaths(
-                f'{remote_action._REMOTE_PROJECT_ROOT}/out/foo/path/to/thing.txt:\n',
-                Path('out/foo')),
-            'path/to/thing.txt:\n',
-        )
-
-    def test_phony_dep_with_canonical_build_dir(self):
-        self.assertEqual(
-            remote_action.remove_working_dir_abspaths(
-                f'{remote_action._REMOTE_PROJECT_ROOT}/set_by_reclient/a/path/to/somethingelse.txt:\n',
-                Path('out/foo')),
-            'path/to/somethingelse.txt:\n',
-        )
-
-    def test_typical_dep_line_multiple_occurrences(self):
-        root = remote_action._REMOTE_PROJECT_ROOT
-        subdir = Path('out/inside/here')
-        wd = root / subdir
-        self.assertEqual(
-            remote_action.remove_working_dir_abspaths(
-                f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n', subdir),
-            'obj/foo.o: foo/bar.h baz/quux.h\n',
-        )
+                _read_file_contents(depfile),
+                'obj/foo.o: foo/bar.h baz/quux.h\n',
+            )
 
 
 class ResolvedShlibsFromLddTests(unittest.TestCase):
@@ -636,6 +655,75 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_run.assert_called_once()
         mock_compare.assert_not_called()
+
+    def test_compare_fsatraces_acceptable_match(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build/out/here')
+        working_dir = exec_root / build_dir
+        p = self._make_main_parser()
+        action = remote_action.RemoteAction(
+            rewrapper=Path('/test-build/rewrapper'),
+            command=['sleep', '1h'],
+            options=['--canonicalize_working_dir=true'],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertTrue(action.canonicalize_working_dir)
+        local_trace_contents = f"""r|{exec_root}/src/input.c
+w|{working_dir}/obj/input.o
+"""
+        remote_root = remote_action._REMOTE_PROJECT_ROOT
+        remote_trace_contents = f"""r|{remote_root}/src/input.c
+w|{remote_root}/set_by_reclient/a/a/obj/input.o
+"""
+        self.assertNotEqual(local_trace_contents, remote_trace_contents)
+        with tempfile.TemporaryDirectory() as td:
+            local_trace = Path(td) / 'local.trace'
+            remote_trace = Path(td) / 'remote.trace'
+            _write_file_contents(local_trace, local_trace_contents)
+            _write_file_contents(remote_trace, remote_trace_contents)
+            diff_text = io.StringIO()
+            with contextlib.redirect_stdout(diff_text):
+                exit_code = action._compare_fsatraces_select_logs(
+                    local_trace=local_trace,
+                    remote_trace=remote_trace,
+                )
+        self.assertEqual(exit_code, 0)  # contents are equivalent
+
+    def test_compare_fsatraces_with_difference(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build/out/here')
+        working_dir = exec_root / build_dir
+        p = self._make_main_parser()
+        action = remote_action.RemoteAction(
+            rewrapper=Path('/test-build/rewrapper'),
+            command=['sleep', '1h'],
+            options=['--canonicalize_working_dir=true'],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+        self.assertTrue(action.canonicalize_working_dir)
+        local_trace_contents = f"""r|{exec_root}/src/input.c
+w|{working_dir}/obj/input.o
+"""
+        remote_root = remote_action._REMOTE_PROJECT_ROOT
+        remote_trace_contents = f"""r|{remote_root}/src/input.c
+r|{remote_root}/includes/input.h
+w|{remote_root}/set_by_reclient/a/a/obj/input.o
+"""
+        self.assertNotEqual(local_trace_contents, remote_trace_contents)
+        with tempfile.TemporaryDirectory() as td:
+            local_trace = Path(td) / 'local.trace'
+            remote_trace = Path(td) / 'remote.trace'
+            _write_file_contents(local_trace, local_trace_contents)
+            _write_file_contents(remote_trace, remote_trace_contents)
+            diff_text = io.StringIO()
+            with contextlib.redirect_stdout(diff_text):
+                exit_code = action._compare_fsatraces_select_logs(
+                    local_trace=local_trace,
+                    remote_trace=remote_trace,
+                )
+        self.assertEqual(exit_code, 1)  # traces differ
 
     def test_local_remote_compare_no_diffs_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
@@ -1075,7 +1163,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 self.assertEqual(action.exec_root_rel, Path('../..'))
                 self.assertEqual(action.build_subdir, fake_builddir)
 
-    def test_path_setup_explicit(self):
+    def test_path_setup_explicit_exec_root(self):
         command = ['beep', 'boop']
         fake_root = Path('/home/project')
         fake_builddir = Path('out/not-default')
@@ -1089,6 +1177,50 @@ class RemoteActionConstructionTests(unittest.TestCase):
             self.assertEqual(action.exec_root, fake_root)
             self.assertEqual(action.exec_root_rel, Path('../..'))
             self.assertEqual(action.build_subdir, fake_builddir)
+
+    def test_path_setup_explicit_exec_root_and_working_dir(self):
+        command = ['beep', 'boop']
+        fake_root = Path('/home/project')
+        fake_builddir = Path('out/not-default')
+        fake_cwd = fake_root / fake_builddir
+        action = remote_action.RemoteAction(
+            rewrapper=self._rewrapper,
+            command=command,
+            exec_root=fake_root,
+            working_dir=fake_cwd,
+        )
+        self.assertEqual(action.exec_root, fake_root)
+        self.assertEqual(action.exec_root_rel, Path('../..'))
+        self.assertEqual(action.build_subdir, fake_builddir)
+        self.assertEqual(action.working_dir, fake_cwd)
+        self.assertFalse(action.canonicalize_working_dir)
+        self.assertEqual(action.remote_build_subdir, fake_builddir)
+        self.assertEqual(
+            action.remote_working_dir,
+            remote_action._REMOTE_PROJECT_ROOT / fake_builddir)
+
+    def test_path_setup_explicit_canonicalize_working_dir(self):
+        command = ['b33p', 'b00p']
+        fake_root = Path('/home/project')
+        fake_builddir = Path('out/not-default')
+        fake_cwd = fake_root / fake_builddir
+        action = remote_action.RemoteAction(
+            rewrapper=self._rewrapper,
+            options=['--canonicalize_working_dir=true'],
+            command=command,
+            exec_root=fake_root,
+            working_dir=fake_cwd,
+        )
+        self.assertEqual(action.exec_root, fake_root)
+        self.assertEqual(action.exec_root_rel, Path('../..'))
+        self.assertEqual(action.build_subdir, fake_builddir)
+        self.assertEqual(action.working_dir, fake_cwd)
+        self.assertTrue(action.canonicalize_working_dir)
+        remote_builddir = Path('set_by_reclient/a')
+        self.assertEqual(action.remote_build_subdir, remote_builddir)
+        self.assertEqual(
+            action.remote_working_dir,
+            remote_action._REMOTE_PROJECT_ROOT / remote_builddir)
 
     def test_inputs_outputs(self):
         command = ['cat', '../src/meow.txt']
