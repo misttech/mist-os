@@ -86,7 +86,7 @@ pub struct FlashCommand {
 
 impl Into<ManifestParams> for FlashCommand {
     fn into(self) -> ManifestParams {
-        let manifest = self.manifest.or_else(|| self.manifest_path);
+        let manifest = self.manifest.or(self.manifest_path);
         ManifestParams {
             manifest,
             product: self.product,
