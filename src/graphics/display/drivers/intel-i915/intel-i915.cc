@@ -138,7 +138,8 @@ struct FramebufferInfo {
   uint32_t width;
   uint32_t height;
   uint32_t stride;
-  uint32_t format;
+  zx_pixel_format_t format;
+  int bytes_per_pixel;
 };
 
 // The bootloader (UEFI and Depthcharge) informs zircon of the framebuffer information using a
@@ -153,8 +154,8 @@ zx::result<FramebufferInfo> GetFramebufferInfo() {
   if (status != ZX_OK) {
     return zx::error(status);
   }
-
-  info.size = info.stride * info.height * ZX_PIXEL_FORMAT_BYTES(info.format);
+  info.bytes_per_pixel = ZX_PIXEL_FORMAT_BYTES(info.format);
+  info.size = info.stride * info.height * info.bytes_per_pixel;
   return zx::ok(info);
 }
 
@@ -1014,8 +1015,10 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, uint64_
     return static_cast<uint32_t>(length);
   }();
 
-  ZX_DEBUG_ASSERT(length >= width_in_tiles(image->type, image->width, image->pixel_format) *
-                                height_in_tiles(image->type, image->height, image->pixel_format) *
+  const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(format.value().pixel_format);
+
+  ZX_DEBUG_ASSERT(length >= width_in_tiles(image->type, image->width, bytes_per_pixel) *
+                                height_in_tiles(image->type, image->height) *
                                 get_tile_byte_size(image->type));
 
   uint32_t align;
@@ -2182,7 +2185,8 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
         registers::PipeRegs pipe_regs(display->pipe()->pipe_id());
 
         auto plane_stride = pipe_regs.PlaneSurfaceStride(0).ReadFrom(mmio_space());
-        plane_stride.set_stride(width_in_tiles(IMAGE_TYPE_SIMPLE, fb_info.width, fb_info.format));
+        plane_stride.set_stride(
+            width_in_tiles(IMAGE_TYPE_SIMPLE, fb_info.width, fb_info.bytes_per_pixel));
         plane_stride.WriteTo(mmio_space());
 
         auto plane_surface = pipe_regs.PlaneSurface(0).ReadFrom(mmio_space());

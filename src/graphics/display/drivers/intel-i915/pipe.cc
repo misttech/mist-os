@@ -520,8 +520,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     plane_height = primary->src_frame.height;
     stride =
         [&]() {
-          uint64_t stride =
-              region.bytes_per_row() / get_tile_byte_width(image->type, image->pixel_format);
+          uint64_t stride = region.bytes_per_row() / get_tile_byte_width(image->type);
           ZX_DEBUG_ASSERT_MSG(stride <= std::numeric_limits<uint32_t>::max(),
                               "%lu overflows uint32_t", stride);
           return static_cast<uint32_t>(stride);
@@ -529,8 +528,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     x_offset = primary->src_frame.x_pos;
     y_offset = primary->src_frame.y_pos;
   } else {
-    uint32_t tile_height = height_in_tiles(image->type, image->height, image->pixel_format);
-    uint32_t tile_px_height = get_tile_px_height(image->type, image->pixel_format);
+    uint32_t tile_height = height_in_tiles(image->type, image->height);
+    uint32_t tile_px_height = get_tile_px_height(image->type);
     uint32_t total_height = tile_height * tile_px_height;
 
     plane_width = primary->src_frame.height;
