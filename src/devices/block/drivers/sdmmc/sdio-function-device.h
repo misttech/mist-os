@@ -56,6 +56,7 @@ class SdioFunctionDevice : public SdioFunctionDeviceType,
   zx_status_t SdioUnregisterVmo(uint32_t vmo_id, zx::vmo* out_vmo);
   zx_status_t SdioDoRwTxn(const sdio_rw_txn_t* txn);
   void SdioRunDiagnostics();
+  void SdioRequestCardReset(sdio_request_card_reset_callback callback, void* cookie);
 
   // FIDL methods
   void GetDevHwInfo(GetDevHwInfoCompleter::Sync& completer) override;

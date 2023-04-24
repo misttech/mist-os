@@ -172,4 +172,23 @@ protocol Sdio {
     /// call RunDiagnostics in these cases, since doing so could interfere with other clients.
     /// TODO(fxbug.dev/64166): Remove this when the SDIO issues have been investigated.
     RunDiagnostics();
+
+    /// Requests that the core driver hard reset the card and perform the SDIO initialization
+    /// sequence again. The callback will be called after the card has been re-initialized, and in
+    /// the meantime all IO calls from this client will return ZX_ERR_SHOULD_WAIT. If an error
+    /// occurs during initialization then all subsequent IO calls will return ZX_ERR_IO_NOT_PRESENT.
+    /// The only way to recover from this situation would be to call `RequestCardReset()` again.
+    ///
+    /// The SDIO core driver will wait for all clients to call this method before performing the
+    /// reset and re-initialization. After the reset clients will have to perform their own
+    /// initialization steps again, such as calling `EnableFnIntr()` or `UpdateBlockSize()`.
+    ///
+    /// VMO registration methods can always be called regardless of the reset state.
+    ///
+    /// The specific method used to hard reset the card is platform- or board-specific; examples
+    /// include toggling a reset GPIO or power cycling the card.
+    @async
+    RequestCardReset() -> (struct {
+        status zx.Status;
+    });
 };
