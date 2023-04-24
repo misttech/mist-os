@@ -17,6 +17,9 @@ namespace fuzzing {
 // |Cleanse| tries to replace bytes with 0x20 or 0xff.
 static constexpr size_t kNumReplacements = 2;
 
+// |Merge| uses real OOMs.
+static constexpr size_t kSmallOomLimit = 1ULL << 26;  // 64 MB
+
 // Test fixtures.
 
 void RunnerTest::SetUp() {
@@ -67,7 +70,8 @@ Promise<Input> RunnerTest::RunOne(bool has_leak) {
 
 Promise<Input> RunnerTest::RunOne(fit::function<ZxPromise<>(const Input&)> set_feedback) {
   Bridge<> bridge;
-  auto task = GetTestInput()
+  auto task = fpromise::make_promise([]() -> ZxResult<> { return fpromise::ok(); })
+                  .and_then(GetTestInput())
                   .and_then([set_feedback = std::move(set_feedback)](Input& input) mutable {
                     return set_feedback(input).and_then([input = std::move(input)]() mutable {
                       return fpromise::ok(std::move(input));
@@ -91,28 +95,40 @@ Promise<Input> RunnerTest::RunOne(fit::function<ZxPromise<>(const Input&)> set_f
   return consumer ? consumer.promise().and_then(std::move(task)).box() : task.box();
 }
 
-void RunnerTest::RunUntil(Promise<> promise) {
-  RunUntil(
-      std::move(promise),
-      [this](const Result<Input>& result) -> Promise<Input> { return RunOne(); }, Input());
+ZxResult<Artifact> RunnerTest::RunUntil(ZxPromise<Artifact> promise) {
+  ZxResult<Artifact> out;
+  RunUntil(promise.then([&out](ZxResult<Artifact>& result) { out = std::move(result); }));
+  return out;
 }
 
-void RunnerTest::RunUntil(Promise<> promise, RunCallback run, Input input) {
+ZxResult<> RunnerTest::RunUntil(ZxPromise<> promise) {
+  ZxResult<> out;
+  RunUntil(promise.then([&out](ZxResult<>& result) { out = std::move(result); }));
+  return out;
+}
+
+void RunnerTest::RunUntil(Promise<> promise) {
+  Barrier barrier;
+  Schedule(promise.wrap_with(barrier));
   auto task =
-      fpromise::make_promise([run = std::move(run),
-                              result = Result<Input>(fpromise::ok(std::move(input))),
-                              running = Future<Input>(), until = Future<>(std::move(promise))](
+      fpromise::make_promise([this, run = Future<Input>(), until = Future<>(barrier.sync())](
                                  Context& context) mutable -> Result<> {
-        while (result.is_ok() && !until(context)) {
-          if (!running) {
-            running = run(result);
+        // while (result.is_ok() && !until(context)) {
+        while (!until(context)) {
+          if (!run) {
+            run = RunOne();
           }
-          if (!running(context)) {
+          if (!run(context)) {
             return fpromise::pending();
           }
-          result = running.take_result();
+          if (run.is_error()) {
+            // Ignore errors; they were checked in |RunOne|.
+            return fpromise::ok();
+          }
+          run = Future<Input>();
         }
-        // Ignore errors; they were checked in |RunOne|.
+        // A call to |RunOne| was dropped, and the |previous_run_|'s completer will not be called.
+        previous_run_ = Consumer<>();
         return fpromise::ok();
       }).wrap_with(scope_);
   FUZZING_EXPECT_OK(std::move(task));
@@ -368,18 +384,9 @@ void RunnerTest::FuzzUntilTime() {
   options->set_max_total_time(zx::msec(100).get());
   Configure(options);
   auto start = zx::clock::get_monotonic();
-
-  Artifact artifact;
-  Barrier barrier;
-  auto task = runner->Fuzz()
-                  .and_then([&artifact](Artifact& result) {
-                    artifact = std::move(result);
-                    return fpromise::ok();
-                  })
-                  .wrap_with(barrier);
-  FUZZING_EXPECT_OK(std::move(task));
-  RunUntil(barrier.sync());
-
+  auto result = RunUntil(runner->Fuzz());
+  ASSERT_TRUE(result.is_ok());
+  auto artifact = result.take_value();
   EXPECT_EQ(artifact.fuzz_result(), FuzzResult::NO_ERRORS);
   auto elapsed = zx::clock::get_monotonic() - start;
   EXPECT_GE(elapsed, zx::msec(100));
@@ -388,19 +395,23 @@ void RunnerTest::FuzzUntilTime() {
 void RunnerTest::TryOneNoError() {
   Configure(MakeOptions());
   Input input({0x01});
-  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), FuzzResult::NO_ERRORS);
+  Artifact artifact;
+  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), &artifact);
   FUZZING_EXPECT_OK(RunOne(), std::move(input));
   RunUntilIdle();
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::NO_ERRORS);
+  EXPECT_FALSE(artifact.has_input());
 }
 
 void RunnerTest::TryOneWithError() {
   Configure(MakeOptions());
   Input input({0x02});
-  FuzzResult fuzz_result;
-  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), &fuzz_result);
+  Artifact artifact;
+  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), &artifact);
   FUZZING_EXPECT_OK(RunOne(FuzzResult::BAD_MALLOC), std::move(input));
   RunUntilIdle();
-  EXPECT_TRUE(fuzz_result == FuzzResult::BAD_MALLOC || fuzz_result == FuzzResult::OOM);
+  EXPECT_TRUE(artifact.fuzz_result() == FuzzResult::BAD_MALLOC ||
+              artifact.fuzz_result() == FuzzResult::OOM);
 }
 
 void RunnerTest::TryOneWithLeak() {
@@ -408,20 +419,22 @@ void RunnerTest::TryOneWithLeak() {
   options->set_detect_leaks(true);
   Configure(options);
   Input input({0x03});
+  Artifact artifact;
   // Simulate a suspected leak, followed by an LSan exit. The leak detection heuristics only run
   // full leak detection when a leak is suspected based on mismatched allocations.
   SetLeak(true);
-  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), FuzzResult::LEAK);
+  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), &artifact);
   FUZZING_EXPECT_OK(RunOne(), input.Duplicate());
   FUZZING_EXPECT_OK(RunOne(FuzzResult::LEAK), std::move(input));
   RunUntilIdle();
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::LEAK);
 }
 
 // Simulate no error on the original input.
 void RunnerTest::MinimizeNoError() {
   Configure(MakeOptions());
   Input input({0x04});
-  FUZZING_EXPECT_ERROR(runner()->Minimize(input.Duplicate()), ZX_ERR_INVALID_ARGS);
+  FUZZING_EXPECT_ERROR(runner()->ValidateMinimize(input.Duplicate()), ZX_ERR_INVALID_ARGS);
   FUZZING_EXPECT_OK(RunOne(), std::move(input));
   RunUntilIdle();
 }
@@ -430,18 +443,44 @@ void RunnerTest::MinimizeNoError() {
 void RunnerTest::MinimizeEmpty() {
   Configure(MakeOptions());
   Input input;
-  FUZZING_EXPECT_OK(runner()->Minimize(input.Duplicate()), input.Duplicate());
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), std::move(input));
+  SetFuzzResultHandler([](const Input& input) { return FuzzResult::CRASH; });
+
+  Artifact validated;
+  FUZZING_EXPECT_OK(runner()->ValidateMinimize(input.Duplicate()), &validated);
+  FUZZING_EXPECT_OK(RunOne(), input.Duplicate());
   RunUntilIdle();
+  EXPECT_EQ(validated.fuzz_result(), FuzzResult::CRASH);
+  ASSERT_TRUE(validated.has_input());
+  EXPECT_EQ(validated.input(), input);
+
+  auto result = RunUntil(runner()->Minimize(std::move(validated)));
+  ASSERT_TRUE(result.is_ok());
+  auto artifact = result.take_value();
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::MINIMIZED);
+  ASSERT_TRUE(artifact.has_input());
+  EXPECT_EQ(artifact.input(), input);
 }
 
 // 1-byte input should exit immediately.
 void RunnerTest::MinimizeOneByte() {
   Configure(MakeOptions());
   Input input({0x44});
-  FUZZING_EXPECT_OK(runner()->Minimize(input.Duplicate()), input.Duplicate());
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), std::move(input));
+  SetFuzzResultHandler([](const Input& input) { return FuzzResult::CRASH; });
+
+  Artifact validated;
+  FUZZING_EXPECT_OK(runner()->ValidateMinimize(input.Duplicate()), &validated);
+  FUZZING_EXPECT_OK(RunOne(), input.Duplicate());
   RunUntilIdle();
+  EXPECT_EQ(validated.fuzz_result(), FuzzResult::CRASH);
+  ASSERT_TRUE(validated.has_input());
+  EXPECT_EQ(validated.input(), input);
+
+  auto result = RunUntil(runner()->Minimize(std::move(validated)));
+  ASSERT_TRUE(result.is_ok());
+  auto minimized = result.take_value();
+  EXPECT_EQ(minimized.fuzz_result(), FuzzResult::MINIMIZED);
+  ASSERT_TRUE(minimized.has_input());
+  EXPECT_EQ(minimized.input(), input);
 }
 
 void RunnerTest::MinimizeReduceByTwo() {
@@ -450,26 +489,26 @@ void RunnerTest::MinimizeReduceByTwo() {
   options->set_runs(kRuns);
   Configure(options);
   Input input({0x51, 0x52, 0x53, 0x54, 0x55, 0x56});
-  Input minimized;
-  Barrier barrier;
-  auto task = runner()
-                  ->Minimize(input.Duplicate())
-                  .and_then([&minimized](Input& result) {
-                    minimized = std::move(result);
-                    return fpromise::ok();
-                  })
-                  .wrap_with(barrier);
-  FUZZING_EXPECT_OK(std::move(task));
+
+  Artifact validated;
+  FUZZING_EXPECT_OK(runner()->ValidateMinimize(input.Duplicate()), &validated);
+  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), input.Duplicate());
+  RunUntilIdle();
+  EXPECT_EQ(validated.fuzz_result(), FuzzResult::CRASH);
+  ASSERT_TRUE(validated.has_input());
+  EXPECT_EQ(validated.input(), input);
 
   // Crash until inputs are smaller than 4 bytes.
-  RunUntil(
-      barrier.sync(),
-      [this](const Result<Input>& result) {
-        return RunOne(result.value().size() > 3 ? FuzzResult::CRASH : FuzzResult::NO_ERRORS);
-      },
-      std::move(input));
+  SetFuzzResultHandler([](const Input& input) {
+    return input.size() > 3 ? FuzzResult::CRASH : FuzzResult::NO_ERRORS;
+  });
 
-  EXPECT_LE(minimized.size(), 3U);
+  auto result = RunUntil(runner()->Minimize(std::move(validated)));
+  ASSERT_TRUE(result.is_ok());
+  auto minimized = result.take_value();
+  EXPECT_EQ(minimized.fuzz_result(), FuzzResult::MINIMIZED);
+  ASSERT_TRUE(minimized.has_input());
+  EXPECT_EQ(minimized.input().size(), 4U);
 }
 
 void RunnerTest::MinimizeNewError() {
@@ -477,30 +516,33 @@ void RunnerTest::MinimizeNewError() {
   options->set_run_limit(zx::msec(500).get());
   Configure(options);
   Input input({0x05, 0x15, 0x25, 0x35});
-  Input minimized;
+
+  Artifact validated;
+  FUZZING_EXPECT_OK(runner()->ValidateMinimize(input.Duplicate()), &validated);
+  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), input.Duplicate());
+  RunUntilIdle();
+  EXPECT_EQ(validated.fuzz_result(), FuzzResult::CRASH);
+  ASSERT_TRUE(validated.has_input());
+  EXPECT_EQ(validated.input(), input);
 
   // Simulate a crash on the original input, and a timeout on any smaller input.
   SetFuzzResultHandler([](const Input& input) {
     return input.size() > 3 ? FuzzResult::CRASH : FuzzResult::TIMEOUT;
   });
-  Barrier barrier;
-  auto task = runner()
-                  ->Minimize(input.Duplicate())
-                  .and_then([&minimized](Input& result) {
-                    minimized = std::move(result);
-                    return fpromise::ok();
-                  })
-                  .wrap_with(barrier);
-  FUZZING_EXPECT_OK(std::move(task));
-  RunUntil(barrier.sync());
-  EXPECT_EQ(minimized, input);
+
+  auto result = RunUntil(runner()->Minimize(std::move(validated)));
+  ASSERT_TRUE(result.is_ok());
+  auto minimized = result.take_value();
+  EXPECT_EQ(minimized.fuzz_result(), FuzzResult::MINIMIZED);
+  ASSERT_TRUE(minimized.has_input());
+  EXPECT_EQ(minimized.input(), input);
 }
 
 void RunnerTest::CleanseNoReplacement() {
   Configure(MakeOptions());
   Input input({0x07, 0x17, 0x27});
-  Input cleansed;
-  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &cleansed);
+  Artifact artifact;
+  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &artifact);
 
   // Simulate no error after cleansing any byte.
   for (size_t i = 0; i < input.size(); ++i) {
@@ -510,18 +552,20 @@ void RunnerTest::CleanseNoReplacement() {
   }
 
   RunUntilIdle();
-  EXPECT_EQ(cleansed, input);
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::CLEANSED);
+  EXPECT_EQ(artifact.input(), input);
 }
 
 void RunnerTest::CleanseAlreadyClean() {
   Configure(MakeOptions());
   Input input({' ', 0xff});
-  Input cleansed;
-  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &cleansed);
+  Artifact artifact;
+  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &artifact);
 
   // All bytes match replacements, so this should be done.
   RunUntilIdle();
-  EXPECT_EQ(cleansed, input);
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::CLEANSED);
+  EXPECT_EQ(artifact.input(), input);
 }
 
 void RunnerTest::CleanseTwoBytes() {
@@ -547,35 +591,45 @@ void RunnerTest::CleanseTwoBytes() {
                                                                    : FuzzResult::NO_ERRORS;
   });
 
-  Input cleansed;
-  FUZZING_EXPECT_OK(runner()->Cleanse(std::move(input)), &cleansed);
+  Artifact artifact;
+  FUZZING_EXPECT_OK(runner()->Cleanse(std::move(input)), &artifact);
   for (auto& input : inputs) {
     FUZZING_EXPECT_OK(RunOne(), std::move(input));
   }
 
   RunUntilIdle();
-  EXPECT_EQ(cleansed, Input({0x20, 0x18, 0xff}));
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::CLEANSED);
+  EXPECT_EQ(artifact.input(), Input({0x20, 0x18, 0xff}));
 }
 
-void RunnerTest::MergeSeedError(zx_status_t expected, uint64_t oom_limit) {
+void RunnerTest::MergeSeedError() {
   auto runner = this->runner();
   auto options = MakeOptions();
-  options->set_oom_limit(oom_limit);
+  options->set_oom_limit(kSmallOomLimit);
   Configure(options);
-  runner->AddToCorpus(CorpusType::SEED, Input({0x09}));
-  if (expected == ZX_OK) {
-    FUZZING_EXPECT_OK(runner->Merge());
-  } else {
-    FUZZING_EXPECT_ERROR(runner->Merge(), expected);
-  }
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::OOM));
-  RunUntilIdle();
+
+  Input input1({0x0a});
+  runner->AddToCorpus(CorpusType::SEED, input1.Duplicate());
+
+  // Triggers error.
+  Input input2({0x0b});
+  SetFuzzResultHandler([](const Input& input) {
+    return input.ToHex() == "0b" ? FuzzResult::OOM : FuzzResult::NO_ERRORS;
+  });
+  runner->AddToCorpus(CorpusType::SEED, input2.Duplicate());
+
+  Input input3({0x0c, 0x0c});
+  runner->AddToCorpus(CorpusType::SEED, input3.Duplicate());
+
+  auto result = RunUntil(runner->ValidateMerge());
+  ASSERT_TRUE(result.is_error());
+  EXPECT_EQ(result.take_error(), ZX_ERR_INVALID_ARGS);
 }
 
-void RunnerTest::Merge(bool keeps_errors, uint64_t oom_limit) {
+void RunnerTest::Merge(bool keeps_errors) {
   auto runner = this->runner();
   auto options = MakeOptions();
-  options->set_oom_limit(oom_limit);
+  options->set_oom_limit(kSmallOomLimit);
   Configure(options);
   std::vector<std::string> expected_seed;
   std::vector<std::string> expected_live;
@@ -597,10 +651,10 @@ void RunnerTest::Merge(bool keeps_errors, uint64_t oom_limit) {
   }
 
   // Second-smallest and 2 non-seed features => kept.
-  Input input5({0x0c, 0x0c});
-  SetCoverage(input5, {{0, 2}, {2, 2}});
-  runner->AddToCorpus(CorpusType::LIVE, input5.Duplicate());
-  expected_live.push_back(input5.ToHex());
+  Input input3({0x0c, 0x0c});
+  SetCoverage(input3, {{0, 2}, {2, 2}});
+  runner->AddToCorpus(CorpusType::LIVE, input3.Duplicate());
+  expected_live.push_back(input3.ToHex());
 
   // Larger and 1 feature not in any smaller inputs => kept.
   Input input4({0x0d, 0x0d, 0x0d});
@@ -609,9 +663,9 @@ void RunnerTest::Merge(bool keeps_errors, uint64_t oom_limit) {
   expected_live.push_back(input4.ToHex());
 
   // Second-smallest but only 1 non-seed feature above => skipped.
-  Input input3({0x0e, 0x0e});
-  SetCoverage(input3, {{0, 2}, {2, 3}});
-  runner->AddToCorpus(CorpusType::LIVE, input3.Duplicate());
+  Input input5({0x0e, 0x0e});
+  SetCoverage(input5, {{0, 2}, {2, 3}});
+  runner->AddToCorpus(CorpusType::LIVE, input5.Duplicate());
 
   // Smallest but features are subset of seed corpus => skipped.
   Input input6({0x0f});
@@ -622,10 +676,14 @@ void RunnerTest::Merge(bool keeps_errors, uint64_t oom_limit) {
   Input input7({0x10, 0x10, 0x10, 0x10});
   SetCoverage(input7, {{0, 2}, {1, 1}, {2, 2}});
   runner->AddToCorpus(CorpusType::LIVE, input7.Duplicate());
+  auto result1 = RunUntil(runner->ValidateMerge());
+  ASSERT_TRUE(result1.is_ok());
 
-  Barrier barrier;
-  FUZZING_EXPECT_OK(runner->Merge().wrap_with(barrier));
-  RunUntil(barrier.sync());
+  auto result2 = RunUntil(runner->Merge());
+  ASSERT_TRUE(result2.is_ok());
+  auto merged = result2.take_value();
+  EXPECT_EQ(merged.fuzz_result(), FuzzResult::MERGED);
+  EXPECT_FALSE(merged.has_input());
 
   auto seed_corpus = runner->GetCorpus(CorpusType::SEED);
   std::vector<std::string> actual_seed;

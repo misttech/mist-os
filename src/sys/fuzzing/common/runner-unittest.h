@@ -82,12 +82,9 @@ class RunnerTest : public AsyncTest {
 
   // Fakes the interactions needed with the runner to perform a sequence of fuzzing runs until the
   // given |promise| completes.
+  ZxResult<Artifact> RunUntil(ZxPromise<Artifact> promise);
+  ZxResult<> RunUntil(ZxPromise<> promise);
   void RunUntil(Promise<> promise);
-
-  // Like |RunUntil|, but additionally takes a |RunCallback| that can choose how to invoke |RunOne|
-  // based on the previous result. The initial result is constructed as |fpromise::ok(input)|.
-  using RunCallback = fit::function<Promise<Input>(const Result<Input>&)>;
-  void RunUntil(Promise<> promise, RunCallback run, Input input);
 
   // Returns the test input for the next run. This must not be called unless |HasTestInput| returns
   // true.
@@ -120,21 +117,17 @@ class RunnerTest : public AsyncTest {
   void FuzzUntilError();
   void FuzzUntilRuns();
   void FuzzUntilTime();
+  void MergeSeedError();
 
-  // The |Merge| unit tests have extra parameters and are not included in runner-unittest.inc.
-  // They should be added directly, e.g.:
+  // The |Merge| unit test has an extra parameters, |keeps_errors|, which indicates whether the
+  // runner includes error-causing inputs in the final corpus. Because of this parameter, this test
+  // is not included in runner-unittest.inc and should be added directly, e.g.:
   //
-  //   TEST_F(DerivedRunnerTest, MergeSeedError) {
-  //     DerivedRunner runner;
-  //     MergeSeedError(&runner, /* expected= */ ZX_ERR_NOT_SUPPORTED);
+  //   TEST_F(DerivedRunnerTest, Merge) {
+  //     MergeSeedError(/* keep_errors= */ true);
   //   }
-
-  // |expected| indicates the anticipated return value when merging a corpus with an error-causing
-  // input.
-  void MergeSeedError(zx_status_t expected, uint64_t oom_limit = kDefaultOomLimit);
-
-  // |keeps_errors| indicates whether merge keeps error-causing inputs in the final corpus.
-  void Merge(bool keeps_errors, uint64_t oom_limit = kDefaultOomLimit);
+  //
+  void Merge(bool keeps_errors);
 
   void Stop();
 

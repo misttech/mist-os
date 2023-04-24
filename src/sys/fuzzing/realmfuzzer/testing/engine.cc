@@ -48,11 +48,11 @@ TEST_F(FuzzerTest, SeedCorpus) {
   corpus.emplace_back(Input());
   FX_LOGS(INFO) << "Testing with " << corpus.size() << " input(s).";
 
-  FuzzResult fuzz_result;
-  FUZZING_EXPECT_OK(runner->TryEach(std::move(corpus)), &fuzz_result);
+  Artifact artifact;
+  FUZZING_EXPECT_OK(runner->TryEach(std::move(corpus)), &artifact);
   RunUntilIdle();
 
-  EXPECT_EQ(fuzz_result, FuzzResult::NO_ERRORS);
+  EXPECT_EQ(artifact.fuzz_result(), FuzzResult::NO_ERRORS);
 }
 
 }  // namespace fuzzing

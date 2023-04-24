@@ -7,20 +7,20 @@ use {
     diagnostics_data::LogsData,
     fidl::endpoints::{create_proxy, create_request_stream},
     fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-    fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES as BUF_SIZE,
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
     futures::{join, AsyncReadExt, AsyncWriteExt, TryStreamExt},
-    serde_json,
+    serde_json::Deserializer,
     std::cell::RefCell,
     std::rc::Rc,
 };
 
 const FUZZER_URL: &str = "fuchsia-pkg://fuchsia.com/fuzz-test-runner-tests#meta/fuzzer.cm";
+const BUF_SIZE: u32 = 32768;
 
 // Connects to the fuzz-manager, and then connects a controller to the fuzzer.
-async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<String>) {
+async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<()>) {
     let fuzz_manager =
         connect_to_protocol::<fuzz::ManagerMarker>().expect("failed to connect fuzz-manager");
     let (controller, log_task) = connect(&fuzz_manager).await;
@@ -34,9 +34,7 @@ async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<Str
 }
 
 // Connects a controller to the fuzzer using the fuzz-manager.
-async fn connect(
-    fuzz_manager: &fuzz::ManagerProxy,
-) -> (fuzz::ControllerProxy, fasync::Task<String>) {
+async fn connect(fuzz_manager: &fuzz::ManagerProxy) -> (fuzz::ControllerProxy, fasync::Task<()>) {
     let (controller, server_end) =
         create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
     let status = fuzz_manager
@@ -62,7 +60,7 @@ async fn connect(
                 break;
             }
             let line = std::str::from_utf8(&buf[..len]).expect("failed to convert syslog to UTF-8");
-            let deserializer = serde_json::Deserializer::from_str(line);
+            let deserializer = Deserializer::from_str(line);
             let iter = deserializer.into_iter::<LogsData>();
             for deserialized in iter {
                 let data = match deserialized {
@@ -73,7 +71,7 @@ async fn connect(
                 logs.push(format!("[{}] {}", data.metadata.severity, msg));
             }
         }
-        logs.join("\n")
+        eprintln!("{}", logs.join("\n"));
     });
     (controller, log_task)
 }
@@ -93,6 +91,25 @@ async fn recv_input(input: fuzz::Input) -> Result<Vec<u8>> {
         fasync::Socket::from_socket(input.socket).context("Failed to create async socket")?;
     rx.read_exact(&mut buf).await.context("Async socket read failed")?;
     Ok(buf)
+}
+
+// Gets an artifact after a long-running workflow.
+async fn watch_artifact(
+    controller: &fuzz::ControllerProxy,
+) -> Result<(FuzzResult, Option<Vec<u8>>)> {
+    let artifact = controller.watch_artifact().await.context(controller_name("WatchArtifact"))?;
+    if let Some(e) = artifact.error {
+        bail!("workflow returned error: {:?}", e)
+    }
+    let fuzz_result = artifact.result.unwrap_or(FuzzResult::NoErrors);
+    let input = match artifact.input {
+        Some(input) => {
+            let input = recv_input(input).await?;
+            Some(input)
+        }
+        None => None,
+    };
+    Ok((fuzz_result, input))
 }
 
 // Simple |fuchsia.fuzzer.CorpusReader| implementation.
@@ -176,15 +193,11 @@ fn controller_name(method: &str) -> String {
 async fn teardown(
     fuzz_manager: fuzz::ManagerProxy,
     test_result: Result<()>,
-    log_task: fasync::Task<String>,
+    log_task: fasync::Task<()>,
 ) -> Result<()> {
     let stop_result = stop(&fuzz_manager).await.map_err(Error::msg);
-    if let Err(e) = test_result.and(stop_result) {
-        let log = log_task.await;
-        eprintln!("{}", log);
-        return Err(e);
-    }
-    Ok(())
+    log_task.await;
+    test_result.and(stop_result)
 }
 
 // Stops the fuzzer.
@@ -223,10 +236,7 @@ async fn test_reconnect() -> Result<()> {
     // Stop the fuzzer and join the logs.
     let stop_result = stop(&fuzz_manager).await.map_err(Error::msg);
     if let Err(e) = test_result1.and(test_result2).and(stop_result) {
-        let (log1, log2) = join!(log_task1, log_task2);
-        // let log2 = log_task2.await;
-        eprintln!("{}", log1);
-        eprintln!("{}", log2);
+        let _ = join!(log_task1, log_task2);
         return Err(e);
     }
     Ok(())
@@ -237,15 +247,13 @@ async fn test_stop() -> Result<()> {
     let (fuzz_manager, _controller, log_task) = setup().await;
 
     // Stop.
-    if let Err(e) = stop(&fuzz_manager).await.map_err(Error::msg) {
-        let log = log_task.await;
-        eprintln!("{}", log);
-        return Err(e);
-    }
+    stop(&fuzz_manager).await.map_err(Error::msg)?;
 
     // Stop when already stopped.
     let response = stop(&fuzz_manager).await;
     assert_eq!(response, Err(zx::Status::NOT_FOUND));
+
+    log_task.await;
     Ok(())
 }
 
@@ -268,10 +276,10 @@ async fn test_fuzz_until_crash() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let response = controller.fuzz().await.context(controller_name("Fuzz"))?;
-        let fuzzed = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
-        compare(&fuzzed.0, FuzzResult::Crash)?;
-        let error_input = recv_input(fuzzed.1).await?;
-        compare(&error_input, b"CRASH".to_vec())
+        compare(&response, zx::Status::OK.into_raw())?;
+        let (fuzz_result, input) = watch_artifact(&controller).await?;
+        compare(&fuzz_result, FuzzResult::Crash)?;
+        compare(&input, Some(b"CRASH".to_vec()))
     };
     teardown(fuzz_manager, test().await, log_task).await
 }
@@ -292,8 +300,9 @@ async fn test_fuzz_until_runs() -> Result<()> {
         controller.add_monitor(client_end).await.context(controller_name("AddMonitor"))?;
         let results = join!(controller.fuzz(), subscribe_to_updates(stream));
         let response = results.0.context(controller_name("Fuzz"))?;
-        let fuzzed = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
-        compare(&fuzzed.0, FuzzResult::NoErrors)?;
+        compare(&response, zx::Status::OK.into_raw())?;
+        let (fuzz_result, _input) = watch_artifact(&controller).await?;
+        compare(&fuzz_result, FuzzResult::NoErrors)?;
         let reasons = results.1.context("failed to get updates")?;
         compare(&reasons.first(), Some(&fuzz::UpdateReason::Init))?;
         compare(&reasons.last(), Some(&fuzz::UpdateReason::Done))
@@ -311,8 +320,9 @@ async fn test_try_one_no_errors() -> Result<()> {
         let results = join!(tx.write_all(input.as_bytes()), controller.try_one(&mut fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context(controller_name("TryOne"))?;
-        let result = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
-        compare(&result, FuzzResult::NoErrors)
+        compare(&response, zx::Status::OK.into_raw())?;
+        let (fuzz_result, _input) = watch_artifact(&controller).await?;
+        compare(&fuzz_result, FuzzResult::NoErrors)
     };
     teardown(fuzz_manager, test().await, log_task).await
 }
@@ -327,8 +337,9 @@ async fn test_try_one_crash() -> Result<()> {
         let results = join!(tx.write_all(input.as_bytes()), controller.try_one(&mut fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context(controller_name("TryOne"))?;
-        let result = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
-        compare(&result, FuzzResult::Crash)
+        compare(&response, zx::Status::OK.into_raw())?;
+        let (fuzz_result, _input) = watch_artifact(&controller).await?;
+        compare(&fuzz_result, FuzzResult::Crash)
     };
     teardown(fuzz_manager, test().await, log_task).await
 }
@@ -343,9 +354,10 @@ async fn test_minimize() -> Result<()> {
         let results = join!(tx.write_all(input.as_bytes()), controller.minimize(&mut fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context("FIDL failure")?;
-        let minimized = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
-        let error_input = recv_input(minimized).await?;
-        compare(&error_input, b"CRASH".to_vec())
+        compare(&response, zx::Status::OK.into_raw())?;
+        let (fuzz_result, input) = watch_artifact(&controller).await?;
+        compare(&fuzz_result, FuzzResult::Minimized)?;
+        compare(&input, Some(b"CRASH".to_vec()))
     };
     teardown(fuzz_manager, test().await, log_task).await
 }
@@ -360,9 +372,10 @@ async fn test_cleanse() -> Result<()> {
         let results = join!(tx.write_all(input.as_bytes()), controller.cleanse(&mut fidl_input));
         results.0.context("failed to send input")?;
         let response = results.1.context("FIDL failure")?;
-        let cleansed = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
-        let error_input = recv_input(cleansed).await?;
-        compare(&error_input, b"    CRASH    ".to_vec())
+        compare(&response, zx::Status::OK.into_raw())?;
+        let (fuzz_result, input) = watch_artifact(&controller).await?;
+        compare(&fuzz_result, FuzzResult::Cleansed)?;
+        compare(&input, Some(b"    CRASH    ".to_vec()))
     };
     teardown(fuzz_manager, test().await, log_task).await
 }

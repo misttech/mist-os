@@ -102,8 +102,8 @@ ZxPromise<> Runner::Configure() {
 ///////////////////////////////////////////////////////////////
 // Workflow methods
 
-ZxPromise<> Runner::Workflow::Start() {
-  return fpromise::make_promise([this]() -> ZxResult<> {
+ZxPromise<> Runner::Workflow::Start(Mode mode) {
+  return fpromise::make_promise([this, mode]() -> ZxResult<> {
     if (completer_) {
       FX_LOGS(WARNING) << "Another fuzzing workflow is already in progress.";
       return fpromise::error(ZX_ERR_BAD_STATE);
@@ -111,12 +111,14 @@ ZxPromise<> Runner::Workflow::Start() {
     ZxBridge<> bridge;
     completer_ = std::move(bridge.completer);
     consumer_ = std::move(bridge.consumer);
-    runner_->StartWorkflow(scope_);
+    if (mode == Mode::kStart || mode == Mode::kBoth) {
+      runner_->StartWorkflow(scope_);
+    }
     return fpromise::ok();
   });
 }
 
-ZxPromise<FuzzResult> Runner::TryOne(Input input) {
+ZxPromise<Artifact> Runner::TryOne(Input input) {
   std::vector<Input> inputs;
   inputs.emplace_back(std::move(input));
   return TryEach(std::move(inputs));
@@ -127,9 +129,11 @@ ZxPromise<> Runner::Workflow::Stop() {
                    : fpromise::make_promise([]() -> ZxResult<> { return fpromise::ok(); });
 }
 
-void Runner::Workflow::Finish() {
+void Runner::Workflow::Finish(Mode mode) {
   if (completer_) {
-    runner_->FinishWorkflow();
+    if (mode == Mode::kFinish || mode == Mode::kBoth) {
+      runner_->FinishWorkflow();
+    }
     completer_.complete_ok();
   }
 }

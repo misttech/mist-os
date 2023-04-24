@@ -34,6 +34,7 @@ class FakeRunner final : public Runner {
   bool has_flag() const { return flag_; }
   const std::vector<Input>& get_inputs() const { return inputs_; }
 
+  void set_validation_error(zx_status_t error) { validation_error_ = error; }
   void set_error(zx_status_t error) { error_ = error; }
   void set_status(Status status) { status_ = std::move(status); }
 
@@ -56,10 +57,16 @@ class FakeRunner final : public Runner {
   using Runner::UpdateMonitors;
 
   ZxPromise<Artifact> Fuzz() override;
-  ZxPromise<FuzzResult> TryEach(std::vector<Input> inputs) override;
-  ZxPromise<Input> Minimize(Input input) override;
-  ZxPromise<Input> Cleanse(Input input) override;
-  ZxPromise<> Merge() override;
+
+  ZxPromise<Artifact> TryEach(std::vector<Input> inputs) override;
+
+  ZxPromise<Artifact> ValidateMinimize(Input input) override;
+  ZxPromise<Artifact> Minimize(Artifact artifact) override;
+
+  ZxPromise<Artifact> Cleanse(Input input) override;
+
+  ZxPromise<> ValidateMerge() override;
+  ZxPromise<Artifact> Merge() override;
 
   Status CollectStatus() override;
 
@@ -71,6 +78,7 @@ class FakeRunner final : public Runner {
   ZxPromise<Artifact> Run();
 
   bool flag_ = false;
+  zx_status_t validation_error_ = ZX_OK;
   zx_status_t error_ = ZX_OK;
   std::vector<Input> inputs_;
   FuzzResult result_ = FuzzResult::NO_ERRORS;

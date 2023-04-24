@@ -16,7 +16,6 @@ rustc_test("bin") {
   edition = "2021"
   visibility = [ ":*" ]
   deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

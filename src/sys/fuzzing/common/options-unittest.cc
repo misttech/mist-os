@@ -101,7 +101,7 @@ TEST(OptionsTest, Copy) {
 }
 
 TEST(OptionsTest, AddDefaults) {
-  // |AddDefaults| should add anything that is missing...
+  // |AddDefaults| should add anything that is missing.
   Options options1;
   AddDefaults(&options1);
 #define FUCHSIA_FUZZER_OPTION(type, option, Option, default_value) \

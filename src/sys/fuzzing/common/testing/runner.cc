@@ -124,61 +124,87 @@ ZxPromise<Artifact> FakeRunner::Fuzz() {
       .wrap_with(workflow_);
 }
 
-ZxPromise<FuzzResult> FakeRunner::TryEach(std::vector<Input> inputs) {
+ZxPromise<Artifact> FakeRunner::TryEach(std::vector<Input> inputs) {
   return Run()
-      .and_then([this, inputs = std::move(inputs)](const Artifact& artifact) {
-        for (const auto& input : inputs) {
-          inputs_.emplace_back(input.Duplicate());
-        }
-        if (artifact.fuzz_result() != FuzzResult::NO_ERRORS) {
-          return fpromise::ok(artifact.fuzz_result());
-        }
-        // If no result was set up, crash if the input contains |kCrash|.
-        for (auto& input : inputs) {
-          auto pos = as_string(input).find(kCrash);
-          if (pos != std::string::npos) {
-            return fpromise::ok(FuzzResult::CRASH);
-          }
-        }
-        return fpromise::ok(FuzzResult::NO_ERRORS);
-      })
+      .and_then(
+          [this, inputs = std::move(inputs)](const Artifact& artifact) -> ZxResult<FuzzResult> {
+            for (const auto& input : inputs) {
+              inputs_.emplace_back(input.Duplicate());
+            }
+            if (artifact.fuzz_result() != FuzzResult::NO_ERRORS) {
+              return fpromise::ok(artifact.fuzz_result());
+            }
+            // If no result was set up, crash if the input contains |kCrash|.
+            for (auto& input : inputs) {
+              auto pos = as_string(input).find(kCrash);
+              if (pos != std::string::npos) {
+                return fpromise::ok(FuzzResult::CRASH);
+              }
+            }
+            return fpromise::ok(FuzzResult::NO_ERRORS);
+          })
+      .and_then([](FuzzResult& fuzz_result) { return fpromise::ok(Artifact(fuzz_result)); })
       .wrap_with(workflow_);
 }
 
-ZxPromise<Input> FakeRunner::Minimize(Input input) {
-  return Run()
-      .and_then([this, input = std::move(input)](Artifact& artifact) {
-        inputs_.emplace_back(input.Duplicate());
-        if (artifact.input().size() != 0) {
-          return fpromise::ok(artifact.take_input());
-        }
-        // If no result was set up, remove all bytes except |kCrash|.
-        auto pos = as_string(input).find(kCrash);
-        return fpromise::ok(pos != std::string::npos ? Input(kCrash) : Input());
-      })
+ZxPromise<Artifact> FakeRunner::ValidateMinimize(Input input) {
+  return fpromise::make_promise([this, input = std::move(input)]() mutable -> ZxResult<Artifact> {
+           if (validation_error_ != ZX_OK) {
+             return fpromise::error(validation_error_);
+           }
+           inputs_.emplace_back(input.Duplicate());
+           return fpromise::ok(Artifact(FuzzResult::NO_ERRORS, std::move(input)));
+         })
       .wrap_with(workflow_);
 }
 
-ZxPromise<Input> FakeRunner::Cleanse(Input input) {
+ZxPromise<Artifact> FakeRunner::Minimize(Artifact validated) {
   return Run()
-      .and_then([this, input = std::move(input)](Artifact& artifact) {
-        inputs_.emplace_back(input.Duplicate());
-        if (artifact.input().size() != 0) {
-          return fpromise::ok(artifact.take_input());
-        }
-        // If no result was set up, cleanse all bytes except |kCrash|.
-        auto pos = as_string(input).find(kCrash);
-        if (pos != std::string::npos) {
-          std::string cleansed(input.size(), ' ');
-          cleansed.replace(pos, kCrashLen, kCrash, 0, kCrashLen);
-          return fpromise::ok(Input(cleansed));
-        }
-        return fpromise::ok(Input());
-      })
+      .and_then(
+          [validated = std::move(validated)](Artifact& artifact) mutable -> ZxResult<Artifact> {
+            auto minimized = artifact.take_input();
+            if (minimized.size() == 0) {
+              minimized = validated.take_input();
+            }
+            // If "CRASH" appears in the input, remove all other bytes.
+            if (as_string(minimized).find(kCrash) != std::string::npos) {
+              minimized = Input(kCrash);
+            }
+            return fpromise::ok(Artifact(FuzzResult::MINIMIZED, std::move(minimized)));
+          })
       .wrap_with(workflow_);
 }
 
-ZxPromise<> FakeRunner::Merge() {
+ZxPromise<Artifact> FakeRunner::Cleanse(Input input) {
+  return Run()
+      .and_then(
+          [this, cleansed = std::move(input)](Artifact& artifact) mutable -> ZxResult<Artifact> {
+            inputs_.emplace_back(cleansed.Duplicate());
+            if (artifact.input().size() != 0) {
+              cleansed = artifact.take_input();
+            }
+            // If "CRASH" appears in the input, cleanse all other bytes.
+            if (auto pos = as_string(cleansed).find(kCrash); pos != std::string::npos) {
+              std::string data(cleansed.size(), ' ');
+              data.replace(pos, kCrashLen, kCrash, 0, kCrashLen);
+              cleansed = Input(data);
+            }
+            return fpromise::ok(Artifact(FuzzResult::CLEANSED, std::move(cleansed)));
+          })
+      .wrap_with(workflow_);
+}
+
+ZxPromise<> FakeRunner::ValidateMerge() {
+  return fpromise::make_promise([this]() -> ZxResult<> {
+           if (validation_error_ != ZX_OK) {
+             return fpromise::error(validation_error_);
+           }
+           return fpromise::ok();
+         })
+      .wrap_with(workflow_);
+}
+
+ZxPromise<Artifact> FakeRunner::Merge() {
   return Run()
       .and_then([this](Artifact& artifact) {
         // The fake runner interprets the length of the input prefix that matches |kCrash| as that
@@ -204,7 +230,7 @@ ZxPromise<> FakeRunner::Merge() {
             max_prefix_len = prefix_len;
           }
         }
-        return fpromise::ok();
+        return fpromise::ok(Artifact(FuzzResult::MERGED));
       })
       .wrap_with(workflow_);
 }

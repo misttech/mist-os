@@ -94,8 +94,8 @@ zx_status_t Engine::RunTest() {
   // called as part of a gTest as well as by the elf_test_runner.
   zx_status_t exitcode = ZX_ERR_NEXT;
   auto task = runner_->Initialize(pkg_dir_, args_)
-                  .and_then([this, fut = ZxFuture<FuzzResult>(),
-                             attempts = 0U](Context& context) mutable -> ZxResult<FuzzResult> {
+                  .and_then([this, fut = ZxFuture<Artifact>(),
+                             attempts = 0U](Context& context) mutable -> ZxResult<Artifact> {
                     while (attempts < kFuzzerTestRetries) {
                       if (!fut) {
                         auto corpus = runner_->GetCorpus(CorpusType::SEED);
@@ -116,12 +116,13 @@ zx_status_t Engine::RunTest() {
                     }
                     return fpromise::error(ZX_ERR_IO_INVALID);
                   })
-                  .then([&exitcode](ZxResult<FuzzResult>& result) {
+                  .then([&exitcode](ZxResult<Artifact>& result) {
                     if (result.is_error()) {
                       exitcode = result.error();
                       return;
                     }
-                    auto fuzz_result = result.take_value();
+                    auto artifact = result.take_value();
+                    auto fuzz_result = artifact.fuzz_result();
                     exitcode = (fuzz_result == FuzzResult::NO_ERRORS) ? 0 : fuzz_result;
                   });
   context_->ScheduleTask(std::move(task));

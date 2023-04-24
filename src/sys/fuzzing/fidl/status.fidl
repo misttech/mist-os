@@ -9,8 +9,9 @@ using zx;
 /// Details about an instrumented process.
 ///
 /// See also:
-///   https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info#zx_info_task_stats
-///   https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info#zx_info_task_runtime
+///
+/// * https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info#zx_info_task_stats
+/// * https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info#zx_info_task_runtime
 type ProcessStats = struct {
     /// The kernel object identifier of the task.
     koid uint64;
@@ -21,51 +22,59 @@ type ProcessStats = struct {
     /// Committed memory that is only mapped into this process.
     mem_private_bytes uint64;
 
-    /// Committed memory that is mapped into this and at least one other process.
+    /// Committed memory that is mapped into this and at least one other
+    /// process.
     mem_shared_bytes uint64;
 
     /// Estimate of how much of |mem_shared_bytes| that this process owns.
     mem_scaled_shared_bytes uint64;
 
-    /// The total amount of time this process was running on a CPU and not blocked.
+    /// The total amount of time this process was running on a CPU and not
+    /// blocked.
     cpu_time zx.Duration;
 
-    // The total amount of time this process was ready but not actually using a CPU.
+    /// The total amount of time this process was ready but not actually using a
+    /// CPU.
     queue_time zx.Duration;
 
-    // The total amount of time this process spent handling page faults.
+    /// The total amount of time this process spent handling page faults.
     page_fault_time zx.Duration;
 
-    // The total amount of time this process spent waiting on contended kernel locks.
+    /// The total amount of time this process spent waiting on contended kernel
+    /// locks.
     lock_contention_time zx.Duration;
 };
 
-// See |Monitor|. Used to indicate why an update was sent.
+/// See `Controller.Monitor`. Used to indicate why an update was sent.
 type UpdateReason = flexible enum : uint8 {
-    // Represents an otherwise unspecified update. Useful when integrating other engines as runners,
-    // e.g. libFuzzer,
+    /// Represents an otherwise unspecified update. Useful when integrating
+    /// other engines as runners, e.g. libFuzzer.
     MISC = 1;
 
-    // A fuzzing action is starting. See, e.g. |Controller.Fuzz|, |Controller.Merge|, etc.
+    /// A fuzzing action is starting. See, e.g. `Controller.Fuzz`,
+    /// `Controller.Merge`, etc.
     INIT = 2;
 
-    // An input produced new feedback.
+    /// An input produced new feedback.
     NEW = 3;
 
-    // Periodic status update, configured with |Options.pulse_interval|.
+    /// Periodic status update, configured with `Options.pulse_interval`.
     PULSE = 4;
 
-    // A shorter input for some particular feedback has been found.
+    /// A shorter input for some particular feedback has been found.
     REDUCE = 5;
 
-    // A fuzzing action is complete.
+    /// A fuzzing action is complete.
     DONE = 6;
 };
 
-// The maximum number of processes for which stats will be returned via |Status|.
+/// The maximum number of processes for which stats will be returned via
+/// `Status`.
 const MAX_PROCESS_STATS uint16 = 256;
 
-/// See |Controller.GetStatus|.
+/// See `Controller.GetStatus`.
+//
+// TODO(fxbug.dev/124032): Include workflow enum.
 type Status = table {
     /// True if the fuzzer is working on a commands, e.g. it is fuzzing.
     1: running bool;
@@ -92,9 +101,13 @@ type Status = table {
     8: process_stats vector<ProcessStats>:MAX_PROCESS_STATS;
 };
 
-/// See |Status|. This protocol is used to push status from the |Controller| to callers.
+/// See `Status`. This protocol is used to push status from the `Controller` to
+/// callers.
 closed protocol Monitor {
     /// Sends the current status.
+    ///
+    /// + request `reason` the cause of a status change.
+    /// + status `status` the reported fuzzing metrics.
     strict Update(struct {
         reason UpdateReason;
         status Status;

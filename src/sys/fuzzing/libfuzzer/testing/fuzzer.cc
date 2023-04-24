@@ -37,12 +37,10 @@ int TestFuzzer::TestOneInput(const uint8_t *data, size_t size) {
                 if (eventpair_->IsConnected() && !relay) {
                   return fpromise::ok();
                 }
-                if (!relay) {
+                if (!connect) {
                   auto handler = context_->MakeRequestHandler<Relay>();
                   auto executor = context_->executor();
                   handler(relay.NewRequest(executor->dispatcher()));
-                }
-                if (!connect) {
                   Bridge<SignaledBuffer> bridge;
                   relay->WatchTestData(bridge.completer.bind());
                   connect = bridge.consumer.promise_or(fpromise::error());

@@ -18,6 +18,7 @@ pub struct FuzzCtlCommand {
 pub enum FuzzCtlSubcommand {
     Reset(ResetSubcommand),
     RunLibFuzzer(RunLibFuzzerSubcommand),
+    ResumeLibFuzzer(ResumeLibFuzzerSubcommand),
 }
 
 /// Command to reset a fuzzer to an initial state.
@@ -140,6 +141,30 @@ pub struct RunLibFuzzerSubcommand {
     /// files to test or directories to fuzz from, but not both, prefixed with 'tmp/'
     #[argh(positional)]
     pub data: Vec<String>,
+}
+
+/// Command to reconnect to a libfuzzer fuzzing task.
+///
+/// If the `fuzz_ctl` process is killed or otherwise exits before a fuzzing task is complete, the
+/// task will continue to run. This command can be used to reconnect and resume waiting for the task
+/// to complete. The arguments to this command match those in `RunLibFuzzerSubCommand` that manage
+/// fuzzer output.
+///
+#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[argh(subcommand, name = "resume_libfuzzer")]
+pub struct ResumeLibFuzzerSubcommand {
+    /// comma-separated list of streams to forward, made up of the following:
+    ///  "stdout", "stderr", "syslog", and/or "all"
+    #[argh(option, from_str_fn(parse_forward), default = "vec![fuzz::TestOutput::Stderr]")]
+    pub forward: Vec<fuzz::TestOutput>,
+
+    /// save the artifact this location if one is produced
+    #[argh(option)]
+    pub exact_artifact_path: Option<String>,
+
+    /// fuzzer component URL
+    #[argh(positional, from_str_fn(parse_url))]
+    pub url: Url,
 }
 
 fn parse_forward(value: &str) -> Result<Vec<fuzz::TestOutput>, String> {

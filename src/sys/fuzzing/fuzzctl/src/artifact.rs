@@ -5,8 +5,8 @@
 use {
     crate::input::Input,
     crate::util::digest_path,
-    anyhow::{Context as _, Result},
-    fidl_fuchsia_fuzzer::{Input as FidlInput, Result_ as FuzzResult},
+    anyhow::{bail, Context as _, Result},
+    fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult},
     fuchsia_zircon_status as zx,
     std::fs,
     std::path::{Path, PathBuf},
@@ -19,78 +19,90 @@ pub struct Artifact {
 
     /// The path to which the fuzzer input, if any, has been saved.
     pub path: Option<PathBuf>,
-
-    /// Indicates an error encountered by the engine itself, or `zx::Status::OK`.
-    pub status: zx::Status,
 }
 
 impl Artifact {
     /// Returns an artifact for a workflow that completed without producing results or data.
     pub fn ok() -> Self {
-        Self { result: FuzzResult::NoErrors, path: None, status: zx::Status::OK }
-    }
-
-    /// Returns an artifact for a workflow that was canceled before completing.
-    pub fn canceled() -> Self {
-        let mut artifact = Self::ok();
-        artifact.status = zx::Status::CANCELED;
-        artifact
+        Self { result: FuzzResult::NoErrors, path: None }
     }
 
     /// Returns an artifact for a workflow that produced a result without data.
     pub fn from_result(result: FuzzResult) -> Self {
-        let mut artifact = Self::ok();
-        artifact.result = result;
-        artifact
+        Self { result, path: None }
     }
 
-    /// Returns an artifact for a workflow that produced results and data.
-    ///
-    /// This will attempt to receive the data and save it locally, and return an error if unable to
-    /// do so.
-    pub async fn try_from_input<P: AsRef<Path>>(
-        result: FuzzResult,
-        fidl_input: FidlInput,
-        artifact_dir: P,
-    ) -> Result<Self> {
-        let mut artifact = Self::from_result(result);
-        let input =
-            Input::try_receive(fidl_input).await.context("failed to receive artifact data")?;
-        let path = digest_path(artifact_dir, Some(result), &input.data);
-        fs::write(&path, input.data)
-            .with_context(|| format!("failed to write artifact to '{}'", path.to_string_lossy()))?;
-        artifact.path = Some(path);
-        Ok(artifact)
+    /// Returns `artifact.path` as a String, or an empty string if it is `None`.
+    pub fn pathname(&self) -> String {
+        self.path.as_ref().map(|p| p.to_string_lossy().to_string()).unwrap_or(String::default())
     }
+}
+
+/// Reads fuzzer input data from a `FidlArtifact` and saves it locally.
+///
+/// Returns:
+/// Returns an `Artifact` on success. Returns an error if the artifact indicates an error, if
+/// it fails to read the data from the `input`, or if it fails to write the data to the file.
+///
+/// See also `utils::digest_path`.
+///
+pub async fn save_artifact<P: AsRef<Path>>(
+    fidl_artifact: FidlArtifact,
+    out_dir: P,
+) -> Result<Option<Artifact>> {
+    if let Some(e) = fidl_artifact.error {
+        if e == zx::Status::PEER_CLOSED.into_raw() {
+            return Ok(None);
+        }
+        bail!("workflow returned an error: ZX_ERR_{}", e);
+    }
+    let result = fidl_artifact.result.context("invalid FIDL artifact: missing result")?;
+    let mut artifact = Artifact::from_result(result);
+    if let Some(fidl_input) = fidl_artifact.input {
+        let input =
+            Input::try_receive(fidl_input).await.context("failed to receive fuzzer input data")?;
+        if artifact.result != FuzzResult::NoErrors {
+            let path = digest_path(out_dir, Some(artifact.result), &input.data);
+            fs::write(&path, input.data).with_context(|| {
+                format!("failed to write fuzzer input to '{}'", path.to_string_lossy())
+            })?;
+            artifact.path = Some(path);
+        }
+    };
+    Ok(Some(artifact))
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::Artifact,
+        super::save_artifact,
         crate::input::InputPair,
         crate::util::digest_path,
         anyhow::Result,
-        fidl_fuchsia_fuzzer::Result_ as FuzzResult,
+        fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult},
         fuchsia_fuzzctl_test::{verify_saved, Test},
         futures::join,
     };
 
     #[fuchsia::test]
-    async fn test_try_from_input() -> Result<()> {
+    async fn test_save_artifact() -> Result<()> {
         let test = Test::try_new()?;
         let saved_dir = test.create_dir("saved")?;
 
         let input_pair = InputPair::try_from_data(b"data".to_vec())?;
         let (fidl_input, input) = input_pair.as_tuple();
         let send_fut = input.send();
-        let save_fut = Artifact::try_from_input(FuzzResult::Crash, fidl_input, &saved_dir);
+        let fidl_artifact = FidlArtifact {
+            result: Some(FuzzResult::Crash),
+            input: Some(fidl_input),
+            ..FidlArtifact::EMPTY
+        };
+        let save_fut = save_artifact(fidl_artifact, &saved_dir);
         let results = join!(send_fut, save_fut);
         assert!(results.0.is_ok());
         assert!(results.1.is_ok());
         let saved = digest_path(&saved_dir, Some(FuzzResult::Crash), b"data");
         verify_saved(&saved, b"data")?;
-
         Ok(())
     }
 }

@@ -7,10 +7,9 @@ use {
     anyhow::{Context as _, Result},
     fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
     fuchsia_fuzzctl::{
-        create_artifact_dir, create_corpus_dir, create_dir_at, get_corpus_name, Controller,
-        InputPair, OutputSink, Writer,
+        create_artifact_dir, create_corpus_dir, create_dir_at, get_corpus_name, save_artifact,
+        Controller, InputPair, OutputSink, Writer,
     },
-    fuchsia_zircon_status as zx,
     std::path::{Path, PathBuf},
     url::Url,
     walkdir::WalkDir,
@@ -174,52 +173,35 @@ impl<O: OutputSink> Fuzzer<O> {
     ///   * An input triggers a fatal error, e.g. death by AddressSanitizer.
     ///   * `fuchsia.fuzzer.Controller/Stop` is called.
     ///
-    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
-    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
+    /// Use `wait_for_artifact` to get the results of the workflow.
     ///
     /// Returns an error if:
     ///   * Either `runs` or `time` is provided but cannot be parsed to  a valid value.
     ///   * Communicating with the fuzzer fails.
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
-    ///   * The error-causing input, or "artifact", fails to be received and saved.
     ///
-    pub async fn run<S: AsRef<str>>(&self, runs: Option<S>, time: Option<S>) -> Result<zx::Status> {
+    pub async fn run<S: AsRef<str>>(&self, runs: Option<S>, time: Option<S>) -> Result<()> {
         self.set_bounds(runs, time).await.context("failed to bound fuzzing")?;
         self.writer.println("Running fuzzer...");
-        let artifact_dir = self.artifact_dir();
-        let artifact = self.controller.fuzz(&artifact_dir).await?;
-        if artifact.status != zx::Status::OK {
-            return Ok(artifact.status);
-        }
-        self.writer.println(get_run_result(&artifact.result));
-        if let Some(path) = artifact.path {
-            self.writer.println(format!("Input saved to '{}'", path.to_string_lossy()));
-        }
-        Ok(zx::Status::OK)
+        self.controller.fuzz().await
     }
 
     /// Executes the fuzzer once using the given input.
     ///
     /// Writes the result of execution to this object's internal `Writer`.
     ///
-    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
-    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
+    /// Use `wait_for_artifact` to get the results of the workflow.
     ///
     /// Returns an error if:
     ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
     ///   * Communicating with the fuzzer fails.
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
     ///
-    pub async fn try_one<S: AsRef<str>>(&self, test_input: S) -> Result<zx::Status> {
+    pub async fn try_one<S: AsRef<str>>(&self, test_input: S) -> Result<()> {
         let input_pair = InputPair::try_from_str(test_input, &self.writer)
             .context("failed to get input to try")?;
         self.writer.println(format!("Trying an input of {} bytes...", input_pair.len()));
-        let artifact = self.controller.try_one(input_pair).await?;
-        if artifact.status != zx::Status::OK {
-            return Ok(artifact.status);
-        }
-        self.writer.println(get_try_result(&artifact.result));
-        Ok(zx::Status::OK)
+        self.controller.try_one(input_pair).await
     }
 
     /// Replaces bytes in a error-causing input with PII-safe bytes, e.g. spaces.
@@ -227,29 +209,19 @@ impl<O: OutputSink> Fuzzer<O> {
     /// The fuzzer will try to reproduce the error caused by the input with each byte replaced by a
     /// fixed number of "clean" candidates.
     ///
-    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
-    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
+    /// Use `wait_for_artifact` to get the results of the workflow.
     ///
     /// Returns an error if:
     ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
     ///   * Communicating with the fuzzer fails.
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
-    ///   * The cleansed input fails to be received and saved.
     ///
-    pub async fn cleanse<S: AsRef<str>>(&self, test_input: S) -> Result<zx::Status> {
+    pub async fn cleanse<S: AsRef<str>>(&self, test_input: S) -> Result<()> {
         let input_pair = InputPair::try_from_str(test_input, &self.writer)
             .context("failed to get input to cleanse")?;
         self.writer
             .println(format!("Attempting to cleanse an input of {} bytes...", input_pair.len()));
-        let artifact_dir = self.artifact_dir();
-        let artifact = self.controller.cleanse(input_pair, &artifact_dir).await?;
-        if artifact.status != zx::Status::OK {
-            return Ok(artifact.status);
-        }
-        if let Some(path) = artifact.path {
-            self.writer.println(format!("Cleansed input written to '{}'", path.to_string_lossy()));
-        };
-        Ok(zx::Status::OK)
+        self.controller.cleanse(input_pair).await
     }
 
     /// Reduces the length of an error-causing input while preserving the error.
@@ -257,36 +229,26 @@ impl<O: OutputSink> Fuzzer<O> {
     /// The fuzzer will bound its attempt to find shorter inputs using the given `runs` or `time`,
     /// if provided.
     ///
-    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
-    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
+    /// Use `wait_for_artifact` to get the results of the workflow.
     ///
     /// Returns an error if:
     ///   * Either `runs` or `time` is provided but cannot be parsed to  a valid value.
     ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
     ///   * Communicating with the fuzzer fails.
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
-    ///   * The minimized input fails to be received and saved.
     ///
     pub async fn minimize<S: AsRef<str>>(
         &self,
         test_input: S,
         runs: Option<S>,
         time: Option<S>,
-    ) -> Result<zx::Status> {
+    ) -> Result<()> {
         self.set_bounds(runs, time).await.context("failed to bound input minimization")?;
         let input_pair = InputPair::try_from_str(test_input, &self.writer)
             .context("failed to get input to minimize")?;
         self.writer
             .println(format!("Attempting to minimize an input of {} bytes...", input_pair.len()));
-        let artifact_dir = self.artifact_dir();
-        let artifact = self.controller.minimize(input_pair, &artifact_dir).await?;
-        if artifact.status != zx::Status::OK {
-            return Ok(artifact.status);
-        }
-        if let Some(path) = artifact.path {
-            self.writer.println(format!("Minimized input written to '{}'", path.to_string_lossy()));
-        };
-        Ok(zx::Status::OK)
+        self.controller.minimize(input_pair).await
     }
 
     /// Removes inputs from the corpus that produce duplicate coverage.
@@ -296,21 +258,15 @@ impl<O: OutputSink> Fuzzer<O> {
     /// coverage. Once complete, the compacted fuzzer is saved to the `corpus_dir`, if provided, or
     /// the current working directory.
     ///
-    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
-    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
+    /// Use `wait_for_artifact` to get the results of the workflow.
     ///
     /// Returns an error if:
     ///   * Communicating with the fuzzer fails.
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
-    ///   * One or more inputs fails to be received and saved.
     ///
-    pub async fn merge(&self) -> Result<zx::Status> {
+    pub async fn merge(&self) -> Result<()> {
         self.writer.println("Compacting fuzzer corpus...");
-        let artifact = self.controller.merge().await?;
-        if artifact.status == zx::Status::OK {
-            self.fetch(fuzz::Corpus::Live).await?;
-        }
-        Ok(artifact.status)
+        self.controller.merge().await
     }
 
     /// Returns information about fuzzer execution.
@@ -362,22 +318,64 @@ impl<O: OutputSink> Fuzzer<O> {
         self.writer.println("Configuring fuzzer...");
         self.controller.configure(fuzz_options).await
     }
-}
 
-fn get_try_result(result: &FuzzResult) -> String {
-    format!("The input {}", get_result(result))
-}
-
-fn get_run_result(result: &FuzzResult) -> String {
-    match result {
-        FuzzResult::NoErrors => "No input to the fuzzer caused an error.".to_string(),
-        result => format!("An input to the fuzzer {}", get_result(result)),
+    /// Waits for the results of a long-running workflow.
+    ///
+    /// The `fuchsia.fuzzer.Controller/WatchArtifact` method uses a
+    /// ["hanging get" pattern](https://fuchsia.dev/fuchsia-src/development/api/fidl#hanging-get).
+    /// The first call will return whatever the current artifact is for the fuzzer; subsequent calls
+    /// will block until the artifact changes. The implementation below may retry the FIDL method to
+    /// ensure it only returns `Ok(None)` on channel close.
+    ///
+    /// This method will save inputs under the output directory based on the artifact's result,
+    /// which in turn may be based on the workflow that was performed.
+    ///
+    pub async fn wait_for_artifact(&self) -> Result<bool> {
+        let fidl_artifact =
+            self.controller.watch_artifact().await.context("failed to watch artifact")?;
+        let artifact = save_artifact(fidl_artifact, self.artifact_dir())
+            .await
+            .context("failed to save artifact")?;
+        let artifact = match artifact {
+            None => return Ok(false),
+            Some(artifact) => artifact,
+        };
+        match artifact.result {
+            FuzzResult::NoErrors => {
+                self.writer.println("The fuzzer did not detect any errors.");
+            }
+            FuzzResult::Merged => {
+                // Artifact is from `fuchsia.fuzzer.Controller/Merge`.
+                self.writer.println("Merge complete.");
+                self.fetch(fuzz::Corpus::Live).await.context("failed to fetch merged corpus")?;
+            }
+            FuzzResult::Cleansed => {
+                // Artifact is from `fuchsia.fuzzer.Controller/Cleanse`.
+                self.writer.println(format!("Cleansed input written to '{}'", artifact.pathname()));
+            }
+            FuzzResult::Minimized => {
+                // Artifact is from `fuchsia.fuzzer.Controller/Minimize`.
+                self.writer
+                    .println(format!("Minimized input written to '{}'", artifact.pathname()));
+            }
+            fuzz_result => {
+                if artifact.path.is_none() {
+                    // Artifact is from `fuchsia.fuzzer.Controller/TryOne`.
+                    self.writer.println(format!("The input {}", get_result(&fuzz_result)));
+                } else {
+                    // Artifact is from `fuchsia.fuzzer.Controller/Fuzz`.
+                    self.writer
+                        .println(format!("An input to the fuzzer {}", get_result(&fuzz_result)));
+                    self.writer.println(format!("Input saved to '{}'", artifact.pathname()));
+                }
+            }
+        }
+        Ok(true)
     }
 }
 
-fn get_result(result: &FuzzResult) -> &str {
+fn get_result(result: &FuzzResult) -> &'static str {
     match result {
-        FuzzResult::NoErrors => "did not cause any errors.",
         FuzzResult::BadMalloc => "caused an invalid allocation of memory.",
         FuzzResult::Crash => "caused a process to crash.",
         FuzzResult::Death => "triggered a sanitizer violation.",
@@ -392,7 +390,7 @@ fn get_result(result: &FuzzResult) -> &str {
 #[cfg(test)]
 mod tests {
     use {
-        super::{get_run_result, get_try_result, Fuzzer},
+        super::{get_result, Fuzzer},
         crate::options,
         anyhow::{Context as _, Result},
         fidl::endpoints::create_proxy_and_stream,
@@ -481,8 +479,8 @@ mod tests {
     async fn test_add() -> Result<()> {
         let mut test = Test::try_new()?;
         let (fake, fuzzer, _task) = perform_test_setup(&test)?;
-        let test_files = vec!["input1", "input2", "input3"];
 
+        let test_files = vec!["input1", "input2", "input3"];
         let corpus_dir = test.create_dir("corpus")?;
         test.create_test_files(&corpus_dir, test_files.iter())?;
 
@@ -511,16 +509,15 @@ mod tests {
             fuzzer: &Fuzzer<BufferSink>,
             runs: Option<String>,
             time: Option<String>,
-            input_data: &[u8],
             result: FuzzResult,
             test: &mut Test,
-        ) -> Result<Option<String>> {
+        ) -> Result<()> {
+            let input_data: &[u8] = b"deadbeef";
             fake.set_result(Ok(result));
             fake.set_input_to_send(input_data);
-            let status = fuzzer.run(runs.clone(), time.clone()).await?;
-            assert_eq!(status, zx::Status::OK);
+
+            fuzzer.run(runs.clone(), time.clone()).await?;
             test.output_matches("Configuring fuzzer...");
-            test.output_matches("Running fuzzer...");
             let mut expected = fuzz::Options::EMPTY;
             add_defaults(&mut expected);
             if let Some(runs) = runs {
@@ -532,17 +529,18 @@ mod tests {
             let actual = fake.get_options();
             assert_eq!(actual.runs, expected.runs);
             assert_eq!(actual.max_total_time, expected.max_total_time);
-            test.output_matches(get_run_result(&result));
-            match result {
-                FuzzResult::NoErrors => Ok(None),
-                result => {
-                    let artifact = digest_path(fuzzer.artifact_dir(), Some(result), input_data);
-                    verify_saved(&artifact, input_data)?;
-                    let artifact = artifact.to_string_lossy().to_string();
-                    test.output_matches(format!("Input saved to '{}'", artifact));
-                    Ok(Some(artifact))
-                }
+            test.output_matches("Running fuzzer...");
+            fuzzer.wait_for_artifact().await?;
+            if result == FuzzResult::NoErrors {
+                test.output_matches("The fuzzer did not detect any errors.");
+            } else {
+                test.output_includes(get_result(&result));
+                let artifact = digest_path(fuzzer.artifact_dir(), Some(result), input_data);
+                verify_saved(&artifact, input_data)?;
+                let artifact = artifact.to_string_lossy().to_string();
+                test.output_matches(format!("Input saved to '{}'", artifact));
             }
+            Ok(())
         }
 
         let mut test = Test::try_new()?;
@@ -550,23 +548,24 @@ mod tests {
 
         let runs = Some("10".to_string());
         let time = Some("10s".to_string());
-        test_run_once(&fake, &fuzzer, runs, None, b"", FuzzResult::NoErrors, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, time, b"", FuzzResult::NoErrors, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::BadMalloc, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::Crash, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::Death, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::Exit, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::Leak, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::Oom, &mut test).await?;
-        test_run_once(&fake, &fuzzer, None, None, b"", FuzzResult::Timeout, &mut test).await?;
+        test_run_once(&fake, &fuzzer, runs, None, FuzzResult::NoErrors, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, time, FuzzResult::NoErrors, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::BadMalloc, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::Crash, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::Death, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::Exit, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::Leak, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::Oom, &mut test).await?;
+        test_run_once(&fake, &fuzzer, None, None, FuzzResult::Timeout, &mut test).await?;
         test.verify_output()?;
 
         // Simulate a hung fuzzer.
         fake.set_result(Err(zx::Status::SHOULD_WAIT));
         fuzzer.controller.set_min_timeout(0);
-        let result = fuzzer.run(None, Some("100ms".to_string())).await;
+        fuzzer.run(None, Some("100ms".to_string())).await?;
+        let result = fuzzer.wait_for_artifact().await;
         assert!(result.is_err());
-        let msg = format!("{}", result.unwrap_err());
+        let msg = format!("{:#}", result.unwrap_err());
         assert!(msg.contains("workflow timed out"));
         Ok(())
     }
@@ -582,17 +581,23 @@ mod tests {
         ) -> Result<()> {
             let test_input = hex::encode(input_data);
             fake.set_result(Ok(result));
-            let status = fuzzer.try_one(test_input).await?;
-            assert_eq!(status, zx::Status::OK);
-            test.output_matches(format!("Trying an input of {} bytes...", input_data.len()));
-            test.output_matches(get_try_result(&result));
+            fuzzer.try_one(test_input).await?;
             let received_input = fake.get_received_input();
             assert_eq!(received_input, input_data);
+
+            test.output_matches(format!("Trying an input of {} bytes...", input_data.len()));
+            fuzzer.wait_for_artifact().await?;
+            if result == FuzzResult::NoErrors {
+                test.output_matches("The fuzzer did not detect any errors.");
+            } else {
+                test.output_matches(format!("The input {}", get_result(&result)));
+            }
             Ok(())
         }
 
         let mut test = Test::try_new()?;
         let (fake, fuzzer, _task) = perform_test_setup(&test)?;
+
         test_try_one(&fake, &fuzzer, b"no errors", FuzzResult::NoErrors, &mut test).await?;
         test_try_one(&fake, &fuzzer, b"bad malloc", FuzzResult::BadMalloc, &mut test).await?;
         test_try_one(&fake, &fuzzer, b"crash", FuzzResult::Crash, &mut test).await?;
@@ -608,11 +613,17 @@ mod tests {
     async fn test_cleanse() -> Result<()> {
         let mut test = Test::try_new()?;
         let (fake, fuzzer, _task) = perform_test_setup(&test)?;
-        let test_input = hex::encode("hello");
+        let input_data = b"hello";
+        let test_input = hex::encode(input_data);
         fake.set_input_to_send(b"world");
-        let status = fuzzer.cleanse(test_input).await?;
-        assert_eq!(status, zx::Status::OK);
+
+        fuzzer.cleanse(test_input).await?;
+        let received_input = fake.get_received_input();
+        assert_eq!(received_input, input_data);
+
         test.output_matches("Attempting to cleanse an input of 5 bytes...");
+        fuzzer.wait_for_artifact().await?;
+
         let artifact = digest_path(fuzzer.artifact_dir(), Some(FuzzResult::Cleansed), b"world");
         verify_saved(&artifact, b"world")?;
         test.output_matches(format!("Cleansed input written to '{}'", artifact.to_string_lossy()));
@@ -623,34 +634,30 @@ mod tests {
     async fn test_minimize() -> Result<()> {
         let mut test = Test::try_new()?;
         let (fake, fuzzer, _task) = perform_test_setup(&test)?;
-        let test_input = hex::encode("hello");
-
+        let input_data = b"hello";
+        let test_input = hex::encode(input_data);
         fake.set_input_to_send(b"world");
-        let status = fuzzer.minimize(test_input.clone(), None, None).await?;
-        assert_eq!(status, zx::Status::OK);
-        test.output_matches("Configuring fuzzer...");
-        test.output_matches("Attempting to minimize an input of 5 bytes...");
-        let artifact = digest_path(fuzzer.artifact_dir(), Some(FuzzResult::Minimized), b"world");
-        verify_saved(&artifact, b"world")?;
-        test.output_matches(format!("Minimized input written to '{}'", artifact.to_string_lossy()));
 
-        fake.set_input_to_send(b"world");
         let runs = "10";
         let time = "10s";
-        let status =
-            fuzzer.minimize(test_input, Some(runs.to_string()), Some(time.to_string())).await?;
-        assert_eq!(status, zx::Status::OK);
+        fuzzer.minimize(test_input, Some(runs.to_string()), Some(time.to_string())).await?;
+        let received_input = fake.get_received_input();
+        assert_eq!(received_input, input_data);
+
         test.output_matches("Configuring fuzzer...");
-        test.output_matches("Attempting to minimize an input of 5 bytes...");
-        let artifact = digest_path(fuzzer.artifact_dir(), Some(FuzzResult::Minimized), b"world");
-        verify_saved(&artifact, b"world")?;
-        test.output_matches(format!("Minimized input written to '{}'", artifact.to_string_lossy()));
         let actual = fake.get_options();
         let mut expected = fuzz::Options::EMPTY;
         options::set(&mut expected, "runs", runs)?;
         options::set(&mut expected, "max_total_time", time)?;
         assert_eq!(actual.runs, expected.runs);
         assert_eq!(actual.max_total_time, expected.max_total_time);
+
+        test.output_matches("Attempting to minimize an input of 5 bytes...");
+        fuzzer.wait_for_artifact().await?;
+
+        let artifact = digest_path(fuzzer.artifact_dir(), Some(FuzzResult::Minimized), b"world");
+        verify_saved(&artifact, b"world")?;
+        test.output_matches(format!("Minimized input written to '{}'", artifact.to_string_lossy()));
         test.verify_output()
     }
 
@@ -660,11 +667,13 @@ mod tests {
         let (fake, fuzzer, _task) = perform_test_setup(&test)?;
 
         fake.set_input_to_send(b"hello");
-        let status = fuzzer.merge().await?;
-        assert_eq!(status, zx::Status::OK);
+        fuzzer.merge().await?;
+
         test.output_matches("Compacting fuzzer corpus...");
+        test.output_matches("Merge complete.");
         test.output_matches("Retrieving fuzzer corpus...");
         test.output_matches("Retrieved 1 input totaling 5 bytes from the live corpus.");
+        fuzzer.wait_for_artifact().await?;
         let input = digest_path(fuzzer.corpus_dir(fuzz::Corpus::Live), None, b"hello");
         verify_saved(&input, b"hello")?;
         test.verify_output()

@@ -21,7 +21,7 @@ struct TransferParams {
 };
 
 template <typename Transfer>
-ZxPromise<Input> AsyncSocketTransfer(TransferParams&& params, Transfer transfer) {
+ZxPromise<Input> AsyncSocketTransfer(TransferParams params, Transfer transfer) {
   FX_DCHECK(params.executor);
   if (params.input.size() == 0) {
     return fpromise::make_promise([input = std::move(params.input)]() mutable -> ZxResult<Input> {
@@ -71,7 +71,7 @@ ZxPromise<Input> AsyncSocketTransfer(TransferParams&& params, Transfer transfer)
 
 }  // namespace
 
-ZxPromise<Input> AsyncSocketRead(const ExecutorPtr& executor, FidlInput&& fidl_input) {
+ZxPromise<Input> AsyncSocketRead(const ExecutorPtr& executor, FidlInput fidl_input) {
   TransferParams params = {
       .executor = executor,
       .label = "read from",
@@ -86,16 +86,36 @@ ZxPromise<Input> AsyncSocketRead(const ExecutorPtr& executor, FidlInput&& fidl_i
       });
 }
 
-ZxPromise<Artifact> AsyncSocketRead(const ExecutorPtr& executor, FidlArtifact&& fidl_artifact) {
-  FuzzResult fuzz_result;
-  FidlInput fidl_input;
-  std::tie(fuzz_result, fidl_input) = std::move(fidl_artifact);
-  return AsyncSocketRead(executor, std::move(fidl_input)).and_then([fuzz_result](Input& input) {
-    return fpromise::ok(Artifact(fuzz_result, std::move(input)));
-  });
+ZxPromise<Artifact> AsyncSocketRead(const ExecutorPtr& executor, FidlArtifact fidl_artifact) {
+  if (fidl_artifact.IsEmpty()) {
+    return fpromise::make_promise([status = fidl_artifact.error()]() -> ZxResult<Artifact> {
+      return fpromise::ok(Artifact());
+    });
+  }
+  if (fidl_artifact.has_error()) {
+    return fpromise::make_promise([status = fidl_artifact.error()]() -> ZxResult<Artifact> {
+      return fpromise::error(status);
+    });
+  }
+  if (!fidl_artifact.has_result()) {
+    return fpromise::make_promise([]() -> ZxResult<Artifact> {
+      FX_LOGS(WARNING) << "Received invalid artifact: missing `result`";
+      return fpromise::error(ZX_ERR_INTERNAL);
+    });
+  }
+  if (!fidl_artifact.has_input()) {
+    return fpromise::make_promise([fuzz_result = fidl_artifact.result()]() -> ZxResult<Artifact> {
+      return fpromise::ok(Artifact(fuzz_result));
+    });
+  }
+  auto* fidl_input = fidl_artifact.mutable_input();
+  return AsyncSocketRead(executor, std::move(*fidl_input))
+      .and_then([fuzz_result = fidl_artifact.result()](Input& input) -> ZxResult<Artifact> {
+        return fpromise::ok(Artifact(fuzz_result, std::move(input)));
+      });
 }
 
-FidlInput AsyncSocketWrite(const ExecutorPtr& executor, Input&& input) {
+FidlInput AsyncSocketWrite(const ExecutorPtr& executor, const Input& input) {
   FidlInput fidl_input;
   fidl_input.size = input.size();
   zx::socket socket;
@@ -107,7 +127,7 @@ FidlInput AsyncSocketWrite(const ExecutorPtr& executor, Input&& input) {
       .executor = executor,
       .label = "write to",
       .socket = std::move(socket),
-      .input = std::move(input),
+      .input = input.Duplicate(),
       .ready = ZX_SOCKET_WRITABLE,
       .done = ZX_SOCKET_PEER_CLOSED,
   };
@@ -119,9 +139,16 @@ FidlInput AsyncSocketWrite(const ExecutorPtr& executor, Input&& input) {
   return fidl_input;
 }
 
-FidlArtifact AsyncSocketWrite(const ExecutorPtr& executor, Artifact&& artifact) {
-  auto fidl_input = AsyncSocketWrite(executor, artifact.take_input());
-  return MakeFidlArtifact(artifact.fuzz_result(), std::move(fidl_input));
+FidlArtifact AsyncSocketWrite(const ExecutorPtr& executor, const Artifact& artifact) {
+  if (artifact.is_empty()) {
+    return FidlArtifact();
+  }
+  FidlArtifact fidl_artifact;
+  fidl_artifact.set_result(artifact.fuzz_result());
+  if (artifact.has_input()) {
+    fidl_artifact.set_input(AsyncSocketWrite(executor, artifact.input()));
+  }
+  return fidl_artifact;
 }
 
 }  // namespace fuzzing

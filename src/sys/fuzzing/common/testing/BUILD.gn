@@ -8,6 +8,8 @@ source_set("testing") {
   visibility = [ "//src/sys/*" ]
   testonly = true
   sources = [
+    "artifact.cc",
+    "artifact.h",
     "async-test.h",
     "component-context.cc",
     "component-context.h",

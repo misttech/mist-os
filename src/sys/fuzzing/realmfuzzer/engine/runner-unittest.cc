@@ -16,10 +16,6 @@ namespace {
 #undef RUNNER_TYPE
 #undef RUNNER_TEST
 
-TEST_F(RealmFuzzerRunnerTest, MergeSeedError) {
-  MergeSeedError(/* expected */ ZX_ERR_INVALID_ARGS);
-}
-
 TEST_F(RealmFuzzerRunnerTest, Merge) { Merge(/* keep_errors= */ true); }
 
 }  // namespace

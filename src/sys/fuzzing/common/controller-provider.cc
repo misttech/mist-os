@@ -5,6 +5,7 @@
 #include "src/sys/fuzzing/common/controller-provider.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/status.h>
 
 namespace fuzzing {
 
@@ -14,6 +15,10 @@ ControllerProviderImpl::ControllerProviderImpl(RunnerPtr runner)
     : binding_(this), controller_(std::move(runner)) {
   binding_.set_error_handler([](zx_status_t status) {
     // The registry signals the provider should exit by closing its channel.
+    if (status != ZX_ERR_PEER_CLOSED) {
+      FX_LOGS(WARNING) << "Registry connection closed: " << zx_status_get_string(status);
+      exit(status);
+    }
     exit(0);
   });
 }

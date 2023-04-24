@@ -10,6 +10,7 @@
 
 #include <iostream>
 
+#include "src/sys/fuzzing/common/async-eventpair.h"
 #include "src/sys/fuzzing/common/async-socket.h"
 #include "src/sys/fuzzing/common/async-types.h"
 #include "src/sys/fuzzing/common/corpus-reader-client.h"
@@ -20,7 +21,17 @@ namespace fuzzing {
 using ::fuchsia::fuzzer::DONE_MARKER;
 
 ControllerImpl::ControllerImpl(RunnerPtr runner)
-    : binding_(this), executor_(runner->executor()), runner_(runner) {}
+    : binding_(this),
+      executor_(runner->executor()),
+      runner_(runner),
+      artifact_(fpromise::ok(Artifact())) {
+  if (auto status = zx::event::create(0, &changed_); status != ZX_OK) {
+    FX_LOGS(FATAL) << "Failed to create artifact event: " << zx_status_get_string(status);
+  }
+  if (auto status = changed_.signal(0, Signal::kSync); status != ZX_OK) {
+    FX_LOGS(FATAL) << "Failed to signal artifact event: " << zx_status_get_string(status);
+  }
+}
 
 void ControllerImpl::Bind(fidl::InterfaceRequest<Controller> request) {
   FX_DCHECK(runner_);
@@ -29,16 +40,37 @@ void ControllerImpl::Bind(fidl::InterfaceRequest<Controller> request) {
 
 ZxPromise<> ControllerImpl::ResetArtifact() {
   return fpromise::make_promise([this]() -> ZxResult<> {
-           artifact_ = Artifact();
+           if (artifact_.is_ok() && artifact_.value().is_empty()) {
+             return fpromise::ok();
+           }
+           artifact_ = fpromise::ok(Artifact());
+           if (auto status = changed_.signal(0, Signal::kSync); status != ZX_OK) {
+             FX_LOGS(ERROR) << "Failed to signal artifact event: " << zx_status_get_string(status);
+             return fpromise::error(status);
+           }
            return fpromise::ok();
          })
       .wrap_with(scope_);
 }
 
-void ControllerImpl::Finish() {
-  std::cout << std::endl << DONE_MARKER << std::endl;
-  std::cerr << std::endl << DONE_MARKER << std::endl;
-  FX_LOGS(INFO) << DONE_MARKER;
+ZxPromise<> ControllerImpl::Finish(ZxResult<Artifact> result) {
+  return fpromise::make_promise([this, result = std::move(result)]() mutable -> ZxResult<> {
+           FX_CHECK(artifact_.is_ok() && artifact_.value().is_empty());
+           if (result.is_ok()) {
+             artifact_ = fpromise::ok(result.take_value());
+           } else {
+             artifact_ = fpromise::error(result.error());
+           }
+           if (auto status = changed_.signal(0, Signal::kSync); status != ZX_OK) {
+             FX_LOGS(ERROR) << "Failed to signal artifact event: " << zx_status_get_string(status);
+             return fpromise::error(status);
+           }
+           std::cout << std::endl << DONE_MARKER << std::endl;
+           std::cerr << std::endl << DONE_MARKER << std::endl;
+           FX_LOGS(INFO) << DONE_MARKER;
+           return fpromise::ok();
+         })
+      .wrap_with(scope_);
 }
 
 ///////////////////////////////////////////////////////////////
@@ -112,8 +144,6 @@ void ControllerImpl::ReadDictionary(ReadDictionaryCallback callback) {
   callback(AsyncSocketWrite(executor_, runner_->GetDictionaryAsInput()));
 }
 
-void ControllerImpl::GetStatus(GetStatusCallback callback) { callback(runner_->CollectStatus()); }
-
 void ControllerImpl::AddMonitor(fidl::InterfaceHandle<Monitor> monitor,
                                 AddMonitorCallback callback) {
   FX_DCHECK(runner_);
@@ -121,17 +151,24 @@ void ControllerImpl::AddMonitor(fidl::InterfaceHandle<Monitor> monitor,
   callback();
 }
 
+// Invokes the callback provided for long-running workflows.
+template <typename ResultType, typename WorkflowCallback>
+static ResultType Acknowledge(ResultType result, WorkflowCallback callback) {
+  if (result.is_error()) {
+    callback(result.error());
+    return fpromise::error(ZX_ERR_CANCELED);
+  }
+  callback(ZX_OK);
+  return result;
+}
+
 void ControllerImpl::Fuzz(FuzzCallback callback) {
   auto task = ResetArtifact()
+                  .then([callback = std::move(callback)](ZxResult<>& result) mutable {
+                    return Acknowledge(std::move(result), std::move(callback));
+                  })
                   .and_then(runner_->Fuzz())
-                  .and_then([this](Artifact& artifact) {
-                    artifact_ = artifact.Duplicate();
-                    return fpromise::ok(AsyncSocketWrite(executor_, std::move(artifact)));
-                  })
-                  .then([this, callback = std::move(callback)](ZxResult<FidlArtifact>& result) {
-                    callback(std::move(result));
-                    Finish();
-                  })
+                  .then([this](ZxResult<Artifact>& result) { return Finish(std::move(result)); })
                   .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
@@ -139,18 +176,11 @@ void ControllerImpl::Fuzz(FuzzCallback callback) {
 void ControllerImpl::TryOne(FidlInput fidl_input, TryOneCallback callback) {
   auto task = ResetArtifact()
                   .and_then(AsyncSocketRead(executor_, std::move(fidl_input)))
-                  .and_then([this](Input& received) {
-                    artifact_ = Artifact(FuzzResult::NO_ERRORS, received.Duplicate());
-                    return runner_->TryOne(std::move(received));
+                  .then([callback = std::move(callback)](ZxResult<Input>& result) mutable {
+                    return Acknowledge(std::move(result), std::move(callback));
                   })
-                  .then([this, callback = std::move(callback)](ZxResult<FuzzResult>& result) {
-                    if (result.is_ok()) {
-                      auto input = artifact_.take_input();
-                      artifact_ = Artifact(result.value(), std::move(input));
-                    }
-                    callback(std::move(result));
-                    Finish();
-                  })
+                  .and_then([this](Input& input) { return runner_->TryOne(std::move(input)); })
+                  .then([this](ZxResult<Artifact>& result) { return Finish(std::move(result)); })
                   .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
@@ -159,49 +189,71 @@ void ControllerImpl::Minimize(FidlInput fidl_input, MinimizeCallback callback) {
   auto task =
       ResetArtifact()
           .and_then(AsyncSocketRead(executor_, std::move(fidl_input)))
-          .and_then([this](Input& received) { return runner_->Minimize(std::move(received)); })
-          .and_then([this](Input& input) {
-            artifact_ = Artifact(FuzzResult::NO_ERRORS, input.Duplicate());
-            return fpromise::ok(AsyncSocketWrite(executor_, std::move(input)));
+          .and_then([this](Input& input) { return runner_->ValidateMinimize(std::move(input)); })
+          .then([callback = std::move(callback)](ZxResult<Artifact>& result) mutable {
+            return Acknowledge(std::move(result), std::move(callback));
           })
-          .then([this, callback = std::move(callback)](ZxResult<FidlInput>& result) {
-            callback(std::move(result));
-            Finish();
-          })
+          .and_then([this](Artifact& artifact) { return runner_->Minimize(std::move(artifact)); })
+          .then([this](ZxResult<Artifact>& result) { return Finish(std::move(result)); })
           .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
 
 void ControllerImpl::Cleanse(FidlInput fidl_input, CleanseCallback callback) {
-  auto task =
-      ResetArtifact()
-          .and_then(AsyncSocketRead(executor_, std::move(fidl_input)))
-          .and_then([this](Input& received) { return runner_->Cleanse(std::move(received)); })
-          .and_then([this](Input& input) {
-            artifact_ = Artifact(FuzzResult::NO_ERRORS, input.Duplicate());
-            return fpromise::ok(AsyncSocketWrite(executor_, std::move(input)));
-          })
-          .then([this, callback = std::move(callback)](ZxResult<FidlInput>& result) {
-            callback(std::move(result));
-            Finish();
-          })
-          .wrap_with(scope_);
+  auto task = ResetArtifact()
+                  .and_then(AsyncSocketRead(executor_, std::move(fidl_input)))
+                  .then([callback = std::move(callback)](ZxResult<Input>& result) mutable {
+                    return Acknowledge(std::move(result), std::move(callback));
+                  })
+                  .and_then([this](Input& input) { return runner_->Cleanse(std::move(input)); })
+                  .then([this](ZxResult<Artifact>& result) { return Finish(std::move(result)); })
+                  .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
 
 void ControllerImpl::Merge(MergeCallback callback) {
   auto task = ResetArtifact()
-                  .and_then(runner_->Merge())
-                  .then([this, callback = std::move(callback)](ZxResult<>& result) {
-                    callback(result.is_ok() ? ZX_OK : result.error());
-                    Finish();
-                  });
+                  .and_then([this]() { return runner_->ValidateMerge(); })
+                  .then([callback = std::move(callback)](ZxResult<>& result) mutable {
+                    return Acknowledge(std::move(result), std::move(callback));
+                  })
+                  .and_then([this]() { return runner_->Merge(); })
+                  .then([this](ZxResult<Artifact>& result) { return Finish(std::move(result)); })
+                  .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
 
-void ControllerImpl::GetResults(GetResultsCallback callback) {
-  const auto& input = artifact_.input();
-  callback(artifact_.fuzz_result(), AsyncSocketWrite(executor_, input.Duplicate()));
+void ControllerImpl::GetStatus(GetStatusCallback callback) { callback(runner_->CollectStatus()); }
+
+void ControllerImpl::WatchArtifact(WatchArtifactCallback callback) {
+  auto task =
+      executor_->MakePromiseWaitHandle(zx::unowned_handle(changed_.get()), kSync)
+          .then([this](const ZxResult<zx_packet_signal_t>& result) -> ZxResult<FidlArtifact> {
+            if (result.is_error()) {
+              auto status = result.error();
+              FX_LOGS(ERROR) << "Failed to watch for artifact: " << zx_status_get_string(status);
+              return fpromise::error(status);
+            }
+            if (auto status = changed_.signal(Signal::kSync, 0); status != ZX_OK) {
+              FX_LOGS(ERROR) << "Failed to clear artifact event: " << zx_status_get_string(status);
+              return fpromise::error(status);
+            }
+            if (artifact_.is_error()) {
+              return fpromise::error(artifact_.error());
+            }
+            return fpromise::ok(AsyncSocketWrite(executor_, artifact_.value()));
+          })
+          .then([callback = std::move(callback)](ZxResult<FidlArtifact>& result) {
+            if (result.is_error()) {
+              FidlArtifact fidl_artifact;
+              fidl_artifact.set_error(result.error());
+              callback(std::move(fidl_artifact));
+            } else {
+              callback(result.take_value());
+            }
+          })
+          .wrap_with(scope_);
+  executor_->schedule_task(std::move(task));
 }
 
 void ControllerImpl::Stop() {

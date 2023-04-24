@@ -74,14 +74,26 @@ class Runner {
   void AddMonitor(fidl::InterfaceHandle<Monitor> monitor);
 
   // Fuzzing workflows corresponding to methods in `fuchsia.fuzzer.Controller`.
-  virtual ZxPromise<Artifact> Fuzz() = 0;
-  ZxPromise<FuzzResult> TryOne(Input input);
-  virtual ZxPromise<Input> Minimize(Input input) = 0;
-  virtual ZxPromise<Input> Cleanse(Input input) = 0;
-  virtual ZxPromise<> Merge() = 0;
 
-  // Like `TryOne` above, but takes multiple `input`s.
-  virtual ZxPromise<FuzzResult> TryEach(std::vector<Input> inputs) = 0;
+  // Implementation of `fuchsia.fuzzer.Controller/Fuzz`.
+  virtual ZxPromise<Artifact> Fuzz() = 0;
+
+  // Implementation of `fuchsia.fuzzer.Controller/TryOne`.
+  ZxPromise<Artifact> TryOne(Input input);
+  virtual ZxPromise<Artifact> TryEach(std::vector<Input> inputs) = 0;
+
+  // Implementation of `fuchsia.fuzzer.Controller/Minimize`. |ValidateMinimize| must be called
+  // before |Minimize|.
+  virtual ZxPromise<Artifact> ValidateMinimize(Input input) = 0;
+  virtual ZxPromise<Artifact> Minimize(Artifact artifact) = 0;
+
+  // Implementation of `fuchsia.fuzzer.Controller/Cleanse`.
+  virtual ZxPromise<Artifact> Cleanse(Input input) = 0;
+
+  // Implementation of `fuchsia.fuzzer.Controller/Merge`. |ValidateMerge| must be called
+  // before |Merge|.
+  virtual ZxPromise<> ValidateMerge() = 0;
+  virtual ZxPromise<Artifact> Merge() = 0;
 
   // Creates a |Status| object representing all attached processes.
   virtual Status CollectStatus() = 0;
@@ -103,6 +115,24 @@ class Runner {
   //
   class Workflow final {
    public:
+    // In most cases, a fuzzing workflow is encapsulated by a promise returned by a single method,
+    // e.g. `Fuzz`. In this case, the promise is wrapped by a `Workflow` that both starts and
+    // finishes the workflow.
+    //
+    // If a workflow spans multiple promises from multiple methods, each method may specify a `mode`
+    // when wrapping its promise. For example, if a workflow is made up of 3 promises from 3
+    // different methods:
+    //
+    // * The first may wrap its promise with `.wrap_with(workflow_, Workflow::Mode::kStart);`.
+    // * The second may wrap its promise with `.wrap_with(workflow_, Workflow::Mode::kNeither);`.
+    // * The last may wrap its promise with `.wrap_with(workflow_, Workflow::Mode::kFinish);`.
+    enum Mode {
+      kStart,
+      kFinish,
+      kBoth,
+      kNeither,
+    };
+
     explicit Workflow(Runner* runner) : runner_(runner) {}
     ~Workflow() = default;
 
@@ -111,12 +141,12 @@ class Runner {
     // Use |wrap_with(workflow_)| on promises that implement a workflow's behavior to create scoped
     // actions on set up and tear down.
     template <typename Promise>
-    decltype(auto) wrap(Promise promise) {
+    decltype(auto) wrap(Promise promise, Mode mode = Mode::kBoth) {
       static_assert(std::is_same<typename Promise::error_type, zx_status_t>::value,
                     "Workflows must use an error type of zx_status_t.");
-      return Start()
+      return Start(mode)
           .and_then(std::move(promise))
-          .inspect([this](const typename Promise::result_type& result) { Finish(); })
+          .inspect([this, mode](const typename Promise::result_type& result) { Finish(mode); })
           .wrap_with(scope_);
     }
 
@@ -125,8 +155,8 @@ class Runner {
     ZxPromise<> Stop();
 
    private:
-    ZxPromise<> Start();
-    void Finish();
+    ZxPromise<> Start(Mode mode);
+    void Finish(Mode mode);
 
     Runner* runner_ = nullptr;
     ZxCompleter<> completer_;

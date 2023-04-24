@@ -3,11 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    crate::args::{FuzzCtlCommand, FuzzCtlSubcommand, ResetSubcommand, RunLibFuzzerSubcommand},
+    crate::args::{
+        FuzzCtlCommand, FuzzCtlSubcommand, ResetSubcommand, ResumeLibFuzzerSubcommand,
+        RunLibFuzzerSubcommand,
+    },
     anyhow::{anyhow, bail, Context as _, Result},
     argh::FromArgs,
     fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-    fuchsia_fuzzctl::{Artifact, Controller, InputPair, Manager, OutputSink, Writer},
+    fuchsia_fuzzctl::{save_artifact, Controller, InputPair, Manager, OutputSink, Writer},
     regex::Regex,
     std::fs,
     std::path::{Path, PathBuf},
@@ -73,6 +76,7 @@ impl<O: OutputSink> FuzzCtl<O> {
         let (result, url) = match args.command {
             FuzzCtlSubcommand::Reset(cmd) => (self.reset(&cmd).await, cmd.url),
             FuzzCtlSubcommand::RunLibFuzzer(cmd) => (self.run_libfuzzer(&cmd).await, cmd.url),
+            FuzzCtlSubcommand::ResumeLibFuzzer(cmd) => (self.resume_libfuzzer(&cmd).await, cmd.url),
         };
         if result.is_err() {
             // Make a best effort to teardown a fuzzer that returns an error.
@@ -100,87 +104,29 @@ impl<O: OutputSink> FuzzCtl<O> {
         Ok(())
     }
 
-    // Invokes `fuchsia.fuzzer.Controller` based on libFuzzer-style command-line arguments.
+    // Performs fuzzing actions based on libFuzzer-style command-line arguments.
     async fn run_libfuzzer(&self, cmd: &RunLibFuzzerSubcommand) -> Result<()> {
         let fuzzer_dir = self.get_fuzzer_dir(&cmd.url).context("failed to get fuzzer directory")?;
-
-        let proxy = self.manager.connect(&cmd.url).await?;
-        let mut controller = Controller::new(proxy, &self.writer);
-
-        for output in cmd.forward.iter() {
-            let socket = self.manager.get_output(&cmd.url, *output).await?;
-            controller.set_output(socket, *output, &Some(fuzzer_dir.clone()))?;
-        }
-
-        let options = cmd.get_options();
-        controller.configure(options).await.context("failed to configure fuzzer")?;
-
-        if cmd.minimize_crash && cmd.merge {
-            bail!("cannot specify both '-minimize_crash=1' and '-merge=1'");
-        }
-
-        let mut data_paths = LibFuzzerDataPaths::try_new(&fuzzer_dir, &cmd.data, &self.writer)?;
-        if data_paths.num_dirs != 0 && data_paths.num_files != 0 {
-            bail!("data paths must be files or directories, but not both");
-        }
-
-        // Minimize
-        if cmd.minimize_crash {
-            if data_paths.num_files != 1 {
-                bail!("'minimize_crash' expects exactly 1 file");
-            }
-            let input_pair = data_paths.take_test_input()?;
-            let artifact = controller
-                .minimize(input_pair, &fuzzer_dir)
-                .await
-                .context("failed to minimize fuzzer input")?;
-            return data_paths.handle_artifact(artifact, &cmd.exact_artifact_path);
-        }
-
-        // Merge
-        if cmd.merge {
-            if data_paths.num_dirs < 2 {
-                bail!("'merge' expects 2 or more directories");
-            }
-            let (output_corpus, input_pairs) =
-                data_paths.take_corpora().context("failed to add corpora to be merged")?;
-            controller
-                .add_to_corpus(input_pairs, fuzz::Corpus::Live)
-                .await
-                .context("failed to add inputs to corpus")?;
-            controller.merge().await.context("failed to merge fuzzer corpora")?;
-            controller
-                .read_corpus(fuzz::Corpus::Live, &output_corpus)
-                .await
-                .context("failed to read corpus after merging")?;
-            return Ok(());
-        }
-
-        // TryOne
-        if data_paths.num_files != 0 {
-            while let Ok(input_pair) = data_paths.take_test_input() {
-                let artifact =
-                    controller.try_one(input_pair).await.context("failed to try fuzzer input")?;
-                if artifact.result != FuzzResult::NoErrors {
-                    break;
-                }
-            }
-            return Ok(());
-        }
-
-        // Fuzz
-        let (output_corpus, input_pairs) =
-            data_paths.take_corpora().context("failed to add corpora to be fuzzed")?;
-        controller
-            .add_to_corpus(input_pairs, fuzz::Corpus::Live)
+        let controller = self
+            .get_controller(&cmd.url, &cmd.forward)
             .await
-            .context("failed to add inputs to corpus")?;
-        let artifact = controller.fuzz(&fuzzer_dir).await.context("failed to fuzz")?;
-        controller
-            .read_corpus(fuzz::Corpus::Live, &output_corpus)
+            .context("failed to get fuzzer controller")?;
+        let mut workflow =
+            LibFuzzerWorkflow::new(&fuzzer_dir, &cmd.exact_artifact_path, controller, &self.writer);
+        workflow.run(cmd).await
+    }
+
+    // Completes fuzzing actions started by a previous instance of fuzz_ctl. If a connection to a
+    // fuzzer fails, this method can be used to reconnect and complete any long-running workflows.
+    async fn resume_libfuzzer(&self, cmd: &ResumeLibFuzzerSubcommand) -> Result<()> {
+        let fuzzer_dir = self.get_fuzzer_dir(&cmd.url).context("failed to get fuzzer directory")?;
+        let controller = self
+            .get_controller(&cmd.url, &cmd.forward)
             .await
-            .context("failed to read corpus after fuzzing")?;
-        data_paths.handle_artifact(artifact, &cmd.exact_artifact_path)
+            .context("failed to get fuzzer controller")?;
+        let workflow =
+            LibFuzzerWorkflow::new(&fuzzer_dir, &cmd.exact_artifact_path, controller, &self.writer);
+        workflow.resume().await
     }
 
     // Returns a directory corresponding to a fuzzer URL.
@@ -224,48 +170,40 @@ impl<O: OutputSink> FuzzCtl<O> {
             .with_context(|| format!("failed to create directory: '{}'", path.to_string_lossy()))?;
         Ok(path)
     }
-}
 
-// Holds paths converted from fuzz_ctl's positional data path arguments.
-struct LibFuzzerDataPaths<O: OutputSink> {
-    base: PathBuf,
-    dirs: Vec<PathBuf>,
-    files: VecIter<PathBuf>,
-    num_dirs: usize,
-    num_files: usize,
-    writer: Writer<O>,
-}
-
-impl<O: OutputSink> LibFuzzerDataPaths<O> {
-    fn try_new<P: AsRef<Path>>(base: P, paths: &Vec<String>, writer: &Writer<O>) -> Result<Self> {
-        let mut data_paths = Self {
-            base: base.as_ref().to_path_buf(),
-            dirs: Vec::new(),
-            files: Vec::new().into_iter(),
-            num_dirs: 0,
-            num_files: 0,
-            writer: writer.clone(),
-        };
-        let mut files: Vec<PathBuf> = Vec::new();
-        for relpath in paths.iter() {
-            let abspath = data_paths.abspath(&relpath)?;
-            if abspath.is_dir() {
-                data_paths.dirs.push(relpath.into());
-            } else if abspath.is_file() {
-                files.push(relpath.into());
-            } else {
-                bail!("no such data path: {}", relpath);
-            }
+    // Returns a `Controller` connected to the fuzzer given by the `url`.
+    async fn get_controller(
+        &self,
+        url: &Url,
+        forward: &Vec<fuzz::TestOutput>,
+    ) -> Result<Controller<O>> {
+        let proxy = self.manager.connect(url).await?;
+        let mut controller = Controller::new(proxy, &self.writer);
+        let fuzzer_dir = self.get_fuzzer_dir(&url)?;
+        for output in forward.iter() {
+            let socket = self.manager.get_output(url, *output).await?;
+            controller.set_output(socket, *output, &Some(fuzzer_dir.clone()))?;
         }
-        data_paths.num_dirs = data_paths.dirs.len();
-        data_paths.num_files = files.len();
-        data_paths.files = files.into_iter();
-        Ok(data_paths)
+        Ok(controller)
+    }
+}
+
+struct LibFuzzerPathBuf {
+    base: PathBuf,
+}
+
+impl LibFuzzerPathBuf {
+    fn new<P: AsRef<Path>>(path: P) -> Self {
+        Self { base: path.as_ref().to_path_buf() }
     }
 
     // Returns an absolute path for the given `relpath` with 'tmp' replaced by the fuzzer directory.
     fn abspath<P: AsRef<Path>>(&self, relpath: P) -> Result<PathBuf> {
         let relpath = relpath.as_ref();
+        if relpath.starts_with(&self.base) {
+            // Already absolute.
+            return Ok(PathBuf::from(relpath));
+        }
         let path = relpath.strip_prefix("tmp").with_context(|| {
             format!("data paths must be relative to 'tmp/': {}", relpath.to_string_lossy())
         })?;
@@ -275,10 +213,141 @@ impl<O: OutputSink> LibFuzzerDataPaths<O> {
     // Returns a relative path for the given `abspath` with the fuzzer directory replaced by 'tmp'.
     fn relpath<P: AsRef<Path>>(&self, abspath: P) -> Result<PathBuf> {
         let abspath = abspath.as_ref();
+        if abspath.starts_with("tmp/") {
+            // Already relative.
+            return Ok(PathBuf::from(abspath));
+        }
         let path = abspath.strip_prefix(&self.base).with_context(|| {
             format!("'{}' is outside fuzzer directory", abspath.to_string_lossy())
         })?;
         Ok(PathBuf::from("tmp").join(path))
+    }
+
+    fn as_path_ref(&self) -> &Path {
+        &self.base.as_path()
+    }
+}
+
+// Holds paths converted from fuzz_ctl's positional data path arguments.
+struct LibFuzzerWorkflow<O: OutputSink> {
+    fuzzer_dir: LibFuzzerPathBuf,
+    controller: Controller<O>,
+    dirs: Vec<PathBuf>,
+    files: VecIter<PathBuf>,
+    num_dirs: usize,
+    num_files: usize,
+    output_corpus: Option<PathBuf>,
+    exact_artifact_path: Option<PathBuf>,
+    writer: Writer<O>,
+}
+
+impl<O: OutputSink> LibFuzzerWorkflow<O> {
+    fn new<P: AsRef<Path>>(
+        fuzzer_dir: P,
+        exact_artifact_path: &Option<String>,
+        controller: Controller<O>,
+        writer: &Writer<O>,
+    ) -> Self {
+        Self {
+            fuzzer_dir: LibFuzzerPathBuf::new(fuzzer_dir),
+            controller,
+            dirs: Vec::new(),
+            files: Vec::new().into_iter(),
+            num_dirs: 0,
+            num_files: 0,
+            output_corpus: None,
+            exact_artifact_path: exact_artifact_path.as_ref().map(|s| PathBuf::from(s)),
+            writer: writer.clone(),
+        }
+    }
+
+    // Executes the given `cmd`.
+    async fn run(&mut self, cmd: &RunLibFuzzerSubcommand) -> Result<()> {
+        let mut files: Vec<PathBuf> = Vec::new();
+        for relpath in cmd.data.iter() {
+            let abspath = self.fuzzer_dir.abspath(&relpath)?;
+            if abspath.is_dir() {
+                self.dirs.push(relpath.into());
+            } else if abspath.is_file() {
+                files.push(relpath.into());
+            } else {
+                bail!("no such data path: {}", relpath);
+            }
+        }
+        self.num_dirs = self.dirs.len();
+        self.num_files = files.len();
+        self.files = files.into_iter();
+        if self.num_dirs != 0 && self.num_files != 0 {
+            bail!("data paths must be files or directories, but not both");
+        }
+
+        if cmd.minimize_crash && cmd.merge {
+            bail!("cannot specify both '-minimize_crash=1' and '-merge=1'");
+        }
+
+        let options = cmd.get_options();
+        self.controller.configure(options).await.context("failed to configure fuzzer")?;
+
+        // Minimize
+        if cmd.minimize_crash {
+            if self.num_files != 1 {
+                bail!("'minimize_crash' expects exactly 1 file");
+            }
+            let input_pair = self.take_test_input()?;
+            self.controller
+                .minimize(input_pair)
+                .await
+                .context("failed to minimize fuzzer input")?;
+            self.finish().await?;
+            return Ok(());
+        }
+
+        // Merge
+        if cmd.merge {
+            if self.num_dirs < 2 {
+                bail!("'merge' expects 2 or more directories");
+            }
+            let input_pairs = self.take_corpora().context("failed to add corpora to be merged")?;
+            self.controller
+                .add_to_corpus(input_pairs, fuzz::Corpus::Live)
+                .await
+                .context("failed to add inputs to corpus")?;
+            self.controller.merge().await.context("failed to merge fuzzer corpora")?;
+            self.finish().await?;
+            self.read_corpus().await?;
+            return Ok(());
+        }
+
+        // TryOne
+        if self.num_files != 0 {
+            while let Ok(input_pair) = self.take_test_input() {
+                self.controller.try_one(input_pair).await.context("failed to try fuzzer input")?;
+                let result = self.finish().await?;
+                if result != FuzzResult::NoErrors {
+                    break;
+                }
+            }
+            return Ok(());
+        }
+
+        // Fuzz
+        let input_pairs = self.take_corpora().context("failed to add corpora to be fuzzed")?;
+        self.controller
+            .add_to_corpus(input_pairs, fuzz::Corpus::Live)
+            .await
+            .context("failed to add inputs to corpus")?;
+        self.controller.fuzz().await.context("failed to fuzz")?;
+        self.finish().await?;
+        self.read_corpus().await?;
+        return Ok(());
+    }
+
+    // Resumes waiting for a fuzzer to complete a long-running workflow. This is useful when
+    // reconnecting to a fuzzer controller.
+    async fn resume(&self) -> Result<()> {
+        self.controller.reset_timer().await?;
+        self.finish().await?;
+        Ok(())
     }
 
     // Finds and converts all the inputs in a given list of directories to input pairs.
@@ -288,12 +357,12 @@ impl<O: OutputSink> LibFuzzerDataPaths<O> {
     //
     // Returns the abolsute path to the first directory, and the accumulated input pairs to be sent.
     //
-    fn take_corpora(&mut self) -> Result<(PathBuf, Vec<InputPair>)> {
+    fn take_corpora(&mut self) -> Result<Vec<InputPair>> {
         let first = (!self.dirs.is_empty()).then(|| self.dirs[0].clone());
         let mut input_pairs = Vec::new();
         let dirs: Vec<_> = self.dirs.drain(..).collect();
         for relpath in dirs {
-            let dir = self.abspath(relpath).unwrap();
+            let dir = self.fuzzer_dir.abspath(relpath).unwrap();
             for entry in WalkDir::new(dir).follow_links(true).into_iter().filter_map(|e| e.ok()) {
                 if !entry.file_type().is_file() {
                     continue;
@@ -308,7 +377,8 @@ impl<O: OutputSink> LibFuzzerDataPaths<O> {
 
         let first = first.unwrap_or(PathBuf::from("tmp/corpus"));
         self.writer.println(format!("Using '{}' as the output corpus.", first.to_string_lossy()));
-        Ok((self.abspath(first).unwrap(), input_pairs))
+        self.output_corpus = self.fuzzer_dir.abspath(first).ok();
+        Ok(input_pairs)
     }
 
     // Converts a file to an input pair to be used as a test case for workflows like `minimize`.
@@ -318,40 +388,66 @@ impl<O: OutputSink> LibFuzzerDataPaths<O> {
     fn take_test_input(&mut self) -> Result<InputPair> {
         let relpath = self.files.next().context("no remaining test input files")?;
         self.writer.println(format!("Using '{}' as the test input.", relpath.to_string_lossy()));
-        InputPair::try_from_path(self.abspath(relpath).unwrap())
+        InputPair::try_from_path(self.fuzzer_dir.abspath(relpath).unwrap())
     }
 
-    // Reports where data associated with a fuzzing artifact has been stored.
+    // Waits for the controller to produce an fuzzing artifact, and reports where data associated
+    // with it has been stored.
     //
-    // If `exact_artifact_path` is not `None`, it rename the artifact data file to that path.
+    // If `self.exact_artifact_path` is not `None`, it renames the artifact data file to that path.
     //
     // Returns an error if renaming is needed but fails.
     //
-    fn handle_artifact(
-        &self,
-        artifact: Artifact,
-        exact_artifact_path: &Option<String>,
-    ) -> Result<()> {
-        if artifact.path.is_none() {
-            return Ok(());
+    async fn finish(&self) -> Result<FuzzResult> {
+        let fidl_artifact = self.controller.watch_artifact().await?;
+        let artifact = save_artifact(fidl_artifact, self.fuzzer_dir.as_path_ref()).await?;
+        if artifact.is_none() {
+            self.writer.println("Workflow was canceled.");
+            return Ok(FuzzResult::NoErrors);
         }
-        let mut relpath =
-            self.relpath(artifact.path.unwrap()).context("invalid `artifact.path`")?;
-        if let Some(exact_artifact_path) = exact_artifact_path {
-            let src = self.abspath(&relpath)?;
-            relpath = PathBuf::from(exact_artifact_path);
-            let dst = self.abspath(&relpath).context("invalid `exact_artifact_path`")?;
-            fs::rename(&src, &dst).with_context(|| {
-                format!("failed to rename {} to {}", src.to_string_lossy(), dst.to_string_lossy())
-            })?;
-        }
-        let relpath = relpath.to_string_lossy().to_string();
+        let artifact = artifact.unwrap();
+        let mut input_path = match artifact.path {
+            Some(path) => path,
+            None => return Ok(artifact.result),
+        };
+        match &self.exact_artifact_path {
+            Some(exact_artifact_path) => {
+                let src = self.fuzzer_dir.abspath(&input_path)?;
+                input_path = PathBuf::from(exact_artifact_path);
+                let dst = self
+                    .fuzzer_dir
+                    .abspath(&input_path)
+                    .context("invalid `exact_artifact_path`")?;
+                fs::rename(&src, &dst).with_context(|| {
+                    format!(
+                        "failed to rename {} to {}",
+                        src.to_string_lossy(),
+                        dst.to_string_lossy()
+                    )
+                })?;
+            }
+            None => {
+                input_path = self.fuzzer_dir.relpath(input_path)?;
+            }
+        };
+        let input_path = input_path.to_string_lossy().to_string();
         let prologue = match artifact.result {
+            FuzzResult::NoErrors => return Ok(artifact.result),
             FuzzResult::Cleansed => "Cleansed input written",
             FuzzResult::Minimized => "Minimized input written",
             _ => "Input saved",
         };
-        self.writer.println(format!("{} to '{}'.", prologue, relpath));
+        self.writer.println(format!("{} to '{}'.", prologue, input_path));
+        Ok(artifact.result)
+    }
+
+    // Updates the local copy of the live corpus to match the inputs in the test realm.
+    async fn read_corpus(&self) -> Result<()> {
+        let output_corpus = self.output_corpus.as_ref().unwrap();
+        self.controller
+            .read_corpus(fuzz::Corpus::Live, output_corpus)
+            .await
+            .context("failed to read corpus")?;
         Ok(())
     }
 }
@@ -359,7 +455,7 @@ impl<O: OutputSink> LibFuzzerDataPaths<O> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{FuzzCtl, LibFuzzerDataPaths},
+        super::{FuzzCtl, LibFuzzerPathBuf},
         anyhow::Result,
         fidl::endpoints::create_proxy,
         fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
@@ -374,21 +470,22 @@ mod tests {
 
     // Test fixtures.
 
-    fn perform_setup() -> Result<(Test, FuzzCtl<BufferSink>, fasync::Task<()>)> {
+    fn perform_setup() -> Result<(Test, FuzzCtl<BufferSink>, LibFuzzerPathBuf, fasync::Task<()>)> {
         let test = Test::try_new()?;
         let (proxy, server_end) = create_proxy::<fuzz::ManagerMarker>()?;
         let fuzz_ctl = FuzzCtl::new(proxy, test.root_dir(), test.writer());
         let task = create_task(serve_manager(server_end, test.clone()), test.writer());
 
-        let fuzzer_dir = fuzzer_dir_for_test(&fuzz_ctl)?;
-        let data_paths = LibFuzzerDataPaths::try_new(&fuzzer_dir, &Vec::new(), test.writer())?;
-        let abspath = data_paths.abspath("tmp/corpus1")?;
+        let url = Url::parse(TEST_URL)?;
+        let fuzzer_dir = fuzz_ctl.get_fuzzer_dir(&url)?;
+        let fuzzer_dir = LibFuzzerPathBuf::new(&fuzzer_dir);
+        let abspath = fuzzer_dir.abspath("tmp/corpus1")?;
         let corpus1 = test.create_dir(abspath)?;
-        let abspath = data_paths.abspath("tmp/corpus2")?;
+        let abspath = fuzzer_dir.abspath("tmp/corpus2")?;
         test.create_dir(abspath)?;
         test.create_test_files(&corpus1, vec!["hello", "world"].iter())?;
 
-        Ok((test, fuzz_ctl, task))
+        Ok((test, fuzz_ctl, fuzzer_dir, task))
     }
 
     async fn run_cmd<O: OutputSink>(fuzz_ctl: &FuzzCtl<O>, cmdline: &Vec<&str>, test: &Test) {
@@ -398,33 +495,11 @@ mod tests {
         }
     }
 
-    fn abspath_for_test<O: OutputSink>(fuzz_ctl: &FuzzCtl<O>, relpath: &str) -> Result<PathBuf> {
-        let fuzzer_dir = fuzzer_dir_for_test(&fuzz_ctl)?;
-        let data_paths = LibFuzzerDataPaths::try_new(&fuzzer_dir, &Vec::new(), &fuzz_ctl.writer)?;
-        data_paths.abspath(relpath)
-    }
-
-    fn digest_relpath<O: OutputSink>(
-        fuzz_ctl: &FuzzCtl<O>,
-        result: FuzzResult,
-        data: &[u8],
-    ) -> Result<PathBuf> {
-        let fuzzer_dir = fuzzer_dir_for_test(&fuzz_ctl)?;
-        let abspath = digest_path(&fuzzer_dir, Some(result), data);
-        let data_paths = LibFuzzerDataPaths::try_new(&fuzzer_dir, &Vec::new(), &fuzz_ctl.writer)?;
-        data_paths.relpath(abspath)
-    }
-
-    fn fuzzer_dir_for_test<O: OutputSink>(fuzz_ctl: &FuzzCtl<O>) -> Result<PathBuf> {
-        let url = Url::parse(TEST_URL)?;
-        fuzz_ctl.get_fuzzer_dir(&url)
-    }
-
     // Unit tests.
 
     #[fuchsia::test]
     async fn test_reset_missing_url() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["reset"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -435,7 +510,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_reset_invalid_urls() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["reset", "bad_url"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -458,19 +533,21 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_reset() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, fuzzer_dir, _task) = perform_setup()?;
 
         // Fuzzer-related files should be cleared and requests made to the fuzz-manager.
-        assert!(abspath_for_test(&fuzz_ctl, "tmp/corpus1/hello").unwrap().exists());
-        assert!(abspath_for_test(&fuzz_ctl, "tmp/corpus1/world").unwrap().exists());
+        let hello = fuzzer_dir.abspath("tmp/corpus1/hello")?;
+        let world = fuzzer_dir.abspath("tmp/corpus1/world")?;
+        assert!(hello.exists());
+        assert!(world.exists());
 
         let _ = test.requests();
         let cmdline = vec!["reset", TEST_URL];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
         assert_eq!(*test.url().borrow(), Some(TEST_URL.to_string()));
 
-        assert!(!abspath_for_test(&fuzz_ctl, "tmp/corpus1/hello").unwrap().exists());
-        assert!(!abspath_for_test(&fuzz_ctl, "tmp/corpus1/world").unwrap().exists());
+        assert!(!hello.exists());
+        assert!(!world.exists());
 
         let requests = vec![
             format!("fuchsia.fuzzer.Manager/Stop({})", TEST_URL),
@@ -483,7 +560,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_missing_url() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -494,7 +571,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_mixed_data_paths() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "tmp/corpus1/hello", "tmp/corpus2"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -505,7 +582,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_invalid_data_paths() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "pkg/data/hello"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -520,7 +597,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_invalid_argh_options() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "--nonsense"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -531,7 +608,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_parse_argh_options() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
         fake.set_result(Ok(FuzzResult::NoErrors));
 
@@ -559,7 +636,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_invalid_options() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "-nonsense=1"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -570,7 +647,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_parse_options() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let mut cmdline = vec!["run_libfuzzer", TEST_URL];
@@ -597,7 +674,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_fuzz_error() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         fake.set_result(Err(zx::Status::INTERNAL));
@@ -619,7 +696,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_fuzz_default_options() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let _ = test.requests();
@@ -631,8 +708,10 @@ mod tests {
 
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
 
-        let relpath = digest_relpath(&fuzz_ctl, FuzzResult::Crash, b"crash")?;
-        test.output_matches(format!("Input saved to '{}'.", relpath.to_string_lossy()));
+        let input_path = digest_path(fuzzer_dir.as_path_ref(), Some(FuzzResult::Crash), b"crash");
+        let input_path = input_path.strip_prefix(fuzzer_dir.as_path_ref())?;
+        let input_path = PathBuf::from("tmp").join(input_path);
+        test.output_matches(format!("Input saved to '{}'.", input_path.to_string_lossy()));
 
         let requests = vec![
             format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
@@ -648,7 +727,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_fuzz_directories() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let _ = test.requests();
@@ -660,8 +739,10 @@ mod tests {
 
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
 
-        let relpath = digest_relpath(&fuzz_ctl, FuzzResult::Oom, b"oom")?;
-        test.output_matches(format!("Input saved to '{}'.", relpath.to_string_lossy()));
+        let input_path = digest_path(fuzzer_dir.as_path_ref(), Some(FuzzResult::Oom), b"oom");
+        let input_path = input_path.strip_prefix(fuzzer_dir.as_path_ref())?;
+        let input_path = PathBuf::from("tmp").join(input_path);
+        test.output_matches(format!("Input saved to '{}'.", input_path.to_string_lossy()));
 
         let requests = vec![
             format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
@@ -679,7 +760,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_fuzz_exact_artifact_path() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let _ = test.requests();
@@ -707,7 +788,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_try_one() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let _ = test.requests();
@@ -732,7 +813,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_try_multiple() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let _ = test.requests();
@@ -759,7 +840,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_minimize_directory() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "tmp/corpus1", "--minimize-crash 1"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -770,7 +851,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_minimize_multiple_files() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec![
             "run_libfuzzer",
@@ -787,7 +868,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_minimize_one_file() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, fuzzer_dir, _task) = perform_setup()?;
         let fake = test.controller();
 
         let _ = test.requests();
@@ -798,9 +879,14 @@ mod tests {
 
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
 
-        let relpath = digest_relpath(&fuzz_ctl, FuzzResult::Minimized, b"minimized")?;
-        test.output_matches(format!("Minimized input written to '{}'.", relpath.to_string_lossy()));
-        assert_eq!(fake.get_result(), Ok(FuzzResult::Minimized));
+        let input_path =
+            digest_path(fuzzer_dir.as_path_ref(), Some(FuzzResult::Minimized), b"minimized");
+        let input_path = input_path.strip_prefix(fuzzer_dir.as_path_ref())?;
+        let input_path = PathBuf::from("tmp").join(input_path);
+        test.output_matches(format!(
+            "Minimized input written to '{}'.",
+            input_path.to_string_lossy()
+        ));
 
         let requests = vec![
             format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
@@ -815,7 +901,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_merge_files() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline =
             vec!["run_libfuzzer", TEST_URL, "tmp/corpus1/hello", "tmp/corpus1/world", "-merge=1"];
@@ -827,7 +913,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_merge_one_directory() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "tmp/corpus1", "--merge 1"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
@@ -838,15 +924,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_merge_directories() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
-        let fake = test.controller();
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let _ = test.requests();
         let cmdline = vec!["run_libfuzzer", TEST_URL, "tmp/corpus1", "tmp/corpus2", "--merge 1"];
         test.output_matches("Using 'tmp/corpus1' as the output corpus.");
 
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
-        assert_eq!(fake.get_result(), Ok(FuzzResult::Merged));
 
         let requests = vec![
             format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
@@ -864,7 +948,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_run_libfuzzer_minimize_and_merge() -> Result<()> {
-        let (mut test, fuzz_ctl, _task) = perform_setup()?;
+        let (mut test, fuzz_ctl, _fuzzer_dir, _task) = perform_setup()?;
 
         let cmdline = vec!["run_libfuzzer", TEST_URL, "--minimize-crash 1", "-merge=1"];
         run_cmd(&fuzz_ctl, &cmdline, &test).await;

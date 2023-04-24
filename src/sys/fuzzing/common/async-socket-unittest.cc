@@ -42,45 +42,48 @@ class AsyncSocketTest : public AsyncTest {
 // Unit tests.
 
 TEST_F(AsyncSocketTest, ReadAndWriteInput) {
-  auto input = Generate(1UL << 10);
-  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), input.Duplicate())),
+  auto input = Generate(1UL << 12);
+  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), input)),
                     std::move(input));
   RunUntilIdle();
 }
 
 TEST_F(AsyncSocketTest, ReadAndWriteEmptyInput) {
   Input input;
-  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), input.Duplicate())),
+  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), input)),
                     std::move(input));
   RunUntilIdle();
 }
 
 TEST_F(AsyncSocketTest, ReadAndWriteLargeInput) {
-  auto input = Generate(1UL << 10);
-  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), input.Duplicate())),
+  auto input = Generate(1UL << 24);
+  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), input)),
                     std::move(input));
   RunUntilIdle();
 }
 
 TEST_F(AsyncSocketTest, ReadAndWriteArtifact) {
-  Artifact artifact(FuzzResult::OOM, Generate(1UL << 10));
-  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), artifact.Duplicate())),
-                    std::move(artifact));
+  Artifact actual;
+  auto expected = Artifact(FuzzResult::OOM, Generate(1UL << 12));
+  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), expected)), &actual);
   RunUntilIdle();
+  EXPECT_EQ(actual, expected);
 }
 
 TEST_F(AsyncSocketTest, ReadAndWriteEmptyArtifact) {
-  Artifact artifact(FuzzResult::OOM, Generate(1UL << 10));
-  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), artifact.Duplicate())),
-                    std::move(artifact));
+  Artifact actual;
+  auto expected = Artifact(FuzzResult::OOM);
+  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), expected)), &actual);
   RunUntilIdle();
+  EXPECT_EQ(actual, expected);
 }
 
 TEST_F(AsyncSocketTest, ReadAndWriteLargeArtifact) {
-  Artifact artifact(FuzzResult::OOM, Generate(1UL << 10));
-  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), artifact.Duplicate())),
-                    std::move(artifact));
+  Artifact actual;
+  auto expected = Artifact(FuzzResult::OOM, Generate(1UL << 24));
+  FUZZING_EXPECT_OK(AsyncSocketRead(executor(), AsyncSocketWrite(executor(), expected)), &actual);
   RunUntilIdle();
+  EXPECT_EQ(actual, expected);
 }
 
 }  // namespace fuzzing

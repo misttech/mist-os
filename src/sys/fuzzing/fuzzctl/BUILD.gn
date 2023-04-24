@@ -101,4 +101,7 @@ fuchsia_test_package("tests") {
     ":bin-unittests",
     ":lib-unittests",
   ]
+  test_specs = {
+    isolated = true
+  }
 }

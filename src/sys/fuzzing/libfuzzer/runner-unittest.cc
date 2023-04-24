@@ -38,13 +38,6 @@ class LibFuzzerRunnerTest : public RunnerTest {
   //////////////////////////////////////
   // Test fixtures.
 
-  // Some of libFuzzer's workflows spawn "inner" processes that test actual inputs and may fault,
-  // while the original, "outer" process controls their execution and should be fault-resistant. If
-  // the OOM limit is set to low, these "outer" processes may fault as well. This is especially
-  // noticeable when running with ASan, where the outer process has been observed to use 35 MB of
-  // memory or more.
-  static const uint64_t kOomLimit = 1ULL << 26;  // 64 MB
-
   const RunnerPtr& runner() const override { return runner_; }
 
   void SetUp() override {
@@ -99,12 +92,11 @@ class LibFuzzerRunnerTest : public RunnerTest {
         .and_then([](const zx_signals_t& observed) -> ZxResult<> { return fpromise::ok(); })
         .or_else([this, relay = RelayPtr(), connect = Future<>()](
                      Context& context, const zx_status_t& status) mutable -> ZxResult<> {
-          // Connect to the fuzzer via the relay.
-          if (!relay) {
+          if (!connect) {
+            // Connect to the fuzzer via the relay.
             auto handler = context_->MakeRequestHandler<Relay>();
             handler(relay.NewRequest(executor()->dispatcher()));
-          }
-          if (!connect) {
+
             // Exchange shared objects with the fuzzer via the relay.
             SignaledBuffer data;
             data.eventpair = eventpair_->Create();
@@ -189,8 +181,6 @@ class LibFuzzerRunnerTest : public RunnerTest {
 #undef RUNNER_TYPE
 #undef RUNNER_TEST
 
-TEST_F(LibFuzzerRunnerTest, MergeSeedError) { MergeSeedError(/* expected */ ZX_OK, kOomLimit); }
-
-TEST_F(LibFuzzerRunnerTest, Merge) { Merge(/* keep_errors= */ false, kOomLimit); }
+TEST_F(LibFuzzerRunnerTest, Merge) { Merge(/* keep_errors= */ false); }
 
 }  // namespace fuzzing

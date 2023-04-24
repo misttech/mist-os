@@ -52,7 +52,7 @@ class ControllerImpl : public Controller {
   void Merge(MergeCallback callback) override;
 
   void GetStatus(GetStatusCallback callback) override;
-  void GetResults(GetResultsCallback callback) override;
+  void WatchArtifact(WatchArtifactCallback callback) override;
 
   // Cancels any workflow being executed by this object's runner.
   void Stop();
@@ -61,13 +61,15 @@ class ControllerImpl : public Controller {
   // Returns a promise to reset the saved artifact as part of starting a workflow.
   ZxPromise<> ResetArtifact();
 
-  // Sends the "done marker" for long-running workflows as described in `fuchsia.fuzzer.Controller`.
-  void Finish();
+  // Returns a promise to update the artifact watcher and send the "done marker" for long-running
+  // workflows as described in `fuchsia.fuzzer.Controller`.
+  ZxPromise<> Finish(ZxResult<Artifact> result);
 
   fidl::Binding<Controller> binding_;
   ExecutorPtr executor_;
   RunnerPtr runner_;
-  Artifact artifact_;
+  ZxResult<Artifact> artifact_;
+  zx::event changed_;
   Scope scope_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(ControllerImpl);

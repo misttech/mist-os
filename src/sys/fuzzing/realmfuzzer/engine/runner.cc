@@ -129,7 +129,7 @@ ZxPromise<Artifact> RealmFuzzerRunner::Fuzz() {
   return FuzzInputs(/* backlog= */ options()->mutation_depth()).wrap_with(workflow_);
 }
 
-ZxPromise<FuzzResult> RealmFuzzerRunner::TryEach(std::vector<Input> inputs) {
+ZxPromise<Artifact> RealmFuzzerRunner::TryEach(std::vector<Input> inputs) {
   return fpromise::make_promise([this, inputs = std::move(inputs)]() mutable -> ZxResult<> {
            for (auto& input : inputs) {
              if (auto status = generated_sender_.Send(std::move(input)); status != ZX_OK) {
@@ -152,81 +152,81 @@ ZxPromise<FuzzResult> RealmFuzzerRunner::TryEach(std::vector<Input> inputs) {
         }
         return fpromise::error(status);
       })
+      .and_then([](FuzzResult& fuzz_result) -> ZxResult<Artifact> {
+        return fpromise::ok(Artifact(fuzz_result));
+      })
       .wrap_with(workflow_);
 }
 
-ZxPromise<Input> RealmFuzzerRunner::Minimize(Input input) {
-  auto orig_corpus = live_corpus_;
-  auto orig_options = CopyOptions(options());
-  // Check that the input can be minimized, and that minimizationis bounded.
+ZxPromise<Artifact> RealmFuzzerRunner::ValidateMinimize(Input input) {
+  // Check that the input can be minimized, and that minimization is bounded.
   return TestOneAsync(std::move(input), kNoPostProcessing)
-      .or_else([](const zx_status_t& status) {
-        if (status == ZX_ERR_STOP) {
+      .or_else([this](const zx_status_t& status) {
+        return CheckPrevious(status).and_then([]() -> ZxResult<Artifact> {
           FX_LOGS(WARNING) << "Test input did not trigger an error.";
           return fpromise::error(ZX_ERR_INVALID_ARGS);
-        }
-        return fpromise::error(status);
+        });
       })
-      .and_then([this](Artifact& artifact) -> ZxResult<Artifact> {
-        if (!options()->has_runs() && !options()->has_max_total_time()) {
-          FX_LOGS(INFO)
-              << "'max_total_time' and 'runs' are both not set. Defaulting to 10 minutes.";
-          options()->set_max_total_time(zx::min(10).get());
-        }
-        return fpromise::ok(std::move(artifact));
-      })
-      .and_then([this, fuzz_result = FuzzResult::NO_ERRORS, input = Input(),
-                 minimize = ZxFuture<Artifact>()](Context& context,
-                                                  Artifact& original) mutable -> ZxResult<Input> {
-        if (fuzz_result == FuzzResult::NO_ERRORS) {
-          // First pass.
-          std::tie(fuzz_result, input) = original.take_tuple();
-        }
-        while (true) {
-          if (!minimize) {
-            // Ratchet down the input one byte.
-            if (input.size() < 2) {
-              FX_LOGS(INFO) << "Input is " << input.size()
-                            << " byte(s); will not minimize further.";
-              return fpromise::ok(std::move(input));
-            }
-            auto next_input = input.Duplicate();
-            next_input.Truncate(input.size() - 1);
-            options()->set_max_input_size(next_input.size());
-            // Start each fuzzing pass using the seed corpus and the minimized input.
-            live_corpus_ = Corpus::MakePtr();
-            live_corpus_->Configure(options());
-            auto status = live_corpus_->Add(std::move(next_input));
-            if (status != ZX_OK) {
-              FX_LOGS(ERROR) << "Failed to reset corpus: " << zx_status_get_string(status);
-              return fpromise::error(status);
-            }
-            // Imitate libFuzzer and count from 0 so long as errors are found.
-            Reset();
-            run_ = 0;
-            pool_->Clear();
-            minimize = FuzzInputs();
-          }
-          if (!minimize(context)) {
-            return fpromise::pending();
-          }
-          if (minimize.is_error()) {
-            return fpromise::error(minimize.error());
-          }
-          auto artifact = minimize.take_value();
-          if (artifact.fuzz_result() == FuzzResult::NO_ERRORS) {
-            FX_LOGS(INFO) << "Did not reduce error input beyond " << input.size()
-                          << " bytes; exiting.";
-            return fpromise::ok(std::move(input));
-          }
-          // TODO(fxbug.dev/85424): This needs a more rigorous way of deduplicating crashes.
-          if (artifact.fuzz_result() != fuzz_result) {
-            FX_LOGS(WARNING) << "Different error detected; will not minimize further.";
-            return fpromise::ok(std::move(input));
-          }
-          input = artifact.take_input();
-        }
-      })
+      .wrap_with(workflow_, Workflow::Mode::kStart);
+}
+
+ZxPromise<Artifact> RealmFuzzerRunner::Minimize(Artifact artifact) {
+  FX_DCHECK(artifact.has_input());
+  auto orig_corpus = live_corpus_;
+  auto orig_options = CopyOptions(options());
+  return fpromise::make_promise([this, fuzz_result = artifact.fuzz_result(),
+                                 input = artifact.take_input(), minimize = ZxFuture<Artifact>()](
+                                    Context& context) mutable -> ZxResult<Input> {
+           while (true) {
+             if (!minimize) {
+               // Ratchet down the input one byte.
+               if (input.size() < 2) {
+                 FX_LOGS(INFO) << "Input is " << input.size()
+                               << " byte(s); will not minimize further.";
+                 return fpromise::ok(std::move(input));
+               }
+               if (!options()->has_runs() && !options()->has_max_total_time()) {
+                 FX_LOGS(INFO)
+                     << "'max_total_time' and 'runs' are both not set. Defaulting to 10 minutes.";
+                 options()->set_max_total_time(zx::min(10).get());
+               }
+               auto next_input = input.Duplicate();
+               next_input.Truncate(input.size() - 1);
+               options()->set_max_input_size(next_input.size());
+               // Start each fuzzing pass using the seed corpus and the minimized input.
+               live_corpus_ = Corpus::MakePtr();
+               live_corpus_->Configure(options());
+               auto status = live_corpus_->Add(std::move(next_input));
+               if (status != ZX_OK) {
+                 FX_LOGS(ERROR) << "Failed to reset corpus: " << zx_status_get_string(status);
+                 return fpromise::error(status);
+               }
+               // Imitate libFuzzer and count from 0 so long as errors are found.
+               Reset();
+               run_ = 0;
+               pool_->Clear();
+               minimize = FuzzInputs();
+             }
+             if (!minimize(context)) {
+               return fpromise::pending();
+             }
+             if (minimize.is_error()) {
+               return fpromise::error(minimize.error());
+             }
+             auto minimized = minimize.take_value();
+             if (minimized.fuzz_result() == FuzzResult::NO_ERRORS) {
+               FX_LOGS(INFO) << "Did not reduce error input beyond " << input.size()
+                             << " bytes; exiting.";
+               return fpromise::ok(std::move(input));
+             }
+             // TODO(fxbug.dev/85424): This needs a more rigorous way of deduplicating crashes.
+             if (minimized.fuzz_result() != fuzz_result) {
+               FX_LOGS(WARNING) << "Different error detected; will not minimize further.";
+               return fpromise::ok(std::move(input));
+             }
+             input = minimized.take_input();
+           }
+         })
       .then(
           [this, orig_corpus, options = std::move(orig_options)](ZxResult<Input>& result) mutable {
             pool_->Clear();
@@ -234,10 +234,13 @@ ZxPromise<Input> RealmFuzzerRunner::Minimize(Input input) {
             set_options(std::move(options));
             return std::move(result);
           })
-      .wrap_with(workflow_);
+      .and_then([](Input& input) -> ZxResult<Artifact> {
+        return fpromise::ok(Artifact(FuzzResult::MINIMIZED, std::move(input)));
+      })
+      .wrap_with(workflow_, Workflow::Mode::kFinish);
 }
 
-ZxPromise<Input> RealmFuzzerRunner::Cleanse(Input input) {
+ZxPromise<Artifact> RealmFuzzerRunner::Cleanse(Input input) {
   // The general approach of this loop is to take tested inputs and their fuzzing results and return
   // them to |GenerateCleanInputs| as |Artifacts|.
   AsyncSender<Artifact> sender;
@@ -315,32 +318,38 @@ ZxPromise<Input> RealmFuzzerRunner::Cleanse(Input input) {
              num_artifacts = 0;
            }
          })
+      .and_then([](Input& input) -> ZxResult<Artifact> {
+        return fpromise::ok(Artifact(FuzzResult::CLEANSED, std::move(input)));
+      })
       .wrap_with(workflow_);
 }
 
-ZxPromise<> RealmFuzzerRunner::Merge() {
-  // First, accumulate the coverage from testing all the elements of the seed corpus.
-  auto collect_errors = std::make_shared<std::vector<Input>>();
+ZxPromise<> RealmFuzzerRunner::ValidateMerge() {
+  // Accumulate the coverage from testing all the elements of the seed corpus.
   return TestOneAsync(Input(), kAccumulateCoverage)
       .or_else([this](const zx_status_t& status) {
         return CheckPrevious(status).and_then(TestCorpusAsync(seed_corpus_, kAccumulateCoverage));
       })
-      .and_then([](const Artifact& artifact) -> ZxResult<Artifact> {
+      .and_then([](Artifact& artifact) -> ZxResult<> {
         FX_LOGS(WARNING) << "Seed corpus contains an input that triggers an error: '"
                          << artifact.input().ToHex() << "'";
         return fpromise::error(ZX_ERR_INVALID_ARGS);
       })
-      .or_else([this, collect_errors](const zx_status_t& status) {
-        return CheckPrevious(status).and_then([this, collect_errors] {
-          // Next, measure what coverage each element of the live corpus provides beyond that
-          // accumulated by the seed corpus. After this step the live corpus contains only valid,
-          // measured inputs.
-          auto unmeasured = live_corpus_;
-          live_corpus_ = Corpus::MakePtr();
-          live_corpus_->Configure(options());
-          return TestCorpusAsync(unmeasured, kMeasureCoverageAndKeepInputs, collect_errors);
-        });
-      })
+      .or_else([this](zx_status_t& status) { return CheckPrevious(status); })
+      .wrap_with(workflow_, Workflow::Mode::kStart);
+}
+
+ZxPromise<Artifact> RealmFuzzerRunner::Merge() {
+  auto collect_errors = std::make_shared<std::vector<Input>>();
+  return fpromise::make_promise([this, collect_errors] {
+           // Measure what coverage each element of the live corpus provides beyond that accumulated
+           // by the seed corpus. After this step the live corpus contains only valid, measured
+           // inputs.
+           auto unmeasured = live_corpus_;
+           live_corpus_ = Corpus::MakePtr();
+           live_corpus_->Configure(options());
+           return TestCorpusAsync(unmeasured, kMeasureCoverageAndKeepInputs, collect_errors);
+         })
       .or_else([this, collect_errors](const zx_status_t& status) {
         return CheckPrevious(status).and_then([this, collect_errors] {
           if (!collect_errors->empty()) {
@@ -349,10 +358,9 @@ ZxPromise<> RealmFuzzerRunner::Merge() {
               FX_LOGS(WARNING) << "  '" << input.ToHex() << "'";
             }
           }
-          // Finally, accumulate the coverage from each element of the live corpus. The live corpus
-          // will be stably sorted by size, number of features measured above, and lexicographical
-          // order. Only elements that add coverage not accumulated by previous elements will be
-          // kept.
+          // Accumulate the coverage from each element of the live corpus. The live corpus will be
+          // stably sorted by size, number of features measured above, and lexicographical order.
+          // Only elements that add coverage not accumulated by previous elements will be kept.
           auto measured = live_corpus_;
           live_corpus_ = Corpus::MakePtr();
           live_corpus_->Configure(options());
@@ -375,7 +383,8 @@ ZxPromise<> RealmFuzzerRunner::Merge() {
           return fpromise::ok();
         });
       })
-      .wrap_with(workflow_);
+      .and_then([]() -> ZxResult<Artifact> { return fpromise::ok(Artifact(FuzzResult::MERGED)); })
+      .wrap_with(workflow_, Workflow::Mode::kFinish);
 }
 
 Status RealmFuzzerRunner::CollectStatus() {

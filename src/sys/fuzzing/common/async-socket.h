@@ -17,24 +17,22 @@ namespace fuzzing {
 //
 // Example:
 //   auto fidl_input = my_sync_ptr->MyFidlMethod();
-//   Input input;
-//   fpromise::run_single_threaded(socket.Read(std::move(fidl_input))
-//     .and_then([&] (Input& received) { input = std::move(received); ... }));
+//   AsyncSocketRead(executor(), std::move(fidl_input))
+//     .and_then([&] (Input& received) { DoSomething(received); ... }));
 //
-ZxPromise<Input> AsyncSocketRead(const ExecutorPtr& executor, FidlInput&& fidl_input);
-ZxPromise<Artifact> AsyncSocketRead(const ExecutorPtr& executor, FidlArtifact&& fidl_artifact);
+ZxPromise<Input> AsyncSocketRead(const ExecutorPtr& executor, FidlInput fidl_input);
+ZxPromise<Artifact> AsyncSocketRead(const ExecutorPtr& executor, FidlArtifact fidl_artifact);
 
 // Schedules a task to write data from an |input| or |artifact| to a corresponding |FidlInput| or
-// |FidlArtifact|, which is returned. These methods take ownership of their inputs to ensure they
-// live as long as the scheduled promises.
+// |FidlArtifact|, which is returned.
 //
 // Example:
-//   socket.Write(my_input.Duplicate(), [&] (FidlInput&& fidl_input) {
-//     my_ptr->MyFidlMethod(std::move(fidl_input);
-//   )});
+//   Input my_input("example");
+//   auto fidl_input = AsyncSocketWrite(executor(), my_input);
+//   my_ptr->MyFidlMethod(std::move(fidl_input);
 //
-FidlInput AsyncSocketWrite(const ExecutorPtr& executor, Input&& input);
-FidlArtifact AsyncSocketWrite(const ExecutorPtr& executor, Artifact&& input);
+FidlInput AsyncSocketWrite(const ExecutorPtr& executor, const Input& input);
+FidlArtifact AsyncSocketWrite(const ExecutorPtr& executor, const Artifact& artifact);
 
 }  // namespace fuzzing
 

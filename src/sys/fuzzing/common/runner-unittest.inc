@@ -23,4 +23,5 @@ TEST_F(RUNNER_TEST, CleanseAlreadyClean) { CleanseAlreadyClean(); }
 TEST_F(RUNNER_TEST, FuzzUntilError) { FuzzUntilError(); }
 TEST_F(RUNNER_TEST, FuzzUntilRuns) { FuzzUntilRuns(); }
 TEST_F(RUNNER_TEST, FuzzUntilTime) { FuzzUntilTime(); }
+TEST_F(RUNNER_TEST, MergeSeedError) { MergeSeedError(); }
 TEST_F(RUNNER_TEST, Stop) { Stop(); }

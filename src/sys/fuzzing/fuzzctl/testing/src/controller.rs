@@ -7,7 +7,9 @@ use {
     crate::options::add_defaults,
     crate::test::Test,
     anyhow::{anyhow, Context as _, Result},
-    fidl_fuchsia_fuzzer::{self as fuzz, Input as FidlInput, Result_ as FuzzResult},
+    fidl_fuchsia_fuzzer::{
+        self as fuzz, Artifact as FidlArtifact, Input as FidlInput, Result_ as FuzzResult,
+    },
     fuchsia_async as fasync,
     fuchsia_fuzzctl::InputPair,
     fuchsia_zircon_status as zx,
@@ -208,8 +210,16 @@ pub async fn serve_controller(
     mut stream: fuzz::ControllerRequestStream,
     mut test: Test,
 ) -> Result<()> {
-    let mut _responder = None;
     let fake = test.controller();
+    let mut artifact = Some(FidlArtifact::EMPTY);
+    let mut watcher: Option<fuzz::ControllerWatchArtifactResponder> = None;
+    // Helper function to send an empty artifact when a workflow is starting.
+    fn reset_artifact(mut watcher: Option<fuzz::ControllerWatchArtifactResponder>) -> Result<()> {
+        if let Some(watcher) = watcher.take() {
+            watcher.send(FidlArtifact::EMPTY)?;
+        }
+        Ok(())
+    }
     loop {
         let request = stream.next().await;
         if fake.is_canceled() {
@@ -252,43 +262,9 @@ pub async fn serve_controller(
                 let status = fake.get_status();
                 responder.send(status)?;
             }
-            Some(Ok(fuzz::ControllerRequest::TryOne { test_input, responder })) => {
-                test.record("fuchsia.fuzzer.Controller/TryOne");
-                fake.receive_input(test_input).await?;
-                match fake.get_result() {
-                    Ok(fuzz_result) => {
-                        responder.send(&mut Ok(fuzz_result))?;
-                        fake.send_output(fuzz::DONE_MARKER).await?;
-                    }
-                    Err(status) => {
-                        responder.send(&mut Err(status.into_raw()))?;
-                    }
-                }
-            }
-            Some(Ok(fuzz::ControllerRequest::Minimize { test_input, responder })) => {
-                test.record("fuchsia.fuzzer.Controller/Minimize");
-                fake.receive_input(test_input).await?;
-                let input_to_send = fake.take_input_to_send().context("input_to_send unset")?;
-                let input_pair = InputPair::try_from_data(input_to_send)?;
-                let (fidl_input, input) = input_pair.as_tuple();
-                fake.set_result(Ok(FuzzResult::Minimized));
-                responder.send(&mut Ok(fidl_input))?;
-                input.send().await?;
-                fake.send_output(fuzz::DONE_MARKER).await?;
-            }
-            Some(Ok(fuzz::ControllerRequest::Cleanse { test_input, responder })) => {
-                test.record("fuchsia.fuzzer.Controller/Cleanse");
-                fake.receive_input(test_input).await?;
-                let input_to_send = fake.take_input_to_send().context("input_to_send unset")?;
-                let input_pair = InputPair::try_from_data(input_to_send)?;
-                let (fidl_input, input) = input_pair.as_tuple();
-                fake.set_result(Ok(FuzzResult::Cleansed));
-                responder.send(&mut Ok(fidl_input))?;
-                input.send().await?;
-                fake.send_output(fuzz::DONE_MARKER).await?;
-            }
             Some(Ok(fuzz::ControllerRequest::Fuzz { responder })) => {
                 test.record("fuchsia.fuzzer.Controller/Fuzz");
+                reset_artifact(watcher.take())?;
                 // As special cases, fuzzing indefinitely without any errors or fuzzing with an
                 // explicit error of `SHOULD_WAIT` will imitate a FIDL call that does not
                 // complete. These can be interrupted by the shell or allowed to timeout.
@@ -300,28 +276,97 @@ pub async fn serve_controller(
                         let mut status = fake.get_status();
                         status.running = Some(true);
                         fake.set_status(status);
-                        // Prevent the responder being dropped and closing the stream.
-                        _responder = Some(responder);
+                        responder.send(zx::Status::OK.into_raw())?;
                     }
                     (_, _, Ok(fuzz_result)) => {
                         let input_to_send = fake.take_input_to_send().unwrap_or(Vec::new());
                         let input_pair = InputPair::try_from_data(input_to_send)?;
                         let (fidl_input, input) = input_pair.as_tuple();
-                        let mut response = Ok((fuzz_result, fidl_input));
-                        responder.send(&mut response)?;
+                        artifact = Some(FidlArtifact {
+                            result: Some(fuzz_result),
+                            input: Some(fidl_input),
+                            ..FidlArtifact::EMPTY
+                        });
+                        responder.send(zx::Status::OK.into_raw())?;
                         input.send().await?;
                         fake.send_output(fuzz::DONE_MARKER).await?;
                     }
                     (_, _, Err(status)) => {
-                        responder.send(&mut Err(status.into_raw()))?;
+                        responder.send(status.into_raw())?;
                     }
                 };
             }
+            Some(Ok(fuzz::ControllerRequest::TryOne { test_input, responder })) => {
+                test.record("fuchsia.fuzzer.Controller/TryOne");
+                reset_artifact(watcher.take())?;
+                fake.receive_input(test_input).await?;
+                match fake.get_result() {
+                    Ok(fuzz_result) => {
+                        artifact = Some(FidlArtifact {
+                            result: Some(fuzz_result),
+                            input: None,
+                            ..FidlArtifact::EMPTY
+                        });
+                        responder.send(zx::Status::OK.into_raw())?;
+                        fake.send_output(fuzz::DONE_MARKER).await?;
+                    }
+                    Err(status) => {
+                        responder.send(status.into_raw())?;
+                    }
+                }
+            }
+            Some(Ok(fuzz::ControllerRequest::Minimize { test_input, responder })) => {
+                test.record("fuchsia.fuzzer.Controller/Minimize");
+                reset_artifact(watcher.take())?;
+                fake.receive_input(test_input).await?;
+                let input_to_send = fake.take_input_to_send().context("input_to_send unset")?;
+                let input_pair = InputPair::try_from_data(input_to_send)?;
+                let (fidl_input, input) = input_pair.as_tuple();
+                artifact = Some(FidlArtifact {
+                    result: Some(FuzzResult::Minimized),
+                    input: Some(fidl_input),
+                    ..FidlArtifact::EMPTY
+                });
+                responder.send(zx::Status::OK.into_raw())?;
+                input.send().await?;
+                fake.send_output(fuzz::DONE_MARKER).await?;
+            }
+            Some(Ok(fuzz::ControllerRequest::Cleanse { test_input, responder })) => {
+                test.record("fuchsia.fuzzer.Controller/Cleanse");
+                reset_artifact(watcher.take())?;
+                fake.receive_input(test_input).await?;
+                let input_to_send = fake.take_input_to_send().context("input_to_send unset")?;
+                let input_pair = InputPair::try_from_data(input_to_send)?;
+                let (fidl_input, input) = input_pair.as_tuple();
+                artifact = Some(FidlArtifact {
+                    result: Some(FuzzResult::Cleansed),
+                    input: Some(fidl_input),
+                    ..FidlArtifact::EMPTY
+                });
+                responder.send(zx::Status::OK.into_raw())?;
+                input.send().await?;
+                fake.send_output(fuzz::DONE_MARKER).await?;
+            }
             Some(Ok(fuzz::ControllerRequest::Merge { responder })) => {
                 test.record("fuchsia.fuzzer.Controller/Merge");
-                fake.set_result(Ok(FuzzResult::Merged));
+                reset_artifact(watcher.take())?;
+                artifact = Some(FidlArtifact {
+                    result: Some(FuzzResult::Merged),
+                    input: None,
+                    ..FidlArtifact::EMPTY
+                });
                 responder.send(zx::Status::OK.into_raw())?;
                 fake.send_output(fuzz::DONE_MARKER).await?;
+            }
+            Some(Ok(fuzz::ControllerRequest::WatchArtifact { responder })) => {
+                match artifact.take() {
+                    Some(artifact) => {
+                        responder.send(artifact)?;
+                    }
+                    None => {
+                        watcher = Some(responder);
+                    }
+                };
             }
             Some(Err(e)) => return Err(anyhow!(e)),
             None => break,

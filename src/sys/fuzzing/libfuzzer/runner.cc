@@ -152,12 +152,12 @@ zx_status_t LibFuzzerRunner::AddToCorpus(CorpusType corpus_type, Input input) {
   switch (corpus_type) {
     case CorpusType::SEED:
       if (auto [iter, inserted] = seed_corpus_.insert(filename); inserted) {
-        WriteInputToFile(std::move(input), files::JoinPath(kSeedCorpusPath, filename));
+        WriteInputToFile(input, files::JoinPath(kSeedCorpusPath, filename));
       }
       break;
     case CorpusType::LIVE:
       if (auto [iter, inserted] = live_corpus_.insert(filename); inserted) {
-        WriteInputToFile(std::move(input), files::JoinPath(kLiveCorpusPath, filename));
+        WriteInputToFile(input, files::JoinPath(kLiveCorpusPath, filename));
       }
       break;
     default:
@@ -245,66 +245,84 @@ ZxPromise<Artifact> LibFuzzerRunner::Fuzz() {
       .wrap_with(workflow_);
 }
 
-ZxPromise<FuzzResult> LibFuzzerRunner::TryEach(std::vector<Input> inputs) {
+ZxPromise<Artifact> LibFuzzerRunner::TryEach(std::vector<Input> inputs) {
   // Write the inputs out to storage for libFuzzer.
   std::filesystem::remove_all(kTempCorpusPath);
   CreateDirectory(kTempCorpusPath);
-  std::vector<std::string> test_inputs;
-  test_inputs.reserve(inputs.size());
+  std::vector<std::string> input_files;
+  input_files.reserve(inputs.size());
   for (auto& input : inputs) {
-    auto test_input = files::JoinPath(kTempCorpusPath, MakeFilename(input));
-    WriteInputToFile(input, test_input);
-    test_inputs.emplace_back(std::move(test_input));
+    auto input_file = files::JoinPath(kTempCorpusPath, MakeFilename(input));
+    WriteInputToFile(input, input_file);
+    input_files.emplace_back(std::move(input_file));
   }
   inputs.clear();
-  return fpromise::make_promise([this, fut = ZxFuture<Artifact>(),
-                                 test_inputs = std::move(test_inputs)](
-                                    Context& context) mutable -> ZxResult<FuzzResult> {
-           // Large corpora can result in a command line that is too big for `fdio_spawn`. Try
-           // inputs in batches.
-           while (true) {
-             if (!fut) {
-               if (test_inputs.empty()) {
-                 return fpromise::ok(FuzzResult::NO_ERRORS);
-               }
-               if (auto status = AddArgs(); status != ZX_OK) {
-                 FX_LOGS(WARNING) << "Failed to add libFuzzer command line flags.";
-                 return fpromise::error(status);
-               }
-               std::vector<std::string> deferred;
-               zx_status_t status = ZX_OK;
-               for (auto& test_input : test_inputs) {
-                 if (status == ZX_OK) {
-                   status = process_.AddArg(test_input);
-                 }
-                 if (status != ZX_OK) {
-                   deferred.emplace_back(std::move(test_input));
-                 }
-               }
-               if (!deferred.empty()) {
-                 FX_LOGS(INFO) << "Will try " << deferred.size()
-                               << " remaining input(s) in a subsequent attempt.";
-               }
-               test_inputs = std::move(deferred);
-               fut = RunAsync();
-             }
-             if (!fut(context)) {
-               return fpromise::pending();
-             }
-             if (fut.is_error()) {
-               return fpromise::error(fut.take_error());
-             }
-             auto artifact = fut.take_value();
-             if (auto fuzz_result = artifact.fuzz_result(); fuzz_result != FuzzResult::NO_ERRORS) {
-               return fpromise::ok(fuzz_result);
-             }
-           }
-         })
-      .wrap_with(workflow_);
+  return TryFiles(std::move(input_files)).wrap_with(workflow_);
 }
 
-ZxPromise<Input> LibFuzzerRunner::Minimize(Input input) {
-  WriteInputToFile(input.Duplicate(), kTestInputPath);
+ZxPromise<Artifact> LibFuzzerRunner::TryFiles(std::vector<std::string> input_files) {
+  print_all_ = true;
+  return fpromise::make_promise(
+      [this, fut = ZxFuture<Artifact>(),
+       input_files = std::move(input_files)](Context& context) mutable -> ZxResult<Artifact> {
+        // Large corpora can result in a command line that is too big for `fdio_spawn`. Try
+        // inputs in batches.
+        while (true) {
+          if (!fut) {
+            if (input_files.empty()) {
+              return fpromise::ok(Artifact(FuzzResult::NO_ERRORS));
+            }
+            if (auto status = AddArgs(); status != ZX_OK) {
+              FX_LOGS(WARNING) << "Failed to add libFuzzer command line flags.";
+              return fpromise::error(status);
+            }
+            std::vector<std::string> deferred;
+            zx_status_t status = ZX_OK;
+            for (auto& input_file : input_files) {
+              if (status == ZX_OK) {
+                status = process_.AddArg(input_file);
+              }
+              if (status != ZX_OK) {
+                deferred.emplace_back(std::move(input_file));
+              }
+            }
+            if (!deferred.empty()) {
+              FX_LOGS(INFO) << "Will try " << deferred.size()
+                            << " remaining input(s) in a subsequent attempt.";
+            }
+            input_files = std::move(deferred);
+            fut = RunAsync();
+          }
+          if (!fut(context)) {
+            return fpromise::pending();
+          }
+          if (fut.is_error()) {
+            return fpromise::error(fut.take_error());
+          }
+          auto artifact = fut.take_value();
+          if (artifact.fuzz_result() != FuzzResult::NO_ERRORS) {
+            return fpromise::ok(std::move(artifact));
+          }
+        }
+      });
+}
+
+ZxPromise<Artifact> LibFuzzerRunner::ValidateMinimize(Input input) {
+  WriteInputToFile(input, kTestInputPath);
+  return TryFiles(std::vector<std::string>({kTestInputPath}))
+      .and_then([](Artifact& artifact) -> ZxResult<Artifact> {
+        if (artifact.fuzz_result() == FuzzResult::NO_ERRORS) {
+          FX_LOGS(WARNING) << "Test input did not trigger an error.";
+          return fpromise::error(ZX_ERR_INVALID_ARGS);
+        }
+        return fpromise::ok(std::move(artifact));
+      })
+      .wrap_with(workflow_, Workflow::Mode::kStart);
+}
+
+ZxPromise<Artifact> LibFuzzerRunner::Minimize(Artifact artifact) {
+  FX_DCHECK(artifact.has_input());
+  WriteInputToFile(artifact.input(), kTestInputPath);
   return fpromise::make_promise([this]() -> ZxResult<> {
            if (auto status = AddArgs(); status != ZX_OK) {
              return fpromise::error(status);
@@ -318,19 +336,13 @@ ZxPromise<Input> LibFuzzerRunner::Minimize(Input input) {
            return fpromise::ok();
          })
       .and_then(RunAsync())
-      .and_then([original = std::move(input)](Artifact& artifact) -> ZxResult<Input> {
-        // libFuzzer returns an error and an empty input if the input did not crash.
-        auto minimized = artifact.take_input();
-        if (artifact.fuzz_result() != FuzzResult::NO_ERRORS && minimized.size() == 0) {
-          FX_LOGS(WARNING) << "Test input did not trigger an error.";
-          return fpromise::error(ZX_ERR_INVALID_ARGS);
-        }
-        return fpromise::ok(std::move(minimized));
+      .and_then([](Artifact& artifact) -> ZxResult<Artifact> {
+        return fpromise::ok(Artifact(FuzzResult::MINIMIZED, artifact.take_input()));
       })
-      .wrap_with(workflow_);
+      .wrap_with(workflow_, Workflow::Mode::kFinish);
 }
 
-ZxPromise<Input> LibFuzzerRunner::Cleanse(Input input) {
+ZxPromise<Artifact> LibFuzzerRunner::Cleanse(Input input) {
   WriteInputToFile(input, kTestInputPath);
   return fpromise::make_promise([this]() -> ZxResult<> {
            if (auto status = AddArgs(); status != ZX_OK) {
@@ -346,15 +358,36 @@ ZxPromise<Input> LibFuzzerRunner::Cleanse(Input input) {
          })
       .and_then(RunAsync())
       .and_then([input = std::move(input)](Artifact& artifact) mutable {
-        auto result = artifact.take_input();
         // A quirk of libFuzzer's cleanse workflow is that it returns no error and an empty input if
         // the input doesn't crash or is already "clean", and doesn't distinguish between the two.
-        return fpromise::ok(result.size() == input.size() ? std::move(result) : std::move(input));
+        if (artifact.input().size() != 0) {
+          input = artifact.take_input();
+        }
+        return fpromise::ok(Artifact(FuzzResult::CLEANSED, std::move(input)));
       })
       .wrap_with(workflow_);
 }
 
-ZxPromise<> LibFuzzerRunner::Merge() {
+ZxPromise<> LibFuzzerRunner::ValidateMerge() {
+  std::vector<std::string> input_files;
+  input_files.reserve(seed_corpus_.size());
+  for (const auto& filename : seed_corpus_) {
+    input_files.emplace_back(files::JoinPath(kSeedCorpusPath, filename));
+  }
+  return TryFiles(std::move(input_files))
+      .and_then([](Artifact& artifact) -> ZxResult<> {
+        if (artifact.fuzz_result() != FuzzResult::NO_ERRORS) {
+          FX_LOGS(WARNING) << "Seed corpus contains an input that triggers an error: '"
+                           << artifact.input().ToHex() << "'";
+          return fpromise::error(ZX_ERR_INVALID_ARGS);
+        }
+        return fpromise::ok();
+      })
+      .wrap_with(workflow_, Workflow::Mode::kStart);
+}
+
+ZxPromise<Artifact> LibFuzzerRunner::Merge() {
+  std::filesystem::remove_all(kTempCorpusPath);
   CreateDirectory(kTempCorpusPath);
   return fpromise::make_promise([this]() -> ZxResult<> {
            if (auto status = AddArgs(); status != ZX_OK) {
@@ -375,17 +408,17 @@ ZxPromise<> LibFuzzerRunner::Merge() {
            return fpromise::ok();
          })
       .and_then(RunAsync())
-      .and_then([this](const Artifact& artifact) {
+      .and_then([this](const Artifact& artifact) -> ZxResult<Artifact> {
         std::filesystem::remove_all(kLiveCorpusPath);
         std::filesystem::rename(kTempCorpusPath, kLiveCorpusPath);
         ReloadLiveCorpus();
-        return fpromise::ok();
+        return fpromise::ok(Artifact(FuzzResult::MERGED));
       })
-      .or_else([](const zx_status_t& status) {
+      .or_else([](const zx_status_t& status) -> ZxResult<Artifact> {
         std::filesystem::remove_all(kTempCorpusPath);
         return fpromise::error(status);
       })
-      .wrap_with(workflow_);
+      .wrap_with(workflow_, Workflow::Mode::kFinish);
 }
 
 Status LibFuzzerRunner::CollectStatus() {
@@ -553,6 +586,7 @@ zx_status_t LibFuzzerRunner::AddArgs() {
     }
   }
   std::filesystem::remove(kResultInputPath);
+  result_input_pathname_.clear();
   if (auto status = process_.AddArg(MakeArg("exact_artifact_path", kResultInputPath));
       status != ZX_OK) {
     return status;
@@ -637,10 +671,14 @@ ZxPromise<Artifact> LibFuzzerRunner::RunAsync() {
         fuzz_result_ = FuzzResult::NO_ERRORS;
         return std::move(result);
       })
-      .and_then([](const FuzzResult& fuzz_result) -> ZxResult<Artifact> {
-        auto input =
-            files::IsFile(kResultInputPath) ? ReadInputFromFile(kResultInputPath) : Input();
-        return fpromise::ok(Artifact(fuzz_result, std::move(input)));
+      .and_then([this](const FuzzResult& fuzz_result) -> ZxResult<Artifact> {
+        Input result_input;
+        if (files::IsFile(kResultInputPath)) {
+          result_input = ReadInputFromFile(kResultInputPath);
+        } else if (!result_input_pathname_.empty()) {
+          result_input = ReadInputFromFile(result_input_pathname_);
+        }
+        return fpromise::ok(Artifact(fuzz_result, std::move(result_input)));
       });
 }
 
@@ -729,7 +767,13 @@ ZxPromise<> LibFuzzerRunner::ParseStderr() {
             continue;
           }
 
+          // When running explicit test inputs, libFuzzer doesn't save artifacts. Record the input
+          // name to determine which caused the error.
           re2::StringPiece input(std::move(line));
+          if (re2::RE2::Consume(&input, "Running: (\\S+)", &result_input_pathname_)) {
+            continue;
+          }
+
           if (re2::RE2::Consume(&input, "==(\\d+)==", &pid_)) {
             continue;
           }

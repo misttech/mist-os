@@ -45,10 +45,16 @@ class LibFuzzerRunner : public Runner {
   Input GetDictionaryAsInput() const override;
 
   ZxPromise<Artifact> Fuzz() override;
-  ZxPromise<FuzzResult> TryEach(std::vector<Input> inputs) override;
-  ZxPromise<Input> Minimize(Input input) override;
-  ZxPromise<Input> Cleanse(Input input) override;
-  ZxPromise<> Merge() override;
+
+  ZxPromise<Artifact> TryEach(std::vector<Input> input) override;
+
+  ZxPromise<Artifact> ValidateMinimize(Input input) override;
+  ZxPromise<Artifact> Minimize(Artifact artifact) override;
+
+  ZxPromise<Artifact> Cleanse(Input input) override;
+
+  ZxPromise<> ValidateMerge() override;
+  ZxPromise<Artifact> Merge() override;
 
   Status CollectStatus() override;
   ZxPromise<> Stop() override;
@@ -59,6 +65,11 @@ class LibFuzzerRunner : public Runner {
   // Construct a set of libFuzzer command-line arguments for the current options and add them to
   // this object's process.
   __WARN_UNUSED_RESULT zx_status_t AddArgs();
+
+  // Like `TryEach`, but takes filenames of saved inputs that can be passed directly to libFuzzer.
+  // If the number of `input_files` is larger than what can be added to the `ChildProcess`, this
+  // method will try them in batches.
+  ZxPromise<Artifact> TryFiles(std::vector<std::string> input_files);
 
   // Returns a promise that runs a libFuzzer process asynchronously and returns the fuzzing result
   // and the input that caused it.

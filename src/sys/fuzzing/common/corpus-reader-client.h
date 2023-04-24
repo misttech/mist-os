@@ -27,7 +27,7 @@ class CorpusReaderClient final {
 
   // Schedules a sequence of calls |fuchsia.fuzzer.CorpusReader.Next| for each element in the list
   // of |inputs|. The returned promise only completes after all |inputs| have been sent.
-  ZxPromise<> Send(std::vector<Input>&& inputs);
+  ZxPromise<> Send(std::vector<Input> inputs);
 
  private:
   fidl::InterfacePtr<CorpusReader> ptr_;

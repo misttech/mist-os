@@ -22,12 +22,12 @@ void CorpusReaderClient::Bind(fidl::InterfaceHandle<CorpusReader> handle) {
   FX_CHECK(status == ZX_OK) << zx_status_get_string(status);
 }
 
-ZxPromise<> CorpusReaderClient::Send(std::vector<Input>&& inputs) {
+ZxPromise<> CorpusReaderClient::Send(std::vector<Input> inputs) {
   // Create sockets for all non-empty inputs, plus one final empty sentinel input.
   std::deque<FidlInput> fidl_inputs;
-  for (auto& input : inputs) {
+  for (const auto& input : inputs) {
     if (input.size()) {
-      fidl_inputs.emplace_back(AsyncSocketWrite(executor_, std::move(input)));
+      fidl_inputs.emplace_back(AsyncSocketWrite(executor_, input));
     }
   }
   fidl_inputs.emplace_back(AsyncSocketWrite(executor_, Input()));
