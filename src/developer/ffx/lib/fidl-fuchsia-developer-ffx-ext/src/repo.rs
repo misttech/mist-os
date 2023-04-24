@@ -200,6 +200,58 @@ impl From<RepositoryStorageType> for fidl_fuchsia_pkg_ext::RepositoryStorageType
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RepositoryRegistrationAliasConflictMode {
+    ErrorOut,
+    Replace,
+}
+
+impl From<fidl::RepositoryRegistrationAliasConflictMode>
+    for RepositoryRegistrationAliasConflictMode
+{
+    fn from(alias_conflict_mode: fidl::RepositoryRegistrationAliasConflictMode) -> Self {
+        match alias_conflict_mode {
+            fidl::RepositoryRegistrationAliasConflictMode::ErrorOut => {
+                RepositoryRegistrationAliasConflictMode::ErrorOut
+            }
+            fidl::RepositoryRegistrationAliasConflictMode::Replace => {
+                RepositoryRegistrationAliasConflictMode::Replace
+            }
+        }
+    }
+}
+
+impl From<RepositoryRegistrationAliasConflictMode>
+    for fidl::RepositoryRegistrationAliasConflictMode
+{
+    fn from(alias_conflict_mode: RepositoryRegistrationAliasConflictMode) -> Self {
+        match alias_conflict_mode {
+            RepositoryRegistrationAliasConflictMode::ErrorOut => {
+                fidl::RepositoryRegistrationAliasConflictMode::ErrorOut
+            }
+            RepositoryRegistrationAliasConflictMode::Replace => {
+                fidl::RepositoryRegistrationAliasConflictMode::Replace
+            }
+        }
+    }
+}
+
+impl From<RepositoryRegistrationAliasConflictMode>
+    for fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode
+{
+    fn from(alias_conflict_mode: RepositoryRegistrationAliasConflictMode) -> Self {
+        match alias_conflict_mode {
+            RepositoryRegistrationAliasConflictMode::ErrorOut => {
+                fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut
+            }
+            RepositoryRegistrationAliasConflictMode::Replace => {
+                fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace
+            }
+        }
+    }
+}
+
 /// The below types exist to provide definitions with Serialize.
 /// TODO(fxbug.dev/76041) They should be removed in favor of the
 /// corresponding fidl-fuchsia-pkg-ext types.
@@ -336,6 +388,9 @@ pub enum RepositoryError {
 
     #[error("package does not exist")]
     NoMatchingPackage,
+
+    #[error("repository registration conflict")]
+    ConflictingRegistration,
 }
 
 impl From<fidl::RepositoryError> for RepositoryError {
@@ -357,6 +412,7 @@ impl From<fidl::RepositoryError> for RepositoryError {
             fErr::InvalidUrl => Err::InvalidUrl,
             fErr::ServerAddressAlreadyInUse => Err::ServerAddressAlreadyInUse,
             fErr::NoMatchingPackage => Err::NoMatchingPackage,
+            fErr::ConflictingRegistration => Err::ConflictingRegistration,
         }
     }
 }
@@ -380,6 +436,7 @@ impl From<RepositoryError> for fidl::RepositoryError {
             Err::InvalidUrl => fErr::InvalidUrl,
             Err::ServerAddressAlreadyInUse => fErr::ServerAddressAlreadyInUse,
             Err::NoMatchingPackage => fErr::NoMatchingPackage,
+            Err::ConflictingRegistration => fErr::ConflictingRegistration,
         }
     }
 }

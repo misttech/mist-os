@@ -138,8 +138,10 @@ protocol RepositoryRegistry {
     /// Registers a repository on a target.
     ///
     /// `target_info`: Metadata describing the repository registration.
+    /// `alias_conflict_mode`: Resolution mode if alias conflicts present.
     RegisterTarget(struct {
         target_info RepositoryTarget;
+        alias_conflict_mode RepositoryRegistrationAliasConflictMode;
     }) -> () error RepositoryError;
 
     /// Deregisters a repository from a target.
@@ -256,6 +258,16 @@ type RepositoryStorageType = strict enum {
     PERSISTENT = 2;
 };
 
+/// How to resolve alias conflicts.
+type RepositoryRegistrationAliasConflictMode = strict enum {
+    /// When encountering an alias conflict, error out immediately.
+    ERROR_OUT = 1;
+
+    /// When encountering an alias conflict, overwrite the alias with
+    /// whatever is being currently registrated.
+    REPLACE = 2;
+};
+
 type RepositoryError = strict enum : uint32 {
     /// Repository "name" is missing in an API where it is required.
     MISSING_REPOSITORY_NAME = 1;
@@ -291,4 +303,6 @@ type RepositoryError = strict enum : uint32 {
     SERVER_ADDRESS_ALREADY_IN_USE = 14;
     /// No package matches the provided name.
     NO_MATCHING_PACKAGE = 15;
+    /// The repository registration has a conflicting alias.
+    CONFLICTING_REGISTRATION = 16;
 };

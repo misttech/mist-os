@@ -13,7 +13,8 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_developer_ffx as ffx,
     fidl_fuchsia_developer_ffx_ext::{
-        RepositoryError, RepositorySpec, RepositoryTarget, ServerStatus,
+        RepositoryError, RepositoryRegistrationAliasConflictMode, RepositorySpec, RepositoryTarget,
+        ServerStatus,
     },
     fidl_fuchsia_net_ext::SocketAddress,
     fidl_fuchsia_pkg::RepositoryManagerMarker,
@@ -203,6 +204,7 @@ pub trait Registrar {
         mut target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
+        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError>;
 
     async fn register_target_with_fidl(
@@ -211,6 +213,7 @@ pub trait Registrar {
         mut target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
+        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError>;
 
     async fn register_target_with_ssh(
@@ -219,6 +222,7 @@ pub trait Registrar {
         mut target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
+        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError>;
 }
 
@@ -272,6 +276,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
+        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError> {
         let repository_mode = pkg::config::repository_registration_mode().await.map_err(|err| {
             tracing::error!("Failed to get repository registration mode: {:#?}", err);
@@ -279,8 +284,26 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         })?;
 
         match repository_mode.as_str() {
-            "fidl" => self.register_target_with_fidl(cx, target_info, save_config, inner).await,
-            "ssh" => self.register_target_with_ssh(cx, target_info, save_config, inner).await,
+            "fidl" => {
+                self.register_target_with_fidl(
+                    cx,
+                    target_info,
+                    save_config,
+                    inner,
+                    alias_conflict_mode,
+                )
+                .await
+            }
+            "ssh" => {
+                self.register_target_with_ssh(
+                    cx,
+                    target_info,
+                    save_config,
+                    inner,
+                    alias_conflict_mode,
+                )
+                .await
+            }
             _ => {
                 tracing::error!("Unrecognized repository registration mode {:?}", repository_mode);
                 return Err(ffx::RepositoryError::InternalError);
@@ -294,6 +317,7 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         mut target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
+        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError> {
         let repo_name = &target_info.repo_name;
 
@@ -396,6 +420,33 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
                 repo.aliases().clone()
             };
 
+            // Checking for registration alias conflicts.
+            for (registration_repo_name, targets) in pkg::config::get_registrations().await {
+                for (existing_target_nodename, existing_target_info) in targets {
+                    // Only check aliases for current target.
+                    if existing_target_nodename != target_nodename {
+                        continue;
+                    }
+                    // Ignore checks on existing repository.
+                    if registration_repo_name == repo_name.to_string() {
+                        continue;
+                    }
+                    if let Some(existing_aliases) = &existing_target_info.aliases {
+                        if !existing_aliases.is_disjoint(&aliases) {
+                            tracing::error!(
+                                "Conflict found for aliases of repo registrations ['{registration_repo_name}','{repo_name}'] for target '{target_nodename}'.",
+                            );
+
+                            if alias_conflict_mode
+                                == RepositoryRegistrationAliasConflictMode::ErrorOut
+                            {
+                                return Err(ffx::RepositoryError::ConflictingRegistration);
+                            }
+                        }
+                    }
+                }
+            }
+
             (config, aliases)
         };
 
@@ -446,7 +497,14 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
         mut target_info: RepositoryTarget,
         save_config: SaveConfig,
         inner: Arc<RwLock<RepoInner>>,
+        alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError> {
+        if alias_conflict_mode == RepositoryRegistrationAliasConflictMode::ErrorOut {
+            tracing::info!(
+                "RepositoryRegistrationAliasConflictMode::ErrorOut is not available for SSH registrations.",
+            );
+        }
+
         let repo_name = &target_info.repo_name;
 
         let repo = inner
@@ -735,10 +793,14 @@ async fn create_aliases_fidl(
         }
     };
 
+    // Check flag here for "overwrite" style
     do_transaction(&rewrite_proxy, |transaction| async {
         // Prepend the alias rules to the front so they take priority.
         let mut rules = alias_rules.iter().cloned().rev().collect::<Vec<_>>();
-        rules.extend(transaction.list_dynamic().await?);
+
+        // These are rules to re-evaluate...
+        let repo_rules_state = transaction.list_dynamic().await?;
+        rules.extend(repo_rules_state);
 
         // Clear the list, since we'll be adding it back later.
         transaction.reset_all()?;
@@ -1228,7 +1290,13 @@ impl<
 
                 Ok(())
             }
-            ffx::RepositoryRegistryRequest::RegisterTarget { target_info, responder } => {
+            ffx::RepositoryRegistryRequest::RegisterTarget {
+                target_info,
+                responder,
+                alias_conflict_mode,
+            } => {
+                let alias_conflict_mode =
+                    RepositoryRegistrationAliasConflictMode::try_from(alias_conflict_mode).unwrap();
                 let mut res = match RepositoryTarget::try_from(target_info) {
                     Ok(target_info) => {
                         self.registrar
@@ -1237,6 +1305,7 @@ impl<
                                 target_info,
                                 SaveConfig::Save,
                                 Arc::clone(&self.inner),
+                                alias_conflict_mode,
                             )
                             .await
                     }
@@ -1465,8 +1534,15 @@ async fn load_registrations_from_config<R: Registrar>(
                 }
             }
 
+            // Uh oh...
             if let Err(err) = registrar
-                .register_target(&cx, target_info, SaveConfig::DoNotSave, Arc::clone(&inner))
+                .register_target(
+                    &cx,
+                    target_info,
+                    SaveConfig::DoNotSave,
+                    Arc::clone(&inner),
+                    RepositoryRegistrationAliasConflictMode::Replace,
+                )
                 .await
             {
                 tracing::warn!(
@@ -2261,7 +2337,10 @@ mod tests {
             .expect("starting the server to succeed");
 
         proxy
-            .register_target(target)
+            .register_target(
+                target,
+                fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+            )
             .await
             .expect("communicated with proxy")
             .expect("target registration to succeed");
@@ -3624,6 +3703,133 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_duplicate_registration_aliases_error() {
+        run_test(TestRunMode::Fidl, async {
+            let conflicting_alias = "fuchsia.com".to_string();
+
+            let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
+            let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
+            let (fake_rcs, fake_rcs_closure) = FakeRcs::new();
+
+            let daemon = FakeDaemonBuilder::new()
+                .rcs_handler(fake_rcs_closure)
+                .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
+                    fake_repo_manager_closure,
+                )
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
+                .inject_fidl_protocol(Rc::clone(&repo))
+                .target(ffx::TargetInfo {
+                    nodename: Some(TARGET_NODENAME.to_string()),
+                    ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
+                    ..ffx::TargetInfo::EMPTY
+                })
+                .build();
+
+            let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+            // Make sure there is nothing in the registry.
+            assert_eq!(fake_engine.take_events(), vec![]);
+            assert_eq!(get_repositories(&proxy).await, vec![]);
+            assert_eq!(get_target_registrations(&proxy).await, vec![]);
+
+            add_repo(&proxy, REPO_NAME).await;
+
+            // We shouldn't have added repositories or rewrite rules to the fuchsia device yet.
+            assert_eq!(fake_repo_manager.take_events(), vec![]);
+            assert_eq!(fake_engine.take_events(), vec![]);
+
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
+                    repo_name: Some(REPO_NAME.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["example.com".to_string(), conflicting_alias.clone()]),
+                    ..ffx::RepositoryTarget::EMPTY
+                },
+            )
+            .await;
+
+            // Registering the target should have set up a repository.
+            assert_eq!(
+                fake_repo_manager.take_events(),
+                vec![RepositoryManagerEvent::Add { repo: test_repo_config_fidl(&repo).await }]
+            );
+
+            // Adding the registration should have set up rewrite rules from the registration
+            // aliases.
+            assert_eq!(
+                fake_engine.take_events(),
+                vec![
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
+                        rule: rule!("example.com".to_string() => REPO_NAME, "/" => "/"),
+                    },
+                    RewriteEngineEvent::EditTransactionAdd {
+                        rule: rule!("fuchsia.com".to_string() => REPO_NAME, "/" => "/"),
+                    },
+                    RewriteEngineEvent::EditTransactionCommit,
+                ],
+            );
+
+            // Registering a repository should create a tunnel.
+            assert_eq!(fake_rcs.take_events(), vec![RcsEvent::ReverseTcp]);
+
+            // The RepositoryRegistry should remember we set up the registrations.
+            assert_eq!(
+                get_target_registrations(&proxy).await,
+                vec![ffx::RepositoryTarget {
+                    repo_name: Some(REPO_NAME.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
+                    ..ffx::RepositoryTarget::EMPTY
+                }],
+            );
+
+            add_repo(&proxy, "other-repo").await;
+
+            // Introducing conflicting alias...
+            assert_eq!(
+                proxy
+                    .register_target(ffx::RepositoryTarget {
+                        repo_name: Some("other-repo".to_string()),
+                        target_identifier: Some(TARGET_NODENAME.to_string()),
+                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                        // Conflicting alias will collide with REPO_NAME registration...
+                        aliases: Some(vec![conflicting_alias.clone()]),
+                        ..ffx::RepositoryTarget::EMPTY
+                    }, fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut)
+                    .await
+                    .expect("communicated with proxy")
+                    .unwrap_err(),
+                ffx::RepositoryError::ConflictingRegistration
+            );
+
+            // Make sure we didn't add the repo.
+            assert_eq!(fake_repo_manager.take_events(), vec![]);
+
+            // Make sure we didn't communicate with the device.
+            assert_eq!(fake_engine.take_events(), vec![]);
+
+            // Make sure only previous repository registration is present.
+            assert_eq!(
+                get_target_registrations(&proxy).await,
+                vec![ffx::RepositoryTarget {
+                    repo_name: Some(REPO_NAME.to_string()),
+                    target_identifier: Some(TARGET_NODENAME.to_string()),
+                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                    aliases: Some(vec!["example.com".to_string(), conflicting_alias.clone()]),
+                    ..ffx::RepositoryTarget::EMPTY
+                }],
+            );
+        })
+    }
+
     async fn check_add_register_server(
         listen_addr: SocketAddr,
         ssh_host_addr: String,
@@ -4381,13 +4587,16 @@ mod tests {
 
         assert_eq!(
             proxy
-                .register_target(ffx::RepositoryTarget {
-                    repo_name: Some(REPO_NAME.to_string()),
-                    target_identifier: Some(TARGET_NODENAME.to_string()),
-                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: None,
-                    ..ffx::RepositoryTarget::EMPTY
-                })
+                .register_target(
+                    ffx::RepositoryTarget {
+                        repo_name: Some(REPO_NAME.to_string()),
+                        target_identifier: Some(TARGET_NODENAME.to_string()),
+                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                        aliases: None,
+                        ..ffx::RepositoryTarget::EMPTY
+                    },
+                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace
+                )
                 .await
                 .unwrap()
                 .unwrap_err(),
@@ -4478,13 +4687,16 @@ mod tests {
         let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
         assert_eq!(
             proxy
-                .register_target(ffx::RepositoryTarget {
-                    repo_name: Some(REPO_NAME.to_string()),
-                    target_identifier: Some(TARGET_NODENAME.to_string()),
-                    storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    aliases: None,
-                    ..ffx::RepositoryTarget::EMPTY
-                })
+                .register_target(
+                    ffx::RepositoryTarget {
+                        repo_name: Some(REPO_NAME.to_string()),
+                        target_identifier: Some(TARGET_NODENAME.to_string()),
+                        storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
+                        aliases: None,
+                        ..ffx::RepositoryTarget::EMPTY
+                    },
+                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace
+                )
                 .await
                 .unwrap()
                 .unwrap_err(),

@@ -25,6 +25,18 @@ pub enum RepositoryStorageType {
     Persistent,
 }
 
+/// Convenience wrapper for the FIDL RepositoryRegistrationAliasConflictMode.
+#[derive(Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RepositoryRegistrationAliasConflictMode {
+    /// When conflicting aliases found during registration process, error out.
+    ErrorOut,
+
+    /// When conflicting aliases found during registration process, replace previous rule with
+    /// current.
+    Replace,
+}
+
 /// Convenience wrapper for the FIDL RepositoryKeyConfig type
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase", tag = "type", content = "value", deny_unknown_fields)]

@@ -40,13 +40,16 @@ async fn register(
     };
 
     match repos
-        .register_target(RepositoryTarget {
-            repo_name: Some(repo_name),
-            target_identifier: target_str,
-            aliases: Some(cmd.alias),
-            storage_type: cmd.storage_type,
-            ..RepositoryTarget::EMPTY
-        })
+        .register_target(
+            RepositoryTarget {
+                repo_name: Some(repo_name.clone()),
+                target_identifier: target_str,
+                aliases: Some(cmd.alias),
+                storage_type: cmd.storage_type,
+                ..RepositoryTarget::EMPTY
+            },
+            cmd.alias_conflict_mode,
+        )
         .await
         .context("communicating with daemon")?
         .map_err(RepositoryError::from)
@@ -66,6 +69,20 @@ async fn register(
                 pkg::config::determine_why_repository_server_is_not_running().await
             )
         }
+        Err(err @ RepositoryError::ConflictingRegistration) => {
+            ffx_bail!(
+                "Error while registering repository: {:#}\n\
+                Repository '{repo_name}' has an alias conflict in its registration.\n\
+                Resolve alias conflict in registration config by finding the conflict with:\n\
+                \n\
+                $ ffx target repository list
+                \n\
+                Then removing the conflicting alias with:\n\
+                \n\
+                $ ffx target repository deregister --repository $CONFLICTING_REPO_NAME",
+                err,
+            )
+        }
         Err(err) => {
             ffx_bail!("Failed to register repository: {}", err)
         }
@@ -79,6 +96,7 @@ mod test {
     use fidl_fuchsia_developer_ffx::{
         RepositoryError, RepositoryRegistryRequest, RepositoryStorageType,
     };
+    use fidl_fuchsia_developer_ffx_ext::RepositoryRegistrationAliasConflictMode;
     use fuchsia_async as fasync;
     use futures::channel::oneshot::{channel, Receiver};
 
@@ -89,7 +107,11 @@ mod test {
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
         let repos = setup_fake_repos(move |req| match req {
-            RepositoryRegistryRequest::RegisterTarget { target_info, responder } => {
+            RepositoryRegistryRequest::RegisterTarget {
+                target_info,
+                responder,
+                alias_conflict_mode: _,
+            } => {
                 sender.take().unwrap().send(target_info).unwrap();
                 responder.send(&mut Ok(())).unwrap();
             }
@@ -109,6 +131,7 @@ mod test {
                 repository: Some(REPO_NAME.to_string()),
                 alias: aliases.clone(),
                 storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace.into(),
             },
             repos,
         )
@@ -142,7 +165,12 @@ mod test {
 
         register(
             None,
-            RegisterCommand { repository: None, alias: vec![], storage_type: None },
+            RegisterCommand {
+                repository: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace.into(),
+            },
             repos,
         )
         .await
@@ -171,6 +199,7 @@ mod test {
                 repository: Some(REPO_NAME.to_string()),
                 alias: aliases.clone(),
                 storage_type: Some(RepositoryStorageType::Persistent),
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace.into(),
             },
             repos,
         )
@@ -199,6 +228,7 @@ mod test {
                 repository: Some(REPO_NAME.to_string()),
                 alias: vec![],
                 storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace.into(),
             },
             repos,
         )
@@ -220,7 +250,11 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_register_returns_error() {
         let repos = setup_fake_repos(move |req| match req {
-            RepositoryRegistryRequest::RegisterTarget { target_info: _, responder } => {
+            RepositoryRegistryRequest::RegisterTarget {
+                target_info: _,
+                responder,
+                alias_conflict_mode: _,
+            } => {
                 responder.send(&mut Err(RepositoryError::TargetCommunicationFailure)).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
@@ -231,7 +265,8 @@ mod test {
             RegisterCommand {
                 repository: Some(REPO_NAME.to_string()),
                 alias: vec![],
-                storage_type: None
+                storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace.into(),
             },
             repos,
         )

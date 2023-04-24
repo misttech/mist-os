@@ -4,7 +4,7 @@
 
 use argh::FromArgs;
 use ffx_core::ffx_command;
-use fidl_fuchsia_developer_ffx::RepositoryStorageType;
+use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
 
 #[ffx_command()]
 #[derive(FromArgs, PartialEq, Debug)]
@@ -26,6 +26,15 @@ pub struct RegisterCommand {
     /// to the repository identified by `name`.
     #[argh(option)]
     pub alias: Vec<String>,
+
+    /// resolution mechanism when alias registrations conflict. Must be either
+    /// `error-out` or `replace`. Default is `replace`.
+    #[argh(
+        option,
+        default = "default_alias_conflict_mode()",
+        from_str_fn(parse_alias_conflict_mode)
+    )]
+    pub alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 }
 
 fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {
@@ -33,5 +42,17 @@ fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {
         "ephemeral" => Ok(RepositoryStorageType::Ephemeral),
         "persistent" => Ok(RepositoryStorageType::Persistent),
         _ => Err(format!("unknown storage type {}", arg)),
+    }
+}
+
+fn default_alias_conflict_mode() -> RepositoryRegistrationAliasConflictMode {
+    RepositoryRegistrationAliasConflictMode::Replace
+}
+
+fn parse_alias_conflict_mode(arg: &str) -> Result<RepositoryRegistrationAliasConflictMode, String> {
+    match arg {
+        "error-out" => Ok(RepositoryRegistrationAliasConflictMode::ErrorOut),
+        "replace" => Ok(RepositoryRegistrationAliasConflictMode::Replace),
+        _ => Err(format!("unknown alias conflict mode {}", arg)),
     }
 }

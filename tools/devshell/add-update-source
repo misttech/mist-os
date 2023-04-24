@@ -186,6 +186,8 @@ function main {
     if [[ -z "{persist}" ]]; then
       register_args+=( --storage-type persistent )
     fi
+    # When alias conflict detected, replace with what is being registered here.
+    register_args+=( --alias-conflict-mode replace )
 
     ffx-register-repository "$source_name" "" "$port" "${register_args[@]}" || return $?
   fi
