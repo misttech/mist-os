@@ -25,6 +25,7 @@ group("tests") {
     ":enums",
     ":experimental_zx_types",
     ":multifile",
+    ":output_namespace_override",
     ":resources",
     ":structs",
     ":zx.test",
@@ -115,7 +116,15 @@ if (is_host) {
 #      the target name, then the library is expected to be called "zx", which
 #      permits the testing of things that FIDL currently requires to be defined
 #      in a library of that name.
-#    - Type: list of relative paths
+#    - Type: list(relative path)
+#
+#  * experimental_flags
+#    - Optional: See fidl().
+#    - Type: list(string)
+#
+#  * backend_parameters
+#    - Optional:
+#    - Type: scope
 #
 #  * cases
 #    - Required: A list of test cases.
@@ -147,6 +156,12 @@ template("zither_golden_test") {
   case_name = target_name
   case_data_dir = "testdata/${case_name}"
 
+  extra_backend_parameters = {
+    if (defined(invoker.backend_parameters)) {
+      forward_variables_from(invoker.backend_parameters, "*")
+    }
+  }
+
   fidl(library_target) {
     forward_variables_from(invoker, [ "experimental_flags" ])
     sources = []
@@ -154,6 +169,8 @@ template("zither_golden_test") {
       sources += [ "${case_data_dir}/$source" ]
     }
     enable_zither = true
+
+    zither = extra_backend_parameters
   }
 
   if (support_rust) {
@@ -199,24 +216,38 @@ template("zither_golden_test") {
     # Clear from previous iteration.
     backend_info = {
     }
-    output_subdir_info = {
+    backend_params = {
+    }
+    output_namespace_info = {
     }
 
-    # Reconstruct the output subdirectory per `zither_library()` documentation.
     backend_info = supported_zither_backend_info[case.backend]
-    output_subdir_info = {
-      prefix_parts = []
-      suffix_parts = []
-      forward_variables_from(backend_info.output_subdir, "*")
-      parts = prefix_parts
-      if (defined(library_name_separator)) {
-        parts += [ string_replace(library_target, ".", library_name_separator) ]
+
+    # Reconstruct the output subdirectory per `zither_library()` documentation,
+    # taking any explicit override into account.
+    backend_params = {
+      if (defined(extra_backend_parameters[case.backend])) {
+        forward_variables_from(extra_backend_parameters[case.backend], "*")
       }
-      parts += suffix_parts
-      path = string_join("/", parts)
     }
-    if (output_subdir_info.path != "") {
-      output_subdir = output_subdir_info.path
+    if (defined(backend_params.output_namespace)) {
+      output_namespace = backend_params.output_namespace
+    } else {
+      output_namespace_info = {
+        prefix_parts = []
+        suffix_parts = []
+        forward_variables_from(backend_info.output_namespace, "*")
+        parts = prefix_parts
+        if (defined(library_name_separator)) {
+          parts +=
+              [ string_replace(library_target, ".", library_name_separator) ]
+        }
+        parts += suffix_parts
+        path = string_join("/", parts)
+      }
+      if (output_namespace_info.path != "") {
+        output_namespace = output_namespace_info.path
+      }
     }
 
     # A per (backend, case) output directory for use below, if needed.
@@ -246,7 +277,7 @@ template("zither_golden_test") {
           rebase_path(source, root_build_dir),
         ]
         foreach(file, case.files) {
-          args += [ "${output_subdir}/${file}" ]
+          args += [ "${output_namespace}/${file}" ]
         }
         outputs = [ source ]
       }
@@ -275,7 +306,7 @@ template("zither_golden_test") {
           "package main",
           "",
           "import (",
-          "  _ \"${output_subdir}\"",  # `_` to avoid usage complaints
+          "  _ \"${output_namespace}\"",  # `_` to avoid usage complaints
           "  _ \"syscall/zx\"",  # Required by fuchsia support quirks.
           ")",
           "",
@@ -326,7 +357,7 @@ template("zither_golden_test") {
       not_needed([
                    "backend_label",
                    "case_output_dir",
-                   "output_subdir",
+                   "output_namespace",
                  ])
     } else if (case.backend == "rust" || case.backend == "kernel" ||
                case.backend == "legacy_syscall_cdecl" ||
@@ -346,7 +377,7 @@ template("zither_golden_test") {
       }
       not_needed([
                    "case_output_dir",
-                   "output_subdir",
+                   "output_namespace",
                  ])
     }
 
@@ -527,6 +558,32 @@ zither_golden_test("multifile") {
         "c.rs",
         "lib.rs",
       ]
+    },
+  ]
+}
+
+# FIDL: testdata/output_namespace_override/
+# Goldens: testdata/constants/goldens/${backend}/
+zither_golden_test("output_namespace_override") {
+  sources = [ "output_namespace_override.test.fidl" ]
+
+  backend_parameters = {
+    c = {
+      output_namespace = "my/custom/c/header/guard"
+    }
+    asm = {
+      output_namespace = "my/custom/asm/header/guard"
+    }
+  }
+
+  cases = [
+    {
+      backend = "c"
+      files = [ "output_namespace_override.h" ]
+    },
+    {
+      backend = "asm"
+      files = [ "output_namespace_override.h" ]
     },
   ]
 }

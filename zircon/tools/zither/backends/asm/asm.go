@@ -22,16 +22,19 @@ var templates embed.FS
 // Generator provides Assembly data layout bindings.
 type Generator struct {
 	fidlgen.Generator
+	outputNamespaceOverride string
 }
 
-func NewGenerator(formatter fidlgen.Formatter) *Generator {
+func NewGenerator(formatter fidlgen.Formatter, outputNamespaceOverride string) *Generator {
 	gen := fidlgen.NewGenerator("AsmTemplates", templates, formatter, template.FuncMap{
-		"MemberName":               MemberName,
-		"HeaderGuard":              HeaderGuard,
+		"MemberName": MemberName,
+		"HeaderGuard": func(summary zither.FileSummary) string {
+			return zither.CHeaderGuard(summary, "asm", outputNamespaceOverride)
+		},
 		"UpperCaseWithUnderscores": c.UpperCaseWithUnderscores,
 		"ConstValue":               ConstValue,
 	})
-	return &Generator{*gen}
+	return &Generator{*gen, outputNamespaceOverride}
 }
 
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.DependencyDeclOrder }
@@ -41,7 +44,7 @@ func (gen Generator) DeclCallback(zither.Decl) {}
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	var outputs []string
 	for _, summary := range summaries {
-		output := filepath.Join(outputDir, zither.HeaderPath(summary, "asm"))
+		output := filepath.Join(outputDir, zither.CHeaderPath(summary, "asm", gen.outputNamespaceOverride))
 		if err := gen.GenerateFile(output, "GenerateAsmFile", summary); err != nil {
 			return nil, err
 		}
@@ -53,10 +56,6 @@ func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string)
 //
 // Template functions.
 //
-
-func HeaderGuard(summary zither.FileSummary) string {
-	return zither.HeaderGuard(summary, "asm")
-}
 
 func MemberName(decl zither.Decl, member zither.Member) string {
 	return c.UpperCaseWithUnderscores(decl) + "_" + c.UpperCaseWithUnderscores(member)

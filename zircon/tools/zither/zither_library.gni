@@ -52,18 +52,18 @@ _gofmt = {
 #
 # Each backend scope contains the following:
 #
-#  * output_subdir
+#  * output_namespace
 #    - Required: Describes the output subdirectory of the output directory
 #      passed to zither in which the backend artifacts will be written. This
 #      subdirectory has backend-specific significance as an C include path,
 #      Go package name, etc. Given a FIDL library name `library_name` and
-#      referring to this scope as `output_subdir_info`, one can reconstruct
+#      referring to this scope as `output_namespace_info`, one can reconstruct
 #      this path as follows:
 #      ```
-#      output_subdir_info = {
+#      output_namespace_info = {
 #        prefix_parts = []
 #        suffix_parts = []
-#        forward_variables_from(backend_info.output_subdir, "*")
+#        forward_variables_from(backend_info.output_namespace, "*")
 #        parts = prefix_parts
 #        if (defined(library_name_separator)) {
 #         parts += [ string_replace(library_name, ".", library_name_separator) ]
@@ -71,7 +71,7 @@ _gofmt = {
 #        path += suffix_parts
 #        path = string_join("/", parts)
 #      }
-#      output_subdir = output_subdir_info.path
+#      output_namespace = output_namespace_info.path
 #      ```
 #    - Type: scope
 #
@@ -104,27 +104,29 @@ _gofmt = {
 #
 supported_zither_backend_info = {
   c = {
-    output_subdir = {
+    output_namespace = {
       prefix_parts = [ "lib" ]
       library_name_separator = "."
       suffix_parts = [ "c" ]
+      supports_override = true
     }
     formatter = _clang_format
 
     _library_template = "_zither_c_family_library"
   }
   asm = {
-    output_subdir = {
+    output_namespace = {
       prefix_parts = [ "lib" ]
       library_name_separator = "."
       suffix_parts = [ "asm" ]
+      supports_override = true
     }
     formatter = _clang_format
 
     _library_template = "_zither_c_family_library"
   }
   go = {
-    output_subdir = {
+    output_namespace = {
       library_name_separator = "/"
     }
     formatter = _gofmt
@@ -133,7 +135,7 @@ supported_zither_backend_info = {
   }
   if (support_rust) {
     rust = {
-      output_subdir = {
+      output_namespace = {
         library_name_separator = "-"
       }
       formatter = {
@@ -145,14 +147,14 @@ supported_zither_backend_info = {
     }
   }
   zircon_ifs = {
-    output_subdir = {
+    output_namespace = {
     }
     _library_template = "_zither_zircon_ifs_file"
   }
 
   kernel = {
     formatter = _clang_format
-    output_subdir = {
+    output_namespace = {
       prefix_parts = [
         "lib",
         "syscalls",
@@ -164,7 +166,7 @@ supported_zither_backend_info = {
 
   legacy_syscall_cdecl = {
     formatter = _clang_format
-    output_subdir = {
+    output_namespace = {
       prefix_parts = [
         "zircon",
         "syscalls",
@@ -179,14 +181,14 @@ supported_zither_backend_info = {
   }
 
   go_runtime = {
-    output_subdir = {
+    output_namespace = {
     }
     formatter = _gofmt
     _library_template = "_zither_go_runtime_sources"
   }
 
   syscall_docs = {
-    output_subdir = {
+    output_namespace = {
     }
     _library_template = "_zither_syscall_docs"
   }
@@ -232,6 +234,7 @@ template("_zither") {
                              "generated_files",
                              "backend",
                              "output_dir",
+                             "output_namespace_override",
                              "formatter",
                            ])
 
@@ -271,6 +274,13 @@ template("_zither") {
         "-source-dir",
         rebase_path("//", root_build_dir),
       ]
+
+      if (defined(output_namespace_override)) {
+        args += [
+          "-output-namespace",
+          output_namespace_override,
+        ]
+      }
 
       if (defined(formatter)) {
         inputs += [ formatter.script ]
@@ -329,7 +339,7 @@ template("_zither") {
 #    - Required: The list of the basenames (i.e., stripped of .fidl and
 #      .test.fidl extensions) of the source FIDL files.
 #
-#  * output_subdir
+#  * output_namespace
 #    - Required: The subdirectory of `output_dir` that has the Zither outputs
 #      for entries.
 #    - Type: relative path
@@ -349,12 +359,12 @@ template("_zither_c_family_library") {
                          [
                            "source_names",
                            "output_dir",
-                           "output_subdir",
+                           "output_namespace",
                          ])
 
   generated_files = []
   foreach(name, source_names) {
-    generated_files += [ "${output_dir}/${output_subdir}/${name}.h" ]
+    generated_files += [ "${output_dir}/${output_namespace}/${name}.h" ]
   }
 
   _zither(zither_target) {
@@ -369,6 +379,10 @@ template("_zither_c_family_library") {
                              "backend",
                              "formatter",
                            ])
+    if (defined(invoker.output_namespace_override) &&
+        invoker.output_namespace_override) {
+      output_namespace_override = output_namespace
+    }
   }
 
   library_headers(main_target) {
@@ -397,12 +411,12 @@ template("_zither_go_library") {
                          [
                            "source_names",
                            "output_dir",
-                           "output_subdir",
+                           "output_namespace",
                          ])
 
-  generated_files = [ "${output_dir}/${output_subdir}/pkg_name.txt" ]
+  generated_files = [ "${output_dir}/${output_namespace}/pkg_name.txt" ]
   foreach(name, source_names) {
-    generated_files += [ "${output_dir}/${output_subdir}/${name}.go" ]
+    generated_files += [ "${output_dir}/${output_namespace}/${name}.go" ]
   }
 
   _zither(zither_target) {
@@ -426,8 +440,8 @@ template("_zither_go_library") {
                              "testonly",
                              "generated_files",
                            ])
-    name = output_subdir
-    source_dir = "${output_dir}/${output_subdir}"
+    name = output_namespace
+    source_dir = "${output_dir}/${output_namespace}"
     sources = rebase_path(generated_files, source_dir)
     non_go_deps = [
       ":${zither_target}($default_toolchain)",
@@ -446,7 +460,7 @@ if (support_rust) {
     forward_variables_from(invoker,
                            [
                              "source_names",
-                             "output_subdir",
+                             "output_namespace",
                            ])
 
     # Underscore to prevent rustc_library() from thinking that this value is a
@@ -456,15 +470,16 @@ if (support_rust) {
     generated_files = []
     if (invoker.backend == "rust_syscall") {
       crate_name = "fuchsia-zircon-sys"
-      crate_root = "${_output_dir}/${output_subdir}/src/definitions.rs"
+      crate_root = "${_output_dir}/${output_namespace}/src/definitions.rs"
       crate_deps = [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
       not_needed([ "source_names" ])
     } else {
       foreach(name, source_names) {
-        generated_files += [ "${_output_dir}/${output_subdir}/src/${name}.rs" ]
+        generated_files +=
+            [ "${_output_dir}/${output_namespace}/src/${name}.rs" ]
       }
-      crate_name = output_subdir
-      crate_root = "${_output_dir}/${output_subdir}/src/lib.rs"
+      crate_name = output_namespace
+      crate_root = "${_output_dir}/${output_namespace}/src/lib.rs"
       crate_deps = [
         "//third_party/rust_crates:bitflags",
         "//third_party/rust_crates:zerocopy",
@@ -566,14 +581,14 @@ template("_zither_kernel_sources") {
   forward_variables_from(invoker,
                          [
                            "output_dir",
-                           "output_subdir",
+                           "output_namespace",
                          ])
   generated_files = [
-    "$output_dir/${output_subdir}/category.inc",
-    "$output_dir/${output_subdir}/kernel.inc",
-    "$output_dir/${output_subdir}/kernel-wrappers.inc",
-    "$output_dir/${output_subdir}/syscalls.inc",
-    "$output_dir/${output_subdir}/zx-syscall-numbers.h",
+    "$output_dir/${output_namespace}/category.inc",
+    "$output_dir/${output_namespace}/kernel.inc",
+    "$output_dir/${output_namespace}/kernel-wrappers.inc",
+    "$output_dir/${output_namespace}/syscalls.inc",
+    "$output_dir/${output_namespace}/zx-syscall-numbers.h",
   ]
 
   _zither(zither_target) {
@@ -618,12 +633,12 @@ template("_zither_legacy_syscall_cdecl_sources") {
   forward_variables_from(invoker,
                          [
                            "output_dir",
-                           "output_subdir",
+                           "output_namespace",
                          ])
   generated_files = [
-    "$output_dir/${output_subdir}/cdecls.inc",
-    "$output_dir/${output_subdir}/cdecls-next.inc",
-    "$output_dir/${output_subdir}/testonly-cdecls.inc",
+    "$output_dir/${output_namespace}/cdecls.inc",
+    "$output_dir/${output_namespace}/cdecls-next.inc",
+    "$output_dir/${output_namespace}/testonly-cdecls.inc",
   ]
 
   _zither(zither_target) {
@@ -761,7 +776,7 @@ template("_zither_syscall_docs") {
 # the bindings of the various supported Zither backends. These backends are
 # listed in `supported_zither_backends` and the details of their bindings can
 # be found in //zircon/tools/zither/README.md. The associated backend library
-# subtargets are as follows where `${output_subdir}` is as described above in
+# subtargets are as follows where `${output_namespace}` is as described above in
 # `supported_zither_backend_info`:
 #
 # Subtargets:
@@ -771,7 +786,7 @@ template("_zither_syscall_docs") {
 #    associated bindings. For more information about a given backend's set of
 #    bindings see //zircon/tools/zither/backends/${backend_name}/README.md.
 #
-# Parameters:
+# Parameters - supplied indirectly via fidl():
 #
 #  * library_name
 #    - Required: The name of the FIDL library.
@@ -794,6 +809,24 @@ template("_zither_syscall_docs") {
 #    - Required: The label of the target that generates the FIDL IR JSON file.
 #    - Type: label
 #
+# Parameters - supplied directly via `fidl() { zither = {...} }`:
+#
+#  * ${backend_name}
+#    - Optional: Additional backend-specific parameters
+#    - Type: scope
+#
+#    Each scope contains:
+#    * output_namespace
+#      - Optional: This is the namespace/layout under which backend outputs are
+#        generated within the specified output directory. By default, this is
+#        backend-specific. The value can determine the name of the resulting
+#        library/package/crate/etc. (when a function of source layout), as well
+#        as the 'include' namespace of the headers generated by a C family
+#        backend. A backend only supports this parameter if
+#        `supported_zither_backend_info["$backend_name"].output_namespace.supports_overrides`
+#        is defined and true.
+#      - Type: string or relative path
+#
 template("zither_library") {
   assert(defined(invoker.sources),
          "zither_library(\"$target_name\") requires `sources`")
@@ -814,31 +847,52 @@ template("zither_library") {
     target(backend_info._library_template, "${target_name}.${backend}") {
       forward_variables_from(invoker,
                              [
-                               "testonly",
-                               "visibility",
+                               "backend",
                                "fidl_gen_dir",
                                "fidl_ir_json",
                                "fidl_ir_target",
-                               "backend",
+                               "testonly",
+                               "visibility",
                              ])
       forward_variables_from(backend_info, [ "formatter" ])
 
       output_dir = "${fidl_gen_dir}/${backend}"
-      output_subdir_info = {
-        prefix_parts = []
-        suffix_parts = []
-        forward_variables_from(backend_info.output_subdir, "*")
-        parts = prefix_parts
-        if (defined(library_name_separator)) {
-          parts += [ string_replace(invoker.library_name,
-                                    ".",
-                                    library_name_separator) ]
-        }
-        parts += suffix_parts
-        path = string_join("/", parts)
+
+      # TODO(crbug.com/gn/328): For some reason, replacing the predicate with
+      # `defined(invoker[backend])` yields an "Assignment had no effect..."
+      # error.
+      if ({
+            forward_variables_from(invoker, [ backend ])
+          } !=
+          {
+          }) {
+        forward_variables_from(invoker[backend], "*")
       }
-      if (output_subdir_info.path != "") {
-        output_subdir = output_subdir_info.path
+
+      if (defined(output_namespace)) {
+        output_namespace_info = backend_info.output_namespace
+        assert(
+            defined(output_namespace_info.supports_override) &&
+                output_namespace_info.supports_override,
+            "Zither backend \"$backend\" does not support output namespace overrides (\"$output_namespace\")")
+        output_namespace_override = true
+      } else {
+        output_namespace_info = {
+          prefix_parts = []
+          suffix_parts = []
+          forward_variables_from(backend_info.output_namespace, "*")
+          parts = prefix_parts
+          if (defined(library_name_separator)) {
+            parts += [ string_replace(invoker.library_name,
+                                      ".",
+                                      library_name_separator) ]
+          }
+          parts += suffix_parts
+          path = string_join("/", parts)
+        }
+        if (output_namespace_info.path != "") {
+          output_namespace = output_namespace_info.path
+        }
       }
 
       source_names = []

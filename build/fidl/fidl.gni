@@ -58,6 +58,10 @@ if (support_rust) {
 #     A list of fidl-lint check IDs to include (by passing the command line flag
 #     "-x some-check-id" for each value).
 #
+#   ${backend_name} (optional)
+#     A scope giving private, backend-specific parameters.
+#     Currently supported backends: zither
+#
 #   fuzzers (optional)
 #     Protocol/methods for which to generate LibFuzzer fuzz targets. Example:
 #       [
@@ -118,7 +122,7 @@ template("fidl") {
          "All FIDL dependencies are inherently " +
              "public, use 'public_deps' instead of 'deps'.")
 
-  extra_parameters = {
+  common_parameters = {
     library_name = target_name
     if (defined(invoker.name)) {
       library_name = invoker.name
@@ -170,7 +174,7 @@ template("fidl") {
                                    "sdk_category",
                                    "sources",
                                  ])
-      forward_variables_from(extra_parameters,
+      forward_variables_from(common_parameters,
                              [
                                "library_name",
                                "fidl_ir_json",
@@ -178,9 +182,9 @@ template("fidl") {
     }
 
     # Check that the IR JSON is indeed an output of the purported IR target.
-    fidlc_outputs = get_target_outputs(extra_parameters.fidl_ir_target)
-    assert(
-        [ extra_parameters.fidl_ir_json ] + fidlc_outputs - fidlc_outputs == [])
+    fidlc_outputs = get_target_outputs(common_parameters.fidl_ir_target)
+    assert([ common_parameters.fidl_ir_json ] + fidlc_outputs - fidlc_outputs ==
+           [])
   } else {
     not_needed(invoker, fidl_only)
   }
@@ -195,7 +199,7 @@ template("fidl") {
                                    "public_deps",
                                    "sdk_category",
                                  ])
-      forward_variables_from(extra_parameters, "*")
+      forward_variables_from(common_parameters, "*")
       fidl_gen_dir += "/dart"
     }
   } else {
@@ -210,7 +214,7 @@ template("fidl") {
                                "visibility",
                                "public_deps",
                              ])
-      forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
+      forward_variables_from(common_parameters, "*", [ "fidl_target" ])
       fidl_gen_dir += "/go"
     }
     not_needed(invoker,
@@ -234,7 +238,7 @@ template("fidl") {
                                    "public_deps",
                                    "sdk_category",
                                  ])
-      forward_variables_from(extra_parameters, "*")
+      forward_variables_from(common_parameters, "*")
       enable_hlcpp = enable_hlcpp
     }
 
@@ -246,7 +250,7 @@ template("fidl") {
                                  "visibility",
                                  "public_deps",
                                ])
-        forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
+        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
         fidl_gen_dir += "/rust"
       }
 
@@ -256,7 +260,7 @@ template("fidl") {
                                  "testonly",
                                  "visibility",
                                ])
-        forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
+        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
         fidl_gen_dir += "/bindlib"
       }
     }
@@ -269,7 +273,7 @@ template("fidl") {
                                  "visibility",
                                  "public_deps",
                                ])
-        forward_variables_from(extra_parameters, "*")
+        forward_variables_from(common_parameters, "*")
         fidl_gen_dir += "/banjo"
       }
     }
@@ -282,7 +286,10 @@ template("fidl") {
                                  "visibility",
                                  "sources",
                                ])
-        forward_variables_from(extra_parameters, "*")
+        forward_variables_from(common_parameters, "*")
+        if (defined(invoker.zither)) {
+          forward_variables_from(invoker.zither, "*")
+        }
         fidl_gen_dir += "/zither"
       }
     } else {
@@ -295,7 +302,7 @@ template("fidl") {
                                "testonly",
                                "visibility",
                              ])
-      forward_variables_from(extra_parameters, [ "fidl_target" ])
+      forward_variables_from(common_parameters, [ "fidl_target" ])
     }
   } else {
     not_needed(invoker, non_dart_go_only + [ "sources" ])

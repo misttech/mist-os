@@ -22,24 +22,27 @@ var templates embed.FS
 // Generator provides C data layout bindings.
 type Generator struct {
 	fidlgen.Generator
+	outputNamespaceOverride string
 }
 
-func NewGenerator(formatter fidlgen.Formatter) *Generator {
+func NewGenerator(formatter fidlgen.Formatter, outputNamespaceOverride string) *Generator {
 	gen := fidlgen.NewGenerator("CTemplates", templates, formatter, template.FuncMap{
 		"LowerCaseWithUnderscores": LowerCaseWithUnderscores,
 		"UpperCaseWithUnderscores": UpperCaseWithUnderscores,
 		"Append":                   Append,
 		"PrimitiveTypeName":        PrimitiveTypeName,
-		"HeaderGuard":              HeaderGuard,
-		"StandardIncludes":         StandardIncludes,
-		"TypeName":                 TypeName,
-		"ConstMemberName":          ConstMemberName,
-		"ConstValue":               ConstValue,
-		"EnumMemberValue":          EnumMemberValue,
-		"BitsMemberValue":          BitsMemberValue,
-		"DescribeType":             DescribeType,
+		"HeaderGuard": func(summary zither.FileSummary) string {
+			return zither.CHeaderGuard(summary, "c", outputNamespaceOverride)
+		},
+		"StandardIncludes": StandardIncludes,
+		"TypeName":         TypeName,
+		"ConstMemberName":  ConstMemberName,
+		"ConstValue":       ConstValue,
+		"EnumMemberValue":  EnumMemberValue,
+		"BitsMemberValue":  BitsMemberValue,
+		"DescribeType":     DescribeType,
 	})
-	return &Generator{*gen}
+	return &Generator{*gen, outputNamespaceOverride}
 }
 
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.DependencyDeclOrder }
@@ -49,7 +52,7 @@ func (gen Generator) DeclCallback(zither.Decl) {}
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	var outputs []string
 	for _, summary := range summaries {
-		output := filepath.Join(outputDir, zither.HeaderPath(summary, "c"))
+		output := filepath.Join(outputDir, zither.CHeaderPath(summary, "c", gen.outputNamespaceOverride))
 		if err := gen.GenerateFile(output, "GenerateCFile", summary); err != nil {
 			return nil, err
 		}
@@ -107,10 +110,6 @@ func TypeName(decl zither.Decl) string {
 
 func ConstMemberName(parent zither.Decl, member zither.Member) string {
 	return UpperCaseWithUnderscores(parent) + "_" + UpperCaseWithUnderscores(member)
-}
-
-func HeaderGuard(summary zither.FileSummary) string {
-	return zither.HeaderGuard(summary, "c")
 }
 
 // StandardIncludes gives the list of language standard headers used by a file.

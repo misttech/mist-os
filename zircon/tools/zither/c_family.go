@@ -11,15 +11,25 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-// HeaderPath gives the relative path at which to emit .h files for a given C
-// family backend.
-func HeaderPath(summary FileSummary, backend string) string {
-	return filepath.Join("lib", summary.Library.String(), backend, summary.Name()+".h")
+// CIncludeNamespace gives the default 'include' namespace for the headers
+// of bindings generated for a given FIDL library and C family backend.
+func CIncludeNamespace(lib fidlgen.LibraryName, backend string) string {
+	return filepath.Join("lib", lib.String(), backend)
 }
 
-// HeaderGuard gives the header guard value for a C family backend.
-func HeaderGuard(summary FileSummary, backend string) string {
-	path := HeaderPath(summary, backend)
+// CHeaderPath gives the header path within the 'include' namespace associated
+// within a given FIDL source file and C family backend.
+func CHeaderPath(summary FileSummary, backend, includeNamespace string) string {
+	if includeNamespace == "" {
+		includeNamespace = CIncludeNamespace(summary.Library, backend)
+	}
+	return filepath.Join(includeNamespace, summary.Name()+".h")
+}
+
+// CHeaderGuard gives the header guard value for a C family backend.
+func CHeaderGuard(summary FileSummary, backend, includeNamespace string) string {
+	path := CHeaderPath(summary, backend, includeNamespace)
+
 	// TODO(fxbug.dev/110021, fxbug.dev/111453): Once these headers are no
 	// longer checked in, we can drop these rewrite rules.
 	if backend == "c" || backend == "asm" {
