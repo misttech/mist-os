@@ -221,9 +221,9 @@ There are some typical objects that a component namespace might contain:
   - `bin/`: executable binaries within the package
   - `lib/`: shared libraries within the package
   - `data/`: data, such as assets, within the package
-- `data/`: local persistent storage (read-write, private to the package)
-- `tmp/`: temporary storage (read-write, private to the package)
-- `svc/`: protocols and services offered to a component
+- `data/`: local persistent storage (read-write, private to the component)
+- `tmp/`: temporary storage (read-write, private to the component)
+- `svc/`: protocols and services offered to the component
   - `fuchsia.process.Launcher`: launch processes
   - `fuchsia.logger.Log`: log messages
   - `vendor.topic.Interface`: service defined by a _vendor_
