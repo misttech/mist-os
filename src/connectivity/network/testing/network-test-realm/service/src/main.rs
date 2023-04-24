@@ -23,9 +23,9 @@ use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use futures_lite::FutureExt as _;
-use log::{error, info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
+use tracing::{error, info, warn};
 
 /// URL for the realm that contains the hermetic network components with a
 /// Netstack2 instance.

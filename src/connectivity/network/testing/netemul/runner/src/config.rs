@@ -9,12 +9,12 @@ use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_netemul_network as fnetemul_network;
 use fidl_fuchsia_sys2 as fsys2;
-use log::{debug, info, warn};
 use std::{
     collections::{hash_map, HashMap, HashSet},
     convert::TryFrom,
     str::FromStr,
 };
+use tracing::{debug, info, warn};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Network {

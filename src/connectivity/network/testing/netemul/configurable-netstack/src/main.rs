@@ -18,7 +18,7 @@ use fuchsia_component::{
     server::{ServiceFs, ServiceFsDir},
 };
 use futures_util::{StreamExt as _, TryStreamExt as _};
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {

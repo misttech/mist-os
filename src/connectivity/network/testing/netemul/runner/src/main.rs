@@ -20,7 +20,7 @@ use fuchsia_component::client::{
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 
 mod config;
 
