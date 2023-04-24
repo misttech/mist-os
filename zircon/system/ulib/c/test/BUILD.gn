@@ -200,10 +200,9 @@ fuchsia_unittest_package("libc-unittests-pkg") {
   test_specs = libc_test_specs
 }
 
-# The libc unittests are still included in core-tests-standalone too.  This is
-# a much smaller subset that serves as a good smoke test for libc itself and
-# essential kernel support that affect the libc tests, before expecting any of
-# the more demanding tests to necessarily work when libc might be suspect.
+# This set of tests serve as a good smoke test for libc itself and essential
+# kernel support that affect the libc tests, before expecting any of the more
+# demanding core-tests to necessarily work when libc might be suspect.
 zbi_test_executable("libc-unittests-standalone") {
   deps = [
     "..:unittests",
