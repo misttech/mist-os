@@ -37,12 +37,6 @@
 
 namespace {
 
-constexpr vaddr_t kPrivateAspaceBase = USER_ASPACE_BASE;
-constexpr vaddr_t kPrivateAspaceSize = PAGE_ALIGN(USER_ASPACE_SIZE / 2);
-
-constexpr vaddr_t kSharedAspaceBase = kPrivateAspaceBase + kPrivateAspaceSize;
-constexpr vaddr_t kSharedAspaceSize = USER_ASPACE_BASE + USER_ASPACE_SIZE - kSharedAspaceBase;
-
 const uint32_t kPolicyIdToPolicyException[] = {
     ZX_EXCP_POLICY_CODE_BAD_HANDLE,             // ZX_POL_BAD_HANDLE,
     ZX_EXCP_POLICY_CODE_WRONG_OBJECT,           // ZX_POL_WRONG_OBJECT
@@ -133,9 +127,8 @@ zx_status_t ProcessDispatcher::CreateShared(
     KernelHandle<ProcessDispatcher>* handle, zx_rights_t* rights,
     KernelHandle<VmAddressRegionDispatcher>* restricted_vmar_handle,
     zx_rights_t* restricted_vmar_rights) {
-  // Make sure shared_proc has a shared aspace.
-  if (shared_proc->normal_aspace_ptr()->base() != kSharedAspaceBase ||
-      shared_proc->normal_aspace_ptr()->size() != kSharedAspaceSize) {
+  if (!shared_proc->normal_aspace() || !shared_proc->restricted_aspace()) {
+    // The shared_proc process must have a normal and restricted aspace.
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -280,18 +273,22 @@ zx_status_t ProcessDispatcher::Initialize(SharedAspaceType type) {
   DEBUG_ASSERT(state_ == State::INITIAL);
 
   char aspace_name[ZX_MAX_NAME_LEN];
+  snprintf(aspace_name, sizeof(aspace_name), "proc:%" PRIu64, get_koid());
+
   if (type == SharedAspaceType::New) {
-    snprintf(aspace_name, sizeof(aspace_name), "proc:%" PRIu64, get_koid());
-    if (!shareable_state_->Initialize(kSharedAspaceBase, kSharedAspaceSize, aspace_name)) {
+    static constexpr vaddr_t top_of_private = USER_ASPACE_BASE + PAGE_ALIGN(USER_ASPACE_SIZE / 2);
+    static constexpr vaddr_t size_of_shared = USER_ASPACE_BASE + USER_ASPACE_SIZE - top_of_private;
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(top_of_private));
+    if (!shareable_state_->Initialize(top_of_private, size_of_shared, aspace_name)) {
       return ZX_ERR_NO_MEMORY;
     }
-  } else if (type == SharedAspaceType::Shared) {
-    snprintf(aspace_name, sizeof(aspace_name), "proc(restricted):%" PRIu64, get_koid());
-    restricted_aspace_ =
-        VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize, VmAspace::Type::User, aspace_name);
-    if (!restricted_aspace_) {
-      return ZX_ERR_NO_MEMORY;
-    }
+  }
+
+  snprintf(aspace_name, sizeof(aspace_name), "proc(restricted):%" PRIu64, get_koid());
+  restricted_aspace_ = VmAspace::Create(USER_ASPACE_BASE, PAGE_ALIGN(USER_ASPACE_SIZE / 2),
+                                        VmAspace::Type::User, aspace_name);
+  if (!restricted_aspace_) {
+    return ZX_ERR_NO_MEMORY;
   }
 
   return ZX_OK;
