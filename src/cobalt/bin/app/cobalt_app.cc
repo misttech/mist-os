@@ -29,6 +29,9 @@ using utils::FuchsiaHTTPClient;
 
 const float kMaxBytesPerEnvelopeFactor = 0.5;  // 50% of total capacity
 
+// In production this comes from the system image; in tests this is provided by
+// the test package.  In both cases, the data is mapped into our incoming
+// namespace under /config/data.
 constexpr char kMetricsRegistryPath[] = "/config/data/global_metrics_registry.pb";
 
 constexpr char kObservationStorePath[] = "/data/observation_store";

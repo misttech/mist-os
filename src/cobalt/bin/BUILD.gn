@@ -12,20 +12,22 @@ metrics_registry("global_metrics_registry") {
   global = true
 }
 
+# The following two targets are only for tests, so we include them in the test
+# package directly via `resource` and serve them out of the test package,
+# rather than using the `config_data` template which would place them in the
+# system image.  See //src/cobalt/bin/meta/base/cobalt_testapp.shard.cml for
+# where we consume cobalt_tests_config_data from the package.
 # Include the global_metrics_registry.pb in the config data for Cobalt.
-config_data("cobalt_registry") {
-  for_pkg = "cobalt_tests"
+resource("cobalt_registry_for_tests") {
   deps = [ ":global_metrics_registry" ]
   sources = [ "$target_gen_dir/global_metrics_registry.pb" ]
-  outputs = [ "global_metrics_registry.pb" ]
+  outputs = [ "cobalt_tests_config_data/global_metrics_registry.pb" ]
 }
 
 # In the default config, Cobalt will upload all metrics (including max_release_stage=DEBUG metrics)
-config_data("config") {
-  for_pkg = "cobalt_tests"
-
+resource("config_for_tests") {
   sources = [ "app/configs/default_config.json" ]
-  outputs = [ "config.json" ]
+  outputs = [ "cobalt_tests_config_data/config.json" ]
 }
 
 group("tests") {
@@ -111,8 +113,8 @@ fuchsia_test_package("cobalt_tests") {
     ":cobalt_testapp_no_network",
   ]
   deps = [
-    ":cobalt_registry",
-    ":config",
+    ":cobalt_registry_for_tests",
+    ":config_for_tests",
     ":testapp_metrics_registry",
     ":variants_no_network_components",
     "app:analyzer_devel_public",
@@ -138,8 +140,8 @@ fuchsia_test_component("cobalt-testapp") {
 fuchsia_test_package("cobalt-manual-tests") {
   test_components = [ ":cobalt-testapp" ]
   deps = [
-    ":cobalt_registry",
-    ":config",
+    ":cobalt_registry_for_tests",
+    ":config_for_tests",
     ":variants_networked_components",
     "app:analyzer_devel_public",
     "app:analyzer_prod_public",
@@ -166,8 +168,8 @@ fuchsia_test_component("cobalt_testapp_for_prober_do_not_run_manually") {
 fuchsia_test_package("cobalt_tests_do_not_run_manually") {
   test_components = [ ":cobalt_testapp_for_prober_do_not_run_manually" ]
   deps = [
-    ":cobalt_registry",
-    ":config",
+    ":cobalt_registry_for_tests",
+    ":config_for_tests",
     ":variants_networked_components",
     "app:analyzer_devel_public",
     "app:analyzer_prod_public",

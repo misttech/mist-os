@@ -47,6 +47,9 @@
             path: "/config/ssl",
         },
         {
+            // In production, this directory capability comes from the system
+            // image.  In tests, this capability is provided from the
+            // `cobalt_tests_config_data` directory from the test package.
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",

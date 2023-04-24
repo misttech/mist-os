@@ -5,9 +5,6 @@
     include: [
         "sys/component/realm_builder.shard.cml",
         "sys/testing/elf_test_runner.shard.cml",
-
-        // Depends on config_data which is a system capability.
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -24,11 +21,19 @@
     ],
     offer: [
         {
-            directory: "config-data",
-            from: "parent",
+            // Tests should avoid using the system image's `config-data`
+            // capability.  We mock out that directory to all the children
+            // by taking the cobalt_tests_config_data directory from the
+            // test package itself and naming that capability `config-data`
+            // as we pass it to the realm builder component, which forwards it
+            // to the actual test cobalt instance, which maps it into its
+            // namespace as /config/data.
+            directory: "pkg",
+            from: "framework",
+            as: "config-data",
             to: "#realm_builder",
             rights: [ "r*" ],
-            subdir: "cobalt_tests",
+            subdir: "cobalt_tests_config_data",
         },
         {
             storage: "data",
