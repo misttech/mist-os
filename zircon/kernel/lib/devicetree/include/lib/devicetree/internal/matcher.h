@@ -7,7 +7,9 @@
 #ifndef ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_INTERNAL_MATCHER_H_
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_INTERNAL_MATCHER_H_
 
+#include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 
@@ -112,7 +114,12 @@ class MatcherVisit {
   explicit constexpr MatcherVisit(State state) : state_(state) {}
 
   constexpr State state() const { return state_; }
-  constexpr void set_state(State state) { state_ = state; }
+  constexpr void set_state(State state) {
+    state_ = state;
+    if (state_ == State::kNeedsPathResolution) {
+      extra_alias_scan_ = 1;
+    }
+  }
 
   // Prevents the associated matcher's callback from being called in any nodes
   // that are part of the subtree of the current node.
@@ -126,9 +133,13 @@ class MatcherVisit {
     }
   }
 
+  // Extra
+  constexpr size_t extra_alias_scan() const { return extra_alias_scan_; }
+
  private:
   State state_ = State::kActive;
   const Node* mark_ = nullptr;
+  size_t extra_alias_scan_ = 0;
 };
 
 template <typename Matcher>
@@ -136,6 +147,23 @@ constexpr size_t GetMaxScans() {
   using MatcherType = std::decay_t<Matcher>;
   return MatcherType::kMaxScans;
 }
+
+// A Matcher whose sole pupose is to guarantee that aliases will be resolved if present. This allows
+// indicating that alias still need to be resolved, if no user provided matcher can make progress
+// due to path resolution.
+class AliasMatcher {
+ public:
+  // Aliases must be resolved within one walk.
+  static constexpr size_t kMaxScans = 1;
+
+  ScanState OnNode(const NodePath& path, const PropertyDecoder& decoder);
+
+  ScanState OnWalk();
+
+  void OnError(std::string_view error);
+};
+
+static_assert(CheckInterface<AliasMatcher>());
 
 }  // namespace internal
 

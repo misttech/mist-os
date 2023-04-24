@@ -57,49 +57,6 @@ auto CompareRangesOfNodes(Iter start_1, Iter end_1, Iter2 start_2, Iter2 end_2) 
 
 }  // namespace internal
 
-// A path is translated into two absolute components, |prefix| and |suffix|. The full absolute path
-// is the concatenation of |prefix|/|suffix|.
-// This allows an aliased path "alias/suffix_path" to become:
-//     alias: "/real_path/"
-//     prefix: "/real_path"
-//     suffix: "suffix_path"
-//
-// When the path is not aliased, "/real_path/suffix_path" then:
-//     prefix: "/real_path/suffix_path"
-//     suffix: ""
-struct ResolvedPath {
-  using Components = StringList<'/'>;
-
-  // Helpers to iterate over respective components.
-  Components Prefix() const { return Components(prefix); }
-
-  Components Suffix() const { return Components(suffix); }
-
-  std::string_view prefix;
-  std::string_view suffix;
-};
-
-// Helper class for translating paths from aliases to absolute paths.
-class PathResolver {
- public:
-  enum class ResolveError {
-    // Alias data was available, but the alias had no match.
-    kBadAlias,
-    // Alias data is not yet available.
-    kNoAliases,
-  };
-
-  constexpr explicit PathResolver(const std::optional<Properties>& aliases) : aliases_(aliases) {}
-
-  // Returns a resolved path containing the de-aliased prefix and the suffix of the path.
-  fit::result<ResolveError, ResolvedPath> Resolve(std::string_view maybe_aliased_path) const;
-
-  constexpr bool has_aliases() const { return !!aliases_; }
-
- private:
-  std::optional<Properties> aliases_;
-};
-
 // Represents the result of comparing |path_a| to |path_b|.
 // Method meant to be read |path_a| |MethodName| of |path_b|.
 // E.g.

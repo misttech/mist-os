@@ -71,7 +71,14 @@ struct SingleNodeMatcher {
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder) {
     visit_count++;
-    switch (devicetree::ComparePath(path, path_to_match)) {
+    auto resolved_path = decoder.ResolvePath(path_to_match);
+    if (resolved_path.is_error()) {
+      return resolved_path.error_value() ==
+                     devicetree::PropertyDecoder::PathResolveError::kNoAliases
+                 ? devicetree::ScanState::kNeedsPathResolution
+                 : devicetree::ScanState::kDoneWithSubtree;
+    }
+    switch (devicetree::ComparePath(path, *resolved_path)) {
       case devicetree::kIsMatch:
         found = true;
         node(path.back(), decoder);
@@ -110,6 +117,7 @@ class MatchTest : public zxtest::Test {
  public:
   static void SetUpTestSuite() {
     ASSERT_NO_FATAL_FAILURE(ReadTestData("complex_no_properties.dtb", fdt_no_props));
+    ASSERT_NO_FATAL_FAILURE(ReadTestData("complex_with_alias.dtb", fdt_no_props_with_alias));
   }
 
   /*
@@ -127,11 +135,23 @@ class MatchTest : public zxtest::Test {
     return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_no_props}));
   }
 
+  /*
+    Same as |no_prop_tree| but with the following aliases:
+      * foo = "/A/C"
+      * bar = "/E/F"
+    In this tree, the aliases node is the last one of the root's offspring.
+  */
+  devicetree::Devicetree no_prop_tree_with_alias() {
+    return devicetree::Devicetree(cpp20::as_bytes(cpp20::span{fdt_no_props_with_alias}));
+  }
+
  private:
   static std::array<uint8_t, kMaxSize> fdt_no_props;
+  static std::array<uint8_t, kMaxSize> fdt_no_props_with_alias;
 };
 
 std::array<uint8_t, kMaxSize> MatchTest::fdt_no_props = {};
+std::array<uint8_t, kMaxSize> MatchTest::fdt_no_props_with_alias = {};
 
 TEST_F(MatchTest, EarlyCompletion) {
   size_t seen = 0;
@@ -146,6 +166,29 @@ TEST_F(MatchTest, EarlyCompletion) {
   // This matcher completes on the first iteration, so the walk count will be 0.
   EXPECT_TRUE(matcher.found);
   EXPECT_EQ(matcher.visit_count, 5);
+  EXPECT_EQ(matcher.walk_count, 0);
+  EXPECT_TRUE(matcher.error.empty());
+  EXPECT_EQ(seen, 1);
+}
+
+TEST_F(MatchTest, NoShortCircuitingAliasesNode) {
+  // Verify that when no matchers can make progress due to PathResolution being needed,
+  // the aliases eventually get resolved, and further progress can be made.
+  size_t seen = 0;
+  SingleNodeMatcher<1> matcher("foo/D", [&](auto name, const auto& decoder) {
+    seen++;
+    EXPECT_EQ(name, "D");
+    matcher.node_match_result = devicetree::ScanState::kDone;
+  });
+
+  auto tree = no_prop_tree_with_alias();
+  EXPECT_TRUE(devicetree::Match(tree, matcher));
+
+  // This matcher completes on the second iteration, so the walk count will be 1.
+  EXPECT_TRUE(matcher.found);
+  // Walk 0: * -> Meeds Path resolution at root. 1 visit.
+  // Walk 1: * -> A -> B -> C -> D (Done)
+  EXPECT_EQ(matcher.visit_count, 6);
   EXPECT_EQ(matcher.walk_count, 0);
   EXPECT_TRUE(matcher.error.empty());
   EXPECT_EQ(seen, 1);

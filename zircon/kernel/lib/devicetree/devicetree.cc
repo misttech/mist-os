@@ -4,8 +4,11 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "lib/devicetree/devicetree.h"
+
 #include <inttypes.h>
-#include <lib/devicetree/devicetree.h>
+#include <lib/devicetree/path.h>
+#include <lib/fit/result.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/assert.h>
 
@@ -141,6 +144,42 @@ Properties::iterator& Properties::iterator::operator++() {
   return *this;
 }
 
+fit::result<PropertyDecoder::PathResolveError, ResolvedPath> PropertyDecoder::ResolvePath(
+    std::string_view maybe_aliased_path) const {
+  if (maybe_aliased_path.empty()) {
+    return fit::ok(ResolvedPath{});
+  }
+
+  if (maybe_aliased_path[0] != '/') {
+    if (!aliases_) {
+      return fit::error(PathResolveError::kNoAliases);
+    }
+    auto& aliases = *aliases_;
+
+    std::string_view alias = maybe_aliased_path.substr(0, maybe_aliased_path.find('/'));
+    std::string_view suffix = maybe_aliased_path.substr(alias.size());
+    if (!suffix.empty()) {
+      suffix.remove_prefix(1);
+    }
+
+    for (auto [name, value] : aliases) {
+      if (name != alias) {
+        continue;
+      }
+      auto maybe_abs_path = value.AsString();
+      if (!maybe_abs_path.has_value() || maybe_abs_path->empty()) {
+        return fit::error(PathResolveError::kBadAlias);
+      }
+      return fit::ok(ResolvedPath{.prefix = *maybe_abs_path, .suffix = suffix});
+    }
+
+    // We did not find a matching alias.
+    return fit::error(PathResolveError::kBadAlias);
+  }
+
+  return fit::ok(ResolvedPath{.prefix = maybe_aliased_path});
+}
+
 Devicetree::Devicetree(ByteView blob) {
   ZX_ASSERT(ReadBigEndianUint32(blob).value == kMagic);
 
@@ -270,7 +309,11 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
       break;
     }
     // Re-initialize the property decoder with this node's properties.
-    new (&decoder) PropertyDecoder(parent, Properties(props_block, string_block_));
+    new (&decoder) PropertyDecoder(parent, Properties(props_block, string_block_), aliases_);
+    constexpr std::string_view kAliasNodePath = "/aliases";
+    if (!aliases_ && ComparePath(*path, kAliasNodePath) == kIsMatch) {
+      aliases_.emplace(decoder.properties());
+    }
     visit = call(pre_order_visitor);
   }
 

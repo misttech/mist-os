@@ -69,102 +69,6 @@ struct AliasContext {
   std::vector<uint8_t> string_block;
 };
 
-TEST(PathResolverTest, ResolveAboslutePath) {
-  std::string_view path = "/absolute_path/with_leaf";
-  devicetree::PathResolver resolver(std::nullopt);
-
-  auto resolved_path = resolver.Resolve(path);
-  ASSERT_TRUE(resolved_path.is_ok());
-
-  auto [stem, leaf] = *resolved_path;
-  EXPECT_EQ(stem, path);
-  EXPECT_TRUE(leaf.empty());
-}
-
-TEST(PathResolverTest, ResolveRelativePathNoAliasNode) {
-  std::string_view path = "alias/with_leaf";
-  devicetree::PathResolver resolver(std::nullopt);
-
-  auto resolved_path = resolver.Resolve(path);
-  ASSERT_TRUE(resolved_path.is_error());
-  EXPECT_EQ(resolved_path.error_value(), devicetree::PathResolver::ResolveError::kNoAliases);
-}
-
-TEST(PathResolverTest, ResolveRelativePathWithAliasNoLeaf) {
-  std::string_view alias_path = "alias";
-  std::string_view absolute_path = "/absolute_path/is_here";
-
-  AliasContext aliases;
-  aliases.Add("11", "/1");
-  aliases.Add("2", "/2");
-  aliases.Add("3", "/3");
-  aliases.Add(alias_path, absolute_path);
-  devicetree::PathResolver resolver(aliases.properties());
-
-  auto resolved_path = resolver.Resolve(alias_path);
-  ASSERT_TRUE(resolved_path.is_ok());
-
-  auto [stem, leaf] = *resolved_path;
-  EXPECT_EQ(stem, absolute_path);
-  EXPECT_TRUE(leaf.empty());
-}
-
-TEST(PathResolverTest, ResolveRelativePathWithAliasWithLeaf) {
-  std::string_view alias_path = "alias";
-  std::string_view absolute_path = "/absolute_path/is_here";
-
-  AliasContext aliases;
-  aliases.Add("11", "/1");
-  aliases.Add("2", "/2");
-  aliases.Add("3", "/3");
-  aliases.Add(alias_path, absolute_path);
-  std::optional<devicetree::Properties> alias_prop = aliases.properties();
-  devicetree::PathResolver resolver(alias_prop);
-
-  auto resolved_path = resolver.Resolve("alias/this/is/a/leaf");
-  ASSERT_TRUE(resolved_path.is_ok());
-
-  auto [stem, leaf] = *resolved_path;
-  EXPECT_EQ(stem, absolute_path);
-  EXPECT_EQ(leaf, "this/is/a/leaf");
-}
-
-TEST(PathResolverTest, ResolveRelativePathWithNoMatchingAlias) {
-  std::string_view alias_path = "alias";
-  std::string_view absolute_path = "/absolute_path/is_here";
-
-  AliasContext aliases;
-  aliases.Add("11", "/1");
-  aliases.Add("2", "/2");
-  aliases.Add("3", "/3");
-  aliases.Add(alias_path, absolute_path);
-  std::optional<devicetree::Properties> alias_prop = aliases.properties();
-  devicetree::PathResolver resolver(alias_prop);
-
-  auto resolved_path = resolver.Resolve("unknown_alias/this/is/a/leaf");
-
-  ASSERT_TRUE(resolved_path.is_error());
-  EXPECT_EQ(resolved_path.error_value(), devicetree::PathResolver::ResolveError::kBadAlias);
-}
-
-TEST(PathResolverTest, ResolveRelativePathWithEmptyAlias) {
-  std::string_view alias_path = "alias";
-  std::string_view absolute_path = "";
-
-  AliasContext aliases;
-  aliases.Add("11", "/1");
-  aliases.Add("2", "/2");
-  aliases.Add("3", "/3");
-  aliases.Add(alias_path, absolute_path);
-  std::optional<devicetree::Properties> alias_prop = aliases.properties();
-  devicetree::PathResolver resolver(alias_prop);
-
-  auto resolved_path = resolver.Resolve("alias/this/is/a/leaf");
-
-  ASSERT_TRUE(resolved_path.is_error());
-  EXPECT_EQ(resolved_path.error_value(), devicetree::PathResolver::ResolveError::kBadAlias);
-}
-
 std::vector<std::string_view> ConvertPath(std::string_view path) {
   std::vector<std::string_view> components;
 
@@ -275,8 +179,8 @@ NodePathHelper ConvertToNodePath(std::string_view path) {
 
 auto ToResolvedPath(std::string_view path,
                     std::optional<devicetree::Properties> aliases = std::nullopt) {
-  devicetree::PathResolver resolver(aliases);
-  auto resolved = resolver.Resolve(path);
+  devicetree::PropertyDecoder decoder(nullptr, devicetree::Properties(), aliases);
+  auto resolved = decoder.ResolvePath(path);
   ZX_ASSERT(resolved.is_ok());
   return resolved.value();
 }

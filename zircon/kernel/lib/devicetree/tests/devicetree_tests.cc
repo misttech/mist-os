@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/devicetree/devicetree.h>
+#include <lib/fit/result.h>
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/stdcompat/span.h>
@@ -213,6 +214,31 @@ TEST(DevicetreeTest, WholeTreeIsPruned) {
   constexpr auto post_order = cpp20::to_array<size_t>({0});
 
   DoAndVerifyWalk(dt, nodes, post_order);
+}
+
+TEST(DevicetreeTest, AliaesNodeIsKept) {
+  uint8_t fdt[kMaxSize];
+  ReadTestData("complex_with_alias_first.dtb", fdt);
+  // aliases:
+  // foo = "/A/C";
+  // bar = "/E/F";
+  devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
+
+  std::optional<devicetree::ResolvedPath> resolved;
+  dt.Walk([&resolved](const auto& path, const auto& decoder) {
+    if (path.back() == "A") {
+      if (auto res = decoder.ResolvePath("foo"); res.is_ok()) {
+        resolved = *res;
+      }
+      return false;
+    }
+    return true;
+  });
+
+  ASSERT_TRUE(resolved);
+  auto [foo, empty] = *resolved;
+  EXPECT_EQ(foo, "/A/C");
+  EXPECT_TRUE(empty.empty());
 }
 
 TEST(DevicetreeTest, PropertiesAreTranslated) {
@@ -465,6 +491,33 @@ struct PropertyBuilder {
     append(property_block, as_bytes(be_value));
   }
 
+  void Add(std::string_view alias, std::string_view absolute_path) {
+    constexpr std::array<uint8_t, sizeof(uint32_t) - 1> kPadding = {};
+
+    uint32_t name_off = byte_swap(static_cast<uint32_t>(string_block.size()));
+    // String must be null terminated.
+    append(string_block, alias);
+    string_block.push_back('\0');
+
+    // Add the null terminator.
+    uint32_t len = static_cast<uint32_t>(absolute_path.size()) + 1;
+    cpp20::span<const uint8_t> padding;
+    if (auto remainder = len % sizeof(uint32_t); remainder != 0) {
+      padding = cpp20::span(kPadding).subspan(0, sizeof(uint32_t) - remainder);
+    }
+    len = byte_swap(len);
+
+    if (!property_block.empty()) {
+      const uint32_t kFdtPropToken = byte_swap(0x00000003);
+      append(property_block, as_bytes(kFdtPropToken));
+    }
+    append(property_block, as_bytes(len));
+    append(property_block, as_bytes(name_off));
+    append(property_block, absolute_path);
+    property_block.push_back('\0');
+    append(property_block, padding);
+  }
+
   std::vector<uint8_t> property_block;
   std::vector<uint8_t> string_block;
 };
@@ -510,6 +563,75 @@ TEST(PropertyDecoderTest, FindProperty) {
 
   check_prop(prop, 1);
   ASSERT_FALSE(not_found);
+}
+
+TEST(PropertyDecoderTest, ResolvePathWithAlias) {
+  PropertyBuilder builder;
+  builder.Add("foo", "/foo/bar");
+  builder.Add("bar", "/bar/baz");
+  builder.Add("baz", "/baz/foo");
+  builder.Add("empty", "");
+  std::optional<devicetree::Properties> aliases(builder.Build());
+
+  devicetree::PropertyDecoder decoder(nullptr, devicetree::Properties(), aliases);
+
+  auto foo_path = decoder.ResolvePath("foo");
+  ASSERT_TRUE(foo_path.is_ok());
+
+  auto [foo_prefix, foo_suffix] = *foo_path;
+  EXPECT_EQ(foo_prefix, "/foo/bar");
+  EXPECT_TRUE(foo_suffix.empty());
+
+  auto bar_path = decoder.ResolvePath("bar/baz");
+  ASSERT_TRUE(bar_path.is_ok());
+
+  auto [bar_prefix, bar_suffix] = *bar_path;
+  EXPECT_EQ(bar_prefix, "/bar/baz");
+  EXPECT_EQ(bar_suffix, "baz");
+
+  auto baz_path = decoder.ResolvePath("baz/baz/foo");
+  ASSERT_TRUE(baz_path.is_ok());
+
+  auto [baz_prefix, baz_suffix] = *baz_path;
+  EXPECT_EQ(baz_prefix, "/baz/foo");
+  EXPECT_EQ(baz_suffix, "baz/foo");
+
+  // Alias not found.
+  auto not_found = decoder.ResolvePath("foobar");
+  ASSERT_TRUE(not_found.is_error());
+  EXPECT_EQ(not_found.error_value(), devicetree::PropertyDecoder::PathResolveError::kBadAlias);
+
+  // Absolute path with alias
+  auto absolute_path = decoder.ResolvePath("/foo");
+  ASSERT_TRUE(absolute_path.is_ok());
+
+  auto [abs_prefix, empty_suffix] = *absolute_path;
+  EXPECT_EQ(abs_prefix, "/foo");
+  EXPECT_TRUE(empty_suffix.empty());
+
+  // empty path
+  auto empty_path = decoder.ResolvePath("empty/baz");
+  ASSERT_TRUE(empty_path.is_error());
+  EXPECT_EQ(empty_path.error_value(), devicetree::PropertyDecoder::PathResolveError::kBadAlias);
+}
+
+TEST(PropertyDecoderTest, ResolvePathNoAlias) {
+  std::optional<devicetree::Properties> aliases;
+
+  devicetree::PropertyDecoder decoder(nullptr, devicetree::Properties(), aliases);
+  auto path_with_alias = decoder.ResolvePath("foo");
+
+  ASSERT_TRUE(path_with_alias.is_error());
+  ASSERT_EQ(path_with_alias.error_value(),
+            devicetree::PropertyDecoder::PathResolveError::kNoAliases);
+
+  auto absolute_path = decoder.ResolvePath("/foo");
+
+  ASSERT_TRUE(absolute_path.is_ok());
+  auto [abs_prefix, empty_suffix] = *absolute_path;
+
+  EXPECT_EQ(abs_prefix, "/foo");
+  EXPECT_TRUE(empty_suffix.empty());
 }
 
 }  // namespace

@@ -100,41 +100,49 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
   static_assert((internal::CheckInterface<std::decay_t<Matchers>>() && ...));
   using internal::ForEachMatcher;
   using internal::MatcherVisit;
-  constexpr size_t kMaxScanForMatchers = std::max({internal::GetMaxScans<Matchers>()...});
-  std::array<MatcherVisit<>, sizeof...(Matchers)> visit_state;
+
+  // Matcher that prevents short circuiting the alias node, when other matchers cant make forward
+  // progress.
+  internal::AliasMatcher alias_matcher;
+
+  // Add an extra walk, for possible alias resolution step.
+  constexpr size_t kMaxScanForMatchers = std::max({internal::GetMaxScans<Matchers>()...}) + 1;
+
+  // Extra state for the alias matcher.
+  std::array<MatcherVisit<>, sizeof...(Matchers) + 1> visit_state;
 
   // Call |OnNode| on all matchers that are not done or avoiding the subtree.
-  auto visit_and_prune = [&visit_state, &matchers...](const NodePath& path,
-                                                      const PropertyDecoder& decoder) {
+  auto visit_and_prune = [&visit_state, &alias_matcher, &matchers...](
+                             const NodePath& path, const PropertyDecoder& decoder) {
     auto on_each_matcher = [&visit_state, &path, &decoder](auto& matcher, size_t index) {
       auto& matcher_state = visit_state[index];
-      if (matcher_state.state() == ScanState::kActive ||
-          matcher_state.state() == ScanState::kNeedsPathResolution) {
+      if (matcher_state.state() == ScanState::kActive) {
         matcher_state.set_state(matcher.OnNode(path, decoder));
         if (matcher_state.state() == ScanState::kDoneWithSubtree) {
           matcher_state.Prune(path);
         }
       }
     };
-    ForEachMatcher(on_each_matcher, matchers...);
+    ForEachMatcher(on_each_matcher, matchers..., alias_matcher);
     // Return whether we still need to visit any node in the underlying subtree.
     return std::any_of(visit_state.begin(), visit_state.end(),
                        [](auto& visit_state) { return visit_state.state() == ScanState::kActive; });
   };
 
   // Unprune any pruned Node, as a post order visitor.
-  auto unprune = [&visit_state, &matchers...](const NodePath& path,
-                                              const PropertyDecoder& decoder) {
+  auto unprune = [&visit_state, &matchers..., &alias_matcher](const NodePath& path,
+                                                              const PropertyDecoder& decoder) {
     ForEachMatcher(
         [&visit_state, &path](auto& matcher, size_t index) { visit_state[index].Unprune(path); },
-        matchers...);
+        matchers..., alias_matcher);
   };
 
   // Call OnWalk on ever matcher
   auto on_walk = [](auto& visit_state, auto&... matchers) {
     ForEachMatcher(
         [&visit_state](auto& matcher, size_t index) {
-          if (visit_state[index].state() != ScanState::kDone) {
+          if (visit_state[index].state() != ScanState::kDone &&
+              visit_state[index].state() != ScanState::kNeedsPathResolution) {
             visit_state[index].set_state(matcher.OnWalk());
           }
         },
@@ -156,7 +164,11 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
         [&error_count, &finished_count, &visit_state, current_scan](auto& matcher, size_t index) {
           using MatcherType = std::decay_t<decltype(matcher)>;
           if (visit_state[index].state() != ScanState::kDone) {
-            if (current_scan >= (MatcherType::kMaxScans - 1)) {
+            if (current_scan > 0 && visit_state[index].state() == ScanState::kNeedsPathResolution) {
+              matcher.OnError("Matcher failed to resolved path after first scan.");
+              error_count++;
+            } else if (current_scan >=
+                       (MatcherType::kMaxScans + visit_state[index].extra_alias_scan() - 1)) {
               matcher.OnError("Matcher failed to reach completion the requested scan number.");
               error_count++;
             }
@@ -178,11 +190,20 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
 
   for (size_t i = 0; i < kMaxScanForMatchers; ++i) {
     devicetree.Walk(visit_and_prune, unprune);
-    on_walk(visit_state, matchers...);
+    on_walk(visit_state, matchers..., alias_matcher);
 
     // If result == 1 then no errors found, but not all matchers are done.
     if (auto res = all_matchers_done(i, matchers...); res != ScanResult::kMatchersPending) {
       return res == ScanResult::kMatchersDone;
+    }
+
+    // Clear path resolution if its first iteration
+    if (i == 0) {
+      for (auto& state : visit_state) {
+        if (state.state() == ScanState::kNeedsPathResolution) {
+          state.set_state(ScanState::kActive);
+        }
+      }
     }
   }
 

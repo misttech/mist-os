@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_DEVICETREE_H_
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_DEVICETREE_H_
 
+#include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
@@ -289,6 +290,28 @@ class MemoryReservations {
   ByteView mem_rsvmap_;
 };
 
+// A path is translated into two absolute components, |prefix| and |suffix|. The full absolute path
+// is the concatenation of |prefix|/|suffix|.
+// This allows an aliased path "alias/suffix_path" to become:
+//     alias: "/real_path/"
+//     prefix: "/real_path"
+//     suffix: "suffix_path"
+//
+// When the path is not aliased, "/real_path/suffix_path" then:
+//     prefix: "/real_path/suffix_path"
+//     suffix: ""
+struct ResolvedPath {
+  using Components = StringList<'/'>;
+
+  // Helpers to iterate over respective components.
+  Components Prefix() const { return Components(prefix); }
+
+  Components Suffix() const { return Components(suffix); }
+
+  std::string_view prefix;
+  std::string_view suffix;
+};
+
 // Property decoder provides an interface for accessing |devicetree::Properties|
 // during a |Devicetree::Walk|.
 //
@@ -300,9 +323,22 @@ class MemoryReservations {
 // around, without this consideration.
 class PropertyDecoder {
  public:
+  // Possible errors when resolving a path.
+  enum class PathResolveError {
+    // Alias data was available, but the alias had no match.
+    kBadAlias,
+    // Alias data is not yet available.
+    kNoAliases,
+  };
+
   constexpr PropertyDecoder() = default;
   constexpr PropertyDecoder(const PropertyDecoder&) = delete;
   constexpr PropertyDecoder(PropertyDecoder&&) = delete;
+  explicit constexpr PropertyDecoder(PropertyDecoder* parent, Properties properties,
+                                     const std::optional<Properties>& aliases)
+      : parent_(parent),
+        properties_(std::move(properties)),
+        aliases_(aliases ? &*aliases : nullptr) {}
   explicit constexpr PropertyDecoder(PropertyDecoder* parent, Properties properties)
       : parent_(parent), properties_(std::move(properties)) {}
   explicit constexpr PropertyDecoder(Properties properties)
@@ -331,6 +367,13 @@ class PropertyDecoder {
   constexpr std::optional<PropertyValue> FindProperty(std::string_view name) const {
     return FindProperties(name)[0];
   }
+
+  // On success, returns a |ResolvedPath| that contains the resolved aliases prefix and the suffix.
+  // On failure, when an aliased path is met, the returned value is true if the caller should try
+  // later (e.g. aliases node has not been found yet) or false if the aliases node was found, but
+  // the alias was not.
+  fit::result<PathResolveError, ResolvedPath> ResolvePath(
+      std::string_view maybe_aliased_path) const;
 
   // Underlying |Properties| object.
   constexpr const Properties& properties() const { return properties_; }
@@ -366,6 +409,7 @@ class PropertyDecoder {
 
   PropertyDecoder* parent_ = nullptr;
   Properties properties_;
+  const Properties* aliases_ = nullptr;
 };
 
 // Represents a devicetree. This class does not dynamically allocate
@@ -502,6 +546,9 @@ class Devicetree {
   std::string_view string_block_;
   // https://devicetree-specification.readthedocs.io/en/v0.3/flattened-format.html#memory-reservation-block
   ByteView mem_rsvmap_;
+
+  // '/aliases' properties, populated during the walk, once found it wont change.
+  mutable std::optional<Properties> aliases_;
 };
 
 }  // namespace devicetree

@@ -13,41 +13,6 @@
 
 namespace devicetree {
 
-fit::result<PathResolver::ResolveError, ResolvedPath> PathResolver::Resolve(
-    std::string_view maybe_aliased_path) const {
-  if (maybe_aliased_path.empty()) {
-    return fit::ok(ResolvedPath{});
-  }
-
-  if (maybe_aliased_path[0] != '/') {
-    if (!aliases_) {
-      return fit::error(ResolveError::kNoAliases);
-    }
-
-    std::string_view alias = maybe_aliased_path.substr(0, maybe_aliased_path.find('/'));
-    std::string_view suffix = maybe_aliased_path.substr(alias.size());
-    if (!suffix.empty()) {
-      suffix.remove_prefix(1);
-    }
-
-    for (auto [name, value] : *aliases_) {
-      if (name != alias) {
-        continue;
-      }
-      auto maybe_abs_path = value.AsString();
-      if (!maybe_abs_path.has_value() || maybe_abs_path->empty()) {
-        return fit::error(ResolveError::kBadAlias);
-      }
-      return fit::ok(ResolvedPath{.prefix = *maybe_abs_path, .suffix = suffix});
-    }
-
-    // We did not find a matching alias.
-    return fit::error(ResolveError::kBadAlias);
-  }
-
-  return fit::ok(ResolvedPath{.prefix = maybe_aliased_path});
-}
-
 CompareResult ComparePath(const NodePath& path_a, const ResolvedPath& path_b) {
   // Compare stem.
   auto [prefix_a_it, prefix_b_it] = internal::CompareRangesOfNodes(
