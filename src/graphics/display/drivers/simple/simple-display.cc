@@ -258,30 +258,6 @@ void SimpleDisplay::DisplayControllerImplApplyConfiguration(const display_config
   }
 }
 
-// TODO(fxb/81875): Remove support when no longer used.
-uint32_t SimpleDisplay::DisplayControllerImplComputeLinearStride(uint32_t width,
-                                                                 zx_pixel_format_t format) {
-  return (width == width_ && format == format_) ? stride_ : 0;
-}
-
-// TODO(fxb/81875): Remove support when no longer used.
-zx_status_t SimpleDisplay::DisplayControllerImplAllocateVmo(uint64_t size, zx::vmo* vmo_out) {
-  zx_info_handle_count handle_count;
-  size_t actual, avail;
-  zx_status_t status = framebuffer_mmio_.get_vmo()->get_info(ZX_INFO_HANDLE_COUNT, &handle_count,
-                                                             sizeof(handle_count), &actual, &avail);
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (handle_count.handle_count != 1) {
-    return ZX_ERR_NO_RESOURCES;
-  }
-  if (size > height_ * stride_ * ZX_PIXEL_FORMAT_BYTES(format_)) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-  return framebuffer_mmio_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, vmo_out);
-}
-
 zx_status_t SimpleDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
   auto result =
       sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));

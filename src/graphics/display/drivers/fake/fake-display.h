@@ -69,8 +69,6 @@ class FakeDisplay : public DeviceType,
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   uint64_t collection_id);
-  zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
-                                                              uint32_t* out_stride);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
   zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
       const display_capture_interface_protocol_t* intf);

@@ -81,8 +81,6 @@ class Display : public DisplayType,
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   uint64_t collection_id);
-  zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
-                                                              uint32_t* out_stride);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -200,7 +198,6 @@ class Display : public DisplayType,
       buffer_collections_;
 
   std::unique_ptr<RenderControl> rc_;
-  int32_t id_ = 0;
   zx::bti bti_;
   ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
   ddk::IoBuffer io_buffer_ TA_GUARDED(lock_);

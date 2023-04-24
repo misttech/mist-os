@@ -456,11 +456,6 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
-                                                                         uint32_t* out_stride) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 zx_status_t FakeDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
   return ZX_ERR_NOT_SUPPORTED;
 }

@@ -110,10 +110,6 @@ class Controller : public DeviceType,
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   uint64_t collection_id);
-  zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
-                                                              uint32_t* out_stride) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
