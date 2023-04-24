@@ -58,6 +58,7 @@ _sdk_versioned_source_sets_list = [
   "//sdk/lib/ui/scenic/cpp",
   "//sdk/lib/utf-utils",
   "//sdk/lib/vfs/cpp",
+  "//sdk/lib/zbi-format",
   "//src/firmware/lib/zbi",
   "//src/lib/fidl/cpp",
   "//src/lib/fidl/cpp:cpp_base",

@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+
+config("public_config") {
+  include_dirs = [ "include" ]
+}
+
+sdk_source_set("zbi-format") {
+  category = "partner"
+  sdk_name = "zbi-format"
+  api = "zbi-format.api"
+
+  public = [
+    # TODO(b/271475507): move each of these files over. The placeholder is just
+    # so we have something to build as required by sdk_source_set().
+    # "include/lib/zbi-format/driver-config.h",
+    # "include/lib/zbi-format/pixel-format.h",
+    # "include/lib/zbi-format/zbi.h",
+    "include/lib/zbi-format/placeholder.h",
+  ]
+
+  public_configs = [ ":public_config" ]
+
+  # Since this doesn't actually compile any code, don't let it contribute any
+  # implicit link inputs from default configs.
+  configs = []
+}
