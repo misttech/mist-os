@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::auth::FsCred;
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::task::*;
@@ -13,7 +14,23 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.subdir(b"kernel", 0o555, |dir| {
         dir.entry(b"unprivileged_bpf_disable", StubSysctl::new_node(), mode);
-        dir.entry(b"kptr_restrict", StubSysctl::new_node(), mode)
+        dir.entry(b"kptr_restrict", StubSysctl::new_node(), mode);
+        dir.node(
+            b"overflowuid",
+            fs.create_node(
+                BytesFile::new_node(b"65534".to_vec()),
+                mode!(IFREG, 0o644),
+                FsCred::root(),
+            ),
+        );
+        dir.node(
+            b"overflowgid",
+            fs.create_node(
+                BytesFile::new_node(b"65534".to_vec()),
+                mode!(IFREG, 0o644),
+                FsCred::root(),
+            ),
+        );
     });
     dir.subdir(b"net", 0o555, |dir| {
         dir.subdir(b"core", 0o555, |dir| {
