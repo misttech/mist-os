@@ -70,6 +70,8 @@ class CanvasLutDataLow : public hwreg::RegisterBase<CanvasLutDataLow, uint32_t> 
 // DMC_CAV_LUT_DATAH, typo-ed as DC_CAV_LUT_DATAH
 class CanvasLutDataHigh : public hwreg::RegisterBase<CanvasLutDataHigh, uint32_t> {
  public:
+  DEF_RSVDZ_FIELD(31, 30);
+
   // Swap words in image data. 1<<3 = 64-bit, 1<<2 = 32-bit, 1<<1 = 16-bit, 1 =
   // 8-bit, 0 = none.
   DEF_FIELD(29, 26, dmc_cav_endianness);
@@ -103,6 +105,8 @@ class CanvasLutDataHigh : public hwreg::RegisterBase<CanvasLutDataHigh, uint32_t
 // committed, e.g. CanvasLutDataHigh::Get().ReadFrom(mmio_space)
 class CanvasLutAddr : public hwreg::RegisterBase<CanvasLutAddr, uint32_t> {
  public:
+  DEF_RSVDZ_FIELD(31, 10);
+
   DEF_BIT(9, dmc_cav_addr_wr);
   DEF_BIT(8, dmc_cav_addr_rd);
   DEF_FIELD(7, 0, dmc_cav_addr_index);

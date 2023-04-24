@@ -113,13 +113,13 @@ void AmlCanvas::Config(ConfigRequestView request, ConfigCompleter::Sync& complet
 
   zx_paddr_t start_addr = paddr + (offset % PAGE_SIZE);
 
-  // set framebuffer address in DMC, read/modify/write
-  auto data_low = CanvasLutDataLow::Get().ReadFrom(&dmc_regs_);
+  // Populate the canvas entry that will be written.
+  auto data_low = CanvasLutDataLow::Get().FromValue(0);
   data_low.SetDmcCavWidth(width >> 3);
   data_low.set_dmc_cav_addr(static_cast<unsigned int>(start_addr >> 3));
   data_low.WriteTo(&dmc_regs_);
 
-  auto data_high = CanvasLutDataHigh::Get().ReadFrom(&dmc_regs_);
+  auto data_high = CanvasLutDataHigh::Get().FromValue(0);
   data_high.SetDmcCavWidth(width >> 3);
   data_high.set_dmc_cav_height(height);
   data_high.set_dmc_cav_blkmode(static_cast<uint32_t>(info->blkmode));
@@ -130,12 +130,13 @@ void AmlCanvas::Config(ConfigRequestView request, ConfigCompleter::Sync& complet
   data_high.set_dmc_cav_endianness(static_cast<uint32_t>(info->endianness));
   data_high.WriteTo(&dmc_regs_);
 
-  auto lut_addr = CanvasLutAddr::Get().ReadFrom(&dmc_regs_);
+  auto lut_addr = CanvasLutAddr::Get().FromValue(0);
   lut_addr.set_dmc_cav_addr_index(index);
   lut_addr.set_dmc_cav_addr_wr(1);
   lut_addr.WriteTo(&dmc_regs_);
 
-  // read a cbus to make sure last write finished
+  // Perform a MMIO read posted to the DMC's configuration bus. When it
+  // completes, the writes above were certainly flushed.
   CanvasLutDataHigh::Get().ReadFrom(&dmc_regs_);
 
   completer.ReplySuccess(static_cast<uint8_t>(index));
