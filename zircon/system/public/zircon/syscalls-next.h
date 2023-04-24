@@ -85,6 +85,8 @@ typedef struct zx_pager_vmo_stats {
 // Declared here in the next syscall header since it is not published
 // in the SDK.
 
+#define ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL ((uint32_t)1)
+
 typedef uint64_t zx_restricted_reason_t;
 
 // Reason codes provided to normal mode when a restricted process traps

@@ -14,12 +14,15 @@
 
 // Verify that restricted_enter handles invalid args.
 TEST(RestrictedMode, EnterInvalidArgs) {
-  // Flags must be zero.
+  // Invalid options.
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0xffffffff, 0, 0));
+
+  // In-thread exceptions are not yet implemented (no ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL).
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(0, 0, 0));
 
   // Enter restricted mode with invalid args.
   // Vector table must be valid user pointer.
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0, -1, 0));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, -1, 0));
 }
 
 TEST(RestrictedMode, BindState) {
@@ -220,7 +223,8 @@ TEST(RestrictedMode, Basic) {
 
   // Enter restricted mode with reasonable args, expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                     &reason_code));
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
@@ -279,7 +283,8 @@ TEST(RestrictedMode, Bench) {
     zx_restricted_reason_t reason_code;
     auto t = zx::ticks::now();
     for (int i = 0; i < iter; i++) {
-      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+      ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                         &reason_code));
     }
     t = zx::ticks::now() - t;
 
@@ -310,7 +315,8 @@ TEST(RestrictedMode, EnterBadStateStruct) {
     ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
 
     // This should fail with bad state.
-    ASSERT_EQ(ZX_ERR_BAD_STATE, zx_restricted_enter(0, (uintptr_t)&vectab, 0));
+    ASSERT_EQ(ZX_ERR_BAD_STATE,
+              zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
   };
 
   state = {};
@@ -509,7 +515,8 @@ TEST(RestrictedMode, Basic) {
 
   // Enter restricted mode and expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                     &reason_code));
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
@@ -580,7 +587,8 @@ TEST(RestrictedMode, Bench) {
     zx_restricted_reason_t reason_code;
     auto t = zx::ticks::now();
     for (int i = 0; i < iter; i++) {
-      ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
+      ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
+                                         &reason_code));
     }
     t = zx::ticks::now() - t;
 
@@ -608,13 +616,15 @@ TEST(RestrictedMode, EnterBadStateStruct) {
   zx_restricted_state_t state{};
   state.pc = -1;  // PC is outside of user space
   ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
-  ASSERT_EQ(ZX_ERR_BAD_STATE, zx_restricted_enter(0, (uintptr_t)&vectab, 0));
+  ASSERT_EQ(ZX_ERR_BAD_STATE,
+            zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
 
   state = {};
   state.pc = (uintptr_t)bounce;
   state.cpsr = 0x1;  // CPSR contains non-user settable flags.
   ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
-  ASSERT_EQ(ZX_ERR_BAD_STATE, zx_restricted_enter(0, (uintptr_t)&vectab, 0));
+  ASSERT_EQ(ZX_ERR_BAD_STATE,
+            zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
 }
 
 #else  // defined(__x86_64__)
@@ -626,6 +636,7 @@ TEST(RestrictedMode, NotSupported) {
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_unbind_state(0));
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(0, 0, 0));
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, 0, 0));
 }
 
 #endif  // defined(__x86_64__)

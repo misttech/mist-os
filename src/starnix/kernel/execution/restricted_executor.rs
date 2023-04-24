@@ -147,8 +147,13 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
         let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
         trace_duration_begin!(trace_category_starnix!(), trace_name_user_space!());
-        let status =
-            unsafe { restricted_enter(0, restricted_return_ptr as usize, &mut reason_code) };
+        let status = unsafe {
+            restricted_enter(
+                zx::sys::ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL,
+                restricted_return_ptr as usize,
+                &mut reason_code,
+            )
+        };
         trace_duration_end!(trace_category_starnix!(), trace_name_user_space!());
         match { status } {
             zx::sys::ZX_OK => {

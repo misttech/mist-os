@@ -75,11 +75,6 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   LTRACEF("options %#x vector %#" PRIx64 " context %#" PRIx64 "\n", options, vector_table_ptr,
           context);
 
-  // no options defined for the moment
-  if (options != 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   // validate the vector table pointer
   if (!is_user_accessible(vector_table_ptr)) {
     return ZX_ERR_INVALID_ARGS;

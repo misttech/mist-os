@@ -35,7 +35,13 @@ thread will return to normal mode via an entry point passed in
 *context* may be any value. It is used as a value to pass back to normal
 mode when returning from restricted mode.
 
-*options* must be zero.
+*options* is a bit vector that contains zero more of the following:
+
+- **ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL** indicates that any exceptions
+  encountered while in restricted mode should be delivered using exception
+  channels. If this option is not present then any exceptions not handled by a
+  process debugger will cause control to vector to `vector_table_ptr` in normal
+  mode with the *reason code* set to `ZX_RESTRICTED_REASON_EXCEPTION`.
 
 Arguments to the function at *vector_table_ptr* are architecturally specific:
 
@@ -46,7 +52,8 @@ On arm64, *context* is placed in *x0* and a reason code is placed in *x1*.
 All other registers are currently undefined, including the stack pointer.
 
 The *reason code* specifies the reason that normal mode execution has resumed.
-Currently, the only implemented *reason code* is `ZX_RESTRICTED_REASON_SYSCALL`.
+This *reason code* may be one of `ZX_RESTRICTED_REASON_SYSCALL`,
+`ZX_RESTRICTED_REASON_EXCEPTION`.
 
 ### Shared process
 
@@ -75,6 +82,9 @@ No return value on success, since the current thread indirectly returns via
 is non-zero.
 
 **ZX_ERR_BAD_STATE** restricted mode register state is invalid.
+
+**ZX_ERR_NOT_SUPPORTED** `ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL` is _not_ provided and
+vectored exceptions are not implemented for the current architecture.
 
 ## See also
 
