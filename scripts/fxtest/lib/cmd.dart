@@ -496,5 +496,26 @@ class FuchsiaTestCommand {
         )));
       }
     }
+
+    if (testsConfig.flags.allOutput) {
+      emitEvent(TestInfo(testsConfig.wrapWith(
+        'Printing all output to console (`-o/--output` specified)\n',
+        [darkGray],
+      )));
+    } else if (testsConfig.flags.slowThreshold > 0) {
+      emitEvent(TestInfo(testsConfig.wrapWith(
+        'Output will be printed to the console for tests taking more than'
+        ' ${testsConfig.flags.slowThreshold} seconds.\n'
+        'To change the timeout threshold, specify the `-s/--slow` flag.\n'
+        'To show all output, specify the `-o/--output` flag.\n',
+        [darkGray],
+      )));
+    } else {
+      emitEvent(TestInfo(testsConfig.wrapWith(
+        'Output will not be printed to the console.\n'
+        'To show all output, specify the `-o/--output` flag.\n',
+        [darkGray],
+      )));
+    }
   }
 }
