@@ -19,9 +19,6 @@ use std::future::Future;
 #[doc(hidden)]
 pub use tracing::error;
 
-#[cfg(not(target_os = "fuchsia"))]
-mod host;
-
 //
 // LOGGING INITIALIZATION
 //
@@ -30,22 +27,15 @@ mod host;
 #[doc(hidden)]
 pub fn init_logging_for_component_with_executor<'a, R>(
     func: impl FnOnce() -> R + 'a,
-    _logging_tags: &'a [&'static str],
+    logging_tags: &'a [&'static str],
     _interest: fidl_fuchsia_diagnostics::Interest,
 ) -> impl FnOnce() -> R + 'a {
     move || {
-        #[cfg(target_os = "fuchsia")]
-        {
-            let mut options = diagnostics_log::PublishOptions::default().tags(_logging_tags);
-            if let Some(severity) = _interest.min_severity {
-                options = options.minimum_severity(severity);
-            }
-            diagnostics_log::initialize(options).expect("initialize_logging");
+        let mut options = diagnostics_log::PublishOptions::default().tags(logging_tags);
+        if let Some(severity) = _interest.min_severity {
+            options = options.minimum_severity(severity);
         }
-
-        #[cfg(not(target_os = "fuchsia"))]
-        crate::host::logger::init(_interest.min_severity);
-
+        diagnostics_log::initialize(options).expect("initialize_logging");
         func()
     }
 }
@@ -54,15 +44,11 @@ pub fn init_logging_for_component_with_executor<'a, R>(
 #[doc(hidden)]
 pub fn init_logging_for_component_with_threads<'a, R>(
     func: impl FnOnce() -> R + 'a,
-    _logging_tags: &'a [&'static str],
-    _interest: fidl_fuchsia_diagnostics::Interest,
+    logging_tags: &'a [&'static str],
+    interest: fidl_fuchsia_diagnostics::Interest,
 ) -> impl FnOnce() -> R + 'a {
     move || {
-        #[cfg(target_os = "fuchsia")]
-        let _guard = init_logging_with_threads(_logging_tags.to_vec(), _interest);
-        #[cfg(not(target_os = "fuchsia"))]
-        crate::host::logger::init(_interest.min_severity);
-
+        let _guard = init_logging_with_threads(logging_tags.to_vec(), interest);
         func()
     }
 }
@@ -71,25 +57,18 @@ pub fn init_logging_for_component_with_threads<'a, R>(
 #[doc(hidden)]
 pub fn init_logging_for_test_with_executor<'a, R>(
     func: impl Fn(usize) -> R + 'a,
-    _name: &'static str,
-    _logging_tags: &'a [&'static str],
-    _interest: fidl_fuchsia_diagnostics::Interest,
+    name: &'static str,
+    logging_tags: &'a [&'static str],
+    interest: fidl_fuchsia_diagnostics::Interest,
 ) -> impl Fn(usize) -> R + 'a {
     move |n| {
-        #[cfg(target_os = "fuchsia")]
-        {
-            let mut tags = vec![_name];
-            tags.extend_from_slice(_logging_tags);
-            let mut options = diagnostics_log::PublishOptions::default().tags(tags.as_slice());
-            if let Some(severity) = _interest.min_severity {
-                options = options.minimum_severity(severity);
-            }
-            diagnostics_log::initialize(options).expect("initalize logging");
+        let mut tags = vec![name];
+        tags.extend_from_slice(logging_tags);
+        let mut options = diagnostics_log::PublishOptions::default().tags(tags.as_slice());
+        if let Some(severity) = interest.min_severity {
+            options = options.minimum_severity(severity);
         }
-
-        #[cfg(not(target_os = "fuchsia"))]
-        crate::host::logger::init(_interest.min_severity);
-
+        diagnostics_log::initialize(options).expect("initalize logging");
         func(n)
     }
 }
@@ -98,20 +77,14 @@ pub fn init_logging_for_test_with_executor<'a, R>(
 #[doc(hidden)]
 pub fn init_logging_for_test_with_threads<'a, R>(
     func: impl Fn(usize) -> R + 'a,
-    _name: &'static str,
-    _logging_tags: &'a [&'static str],
-    _interest: fidl_fuchsia_diagnostics::Interest,
+    name: &'static str,
+    logging_tags: &'a [&'static str],
+    interest: fidl_fuchsia_diagnostics::Interest,
 ) -> impl Fn(usize) -> R + 'a {
     move |n| {
-        #[cfg(target_os = "fuchsia")]
-        let _guard = {
-            let mut tags = vec![_name];
-            tags.extend_from_slice(_logging_tags);
-            init_logging_with_threads(tags, _interest.clone())
-        };
-        #[cfg(not(target_os = "fuchsia"))]
-        crate::host::logger::init(_interest.min_severity);
-
+        let mut tags = vec![name];
+        tags.extend_from_slice(logging_tags);
+        let _guard = init_logging_with_threads(tags.to_vec(), interest.clone());
         func(n)
     }
 }
@@ -156,6 +129,18 @@ fn init_logging_with_threads(
     });
 
     AbortAndJoinOnDrop(recv.recv().map_or(None, |value| Some(value)), Some(bg_thread))
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+fn init_logging_with_threads(
+    tags: Vec<&'static str>,
+    interest: fidl_fuchsia_diagnostics::Interest,
+) {
+    let mut options = diagnostics_log::PublishOptions::default().tags(&tags);
+    if let Some(severity) = interest.min_severity {
+        options = options.minimum_severity(severity);
+    }
+    diagnostics_log::initialize(options).expect("initialize logging");
 }
 
 //
