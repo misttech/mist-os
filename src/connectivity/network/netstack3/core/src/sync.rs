@@ -8,15 +8,14 @@
 // exported from this module.
 
 #[cfg(feature = "instrumented")]
-pub use netstack3_sync_instrumented::{
-    rc, LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
-};
+use netstack3_sync_instrumented as netstack3_sync;
 
 // Don't perform recursive lock checks when benchmarking so that the benchmark
 // results are not affected by the extra bookkeeping.
 #[cfg(not(feature = "instrumented"))]
-pub use netstack3_sync_not_instrumented::{
-    rc, LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
-};
+use netstack3_sync_not_instrumented as netstack3_sync;
 
-pub use rc::{Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc};
+pub use netstack3_sync::{
+    rc::{Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc},
+    LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
