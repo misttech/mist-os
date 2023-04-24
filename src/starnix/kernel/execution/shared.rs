@@ -12,9 +12,8 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use process_builder::elf_parse;
 use std::convert::TryFrom;
 use std::sync::Arc;
-#[cfg(target_arch = "x86_64")]
-use zerocopy::AsBytes;
 
+use crate::arch::execution::generate_interrupt_instructions;
 use crate::fs::ext4::ExtFilesystem;
 use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
 use crate::fs::*;
@@ -200,33 +199,7 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
     //   1. Issues a software interrupt caught by the debugger.
     //   2. Jumps back to the current instruction pointer of the thread executed by an indirect
     //      jump to the 64-bit address immediately following the jump instruction.
-    #[cfg(target_arch = "x86_64")]
-    let instructions = {
-        const INTERRUPT_AND_JUMP: [u8; 7] = [
-            0xcc, // int 3
-            0xff, 0x25, 0x00, 0x00, 0x00, 0x00, // jmp *0x0(%rip)
-        ];
-        let mut instruction_pointer = current_task.registers.rip.as_bytes().to_owned();
-        let mut instructions = INTERRUPT_AND_JUMP.to_vec();
-        instructions.append(&mut instruction_pointer);
-        instructions
-    };
-    #[cfg(target_arch = "aarch64")]
-    let instructions = {
-        const INTERRUPT_AND_JUMP: [u8; 8] = [
-            0x00, 0x00, 0x20, 0xd4, // 0xd4200000 = brk 0 (the argument is ignored by us).
-            // TODO(fxbug.dev/121659): Write this code. This issues an undefined instruction so it's
-            // obvious something is not implemented. As of this writing, ARM doesn't compile so this
-            // code can't be tested so I didn't want to write something that looked correct but was
-            // wrong.
-            //
-            // I believe ARM lacks a single indirect-from-memory jump instruction like x86 so this
-            // will need some research on what registers we can clobber.
-            0x00, 0x00, 0x00, 0x00, // udf = "Undefined instruction"
-        ];
-        INTERRUPT_AND_JUMP.to_vec()
-    };
-
+    let instructions = generate_interrupt_instructions(current_task);
     let vmo = Arc::new(
         zx::Vmo::create(*PAGE_SIZE)
             .and_then(|vmo| vmo.replace_as_executable(&VMEX_RESOURCE))
