@@ -35,11 +35,13 @@ const DEFAULT_SNAPSHOT_EXPIRATION: i64 = 30;
 /// Number of days from now before the timestamp metadata is expired.
 const DEFAULT_TIMESTAMP_EXPIRATION: i64 = 30;
 
+#[derive(Debug)]
 struct ToBeStagedPackage {
     manifest_path: Option<Utf8PathBuf>,
     kind: ToBeStagedPackageKind,
 }
 
+#[derive(Debug)]
 enum ToBeStagedPackageKind {
     Manifest { manifest: PackageManifest },
     Archive { _archive_out: TempDir, manifest: PackageManifest },
@@ -55,6 +57,7 @@ impl ToBeStagedPackage {
 }
 
 /// RepoBuilder can create and manipulate package repositories.
+#[derive(Debug)]
 pub struct RepoBuilder<'a, R: RepoStorageProvider> {
     signing_repo_keys: Option<&'a RepoKeys>,
     trusted_repo_keys: &'a RepoKeys,
@@ -67,7 +70,8 @@ pub struct RepoBuilder<'a, R: RepoStorageProvider> {
     refresh_non_root_metadata: bool,
     inherit_from_trusted_targets: bool,
     named_packages: HashMap<PackagePath, Hash>,
-    staged_package_contents: HashMap<Hash, ToBeStagedPackage>,
+    staged_packages: HashMap<Hash, ToBeStagedPackage>,
+    staged_blobs: HashMap<Hash, BlobInfo>,
     deps: HashSet<Utf8PathBuf>,
 }
 
@@ -116,7 +120,8 @@ where
             refresh_non_root_metadata: false,
             inherit_from_trusted_targets: true,
             named_packages: HashMap::new(),
-            staged_package_contents: HashMap::new(),
+            staged_packages: HashMap::new(),
+            staged_blobs: HashMap::new(),
             deps: HashSet::new(),
         }
     }
@@ -158,7 +163,7 @@ where
         self
     }
 
-    /// Whether or not to raise an error if a package does not exist.
+    /// Whether or not to raise an error if package does not exist.
     pub fn ignore_missing_packages(mut self, ignore_missing_packages: bool) -> Self {
         self.ignore_missing_packages = ignore_missing_packages;
         self
@@ -268,18 +273,36 @@ where
     ) -> Result<RepoBuilder<'a, R>> {
         let package_hash = package.manifest().hash();
 
-        self = self
-            .stage_package_contents(package)
+        // We don't want to stage any blobs if we have `ignore_missing_files ==
+        // true`, and a package or subpackage is missing, so we'll track that
+        // separately before we decide to commit to stage this package.
+        let mut staged_blobs = HashMap::new();
+        let mut staged_packages = HashMap::new();
+        let mut deps = HashSet::new();
+
+        let did_stage_package = self
+            .stage_package(package, &mut staged_packages, &mut staged_blobs, &mut deps)
             .await
             .with_context(|| format!("staging package path '{package_path}'"))?;
+
+        // Exit early if we did not stage the package.
+        if !did_stage_package {
+            return Ok(self);
+        }
+
+        // Since we successfully processed this package, merge in all the
+        // package hashes and blobs.
+        self.staged_packages.extend(staged_packages);
+        self.staged_blobs.extend(staged_blobs);
+        self.deps.extend(deps);
 
         match self.named_packages.entry(package_path) {
             hash_map::Entry::Vacant(entry) => {
                 entry.insert(package_hash);
             }
             hash_map::Entry::Occupied(entry) => {
-                let old_package = self.staged_package_contents.get(entry.get()).unwrap();
-                let new_package = self.staged_package_contents.get(&package_hash).unwrap();
+                let old_package = self.staged_packages.get(entry.get()).unwrap();
+                let new_package = self.staged_packages.get(&package_hash).unwrap();
 
                 check_manifests_are_equivalent(old_package, new_package)
                     .with_context(|| format!("staging package path '{}'", entry.key()))?;
@@ -289,58 +312,154 @@ where
         Ok(self)
     }
 
-    /// Stage an package such that the blobs will be published, but will not necessarily publish the
-    /// package to the TUF metadata. This is used both by `staged_named_package` and
-    /// `stage_subpackage` to queue up the manifests for publishing.
-    #[allow(clippy::map_entry)] // Clippy doesn't see that `self` is moved, and can't use `entry()`.
-    async fn stage_package_contents(
-        mut self,
+    /// Try to stage a package and the blobs inside of it for publishing to the
+    /// package repository.
+    ///
+    /// The behavior of this function depends on the `ignore_missing_packages`
+    /// setting. If it is true, this will exit early and not stage any files. If
+    /// false, this will return an error.
+    ///
+    /// This returns `true` if the package was staged, or `false` if any of the
+    /// package contents were missing.
+    async fn stage_package(
+        &self,
         package: ToBeStagedPackage,
-    ) -> Result<RepoBuilder<'a, R>> {
+        to_be_staged_packages: &mut HashMap<Hash, ToBeStagedPackage>,
+        to_be_staged_blobs: &mut HashMap<Hash, BlobInfo>,
+        deps: &mut HashSet<Utf8PathBuf>,
+    ) -> Result<bool> {
         if let Some(path) = &package.manifest_path {
-            self.deps.insert(Utf8PathBuf::from(path));
+            deps.insert(Utf8PathBuf::from(path));
         }
 
         let package_hash = package.manifest().hash();
 
         // We'll only add the package manifest if we haven't already staged a manifest for this hash.
-        if !self.staged_package_contents.contains_key(&package_hash) {
-            // Mark all the package contents as a dependency.
-            for blob in package.manifest().blobs() {
-                self.deps.insert(Utf8PathBuf::from(&blob.source_path));
-            }
+        if self.staged_packages.contains_key(&package_hash)
+            || to_be_staged_packages.contains_key(&package_hash)
+        {
+            return Ok(true);
+        }
 
-            // Stage all subpackages.
-            for subpackage in package.manifest().subpackages() {
-                // We only need to stage the subpackage if we haven't staged this merkle.
-                if !self.staged_package_contents.contains_key(&subpackage.merkle) {
-                    let manifest_path = Utf8PathBuf::from(&subpackage.manifest_path);
-                    self = self.stage_subpackage(manifest_path).await?;
+        // Rust doesn't know we've fully processed the stream, so we need to
+        // explicitly drop it so it knows we're done borrowing values.
+        let blobs = {
+            let to_be_staged_blobs = &*to_be_staged_blobs;
+
+            // Iterate over the blobs in parallel and check if they exist, ignoring
+            // any that we've already staged.
+            let stream = futures::stream::iter(package.manifest().blobs().iter())
+                .filter_map(|blob| async move {
+                    if self.staged_blobs.contains_key(&blob.merkle)
+                        || to_be_staged_blobs.contains_key(&blob.merkle)
+                    {
+                        None
+                    } else {
+                        Some(async move {
+                            let result = async_fs::metadata(&blob.source_path).await;
+                            (blob, result)
+                        })
+                    }
+                })
+                .buffer_unordered(std::thread::available_parallelism()?.get());
+
+            // Gather up the results. If `ignore_missing_files` is true and any of
+            // the files are missing, exit early. Otherwise error out.
+            let mut blobs = vec![];
+
+            let mut stream = std::pin::pin!(stream);
+
+            while let Some((blob, result)) = stream.next().await {
+                match result {
+                    Ok(_) => {
+                        blobs.push(blob);
+                    }
+                    Err(err) => {
+                        if self.ignore_missing_packages
+                            && err.kind() == std::io::ErrorKind::NotFound
+                        {
+                            return Ok(false);
+                        } else {
+                            return Err(err).with_context(|| {
+                                format!("checking if {} exists", blob.source_path)
+                            });
+                        }
+                    }
                 }
             }
 
-            self.staged_package_contents.insert(package_hash, package);
+            blobs
         };
 
-        Ok(self)
+        // Merge our blobs in to be staged. We can't do the merge above because
+        // the stream has an immutable reference to `to_be_staged_blobs` so it
+        // can filter our already staged blobs.
+        for blob in blobs {
+            deps.insert(Utf8PathBuf::from(&blob.source_path));
+            to_be_staged_blobs.insert(blob.merkle, blob.clone());
+        }
+
+        // Stage all subpackages.
+        for subpackage in package.manifest().subpackages() {
+            // We only need to stage the subpackage if we haven't staged this merkle.
+            if !self.staged_packages.contains_key(&subpackage.merkle)
+                && !to_be_staged_packages.contains_key(&subpackage.merkle)
+            {
+                let manifest_path = Utf8PathBuf::from(&subpackage.manifest_path);
+
+                // Don't stage the package if any subpackages are missing.
+                if !self
+                    .stage_subpackage(
+                        manifest_path,
+                        to_be_staged_packages,
+                        to_be_staged_blobs,
+                        deps,
+                    )
+                    .await?
+                {
+                    return Ok(false);
+                }
+            }
+        }
+
+        to_be_staged_packages.insert(package_hash, package);
+
+        Ok(true)
     }
 
     /// Stage a subpackage's package manifest from the `path` to be published.
-    async fn stage_subpackage(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
-        let contents = async_fs::read(path.as_std_path())
-            .await
-            .with_context(|| format!("reading package manifest {path}"))?;
+    async fn stage_subpackage(
+        &self,
+        path: Utf8PathBuf,
+        to_be_staged_packages: &mut HashMap<Hash, ToBeStagedPackage>,
+        to_be_staged_blobs: &mut HashMap<Hash, BlobInfo>,
+        deps: &mut HashSet<Utf8PathBuf>,
+    ) -> Result<bool> {
+        let contents = match async_fs::read(path.as_std_path()).await {
+            Ok(contents) => contents,
+            Err(err) => {
+                if self.ignore_missing_packages && err.kind() == std::io::ErrorKind::NotFound {
+                    return Ok(false);
+                }
+
+                return Err(err).with_context(|| format!("reading package manifest {path}"));
+            }
+        };
 
         let manifest = PackageManifest::from_reader(&path, &contents[..])
-            .with_context(|| format!("reading package manifest {path}"))?;
+            .with_context(|| format!("parsing package manifest {path}"))?;
 
         // Stage the subpackage. We will use `stage_package_contents` since we don't need to include
         // the package in the TUF metadata. We're recursing, so we need to box our future.
-        let fut: Pin<Box<dyn Future<Output = _>>> =
-            Box::pin(self.stage_package_contents(ToBeStagedPackage {
+        let fut: Pin<Box<dyn Future<Output = _>>> = Box::pin(self.stage_package(
+            ToBeStagedPackage {
                 manifest_path: Some(path),
                 kind: ToBeStagedPackageKind::Manifest { manifest },
-            }));
+            },
+            to_be_staged_packages,
+            to_be_staged_blobs,
+            deps,
+        ));
 
         fut.await
     }
@@ -439,25 +558,10 @@ where
             .inherit_from_trusted_targets(self.inherit_from_trusted_targets)
             .target_hash_algorithms(&[HashAlgorithm::Sha512]);
 
-        // Gather up all package blobs, and separate out the the meta.far blobs.
-        let mut staged_blobs = HashMap::new();
-        for package in self.staged_package_contents.values() {
-            for blob in package.manifest().blobs() {
-                staged_blobs.insert(blob.merkle, blob.clone());
-            }
-        }
-
         let mut package_meta_fars = HashMap::new();
         for (package_path, package_hash) in &self.named_packages {
-            let meta_far_blob = staged_blobs.get(package_hash).unwrap();
+            let meta_far_blob = self.staged_blobs.get(package_hash).unwrap();
             package_meta_fars.insert(package_path, meta_far_blob);
-        }
-
-        // Make sure all the blobs exist.
-        for blob in staged_blobs.values() {
-            async_fs::metadata(&blob.source_path)
-                .await
-                .with_context(|| format!("reading {}", blob.source_path))?;
         }
 
         // Stage the metadata blobs.
@@ -504,7 +608,7 @@ where
         repo_builder.commit().await.context("publishing metadata")?;
 
         // Stage the blobs.
-        let () = futures::stream::iter(&staged_blobs)
+        let () = futures::stream::iter(&self.staged_blobs)
             .map(Ok)
             .try_for_each_concurrent(
                 std::thread::available_parallelism()?.get(),
@@ -514,7 +618,7 @@ where
             )
             .await?;
 
-        Ok((self.deps, staged_blobs))
+        Ok((self.deps, self.staged_blobs))
     }
 }
 
@@ -987,6 +1091,211 @@ mod tests {
             .targets()
             .get(&TargetPath::new(format!("{ANONYMOUS_SUBPACKAGE}/0")).unwrap())
             .is_none());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_error_if_package_manifest_is_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Add the superpackage. This should fail because we haven't set `ignore_missing_files`.
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        // Try to stage the superpackage, which should error out because the
+        // subpackage doesn't exist.
+        assert_matches!(
+            RepoBuilder::create(&repo, &repo_keys).add_package(dir.join("does-not-exist")).await,
+            Err(_)
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_do_not_stage_blobs_if_ignore_missing_files_and_package_files_are_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let (_, pkg_manifest) =
+            test_utils::make_package_manifest("package", dir.as_std_path(), vec![]);
+
+        // Delete a subpackage file.
+        std::fs::remove_file(&dir.join("package").join("meta.far")).unwrap();
+
+        // Commit the supackage to the repository. This should succeed because
+        // `ignore_missing_files` is true.
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        let (actual_deps, committed_blobs) = RepoBuilder::create(&repo, &repo_keys)
+            .ignore_missing_packages(true)
+            .add_package_manifest(None, pkg_manifest.clone())
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        // However we shouldn't have tried to write anything to the repository.
+        assert_eq!(actual_deps, HashSet::new());
+        assert_eq!(committed_blobs, HashMap::new());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_error_if_subpackage_manifest_is_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Make a subpackage.
+        let subpkg_dir = dir.join("subpackage");
+        let (_, subpkg_manifest) =
+            test_utils::make_package_manifest("subpackage", subpkg_dir.as_std_path(), Vec::new());
+
+        let subpkg_manifest_path = subpkg_dir.join("subpackage.manifest");
+        serde_json::to_writer(
+            std::fs::File::create(&subpkg_manifest_path).unwrap(),
+            &subpkg_manifest,
+        )
+        .unwrap();
+
+        // Make a superpackage that uses the subpackage.
+        let superpkg_dir = dir.join("superpackage");
+        let (_, superpkg_manifest) = test_utils::make_package_manifest(
+            "superpackage",
+            superpkg_dir.as_std_path(),
+            vec![(
+                "subpackage".parse().unwrap(),
+                subpkg_manifest.hash(),
+                subpkg_manifest_path.clone().into(),
+            )],
+        );
+
+        // Delete the subpackage manifest.
+        std::fs::remove_file(&subpkg_manifest_path).unwrap();
+
+        // Add the superpackage. This should fail because we haven't set `ignore_missing_files`.
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        // Try to stage the superpackage, which should error out because the
+        // subpackage doesn't exist.
+        assert_matches!(
+            RepoBuilder::create(&repo, &repo_keys)
+                .add_package_manifest(None, superpkg_manifest)
+                .await,
+            Err(_)
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_do_not_stage_blobs_if_ignore_missing_files_and_subpackage_manifest_is_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Create the subpackage.
+        let subpkg_dir = dir.join("subpackage");
+        let (_, subpkg_manifest) =
+            test_utils::make_package_manifest("subpackage", subpkg_dir.as_std_path(), Vec::new());
+
+        let subpkg_manifest_path = subpkg_dir.join("subpackage.manifest");
+        serde_json::to_writer(
+            std::fs::File::create(&subpkg_manifest_path).unwrap(),
+            &subpkg_manifest,
+        )
+        .unwrap();
+
+        // Create the superpackage that uses the subpackage.
+        let superpkg_dir = dir.join("superpackage");
+        let (_, superpkg_manifest) = test_utils::make_package_manifest(
+            "superpackage",
+            superpkg_dir.as_std_path(),
+            vec![(
+                "subpackage".parse().unwrap(),
+                subpkg_manifest.hash(),
+                subpkg_manifest_path.clone().into(),
+            )],
+        );
+
+        // Delete the subpackage manifest.
+        std::fs::remove_file(&subpkg_manifest_path).unwrap();
+
+        // Commit the supackage to the repository. This should succeed because
+        // `ignore_missing_files` is true.
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        let (actual_deps, committed_blobs) = RepoBuilder::create(&repo, &repo_keys)
+            .ignore_missing_packages(true)
+            .add_package_manifest(None, superpkg_manifest.clone())
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        // However we shouldn't have tried to write anything to the repository.
+        assert_eq!(actual_deps, HashSet::new());
+        assert_eq!(committed_blobs, HashMap::new());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_do_not_stage_blobs_if_ignore_missing_files_and_subpackage_files_are_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Create the subpackage.
+        let subpkg_dir = dir.join("subpackage");
+        let (_, subpkg_manifest) =
+            test_utils::make_package_manifest("subpackage", subpkg_dir.as_std_path(), Vec::new());
+
+        let subpkg_manifest_path = subpkg_dir.join("subpackage.manifest");
+        serde_json::to_writer(
+            std::fs::File::create(&subpkg_manifest_path).unwrap(),
+            &subpkg_manifest,
+        )
+        .unwrap();
+
+        // Create the superpackage that uses the subpackage.
+        let superpkg_dir = dir.join("superpackage");
+        let (_, superpkg_manifest) = test_utils::make_package_manifest(
+            "superpackage",
+            superpkg_dir.as_std_path(),
+            vec![(
+                "subpackage".parse().unwrap(),
+                subpkg_manifest.hash(),
+                subpkg_manifest_path.clone().into(),
+            )],
+        );
+
+        // Delete a subpackage file.
+        std::fs::remove_file(&subpkg_dir.join("subpackage").join("meta.far")).unwrap();
+
+        // Commit the supackage to the repository. This should succeed because
+        // `ignore_missing_files` is true.
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        let repo = FileSystemRepository::new(metadata_repo_path, blob_repo_path.clone());
+        let repo_keys = test_utils::make_repo_keys();
+
+        let (actual_deps, committed_blobs) = RepoBuilder::create(&repo, &repo_keys)
+            .ignore_missing_packages(true)
+            .add_package_manifest(None, superpkg_manifest.clone())
+            .await
+            .unwrap()
+            .commit()
+            .await
+            .unwrap();
+
+        // However we shouldn't have tried to write anything to the repository.
+        assert_eq!(actual_deps, HashSet::new());
+        assert_eq!(committed_blobs, HashMap::new());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
