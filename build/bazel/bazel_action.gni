@@ -494,10 +494,12 @@ template("bazel_action") {
     deps += [ ":${_ninja_inputs_target}" ]
     deps += [ "//build/bazel:generate_main_workspace($default_toolchain)" ]
 
-    # Prevent concurrent bazel build actions to run, otherwise
-    # the `bazel-bin` symlink target would become unpredictable resulting
-    # in erroneous outputs or errors.
-    pool = "//build/bazel:build_action_pool($default_toolchain)"
+    # Using the console pool prevents concurrent bazel build actions to run
+    # (otherwise the `bazel-bin` symlink target would become unpredictable
+    # resulting in erroneous outputs or errors), as well as allow Bazel to
+    # print its progress on smart terminals when `fx build` is invoked
+    # from one, which is handy to follow long-lasting commands.
+    pool = "//:console($default_toolchain)"
 
     # This action definitely cannot be hermetic. Callers should add
     # themselves to the //build:non_hermetic_deps visibility list.

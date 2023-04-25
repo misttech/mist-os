@@ -45,16 +45,6 @@ generate_bazel_inputs_manifest("legacy_ninja_build_outputs") {
   inputs_deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
 }
 
-# Used by bazel_action() to only allow one concurrent `bazel build`
-# action at a time during the build, since doing so modifies the workspace,
-# in particular the `bazel-bin` symlink that is used to copy the Bazel outputs
-# to the Ninja output directory.
-if (current_toolchain == default_toolchain) {
-  pool("build_action_pool") {
-    depth = 1
-  }
-}
-
 action("generate_main_workspace") {
   script = "//build/bazel/scripts/update_workspace.py"
 
