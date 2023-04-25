@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.audio;
 
-using zx;
 using fuchsia.hardware.audio.signalprocessing;
 
 const UNIQUE_ID_SIZE uint32 = 16;
@@ -19,26 +18,6 @@ type GainState = table {
 
     /// Current gain in decibels. Required.
     3: gain_db float32;
-};
-
-/// Plug state as returned by the driver.
-/// If the driver reports a `plug_detect_capabilities` equal to HARDWIRED, then the driver should
-/// respond to `WatchPlugState` only the first time it is called, with `plugged` set to true and
-/// `plug_state_time` set to time '0'.
-type PlugState = table {
-    /// Stream is currently plugged in. Required
-    1: plugged bool;
-
-    /// Timestamps the information provided in the rest of the fields of this struct. Required.
-    2: plug_state_time zx.Time;
-};
-
-type PlugDetectCapabilities = strict enum {
-    /// Stream is hardwired (will always be plugged in).
-    HARDWIRED = 0;
-
-    /// Stream is able to asynchronously notify of plug state changes.
-    CAN_ASYNC_NOTIFY = 1;
 };
 
 type StreamProperties = table {
