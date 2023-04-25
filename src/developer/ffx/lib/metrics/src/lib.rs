@@ -89,6 +89,24 @@ pub async fn add_daemon_launch_event() {
     add_daemon_metrics_event("start").await;
 }
 
+pub async fn add_flash_partition_event(
+    partition_name: &String,
+    product_name: &String,
+    board_name: &String,
+    file_size: u64,
+    flash_time: &Duration,
+) -> Result<()> {
+    let mut custom_dimensions = BTreeMap::from([
+        ("partition_name", partition_name.clone()),
+        ("product_name", product_name.clone()),
+        ("board_name", board_name.clone()),
+        ("file_size", file_size.to_string()),
+        ("flash_time", flash_time.as_millis().to_string()),
+    ]);
+    add_client_id_as_custom_dimension(&mut custom_dimensions).await;
+    add_custom_event(Some("ffx_flash"), None, None, custom_dimensions).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -15,6 +15,7 @@ use async_utils::async_once::Once;
 use fastboot::UploadProgressListener as _;
 use ffx_config::get;
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent};
+use ffx_metrics::add_flash_partition_event;
 use fidl::{prelude::*, Error as FidlError};
 use fidl_fuchsia_developer_ffx::{
     FastbootError, FastbootRequest, RebootError, RebootListenerProxy,
@@ -28,7 +29,7 @@ use futures::{
     try_join,
 };
 use selectors::{self, VerboseError};
-use std::{net::SocketAddr, rc::Rc, time::Duration};
+use std::{net::SocketAddr, rc::Rc, time::Duration, time::Instant};
 
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
 const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
@@ -187,6 +188,25 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         }
     }
 
+    async fn report_flash_metrics(
+        &self,
+        flash_duration: Duration,
+        path: String,
+        partition_name: String,
+    ) -> Result<()> {
+        // Check file size
+        let meta = std::fs::metadata(&path);
+        let file_size = meta?.len();
+        // Get target info
+        let (product, board) = match self.target.build_config() {
+            Some(config) => (config.product_config, config.board_config),
+            None => ("".to_string(), "".to_string()),
+        };
+        // Report
+        add_flash_partition_event(&partition_name, &product, &board, file_size, &flash_duration)
+            .await
+    }
+
     pub async fn handle_fastboot_request(&mut self, req: FastbootRequest) -> Result<()> {
         tracing::debug!("fastboot - received req: {:?}", req);
         match req {
@@ -260,15 +280,24 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
 
                 let upload_listener = upload_listener_res.unwrap();
 
+                let flash_start = Instant::now();
                 let res = future::ready(Ok(()))
                     .and_then(|_| async { self.interface().await })
                     .and_then(|interface| async {
                         flash(interface, &path, &partition_name, &upload_listener).await
                     })
                     .await;
+                let flash_duration = Instant::now() - flash_start;
 
                 match res {
-                    Ok(_) => responder.send(&mut Ok(()))?,
+                    Ok(_) => {
+                        let report_res =
+                            self.report_flash_metrics(flash_duration, path, partition_name).await;
+                        if let Err(e) = report_res {
+                            tracing::debug!("Error reporting flash partition metrics:\n{:?}", e);
+                        }
+                        responder.send(&mut Ok(()))?
+                    }
                     Err(e) => {
                         tracing::error!(
                             "Error flashing \"{}\" from {}:\n{:?}",
