@@ -83,3 +83,12 @@ type ChannelBandwidth = strict enum { // Channel Bandwidth
     CBW160 = 4;
     CBW80P80 = 5;
 };
+
+/// Outcome of a packet transmission.
+@available(removed=13)
+type WlanTxResult = strict enum : uint8 {
+    /// ACK was not received or transmission otherwise failed.
+    FAILED = 0x0;
+    /// ACK was received from peer.
+    SUCCESS = 0x1;
+};

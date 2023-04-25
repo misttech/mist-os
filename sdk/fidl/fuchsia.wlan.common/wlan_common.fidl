@@ -167,7 +167,8 @@ type WlanTxStatusEntry = struct {
 };
 
 /// Outcome of a packet transmission.
-type WlanTxResult = strict enum : uint8 {
+@available(added=13)
+type WlanTxResult = flexible enum : uint8 {
     /// ACK was not received or transmission otherwise failed.
     FAILED = 0x0;
     /// ACK was received from peer.
