@@ -8,7 +8,6 @@ Similar to json_format.MessageToDict, but handles maps properly.
 This works on any proto Message subtype.
 """
 
-from api.proxy import log_pb2
 from google.protobuf import json_format
 from google.protobuf import descriptor
 from google.protobuf import message
