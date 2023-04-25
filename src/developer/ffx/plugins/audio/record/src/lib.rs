@@ -6,91 +6,110 @@ use ffx_audio_record_args::AudioCaptureUsageExtended;
 
 use {
     anyhow::Result,
+    async_trait::async_trait,
     blocking::Unblock,
-    errors::ffx_bail,
     ffx_audio_record_args::RecordCommand,
-    ffx_core::ffx_plugin,
+    fho::{selector, FfxContext, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, CapturerType, RecordLocation,
     },
     fidl_fuchsia_media::AudioStreamType,
 };
 
-#[ffx_plugin(
-    "audio",
-    AudioDaemonProxy = "core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"
-)]
-pub async fn record_cmd(audio_proxy: AudioDaemonProxy, cmd: RecordCommand) -> Result<()> {
-    record_capture(audio_proxy, cmd).await?;
-    Ok(())
-}
-
-pub async fn record_capture(
+#[derive(FfxTool)]
+pub struct RecordTool {
+    #[command]
+    cmd: RecordCommand,
+    #[with(selector("core/audio_ffx_daemon:expose:fuchsia.audio.ffxdaemon.AudioDaemon"))]
     audio_proxy: AudioDaemonProxy,
-    record_command: RecordCommand,
-) -> Result<()> {
-    let capturer_usage = match record_command.usage {
-        AudioCaptureUsageExtended::Background(usage)
-        | AudioCaptureUsageExtended::Foreground(usage)
-        | AudioCaptureUsageExtended::Communication(usage)
-        | AudioCaptureUsageExtended::SystemAgent(usage) => Some(usage),
-        _ => None,
-    };
+}
+fho::embedded_plugin!(RecordTool);
+#[async_trait(?Send)]
+impl FfxMain for RecordTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let capturer_usage = match self.cmd.usage {
+            AudioCaptureUsageExtended::Background(usage)
+            | AudioCaptureUsageExtended::Foreground(usage)
+            | AudioCaptureUsageExtended::Communication(usage)
+            | AudioCaptureUsageExtended::SystemAgent(usage) => Some(usage),
+            _ => None,
+        };
 
-    let (location, gain_settings) = match record_command.usage {
-        AudioCaptureUsageExtended::Loopback => {
-            (RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}), None)
-        }
-        AudioCaptureUsageExtended::Ultrasound => (
-            RecordLocation::Capturer(CapturerType::UltrasoundCapturer(
-                fidl_fuchsia_audio_ffxdaemon::UltrasoundCapturer {},
-            )),
-            None,
-        ),
-        _ => (
-            RecordLocation::Capturer(CapturerType::StandardCapturer(CapturerInfo {
-                usage: capturer_usage,
-                ..CapturerInfo::EMPTY
-            })),
-            Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
-                mute: Some(record_command.mute),
-                gain: Some(record_command.gain),
-                ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
-            }),
-        ),
-    };
+        let (location, gain_settings) = match self.cmd.usage {
+            AudioCaptureUsageExtended::Loopback => {
+                (RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}), None)
+            }
+            AudioCaptureUsageExtended::Ultrasound => (
+                RecordLocation::Capturer(CapturerType::UltrasoundCapturer(
+                    fidl_fuchsia_audio_ffxdaemon::UltrasoundCapturer {},
+                )),
+                None,
+            ),
+            _ => (
+                RecordLocation::Capturer(CapturerType::StandardCapturer(CapturerInfo {
+                    usage: capturer_usage,
+                    ..CapturerInfo::EMPTY
+                })),
+                Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+                    mute: Some(self.cmd.mute),
+                    gain: Some(self.cmd.gain),
+                    ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+                }),
+            ),
+        };
 
-    let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
-        fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
-    >();
+        let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
+            fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
+        >();
 
-    let request = AudioDaemonRecordRequest {
-        location: Some(location),
-        stream_type: Some(AudioStreamType::from(&record_command.format)),
-        duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
-        canceler: Some(cancel_server),
-        gain_settings,
-        buffer_size: record_command.buffer_size,
-        ..AudioDaemonRecordRequest::EMPTY
-    };
+        let request = AudioDaemonRecordRequest {
+            location: Some(location),
+            stream_type: Some(AudioStreamType::from(&self.cmd.format)),
+            duration: self.cmd.duration.map(|duration| duration.as_nanos() as i64),
+            canceler: Some(cancel_server),
+            gain_settings,
+            buffer_size: self.cmd.buffer_size,
+            ..AudioDaemonRecordRequest::EMPTY
+        };
 
-    let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
-        Ok(value) => (
-            value.stdout.ok_or(anyhow::anyhow!("No stdout socket."))?,
-            value.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
-        ),
-        Err(err) => ffx_bail!("Record failed with err: {}", err),
-    };
+        let (stdout_sock, stderr_sock) = {
+            let response = self
+                .audio_proxy
+                .record(request)
+                .await
+                .user_message("Timeout awaiting record command response.")?
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "AudioDaemon Record request failed with error {}",
+                        fuchsia_zircon_status::Status::from_raw(e)
+                    )
+                })?;
 
-    let mut stdout = Unblock::new(std::io::stdout());
-    let mut stderr = Unblock::new(std::io::stderr());
+            (
+                response.stdout.ok_or(anyhow::anyhow!("No stdout socket."))?,
+                response.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
+            )
+        };
 
-    futures::future::try_join3(
-        futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
-        futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
-        ffx_audio_common::wait_for_keypress(cancel_client),
-    )
-    .await
-    .map(|_| ())
-    .map_err(|e| anyhow::anyhow!("Error copying data from socket. {}", e))
+        let mut stdout = Unblock::new(std::io::stdout());
+        let mut stderr = Unblock::new(std::io::stderr());
+
+        futures::future::try_join3(
+            futures::io::copy(
+                fidl::AsyncSocket::from_socket(stdout_sock)
+                    .user_message("Could not create async socket for stdout.")?,
+                &mut stdout,
+            ),
+            futures::io::copy(
+                fidl::AsyncSocket::from_socket(stderr_sock)
+                    .user_message("Could not create async socket for stderr.")?,
+                &mut stderr,
+            ),
+            ffx_audio_common::wait_for_keypress(cancel_client),
+        )
+        .await
+        .map(|_| ())
+        .user_message("Error copying data from socket.")
+    }
 }
