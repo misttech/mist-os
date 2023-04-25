@@ -172,20 +172,20 @@ def _build_fuchsia_package_impl(ctx):
     # where we will collect all of the temporary files
     pkg_dir = ctx.label.name + "_pkg/"
 
-    # An environment variable that creates an isolated FFX instance.
-    ffx_isolate_dir = ctx.actions.declare_directory(pkg_dir + "_package.ffx")
-
     # Declare all of the output files
     manifest = ctx.actions.declare_file(pkg_dir + "manifest")
     meta_package = ctx.actions.declare_file(pkg_dir + "meta/package")
     meta_far = ctx.actions.declare_file(pkg_dir + "meta.far")
-    output_package_manifest = ctx.actions.declare_file(ctx.label.name + "_package_manifest.json")
+    output_package_manifest = ctx.actions.declare_file(pkg_dir + "package_manifest.json")
     far_file = ctx.actions.declare_file(archive_name)
+
+    # Environment variables that create an isolated FFX instance.
+    ffx_isolate_build_dir = ctx.actions.declare_directory(pkg_dir + "_package_build.ffx")
+    ffx_isolate_archive_dir = ctx.actions.declare_directory(pkg_dir + "_package_archive.ffx")
 
     # The Fuchsia target API level of this package
     api_level = sdk.default_api_level
-
-    api_level_input = ["-api-level", str(api_level)]
+    api_level_input = ["--api-level", str(api_level)]
 
     # All of the resources that will go into the package
     package_resources = [
@@ -247,12 +247,11 @@ def _build_fuchsia_package_impl(ctx):
     )
 
     # Create the meta/package file
-    output_dir = manifest.dirname
     ctx.actions.run(
         executable = sdk.pm,
         arguments = [
             "-o",  # output directory
-            output_dir,
+            manifest.dirname,
             "-n",  # name of the package
             ctx.attr.package_name,
             "init",
@@ -271,29 +270,31 @@ def _build_fuchsia_package_impl(ctx):
         meta_package,
     ]
 
-    repo_name_args = ["-r", ctx.attr.package_repository_name] if (ctx.attr.package_repository_name != None) else []
+    repo_name_args = []
+    if (ctx.attr.package_repository_name != None) and (ctx.attr.package_repository_name != ""):
+        repo_name_args = ["--repository", ctx.attr.package_repository_name]
 
     # Build the package
     ctx.actions.run(
-        executable = sdk.pm,
+        executable = sdk.ffx,
         arguments = [
-            "-o",
-            output_dir,
-            "-m",
-            manifest.path,
-            "-n",
-            ctx.attr.package_name,
-        ] + repo_name_args + api_level_input + [
+            "--isolate-dir",
+            ffx_isolate_build_dir.path,
+            "package",
             "build",
-            "--output-package-manifest",
-            output_package_manifest.path,
-        ],
+            manifest.path,
+            "-o",  # output directory
+            output_package_manifest.dirname,
+            "--published-name",  # name of package
+            ctx.attr.package_name,
+        ] + api_level_input + repo_name_args,
         inputs = build_inputs,
         outputs = [
             output_package_manifest,
             meta_far,
+            ffx_isolate_build_dir,
         ],
-        mnemonic = "FuchsiaPmBuild",
+        mnemonic = "FuchsiaFfxPackageBuild",
         progress_message = "Building package for %s" % ctx.label,
     )
 
@@ -307,7 +308,7 @@ def _build_fuchsia_package_impl(ctx):
         executable = sdk.ffx,
         arguments = [
             "--isolate-dir",
-            ffx_isolate_dir.path,
+            ffx_isolate_archive_dir.path,
             "package",
             "archive",
             "create",
@@ -316,7 +317,7 @@ def _build_fuchsia_package_impl(ctx):
             far_file.path,
         ],
         inputs = artifact_inputs,
-        outputs = [far_file, ffx_isolate_dir],
+        outputs = [far_file, ffx_isolate_archive_dir],
         mnemonic = "FuchsiaFfxPackageArchiveCreate",
         progress_message = "Archiving package for %{label}",
     )
