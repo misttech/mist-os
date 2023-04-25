@@ -102,8 +102,13 @@ __NO_INLINE syscall_pre_out do_syscall_pre(uint64_t syscall_num, uint64_t pc) {
 __NO_INLINE syscall_result do_syscall_post(uint64_t ret, uint64_t syscall_num) {
   LTRACEF_LEVEL(2, "t %p ret %#" PRIx64 "\n", Thread::Current::Get(), ret);
 
-  /* re-disable interrupts on the way out
-     This must be done before the below fxt_duration_end call. */
+  // Disable interrupts on the way out before checking thread signals.
+  //
+  // To avoid a situation where fail to process a thread signal (the "lost wakeup" problem), it's
+  // critical that once we've check for thread signals, we do not enable interrupts until we have
+  // either processed all pending signals or we have returned to user mode.
+  //
+  // Also, disable interrupts before the fxt_duration_end call below.
   arch_disable_ints();
 
   KTRACE_DURATION_END_LABEL_REF("kernel:syscall", syscall_name_ref(syscall_num));

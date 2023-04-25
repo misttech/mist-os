@@ -1242,7 +1242,15 @@ struct Thread {
     static void SignalPolicyException(uint32_t policy_exception_code,
                                       uint32_t policy_exception_data);
 
-    // Process pending signals, may never return because of kill signal.
+    // Process any pending thread signals.
+    //
+    // This method may never return if the thread has a pending kill signal.
+    //
+    // Interrupt state - This method modifies interrupt state.  It is critical that this method be
+    // called with interrupts disabled to eliminate a "lost wakeup" race condition.  While
+    // interrupts must be disabled prior to call this method, the method may re-enable them during
+    // the processing of certain signals.  This method guarantees that if it does return, it will do
+    // so with interrupts disabled.
     static void ProcessPendingSignals(GeneralRegsSource source, void* gregs);
 
     // Migrates the current thread to the CPU identified by target_cpu.
@@ -1286,7 +1294,7 @@ struct Thread {
     static void DumpUserTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
       dump_thread_tid_during_panic(tid, full);
     }
-  };
+  };  // struct Current;
 
   // Trait for the global Thread list.
   struct ThreadListTrait {

@@ -231,13 +231,13 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
 }
 
 void arch_enter_uspace(iframe_t* iframe) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
   LTRACEF("entry %#" PRIxPTR " user stack %#" PRIxPTR "\n", iframe->ip, iframe->user_sp);
   LTRACEF("kernel stack %#" PRIxPTR "\n", x86_get_percpu()->default_tss.rsp0);
 #if __has_feature(safe_stack)
   LTRACEF("kernel unsafe stack %#" PRIxPTR "\n", Thread::Current::Get()->stack().unsafe_top());
 #endif
-
-  arch_disable_ints();
 
   /* check that we are accessing userspace code */
   ASSERT(arch_is_valid_user_pc(iframe->ip));

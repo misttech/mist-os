@@ -42,6 +42,8 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t entry_point, uintptr_t
 
 // Enter userspace.
 // |iframe| is generally initialized with |arch_setup_uspace_iframe()|.
+//
+// Must be called with interrupts disabled.
 void arch_enter_uspace(iframe_t* iframe) __NO_RETURN;
 
 // On x86, user mode general registers are stored in one of two structures depending on how the

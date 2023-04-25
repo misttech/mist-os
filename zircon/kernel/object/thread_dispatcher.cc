@@ -427,6 +427,7 @@ int ThreadDispatcher::StartRoutine(void* arg) {
   // Notify debugger if attached.
   t->HandleSingleShotException(t->process_->debug_exceptionate(), ZX_EXCP_THREAD_STARTING, context);
 
+  arch_disable_ints();
   arch_iframe_process_pending_signals(&iframe);
 
   // switch to user mode and start the process

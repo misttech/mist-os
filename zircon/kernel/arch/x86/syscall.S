@@ -406,9 +406,6 @@ syscall_maybe_mds_buff_overwrite:
     sysretq
 
 .Lthread_signaled:
-    // re-enable interrupts to maintain kernel preemptiveness
-    sti
-
     // Pass a pointer to the syscall_regs_t struct as first arg.
     movq    %rsp, %rdi
     call    x86_syscall_process_pending_signals

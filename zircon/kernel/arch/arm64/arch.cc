@@ -271,6 +271,8 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
 // Switch to user mode, set the user stack pointer to user_stack_top, put the svc stack pointer to
 // the top of the kernel stack.
 void arch_enter_uspace(iframe_t* iframe) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
   Thread* ct = Thread::Current::Get();
 
   LTRACEF("r0 %#" PRIxPTR " r1 %#" PRIxPTR " spsr %#" PRIxPTR " st %#" PRIxPTR " usp %#" PRIxPTR
@@ -282,8 +284,6 @@ void arch_enter_uspace(iframe_t* iframe) {
 #endif
 
   ASSERT(arch_is_valid_user_pc(iframe->elr));
-
-  arch_disable_ints();
 
 #if __has_feature(shadow_call_stack)
   arm64_uspace_entry(iframe, ct->stack().top(), scsp_base);

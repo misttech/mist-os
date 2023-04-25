@@ -901,71 +901,124 @@ ScopedThreadExceptionContext::~ScopedThreadExceptionContext() {
   }
 }
 
-// check for any pending signals and handle them
 void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* gregs) {
-  Thread* current_thread = Thread::Current::Get();
-  if (likely(current_thread->signals() == 0)) {
-    return;
-  }
+  // Prior to calling this method, interrupts must be disabled.  This method may enable interrupts,
+  // but if it does, it will disable them prior to returning.
+  //
+  // TODO(maniscalco): Refer the reader to the to-be-written theory of operations documentation for
+  // kernel thread signals.
+  DEBUG_ASSERT(arch_ints_disabled());
 
-  // grab the thread lock so we can safely look at the signal mask
-  Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+  Thread* const current_thread = Thread::Current::Get();
 
-  // This thread is about to be killed, raise an exception, or become suspended.  If this is a user
-  // thread, these are all debugger-visible actions.  Save the general registers so that a debugger
-  // may access them.
-  const bool has_user_thread = current_thread->user_thread_ != nullptr;
-  if (has_user_thread) {
-    arch_set_suspended_general_regs(current_thread, source, gregs);
-  }
-  auto cleanup_suspended_general_regs = fit::defer([current_thread, has_user_thread]() {
-    if (has_user_thread) {
-      arch_reset_suspended_general_regs(current_thread);
-    }
-  });
-
-  if (current_thread->CheckKillSignal()) {
-    guard.Release();
-    cleanup_suspended_general_regs.cancel();
-    Thread::Current::Exit(0);
-  }
-
-  // Report any policy exceptions raised by syscalls.
-  const unsigned int signals = current_thread->signals();
-  if (has_user_thread && (signals & THREAD_SIGNAL_POLICY_EXCEPTION)) {
-    current_thread->signals_.fetch_and(~THREAD_SIGNAL_POLICY_EXCEPTION, ktl::memory_order_relaxed);
-    uint32_t policy_exception_code = current_thread->extra_policy_exception_code_;
-    uint32_t policy_exception_data = current_thread->extra_policy_exception_data_;
-    guard.Release();
-
-    zx_status_t status =
-        arch_dispatch_user_policy_exception(policy_exception_code, policy_exception_data);
-    if (status != ZX_OK) {
-      panic("arch_dispatch_user_policy_exception() failed: status=%d\n", status);
-    }
-    return;
-  }
-
-  if (signals & THREAD_SIGNAL_SUSPEND) {
-    DEBUG_ASSERT(current_thread->state() == THREAD_RUNNING);
-    // This thread has been asked to suspend.  If it has a user mode component we need to save the
-    // user register state prior to calling |thread_do_suspend| so that a debugger may access it
-    // while the thread is suspended.
-    if (has_user_thread) {
-      // The enclosing function, |thread_process_pending_signals|, is called at the boundary of
-      // kernel and user mode (e.g. just before returning from a syscall, timer interrupt, or
-      // architectural exception/fault).  We're about the perform a save.  If the save fails
-      // (returns false), then we likely have a mismatched save/restore pair, which is a bug.
-      const bool saved = current_thread->SaveUserStateLocked();
-      DEBUG_ASSERT(saved);
-      guard.CallUnlocked([]() { Thread::Current::DoSuspend(); });
-      if (saved) {
-        current_thread->RestoreUserStateLocked();
+  // It's possible for certain signals to be asserted, processed, and then re-asserted during this
+  // method so loop until there are no pending signals.
+  unsigned int signals;
+  while ((signals = current_thread->signals()) != 0) {
+    // THREAD_SIGNAL_KILL
+    //
+    // We check this signal first because if asserted, the thread will terminate so there's no point
+    // in checking other signals before kill.
+    if (signals & THREAD_SIGNAL_KILL) {
+      // We're going to call Exit, which generates a user-visible exception on user threads.  If
+      // this thread has user mode component, call arch_set_suspended_general_regs() to make the
+      // general registers available to a debugger during the exception.
+      if (current_thread->user_thread_) {
+        // TODO(fxbug.dev/126109): Do we need to hold the thread lock here?
+        Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        arch_set_suspended_general_regs(current_thread, source, gregs);
       }
-    } else {
-      // No user mode component so nothing to save.
-      guard.Release();
-      Thread::Current::DoSuspend();
+
+      // Thread::Current::Exit may only be called with interrupts enabled.  Note, this is thread is
+      // committed to terminating and will never return so we don't need to worry about disabling
+      // interrupts post-Exit.
+      arch_enable_ints();
+      Thread::Current::Exit(0);
+
+      __UNREACHABLE;
+    }
+
+    const bool has_user_thread = current_thread->user_thread_ != nullptr;
+
+    // THREAD_SIGNAL_POLICY_EXCEPTION
+    //
+    if (signals & THREAD_SIGNAL_POLICY_EXCEPTION) {
+      DEBUG_ASSERT(has_user_thread);
+      // TODO(maniscalco): Consider wrapping this up in a method
+      // (e.g. Thread::Current::ClearSignals) and think hard about whether relaxed is sufficient.
+      current_thread->signals_.fetch_and(~THREAD_SIGNAL_POLICY_EXCEPTION,
+                                         ktl::memory_order_relaxed);
+
+      uint32_t policy_exception_code;
+      uint32_t policy_exception_data;
+      {
+        // TODO(fxbug.dev/126109): Do we need to hold the thread lock here?
+        Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+        // Policy exceptions are user-visible so must make the general register state available to
+        // a debugger.
+        arch_set_suspended_general_regs(current_thread, source, gregs);
+
+        policy_exception_code = current_thread->extra_policy_exception_code_;
+        policy_exception_data = current_thread->extra_policy_exception_data_;
+      }
+
+      // Call arch_dispatch_user_policy_exception with interrupts enabled, but be sure to disable
+      // them afterwards.
+      arch_enable_ints();
+      zx_status_t status =
+          arch_dispatch_user_policy_exception(policy_exception_code, policy_exception_data);
+      ZX_ASSERT_MSG(status == ZX_OK, "arch_dispatch_user_policy_exception() failed: status=%d\n",
+                    status);
+      arch_disable_ints();
+
+      {
+        // TODO(fxbug.dev/126109): Do we need to hold the thread lock here?
+        Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+        arch_reset_suspended_general_regs(current_thread);
+      }
+    }
+
+    // THREAD_SIGNAL_SUSPEND
+    //
+    if (signals & THREAD_SIGNAL_SUSPEND) {
+      if (has_user_thread) {
+        bool saved;
+        {
+          // TODO(fxbug.dev/126109): Do we need to hold the thread lock here?
+          Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+          // This thread has been asked to suspend.  When a user thread is suspended, its full
+          // register state (not just the general purpose registers) is accessible to a debugger.
+          arch_set_suspended_general_regs(current_thread, source, gregs);
+          saved = current_thread->SaveUserStateLocked();
+        }
+
+        // The enclosing function, is called at the boundary of kernel and user mode (e.g. just
+        // before returning from a syscall, timer interrupt, or architectural exception/fault).
+        // We're about the perform a save.  If the save fails (returns false), then we likely have a
+        // mismatched save/restore pair, which is a bug.
+        DEBUG_ASSERT(saved);
+
+        arch_enable_ints();
+        Thread::Current::DoSuspend();
+        arch_disable_ints();
+
+        {
+          // TODO(fxbug.dev/126109): Do we need to hold the thread lock here?
+          Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
+
+          if (saved) {
+            current_thread->RestoreUserStateLocked();
+          }
+          arch_reset_suspended_general_regs(current_thread);
+        }
+      } else {
+        // No user mode component so we don't need to save any register state.
+        arch_enable_ints();
+        Thread::Current::DoSuspend();
+        arch_disable_ints();
+      }
     }
   }
 }
