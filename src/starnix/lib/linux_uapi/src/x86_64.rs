@@ -2644,6 +2644,200 @@ pub const FF_AUTOCENTER: u32 = 97;
 pub const FF_MAX_EFFECTS: u32 = 96;
 pub const FF_MAX: u32 = 127;
 pub const FF_CNT: u32 = 128;
+pub const __LITTLE_ENDIAN: u32 = 1234;
+pub const IPTOS_TOS_MASK: u32 = 30;
+pub const IPTOS_LOWDELAY: u32 = 16;
+pub const IPTOS_THROUGHPUT: u32 = 8;
+pub const IPTOS_RELIABILITY: u32 = 4;
+pub const IPTOS_MINCOST: u32 = 2;
+pub const IPTOS_PREC_MASK: u32 = 224;
+pub const IPTOS_PREC_NETCONTROL: u32 = 224;
+pub const IPTOS_PREC_INTERNETCONTROL: u32 = 192;
+pub const IPTOS_PREC_CRITIC_ECP: u32 = 160;
+pub const IPTOS_PREC_FLASHOVERRIDE: u32 = 128;
+pub const IPTOS_PREC_FLASH: u32 = 96;
+pub const IPTOS_PREC_IMMEDIATE: u32 = 64;
+pub const IPTOS_PREC_PRIORITY: u32 = 32;
+pub const IPTOS_PREC_ROUTINE: u32 = 0;
+pub const IPOPT_COPY: u32 = 128;
+pub const IPOPT_CLASS_MASK: u32 = 96;
+pub const IPOPT_NUMBER_MASK: u32 = 31;
+pub const IPOPT_CONTROL: u32 = 0;
+pub const IPOPT_RESERVED1: u32 = 32;
+pub const IPOPT_MEASUREMENT: u32 = 64;
+pub const IPOPT_RESERVED2: u32 = 96;
+pub const IPOPT_END: u32 = 0;
+pub const IPOPT_NOOP: u32 = 1;
+pub const IPOPT_SEC: u32 = 130;
+pub const IPOPT_LSRR: u32 = 131;
+pub const IPOPT_TIMESTAMP: u32 = 68;
+pub const IPOPT_CIPSO: u32 = 134;
+pub const IPOPT_RR: u32 = 7;
+pub const IPOPT_SID: u32 = 136;
+pub const IPOPT_SSRR: u32 = 137;
+pub const IPOPT_RA: u32 = 148;
+pub const IPVERSION: u32 = 4;
+pub const MAXTTL: u32 = 255;
+pub const IPDEFTTL: u32 = 64;
+pub const IPOPT_OPTVAL: u32 = 0;
+pub const IPOPT_OLEN: u32 = 1;
+pub const IPOPT_OFFSET: u32 = 2;
+pub const IPOPT_MINOFF: u32 = 4;
+pub const MAX_IPOPTLEN: u32 = 40;
+pub const IPOPT_NOP: u32 = 1;
+pub const IPOPT_EOL: u32 = 0;
+pub const IPOPT_TS: u32 = 68;
+pub const IPOPT_TS_TSONLY: u32 = 0;
+pub const IPOPT_TS_TSANDADDR: u32 = 1;
+pub const IPOPT_TS_PRESPEC: u32 = 3;
+pub const IPV4_BEET_PHMAXLEN: u32 = 8;
+pub const __UAPI_DEF_IF_IFCONF: u32 = 1;
+pub const __UAPI_DEF_IF_IFMAP: u32 = 1;
+pub const __UAPI_DEF_IF_IFNAMSIZ: u32 = 1;
+pub const __UAPI_DEF_IF_IFREQ: u32 = 1;
+pub const __UAPI_DEF_IF_NET_DEVICE_FLAGS: u32 = 1;
+pub const __UAPI_DEF_IF_NET_DEVICE_FLAGS_LOWER_UP_DORMANT_ECHO: u32 = 1;
+pub const __UAPI_DEF_IN_ADDR: u32 = 1;
+pub const __UAPI_DEF_IN_IPPROTO: u32 = 1;
+pub const __UAPI_DEF_IN_PKTINFO: u32 = 1;
+pub const __UAPI_DEF_IP_MREQ: u32 = 1;
+pub const __UAPI_DEF_SOCKADDR_IN: u32 = 1;
+pub const __UAPI_DEF_IN_CLASS: u32 = 1;
+pub const __UAPI_DEF_IN6_ADDR: u32 = 1;
+pub const __UAPI_DEF_IN6_ADDR_ALT: u32 = 1;
+pub const __UAPI_DEF_SOCKADDR_IN6: u32 = 1;
+pub const __UAPI_DEF_IPV6_MREQ: u32 = 1;
+pub const __UAPI_DEF_IPPROTO_V6: u32 = 1;
+pub const __UAPI_DEF_IPV6_OPTIONS: u32 = 1;
+pub const __UAPI_DEF_IN6_PKTINFO: u32 = 1;
+pub const __UAPI_DEF_IP6_MTUINFO: u32 = 1;
+pub const __UAPI_DEF_SOCKADDR_IPX: u32 = 1;
+pub const __UAPI_DEF_IPX_ROUTE_DEFINITION: u32 = 1;
+pub const __UAPI_DEF_IPX_INTERFACE_DEFINITION: u32 = 1;
+pub const __UAPI_DEF_IPX_CONFIG_DATA: u32 = 1;
+pub const __UAPI_DEF_IPX_ROUTE_DEF: u32 = 1;
+pub const __UAPI_DEF_XATTR: u32 = 1;
+pub const IPV6_FL_A_GET: u32 = 0;
+pub const IPV6_FL_A_PUT: u32 = 1;
+pub const IPV6_FL_A_RENEW: u32 = 2;
+pub const IPV6_FL_F_CREATE: u32 = 1;
+pub const IPV6_FL_F_EXCL: u32 = 2;
+pub const IPV6_FL_F_REFLECT: u32 = 4;
+pub const IPV6_FL_F_REMOTE: u32 = 8;
+pub const IPV6_FL_S_NONE: u32 = 0;
+pub const IPV6_FL_S_EXCL: u32 = 1;
+pub const IPV6_FL_S_PROCESS: u32 = 2;
+pub const IPV6_FL_S_USER: u32 = 3;
+pub const IPV6_FL_S_ANY: u32 = 255;
+pub const IPV6_FLOWINFO_FLOWLABEL: u32 = 1048575;
+pub const IPV6_FLOWINFO_PRIORITY: u32 = 267386880;
+pub const IPV6_PRIORITY_UNCHARACTERIZED: u32 = 0;
+pub const IPV6_PRIORITY_FILLER: u32 = 256;
+pub const IPV6_PRIORITY_UNATTENDED: u32 = 512;
+pub const IPV6_PRIORITY_RESERVED1: u32 = 768;
+pub const IPV6_PRIORITY_BULK: u32 = 1024;
+pub const IPV6_PRIORITY_RESERVED2: u32 = 1280;
+pub const IPV6_PRIORITY_INTERACTIVE: u32 = 1536;
+pub const IPV6_PRIORITY_CONTROL: u32 = 1792;
+pub const IPV6_PRIORITY_8: u32 = 2048;
+pub const IPV6_PRIORITY_9: u32 = 2304;
+pub const IPV6_PRIORITY_10: u32 = 2560;
+pub const IPV6_PRIORITY_11: u32 = 2816;
+pub const IPV6_PRIORITY_12: u32 = 3072;
+pub const IPV6_PRIORITY_13: u32 = 3328;
+pub const IPV6_PRIORITY_14: u32 = 3584;
+pub const IPV6_PRIORITY_15: u32 = 3840;
+pub const IPPROTO_HOPOPTS: u32 = 0;
+pub const IPPROTO_ROUTING: u32 = 43;
+pub const IPPROTO_FRAGMENT: u32 = 44;
+pub const IPPROTO_ICMPV6: u32 = 58;
+pub const IPPROTO_NONE: u32 = 59;
+pub const IPPROTO_DSTOPTS: u32 = 60;
+pub const IPPROTO_MH: u32 = 135;
+pub const IPV6_TLV_PAD1: u32 = 0;
+pub const IPV6_TLV_PADN: u32 = 1;
+pub const IPV6_TLV_ROUTERALERT: u32 = 5;
+pub const IPV6_TLV_CALIPSO: u32 = 7;
+pub const IPV6_TLV_IOAM: u32 = 49;
+pub const IPV6_TLV_JUMBO: u32 = 194;
+pub const IPV6_TLV_HAO: u32 = 201;
+pub const IPV6_ADDRFORM: u32 = 1;
+pub const IPV6_2292PKTINFO: u32 = 2;
+pub const IPV6_2292HOPOPTS: u32 = 3;
+pub const IPV6_2292DSTOPTS: u32 = 4;
+pub const IPV6_2292RTHDR: u32 = 5;
+pub const IPV6_2292PKTOPTIONS: u32 = 6;
+pub const IPV6_CHECKSUM: u32 = 7;
+pub const IPV6_2292HOPLIMIT: u32 = 8;
+pub const IPV6_NEXTHOP: u32 = 9;
+pub const IPV6_AUTHHDR: u32 = 10;
+pub const IPV6_FLOWINFO: u32 = 11;
+pub const IPV6_UNICAST_HOPS: u32 = 16;
+pub const IPV6_MULTICAST_IF: u32 = 17;
+pub const IPV6_MULTICAST_HOPS: u32 = 18;
+pub const IPV6_MULTICAST_LOOP: u32 = 19;
+pub const IPV6_ADD_MEMBERSHIP: u32 = 20;
+pub const IPV6_DROP_MEMBERSHIP: u32 = 21;
+pub const IPV6_ROUTER_ALERT: u32 = 22;
+pub const IPV6_MTU_DISCOVER: u32 = 23;
+pub const IPV6_MTU: u32 = 24;
+pub const IPV6_RECVERR: u32 = 25;
+pub const IPV6_V6ONLY: u32 = 26;
+pub const IPV6_JOIN_ANYCAST: u32 = 27;
+pub const IPV6_LEAVE_ANYCAST: u32 = 28;
+pub const IPV6_MULTICAST_ALL: u32 = 29;
+pub const IPV6_ROUTER_ALERT_ISOLATE: u32 = 30;
+pub const IPV6_RECVERR_RFC4884: u32 = 31;
+pub const IPV6_PMTUDISC_DONT: u32 = 0;
+pub const IPV6_PMTUDISC_WANT: u32 = 1;
+pub const IPV6_PMTUDISC_DO: u32 = 2;
+pub const IPV6_PMTUDISC_PROBE: u32 = 3;
+pub const IPV6_PMTUDISC_INTERFACE: u32 = 4;
+pub const IPV6_PMTUDISC_OMIT: u32 = 5;
+pub const IPV6_FLOWLABEL_MGR: u32 = 32;
+pub const IPV6_FLOWINFO_SEND: u32 = 33;
+pub const IPV6_IPSEC_POLICY: u32 = 34;
+pub const IPV6_XFRM_POLICY: u32 = 35;
+pub const IPV6_HDRINCL: u32 = 36;
+pub const IPV6_RECVPKTINFO: u32 = 49;
+pub const IPV6_PKTINFO: u32 = 50;
+pub const IPV6_RECVHOPLIMIT: u32 = 51;
+pub const IPV6_HOPLIMIT: u32 = 52;
+pub const IPV6_RECVHOPOPTS: u32 = 53;
+pub const IPV6_HOPOPTS: u32 = 54;
+pub const IPV6_RTHDRDSTOPTS: u32 = 55;
+pub const IPV6_RECVRTHDR: u32 = 56;
+pub const IPV6_RTHDR: u32 = 57;
+pub const IPV6_RECVDSTOPTS: u32 = 58;
+pub const IPV6_DSTOPTS: u32 = 59;
+pub const IPV6_RECVPATHMTU: u32 = 60;
+pub const IPV6_PATHMTU: u32 = 61;
+pub const IPV6_DONTFRAG: u32 = 62;
+pub const IPV6_RECVTCLASS: u32 = 66;
+pub const IPV6_TCLASS: u32 = 67;
+pub const IPV6_AUTOFLOWLABEL: u32 = 70;
+pub const IPV6_ADDR_PREFERENCES: u32 = 72;
+pub const IPV6_PREFER_SRC_TMP: u32 = 1;
+pub const IPV6_PREFER_SRC_PUBLIC: u32 = 2;
+pub const IPV6_PREFER_SRC_PUBTMP_DEFAULT: u32 = 256;
+pub const IPV6_PREFER_SRC_COA: u32 = 4;
+pub const IPV6_PREFER_SRC_HOME: u32 = 1024;
+pub const IPV6_PREFER_SRC_CGA: u32 = 8;
+pub const IPV6_PREFER_SRC_NONCGA: u32 = 2048;
+pub const IPV6_MINHOPCOUNT: u32 = 73;
+pub const IPV6_ORIGDSTADDR: u32 = 74;
+pub const IPV6_RECVORIGDSTADDR: u32 = 74;
+pub const IPV6_TRANSPARENT: u32 = 75;
+pub const IPV6_UNICAST_IF: u32 = 76;
+pub const IPV6_RECVFRAGSIZE: u32 = 77;
+pub const IPV6_FREEBIND: u32 = 78;
+pub const IPV6_MIN_MTU: u32 = 1280;
+pub const IPV6_SRCRT_STRICT: u32 = 1;
+pub const IPV6_SRCRT_TYPE_0: u32 = 0;
+pub const IPV6_SRCRT_TYPE_2: u32 = 2;
+pub const IPV6_SRCRT_TYPE_3: u32 = 3;
+pub const IPV6_SRCRT_TYPE_4: u32 = 4;
+pub const IPV6_OPT_ROUTERALERT_MLD: u32 = 0;
 pub const ADFS_SUPER_MAGIC: u32 = 44533;
 pub const AFFS_SUPER_MAGIC: u32 = 44543;
 pub const AFS_SUPER_MAGIC: u32 = 1397113167;
@@ -2849,32 +3043,6 @@ pub const MAP_HUGE_512MB: u32 = 1946157056;
 pub const MAP_HUGE_1GB: u32 = 2013265920;
 pub const MAP_HUGE_2GB: u32 = 2080374784;
 pub const MAP_HUGE_16GB: u32 = 2281701376;
-pub const __UAPI_DEF_IF_IFCONF: u32 = 1;
-pub const __UAPI_DEF_IF_IFMAP: u32 = 1;
-pub const __UAPI_DEF_IF_IFNAMSIZ: u32 = 1;
-pub const __UAPI_DEF_IF_IFREQ: u32 = 1;
-pub const __UAPI_DEF_IF_NET_DEVICE_FLAGS: u32 = 1;
-pub const __UAPI_DEF_IF_NET_DEVICE_FLAGS_LOWER_UP_DORMANT_ECHO: u32 = 1;
-pub const __UAPI_DEF_IN_ADDR: u32 = 1;
-pub const __UAPI_DEF_IN_IPPROTO: u32 = 1;
-pub const __UAPI_DEF_IN_PKTINFO: u32 = 1;
-pub const __UAPI_DEF_IP_MREQ: u32 = 1;
-pub const __UAPI_DEF_SOCKADDR_IN: u32 = 1;
-pub const __UAPI_DEF_IN_CLASS: u32 = 1;
-pub const __UAPI_DEF_IN6_ADDR: u32 = 1;
-pub const __UAPI_DEF_IN6_ADDR_ALT: u32 = 1;
-pub const __UAPI_DEF_SOCKADDR_IN6: u32 = 1;
-pub const __UAPI_DEF_IPV6_MREQ: u32 = 1;
-pub const __UAPI_DEF_IPPROTO_V6: u32 = 1;
-pub const __UAPI_DEF_IPV6_OPTIONS: u32 = 1;
-pub const __UAPI_DEF_IN6_PKTINFO: u32 = 1;
-pub const __UAPI_DEF_IP6_MTUINFO: u32 = 1;
-pub const __UAPI_DEF_SOCKADDR_IPX: u32 = 1;
-pub const __UAPI_DEF_IPX_ROUTE_DEFINITION: u32 = 1;
-pub const __UAPI_DEF_IPX_INTERFACE_DEFINITION: u32 = 1;
-pub const __UAPI_DEF_IPX_CONFIG_DATA: u32 = 1;
-pub const __UAPI_DEF_IPX_ROUTE_DEF: u32 = 1;
-pub const __UAPI_DEF_XATTR: u32 = 1;
 pub const IFNAMSIZ: u32 = 16;
 pub const IFALIASZ: u32 = 256;
 pub const ALTIFNAMSIZ: u32 = 128;
@@ -3005,121 +3173,6 @@ pub const INADDR_ALLHOSTS_GROUP: u32 = 3758096385;
 pub const INADDR_ALLRTRS_GROUP: u32 = 3758096386;
 pub const INADDR_ALLSNOOPERS_GROUP: u32 = 3758096490;
 pub const INADDR_MAX_LOCAL_GROUP: u32 = 3758096639;
-pub const __LITTLE_ENDIAN: u32 = 1234;
-pub const IPV6_FL_A_GET: u32 = 0;
-pub const IPV6_FL_A_PUT: u32 = 1;
-pub const IPV6_FL_A_RENEW: u32 = 2;
-pub const IPV6_FL_F_CREATE: u32 = 1;
-pub const IPV6_FL_F_EXCL: u32 = 2;
-pub const IPV6_FL_F_REFLECT: u32 = 4;
-pub const IPV6_FL_F_REMOTE: u32 = 8;
-pub const IPV6_FL_S_NONE: u32 = 0;
-pub const IPV6_FL_S_EXCL: u32 = 1;
-pub const IPV6_FL_S_PROCESS: u32 = 2;
-pub const IPV6_FL_S_USER: u32 = 3;
-pub const IPV6_FL_S_ANY: u32 = 255;
-pub const IPV6_FLOWINFO_FLOWLABEL: u32 = 1048575;
-pub const IPV6_FLOWINFO_PRIORITY: u32 = 267386880;
-pub const IPV6_PRIORITY_UNCHARACTERIZED: u32 = 0;
-pub const IPV6_PRIORITY_FILLER: u32 = 256;
-pub const IPV6_PRIORITY_UNATTENDED: u32 = 512;
-pub const IPV6_PRIORITY_RESERVED1: u32 = 768;
-pub const IPV6_PRIORITY_BULK: u32 = 1024;
-pub const IPV6_PRIORITY_RESERVED2: u32 = 1280;
-pub const IPV6_PRIORITY_INTERACTIVE: u32 = 1536;
-pub const IPV6_PRIORITY_CONTROL: u32 = 1792;
-pub const IPV6_PRIORITY_8: u32 = 2048;
-pub const IPV6_PRIORITY_9: u32 = 2304;
-pub const IPV6_PRIORITY_10: u32 = 2560;
-pub const IPV6_PRIORITY_11: u32 = 2816;
-pub const IPV6_PRIORITY_12: u32 = 3072;
-pub const IPV6_PRIORITY_13: u32 = 3328;
-pub const IPV6_PRIORITY_14: u32 = 3584;
-pub const IPV6_PRIORITY_15: u32 = 3840;
-pub const IPPROTO_HOPOPTS: u32 = 0;
-pub const IPPROTO_ROUTING: u32 = 43;
-pub const IPPROTO_FRAGMENT: u32 = 44;
-pub const IPPROTO_ICMPV6: u32 = 58;
-pub const IPPROTO_NONE: u32 = 59;
-pub const IPPROTO_DSTOPTS: u32 = 60;
-pub const IPPROTO_MH: u32 = 135;
-pub const IPV6_TLV_PAD1: u32 = 0;
-pub const IPV6_TLV_PADN: u32 = 1;
-pub const IPV6_TLV_ROUTERALERT: u32 = 5;
-pub const IPV6_TLV_CALIPSO: u32 = 7;
-pub const IPV6_TLV_IOAM: u32 = 49;
-pub const IPV6_TLV_JUMBO: u32 = 194;
-pub const IPV6_TLV_HAO: u32 = 201;
-pub const IPV6_ADDRFORM: u32 = 1;
-pub const IPV6_2292PKTINFO: u32 = 2;
-pub const IPV6_2292HOPOPTS: u32 = 3;
-pub const IPV6_2292DSTOPTS: u32 = 4;
-pub const IPV6_2292RTHDR: u32 = 5;
-pub const IPV6_2292PKTOPTIONS: u32 = 6;
-pub const IPV6_CHECKSUM: u32 = 7;
-pub const IPV6_2292HOPLIMIT: u32 = 8;
-pub const IPV6_NEXTHOP: u32 = 9;
-pub const IPV6_AUTHHDR: u32 = 10;
-pub const IPV6_FLOWINFO: u32 = 11;
-pub const IPV6_UNICAST_HOPS: u32 = 16;
-pub const IPV6_MULTICAST_IF: u32 = 17;
-pub const IPV6_MULTICAST_HOPS: u32 = 18;
-pub const IPV6_MULTICAST_LOOP: u32 = 19;
-pub const IPV6_ADD_MEMBERSHIP: u32 = 20;
-pub const IPV6_DROP_MEMBERSHIP: u32 = 21;
-pub const IPV6_ROUTER_ALERT: u32 = 22;
-pub const IPV6_MTU_DISCOVER: u32 = 23;
-pub const IPV6_MTU: u32 = 24;
-pub const IPV6_RECVERR: u32 = 25;
-pub const IPV6_V6ONLY: u32 = 26;
-pub const IPV6_JOIN_ANYCAST: u32 = 27;
-pub const IPV6_LEAVE_ANYCAST: u32 = 28;
-pub const IPV6_MULTICAST_ALL: u32 = 29;
-pub const IPV6_ROUTER_ALERT_ISOLATE: u32 = 30;
-pub const IPV6_RECVERR_RFC4884: u32 = 31;
-pub const IPV6_PMTUDISC_DONT: u32 = 0;
-pub const IPV6_PMTUDISC_WANT: u32 = 1;
-pub const IPV6_PMTUDISC_DO: u32 = 2;
-pub const IPV6_PMTUDISC_PROBE: u32 = 3;
-pub const IPV6_PMTUDISC_INTERFACE: u32 = 4;
-pub const IPV6_PMTUDISC_OMIT: u32 = 5;
-pub const IPV6_FLOWLABEL_MGR: u32 = 32;
-pub const IPV6_FLOWINFO_SEND: u32 = 33;
-pub const IPV6_IPSEC_POLICY: u32 = 34;
-pub const IPV6_XFRM_POLICY: u32 = 35;
-pub const IPV6_HDRINCL: u32 = 36;
-pub const IPV6_RECVPKTINFO: u32 = 49;
-pub const IPV6_PKTINFO: u32 = 50;
-pub const IPV6_RECVHOPLIMIT: u32 = 51;
-pub const IPV6_HOPLIMIT: u32 = 52;
-pub const IPV6_RECVHOPOPTS: u32 = 53;
-pub const IPV6_HOPOPTS: u32 = 54;
-pub const IPV6_RTHDRDSTOPTS: u32 = 55;
-pub const IPV6_RECVRTHDR: u32 = 56;
-pub const IPV6_RTHDR: u32 = 57;
-pub const IPV6_RECVDSTOPTS: u32 = 58;
-pub const IPV6_DSTOPTS: u32 = 59;
-pub const IPV6_RECVPATHMTU: u32 = 60;
-pub const IPV6_PATHMTU: u32 = 61;
-pub const IPV6_DONTFRAG: u32 = 62;
-pub const IPV6_RECVTCLASS: u32 = 66;
-pub const IPV6_TCLASS: u32 = 67;
-pub const IPV6_AUTOFLOWLABEL: u32 = 70;
-pub const IPV6_ADDR_PREFERENCES: u32 = 72;
-pub const IPV6_PREFER_SRC_TMP: u32 = 1;
-pub const IPV6_PREFER_SRC_PUBLIC: u32 = 2;
-pub const IPV6_PREFER_SRC_PUBTMP_DEFAULT: u32 = 256;
-pub const IPV6_PREFER_SRC_COA: u32 = 4;
-pub const IPV6_PREFER_SRC_HOME: u32 = 1024;
-pub const IPV6_PREFER_SRC_CGA: u32 = 8;
-pub const IPV6_PREFER_SRC_NONCGA: u32 = 2048;
-pub const IPV6_MINHOPCOUNT: u32 = 73;
-pub const IPV6_ORIGDSTADDR: u32 = 74;
-pub const IPV6_RECVORIGDSTADDR: u32 = 74;
-pub const IPV6_TRANSPARENT: u32 = 75;
-pub const IPV6_UNICAST_IF: u32 = 76;
-pub const IPV6_RECVFRAGSIZE: u32 = 77;
-pub const IPV6_FREEBIND: u32 = 78;
 pub const NF_DROP: u32 = 0;
 pub const NF_ACCEPT: u32 = 1;
 pub const NF_STOLEN: u32 = 2;
@@ -3894,6 +3947,7 @@ pub const TFD_CLOEXEC: u32 = 524288;
 pub const TFD_NONBLOCK: u32 = 2048;
 pub const UIO_FASTIOV: u32 = 8;
 pub const UIO_MAXIOV: u32 = 1024;
+pub const UNIX_PATH_MAX: u32 = 108;
 pub const __X32_SYSCALL_BIT: u32 = 1073741824;
 pub const __NR_read: u32 = 0;
 pub const __NR_write: u32 = 1;
@@ -4257,6 +4311,22 @@ pub const __NR_memfd_secret: u32 = 447;
 pub const __NR_process_mrelease: u32 = 448;
 pub const __NR_futex_waitv: u32 = 449;
 pub const __NR_set_mempolicy_home_node: u32 = 450;
+pub const SO_VM_SOCKETS_BUFFER_SIZE: u32 = 0;
+pub const SO_VM_SOCKETS_BUFFER_MIN_SIZE: u32 = 1;
+pub const SO_VM_SOCKETS_BUFFER_MAX_SIZE: u32 = 2;
+pub const SO_VM_SOCKETS_PEER_HOST_VM_ID: u32 = 3;
+pub const SO_VM_SOCKETS_TRUSTED: u32 = 5;
+pub const SO_VM_SOCKETS_CONNECT_TIMEOUT_OLD: u32 = 6;
+pub const SO_VM_SOCKETS_NONBLOCK_TXRX: u32 = 7;
+pub const SO_VM_SOCKETS_CONNECT_TIMEOUT_NEW: u32 = 8;
+pub const SO_VM_SOCKETS_CONNECT_TIMEOUT: u32 = 6;
+pub const VMADDR_CID_ANY: i32 = -1;
+pub const VMADDR_PORT_ANY: i32 = -1;
+pub const VMADDR_CID_HYPERVISOR: u32 = 0;
+pub const VMADDR_CID_LOCAL: u32 = 1;
+pub const VMADDR_CID_HOST: u32 = 2;
+pub const VMADDR_FLAG_TO_HOST: u32 = 1;
+pub const VM_SOCKETS_INVALID_VERSION: i32 = -1;
 pub const WNOHANG: u32 = 1;
 pub const WUNTRACED: u32 = 2;
 pub const WSTOPPED: u32 = 2;
@@ -4478,6 +4548,8 @@ pub struct sockaddr {
     pub sa_family: __kernel_sa_family_t,
     pub sa_data: [crate::x86_64_types::c_char; 14usize],
 }
+pub type sockaddr_storage = __kernel_sockaddr_storage;
+pub type sa_family_t = __kernel_sa_family_t;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct pollfd {
@@ -9122,6 +9194,434 @@ impl Default for ff_effect {
         }
     }
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct iphdr {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub tos: __u8,
+    pub tot_len: __be16,
+    pub id: __be16,
+    pub frag_off: __be16,
+    pub ttl: __u8,
+    pub protocol: __u8,
+    pub check: __sum16,
+    pub saddr: __be32,
+    pub daddr: __be32,
+}
+impl iphdr {
+    #[inline]
+    pub fn ihl(&self) -> __u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 4u8) as u8) }
+    }
+    #[inline]
+    pub fn set_ihl(&mut self, val: __u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn version(&self) -> __u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 4u8) as u8) }
+    }
+    #[inline]
+    pub fn set_version(&mut self, val: __u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(4usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(ihl: __u8, version: __u8) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 4u8, {
+            let ihl: u8 = unsafe { ::std::mem::transmute(ihl) };
+            ihl as u64
+        });
+        __bindgen_bitfield_unit.set(4usize, 4u8, {
+            let version: u8 = unsafe { ::std::mem::transmute(version) };
+            version as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct ip_auth_hdr {
+    pub nexthdr: __u8,
+    pub hdrlen: __u8,
+    pub reserved: __be16,
+    pub spi: __be32,
+    pub seq_no: __be32,
+    pub auth_data: __IncompleteArrayField<__u8>,
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct ip_esp_hdr {
+    pub spi: __be32,
+    pub seq_no: __be32,
+    pub enc_data: __IncompleteArrayField<__u8>,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct ip_comp_hdr {
+    pub nexthdr: __u8,
+    pub flags: __u8,
+    pub cpi: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct ip_beet_phdr {
+    pub nexthdr: __u8,
+    pub hdrlen: __u8,
+    pub padlen: __u8,
+    pub reserved: __u8,
+}
+pub const IPV4_DEVCONF_FORWARDING: _bindgen_ty_42 = 1;
+pub const IPV4_DEVCONF_MC_FORWARDING: _bindgen_ty_42 = 2;
+pub const IPV4_DEVCONF_PROXY_ARP: _bindgen_ty_42 = 3;
+pub const IPV4_DEVCONF_ACCEPT_REDIRECTS: _bindgen_ty_42 = 4;
+pub const IPV4_DEVCONF_SECURE_REDIRECTS: _bindgen_ty_42 = 5;
+pub const IPV4_DEVCONF_SEND_REDIRECTS: _bindgen_ty_42 = 6;
+pub const IPV4_DEVCONF_SHARED_MEDIA: _bindgen_ty_42 = 7;
+pub const IPV4_DEVCONF_RP_FILTER: _bindgen_ty_42 = 8;
+pub const IPV4_DEVCONF_ACCEPT_SOURCE_ROUTE: _bindgen_ty_42 = 9;
+pub const IPV4_DEVCONF_BOOTP_RELAY: _bindgen_ty_42 = 10;
+pub const IPV4_DEVCONF_LOG_MARTIANS: _bindgen_ty_42 = 11;
+pub const IPV4_DEVCONF_TAG: _bindgen_ty_42 = 12;
+pub const IPV4_DEVCONF_ARPFILTER: _bindgen_ty_42 = 13;
+pub const IPV4_DEVCONF_MEDIUM_ID: _bindgen_ty_42 = 14;
+pub const IPV4_DEVCONF_NOXFRM: _bindgen_ty_42 = 15;
+pub const IPV4_DEVCONF_NOPOLICY: _bindgen_ty_42 = 16;
+pub const IPV4_DEVCONF_FORCE_IGMP_VERSION: _bindgen_ty_42 = 17;
+pub const IPV4_DEVCONF_ARP_ANNOUNCE: _bindgen_ty_42 = 18;
+pub const IPV4_DEVCONF_ARP_IGNORE: _bindgen_ty_42 = 19;
+pub const IPV4_DEVCONF_PROMOTE_SECONDARIES: _bindgen_ty_42 = 20;
+pub const IPV4_DEVCONF_ARP_ACCEPT: _bindgen_ty_42 = 21;
+pub const IPV4_DEVCONF_ARP_NOTIFY: _bindgen_ty_42 = 22;
+pub const IPV4_DEVCONF_ACCEPT_LOCAL: _bindgen_ty_42 = 23;
+pub const IPV4_DEVCONF_SRC_VMARK: _bindgen_ty_42 = 24;
+pub const IPV4_DEVCONF_PROXY_ARP_PVLAN: _bindgen_ty_42 = 25;
+pub const IPV4_DEVCONF_ROUTE_LOCALNET: _bindgen_ty_42 = 26;
+pub const IPV4_DEVCONF_IGMPV2_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_42 = 27;
+pub const IPV4_DEVCONF_IGMPV3_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_42 = 28;
+pub const IPV4_DEVCONF_IGNORE_ROUTES_WITH_LINKDOWN: _bindgen_ty_42 = 29;
+pub const IPV4_DEVCONF_DROP_UNICAST_IN_L2_MULTICAST: _bindgen_ty_42 = 30;
+pub const IPV4_DEVCONF_DROP_GRATUITOUS_ARP: _bindgen_ty_42 = 31;
+pub const IPV4_DEVCONF_BC_FORWARDING: _bindgen_ty_42 = 32;
+pub const IPV4_DEVCONF_ARP_EVICT_NOCARRIER: _bindgen_ty_42 = 33;
+pub const __IPV4_DEVCONF_MAX: _bindgen_ty_42 = 34;
+pub type _bindgen_ty_42 = crate::x86_64_types::c_uint;
+#[repr(C)]
+#[derive(Copy, Clone, AsBytes, FromBytes)]
+pub struct in6_addr {
+    pub in6_u: in6_addr__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone, AsBytes, FromBytes)]
+pub union in6_addr__bindgen_ty_1 {
+    pub u6_addr8: [__u8; 16usize],
+    pub u6_addr16: [__be16; 8usize],
+    pub u6_addr32: [__be32; 4usize],
+}
+impl Default for in6_addr__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for in6_addr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, AsBytes, FromBytes)]
+pub struct sockaddr_in6 {
+    pub sin6_family: crate::x86_64_types::c_ushort,
+    pub sin6_port: __be16,
+    pub sin6_flowinfo: __be32,
+    pub sin6_addr: in6_addr,
+    pub sin6_scope_id: __u32,
+}
+impl Default for sockaddr_in6 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ipv6_mreq {
+    pub ipv6mr_multiaddr: in6_addr,
+    pub ipv6mr_ifindex: crate::x86_64_types::c_int,
+}
+impl Default for ipv6_mreq {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct in6_flowlabel_req {
+    pub flr_dst: in6_addr,
+    pub flr_label: __be32,
+    pub flr_action: __u8,
+    pub flr_share: __u8,
+    pub flr_flags: __u16,
+    pub flr_expires: __u16,
+    pub flr_linger: __u16,
+    pub __flr_pad: __u32,
+}
+impl Default for in6_flowlabel_req {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, AsBytes, FromBytes)]
+pub struct in6_pktinfo {
+    pub ipi6_addr: in6_addr,
+    pub ipi6_ifindex: crate::x86_64_types::c_int,
+}
+impl Default for in6_pktinfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ip6_mtuinfo {
+    pub ip6m_addr: sockaddr_in6,
+    pub ip6m_mtu: __u32,
+}
+impl Default for ip6_mtuinfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct in6_ifreq {
+    pub ifr6_addr: in6_addr,
+    pub ifr6_prefixlen: __u32,
+    pub ifr6_ifindex: crate::x86_64_types::c_int,
+}
+impl Default for in6_ifreq {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct ipv6_rt_hdr {
+    pub nexthdr: __u8,
+    pub hdrlen: __u8,
+    pub type_: __u8,
+    pub segments_left: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct ipv6_opt_hdr {
+    pub nexthdr: __u8,
+    pub hdrlen: __u8,
+}
+#[repr(C)]
+pub struct rt0_hdr {
+    pub rt_hdr: ipv6_rt_hdr,
+    pub reserved: __u32,
+    pub addr: __IncompleteArrayField<in6_addr>,
+}
+impl Default for rt0_hdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct rt2_hdr {
+    pub rt_hdr: ipv6_rt_hdr,
+    pub reserved: __u32,
+    pub addr: in6_addr,
+}
+impl Default for rt2_hdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub struct ipv6_destopt_hao {
+    pub type_: __u8,
+    pub length: __u8,
+    pub addr: in6_addr,
+}
+impl Default for ipv6_destopt_hao {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ipv6hdr {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
+    pub flow_lbl: [__u8; 3usize],
+    pub payload_len: __be16,
+    pub nexthdr: __u8,
+    pub hop_limit: __u8,
+    pub saddr: in6_addr,
+    pub daddr: in6_addr,
+}
+impl Default for ipv6hdr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ipv6hdr {
+    #[inline]
+    pub fn priority(&self) -> __u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 4u8) as u8) }
+    }
+    #[inline]
+    pub fn set_priority(&mut self, val: __u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn version(&self) -> __u8 {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 4u8) as u8) }
+    }
+    #[inline]
+    pub fn set_version(&mut self, val: __u8) {
+        unsafe {
+            let val: u8 = ::std::mem::transmute(val);
+            self._bitfield_1.set(4usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(priority: __u8, version: __u8) -> __BindgenBitfieldUnit<[u8; 1usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 1usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 4u8, {
+            let priority: u8 = unsafe { ::std::mem::transmute(priority) };
+            priority as u64
+        });
+        __bindgen_bitfield_unit.set(4usize, 4u8, {
+            let version: u8 = unsafe { ::std::mem::transmute(version) };
+            version as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+pub const DEVCONF_FORWARDING: _bindgen_ty_43 = 0;
+pub const DEVCONF_HOPLIMIT: _bindgen_ty_43 = 1;
+pub const DEVCONF_MTU6: _bindgen_ty_43 = 2;
+pub const DEVCONF_ACCEPT_RA: _bindgen_ty_43 = 3;
+pub const DEVCONF_ACCEPT_REDIRECTS: _bindgen_ty_43 = 4;
+pub const DEVCONF_AUTOCONF: _bindgen_ty_43 = 5;
+pub const DEVCONF_DAD_TRANSMITS: _bindgen_ty_43 = 6;
+pub const DEVCONF_RTR_SOLICITS: _bindgen_ty_43 = 7;
+pub const DEVCONF_RTR_SOLICIT_INTERVAL: _bindgen_ty_43 = 8;
+pub const DEVCONF_RTR_SOLICIT_DELAY: _bindgen_ty_43 = 9;
+pub const DEVCONF_USE_TEMPADDR: _bindgen_ty_43 = 10;
+pub const DEVCONF_TEMP_VALID_LFT: _bindgen_ty_43 = 11;
+pub const DEVCONF_TEMP_PREFERED_LFT: _bindgen_ty_43 = 12;
+pub const DEVCONF_REGEN_MAX_RETRY: _bindgen_ty_43 = 13;
+pub const DEVCONF_MAX_DESYNC_FACTOR: _bindgen_ty_43 = 14;
+pub const DEVCONF_MAX_ADDRESSES: _bindgen_ty_43 = 15;
+pub const DEVCONF_FORCE_MLD_VERSION: _bindgen_ty_43 = 16;
+pub const DEVCONF_ACCEPT_RA_DEFRTR: _bindgen_ty_43 = 17;
+pub const DEVCONF_ACCEPT_RA_PINFO: _bindgen_ty_43 = 18;
+pub const DEVCONF_ACCEPT_RA_RTR_PREF: _bindgen_ty_43 = 19;
+pub const DEVCONF_RTR_PROBE_INTERVAL: _bindgen_ty_43 = 20;
+pub const DEVCONF_ACCEPT_RA_RT_INFO_MAX_PLEN: _bindgen_ty_43 = 21;
+pub const DEVCONF_PROXY_NDP: _bindgen_ty_43 = 22;
+pub const DEVCONF_OPTIMISTIC_DAD: _bindgen_ty_43 = 23;
+pub const DEVCONF_ACCEPT_SOURCE_ROUTE: _bindgen_ty_43 = 24;
+pub const DEVCONF_MC_FORWARDING: _bindgen_ty_43 = 25;
+pub const DEVCONF_DISABLE_IPV6: _bindgen_ty_43 = 26;
+pub const DEVCONF_ACCEPT_DAD: _bindgen_ty_43 = 27;
+pub const DEVCONF_FORCE_TLLAO: _bindgen_ty_43 = 28;
+pub const DEVCONF_NDISC_NOTIFY: _bindgen_ty_43 = 29;
+pub const DEVCONF_MLDV1_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_43 = 30;
+pub const DEVCONF_MLDV2_UNSOLICITED_REPORT_INTERVAL: _bindgen_ty_43 = 31;
+pub const DEVCONF_SUPPRESS_FRAG_NDISC: _bindgen_ty_43 = 32;
+pub const DEVCONF_ACCEPT_RA_FROM_LOCAL: _bindgen_ty_43 = 33;
+pub const DEVCONF_USE_OPTIMISTIC: _bindgen_ty_43 = 34;
+pub const DEVCONF_ACCEPT_RA_MTU: _bindgen_ty_43 = 35;
+pub const DEVCONF_STABLE_SECRET: _bindgen_ty_43 = 36;
+pub const DEVCONF_USE_OIF_ADDRS_ONLY: _bindgen_ty_43 = 37;
+pub const DEVCONF_ACCEPT_RA_MIN_HOP_LIMIT: _bindgen_ty_43 = 38;
+pub const DEVCONF_IGNORE_ROUTES_WITH_LINKDOWN: _bindgen_ty_43 = 39;
+pub const DEVCONF_DROP_UNICAST_IN_L2_MULTICAST: _bindgen_ty_43 = 40;
+pub const DEVCONF_DROP_UNSOLICITED_NA: _bindgen_ty_43 = 41;
+pub const DEVCONF_KEEP_ADDR_ON_DOWN: _bindgen_ty_43 = 42;
+pub const DEVCONF_RTR_SOLICIT_MAX_INTERVAL: _bindgen_ty_43 = 43;
+pub const DEVCONF_SEG6_ENABLED: _bindgen_ty_43 = 44;
+pub const DEVCONF_SEG6_REQUIRE_HMAC: _bindgen_ty_43 = 45;
+pub const DEVCONF_ENHANCED_DAD: _bindgen_ty_43 = 46;
+pub const DEVCONF_ADDR_GEN_MODE: _bindgen_ty_43 = 47;
+pub const DEVCONF_DISABLE_POLICY: _bindgen_ty_43 = 48;
+pub const DEVCONF_ACCEPT_RA_RT_INFO_MIN_PLEN: _bindgen_ty_43 = 49;
+pub const DEVCONF_NDISC_TCLASS: _bindgen_ty_43 = 50;
+pub const DEVCONF_RPL_SEG_ENABLED: _bindgen_ty_43 = 51;
+pub const DEVCONF_RA_DEFRTR_METRIC: _bindgen_ty_43 = 52;
+pub const DEVCONF_IOAM6_ENABLED: _bindgen_ty_43 = 53;
+pub const DEVCONF_IOAM6_ID: _bindgen_ty_43 = 54;
+pub const DEVCONF_IOAM6_ID_WIDE: _bindgen_ty_43 = 55;
+pub const DEVCONF_NDISC_EVICT_NOCARRIER: _bindgen_ty_43 = 56;
+pub const DEVCONF_ACCEPT_UNTRACKED_NA: _bindgen_ty_43 = 57;
+pub const DEVCONF_MAX: _bindgen_ty_43 = 58;
+pub type _bindgen_ty_43 = crate::x86_64_types::c_uint;
 pub const membarrier_cmd_MEMBARRIER_CMD_QUERY: membarrier_cmd = 0;
 pub const membarrier_cmd_MEMBARRIER_CMD_GLOBAL: membarrier_cmd = 1;
 pub const membarrier_cmd_MEMBARRIER_CMD_GLOBAL_EXPEDITED: membarrier_cmd = 2;
@@ -9218,18 +9718,18 @@ pub const net_device_flags_IFF_LOWER_UP: net_device_flags = 65536;
 pub const net_device_flags_IFF_DORMANT: net_device_flags = 131072;
 pub const net_device_flags_IFF_ECHO: net_device_flags = 262144;
 pub type net_device_flags = crate::x86_64_types::c_uint;
-pub const IF_OPER_UNKNOWN: _bindgen_ty_42 = 0;
-pub const IF_OPER_NOTPRESENT: _bindgen_ty_42 = 1;
-pub const IF_OPER_DOWN: _bindgen_ty_42 = 2;
-pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_42 = 3;
-pub const IF_OPER_TESTING: _bindgen_ty_42 = 4;
-pub const IF_OPER_DORMANT: _bindgen_ty_42 = 5;
-pub const IF_OPER_UP: _bindgen_ty_42 = 6;
-pub type _bindgen_ty_42 = crate::x86_64_types::c_uint;
-pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_43 = 0;
-pub const IF_LINK_MODE_DORMANT: _bindgen_ty_43 = 1;
-pub const IF_LINK_MODE_TESTING: _bindgen_ty_43 = 2;
-pub type _bindgen_ty_43 = crate::x86_64_types::c_uint;
+pub const IF_OPER_UNKNOWN: _bindgen_ty_44 = 0;
+pub const IF_OPER_NOTPRESENT: _bindgen_ty_44 = 1;
+pub const IF_OPER_DOWN: _bindgen_ty_44 = 2;
+pub const IF_OPER_LOWERLAYERDOWN: _bindgen_ty_44 = 3;
+pub const IF_OPER_TESTING: _bindgen_ty_44 = 4;
+pub const IF_OPER_DORMANT: _bindgen_ty_44 = 5;
+pub const IF_OPER_UP: _bindgen_ty_44 = 6;
+pub type _bindgen_ty_44 = crate::x86_64_types::c_uint;
+pub const IF_LINK_MODE_DEFAULT: _bindgen_ty_45 = 0;
+pub const IF_LINK_MODE_DORMANT: _bindgen_ty_45 = 1;
+pub const IF_LINK_MODE_TESTING: _bindgen_ty_45 = 2;
+pub type _bindgen_ty_45 = crate::x86_64_types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct ifmap {
@@ -9372,35 +9872,35 @@ pub type in_addr_t = u32;
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
-pub const IPPROTO_IP: _bindgen_ty_44 = 0;
-pub const IPPROTO_ICMP: _bindgen_ty_44 = 1;
-pub const IPPROTO_IGMP: _bindgen_ty_44 = 2;
-pub const IPPROTO_IPIP: _bindgen_ty_44 = 4;
-pub const IPPROTO_TCP: _bindgen_ty_44 = 6;
-pub const IPPROTO_EGP: _bindgen_ty_44 = 8;
-pub const IPPROTO_PUP: _bindgen_ty_44 = 12;
-pub const IPPROTO_UDP: _bindgen_ty_44 = 17;
-pub const IPPROTO_IDP: _bindgen_ty_44 = 22;
-pub const IPPROTO_TP: _bindgen_ty_44 = 29;
-pub const IPPROTO_DCCP: _bindgen_ty_44 = 33;
-pub const IPPROTO_IPV6: _bindgen_ty_44 = 41;
-pub const IPPROTO_RSVP: _bindgen_ty_44 = 46;
-pub const IPPROTO_GRE: _bindgen_ty_44 = 47;
-pub const IPPROTO_ESP: _bindgen_ty_44 = 50;
-pub const IPPROTO_AH: _bindgen_ty_44 = 51;
-pub const IPPROTO_MTP: _bindgen_ty_44 = 92;
-pub const IPPROTO_BEETPH: _bindgen_ty_44 = 94;
-pub const IPPROTO_ENCAP: _bindgen_ty_44 = 98;
-pub const IPPROTO_PIM: _bindgen_ty_44 = 103;
-pub const IPPROTO_COMP: _bindgen_ty_44 = 108;
-pub const IPPROTO_SCTP: _bindgen_ty_44 = 132;
-pub const IPPROTO_UDPLITE: _bindgen_ty_44 = 136;
-pub const IPPROTO_MPLS: _bindgen_ty_44 = 137;
-pub const IPPROTO_ETHERNET: _bindgen_ty_44 = 143;
-pub const IPPROTO_RAW: _bindgen_ty_44 = 255;
-pub const IPPROTO_MPTCP: _bindgen_ty_44 = 262;
-pub const IPPROTO_MAX: _bindgen_ty_44 = 263;
-pub type _bindgen_ty_44 = crate::x86_64_types::c_uint;
+pub const IPPROTO_IP: _bindgen_ty_46 = 0;
+pub const IPPROTO_ICMP: _bindgen_ty_46 = 1;
+pub const IPPROTO_IGMP: _bindgen_ty_46 = 2;
+pub const IPPROTO_IPIP: _bindgen_ty_46 = 4;
+pub const IPPROTO_TCP: _bindgen_ty_46 = 6;
+pub const IPPROTO_EGP: _bindgen_ty_46 = 8;
+pub const IPPROTO_PUP: _bindgen_ty_46 = 12;
+pub const IPPROTO_UDP: _bindgen_ty_46 = 17;
+pub const IPPROTO_IDP: _bindgen_ty_46 = 22;
+pub const IPPROTO_TP: _bindgen_ty_46 = 29;
+pub const IPPROTO_DCCP: _bindgen_ty_46 = 33;
+pub const IPPROTO_IPV6: _bindgen_ty_46 = 41;
+pub const IPPROTO_RSVP: _bindgen_ty_46 = 46;
+pub const IPPROTO_GRE: _bindgen_ty_46 = 47;
+pub const IPPROTO_ESP: _bindgen_ty_46 = 50;
+pub const IPPROTO_AH: _bindgen_ty_46 = 51;
+pub const IPPROTO_MTP: _bindgen_ty_46 = 92;
+pub const IPPROTO_BEETPH: _bindgen_ty_46 = 94;
+pub const IPPROTO_ENCAP: _bindgen_ty_46 = 98;
+pub const IPPROTO_PIM: _bindgen_ty_46 = 103;
+pub const IPPROTO_COMP: _bindgen_ty_46 = 108;
+pub const IPPROTO_SCTP: _bindgen_ty_46 = 132;
+pub const IPPROTO_UDPLITE: _bindgen_ty_46 = 136;
+pub const IPPROTO_MPLS: _bindgen_ty_46 = 137;
+pub const IPPROTO_ETHERNET: _bindgen_ty_46 = 143;
+pub const IPPROTO_RAW: _bindgen_ty_46 = 255;
+pub const IPPROTO_MPTCP: _bindgen_ty_46 = 262;
+pub const IPPROTO_MAX: _bindgen_ty_46 = 263;
+pub type _bindgen_ty_46 = crate::x86_64_types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct ip_mreq {
@@ -9510,90 +10010,6 @@ pub struct sockaddr_in {
     pub sin_addr: in_addr,
     pub __pad: [crate::x86_64_types::c_uchar; 8usize],
 }
-#[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
-pub struct in6_addr {
-    pub in6_u: in6_addr__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone, FromBytes)]
-pub union in6_addr__bindgen_ty_1 {
-    pub u6_addr8: [__u8; 16usize],
-    pub u6_addr16: [__be16; 8usize],
-    pub u6_addr32: [__be32; 4usize],
-}
-impl Default for in6_addr__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl Default for in6_addr {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct sockaddr_in6 {
-    pub sin6_family: crate::x86_64_types::c_ushort,
-    pub sin6_port: __be16,
-    pub sin6_flowinfo: __be32,
-    pub sin6_addr: in6_addr,
-    pub sin6_scope_id: __u32,
-}
-impl Default for sockaddr_in6 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct ipv6_mreq {
-    pub ipv6mr_multiaddr: in6_addr,
-    pub ipv6mr_ifindex: crate::x86_64_types::c_int,
-}
-impl Default for ipv6_mreq {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct in6_flowlabel_req {
-    pub flr_dst: in6_addr,
-    pub flr_label: __be32,
-    pub flr_action: __u8,
-    pub flr_share: __u8,
-    pub flr_flags: __u16,
-    pub flr_expires: __u16,
-    pub flr_linger: __u16,
-    pub __flr_pad: __u32,
-}
-impl Default for in6_flowlabel_req {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
 pub const nf_inet_hooks_NF_INET_PRE_ROUTING: nf_inet_hooks = 0;
 pub const nf_inet_hooks_NF_INET_LOCAL_IN: nf_inet_hooks = 1;
 pub const nf_inet_hooks_NF_INET_FORWARD: nf_inet_hooks = 2;
@@ -9606,16 +10022,16 @@ pub const nf_dev_hooks_NF_NETDEV_INGRESS: nf_dev_hooks = 0;
 pub const nf_dev_hooks_NF_NETDEV_EGRESS: nf_dev_hooks = 1;
 pub const nf_dev_hooks_NF_NETDEV_NUMHOOKS: nf_dev_hooks = 2;
 pub type nf_dev_hooks = crate::x86_64_types::c_uint;
-pub const NFPROTO_UNSPEC: _bindgen_ty_45 = 0;
-pub const NFPROTO_INET: _bindgen_ty_45 = 1;
-pub const NFPROTO_IPV4: _bindgen_ty_45 = 2;
-pub const NFPROTO_ARP: _bindgen_ty_45 = 3;
-pub const NFPROTO_NETDEV: _bindgen_ty_45 = 5;
-pub const NFPROTO_BRIDGE: _bindgen_ty_45 = 7;
-pub const NFPROTO_IPV6: _bindgen_ty_45 = 10;
-pub const NFPROTO_DECNET: _bindgen_ty_45 = 12;
-pub const NFPROTO_NUMPROTO: _bindgen_ty_45 = 13;
-pub type _bindgen_ty_45 = crate::x86_64_types::c_uint;
+pub const NFPROTO_UNSPEC: _bindgen_ty_47 = 0;
+pub const NFPROTO_INET: _bindgen_ty_47 = 1;
+pub const NFPROTO_IPV4: _bindgen_ty_47 = 2;
+pub const NFPROTO_ARP: _bindgen_ty_47 = 3;
+pub const NFPROTO_NETDEV: _bindgen_ty_47 = 5;
+pub const NFPROTO_BRIDGE: _bindgen_ty_47 = 7;
+pub const NFPROTO_IPV6: _bindgen_ty_47 = 10;
+pub const NFPROTO_DECNET: _bindgen_ty_47 = 12;
+pub const NFPROTO_NUMPROTO: _bindgen_ty_47 = 13;
+pub type _bindgen_ty_47 = crate::x86_64_types::c_uint;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union nf_inet_addr {
@@ -10112,9 +10528,9 @@ pub const nl_mmap_status_NL_MMAP_STATUS_VALID: nl_mmap_status = 2;
 pub const nl_mmap_status_NL_MMAP_STATUS_COPY: nl_mmap_status = 3;
 pub const nl_mmap_status_NL_MMAP_STATUS_SKIP: nl_mmap_status = 4;
 pub type nl_mmap_status = crate::x86_64_types::c_uint;
-pub const NETLINK_UNCONNECTED: _bindgen_ty_46 = 0;
-pub const NETLINK_CONNECTED: _bindgen_ty_46 = 1;
-pub type _bindgen_ty_46 = crate::x86_64_types::c_uint;
+pub const NETLINK_UNCONNECTED: _bindgen_ty_48 = 0;
+pub const NETLINK_CONNECTED: _bindgen_ty_48 = 1;
+pub type _bindgen_ty_48 = crate::x86_64_types::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct nlattr {
@@ -10708,6 +11124,31 @@ impl Default for iovec {
             s.assume_init()
         }
     }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sockaddr_un {
+    pub sun_family: __kernel_sa_family_t,
+    pub sun_path: [crate::x86_64_types::c_char; 108usize],
+}
+impl Default for sockaddr_un {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct sockaddr_vm {
+    pub svm_family: __kernel_sa_family_t,
+    pub svm_reserved1: crate::x86_64_types::c_ushort,
+    pub svm_port: crate::x86_64_types::c_uint,
+    pub svm_cid: crate::x86_64_types::c_uint,
+    pub svm_flags: __u8,
+    pub svm_zero: [crate::x86_64_types::c_uchar; 3usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]

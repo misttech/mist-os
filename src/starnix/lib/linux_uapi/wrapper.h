@@ -31,6 +31,8 @@
 #include <linux/futex.h>
 #include <linux/inotify.h>
 #include <linux/input.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
 #include <linux/limits.h>
 #include <linux/magic.h>
 #include <linux/membarrier.h>
@@ -57,7 +59,9 @@
 #include <linux/time.h>
 #include <linux/timerfd.h>
 #include <linux/uio.h>
+#include <linux/un.h>
 #include <linux/unistd.h>
+#include <linux/vm_sockets.h>
 #include <linux/wait.h>
 #include <linux/xattr.h>
 

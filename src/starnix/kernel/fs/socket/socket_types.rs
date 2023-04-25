@@ -258,7 +258,11 @@ impl SocketAddress {
             }
             SocketAddress::Vsock(port) => {
                 let mut bytes = vec![0u8; std::mem::size_of::<sockaddr_vm>()];
-                let vm_addr = sockaddr_vm::new(*port);
+                let vm_addr = sockaddr_vm {
+                    svm_family: AF_VSOCK,
+                    svm_port: *port,
+                    .. sockaddr_vm::default()
+                };
                 vm_addr.write_to(&mut bytes[..]);
                 bytes
             }

@@ -23,4 +23,7 @@ struct sockaddr {
   char sa_data[14];
 };
 
+typedef struct __kernel_sockaddr_storage sockaddr_storage;
+typedef __kernel_sa_family_t sa_family_t;
+
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_
