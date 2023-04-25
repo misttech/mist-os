@@ -20,6 +20,11 @@ type DaiProperties = table {
     /// Product name of the DAI interface provider. If not included, the product name is
     /// unspecified.
     3: product_name string:MAX_DAI_UI_STRING_SIZE;
+
+    /// A unique identifier for the driver.
+    /// If not included, there is no unique id for the driver.
+    @available(added=HEAD)
+    4: unique_id array<uint8, UNIQUE_ID_SIZE>;
 };
 
 /// For an overview see
