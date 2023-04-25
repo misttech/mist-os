@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_DEV_UART_MOTMOT_INCLUDE_DEV_UART_MOTMOT_INIT_H_
 #define ZIRCON_KERNEL_DEV_UART_MOTMOT_INCLUDE_DEV_UART_MOTMOT_INIT_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 // Initialization routines at the PLATFORM_EARLY and PLATFORM levels.
 void MotmotUartInitEarly(const zbi_dcfg_simple_t& config);

@@ -14,11 +14,7 @@ source_set("generic-arm") {
   ]
 
   deps = [
-    # uart.cc includes <platform/uart.h>
-    "//zircon/kernel/platform:headers",
-  ]
-
-  deps += [
+    "//sdk/lib/zbi-format",
     "//zircon/kernel/dev/hdcp/amlogic_s912",
     "//zircon/kernel/dev/hw_rng",
     "//zircon/kernel/dev/hw_rng/amlogic_rng",
@@ -53,6 +49,7 @@ source_set("generic-arm") {
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/object",
     "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/platform:headers",
     "//zircon/kernel/vm",
     "//zircon/system/ulib/explicit-memory",
     "//zircon/system/ulib/ram-crashlog",

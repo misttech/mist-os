@@ -83,6 +83,7 @@ if (toolchain_base_environment == "kernel") {
     deps = [
       ":boot-mmu",
       "code-patches:headers",
+      "//sdk/lib/zbi-format",
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/console",

@@ -8,8 +8,8 @@
 #ifndef ZIRCON_KERNEL_DEV_TIMER_ARM_GENERIC_INCLUDE_DEV_TIMER_ARM_GENERIC_H_
 #define ZIRCON_KERNEL_DEV_TIMER_ARM_GENERIC_INCLUDE_DEV_TIMER_ARM_GENERIC_H_
 
+#include <lib/zbi-format/driver-config.h>
 #include <sys/types.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/types.h>
 
 zx_time_t cntpct_to_zx_time(uint64_t cntpct);

@@ -11,6 +11,7 @@ source_set("abi_type_validator") {
   visibility = [ "//zircon/kernel/*" ]
   sources = [ "abi_type_validator.cc" ]
   deps = [
+    "//sdk/lib/zbi-format",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/zircon-internal",
   ]

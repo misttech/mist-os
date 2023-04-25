@@ -8,7 +8,7 @@
 #ifndef ZIRCON_KERNEL_DEV_HW_WATCHDOG_GENERIC32_INCLUDE_DEV_HW_WATCHDOG_GENERIC32_INIT_H_
 #define ZIRCON_KERNEL_DEV_HW_WATCHDOG_GENERIC32_INCLUDE_DEV_HW_WATCHDOG_GENERIC32_INIT_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 // Early (single-threaded) and late (multi-threaded) initialization routines
 // for the driver.

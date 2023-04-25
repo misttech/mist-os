@@ -5,9 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <inttypes.h>
+#include <lib/zbi-format/driver-config.h>
 #include <string.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 
 #include <arch/arm64/smccc.h>
 #include <dev/psci.h>

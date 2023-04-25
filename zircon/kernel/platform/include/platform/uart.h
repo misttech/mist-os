@@ -9,7 +9,7 @@
 
 #include <lib/uart/null.h>
 #include <lib/uart/uart.h>
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <ktl/optional.h>
 

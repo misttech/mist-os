@@ -7,10 +7,10 @@
 #include <endian.h>
 #include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>
 #include <stdio.h>
-#include <zircon/boot/driver-config.h>
 
 #include "src/virtualization/bin/vmm/guest.h"
 #include "src/virtualization/bin/vmm/zbi.h"

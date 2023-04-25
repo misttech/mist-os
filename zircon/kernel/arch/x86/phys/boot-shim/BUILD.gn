@@ -223,6 +223,7 @@ if (toolchain_environment == "kernel.phys32") {
       ":legacy-boot-shim",
       "..:multiboot",
       "//sdk/lib/fit",
+      "//sdk/lib/zbi-format",
       "//zircon/kernel/phys:stdio",
       "//zircon/kernel/phys:symbolize",
       "//zircon/kernel/phys:uart",

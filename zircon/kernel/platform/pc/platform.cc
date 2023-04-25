@@ -33,11 +33,11 @@
 #include <lib/debuglog.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/system-topology.h>
+#include <lib/zbi-format/driver-config.h>
 #include <mexec.h>
 #include <platform.h>
 #include <string.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/boot/image.h>
 #include <zircon/errors.h>
 #include <zircon/pixelformat.h>

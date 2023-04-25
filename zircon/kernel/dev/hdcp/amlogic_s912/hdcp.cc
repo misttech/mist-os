@@ -5,11 +5,11 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/cbuf.h>
+#include <lib/zbi-format/driver-config.h>
 #include <reg.h>
 #include <stdio.h>
 #include <string.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 
 #include <arch/arm64/periphmap.h>
 #include <arch/arm64/smccc.h>

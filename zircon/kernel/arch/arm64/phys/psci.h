@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_ARCH_ARM64_PHYS_PSCI_H_
 #define ZIRCON_KERNEL_ARCH_ARM64_PHYS_PSCI_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 void ArmPsciSetup(const zbi_dcfg_arm_psci_driver_t* cfg);
 

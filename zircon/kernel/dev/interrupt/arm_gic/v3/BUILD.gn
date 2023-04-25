@@ -11,6 +11,7 @@ library_headers("headers") {
     "dev/interrupt/arm_gicv3_init.h",
     "dev/interrupt/arm_gicv3_regs.h",
   ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 source_set("v3") {

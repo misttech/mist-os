@@ -100,6 +100,7 @@ template("sdk_source_set") {
   }
 
   target(target_type, main_target_name) {
+    deps = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -117,15 +118,16 @@ template("sdk_source_set") {
       visibility += [ ":${sdk_target_name}" ]
     }
 
+    if (defined(invoker.non_sdk_deps)) {
+      deps += invoker.non_sdk_deps
+    }
+
     # 'source_set()' targets in the 'partner' or 'public' category that are not
     # testonly must be tracked by
     # //build/sdk:sdk_versioned_source_sets_allowlist for SDK consistency
     # checks (see https://fxbug.dev/118903).
     if ((!defined(invoker.testonly) || !invoker.testonly) &&
         (invoker.category == "partner" || invoker.category == "public")) {
-      if (!defined(deps)) {
-        deps = []
-      }
       deps += [ "//build/sdk:sdk_versioned_source_sets_allowlist" ]
     }
 

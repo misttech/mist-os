@@ -14,12 +14,10 @@ sdk_source_set("zbi-format") {
   api = "zbi-format.api"
 
   public = [
-    # TODO(b/271475507): move each of these files over. The placeholder is just
-    # so we have something to build as required by sdk_source_set().
-    # "include/lib/zbi-format/driver-config.h",
+    # TODO(b/271475507): move each of these files over.
     # "include/lib/zbi-format/pixel-format.h",
     # "include/lib/zbi-format/zbi.h",
-    "include/lib/zbi-format/placeholder.h",
+    "include/lib/zbi-format/driver-config.h",
   ]
 
   public_configs = [ ":public_config" ]
@@ -27,4 +25,6 @@ sdk_source_set("zbi-format") {
   # Since this doesn't actually compile any code, don't let it contribute any
   # implicit link inputs from default configs.
   configs = []
+
+  non_sdk_deps = [ "//sdk/fidl/zbi:zbi.c.checked-in" ]
 }

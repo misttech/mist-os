@@ -5,7 +5,7 @@
 #ifndef LIB_UART_AMLOGIC_H_
 #define LIB_UART_AMLOGIC_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 #include <zircon/boot/image.h>
 
 #include <algorithm>

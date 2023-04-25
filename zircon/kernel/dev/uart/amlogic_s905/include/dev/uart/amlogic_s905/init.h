@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_DEV_UART_AMLOGIC_S905_INCLUDE_DEV_UART_AMLOGIC_S905_INIT_H_
 #define ZIRCON_KERNEL_DEV_UART_AMLOGIC_S905_INCLUDE_DEV_UART_AMLOGIC_S905_INIT_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 // Initialization routines at the PLATFORM_EARLY and PLATFORM levels.
 void AmlogicS905UartInitEarly(const zbi_dcfg_simple_t& config);

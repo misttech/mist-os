@@ -7,7 +7,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/uart/all.h>
 #include <lib/uart/null.h>
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <dev/init.h>
 #include <dev/uart/amlogic_s905/init.h>

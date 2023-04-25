@@ -6,7 +6,7 @@
 #define LIB_UART_NS8250_H_
 
 #include <lib/acpi_lite/debug_port.h>
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <hwreg/bitfields.h>
 

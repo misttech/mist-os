@@ -9,7 +9,7 @@
 #define ZIRCON_KERNEL_DEV_PSCI_INCLUDE_DEV_PSCI_H_
 
 #include <arch.h>
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <arch/arm64/mp.h>
 #include <dev/power.h>

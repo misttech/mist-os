@@ -74,7 +74,7 @@ as possible.
 Each kind of UART device is described to the Zircon kernel by a boot loader via
 a ZBI item of type `ZBI_TYPE_KERNEL_DRIVER`.  The `extra` header field is the
 subtype, a `ZBI_KERNEL_DRIVER_*_UART` constant defined in
-[`<zircon/boot/driver-config.h>`](../../../system/public/zircon/boot/driver-config.h).
+[`<lib/zbi-format/driver-config.h>`](/sdk/lib/zbi-format/driver-config.h).
 That file is generated from the FIDL source files in
 [`//sdk/fidl/zbi`](../../../sdk/fidl/zbi), where the `KernelDriver` `enum` type
 represents all these constants.

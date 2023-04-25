@@ -8,6 +8,7 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("headers") {
   headers = [ "dev/power/as370/init.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 source_set("as370") {

@@ -11,11 +11,11 @@
 #include <lib/uart/null.h>
 #include <lib/uart/qemu.h>
 #include <lib/uart/uart.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/time.h>
 #include <stdint.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/errors.h>
 #include <zircon/time.h>
 

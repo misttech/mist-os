@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/zbi-format/driver-config.h>
 #include <zircon/assert.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/boot/image.h>
 
 #include <ktl/byte.h>

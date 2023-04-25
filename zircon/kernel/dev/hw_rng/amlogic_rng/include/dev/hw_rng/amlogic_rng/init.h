@@ -8,7 +8,7 @@
 #ifndef ZIRCON_KERNEL_DEV_HW_RNG_AMLOGIC_RNG_INCLUDE_DEV_HW_RNG_AMLOGIC_RNG_INIT_H_
 #define ZIRCON_KERNEL_DEV_HW_RNG_AMLOGIC_RNG_INCLUDE_DEV_HW_RNG_AMLOGIC_RNG_INIT_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <phys/arch/arch-handoff.h>
 

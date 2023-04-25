@@ -10,10 +10,10 @@
 #include <lib/arch/intrin.h>
 #include <lib/ktrace.h>
 #include <lib/root_resource_filter.h>
+#include <lib/zbi-format/driver-config.h>
 #include <reg.h>
 #include <string.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 

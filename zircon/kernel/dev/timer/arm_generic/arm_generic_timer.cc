@@ -15,10 +15,10 @@
 #include <lib/fit/defer.h>
 #include <lib/fixed_point.h>
 #include <lib/unittest/unittest.h>
+#include <lib/zbi-format/driver-config.h>
 #include <platform.h>
 #include <pow2.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/types.h>
 
 #include <arch/interrupt.h>

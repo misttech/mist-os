@@ -54,7 +54,10 @@ source_set("src") {
     "//zircon/system/ulib/tftp",
     "//zircon/third_party/ulib/cksum",
   ]
-  public_deps = [ "//src/bringup/lib/netboot" ]
+  public_deps = [
+    "//sdk/lib/zbi-format",
+    "//src/bringup/lib/netboot",
+  ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [
@@ -102,6 +105,7 @@ if (!is_mac) {
     include_dirs = [ "." ]
     deps = [
       "../host",
+      "//sdk/lib/zbi-format",
       "//src/bringup/lib/netboot",
       "//src/firmware/gigaboot/lib:bootbyte",
       "//src/firmware/lib/abr",

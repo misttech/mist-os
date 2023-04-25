@@ -8,6 +8,7 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("headers") {
   headers = [ "dev/hw_watchdog/generic32/init.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 source_set("generic32") {

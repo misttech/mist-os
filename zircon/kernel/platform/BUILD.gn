@@ -21,6 +21,7 @@ zx_library("platform") {
     "ram_mappable_crashlog.cc",
   ]
   deps = [
+    "//sdk/lib/zbi-format",
     "//src/lib/zbitl",
     "//zircon/kernel/dev/interrupt",
     "//zircon/kernel/dev/pdev/hw_watchdog",

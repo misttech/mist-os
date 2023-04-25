@@ -744,6 +744,9 @@ if (is_kernel) {
       "include/phys/handoff.h",
     ]
     public_deps = [
+      # arch-handoff.h has #include <lib/zbi-format/driver-config.h>
+      "//sdk/lib/zbi-format",
+
       # handoff.h has #include <lib/arch/ticks.h>.
       "//zircon/kernel/lib/arch",
 

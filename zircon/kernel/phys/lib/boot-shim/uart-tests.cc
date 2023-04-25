@@ -8,8 +8,8 @@
 #include <lib/uart/all.h>
 #include <lib/uart/ns8250.h>
 #include <lib/uart/null.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/image.h>
-#include <zircon/boot/driver-config.h>
 
 #include <array>
 

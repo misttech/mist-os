@@ -7,8 +7,8 @@
 #ifndef ZIRCON_KERNEL_DEV_UART_DW8250_INCLUDE_DEV_UART_DW8250_INIT_H_
 #define ZIRCON_KERNEL_DEV_UART_DW8250_INCLUDE_DEV_UART_DW8250_INIT_H_
 
+#include <lib/zbi-format/driver-config.h>
 #include <sys/types.h>
-#include <zircon/boot/driver-config.h>
 
 // Initialization routines at the PLATFORM_EARLY and PLATFORM levels.
 // Stride sets the width of the registers and their offset from each other.

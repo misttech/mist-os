@@ -52,6 +52,7 @@ source_set("legacy_c_gigaboot") {
   configs += [ "$dir_gigaboot/src:config" ]
 
   deps = [
+    "//sdk/lib/zbi-format",
     "//src/bringup/lib/netboot",
     "//src/firmware/lib/abr:in_tree",
     "//src/firmware/lib/zbi:in_tree",

@@ -6,10 +6,10 @@
 
 #include <endian.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>
 #include <lib/zx/channel.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/status.h>
 
 #include "src/virtualization/bin/vmm/bits.h"

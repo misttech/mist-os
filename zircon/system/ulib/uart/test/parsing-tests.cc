@@ -6,7 +6,7 @@
 #include <lib/uart/all.h>
 #include <lib/uart/amlogic.h>
 #include <lib/uart/ns8250.h>
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <string>
 

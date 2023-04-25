@@ -8,12 +8,12 @@
 #include <lib/arch/intrin.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zx/result.h>
 #include <reg.h>
 #include <stdio.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 
 #include <arch/arm64/periphmap.h>
 #include <dev/interrupt.h>

@@ -10,6 +10,7 @@ config("includes") {
 
 source_set("amlogic_s912") {
   public = [ "include/dev/hdcp/amlogic_s912/init.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
   sources = [ "hdcp.cc" ]
   deps = [
     "//zircon/kernel/dev/interrupt",

@@ -5,11 +5,11 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-options/boot-options.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <platform.h>
 #include <reg.h>
 #include <string.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/types.h>
 
 #include <dev/hw_watchdog/generic32/init.h>

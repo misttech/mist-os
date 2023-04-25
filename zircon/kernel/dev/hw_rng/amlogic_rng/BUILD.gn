@@ -10,6 +10,7 @@ config("includes") {
 
 source_set("amlogic_rng") {
   public = [ "include/dev/hw_rng/amlogic_rng/init.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
   sources = [ "amlogic-rng.cc" ]
   deps = [
     "//zircon/kernel/dev/hw_rng",

@@ -16,7 +16,7 @@ protocol Items {
     /// TODO: Refactor API: fxbug.dev/34597
     ///
     /// For a list of `type`s, refer to <zircon/boot/image.h>.
-    /// For a list of `extra`s, refer to <zircon/boot/driver-config.h>.
+    /// For a list of `extra`s, refer to <lib/zbi-format/driver-config.h>.
     Get(struct {
         type uint32;
         extra uint32;

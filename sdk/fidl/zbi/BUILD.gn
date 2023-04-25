@@ -15,14 +15,13 @@ fidl("zbi") {
     c = {
       # The C backend is used to generate checked-in headers within this
       # include namespace.
-      output_namespace = "zircon/boot"
+      output_namespace = "lib/zbi-format"
     }
   }
 }
 
-# Depended on by //zircon/public/sysroot/sdk:sysroot_sdk.
-zither_golden_files("sysroot_sdk") {
+zither_golden_files("zbi.c.checked-in") {
   fidl = ":zbi"
   backend = "c"
-  sources = [ "//zircon/system/public/zircon/boot/driver-config.h" ]
+  sources = [ "//sdk/lib/zbi-format/include/lib/zbi-format/driver-config.h" ]
 }

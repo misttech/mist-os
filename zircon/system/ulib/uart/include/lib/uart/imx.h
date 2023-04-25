@@ -5,7 +5,7 @@
 #ifndef LIB_UART_IMX_H_
 #define LIB_UART_IMX_H_
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 
 #include <utility>
 

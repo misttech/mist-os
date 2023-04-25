@@ -62,6 +62,7 @@ template("boot_shim") {
       configs += [ ":boot_shim_config" ]
       deps = [
         ":common",
+        "//sdk/lib/zbi-format",
         "//zircon/system/ulib/ddk-platform-defs:headers",
       ]
       sources = [

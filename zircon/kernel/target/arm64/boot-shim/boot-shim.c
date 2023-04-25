@@ -7,11 +7,11 @@
 #include "boot-shim.h"
 
 #include <lib/ddk/platform-defs.h>
+#include <lib/zbi-format/driver-config.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include <zircon/boot/driver-config.h>
 
 #include "debug.h"
 #include "devicetree.h"

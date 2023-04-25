@@ -24,6 +24,9 @@ zx_library("boot-shim") {
     # <lib/boot-shim/item-base.h> has #include <lib/stdcompat/span.h>.
     "//sdk/lib/stdcompat",
 
+    # <lib/boot-shim/acpi.h> has #include <lib/zbi-format/driver-config.h>.
+    "//sdk/lib/zbi-format",
+
     # <lib/boot-shim/uart.h> has #include <lib/uart/all.h>.
     "//zircon/system/ulib/uart",
 
@@ -108,6 +111,7 @@ if (!is_kernel) {
     deps = [
       ":boot-shim",
       ":boot-shim-test",
+      "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/acpi_lite",
       "//zircon/kernel/lib/devicetree/tests:test_helper",
       "//zircon/kernel/phys/lib/memalloc",

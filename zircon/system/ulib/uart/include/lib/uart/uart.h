@@ -6,10 +6,10 @@
 #define LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/boot/image.h>
 
 #include <cstdlib>

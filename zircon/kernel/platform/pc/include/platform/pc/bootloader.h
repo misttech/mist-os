@@ -8,7 +8,6 @@
 #define ZIRCON_KERNEL_PLATFORM_PC_INCLUDE_PLATFORM_PC_BOOTLOADER_H_
 
 #include <stdint.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/boot/image.h>
 
 #include <ktl/span.h>

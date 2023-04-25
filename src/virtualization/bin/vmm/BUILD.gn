@@ -124,6 +124,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_hlcpp",
     "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_hlcpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/zbi-format",
     "//src/graphics/lib/magma/include/virtio",
     "//src/lib/fsl",
     "//src/lib/zbitl",

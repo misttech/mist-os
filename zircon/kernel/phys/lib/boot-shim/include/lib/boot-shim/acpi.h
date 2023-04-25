@@ -7,8 +7,8 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_ACPI_H_
 #define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_ACPI_H_
 
+#include <lib/zbi-format/driver-config.h>
 #include <stdio.h>
-#include <zircon/boot/driver-config.h>
 
 #include "item-base.h"
 
@@ -31,8 +31,8 @@ class AcpiRsdpItem : public SingleOptionalItem<uint64_t, ZBI_TYPE_ACPI_RSDP> {
 
 // This can supply a ZBI_TYPE_KERNEL_DRIVER item based on the serial console
 // details in ACPI's DBG2 table.
-class AcpiUartItem
-    : public boot_shim::SingleVariantItemBase<AcpiUartItem, zbi_dcfg_simple_t, zbi_dcfg_simple_pio_t> {
+class AcpiUartItem : public boot_shim::SingleVariantItemBase<AcpiUartItem, zbi_dcfg_simple_t,
+                                                             zbi_dcfg_simple_pio_t> {
  public:
   // This initializes the data from ACPI tables.
   void Init(const acpi_lite::AcpiParserInterface& parser, const char* shim_name, FILE* log);

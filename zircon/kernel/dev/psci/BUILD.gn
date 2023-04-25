@@ -8,6 +8,7 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("headers") {
   headers = [ "dev/psci.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 source_set("psci") {

@@ -24,7 +24,7 @@
 #include <lib/zircon-internal/device/cpu-trace/common-pm.h>
 #endif
 
-#include <zircon/boot/driver-config.h>
+#include <lib/zbi-format/driver-config.h>
 #include <zircon/syscalls/clock.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>

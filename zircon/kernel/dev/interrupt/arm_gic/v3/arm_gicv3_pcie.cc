@@ -10,8 +10,8 @@
 #if WITH_KERNEL_PCIE
 #include <inttypes.h>
 #include <lib/lazy_init/lazy_init.h>
+#include <lib/zbi-format/driver-config.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/types.h>
 
 #include <dev/pcie_bus_driver.h>

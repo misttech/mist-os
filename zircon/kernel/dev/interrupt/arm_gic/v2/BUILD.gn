@@ -13,6 +13,7 @@ library_headers("headers") {
     "dev/interrupt/arm_gicv2m_msi.h",
     "dev/interrupt/arm_gicv2m.h",
   ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 source_set("v2") {

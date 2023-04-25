@@ -4,9 +4,9 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 #include <lib/arch/intrin.h>
+#include <lib/zbi-format/driver-config.h>
 #include <reg.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 
 #include <arch/arm64/periphmap.h>
 #include <dev/power.h>

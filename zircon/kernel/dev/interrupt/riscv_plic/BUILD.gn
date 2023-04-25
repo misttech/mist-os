@@ -9,6 +9,7 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("riscv_plic") {
   sources = [ "riscv_plic.cc" ]
   deps = [
+    "//sdk/lib/zbi-format",
     "//zircon/kernel/dev/interrupt",
     "//zircon/kernel/dev/pdev/interrupt",
     "//zircon/kernel/lib/init",

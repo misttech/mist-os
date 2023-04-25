@@ -30,12 +30,8 @@ zx_library("pc") {
   ]
 
   deps = [
-    # uart.cc includes <platform/uart.h>
-    "//zircon/kernel/platform:headers",
-  ]
-
-  deps += [
     ":tests",
+    "//sdk/lib/zbi-format",
     "//src/lib/zbitl",
     "//zircon/kernel/arch/x86:headers",
     "//zircon/kernel/dev/interrupt",
@@ -61,6 +57,7 @@ zx_library("pc") {
     "//zircon/kernel/lib/unittest",
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/platform:headers",
     "//zircon/system/ulib/explicit-memory",
     "//zircon/system/ulib/ram-crashlog",
     "//zircon/system/ulib/smbios",

@@ -23,6 +23,7 @@ test("uart-unittests") {
     "pl011-tests.cc",
   ]
   deps = [
+    "//sdk/lib/zbi-format",
     "//zircon/system/ulib/uart",
     "//zircon/system/ulib/uart:uart-mock",
     "//zircon/system/ulib/zxtest",

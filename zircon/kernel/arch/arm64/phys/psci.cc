@@ -9,9 +9,9 @@
 #include <lib/arch/arm64/psci.h>
 #include <lib/arch/arm64/system.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/zbi-format/driver-config.h>
 #include <stdint.h>
 #include <zircon/assert.h>
-#include <zircon/boot/driver-config.h>
 
 #include <phys/main.h>
 #include <phys/stdio.h>

@@ -10,9 +10,9 @@
 #include <lib/arch/intrin.h>
 #include <lib/counters.h>
 #include <lib/unittest/unittest.h>
+#include <lib/zbi-format/driver-config.h>
 #include <platform.h>
 #include <trace.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/types.h>
 
 #include <arch/riscv64/sbi.h>

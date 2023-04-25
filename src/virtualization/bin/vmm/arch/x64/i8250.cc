@@ -5,10 +5,10 @@
 #include "src/virtualization/bin/vmm/arch/x64/i8250.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>
 #include <stdio.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/boot/image.h>
 
 #include "src/virtualization/bin/vmm/arch/x64/i8250_registers.h"

@@ -5,9 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/arm64/system.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/view.h>
 #include <stdio.h>
-#include <zircon/boot/driver-config.h>
 #include <zircon/boot/image.h>
 
 #include <phys/exception.h>
