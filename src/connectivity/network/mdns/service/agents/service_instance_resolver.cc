@@ -139,7 +139,7 @@ void ServiceInstanceResolver::OnAddLocalServiceInstance(const Mdns::ServiceInsta
     return;
   }
 
-  if (instance.service_name_ != service_) {
+  if (instance.service_name_ != service_ || instance.instance_name_ != instance_name_) {
     return;
   }
 

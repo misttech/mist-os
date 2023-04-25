@@ -164,5 +164,41 @@ TEST_F(InstanceResolverTest, LocalProxyInstance) {
   EXPECT_EQ(kText, instance_from_callback.text_strings());
 }
 
+// Regression test for b/274710801
+TEST_F(InstanceResolverTest, LocalProxyInstanceFail) {
+  constexpr char kAnotherInstanceName[] = "another-testinstance";
+
+  fuchsia::net::mdns::ServiceInstance instance_from_callback;
+  bool callback_called = false;
+
+  ServiceInstanceResolver under_test(
+      this, kServiceName, kInstanceName, now(), Media::kBoth, IpVersions::kBoth, kIncludeLocal,
+      kIncludeLocalProxies,
+      [&instance_from_callback, &callback_called](fuchsia::net::mdns::ServiceInstance instance) {
+        instance_from_callback = std::move(instance);
+        callback_called = true;
+      });
+
+  SetAgent(under_test);
+
+  under_test.Start(kLocalHostFullName);
+
+  // Expect a PTR question on start.
+  auto message = ExpectOutboundMessage(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
+  ExpectQuestion(message.get(), kInstanceFullName, DnsType::kSrv);
+  ExpectNoOtherQuestionOrResource(message.get());
+  ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
+  ExpectNoOther();
+
+  // |ServiceInstanceResolver| |under_test| test is created with |kInstanceName| while we are trying
+  // to add local service instance of name |kAnotherInstanceName|. We dont expect the callback to
+  // get triggered.
+  under_test.OnAddLocalServiceInstance(
+      ServiceInstance(kServiceName, kAnotherInstanceName, kHostName, kSocketAddresses, kText),
+      kFromLocalProxyHost);
+
+  EXPECT_FALSE(callback_called);
+}
+
 }  // namespace test
 }  // namespace mdns
