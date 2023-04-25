@@ -13,9 +13,6 @@ type RequestStatus = strict enum {
     REJECTED_DUPLICATE_REQUEST = 4;
 };
 
-// LINT analyzer keyword intended for humans:
-// LINT.IfChange
-
 /// PHY types supporting different MCS and payload data rates.
 /// Based off of dot11PHYType from IEEE 802.11-2016/2020 Annex C + Amendments
 @available(added=13)
@@ -123,8 +120,6 @@ type WlanBand = flexible enum : uint8 {
     TWO_GHZ = 0;
     FIVE_GHZ = 1;
 };
-
-// LINT.ThenChange(//sdk/banjo/fuchsia.hardware.wlan.associnfo/associnfo.fidl)
 
 type ScanType = strict enum {
     ACTIVE = 1;
