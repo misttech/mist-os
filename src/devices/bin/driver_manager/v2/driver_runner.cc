@@ -405,18 +405,19 @@ void DriverRunner::DestroyDriverComponent(dfv2::Node& node,
 }
 
 void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) {
+  BindRequest request = {
+      .node = node.weak_from_this(),
+      .tracker = result_tracker,
+  };
   if (bind_orphan_ongoing_) {
-    pending_bind_requests_.push(BindRequest{
-        .node = node.weak_from_this(),
-        .tracker = result_tracker,
-    });
+    pending_bind_requests_.push(std::move(request));
     return;
   }
 
   bind_orphan_ongoing_ = true;
 
   auto next_attempt = [this]() mutable { ProcessPendingBindRequests(); };
-  BindInternal(node, result_tracker, next_attempt);
+  BindInternal(std::move(request), next_attempt);
 }
 
 void DriverRunner::TryBindAllOrphansInternal(std::shared_ptr<BindResultTracker> tracker) {
@@ -430,54 +431,57 @@ void DriverRunner::TryBindAllOrphansInternal(std::shared_ptr<BindResultTracker> 
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);
   orphaned_nodes_ = {};
 
-  for (auto& [path, weak_node] : orphaned_nodes) {
-    auto node = weak_node.lock();
-    if (!node) {
-      tracker->ReportNoBind();
-      continue;
-    }
-
-    BindInternal(*node, tracker);
+  for (auto& [path, node] : orphaned_nodes) {
+    BindInternal(BindRequest{
+        .node = node,
+        .tracker = tracker,
+    });
   }
 }
 
-void DriverRunner::BindInternal(Node& node, std::shared_ptr<BindResultTracker> result_tracker,
+void DriverRunner::BindInternal(BindRequest request,
                                 BindMatchCompleteCallback match_complete_callback) {
   ZX_ASSERT(bind_orphan_ongoing_);
+  std::shared_ptr node = request.node.lock();
+  if (!node) {
+    LOGF(WARNING, "Node was freed before bind request is processed.");
+    if (request.tracker) {
+      request.tracker->ReportNoBind();
+    }
+    match_complete_callback();
+    return;
+  }
 
   // Check the DFv1 composites first, and don't bind to others if they match.
-  if (composite_device_manager_.BindNode(node.shared_from_this())) {
-    if (result_tracker) {
-      result_tracker->ReportSuccessfulBind(node.MakeComponentMoniker(), "");
+  if (composite_device_manager_.BindNode(node)) {
+    if (request.tracker) {
+      request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), "");
     }
     match_complete_callback();
     return;
   }
 
   auto match_callback =
-      [this, weak_node = node.weak_from_this(), result_tracker,
+      [this, request = std::move(request),
        match_complete_callback = std::move(match_complete_callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result) mutable {
-        OnMatchDriverCallback(weak_node, result, result_tracker,
-                              std::move(match_complete_callback));
+        OnMatchDriverCallback(std::move(request), result, std::move(match_complete_callback));
       };
   fidl::Arena<> arena;
-  driver_index_->MatchDriver(node.CreateMatchArgs(arena)).Then(std::move(match_callback));
+  driver_index_->MatchDriver(node->CreateMatchArgs(arena)).Then(std::move(match_callback));
 }
 
 void DriverRunner::OnMatchDriverCallback(
-    std::weak_ptr<Node> weak_node, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
-    std::shared_ptr<BindResultTracker> result_tracker,
+    BindRequest request, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
     BindMatchCompleteCallback match_complete_callback) {
-  auto report_no_bind =
-      fit::defer([&result_tracker, callback = match_complete_callback.share()]() mutable {
-        if (result_tracker) {
-          result_tracker->ReportNoBind();
-        }
-        callback();
-      });
+  auto report_no_bind = fit::defer([&request, &match_complete_callback]() mutable {
+    if (request.tracker) {
+      request.tracker->ReportNoBind();
+    }
+    match_complete_callback();
+  });
 
-  auto node = weak_node.lock();
+  std::shared_ptr node = request.node.lock();
 
   // TODO(fxb/125100): Add an additional guard to ensure that the node is still available for
   // binding when the match callback is fired. Currently, there are no issues from it, but it
@@ -488,17 +492,17 @@ void DriverRunner::OnMatchDriverCallback(
     return;
   }
 
-  auto driver_url = BindNodeToResult(*node, result, result_tracker != nullptr);
+  auto driver_url = BindNodeToResult(*node, result, request.tracker != nullptr);
   if (driver_url == std::nullopt) {
-    orphaned_nodes_.emplace(node->MakeComponentMoniker(), weak_node);
+    orphaned_nodes_.emplace(node->MakeComponentMoniker(), node);
     report_no_bind.call();
     return;
   }
 
   orphaned_nodes_.erase(node->MakeComponentMoniker());
   report_no_bind.cancel();
-  if (result_tracker) {
-    result_tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value());
+  if (request.tracker) {
+    request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(), driver_url.value());
   }
   match_complete_callback();
 }
@@ -632,22 +636,13 @@ void DriverRunner::ProcessPendingBindRequests() {
 
   // Go through all the pending bind requests.
   while (!pending_bind_requests_.empty()) {
-    auto request = std::move(pending_bind_requests_.front());
+    BindRequest request = std::move(pending_bind_requests_.front());
     pending_bind_requests_.pop();
-    if (auto locked_node = request.node.lock()) {
-      auto match_complete_callback = [tracker]() mutable {
-        // The bind status doesn't matter for this tracker.
-        tracker->ReportNoBind();
-      };
-      BindInternal(*locked_node, request.tracker, std::move(match_complete_callback));
-      continue;
-    }
-
-    LOGF(WARNING, "Node was freed before bind request is processed.");
-    if (request.tracker) {
-      request.tracker->ReportNoBind();
-    }
-    tracker->ReportNoBind();
+    auto match_complete_callback = [tracker]() mutable {
+      // The bind status doesn't matter for this tracker.
+      tracker->ReportNoBind();
+    };
+    BindInternal(std::move(request), std::move(match_complete_callback));
   }
 
   // If there are any pending callbacks for TryBindAllOrphans(), begin a new attempt.
