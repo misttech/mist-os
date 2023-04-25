@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::syscalls::decls::{Syscall, SyscallDecl};
 use crate::task::CurrentTask;
 
 /// Generates CFI directives so the unwinder will be redirected to unwind the stack provided in `state`.
@@ -18,6 +19,21 @@ macro_rules! restore_cfi_directives {
 
 pub(crate) use generate_cfi_directives;
 pub(crate) use restore_cfi_directives;
+
+impl Syscall {
+    /// Populates the syscall parameters from the ARM64 registers.
+    pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
+        Syscall {
+            decl: syscall_decl,
+            arg0: current_task.registers.r[0],
+            arg1: current_task.registers.r[1],
+            arg2: current_task.registers.r[2],
+            arg3: current_task.registers.r[3],
+            arg4: current_task.registers.r[4],
+            arg5: current_task.registers.r[5],
+        }
+    }
+}
 
 pub fn generate_interrupt_instructions(_current_task: &CurrentTask) -> Vec<u8> {
     const INTERRUPT_AND_JUMP: [u8; 8] = [

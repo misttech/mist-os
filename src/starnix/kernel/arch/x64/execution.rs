@@ -4,6 +4,7 @@
 
 use zerocopy::AsBytes;
 
+use crate::syscalls::decls::{Syscall, SyscallDecl};
 use crate::task::CurrentTask;
 
 /// Generates CFI directives so the unwinder will be redirected to unwind the stack provided in `state`.
@@ -61,6 +62,21 @@ macro_rules! restore_cfi_directives {
 
 pub(crate) use generate_cfi_directives;
 pub(crate) use restore_cfi_directives;
+
+impl Syscall {
+    /// Populates the syscall parameters from the x64 registers.
+    pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
+        Syscall {
+            decl: syscall_decl,
+            arg0: current_task.registers.rdi,
+            arg1: current_task.registers.rsi,
+            arg2: current_task.registers.rdx,
+            arg3: current_task.registers.r10,
+            arg4: current_task.registers.r8,
+            arg5: current_task.registers.r9,
+        }
+    }
+}
 
 pub fn generate_interrupt_instructions(current_task: &CurrentTask) -> Vec<u8> {
     const INTERRUPT_AND_JUMP: [u8; 7] = [
