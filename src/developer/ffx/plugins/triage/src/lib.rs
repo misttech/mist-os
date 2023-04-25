@@ -109,7 +109,7 @@ fn analyze_snapshot(
 
         let results_formatter = ActionResultFormatter::new(&action_results);
 
-        let output = results_formatter.to_text();
+        let output = results_formatter.to_string();
 
         writer
             .write_fmt(format_args!("{}\n", output))

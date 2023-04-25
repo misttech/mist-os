@@ -87,7 +87,7 @@ impl TriageManager {
         }
         let results = fuchsia_triage::analyze(&targets, &context)?;
         let results_formatter = ActionResultFormatter::new(&results);
-        Ok(results_formatter.to_text())
+        Ok(results_formatter.to_string())
     }
 
     pub fn analyze_structured(
@@ -236,8 +236,16 @@ mod test {
         }
     }"#;
 
-    const OK_PLUGINS_PREFIX: &str =
-        "Process Crashes Plugin - OK\nSandbox Errors Plugin - OK\nRouting Errors Plugin - OK\nMemory Summary Plugin - OK\n";
+    const OK_PLUGINS_PREFIX: &str = "\
+        Plugin 'Process Crashes' - nothing to show\n\
+        \n\
+        Plugin 'Sandbox Errors' - nothing to show\n\
+        \n\
+        Plugin 'Routing Errors' - nothing to show\n\
+        \n\
+        Plugin 'Memory Summary' - nothing to show\n\
+        \n\
+        ";
 
     #[fuchsia::test]
     fn analyze() {
@@ -249,10 +257,7 @@ mod test {
         let inspect_target = manager.build_inspect_target("inspect.json", INSPECT_CONTENT).unwrap();
         let determination = manager.analyze(&[inspect_target], context).unwrap();
 
-        assert_eq!(
-            determination,
-            OK_PLUGINS_PREFIX.to_owned() + "No actions were triggered. All targets OK."
-        );
+        assert_eq!(&determination, OK_PLUGINS_PREFIX);
     }
 
     fn targets_without_boot(manager: &mut TriageManager) -> Box<[i32]> {
@@ -320,30 +325,21 @@ mod test {
             targets = targets_with_boot(&mut manager);
             context = context_with_boot(&mut manager);
         }
-        assert_eq!(
-            manager.analyze(&targets, context).unwrap(),
-            OK_PLUGINS_PREFIX.to_owned() + "No actions were triggered. All targets OK."
-        );
+        assert_eq!(&manager.analyze(&targets, context).unwrap(), OK_PLUGINS_PREFIX);
         let targets;
         let context;
         {
             targets = targets_without_boot(&mut manager);
             context = context_without_boot(&mut manager);
         }
-        assert_eq!(
-            manager.analyze(&targets, context).unwrap(),
-            OK_PLUGINS_PREFIX.to_owned() + "No actions were triggered. All targets OK."
-        );
+        assert_eq!(&manager.analyze(&targets, context).unwrap(), OK_PLUGINS_PREFIX);
         let targets;
         let context;
         {
             targets = targets_with_boot(&mut manager);
             context = context_without_boot(&mut manager);
         }
-        assert_eq!(
-            manager.analyze(&targets, context).unwrap(),
-            OK_PLUGINS_PREFIX.to_owned() + "No actions were triggered. All targets OK."
-        );
+        assert_eq!(&manager.analyze(&targets, context).unwrap(), OK_PLUGINS_PREFIX);
         // For this last test, bootlog is effectively empty, so the bootlog test will fail.
         let targets;
         let context;
@@ -353,8 +349,7 @@ mod test {
         }
         assert_eq!(
             manager.analyze(&targets, context).unwrap() + "\n",
-            "Warnings\n--------\n[WARNING] devhost not inserted.\n\n".to_owned()
-                + OK_PLUGINS_PREFIX
+            format!("Warnings\n--------\n[WARNING] devhost not inserted.\n\n{OK_PLUGINS_PREFIX}\n")
         );
 
         // Test that plugin output is property triggered and formatted.
@@ -373,7 +368,7 @@ mod test {
         let result = manager.analyze(&targets, context).unwrap();
         assert!(
             result.contains(
-                r#"Process Crashes Plugin
+                r#"Plugin 'Process Crashes'
 Errors
 ------
 [ERROR]: my_component.cmx crashed at 1h1m1.123s [3661.123]

@@ -106,8 +106,8 @@ impl RunResult {
         }
 
         let results_formatter = ActionResultFormatter::new(&self.action_results);
-        let output = results_formatter.to_text();
-        dest.write_fmt(format_args!("{}\n", output)).context("failed to write to destination")?;
+        let output = results_formatter.to_string();
+        dest.write_fmt(format_args!("{}", output)).context("failed to write to destination")?;
         Ok(())
     }
 }
@@ -149,7 +149,7 @@ mod tests {
         run_result.write_report(&mut dest)?;
 
         let output = String::from_utf8(dest)?;
-        assert_eq!("No actions were triggered. All targets OK.\n", output);
+        assert_eq!("", output);
 
         Ok(())
     }
@@ -191,11 +191,7 @@ mod tests {
         run_result.write_report(&mut dest)?;
 
         let output = String::from_utf8(dest)?;
-        assert_eq!(
-            "Featured Values\n---------------\ngauge\n\n\
-            No actions were triggered. All targets OK.\n",
-            output
-        );
+        assert_eq!("Featured Values\n---------------\ngauge\n\n", output);
 
         Ok(())
     }
