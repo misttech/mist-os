@@ -177,45 +177,48 @@ static bool committed_monotonic() {
   END_TEST;
 }
 
-// Helper that can be passed to thread_create that continuously allocates and frees a single object.
+// A helper that continuously allocates and frees a single object.
 template <size_t P, size_t O>
-static int arena_alloc_helper(void* arg) {
-  GPArena<P, O>* arena = static_cast<GPArena<P, O>*>(arg);
-  unsigned int allocations = 0;
-  while (1) {
-    void* v = arena->Alloc();
-    // On any failure just return. That we terminated at all is the error signal to our parent.
-    if (v == nullptr) {
-      return -1;
-    }
-    arena->Free(v);
-    // Check every so often if someone is trying to kill us. We cannot check every iteration
-    // since then we would be bouncing the thread_lock back and forth removing most of the
-    // chances at actually doing Alloc and Free concurrently.
-    allocations++;
-    if (allocations % 100 == 0) {
-      // The user registers we pass to |thread_process_pending_signals| do not matter because this
-      // thread is a pure kernel thread and has no user mode component.
-      iframe_t iframe = {};
-      Thread::Current::ProcessPendingSignals(GeneralRegsSource::Iframe, &iframe);
+struct ArenaAllocFixture {
+  GPArena<P, O> arena;
+  ktl::atomic<bool> stop_requested{};
+
+  // A thread_start_routine for use with Thread::Create.
+  static int run(void* arg) { return static_cast<ArenaAllocFixture<P, O>*>(arg)->Run(); }
+  int Run() {
+    unsigned int allocations = 0;
+    while (1) {
+      void* v = arena.Alloc();
+      // On any failure just return. That we terminated at all is the error signal to our parent.
+      if (v == nullptr) {
+        return -1;
+      }
+      arena.Free(v);
+      // Check every so often if someone is trying to stop us. We don't check every iteration to
+      // maximize the chance of actually doing Alloc and Free concurrently.
+      allocations++;
+      if (allocations % 100 == 0 && stop_requested.load(ktl::memory_order_relaxed)) {
+        return 0;
+      }
     }
   }
-}
+};
 
 static bool parallel_alloc() {
   BEGIN_TEST;
 
-  GPArena<0, 8> arena;
-  ASSERT_EQ(arena.Init("test", 4), ZX_OK);
+  using Fixture = ArenaAllocFixture<0, 8>;
+  Fixture fixture;
+  ASSERT_EQ(fixture.arena.Init("test", 4), ZX_OK);
 
-  // Spin up two instances of the allocation helper that will run in parallel.
-  auto t1 = Thread::Create("gparena worker1", arena_alloc_helper<0, 8>, &arena, DEFAULT_PRIORITY);
-  auto t2 = Thread::Create("gparena worker2", arena_alloc_helper<0, 8>, &arena, DEFAULT_PRIORITY);
+  // Spin up two instances of the allocation fixture that will run in parallel.
+  auto t1 = Thread::Create("gparena worker1", Fixture::run, &fixture, DEFAULT_PRIORITY);
+  auto t2 = Thread::Create("gparena worker2", Fixture::run, &fixture, DEFAULT_PRIORITY);
   t1->Resume();
   t2->Resume();
 
   // Attempt to join one of the threads, letting it run for a bit. If the join succeeds this means
-  // the helper terminated, which indicates it encountered an error.
+  // the fixture terminated, which indicates it encountered an error.
   zx_status_t status = t1->Join(nullptr, current_time() + ZX_MSEC(500));
   EXPECT_NE(status, ZX_OK);
   // Check that the other thread is still running as well.
@@ -223,8 +226,7 @@ static bool parallel_alloc() {
   EXPECT_NE(status, ZX_OK);
 
   // Cleanup.
-  t1->Kill();
-  t2->Kill();
+  fixture.stop_requested.store(true, ktl::memory_order_relaxed);
   status = t1->Join(nullptr, current_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
   status = t2->Join(nullptr, current_time() + ZX_SEC(5));
@@ -235,18 +237,20 @@ static bool parallel_alloc() {
 
 static bool parallel_grow_memory() {
   BEGIN_TEST;
-  GPArena<0, 8> arena;
+
   constexpr int count = PAGE_SIZE * 64 / 8;
 
   fbl::AllocChecker ac;
   ktl::unique_ptr<void*[]> allocs = ktl::make_unique<void*[]>(&ac, count);
   ASSERT_TRUE(ac.check());
 
-  ASSERT_EQ(arena.Init("test", count), ZX_OK);
+  using Fixture = ArenaAllocFixture<0, 8>;
+  Fixture fixture;
+  ASSERT_EQ(fixture.arena.Init("test", count), ZX_OK);
 
   // Spin up a worker that will perform allocations in parallel whilst we are causing the arena
   // to need to be grown.
-  auto t = Thread::Create("gparena worker", arena_alloc_helper<0, 8>, &arena, DEFAULT_PRIORITY);
+  auto t = Thread::Create("gparena worker", Fixture::run, &fixture, DEFAULT_PRIORITY);
   t->Resume();
 
   // let the worker run for a bit to make sure its started.
@@ -255,7 +259,7 @@ static bool parallel_grow_memory() {
 
   // Allocate all the rest of the objects causing arena to have to grow.
   for (int i = 0; i < count - 1; i++) {
-    allocs[i] = arena.Alloc();
+    allocs[i] = fixture.arena.Alloc();
     EXPECT_NONNULL(allocs[i]);
   }
 
@@ -264,12 +268,12 @@ static bool parallel_grow_memory() {
   EXPECT_NE(status, ZX_OK);
 
   // Cleanup.
-  t->Kill();
+  fixture.stop_requested.store(true, ktl::memory_order_relaxed);
   status = t->Join(nullptr, current_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
 
   for (int i = 0; i < count - 1; i++) {
-    arena.Free(allocs[i]);
+    fixture.arena.Free(allocs[i]);
   }
 
   END_TEST;
