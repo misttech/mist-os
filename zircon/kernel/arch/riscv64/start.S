@@ -120,7 +120,7 @@ PhysbootHandoff = _start
 
 .Lmmu_on_vaddr:
     // Set up the percpu structure for the logical CPU 0
-    lla     gp, riscv64_percpu_array
+    lla     s11, riscv64_percpu_array
 
     // save the time stamp just before entering C
     rdtime  a0

@@ -79,7 +79,8 @@
 #define REGOFF(x) ((x)*8)
 #define CONTEXT_SWITCH_FRAME_OFFSET_RA REGOFF(0)
 #define CONTEXT_SWITCH_FRAME_OFFSET_TP REGOFF(1)
-#define CONTEXT_SWITCH_FRAME_OFFSET_S(n) REGOFF(2 + n)
+#define CONTEXT_SWITCH_FRAME_OFFSET_GP REGOFF(2)
+#define CONTEXT_SWITCH_FRAME_OFFSET_S(n) REGOFF(3 + n)
 
 #define SIZEOF_CONTEXT_SWITCH_FRAME REGOFF(14)
 
@@ -139,11 +140,12 @@
 struct alignas(16) riscv64_context_switch_frame {
   uint64_t ra;  // return address (x1)
   uint64_t tp;  // thread pointer
+  uint64_t gp;  // shadow-call-stack pointer (x3)
 
   uint64_t s0;  // x8-x9
   uint64_t s1;
 
-  uint64_t s2;  // x18-x27
+  uint64_t s2;  // x18-x26
   uint64_t s3;
   uint64_t s4;
   uint64_t s5;
@@ -152,7 +154,8 @@ struct alignas(16) riscv64_context_switch_frame {
   uint64_t s8;
   uint64_t s9;
   uint64_t s10;
-  uint64_t s11;
+
+  static constexpr auto kShadowCallStackPointer = &riscv64_context_switch_frame::gp;
 };
 
 static_assert(__offsetof(riscv64_context_switch_frame, ra) == CONTEXT_SWITCH_FRAME_OFFSET_RA);

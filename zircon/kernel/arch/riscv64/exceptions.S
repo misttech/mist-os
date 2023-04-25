@@ -32,11 +32,16 @@
 // Notably in the top 2 or 3 words (depending on usage of shadow call stack feature) just
 // below the kernel SP:
 // -8 = saved tp (thread pointer)
-// -16 = saved gp (current cpu pointer)
-// -24 = saved s2 (current shadow call stack pointer, if feature is enabled)
+// -16 = saved s11 (current cpu pointer)
+// -24 = saved gp (current shadow call stack pointer, if feature is enabled)
 //
 // When entering the kernel from user mode quickly recover this state before saving iframe
 // state that would otherwise overlap these saved words (iframe->regs.t4 ... t6)
+
+#define SAVERESTORE_REGS(n) (RISCV64_IFRAME_SIZE - REGOFF(n))
+#define SAVERESTORE_TP SAVERESTORE_REGS(1)
+#define SAVERESTORE_S11 SAVERESTORE_REGS(2)
+#define SAVERESTORE_GP SAVERESTORE_REGS(3)
 
 // Save all of the required registers on the stack, conditional logic based on if
 // exception originates in user or kernel mode.
@@ -66,19 +71,17 @@
     sd     tp, RISCV64_IFRAME_OFFSET_SP(sp)
 
     // recover tp from the top word of the stack (we saved it here before)
-    ld     tp, (RISCV64_IFRAME_SIZE - REGOFF(1))(sp)
+    ld     tp, SAVERESTORE_TP(sp)
 
-    // recover gp from the second from top word of the stack
+    // Recover s11 (percpu pointer) from the second from top word of the stack.
+    sd     s11, RISCV64_IFRAME_OFFSET_S11(sp)
+    ld     s11, SAVERESTORE_S11(sp)
+
+    // Always save gp here to keep the logic simpler in the no shadow-call-stack case.
     sd     gp, RISCV64_IFRAME_OFFSET_GP(sp)
-    ld     gp, (RISCV64_IFRAME_SIZE - REGOFF(2))(sp)
-
 #if __has_feature(shadow_call_stack)
-    // recover s2 (the shadow call stack pointer) from the third from top word of the stack
-    sd     s2, RISCV64_IFRAME_OFFSET_S2(sp)
-    ld     s2, (RISCV64_IFRAME_SIZE - REGOFF(3))(sp)
-#else
-    // just save s2 here to keep the logic simpler in the no shadow case
-    sd     s2, RISCV64_IFRAME_OFFSET_S2(sp)
+    // recover gp (the shadow call stack pointer) from the third from top word of the stack
+    ld     gp, SAVERESTORE_GP(sp)
 #endif
 .endif
 
@@ -89,6 +92,12 @@
     // TODO-rvbringup: consider saving pre-decremented sp for debugging purposes
     sd     sp, RISCV64_IFRAME_OFFSET_SP(sp)   // x2
     sd     gp, RISCV64_IFRAME_OFFSET_GP(sp)   // x3
+#if __has_feature(shadow_call_stack)
+    // TODO(fxbug.dev/124357): bump the shadow call stack forward one in case
+    // we interrupted the cpu after it has saved a return address but before it
+    // has had a chance to increment it
+    addi   gp, gp, 8
+#endif
     sd     tp, RISCV64_IFRAME_OFFSET_TP(sp)   // x4
 .endif
     sd     t0, RISCV64_IFRAME_OFFSET_T0(sp)   // x5
@@ -104,15 +113,7 @@
     sd     a5, RISCV64_IFRAME_OFFSET_A5(sp)   // x15
     sd     a6, RISCV64_IFRAME_OFFSET_A6(sp)   // x16
     sd     a7, RISCV64_IFRAME_OFFSET_A7(sp)   // x17
-.if \user == 0
     sd     s2, RISCV64_IFRAME_OFFSET_S2(sp)   // x18
-#if __has_feature(shadow_call_stack)
-    // bump the shadow call stack forward one in case we interrupted the cpu
-    // after it has saved a return address but before it has had a chance to
-    // increment it
-    addi   s2, s2, 8
-#endif
-.endif
     sd     s3, RISCV64_IFRAME_OFFSET_S3(sp)   // x19
     sd     s4, RISCV64_IFRAME_OFFSET_S4(sp)   // x20
     sd     s5, RISCV64_IFRAME_OFFSET_S5(sp)   // x21
@@ -121,7 +122,7 @@
     sd     s8, RISCV64_IFRAME_OFFSET_S8(sp)   // x24
     sd     s9, RISCV64_IFRAME_OFFSET_S9(sp)   // x25
     sd     s10, RISCV64_IFRAME_OFFSET_S10(sp) // x26
-    sd     s11, RISCV64_IFRAME_OFFSET_S11(sp) // x27
+    // s11 (x27) is the percpu pointer, already saved above.
     sd     t3, RISCV64_IFRAME_OFFSET_T3(sp)   // x28
     sd     t4, RISCV64_IFRAME_OFFSET_T4(sp)   // x29
     sd     t5, RISCV64_IFRAME_OFFSET_T5(sp)   // x30
@@ -152,9 +153,12 @@
     // the following registers will be handled in the user path below
     // or in a special way for kernel mode:
     // sp (x2) - bumped at the end of the macro
-    // gp (x3) - not restored in kernel mode
-    // tp (x4) - restored here in kernel mode
+    // gp (x3) - restored here in kernel mode (shadow-call-stack pointer)
+    // tp (x4) - restored here in kernel mode (thread pointer)
+    // s11 (x27) - not restored in kernel mode (percpu pointer)
 .if \user == 0
+   // These two will be handled separately in the user path.
+    ld     gp, RISCV64_IFRAME_OFFSET_GP(sp)   // x3
     ld     tp, RISCV64_IFRAME_OFFSET_TP(sp)   // x4
 .endif
     ld     t0, RISCV64_IFRAME_OFFSET_T0(sp)   // x5
@@ -170,10 +174,7 @@
     ld     a5, RISCV64_IFRAME_OFFSET_A5(sp)   // x15
     ld     a6, RISCV64_IFRAME_OFFSET_A6(sp)   // x16
     ld     a7, RISCV64_IFRAME_OFFSET_A7(sp)   // x17
-    // s2 (x18) will be dealt with in the user path
-.if \user == 0
     ld     s2, RISCV64_IFRAME_OFFSET_S2(sp)   // x18
-.endif
     ld     s3, RISCV64_IFRAME_OFFSET_S3(sp)   // x19
     ld     s4, RISCV64_IFRAME_OFFSET_S4(sp)   // x20
     ld     s5, RISCV64_IFRAME_OFFSET_S5(sp)   // x21
@@ -182,29 +183,37 @@
     ld     s8, RISCV64_IFRAME_OFFSET_S8(sp)   // x24
     ld     s9, RISCV64_IFRAME_OFFSET_S9(sp)   // x25
     ld     s10, RISCV64_IFRAME_OFFSET_S10(sp) // x26
-    ld     s11, RISCV64_IFRAME_OFFSET_S11(sp) // x27
+    // s11 (x27) will be handled separately in the user path.
     ld     t3, RISCV64_IFRAME_OFFSET_T3(sp)   // x28
     ld     t4, RISCV64_IFRAME_OFFSET_T4(sp)   // x29
     ld     t5, RISCV64_IFRAME_OFFSET_T5(sp)   // x30
     ld     t6, RISCV64_IFRAME_OFFSET_T6(sp)   // x31
 
 .if \user == 1
-    // before we run out of registers, save tp and gp to the top of the kernel
-    // stack and put the kernel stack in the scratch register
-    sd     tp, (RISCV64_IFRAME_SIZE - REGOFF(1))(sp)
-    sd     gp, (RISCV64_IFRAME_SIZE - REGOFF(2))(sp)
+    // Before we run out of registers, save tp and s11 (percpu pointer) to the
+    // top of the kernel stack and put the kernel stack in the scratch
+    // register.  The registers at the tail end of the iframe have already been
+    // loaded above, so we can use that part of the stack to transfer the last
+    // few special registers.
+#if (SAVERESTORE_TP <= RISCV64_IFRAME_OFFSET_S11 || \
+     SAVERESTORE_S11 <= RISCV64_IFRAME_OFFSET_S11 || \
+     SAVERESTORE_GP <= RISCV64_IFRAME_OFFSET_S11)
+#error "iframe regs clobbered by regs saved at top of kernel stack while in user"
+#endif
 
+    sd     tp, SAVERESTORE_TP(sp)
+    sd     s11, SAVERESTORE_S11(sp)
 #if __has_feature(shadow_call_stack)
     // save the shadow call pointer in the third from top slot on the kernel stack
-    sd     s2, (RISCV64_IFRAME_SIZE - REGOFF(3))(sp)
+    sd     gp, SAVERESTORE_GP(sp)
 #endif
 
     // save the top of the kernel stack into the sscratch register
-    addi   gp, sp, RISCV64_IFRAME_SIZE
-    csrw   sscratch, gp
+    add    s11, sp, RISCV64_IFRAME_SIZE
+    csrw   sscratch, s11
 
     // recover the last of the user registers from the iframe, stack pointer last
-    ld     s2, RISCV64_IFRAME_OFFSET_S2(sp)
+    ld     s11, RISCV64_IFRAME_OFFSET_S11(sp)
     ld     tp, RISCV64_IFRAME_OFFSET_TP(sp)
     ld     gp, RISCV64_IFRAME_OFFSET_GP(sp)
     ld     sp, RISCV64_IFRAME_OFFSET_SP(sp)
@@ -234,7 +243,7 @@ FUNCTION(riscv64_exception_entry)
 END_FUNCTION(riscv64_exception_entry)
 
 LOCAL_FUNCTION(kernel_exception_entry)
-    // we came from kernel space so tp and gp are okay
+    // we came from kernel space so tp and s11 are okay
     save_regs 0
 
     // Clear the SUM bit in case we interrupted a section of the kernel with it cleared.
@@ -266,11 +275,15 @@ FUNCTION(riscv64_uspace_entry)
     // a1 == top of kernel stack
     // a2 == shadow call base
 
+#define SAVERESTORE_NO_IFRAME(reg) (SAVERESTORE_##reg - RISCV64_IFRAME_SIZE)
+
     // Save a few things at the top of the stack to recover on exception entry
     // Note: must match logic in the frame save/restore macro above
-    sd     tp, -REGOFF(1)(a1) // thread pointer
-    sd     gp, -REGOFF(2)(a1) // current cpu pointer
-    sd     a2, -REGOFF(3)(a1) // shadow call stack
+    sd     tp, SAVERESTORE_NO_IFRAME(TP)(a1) // thread pointer
+    sd     s11, SAVERESTORE_NO_IFRAME(S11)(a1) // current cpu pointer
+#if __has_feature(shadow_call_stack)
+    sd     a2, SAVERESTORE_NO_IFRAME(GP)(a1) // shadow call stack pointer
+#endif
 
     // Save the kernel stack pointer in the sscratch register
     csrw   sscratch, a1
@@ -321,7 +334,7 @@ FUNCTION(riscv64_uspace_entry)
 END_FUNCTION(riscv64_uspace_entry)
 
 #ifdef KERNEL_NO_USERABI
-// If we're not building user abi there are no wrapper functions or 
+// If we're not building user abi there are no wrapper functions or
 // proper unknown_syscall function for the dispatcher to dispatch to,
 // so define a stub routine so the code at least links.
 FUNCTION(unknown_syscall)

@@ -15,6 +15,7 @@ FUNCTION(riscv64_context_switch)
     addi  sp, sp, -SIZEOF_CONTEXT_SWITCH_FRAME
     sd    ra, CONTEXT_SWITCH_FRAME_OFFSET_RA(sp)
     sd    tp, CONTEXT_SWITCH_FRAME_OFFSET_TP(sp)
+    sd    gp, CONTEXT_SWITCH_FRAME_OFFSET_GP(sp)
 
     sd    s0, CONTEXT_SWITCH_FRAME_OFFSET_S(0)(sp)
     sd    s1, CONTEXT_SWITCH_FRAME_OFFSET_S(1)(sp)
@@ -27,7 +28,6 @@ FUNCTION(riscv64_context_switch)
     sd    s8, CONTEXT_SWITCH_FRAME_OFFSET_S(8)(sp)
     sd    s9, CONTEXT_SWITCH_FRAME_OFFSET_S(9)(sp)
     sd    s10, CONTEXT_SWITCH_FRAME_OFFSET_S(10)(sp)
-    sd    s11, CONTEXT_SWITCH_FRAME_OFFSET_S(11)(sp)
 
     /* save old sp */
     sd    sp, (a0)
@@ -47,8 +47,8 @@ FUNCTION(riscv64_context_switch)
     ld    s8, CONTEXT_SWITCH_FRAME_OFFSET_S(8)(sp)
     ld    s9, CONTEXT_SWITCH_FRAME_OFFSET_S(9)(sp)
     ld    s10, CONTEXT_SWITCH_FRAME_OFFSET_S(10)(sp)
-    ld    s11, CONTEXT_SWITCH_FRAME_OFFSET_S(11)(sp)
 
+    ld    gp, CONTEXT_SWITCH_FRAME_OFFSET_GP(sp)
     ld    tp, CONTEXT_SWITCH_FRAME_OFFSET_TP(sp)
     ld    ra, CONTEXT_SWITCH_FRAME_OFFSET_RA(sp)
     addi  sp, sp, SIZEOF_CONTEXT_SWITCH_FRAME
@@ -69,7 +69,7 @@ FUNCTION(_riscv64_user_copy)
     addi   sp, sp, -48
     sd     ra, 32(sp)
     sd     s3, 24(sp)
-    sd     s2, 16(sp)
+    sd     gp, 16(sp)
     sd     s1, 8(sp)
     sd     s0, (sp)
 
@@ -95,7 +95,7 @@ FUNCTION(_riscv64_user_copy)
     // redirected to .Lfault_from_user, below.
     //
     // Note makes serious assumptions about the implementation of memcpy.
-    // Notably the memcpy implementation will not save or modify anything other than s0, s2 and sp
+    // Notably the memcpy implementation will not save or modify anything other than s0, gp and sp
     // as per normal frame pointer and shadow call stack usage. We save these registers above
     // as a result in case the fault path is taken and we're effectively pulled out of
     // the guts of the memcpy so that we can restore them below.
@@ -121,7 +121,7 @@ FUNCTION(_riscv64_user_copy)
 
     ld     s0, (sp)
     ld     s1, 8(sp)
-    ld     s2, 16(sp)
+    ld     gp, 16(sp)
     ld     s3, 24(sp)
     ld     ra, 32(sp)
     addi   sp, sp, 48

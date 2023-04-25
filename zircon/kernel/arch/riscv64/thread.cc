@@ -42,7 +42,7 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
 
 #if __has_feature(shadow_call_stack)
   // the shadow call stack grows up
-  frame->s2 = t->stack().shadow_call_base();
+  frame->*riscv64_context_switch_frame::kShadowCallStackPointer = t->stack().shadow_call_base();
 #endif
 
   // set the thread pointer that will be restored on the first context switch

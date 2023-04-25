@@ -48,10 +48,10 @@ struct alignas(MAX_CACHE_LINE) riscv64_percpu {
 // single instruction with risking a CPU switch via preemption (for those
 // cases, it's necessary to use the READ_PERCPU_FIELD* and WRITE_PERCPU_FIELD*
 // macros), but it gives the compiler the option.
-register riscv64_percpu* riscv64_percpu_ptr __asm__("gp");
+register riscv64_percpu* riscv64_percpu_ptr __asm__("s11");
 
 inline void riscv64_set_percpu(struct riscv64_percpu* ptr) {
-  __asm__ volatile("mv gp, %0" ::"r"(ptr), "m"(*ptr));
+  __asm__ volatile("mv s11, %0" ::"r"(ptr), "m"(*ptr));
 }
 
 inline riscv64_percpu* riscv64_read_percpu_ptr() { return riscv64_percpu_ptr; }
@@ -59,20 +59,32 @@ inline riscv64_percpu* riscv64_read_percpu_ptr() { return riscv64_percpu_ptr; }
 // Mark as volatile to force a read of the field to make sure the compiler
 // always emits a read when asked and does not cache a copy between.  For the
 // same reason, this can't by done via the riscv64_percpu_ptr variable, since
-// the compiler could copy gp into another register and access it after a
+// the compiler could copy s11 into another register and access it after a
 // reschedule.
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline T riscv64_read_percpu_field() {
-  uint64_t value;
-  __asm__ volatile("lwu %0, %1(gp)" : "=r"(value) : "I"(Offset));
-  return static_cast<T>(value);
+  if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    uint32_t value;
+    __asm__ volatile("lwu %0, %1(s11)" : "=r"(value) : "I"(Offset));
+    return static_cast<T>(value);
+  } else {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    uint64_t value;
+    __asm__ volatile("ld %0, %1(s11)" : "=r"(value) : "I"(Offset));
+    return static_cast<T>(value);
+  }
 }
 #define READ_PERCPU_FIELD32(field) \
   (riscv64_read_percpu_field<uint32_t, offsetof(riscv64_percpu, field)>())
 
 template <typename T, size_t Offset>
 [[gnu::always_inline]] inline void riscv64_write_percpu_field(T value) {
-  __asm__ volatile("sw %0, %1(gp)" : : "r"(static_cast<uint64_t>(value)), "I"(Offset));
+  if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    __asm__ volatile("sw %0, %1(s11)" : : "r"(static_cast<uint64_t>(value)), "I"(Offset));
+  } else {
+    static_assert(sizeof(T) == sizeof(uint64_t));
+    __asm__ volatile("sd %0, %1(s11)" : : "r"(static_cast<uint64_t>(value)), "I"(Offset));
+  }
 }
 #define WRITE_PERCPU_FIELD32(field, value) \
   (riscv64_write_percpu_field<uint32_t, offsetof(riscv64_percpu, field)>(value))

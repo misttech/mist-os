@@ -91,6 +91,7 @@ __NO_RETURN __NO_INLINE void exception_die(iframe_t* iframe, int64_t cause, uint
   PrintFrame(stdout, *iframe);
   printf("cause  %18" PRIi64 " %s\n", cause, cause_to_string(cause));
   printf("tval   %#18" PRIx64 "\n", tval);
+  Thread::Current::Get()->stack().DumpInfo(CRITICAL);
 
   // Fill in the crashlog.
   g_crashlog.regs.iframe = iframe;
