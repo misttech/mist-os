@@ -93,6 +93,9 @@ std::optional<ExceptionReason> DetectExceptionReason(
       default:
         return std::nullopt;
     }
+  } else if (exception_report.header.type == ZX_EXCP_UNDEFINED_INSTRUCTION &&
+             exception_report.context.arch.u.arm_64.esr == 0x2000000) {
+    return ExceptionReason::kArm64UnknownException;
   }
 
   return std::nullopt;

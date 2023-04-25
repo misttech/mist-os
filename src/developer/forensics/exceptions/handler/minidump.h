@@ -25,6 +25,7 @@ enum class ExceptionReason {
   kPageFaultIoDataIntegrity,
   kPageFaultBadState,
   kPageFaultNoMemory,
+  kArm64UnknownException,
 };
 
 // If |string_file| is empty, this function will error out.

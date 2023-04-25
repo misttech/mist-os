@@ -118,6 +118,18 @@ TEST_F(CrashReportBuilderTest, ExceptionReason_PageFaultBadState) {
   EXPECT_EQ(crash_report.crash_signature(), "fuchsia-page_fault-bad_state");
 }
 
+TEST_F(CrashReportBuilderTest, ExceptionReason_Arm64UnknownException) {
+  fsl::SizedVmo minidump_vmo;
+  ASSERT_TRUE(fsl::VmoFromString("minidump", &minidump_vmo));
+
+  builder_.SetMinidump(std::move(minidump_vmo.vmo()))
+      .SetExceptionReason(ExceptionReason::kArm64UnknownException);
+
+  auto crash_report = builder_.Consume();
+  ASSERT_TRUE(crash_report.has_crash_signature());
+  EXPECT_EQ(crash_report.crash_signature(), "fuchsia-arm64-unknown-exception");
+}
+
 TEST_F(CrashReportBuilderTest, ProcessTerminated) {
   builder_.SetProcessTerminated();
 
