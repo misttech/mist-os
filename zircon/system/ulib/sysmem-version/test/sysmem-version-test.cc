@@ -329,6 +329,11 @@ void random<v1::PixelFormatType>(v1::PixelFormatType* field) {
       /*RGB332 =*/110u,
       /*RGB2220 =*/111u,
       /*L8 =*/112u,
+      /*R8 =*/113u,
+      /*R8G8 =*/114u,
+      /*A2R10G10B10 =*/115u,
+      /*A2B10G10R10 =*/116u,
+      /*DO_NOT_CARE =*/0xFFFFFFFEu,
   };
   uint32_t index;
   random(&index);
@@ -453,6 +458,12 @@ v1::wire::PixelFormat V1WireRandomPixelFormat() {
   if (r.has_format_modifier) {
     random(&r.format_modifier.value);
   }
+  return r;
+}
+
+v1::PixelFormatType V1RandomPixelFormatType() {
+  v1::PixelFormatType r{};
+  random(&r);
   return r;
 }
 
@@ -773,6 +784,15 @@ TEST(SysmemVersion, PixelFormat) {
     auto v1_2 = sysmem::V1CopyFromV2PixelFormat(v2_2);
     auto snap_2 = SnapMoveFrom(std::move(v1_2));
     EXPECT_TRUE(IsEqual(*snap_1, *snap_2));
+  }
+}
+
+TEST(SysmemVersion, PixelFormatType) {
+  for (uint32_t run = 0; run < kRunCount; ++run) {
+    auto v1_1 = V1RandomPixelFormatType();
+    auto v2_1 = sysmem::V2CopyFromV1PixelFormatType(v1_1);
+    auto v1_2 = sysmem::V1CopyFromV2PixelFormatType(v2_1);
+    EXPECT_EQ(v1_1, v1_2);
   }
 }
 

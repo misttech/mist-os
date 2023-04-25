@@ -193,6 +193,12 @@ static_assert(2 == fidl_underlying_cast(static_cast<fuchsia_sysmem2::HeapType>(2
 [[nodiscard]] fuchsia_sysmem2::wire::HeapType V2CopyFromV1HeapType(
     fuchsia_sysmem::wire::HeapType heap_type);
 
+// For cases that also need to convey pixel_format_modifier, see
+// V2CopyFromV1PixelFormat. The implied modifier when not provided or not set
+// is FORMAT_MODIFIER_NONE (aka LINEAR).
+[[nodiscard]] fuchsia_images2::PixelFormat V2CopyFromV1PixelFormatType(
+    const fuchsia_sysmem::PixelFormatType& v1);
+
 [[nodiscard]] PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1);
 [[nodiscard]] PixelFormatAndModifier V2CopyFromV1PixelFormat(
     const fuchsia_sysmem::wire::PixelFormat& v1);
@@ -290,6 +296,12 @@ V1CopyFromV2BufferMemoryConstraints(const fuchsia_sysmem2::wire::BufferMemoryCon
 [[nodiscard]] fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier& v2);
 [[nodiscard]] fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(
     const PixelFormatAndModifier& v2);
+
+// For cases that also need to convey pixel_format_modifier, see
+// V2CopyFromV1PixelFormat. The implied modifier when not provided or not set
+// is FORMAT_MODIFIER_NONE (aka LINEAR).
+[[nodiscard]] fuchsia_sysmem::PixelFormatType V1CopyFromV2PixelFormatType(
+    const fuchsia_images2::PixelFormat& v2);
 
 [[nodiscard]] uint64_t V1ConvertFromV2PixelFormatModifier(uint64_t v2_pixel_format_modifier);
 

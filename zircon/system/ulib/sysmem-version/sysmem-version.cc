@@ -382,9 +382,14 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsAuxBuffers(
 
 }  // namespace
 
+fuchsia_images2::PixelFormat V2CopyFromV1PixelFormatType(
+    const fuchsia_sysmem::PixelFormatType& v1) {
+  return static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1));
+}
+
 PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat& v1) {
   PixelFormatAndModifier v2b;
-  v2b.pixel_format = static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1.type()));
+  v2b.pixel_format = V2CopyFromV1PixelFormatType(v1.type());
   if (v1.has_format_modifier()) {
     v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier().value());
   }
@@ -393,7 +398,7 @@ PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::PixelFormat
 
 PixelFormatAndModifier V2CopyFromV1PixelFormat(const fuchsia_sysmem::wire::PixelFormat& v1) {
   PixelFormatAndModifier v2b;
-  v2b.pixel_format = static_cast<fuchsia_images2::PixelFormat>(static_cast<uint32_t>(v1.type));
+  v2b.pixel_format = V2CopyFromV1PixelFormatType(v1.type);
   if (v1.has_format_modifier) {
     v2b.pixel_format_modifier = V2ConvertFromV1PixelFormatModifier(v1.format_modifier.value);
   }
@@ -1021,9 +1026,14 @@ fuchsia_sysmem::wire::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
   return v1;
 }
 
+fuchsia_sysmem::PixelFormatType V1CopyFromV2PixelFormatType(
+    const fuchsia_images2::PixelFormat& v2) {
+  return static_cast<fuchsia_sysmem::PixelFormatType>(static_cast<uint32_t>(v2));
+}
+
 fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier& v2) {
   fuchsia_sysmem::PixelFormat v1;
-  v1.type() = static_cast<fuchsia_sysmem::PixelFormatType>(static_cast<uint32_t>(v2.pixel_format));
+  v1.type() = V1CopyFromV2PixelFormatType(v2.pixel_format);
   v1.has_format_modifier() = true;
   v1.format_modifier().value() = V1ConvertFromV2PixelFormatModifier(v2.pixel_format_modifier);
   return v1;
@@ -1031,7 +1041,7 @@ fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier
 
 fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(const PixelFormatAndModifier& v2) {
   fuchsia_sysmem::wire::PixelFormat v1;
-  v1.type = static_cast<fuchsia_sysmem::PixelFormatType>(static_cast<uint32_t>(v2.pixel_format));
+  v1.type = V1CopyFromV2PixelFormatType(v2.pixel_format);
   v1.has_format_modifier = true;
   v1.format_modifier.value = V1ConvertFromV2PixelFormatModifier(v2.pixel_format_modifier);
   return v1;
