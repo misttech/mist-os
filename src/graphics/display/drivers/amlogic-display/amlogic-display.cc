@@ -248,6 +248,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uin
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  import_info->pixel_format = sysmem::V2CopyFromV1PixelFormat(
+      collection_info.settings.image_format_constraints.pixel_format);
+
   ZX_DEBUG_ASSERT(
       collection_info.settings.image_format_constraints.pixel_format.has_format_modifier);
 

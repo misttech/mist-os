@@ -16,6 +16,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
@@ -60,6 +61,7 @@ struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> 
   uint32_t image_height;
   uint32_t image_width;
 
+  PixelFormatAndModifier pixel_format;
   bool is_afbc;
   zx::pmt pmt;
   zx_paddr_t paddr;

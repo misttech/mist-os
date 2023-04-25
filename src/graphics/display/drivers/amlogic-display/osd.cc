@@ -348,26 +348,21 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   }
   cfg_w0.set_blk_mode(OsdBlk0CfgW0Reg::kBlockMode32Bit);
 
-  // This is guaranteed by AmlogicDisplay::CheckConfiguration().
-  ZX_DEBUG_ASSERT(config->layer_count > 0);
-  ZX_DEBUG_ASSERT(config->layer_list[0]->type == LAYER_TYPE_PRIMARY);
-
-  const primary_layer_t& primary_layer = config->layer_list[0]->cfg.primary;
-  switch (primary_layer.image.pixel_format) {
-    case ZX_PIXEL_FORMAT_ARGB_8888:
-    case ZX_PIXEL_FORMAT_RGB_x888:
-      cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixArgb8888);
-      break;
-    case ZX_PIXEL_FORMAT_ABGR_8888:
-    case ZX_PIXEL_FORMAT_BGR_888x:
+  switch (info->pixel_format.pixel_format) {
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
       cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixAbgr8888);
+      break;
+    case fuchsia_images2::PixelFormat::kBgra32:
+      cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixArgb8888);
       break;
     default:
       // This should never happen. The image validity is guaranteed in
       // ImportImage() / CheckConfiguration().
-      ZX_ASSERT_MSG(false, "Unsupported image format %08x", primary_layer.image.pixel_format);
+      ZX_ASSERT_MSG(false, "Unsupported image format %u",
+                    static_cast<uint32_t>(info->pixel_format.pixel_format));
       return;
   }
+
   rdma_->SetRdmaTableValue(next_table_idx, IDX_BLK0_CFG_W0, cfg_w0.reg_value());
 
   // Configure ctrl_stat and ctrl_stat2 registers
@@ -400,15 +395,15 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   osd_ctrl_stat2_val.set_replaced_alpha_en(1).set_replaced_alpha(kMaximumAlpha);
   osd_ctrl_stat_val.set_global_alpha(kMaximumAlpha);
 
+  // This is guaranteed by AmlogicDisplay::CheckConfiguration().
+  ZX_DEBUG_ASSERT(config->layer_count > 0);
+  ZX_DEBUG_ASSERT(config->layer_list[0]->type == LAYER_TYPE_PRIMARY);
+  const primary_layer_t& primary_layer = config->layer_list[0]->cfg.primary;
   if (primary_layer.alpha_mode != ALPHA_DISABLE) {
     // If a global alpha value is provided, apply it.
     if (!isnan(primary_layer.alpha_layer_val)) {
       auto num = static_cast<uint8_t>(round(primary_layer.alpha_layer_val * kMaximumAlpha));
       osd_ctrl_stat_val.set_global_alpha(num);
-    }
-    // If format includes alpha channel, disable "replaced_alpha"
-    if (primary_layer.image.pixel_format != ZX_PIXEL_FORMAT_RGB_x888) {
-      osd_ctrl_stat2_val.set_replaced_alpha_en(0);
     }
   }
 
