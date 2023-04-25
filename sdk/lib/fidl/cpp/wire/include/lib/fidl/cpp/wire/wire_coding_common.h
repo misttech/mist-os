@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_WIRE_CODING_COMMON_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_WIRE_CODING_COMMON_H_
+#ifndef LIB_FIDL_CPP_WIRE_WIRE_CODING_COMMON_H_
+#define LIB_FIDL_CPP_WIRE_WIRE_CODING_COMMON_H_
 
 #include <lib/fidl/cpp/wire/coding_errors.h>
 #include <lib/fidl/internal.h>
@@ -103,4 +103,4 @@ class RecursionDepth<true> {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_WIRE_CODING_COMMON_H_
+#endif  // LIB_FIDL_CPP_WIRE_WIRE_CODING_COMMON_H_

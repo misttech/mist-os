@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_SYNCHRONIZATION_CHECKER_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_SYNCHRONIZATION_CHECKER_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_SYNCHRONIZATION_CHECKER_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_SYNCHRONIZATION_CHECKER_H_
 
 #include <lib/async/cpp/sequence_checker.h>
 #include <zircon/compiler.h>
@@ -128,4 +128,4 @@ class __TA_SCOPED_CAPABILITY ScopedThreadGuard final {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_SYNCHRONIZATION_CHECKER_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_SYNCHRONIZATION_CHECKER_H_

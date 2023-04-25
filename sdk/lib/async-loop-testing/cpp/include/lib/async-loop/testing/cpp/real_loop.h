@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_ASYNC_LOOP_TESTING_CPP_INCLUDE_LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
-#define LIB_ASYNC_LOOP_TESTING_CPP_INCLUDE_LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
+#ifndef LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
+#define LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -153,4 +153,4 @@ Result RealLoop::PerformBlockingWorkImpl(Callable&& work) {
 
 }  // namespace loop_fixture
 
-#endif  // LIB_ASYNC_LOOP_TESTING_CPP_INCLUDE_LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
+#endif  // LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_

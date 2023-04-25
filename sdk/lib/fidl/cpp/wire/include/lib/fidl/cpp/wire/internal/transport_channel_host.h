@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_TRANSPORT_CHANNEL_HOST_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_TRANSPORT_CHANNEL_HOST_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_TRANSPORT_CHANNEL_HOST_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_TRANSPORT_CHANNEL_HOST_H_
 
 #include <lib/fidl/cpp/wire/internal/transport.h>
 
@@ -25,4 +25,4 @@ struct AssociatedTransportImpl<fidl_channel_handle_metadata_t> {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_TRANSPORT_CHANNEL_HOST_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_TRANSPORT_CHANNEL_HOST_H_

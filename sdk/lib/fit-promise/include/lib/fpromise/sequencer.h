@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_SEQUENCER_H_
-#define LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_SEQUENCER_H_
+#ifndef LIB_FPROMISE_SEQUENCER_H_
+#define LIB_FPROMISE_SEQUENCER_H_
 
 #include <assert.h>
 #include <lib/fit/thread_safety.h>
@@ -53,9 +53,9 @@ class sequencer final {
 
     fpromise::bridge<> bridge;
     fpromise::consumer<> prior = swap_prior(std::move(bridge.consumer));
-    return prior.promise_or(fpromise::ok()).then(
-        [promise = std::move(promise), completer = std::move(bridge.completer)](
-            fpromise::context& context, const fpromise::result<>&) mutable {
+    return prior.promise_or(fpromise::ok())
+        .then([promise = std::move(promise), completer = std::move(bridge.completer)](
+                  fpromise::context& context, const fpromise::result<>&) mutable {
           // This handler will run once the completer associated
           // with the |prior| promise is abandoned.  Once the promise
           // has finished, both the promise and completer will be
@@ -81,4 +81,4 @@ class sequencer final {
 
 }  // namespace fpromise
 
-#endif  // LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_SEQUENCER_H_
+#endif  // LIB_FPROMISE_SEQUENCER_H_

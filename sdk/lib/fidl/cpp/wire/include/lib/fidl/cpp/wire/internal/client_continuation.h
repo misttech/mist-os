@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_CONTINUATION_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_CONTINUATION_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_CONTINUATION_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_CONTINUATION_H_
 
 #include <lib/fidl/cpp/wire/message.h>
 #include <lib/fidl/cpp/wire/status.h>
@@ -75,4 +75,4 @@ struct WeakCallbackFactory {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_CONTINUATION_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_CONTINUATION_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CODING_ERRORS_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CODING_ERRORS_H_
+#ifndef LIB_FIDL_CPP_WIRE_CODING_ERRORS_H_
+#define LIB_FIDL_CPP_WIRE_CODING_ERRORS_H_
 
 namespace fidl::internal {
 
@@ -52,4 +52,4 @@ extern const char* const kCodingErrorDataTooShort;
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CODING_ERRORS_H_
+#endif  // LIB_FIDL_CPP_WIRE_CODING_ERRORS_H_

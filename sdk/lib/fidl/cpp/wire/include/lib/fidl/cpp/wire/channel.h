@@ -5,8 +5,8 @@
 // channel.h is the "entrypoint header" that should be included when using the
 // channel transport with LLCPP.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CHANNEL_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CHANNEL_H_
+#ifndef LIB_FIDL_CPP_WIRE_CHANNEL_H_
+#define LIB_FIDL_CPP_WIRE_CHANNEL_H_
 
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/internal/arrow.h>
@@ -863,4 +863,4 @@ class ServerBindingGroup final
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CHANNEL_H_
+#endif  // LIB_FIDL_CPP_WIRE_CHANNEL_H_

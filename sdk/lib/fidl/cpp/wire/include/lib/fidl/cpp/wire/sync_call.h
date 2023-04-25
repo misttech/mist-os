@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_SYNC_CALL_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_SYNC_CALL_H_
+#ifndef LIB_FIDL_CPP_WIRE_SYNC_CALL_H_
+#define LIB_FIDL_CPP_WIRE_SYNC_CALL_H_
 
 #include <lib/fidl/cpp/wire/async_binding.h>
 #include <lib/fidl/cpp/wire/internal/arrow.h>
@@ -377,4 +377,4 @@ using EventBuffer = internal::InlineMessageBuffer<EventReplyBufferSizeInChannel<
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_SYNC_CALL_H_
+#endif  // LIB_FIDL_CPP_WIRE_SYNC_CALL_H_

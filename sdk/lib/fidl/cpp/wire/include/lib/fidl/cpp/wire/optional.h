@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OPTIONAL_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OPTIONAL_H_
+#ifndef LIB_FIDL_CPP_WIRE_OPTIONAL_H_
+#define LIB_FIDL_CPP_WIRE_OPTIONAL_H_
 
 #include <lib/fidl/cpp/wire/traits.h>
 #include <zircon/assert.h>
@@ -93,4 +93,4 @@ struct IsUnion<WireOptional<T>> : public IsUnion<T> {};
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OPTIONAL_H_
+#endif  // LIB_FIDL_CPP_WIRE_OPTIONAL_H_

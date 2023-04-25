@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_WIRE_TYPES_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_WIRE_TYPES_H_
+#ifndef LIB_FIDL_DRIVER_CPP_WIRE_TYPES_H_
+#define LIB_FIDL_DRIVER_CPP_WIRE_TYPES_H_
 
 #include <lib/fidl/cpp/wire/wire_coding_traits.h>
 #include <lib/fidl/cpp/wire/wire_types.h>
@@ -61,4 +61,4 @@ struct WireCodingTraits<::fdf::ClientEnd<T>, Constraint, IsRecursive> {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_WIRE_TYPES_H_
+#endif  // LIB_FIDL_DRIVER_CPP_WIRE_TYPES_H_

@@ -5,8 +5,8 @@
 // A class for checking that the current thread is/isn't the same as an initial
 // thread.
 
-#ifndef LIB_FIT_INCLUDE_LIB_FIT_THREAD_CHECKER_H_
-#define LIB_FIT_INCLUDE_LIB_FIT_THREAD_CHECKER_H_
+#ifndef LIB_FIT_THREAD_CHECKER_H_
+#define LIB_FIT_THREAD_CHECKER_H_
 
 #include <assert.h>
 
@@ -71,4 +71,4 @@ class FIT_CAPABILITY("mutex") thread_checker final {
 
 }  // namespace fit
 
-#endif  // LIB_FIT_INCLUDE_LIB_FIT_THREAD_CHECKER_H_
+#endif  // LIB_FIT_THREAD_CHECKER_H_

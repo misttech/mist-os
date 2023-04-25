@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_THENABLE_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_THENABLE_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_THENABLE_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_THENABLE_H_
 
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/client_base.h>
@@ -144,4 +144,4 @@ class [[nodiscard]] WireThenableImpl : private ThenableBase {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_THENABLE_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_THENABLE_H_

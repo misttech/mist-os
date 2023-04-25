@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TYPES_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TYPES_H_
+#ifndef LIB_FDF_TYPES_H_
+#define LIB_FDF_TYPES_H_
 
 #include <zircon/syscalls.h>
 
@@ -48,4 +48,4 @@ typedef struct fdf_channel_call_args {
 
 __END_CDECLS
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TYPES_H_
+#endif  // LIB_FDF_TYPES_H_

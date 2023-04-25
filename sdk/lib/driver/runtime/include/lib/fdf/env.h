@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_ENV_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_ENV_H_
+#ifndef LIB_FDF_ENV_H_
+#define LIB_FDF_ENV_H_
 
 #include <lib/fdf/dispatcher.h>
 #include <zircon/types.h>
@@ -106,4 +106,4 @@ bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher);
 
 __END_CDECLS
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_ENV_H_
+#endif  // LIB_FDF_ENV_H_

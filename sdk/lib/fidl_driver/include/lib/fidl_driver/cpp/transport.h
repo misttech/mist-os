@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_TRANSPORT_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_TRANSPORT_H_
+#ifndef LIB_FIDL_DRIVER_CPP_TRANSPORT_H_
+#define LIB_FIDL_DRIVER_CPP_TRANSPORT_H_
 
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/channel.h>
@@ -282,4 +282,4 @@ zx::result<fdf::ClientEnd<Protocol>> CreateEndpoints(fdf::ServerEnd<Protocol>* o
 
 }  // namespace fdf
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_TRANSPORT_H_
+#endif  // LIB_FIDL_DRIVER_CPP_TRANSPORT_H_

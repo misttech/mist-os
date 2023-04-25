@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_TRAITS_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_TRAITS_H_
+#ifndef LIB_FIDL_CPP_WIRE_TRAITS_H_
+#define LIB_FIDL_CPP_WIRE_TRAITS_H_
 
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/internal.h>
@@ -379,4 +379,4 @@ constexpr uint32_t ClampedHandleCount() {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_TRAITS_H_
+#endif  // LIB_FIDL_CPP_WIRE_TRAITS_H_

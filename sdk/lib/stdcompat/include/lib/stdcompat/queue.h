@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_QUEUE_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_QUEUE_H_
+#ifndef LIB_STDCOMPAT_QUEUE_H_
+#define LIB_STDCOMPAT_QUEUE_H_
 
 #include <queue>
 
@@ -33,4 +33,4 @@ typename std::deque<T, Alloc>::size_type erase_if(std::deque<T, Alloc>& c, Pred 
 
 }  // namespace cpp20
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_QUEUE_H_
+#endif  // LIB_STDCOMPAT_QUEUE_H_

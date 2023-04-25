@@ -184,7 +184,7 @@ inline zx_status_t Clone(const ::std::map<uint64_t, UnknownData>& value,
   result->clear();
   for (const auto& pair : value) {
     auto field = result->emplace(std::piecewise_construct, std::forward_as_tuple(pair.first),
-                                     std::forward_as_tuple());
+                                 std::forward_as_tuple());
     zx_status_t status = Clone(pair.second, &field.first->second);
     if (status != ZX_OK)
       return status;

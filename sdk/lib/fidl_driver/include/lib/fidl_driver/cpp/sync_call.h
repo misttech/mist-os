@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_
+#ifndef LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_
+#define LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_
 
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/transport.h>
@@ -210,4 +210,4 @@ fdf::internal::SyncEndpointVeneer<FidlProtocol> WireCall(
 }
 }  // namespace fdf
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_
+#endif  // LIB_FIDL_DRIVER_CPP_SYNC_CALL_H_

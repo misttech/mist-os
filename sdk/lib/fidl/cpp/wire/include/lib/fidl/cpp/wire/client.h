@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CLIENT_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CLIENT_H_
+#ifndef LIB_FIDL_CPP_WIRE_CLIENT_H_
+#define LIB_FIDL_CPP_WIRE_CLIENT_H_
 
 #include <lib/fidl/cpp/wire/client_base.h>
 #include <lib/fidl/cpp/wire/internal/endpoints.h>
@@ -587,4 +587,4 @@ WireSharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*) -> WireSharedCl
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CLIENT_H_
+#endif  // LIB_FIDL_CPP_WIRE_CLIENT_H_

@@ -97,10 +97,10 @@ def top_level_docs():
 
 # Guard macro that goes at the beginning/end of the header (after license).
 def guards(begin):
-    macro = 'LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_H_'
+    macro = 'LIB_MAGMA_MAGMA_H_'
     if begin:
         return f'#ifndef {macro}\n#define {macro}\n'
-    return f'#endif // {macro}'
+    return f'#endif  // {macro}'
 
 
 # Begin/end C linkage scope.

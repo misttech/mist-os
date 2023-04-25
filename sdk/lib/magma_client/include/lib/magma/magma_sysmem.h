@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_SYSMEM_H_
-#define LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_SYSMEM_H_
+#ifndef LIB_MAGMA_MAGMA_SYSMEM_H_
+#define LIB_MAGMA_MAGMA_SYSMEM_H_
 
 #include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
@@ -304,4 +304,4 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_format_index(
 }
 #endif
 
-#endif  // LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_SYSMEM_H_
+#endif  // LIB_MAGMA_MAGMA_SYSMEM_H_

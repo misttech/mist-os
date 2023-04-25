@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_UNOWNED_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_UNOWNED_H_
+#ifndef LIB_FDF_CPP_UNOWNED_H_
+#define LIB_FDF_CPP_UNOWNED_H_
 
 namespace fdf {
 
@@ -85,4 +85,4 @@ bool operator>=(const Unowned<T>& a, const Unowned<T>& b) {
 
 }  // namespace fdf
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_UNOWNED_H_
+#endif  // LIB_FDF_CPP_UNOWNED_H_

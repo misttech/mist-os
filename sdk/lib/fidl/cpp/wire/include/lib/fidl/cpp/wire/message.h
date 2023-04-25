@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_MESSAGE_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_MESSAGE_H_
+#ifndef LIB_FIDL_CPP_WIRE_MESSAGE_H_
+#define LIB_FIDL_CPP_WIRE_MESSAGE_H_
 
 #include <lib/fidl/cpp/transaction_header.h>
 #include <lib/fidl/cpp/wire/decoded_value.h>
@@ -193,4 +193,4 @@ class OutgoingToEncodedMessage {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_MESSAGE_H_
+#endif  // LIB_FIDL_CPP_WIRE_MESSAGE_H_

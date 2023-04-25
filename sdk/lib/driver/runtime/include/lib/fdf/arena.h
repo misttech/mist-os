@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_ARENA_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_ARENA_H_
+#ifndef LIB_FDF_ARENA_H_
+#define LIB_FDF_ARENA_H_
 
 #include <lib/fdf/types.h>
 
@@ -75,4 +75,4 @@ void fdf_arena_drop_ref(fdf_arena_t* arena);
 
 __END_CDECLS
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_ARENA_H_
+#endif  // LIB_FDF_ARENA_H_

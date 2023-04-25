@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIT_INCLUDE_LIB_FIT_INLINE_ANY_H_
-#define LIB_FIT_INCLUDE_LIB_FIT_INLINE_ANY_H_
+#ifndef LIB_FIT_INLINE_ANY_H_
+#define LIB_FIT_INLINE_ANY_H_
 
 #include <lib/stdcompat/type_traits.h>
 
@@ -81,4 +81,4 @@ class pinned_inline_any : public internal::inline_any_impl<Interface, Reserve, A
 
 }  // namespace fit
 
-#endif  // LIB_FIT_INCLUDE_LIB_FIT_INLINE_ANY_H_
+#endif  // LIB_FIT_INLINE_ANY_H_

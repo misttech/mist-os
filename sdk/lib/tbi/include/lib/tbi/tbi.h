@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_LIB_TBI_INCLUDE_LIB_TBI_TBI_H_
-#define SRC_LIB_TBI_INCLUDE_LIB_TBI_TBI_H_
+#ifndef LIB_TBI_TBI_H_
+#define LIB_TBI_TBI_H_
 
 #include <stdint.h>
 #include <string.h>
@@ -25,4 +25,4 @@ inline T* RemoveTag(T* ptr) {
 
 }  // namespace tbi
 
-#endif  // SRC_LIB_TBI_INCLUDE_LIB_TBI_TBI_H_
+#endif  // LIB_TBI_TBI_H_

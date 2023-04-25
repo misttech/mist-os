@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_ASYNC_BINDING_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_ASYNC_BINDING_H_
+#ifndef LIB_FIDL_CPP_WIRE_ASYNC_BINDING_H_
+#define LIB_FIDL_CPP_WIRE_ASYNC_BINDING_H_
 
 #include <lib/async/dispatcher.h>
 #include <lib/async/task.h>
@@ -553,4 +553,4 @@ using WeakClientBindingRef = WeakBindingRef<AsyncClientBinding>;
 }  // namespace internal
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_ASYNC_BINDING_H_
+#endif  // LIB_FIDL_CPP_WIRE_ASYNC_BINDING_H_

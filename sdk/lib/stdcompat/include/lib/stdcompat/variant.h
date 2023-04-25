@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_VARIANT_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_VARIANT_H_
+#ifndef LIB_STDCOMPAT_VARIANT_H_
+#define LIB_STDCOMPAT_VARIANT_H_
 
 #include <cstddef>
 #include <limits>
@@ -336,8 +336,8 @@ class variant
       std::is_assignable<selected_t<T&&>&, T>,
       disjunction<std::is_nothrow_constructible<selected_t<T&&>, T>,
                   negation<std::is_nothrow_move_constructible<selected_t<T&&>>>>>
-  operator=(T&& value) noexcept(std::is_nothrow_assignable<selected_t<T&&>&, T>::value&&
-                                    std::is_nothrow_constructible<selected_t<T&&>, T>::value) {
+  operator=(T&& value) noexcept(std::is_nothrow_assignable<selected_t<T&&>&, T>::value &&
+                                std::is_nothrow_constructible<selected_t<T&&>, T>::value) {
     constexpr auto index = selected_index<T>;
     if (storage_.index() == index) {
       storage_.get(index_tag<index>{}) = std::forward<T>(value);
@@ -353,8 +353,8 @@ class variant
       std::is_assignable<selected_t<T&&>&, T>,
       conjunction<negation<std::is_nothrow_constructible<selected_t<T&&>, T>>,
                   std::is_nothrow_move_constructible<selected_t<T&&>>>>
-  operator=(T&& value) noexcept(std::is_nothrow_assignable<selected_t<T&&>&, T>::value&&
-                                    std::is_nothrow_constructible<selected_t<T&&>, T>::value) {
+  operator=(T&& value) noexcept(std::is_nothrow_assignable<selected_t<T&&>&, T>::value &&
+                                std::is_nothrow_constructible<selected_t<T&&>, T>::value) {
     constexpr auto index = selected_index<T>;
     if (storage_.index() == index) {
       storage_.get(index_tag<index>{}) = std::forward<T>(value);
@@ -651,4 +651,4 @@ constexpr decltype(auto) visit(Visitor&& visitor, Variants&&... variants) {
 
 #endif  // __cpp_lib_variant >= 2016L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_VARIANT_H_
+#endif  // LIB_STDCOMPAT_VARIANT_H_

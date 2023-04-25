@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CONNECT_SERVICE_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CONNECT_SERVICE_H_
+#ifndef LIB_FIDL_CPP_WIRE_CONNECT_SERVICE_H_
+#define LIB_FIDL_CPP_WIRE_CONNECT_SERVICE_H_
 
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
@@ -64,4 +64,4 @@ constexpr const char* DiscoverableProtocolDefaultPath = fidl::internal::default_
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_CONNECT_SERVICE_H_
+#endif  // LIB_FIDL_CPP_WIRE_CONNECT_SERVICE_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_DETAILS_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_DETAILS_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_DETAILS_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_DETAILS_H_
 
 #include <lib/fidl/cpp/wire/internal/arrow.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -243,4 +243,4 @@ class AnyTeardownObserver final {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_DETAILS_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_CLIENT_DETAILS_H_

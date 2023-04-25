@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CTS_TESTS_PKG_FIDL_CPP_TEST_HANDLE_UTIL_H_
-#define CTS_TESTS_PKG_FIDL_CPP_TEST_HANDLE_UTIL_H_
+#ifndef CTF_TESTS_PKG_FIDL_CPP_TEST_HANDLE_UTIL_H_
+#define CTF_TESTS_PKG_FIDL_CPP_TEST_HANDLE_UTIL_H_
 
 #include <lib/zx/handle.h>
 
@@ -18,4 +18,4 @@ zx_handle_t CreateEvent(zx_rights_t rights = ZX_RIGHT_SAME_RIGHTS);
 }  // namespace test
 }  // namespace fidl
 
-#endif  // CTS_TESTS_PKG_FIDL_CPP_TEST_HANDLE_UTIL_H_
+#endif  // CTF_TESTS_PKG_FIDL_CPP_TEST_HANDLE_UTIL_H_

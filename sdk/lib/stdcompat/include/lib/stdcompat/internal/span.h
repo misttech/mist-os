@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
-#define SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
+#ifndef LIB_STDCOMPAT_INTERNAL_SPAN_H_
+#define LIB_STDCOMPAT_INTERNAL_SPAN_H_
 
 #include <array>
 #include <cstddef>
@@ -228,4 +228,4 @@ struct __is_cpp17_contiguous_iterator<cpp20::internal::span_iterator<It>> : true
 #endif
 #endif
 
-#endif  // SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
+#endif  // LIB_STDCOMPAT_INTERNAL_SPAN_H_

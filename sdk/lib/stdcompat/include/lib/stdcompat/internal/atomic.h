@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_ATOMIC_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_ATOMIC_H_
+#ifndef LIB_STDCOMPAT_INTERNAL_ATOMIC_H_
+#define LIB_STDCOMPAT_INTERNAL_ATOMIC_H_
 
 #include <algorithm>
 #include <atomic>
@@ -344,4 +344,4 @@ class bitwise_ops<Derived, T, std::enable_if_t<cpp17::is_integral_v<T>>> {
 }  // namespace atomic_internal
 }  // namespace cpp20
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_ATOMIC_H_
+#endif  // LIB_STDCOMPAT_INTERNAL_ATOMIC_H_

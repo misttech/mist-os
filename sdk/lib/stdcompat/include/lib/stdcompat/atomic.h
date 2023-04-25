@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_ATOMIC_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_ATOMIC_H_
+#ifndef LIB_STDCOMPAT_ATOMIC_H_
+#define LIB_STDCOMPAT_ATOMIC_H_
 
 #include <assert.h>
 
@@ -77,4 +77,4 @@ class atomic_ref : public atomic_internal::atomic_ops<atomic_ref<T>, T>,
 
 }  // namespace cpp20
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_ATOMIC_H_
+#endif  // LIB_STDCOMPAT_ATOMIC_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_INTERNAL_ENDPOINT_CONVERSIONS_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_INTERNAL_ENDPOINT_CONVERSIONS_H_
+#ifndef LIB_FIDL_DRIVER_CPP_INTERNAL_ENDPOINT_CONVERSIONS_H_
+#define LIB_FIDL_DRIVER_CPP_INTERNAL_ENDPOINT_CONVERSIONS_H_
 
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
@@ -59,4 +59,4 @@ struct WireTypeForNaturalType<fdf::UnownedServerEnd<Protocol>> {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_INTERNAL_ENDPOINT_CONVERSIONS_H_
+#endif  // LIB_FIDL_DRIVER_CPP_INTERNAL_ENDPOINT_CONVERSIONS_H_

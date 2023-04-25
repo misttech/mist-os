@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FDIO_INCLUDE_LIB_FDIO_SPAWN_ACTIONS_H_
-#define LIB_FDIO_INCLUDE_LIB_FDIO_SPAWN_ACTIONS_H_
+#ifndef LIB_FDIO_SPAWN_ACTIONS_H_
+#define LIB_FDIO_SPAWN_ACTIONS_H_
 
 #include <lib/fdio/spawn.h>
 #include <lib/zx/object.h>
@@ -85,4 +85,4 @@ class FdioSpawnActions final {
   }
 } ZX_AVAILABLE_SINCE(1);
 
-#endif  // LIB_FDIO_INCLUDE_LIB_FDIO_SPAWN_ACTIONS_H_
+#endif  // LIB_FDIO_SPAWN_ACTIONS_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_NODE_UTILS_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_NODE_UTILS_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_NODE_UTILS_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_NODE_UTILS_H_
 
 #include <lib/fidl/cpp/wire/internal/intrusive_container/container_utils.h>
 
@@ -91,4 +91,4 @@ struct CommonNodeStateBase {
 }  // namespace internal_wavl
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_NODE_UTILS_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_NODE_UTILS_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FDIO_INCLUDE_LIB_FDIO_SPAWN_H_
-#define LIB_FDIO_INCLUDE_LIB_FDIO_SPAWN_H_
+#ifndef LIB_FDIO_SPAWN_H_
+#define LIB_FDIO_SPAWN_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -306,4 +306,4 @@ zx_status_t fdio_spawn_vmo(ZX_HANDLE_USE zx_handle_t job, uint32_t flags,
 
 __END_CDECLS
 
-#endif  // LIB_FDIO_INCLUDE_LIB_FDIO_SPAWN_H_
+#endif  // LIB_FDIO_SPAWN_H_

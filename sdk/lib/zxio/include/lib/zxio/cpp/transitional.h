@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_ZXIO_INCLUDE_LIB_ZXIO_CPP_TRANSITIONAL_H_
-#define LIB_ZXIO_INCLUDE_LIB_ZXIO_CPP_TRANSITIONAL_H_
+#ifndef LIB_ZXIO_CPP_TRANSITIONAL_H_
+#define LIB_ZXIO_CPP_TRANSITIONAL_H_
 
 #include <lib/zxio/types.h>
 #include <sys/socket.h>
@@ -22,4 +22,4 @@ void zxio_wait_begin_inner(zxio_t* io, uint32_t events, zx_signals_t signals,
 void zxio_wait_end_inner(zxio_t* io, zx_signals_t signals, uint32_t* out_events,
                          zx_signals_t* out_signals);
 
-#endif  // LIB_ZXIO_INCLUDE_LIB_ZXIO_CPP_TRANSITIONAL_H_
+#endif  // LIB_ZXIO_CPP_TRANSITIONAL_H_

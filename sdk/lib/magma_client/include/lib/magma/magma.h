@@ -32,8 +32,8 @@
 
 // clang-format off
 
-#ifndef LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_H_
-#define LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_H_
+#ifndef LIB_MAGMA_MAGMA_H_
+#define LIB_MAGMA_MAGMA_H_
 
 #include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
@@ -584,4 +584,4 @@ MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
 #endif
 
 // LINT.ThenChange(magma_common_defs.h:version)
-#endif // LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_H_
+#endif  // LIB_MAGMA_MAGMA_H_

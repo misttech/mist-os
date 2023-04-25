@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_PROMISE_INTERNAL_H_
-#define LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_PROMISE_INTERNAL_H_
+#ifndef LIB_FPROMISE_PROMISE_INTERNAL_H_
+#define LIB_FPROMISE_PROMISE_INTERNAL_H_
 
 #include <assert.h>
 #include <lib/fit/function.h>
@@ -723,4 +723,4 @@ inline promise_impl<Continuation> make_promise_with_continuation(Continuation co
 
 }  // namespace fpromise
 
-#endif  // LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_PROMISE_INTERNAL_H_
+#endif  // LIB_FPROMISE_PROMISE_INTERNAL_H_

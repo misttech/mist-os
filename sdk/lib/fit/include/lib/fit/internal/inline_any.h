@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIT_INCLUDE_LIB_FIT_INTERNAL_INLINE_ANY_H_
-#define LIB_FIT_INCLUDE_LIB_FIT_INTERNAL_INLINE_ANY_H_
+#ifndef LIB_FIT_INTERNAL_INLINE_ANY_H_
+#define LIB_FIT_INTERNAL_INLINE_ANY_H_
 
 #include <lib/stdcompat/type_traits.h>
 #include <lib/stdcompat/utility.h>
@@ -336,4 +336,4 @@ class inline_any_impl {
 }  // namespace internal
 }  // namespace fit
 
-#endif  // LIB_FIT_INCLUDE_LIB_FIT_INTERNAL_INLINE_ANY_H_
+#endif  // LIB_FIT_INTERNAL_INLINE_ANY_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_
 
 #include <zircon/fidl.h>
 
@@ -59,4 +59,4 @@ size_t FormatApplicationError(uint32_t value, const char* member_name, const fid
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_

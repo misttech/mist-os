@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_ZXIO_INCLUDE_LIB_ZXIO_BSDSOCKET_H_
-#define LIB_ZXIO_INCLUDE_LIB_ZXIO_BSDSOCKET_H_
+#ifndef LIB_ZXIO_BSDSOCKET_H_
+#define LIB_ZXIO_BSDSOCKET_H_
 
 #include <lib/zxio/types.h>
 #include <lib/zxio/zxio.h>
@@ -71,4 +71,4 @@ ZXIO_EXPORT zx_status_t zxio_sendmsg(zxio_t* io, const struct msghdr* msg, int f
 
 __END_CDECLS
 
-#endif  // LIB_ZXIO_INCLUDE_LIB_ZXIO_BSDSOCKET_H_
+#endif  // LIB_ZXIO_BSDSOCKET_H_

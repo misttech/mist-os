@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SERVER_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SERVER_H_
+#ifndef LIB_FIDL_DRIVER_CPP_SERVER_H_
+#define LIB_FIDL_DRIVER_CPP_SERVER_H_
 
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -385,4 +385,4 @@ class ServerBindingGroup final
 
 }  // namespace fdf
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_SERVER_H_
+#endif  // LIB_FIDL_DRIVER_CPP_SERVER_H_

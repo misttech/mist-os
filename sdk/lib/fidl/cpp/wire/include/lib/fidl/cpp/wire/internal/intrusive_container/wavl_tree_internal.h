@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_WAVL_TREE_INTERNAL_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_WAVL_TREE_INTERNAL_H_
+#ifndef LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_WAVL_TREE_INTERNAL_H_
+#define LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_WAVL_TREE_INTERNAL_H_
 
 #include <lib/fidl/cpp/wire/internal/intrusive_container/container_utils.h>
 #include <stdint.h>
@@ -168,4 +168,4 @@ struct WAVLTreeNodeState<PtrType, Options, int32_t>
 }  // namespace internal_wavl
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_WAVL_TREE_INTERNAL_H_
+#endif  // LIB_FIDL_CPP_WIRE_INTERNAL_INTRUSIVE_CONTAINER_WAVL_TREE_INTERNAL_H_

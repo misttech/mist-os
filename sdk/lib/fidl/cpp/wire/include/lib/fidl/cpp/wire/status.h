@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_STATUS_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_STATUS_H_
+#ifndef LIB_FIDL_CPP_WIRE_STATUS_H_
+#define LIB_FIDL_CPP_WIRE_STATUS_H_
 
 #include <lib/fidl/cpp/wire/internal/display_error.h>
 #include <zircon/assert.h>
@@ -623,4 +623,4 @@ static_assert(sizeof(UnbindInfo) == sizeof(uintptr_t) * 2, "UnbindInfo should be
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_STATUS_H_
+#endif  // LIB_FIDL_CPP_WIRE_STATUS_H_

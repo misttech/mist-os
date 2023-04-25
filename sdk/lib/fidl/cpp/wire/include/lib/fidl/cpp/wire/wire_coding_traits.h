@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
+#ifndef LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
+#define LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
 
 #include <lib/fidl/cpp/wire/coding_errors.h>
 #include <lib/fidl/cpp/wire/object_view.h>
@@ -799,4 +799,4 @@ fidl::Status EnsureSupportedWireFormat(::fidl::WireFormatMetadata metadata);
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
+#endif  // LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_

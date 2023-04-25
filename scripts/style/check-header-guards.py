@@ -37,7 +37,7 @@ sysroot_prefix = re.compile('^(' + '|'.join(SYSROOT_PREFIXES) + ')_')
 PUBLIC_PREFIXES = [
     'ZIRCON_SYSTEM_PUBLIC',
     'ZIRCON_SYSTEM_ULIB_.*_INCLUDE',
-    'SDK',
+    'SDK(_.*_INCLUDE)?',
 ]
 public_prefix = re.compile('^(' + '|'.join(PUBLIC_PREFIXES) + ')_')
 

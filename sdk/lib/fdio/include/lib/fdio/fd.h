@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FDIO_INCLUDE_LIB_FDIO_FD_H_
-#define LIB_FDIO_INCLUDE_LIB_FDIO_FD_H_
+#ifndef LIB_FDIO_FD_H_
+#define LIB_FDIO_FD_H_
 
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
@@ -126,4 +126,4 @@ zx_status_t fdio_fd_transfer_or_clone(int fd, zx_handle_t* out_handle) ZX_AVAILA
 
 __END_CDECLS
 
-#endif  // LIB_FDIO_INCLUDE_LIB_FDIO_FD_H_
+#endif  // LIB_FDIO_FD_H_

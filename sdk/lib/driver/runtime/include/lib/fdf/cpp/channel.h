@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_CHANNEL_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_CHANNEL_H_
+#ifndef LIB_FDF_CPP_CHANNEL_H_
+#define LIB_FDF_CPP_CHANNEL_H_
 
 #include <lib/fdf/channel.h>
 #include <lib/fdf/cpp/arena.h>
@@ -269,4 +269,4 @@ using UnownedChannel = fdf::Unowned<Channel>;
 
 }  // namespace fdf
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_CHANNEL_H_
+#endif  // LIB_FDF_CPP_CHANNEL_H_

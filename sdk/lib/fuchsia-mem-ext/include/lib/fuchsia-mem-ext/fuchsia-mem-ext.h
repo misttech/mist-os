@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FUCHSIA_MEM_EXT_INCLUDE_LIB_FUCHSIA_MEM_EXT_FUCHSIA_MEM_EXT_H_
-#define LIB_FUCHSIA_MEM_EXT_INCLUDE_LIB_FUCHSIA_MEM_EXT_FUCHSIA_MEM_EXT_H_
+#ifndef LIB_FUCHSIA_MEM_EXT_FUCHSIA_MEM_EXT_H_
+#define LIB_FUCHSIA_MEM_EXT_FUCHSIA_MEM_EXT_H_
 
 #include <fuchsia/mem/cpp/fidl.h>
 #include <lib/stdcompat/span.h>
@@ -52,4 +52,4 @@ zx::result<std::vector<uint8_t>> ExtractData(fuchsia::mem::Data data);
 
 }  // namespace fuchsia_mem_ext
 
-#endif  // LIB_FUCHSIA_MEM_EXT_INCLUDE_LIB_FUCHSIA_MEM_EXT_FUCHSIA_MEM_EXT_H_
+#endif  // LIB_FUCHSIA_MEM_EXT_FUCHSIA_MEM_EXT_H_

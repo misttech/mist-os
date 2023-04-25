@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_BASE_INCLUDE_LIB_FIDL_CPP_TRANSACTION_HEADER_H_
-#define LIB_FIDL_BASE_INCLUDE_LIB_FIDL_CPP_TRANSACTION_HEADER_H_
+#ifndef LIB_FIDL_CPP_TRANSACTION_HEADER_H_
+#define LIB_FIDL_CPP_TRANSACTION_HEADER_H_
 
 #include <lib/fidl/txn_header.h>
 
@@ -51,4 +51,4 @@ inline bool IsByteOverflow(const fidl_message_header_t* hdr) {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_BASE_INCLUDE_LIB_FIDL_CPP_TRANSACTION_HEADER_H_
+#endif  // LIB_FIDL_CPP_TRANSACTION_HEADER_H_

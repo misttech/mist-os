@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_PROTOCOL_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_PROTOCOL_H_
+#ifndef LIB_FDF_CPP_PROTOCOL_H_
+#define LIB_FDF_CPP_PROTOCOL_H_
 
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/token.h>
@@ -86,4 +86,4 @@ zx_status_t ProtocolConnect(zx::channel token, fdf::Channel channel);
 
 }  // namespace fdf
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_PROTOCOL_H_
+#endif  // LIB_FDF_CPP_PROTOCOL_H_

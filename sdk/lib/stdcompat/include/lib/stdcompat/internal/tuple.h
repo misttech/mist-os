@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_TUPLE_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_TUPLE_H_
+#ifndef LIB_STDCOMPAT_INTERNAL_TUPLE_H_
+#define LIB_STDCOMPAT_INTERNAL_TUPLE_H_
 
 #include <cstddef>
 
@@ -20,4 +20,4 @@ constexpr decltype(auto) apply_impl(F&& f, T&& tuple, std::index_sequence<Is...>
 }  // namespace internal
 }  // namespace cpp17
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_TUPLE_H_
+#endif  // LIB_STDCOMPAT_INTERNAL_TUPLE_H_

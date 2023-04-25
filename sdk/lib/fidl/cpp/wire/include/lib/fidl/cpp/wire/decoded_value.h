@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_DECODED_VALUE_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_DECODED_VALUE_H_
+#ifndef LIB_FIDL_CPP_WIRE_DECODED_VALUE_H_
+#define LIB_FIDL_CPP_WIRE_DECODED_VALUE_H_
 
 #include <lib/fidl/cpp/wire/traits.h>
 #include <zircon/fidl.h>
@@ -69,4 +69,4 @@ class DecodedValue {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_DECODED_VALUE_H_
+#endif  // LIB_FIDL_CPP_WIRE_DECODED_VALUE_H_

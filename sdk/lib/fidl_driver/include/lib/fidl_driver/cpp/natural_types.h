@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_NATURAL_TYPES_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_NATURAL_TYPES_H_
+#ifndef LIB_FIDL_DRIVER_CPP_NATURAL_TYPES_H_
+#define LIB_FIDL_DRIVER_CPP_NATURAL_TYPES_H_
 
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fidl/cpp/natural_coding_traits.h>
@@ -71,4 +71,4 @@ struct NaturalCodingTraits<::fdf::ClientEnd<T>, Constraint> {
 
 }  // namespace fidl::internal
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_NATURAL_TYPES_H_
+#endif  // LIB_FIDL_DRIVER_CPP_NATURAL_TYPES_H_

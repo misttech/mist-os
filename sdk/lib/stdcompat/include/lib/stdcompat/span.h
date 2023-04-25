@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_SPAN_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_SPAN_H_
+#ifndef LIB_STDCOMPAT_SPAN_H_
+#define LIB_STDCOMPAT_SPAN_H_
 
 #include <cassert>
 #include <cstddef>
@@ -260,4 +260,4 @@ cpp20::span<const cpp17::byte, S> as_bytes(cpp20::span<T, N> s) noexcept {
 
 #endif  // __cpp_lib_span >= 202002L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_SPAN_H_
+#endif  // LIB_STDCOMPAT_SPAN_H_

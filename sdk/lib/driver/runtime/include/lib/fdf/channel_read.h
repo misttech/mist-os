@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CHANNEL_READ_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CHANNEL_READ_H_
+#ifndef LIB_FDF_CHANNEL_READ_H_
+#define LIB_FDF_CHANNEL_READ_H_
 
 #include <lib/async/dispatcher.h>
 #include <lib/fdf/channel.h>
@@ -37,4 +37,4 @@ struct fdf_channel_read {
 
 __END_CDECLS
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CHANNEL_READ_H_
+#endif  // LIB_FDF_CHANNEL_READ_H_

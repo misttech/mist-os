@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_RESULT_H_
-#define LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_RESULT_H_
+#ifndef LIB_FPROMISE_RESULT_H_
+#define LIB_FPROMISE_RESULT_H_
 
 #include <assert.h>
 #include <lib/stdcompat/variant.h>
@@ -238,4 +238,4 @@ void swap(result<V, E>& a, result<V, E>& b) {
 
 }  // namespace fpromise
 
-#endif  // LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_RESULT_H_
+#endif  // LIB_FPROMISE_RESULT_H_

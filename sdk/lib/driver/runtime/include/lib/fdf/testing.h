@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TESTING_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TESTING_H_
+#ifndef LIB_FDF_TESTING_H_
+#define LIB_FDF_TESTING_H_
 
 #include <lib/fdf/dispatcher.h>
 #include <zircon/types.h>
@@ -51,4 +51,4 @@ zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher);
 
 __END_CDECLS
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TESTING_H_
+#endif  // LIB_FDF_TESTING_H_

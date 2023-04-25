@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_NATURAL_CLIENT_H_
-#define LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_NATURAL_CLIENT_H_
+#ifndef LIB_FIDL_DRIVER_CPP_NATURAL_CLIENT_H_
+#define LIB_FIDL_DRIVER_CPP_NATURAL_CLIENT_H_
 
 #include <lib/fidl/cpp/internal/make_response_context.h>
 #include <lib/fidl/cpp/wire/internal/arrow.h>
@@ -536,4 +536,4 @@ SharedClient(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*) -> SharedClient<Protoc
 
 }  // namespace fdf
 
-#endif  // LIB_FIDL_DRIVER_INCLUDE_LIB_FIDL_DRIVER_CPP_NATURAL_CLIENT_H_
+#endif  // LIB_FIDL_DRIVER_CPP_NATURAL_CLIENT_H_

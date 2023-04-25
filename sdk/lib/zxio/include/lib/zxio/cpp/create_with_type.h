@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_ZXIO_INCLUDE_LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_
-#define LIB_ZXIO_INCLUDE_LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_
+#ifndef LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_
+#define LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/stream.h>
@@ -32,4 +32,4 @@ inline zx_status_t CreateVmo(zxio_storage_t* storage, zx::vmo vmo, zx::stream st
 
 }  // namespace zxio
 
-#endif  // LIB_ZXIO_INCLUDE_LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_
+#endif  // LIB_ZXIO_CPP_CREATE_WITH_TYPE_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_ENV_H_
-#define LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_ENV_H_
+#ifndef LIB_FDF_CPP_ENV_H_
+#define LIB_FDF_CPP_ENV_H_
 
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/env.h>
@@ -117,4 +117,4 @@ class DriverShutdown : public fdf_env_driver_shutdown_observer_t {
 
 }  // namespace fdf_env
 
-#endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_CPP_ENV_H_
+#endif  // LIB_FDF_CPP_ENV_H_

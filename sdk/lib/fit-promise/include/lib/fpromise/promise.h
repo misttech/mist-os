@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_PROMISE_H_
-#define LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_PROMISE_H_
+#ifndef LIB_FPROMISE_PROMISE_H_
+#define LIB_FPROMISE_PROMISE_H_
 
 #include <assert.h>
 #include <lib/fit/function.h>
@@ -1613,4 +1613,4 @@ inline void swap(suspended_task& a, suspended_task& b) { a.swap(b); }
 
 }  // namespace fpromise
 
-#endif  // LIB_FIT_PROMISE_INCLUDE_LIB_FPROMISE_PROMISE_H_
+#endif  // LIB_FPROMISE_PROMISE_H_

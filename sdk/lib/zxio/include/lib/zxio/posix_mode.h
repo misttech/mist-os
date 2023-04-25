@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_ZXIO_INCLUDE_LIB_ZXIO_POSIX_MODE_H_
-#define LIB_ZXIO_INCLUDE_LIB_ZXIO_POSIX_MODE_H_
+#ifndef LIB_ZXIO_POSIX_MODE_H_
+#define LIB_ZXIO_POSIX_MODE_H_
 
 #include <lib/zxio/types.h>
 
@@ -19,4 +19,4 @@ uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t a
 
 __END_CDECLS
 
-#endif  // LIB_ZXIO_INCLUDE_LIB_ZXIO_POSIX_MODE_H_
+#endif  // LIB_ZXIO_POSIX_MODE_H_

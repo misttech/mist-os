@@ -15,8 +15,8 @@
 #include <ranges>
 #endif
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
+#ifndef LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
+#define LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
 
 namespace fidl_testing {
 
@@ -267,4 +267,4 @@ class OutgoingMessage : public ::fidl::Status {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
+#endif  // LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_

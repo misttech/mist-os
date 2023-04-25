@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_LINKAGE_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_LINKAGE_H_
+#ifndef LIB_STDCOMPAT_INTERNAL_LINKAGE_H_
+#define LIB_STDCOMPAT_INTERNAL_LINKAGE_H_
 
 // The libc++ headers obey this #define: When it's 1 then it's important
 // that all the code in the translation unit stay in the translation unit.
@@ -29,4 +29,4 @@
 
 #endif  // _LIBCPP_HIDE_FROM_ABI_PER_TU
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_LINKAGE_H_
+#endif  // LIB_STDCOMPAT_INTERNAL_LINKAGE_H_

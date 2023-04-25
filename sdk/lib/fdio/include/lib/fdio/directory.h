@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FDIO_INCLUDE_LIB_FDIO_DIRECTORY_H_
-#define LIB_FDIO_INCLUDE_LIB_FDIO_DIRECTORY_H_
+#ifndef LIB_FDIO_DIRECTORY_H_
+#define LIB_FDIO_DIRECTORY_H_
 
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
@@ -135,4 +135,4 @@ zx_status_t fdio_service_clone_to(ZX_HANDLE_USE zx_handle_t node,
 
 __END_CDECLS
 
-#endif  // LIB_FDIO_INCLUDE_LIB_FDIO_DIRECTORY_H_
+#endif  // LIB_FDIO_DIRECTORY_H_

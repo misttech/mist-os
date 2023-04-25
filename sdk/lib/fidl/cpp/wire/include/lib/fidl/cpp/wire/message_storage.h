@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_MESSAGE_STORAGE_H_
-#define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_MESSAGE_STORAGE_H_
+#ifndef LIB_FIDL_CPP_WIRE_MESSAGE_STORAGE_H_
+#define LIB_FIDL_CPP_WIRE_MESSAGE_STORAGE_H_
 
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/function.h>
@@ -194,4 +194,4 @@ AnyBufferAllocator MakeAnyBufferAllocator(MemoryResource&& resource) {
 
 }  // namespace fidl
 
-#endif  // LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_MESSAGE_STORAGE_H_
+#endif  // LIB_FIDL_CPP_WIRE_MESSAGE_STORAGE_H_
