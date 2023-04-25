@@ -20,7 +20,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    The Bazel product bundle target to build.
 #    Type: label (from BUILD.bazel)
 #
-#  bazel_product_image_target (optional)
+#  bazel_product_image_target (required)
 #    The Bazel product image target for this product bundle.
 #
 #    When set, two extra sub_targets are provided to access outputs from Bazel
@@ -62,6 +62,8 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 template("bazel_product_bundle") {
   assert(defined(invoker.bazel_product_bundle_target),
          "bazel_product_bundle_target is required")
+  assert(defined(invoker.bazel_product_image_target),
+         "bazel_product_image_target is required")
   assert(defined(invoker.bazel_inputs_from_gn),
          "bazel_inputs_from_gn is required")
 
@@ -84,49 +86,46 @@ template("bazel_product_bundle") {
 
   # NOTE: Only depend on product image targets if your outputs are not included
   # in product bundles.
-  if (defined(invoker.bazel_product_image_target)) {
-    _product_assembly_target = "${target_name}_product_assembly"
-    bazel_action(_product_assembly_target) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                               "deps",
-                             ])
+  _product_assembly_target = "${target_name}_product_assembly"
+  bazel_action(_product_assembly_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                           ])
 
-      command = "build"
-      bazel_targets =
-          [ invoker.bazel_product_image_target + "_product_assembly" ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
-      copy_outputs = [
-        {
-          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/image_assembly.json"
-          ninja = "${_product_assembly_target}/image_assembly.json"
-        },
-      ]
-    }
+    command = "build"
+    bazel_targets = [ invoker.bazel_product_image_target + "_product_assembly" ]
+    bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+    copy_outputs = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/image_assembly.json"
+        ninja = "${_product_assembly_target}/image_assembly.json"
+      },
+    ]
+  }
 
-    _create_system_target = "${target_name}_create_system"
-    bazel_action(_create_system_target) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                               "deps",
-                             ])
+  _create_system_target = "${target_name}_create_system"
+  bazel_action(_create_system_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                             "deps",
+                           ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_product_image_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
-      allow_directory_in_outputs = true
-      copy_outputs = [
-        {
-          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-          ninja = _create_system_target
-        },
-      ]
-      directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
-    }
+    command = "build"
+    bazel_targets = [ invoker.bazel_product_image_target ]
+    bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+    allow_directory_in_outputs = true
+    copy_outputs = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+        ninja = _create_system_target
+      },
+    ]
+    directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
   }
 
   _product_bundle_bazel_action_target = "${target_name}_bazel_action"
