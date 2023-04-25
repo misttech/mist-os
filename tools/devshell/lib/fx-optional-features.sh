@@ -16,7 +16,7 @@ function list_optional_features {
 function is_feature_enabled_by_default {
   case "$1" in
   "fxtest_auto_publishes_publishes") return 0;;
-  "incremental") return 1 ;;
+  "incremental") return 0 ;;
   "incremental_legacy") return 1 ;;
   "incremental_new") return 1 ;;
   "legacy_fastboot") return 1 ;;

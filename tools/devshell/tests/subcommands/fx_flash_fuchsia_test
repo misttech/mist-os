@@ -51,6 +51,17 @@ EOF
   cat > "${BT_TEMP_DIR}/tools/devshell/get-flash-source.mock_side_effects" <<EOF
     echo flash-manifest:flash.json
 EOF
+
+  btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
+  cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
+if [[ "$@" == "flash" ]]; then
+  echo "flash"
+else
+  echo "unknown command $@" 1>&2
+  exit 1
+fi
+EOF
+
 }
 
 TEST_fx_flash_ssh() {
