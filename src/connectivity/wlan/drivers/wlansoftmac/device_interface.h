@@ -40,7 +40,7 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
 
  private:
   common::MacAddr addr_;
-  wlan_channel_t chan_ = {};
+  wlan_channel_t chan_ = {.cbw = CHANNEL_BANDWIDTH_CBW20};
   bool online_ = false;
 };
 
