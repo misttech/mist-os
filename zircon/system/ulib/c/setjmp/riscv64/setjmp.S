@@ -36,6 +36,7 @@
 
   // Store the vanilla call-saved registers.
   sd s1, JB_S(1)*8(a0)
+  sd s2, JB_S(2)*8(a0)
   sd s3, JB_S(3)*8(a0)
   sd s4, JB_S(4)*8(a0)
   sd s5, JB_S(5)*8(a0)
@@ -50,7 +51,7 @@
   xor a3, a3, sp  // Mangled SP.
   xor a4, a4, s0  // Mangled FP (s0).
   xor a5, a5, a7  // Mangled unsafe SP.
-  xor a6, a6, s2  // Mangled shadow call stack pointer (s2).
+  xor a6, a6, gp  // Mangled shadow call stack pointer (gp).
 
   sd a2, JB_PC*8(a0)
   sd a3, JB_SP*8(a0)

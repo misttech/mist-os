@@ -36,15 +36,18 @@
 
 #elif defined(__riscv)
 
-// The shadow call stack pointer (s2 / x18) is also mangled.
+// The shadow call stack pointer (gp / x3) is also mangled.
 #define JB_SCSP 4
 #define JB_ARCH_MANGLE_COUNT 1
 
-// Callee-saves registers are s0..s11, but s0 is FP and s2 is SCSP.
-#define JB_S(n) (JB_MANGLE_COUNT + (((n) > 2) * ((n)-2)))
+// Callee-saves registers are s0..s11, but s0 is FP and so handled above.
+#define JB_S(n) (JB_MANGLE_COUNT + (n)-1)
 
 // FP registers fs0..fs11 are also callee-saves.
-#define JB_FS(n) (JB_S(11) + (n))
+#define JB_FS(n) (JB_S(12) + (n))
+#if JB_FS(0) <= JB_S(11)
+#error "JB_FS defined wrong"
+#endif
 
 #define JB_COUNT JB_FS(12)
 
