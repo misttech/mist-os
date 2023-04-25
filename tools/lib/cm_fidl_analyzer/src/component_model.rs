@@ -25,7 +25,7 @@ use {
     futures::FutureExt,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
     routing::{
-        capability_source::{CapabilitySourceInterface, ComponentCapability},
+        capability_source::{CapabilitySource, ComponentCapability},
         component_id_index::ComponentIdIndex,
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
@@ -1029,15 +1029,15 @@ impl ComponentModelForAnalyzer {
         route_source: &RouteSource<ComponentInstanceForAnalyzer>,
     ) -> Result<(), AnalyzerModelError> {
         match &route_source.source {
-            CapabilitySourceInterface::Component { component: weak, .. } => {
+            CapabilitySource::Component { component: weak, .. } => {
                 self.check_executable(&weak.upgrade()?)
             }
-            CapabilitySourceInterface::Namespace { .. } => Ok(()),
-            CapabilitySourceInterface::Capability { source_capability, component: weak } => {
+            CapabilitySource::Namespace { .. } => Ok(()),
+            CapabilitySource::Capability { source_capability, component: weak } => {
                 self.check_capability_source(&weak.upgrade()?, &source_capability)
             }
-            CapabilitySourceInterface::Builtin { .. } => Ok(()),
-            CapabilitySourceInterface::Framework { .. } => Ok(()),
+            CapabilitySource::Builtin { .. } => Ok(()),
+            CapabilitySource::Framework { .. } => Ok(()),
             _ => unimplemented![],
         }
     }
@@ -1155,7 +1155,7 @@ impl ComponentModelForAnalyzer {
             let (storage_decl, storage_component) = match result {
                 RouteSource {
                     source:
-                        CapabilitySourceInterface::Component {
+                        CapabilitySource::Component {
                             capability: ComponentCapability::Storage(storage_decl),
                             component,
                             ..

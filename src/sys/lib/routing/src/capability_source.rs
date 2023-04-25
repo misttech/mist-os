@@ -37,7 +37,7 @@ pub enum Error {
 /// Describes the source of a capability, as determined by `find_capability_source`
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
-pub enum CapabilitySourceInterface<C: ComponentInstanceInterface> {
+pub enum CapabilitySource<C: ComponentInstanceInterface> {
     /// This capability originates from the component instance for the given Realm.
     /// point.
     Component { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
@@ -77,7 +77,7 @@ pub enum CapabilitySourceInterface<C: ComponentInstanceInterface> {
     },
 }
 
-impl<C: ComponentInstanceInterface> CapabilitySourceInterface<C> {
+impl<C: ComponentInstanceInterface> CapabilitySource<C> {
     /// Returns whether the given CapabilitySourceInterface can be available in a component's
     /// namespace.
     pub fn can_be_in_namespace(&self) -> bool {
@@ -136,27 +136,22 @@ impl<C: ComponentInstanceInterface> CapabilitySourceInterface<C> {
     }
 }
 
-impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySourceInterface<C> {
+impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                CapabilitySourceInterface::Component { capability, component } => {
+                CapabilitySource::Component { capability, component } => {
                     format!("{} '{}'", capability, component.abs_moniker)
                 }
-                CapabilitySourceInterface::Framework { capability, .. } => capability.to_string(),
-                CapabilitySourceInterface::Builtin { capability, .. } => capability.to_string(),
-                CapabilitySourceInterface::Namespace { capability, .. } => capability.to_string(),
-                CapabilitySourceInterface::Aggregate { capability, .. } => capability.to_string(),
-                CapabilitySourceInterface::Capability { source_capability, .. } =>
+                CapabilitySource::Framework { capability, .. } => capability.to_string(),
+                CapabilitySource::Builtin { capability, .. } => capability.to_string(),
+                CapabilitySource::Namespace { capability, .. } => capability.to_string(),
+                CapabilitySource::Aggregate { capability, .. } => capability.to_string(),
+                CapabilitySource::Capability { source_capability, .. } =>
                     format!("{}", source_capability),
-                CapabilitySourceInterface::Collection {
-                    capability,
-                    collection_name,
-                    component,
-                    ..
-                } => {
+                CapabilitySource::Collection { capability, collection_name, component, .. } => {
                     format!(
                         "{} from collection '#{}' of component '{}'",
                         capability, collection_name, &component.abs_moniker
@@ -182,10 +177,7 @@ pub trait AggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Syn
     async fn list_instances(&self) -> Result<Vec<String>, RoutingError>;
 
     /// Route the given `instance` of the capability to its source.
-    async fn route_instance(
-        &self,
-        instance: &str,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>;
+    async fn route_instance(&self, instance: &str) -> Result<CapabilitySource<C>, RoutingError>;
 
     /// Trait-object compatible clone.
     fn clone_boxed(&self) -> Box<dyn AggregateCapabilityProvider<C>>;

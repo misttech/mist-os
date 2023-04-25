@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability_source::{AggregateCapabilityProvider, CapabilitySourceInterface},
+        capability_source::{AggregateCapabilityProvider, CapabilitySource},
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
         },
@@ -103,10 +103,7 @@ where
     ///
     /// `instance` is the name of the child that exposes the capability, as returned by
     /// `list_instances`.
-    async fn route_instance(
-        &self,
-        instance: &str,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError> {
+    async fn route_instance(&self, instance: &str) -> Result<CapabilitySource<C>, RoutingError> {
         let collection_component = self.collection_component.upgrade()?;
         let find_child_moniker = ChildMoniker::try_new(instance, Some(&self.collection_name))?;
         let (child_moniker, child_component): (ChildMoniker, Arc<C>) = {
@@ -224,10 +221,7 @@ where
             .collect())
     }
 
-    async fn route_instance(
-        &self,
-        instance: &str,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError> {
+    async fn route_instance(&self, instance: &str) -> Result<CapabilitySource<C>, RoutingError> {
         for offer_decl in &self.offer_decls {
             if offer_decl
                 .source_instance_filter

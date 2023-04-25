@@ -4,14 +4,14 @@
 
 use {
     crate::model::{component::ComponentInstance, error::ModelError},
-    ::routing::capability_source::CapabilitySourceInterface,
     async_trait::async_trait,
     cm_task_scope::TaskScope,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::path::PathBuf,
 };
 
-pub type CapabilitySource = CapabilitySourceInterface<ComponentInstance>;
+pub type CapabilitySource = ::routing::capability_source::CapabilitySource<ComponentInstance>;
+
 /// The server-side of a capability implements this trait.
 /// Multiple `CapabilityProvider` objects can compose with one another for a single
 /// capability request. For example, a `CapabilityProvider` can be interposed

@@ -26,7 +26,7 @@ use {
             AvailabilityProtocolVisitor, AvailabilityServiceVisitor, AvailabilityState,
             AvailabilityStorageVisitor,
         },
-        capability_source::{CapabilitySourceInterface, ComponentCapability, InternalCapability},
+        capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
         },
@@ -130,19 +130,16 @@ impl RouteRequest {
 /// The data returned after successfully routing a capability to its source.
 #[derive(Debug)]
 pub struct RouteSource<C: ComponentInstanceInterface> {
-    pub source: CapabilitySourceInterface<C>,
+    pub source: CapabilitySource<C>,
     pub relative_path: PathBuf,
 }
 
 impl<C: ComponentInstanceInterface> RouteSource<C> {
-    fn new(source: CapabilitySourceInterface<C>) -> Self {
+    fn new(source: CapabilitySource<C>) -> Self {
         Self { source, relative_path: "".into() }
     }
 
-    fn new_with_relative_path(
-        source: CapabilitySourceInterface<C>,
-        relative_path: PathBuf,
-    ) -> Self {
+    fn new_with_relative_path(source: CapabilitySource<C>, relative_path: PathBuf) -> Self {
         Self { source, relative_path }
     }
 }
@@ -813,14 +810,14 @@ where
 /// - On success, Ok(()) is returned
 /// - RoutingError::ComponentNotInIndex is returned on failure.
 pub fn verify_instance_in_component_id_index<C>(
-    source: &CapabilitySourceInterface<C>,
+    source: &CapabilitySource<C>,
     instance: &Arc<C>,
 ) -> Result<(), RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
     let storage_decl = match source {
-        CapabilitySourceInterface::Component {
+        CapabilitySource::Component {
             capability: ComponentCapability::Storage(storage_decl),
             component: _,
         } => storage_decl,
@@ -843,7 +840,7 @@ pub async fn route_to_storage_decl<C, M>(
     use_decl: UseStorageDecl,
     target: &Arc<C>,
     mapper: &mut M,
-) -> Result<CapabilitySourceInterface<C>, RoutingError>
+) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
@@ -947,7 +944,7 @@ where
                 .ok_or(RoutingError::register_from_component_manager_not_found(
                     reg.source_name().to_string(),
                 ))?;
-            Ok(CapabilitySourceInterface::Builtin {
+            Ok(CapabilitySource::Builtin {
                 capability: internal_capability,
                 top_instance: Arc::downgrade(&top_instance),
             })

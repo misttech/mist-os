@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability_source::CapabilitySourceInterface,
+        capability_source::CapabilitySource,
         component_instance::ComponentInstanceInterface,
         config::{
             AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
@@ -123,13 +123,13 @@ impl GlobalPolicyChecker {
     }
 
     fn get_policy_key<'a, C>(
-        capability_source: &'a CapabilitySourceInterface<C>,
+        capability_source: &'a CapabilitySource<C>,
     ) -> Result<CapabilityAllowlistKey, PolicyError>
     where
         C: ComponentInstanceInterface,
     {
         Ok(match &capability_source {
-            CapabilitySourceInterface::Namespace { capability, .. } => CapabilityAllowlistKey {
+            CapabilitySource::Namespace { capability, .. } => CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
                 source_name: capability
                     .source_name()
@@ -138,8 +138,8 @@ impl GlobalPolicyChecker {
                 source: CapabilityAllowlistSource::Self_,
                 capability: capability.type_name(),
             },
-            CapabilitySourceInterface::Component { capability, component }
-            | CapabilitySourceInterface::FilteredService { capability, component, .. } => {
+            CapabilitySource::Component { capability, component }
+            | CapabilitySource::FilteredService { capability, component, .. } => {
                 CapabilityAllowlistKey {
                     source_moniker: ExtendedMoniker::ComponentInstance(
                         component.abs_moniker.clone(),
@@ -152,23 +152,19 @@ impl GlobalPolicyChecker {
                     capability: capability.type_name(),
                 }
             }
-            CapabilitySourceInterface::Builtin { capability, .. } => CapabilityAllowlistKey {
+            CapabilitySource::Builtin { capability, .. } => CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
                 source_name: capability.source_name().clone(),
                 source: CapabilityAllowlistSource::Self_,
                 capability: capability.type_name(),
             },
-            CapabilitySourceInterface::Framework { capability, component } => {
-                CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(
-                        component.abs_moniker.clone(),
-                    ),
-                    source_name: capability.source_name().clone(),
-                    source: CapabilityAllowlistSource::Framework,
-                    capability: capability.type_name(),
-                }
-            }
-            CapabilitySourceInterface::Capability { source_capability, component } => {
+            CapabilitySource::Framework { capability, component } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(component.abs_moniker.clone()),
+                source_name: capability.source_name().clone(),
+                source: CapabilityAllowlistSource::Framework,
+                capability: capability.type_name(),
+            },
+            CapabilitySource::Capability { source_capability, component } => {
                 CapabilityAllowlistKey {
                     source_moniker: ExtendedMoniker::ComponentInstance(
                         component.abs_moniker.clone(),
@@ -181,17 +177,13 @@ impl GlobalPolicyChecker {
                     capability: source_capability.type_name(),
                 }
             }
-            CapabilitySourceInterface::Collection { capability, component, .. }
-            | CapabilitySourceInterface::Aggregate { capability, component, .. } => {
-                CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(
-                        component.abs_moniker.clone(),
-                    ),
-                    source_name: capability.source_name().clone(),
-                    source: CapabilityAllowlistSource::Self_,
-                    capability: capability.type_name(),
-                }
-            }
+            CapabilitySource::Collection { capability, component, .. }
+            | CapabilitySource::Aggregate { capability, component, .. } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(component.abs_moniker.clone()),
+                source_name: capability.source_name().clone(),
+                source: CapabilityAllowlistSource::Self_,
+                capability: capability.type_name(),
+            },
         })
     }
 
@@ -199,7 +191,7 @@ impl GlobalPolicyChecker {
     /// given target_moniker, else a descriptive PolicyError.
     pub fn can_route_capability<'a, C>(
         &self,
-        capability_source: &'a CapabilitySourceInterface<C>,
+        capability_source: &'a CapabilitySource<C>,
         target_moniker: &'a AbsoluteMoniker,
     ) -> Result<(), PolicyError>
     where
@@ -248,7 +240,7 @@ impl GlobalPolicyChecker {
     /// environment.
     pub fn can_route_debug_capability<'a, C>(
         &self,
-        capability_source: &'a CapabilitySourceInterface<C>,
+        capability_source: &'a CapabilitySource<C>,
         env_moniker: &'a AbsoluteMoniker,
         env_name: &'a str,
         target_moniker: &'a AbsoluteMoniker,

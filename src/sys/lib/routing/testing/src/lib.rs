@@ -32,7 +32,7 @@ use {
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMonikerBase},
     routing::{
         capability_source::{
-            AggregateCapability, CapabilitySourceInterface, ComponentCapability, InternalCapability,
+            AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
         },
         component_id_index::ComponentInstanceId,
         component_instance::ComponentInstanceInterface,
@@ -1869,7 +1869,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_matches!(
         route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
             Ok(RouteSource {
-                source: CapabilitySourceInterface::<
+                source: CapabilitySource::<
                     <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C
                     >::Component {
                         capability: ComponentCapability::Protocol(protocol_decl),
@@ -2255,7 +2255,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Aggregate {
                         capability: AggregateCapability::Service(name),
@@ -4510,7 +4510,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
@@ -4583,7 +4583,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
@@ -4669,7 +4669,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
@@ -4757,7 +4757,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::FilteredService {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
@@ -4859,7 +4859,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::FilteredService {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
@@ -4933,7 +4933,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
@@ -5017,7 +5017,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
@@ -5098,7 +5098,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
@@ -5182,7 +5182,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
@@ -5308,7 +5308,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Builtin {
                         capability: InternalCapability::Runner(name),
@@ -5350,7 +5350,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySourceInterface::<
+                    CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Builtin {
                         capability: InternalCapability::Runner(name),

@@ -6,7 +6,7 @@ use {
     crate::{
         availability::AvailabilityServiceVisitor,
         capability_source::{
-            AggregateCapability, CapabilitySourceInterface, ComponentCapability, InternalCapability,
+            AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
         },
         collection::{AggregateServiceProvider, CollectionCapabilityProvider},
         component_instance::{
@@ -92,7 +92,7 @@ where
         sources: S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -102,7 +102,7 @@ where
     {
         mapper.add_use(target.abs_moniker().clone(), use_decl.clone().into());
         let target_capabilities = target.lock_resolved_state().await?.capabilities();
-        Ok(CapabilitySourceInterface::<C>::Component {
+        Ok(CapabilitySource::<C>::Component {
             capability: sources.find_component_source(
                 use_decl.source_name(),
                 target.abs_moniker(),
@@ -144,7 +144,7 @@ where
         sources: S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources,
@@ -171,7 +171,7 @@ where
         visitor: &mut V,
         mapper: &mut M,
         route: &mut Vec<RouteInfo<C, O, ()>>,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources,
@@ -218,7 +218,7 @@ where
         visitor: &mut V,
         mapper: &mut M,
         route: &mut Vec<RouteInfo<C, O, ()>>,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources,
@@ -278,7 +278,7 @@ where
         sources: S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -307,7 +307,7 @@ where
         visitor: &mut V,
         mapper: &mut M,
         route: &mut Vec<RouteInfo<C, O, E>>,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -394,7 +394,7 @@ where
         sources: S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -430,7 +430,7 @@ where
         visitor: &mut V,
         mapper: &mut M,
         route: &mut Vec<RouteInfo<C, O, E>>,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -499,7 +499,7 @@ where
         sources: S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -535,7 +535,7 @@ where
         visitor: &mut V,
         mapper: &mut M,
         route: &mut Vec<RouteInfo<C, O, E>>,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -560,10 +560,10 @@ where
                         || offer_service_decl.renamed_instances.is_some()
                     {
                         // TODO(https://fxbug.dev/97147) support collection sources as well.
-                        if let CapabilitySourceInterface::Component { capability, component } =
+                        if let CapabilitySource::Component { capability, component } =
                             capability_source
                         {
-                            return Ok(CapabilitySourceInterface::<C>::FilteredService {
+                            return Ok(CapabilitySource::<C>::FilteredService {
                                 capability: capability,
                                 component: component,
                                 source_instance_filter: offer_service_decl
@@ -579,7 +579,7 @@ where
                 Ok(capability_source)
             }
             OfferResult::OfferFromCollection(offer_decl, collection_component, collection_name) => {
-                Ok(CapabilitySourceInterface::<C>::Collection {
+                Ok(CapabilitySource::<C>::Collection {
                     capability: AggregateCapability::Service(offer_decl.source_name().clone()),
                     component: collection_component.as_weak(),
                     aggregate_capability_provider: Box::new(CollectionCapabilityProvider {
@@ -612,7 +612,7 @@ fn create_aggregate_source<C, O, M>(
     offer_decls: Vec<O>,
     aggregation_component: Arc<C>,
     mapper: M,
-) -> Result<CapabilitySourceInterface<C>, RoutingError>
+) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     O: OfferDeclCommon + FromEnum<OfferDecl> + Into<OfferDecl> + Clone,
@@ -658,7 +658,7 @@ where
     );
     // TODO(fxbug.dev/71881) Make the Collection CapabilitySourceInterface type generic
     // for other types of aggregations.
-    Ok(CapabilitySourceInterface::<C>::Aggregate {
+    Ok(CapabilitySource::<C>::Aggregate {
         capability: AggregateCapability::Service(source_name),
         component: aggregation_component.as_weak(),
         capability_provider: Box::new(AggregateServiceProvider::new(
@@ -694,7 +694,7 @@ where
         sources: S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -729,7 +729,7 @@ where
         visitor: &mut V,
         mapper: &mut M,
         route: &mut Vec<RouteInfo<C, Offer, E>>,
-    ) -> Result<CapabilitySourceInterface<C>, RoutingError>
+    ) -> Result<CapabilitySource<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources + 'static,
@@ -744,7 +744,7 @@ where
                 expose_decl,
                 collection_component,
                 collection_name,
-            ) => Ok(CapabilitySourceInterface::<C>::Collection {
+            ) => Ok(CapabilitySource::<C>::Collection {
                 capability: AggregateCapability::Service(expose_decl.source_name().clone()),
                 component: collection_component.as_weak(),
                 aggregate_capability_provider: Box::new(CollectionCapabilityProvider {
@@ -1055,7 +1055,7 @@ pub struct Use<U>(PhantomData<U>);
 /// The result of routing a Use declaration to the next phase.
 enum UseResult<C: ComponentInstanceInterface, O, U> {
     /// The source of the Use was found (Framework, AboveRoot, etc.)
-    Source(CapabilitySourceInterface<C>),
+    Source(CapabilitySource<C>),
     /// The Use led to a parent Offer declaration.
     FromParent(Vec<O>, Arc<C>),
     /// The Use led to a child Expose declaration.
@@ -1087,15 +1087,13 @@ where
     {
         mapper.add_use(target.abs_moniker().clone(), use_.clone().into());
         match use_.source() {
-            UseSource::Framework => {
-                Ok(UseResult::Source(CapabilitySourceInterface::<C>::Framework {
-                    capability: sources.framework_source(use_.source_name().clone(), mapper)?,
-                    component: target.as_weak(),
-                }))
-            }
+            UseSource::Framework => Ok(UseResult::Source(CapabilitySource::<C>::Framework {
+                capability: sources.framework_source(use_.source_name().clone(), mapper)?,
+                component: target.as_weak(),
+            })),
             UseSource::Capability(_) => {
                 sources.capability_source()?;
-                Ok(UseResult::Source(CapabilitySourceInterface::<C>::Capability {
+                Ok(UseResult::Source(CapabilitySource::<C>::Capability {
                     component: target.as_weak(),
                     source_capability: ComponentCapability::Use(use_.into()),
                 }))
@@ -1109,12 +1107,10 @@ where
                             visitor,
                             mapper,
                         )? {
-                            return Ok(UseResult::Source(
-                                CapabilitySourceInterface::<C>::Namespace {
-                                    capability,
-                                    top_instance: Arc::downgrade(&top_instance),
-                                },
-                            ));
+                            return Ok(UseResult::Source(CapabilitySource::<C>::Namespace {
+                                capability,
+                                top_instance: Arc::downgrade(&top_instance),
+                            }));
                         }
                     }
                     if let Some(capability) = sources.find_builtin_source(
@@ -1123,7 +1119,7 @@ where
                         visitor,
                         mapper,
                     )? {
-                        return Ok(UseResult::Source(CapabilitySourceInterface::<C>::Builtin {
+                        return Ok(UseResult::Source(CapabilitySource::<C>::Builtin {
                             capability,
                             top_instance: Arc::downgrade(&top_instance),
                         }));
@@ -1191,7 +1187,7 @@ pub struct Registration<R>(PhantomData<R>);
 /// The result of routing a Registration declaration to the next phase.
 enum RegistrationResult<C: ComponentInstanceInterface, O, E> {
     /// The source of the Registration was found (Framework, AboveRoot, etc.).
-    Source(CapabilitySourceInterface<C>),
+    Source(CapabilitySource<C>),
     /// The Registration led to a parent Offer declaration.
     FromParent(Vec<O>, Arc<C>),
     /// The Registration led to a child Expose declaration.
@@ -1228,7 +1224,7 @@ where
         match registration.source() {
             RegistrationSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                Ok(RegistrationResult::Source(CapabilitySourceInterface::<C>::Component {
+                Ok(RegistrationResult::Source(CapabilitySource::<C>::Component {
                     capability: sources.find_component_source(
                         registration.source_name(),
                         target.abs_moniker(),
@@ -1249,7 +1245,7 @@ where
                             mapper,
                         )? {
                             return Ok(RegistrationResult::Source(
-                                CapabilitySourceInterface::<C>::Namespace {
+                                CapabilitySource::<C>::Namespace {
                                     capability,
                                     top_instance: Arc::downgrade(&top_instance),
                                 },
@@ -1262,12 +1258,10 @@ where
                         visitor,
                         mapper,
                     )? {
-                        return Ok(RegistrationResult::Source(
-                            CapabilitySourceInterface::<C>::Builtin {
-                                capability,
-                                top_instance: Arc::downgrade(&top_instance),
-                            },
-                        ));
+                        return Ok(RegistrationResult::Source(CapabilitySource::<C>::Builtin {
+                            capability,
+                            top_instance: Arc::downgrade(&top_instance),
+                        }));
                     }
                     Err(RoutingError::register_from_component_manager_not_found(
                         registration.source_name().to_string(),
@@ -1336,7 +1330,7 @@ pub struct Offer<O>(PhantomData<O>);
 /// The result of routing an Offer declaration to the next phase.
 enum OfferResult<C: ComponentInstanceInterface, O> {
     /// The source of the Offer was found (Framework, AboveRoot, Component, etc.).
-    Source(CapabilitySourceInterface<C>),
+    Source(CapabilitySource<C>),
     /// The Offer led to an Offer-from-child declaration.
     /// Not all capabilities can be exposed, so let the caller decide how to handle this.
     OfferFromChild(O, Arc<C>),
@@ -1394,33 +1388,31 @@ where
                             if offer_service_decl.source_instance_filter.is_some()
                                 || offer_service_decl.renamed_instances.is_some()
                             {
-                                Ok(OfferResult::Source(
-                                    CapabilitySourceInterface::<C>::FilteredService {
-                                        capability: component_capability,
-                                        component: target.as_weak(),
-                                        source_instance_filter: offer_service_decl
-                                            .source_instance_filter
-                                            .unwrap_or(vec![]),
-                                        instance_name_source_to_target: offer_service_decl
-                                            .renamed_instances
-                                            .map_or(HashMap::new(), name_mappings_to_map),
-                                    },
-                                ))
+                                Ok(OfferResult::Source(CapabilitySource::<C>::FilteredService {
+                                    capability: component_capability,
+                                    component: target.as_weak(),
+                                    source_instance_filter: offer_service_decl
+                                        .source_instance_filter
+                                        .unwrap_or(vec![]),
+                                    instance_name_source_to_target: offer_service_decl
+                                        .renamed_instances
+                                        .map_or(HashMap::new(), name_mappings_to_map),
+                                }))
                             } else {
-                                Ok(OfferResult::Source(CapabilitySourceInterface::<C>::Component {
+                                Ok(OfferResult::Source(CapabilitySource::<C>::Component {
                                     capability: component_capability,
                                     component: target.as_weak(),
                                 }))
                             }
                         }
-                        _ => Ok(OfferResult::Source(CapabilitySourceInterface::<C>::Component {
+                        _ => Ok(OfferResult::Source(CapabilitySource::<C>::Component {
                             capability: component_capability,
                             component: target.as_weak(),
                         })),
                     };
                 }
                 OfferSource::Framework => {
-                    return Ok(OfferResult::Source(CapabilitySourceInterface::<C>::Framework {
+                    return Ok(OfferResult::Source(CapabilitySource::<C>::Framework {
                         capability: sources
                             .framework_source(offer.source_name().clone(), mapper)?,
                         component: target.as_weak(),
@@ -1428,7 +1420,7 @@ where
                 }
                 OfferSource::Capability(_) => {
                     sources.capability_source()?;
-                    return Ok(OfferResult::Source(CapabilitySourceInterface::<C>::Capability {
+                    return Ok(OfferResult::Source(CapabilitySource::<C>::Capability {
                         source_capability: ComponentCapability::Offer(offer.into()),
                         component: target.as_weak(),
                     }));
@@ -1444,7 +1436,7 @@ where
                                     mapper,
                                 )? {
                                     return Ok(OfferResult::Source(
-                                        CapabilitySourceInterface::<C>::Namespace {
+                                        CapabilitySource::<C>::Namespace {
                                             capability,
                                             top_instance: Arc::downgrade(&top_instance),
                                         },
@@ -1457,12 +1449,10 @@ where
                                 visitor,
                                 mapper,
                             )? {
-                                return Ok(OfferResult::Source(
-                                    CapabilitySourceInterface::<C>::Builtin {
-                                        capability,
-                                        top_instance: Arc::downgrade(&top_instance),
-                                    },
-                                ));
+                                return Ok(OfferResult::Source(CapabilitySource::<C>::Builtin {
+                                    capability,
+                                    top_instance: Arc::downgrade(&top_instance),
+                                }));
                             }
                             return Err(RoutingError::offer_from_component_manager_not_found(
                                 offer.source_name().to_string(),
@@ -1568,7 +1558,7 @@ pub struct Expose<E>(PhantomData<E>);
 /// The result of routing an Expose declaration to the next phase.
 enum ExposeResult<C: ComponentInstanceInterface, E> {
     /// The source of the Expose was found (Framework, Component, etc.).
-    Source(CapabilitySourceInterface<C>),
+    Source(CapabilitySource<C>),
     /// The source of the Expose comes from a collection.
     ExposeFromCollection(E, Arc<C>, String),
 }
@@ -1605,7 +1595,7 @@ where
             match expose.source() {
                 ExposeSource::Self_ => {
                     let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                    return Ok(ExposeResult::Source(CapabilitySourceInterface::<C>::Component {
+                    return Ok(ExposeResult::Source(CapabilitySource::<C>::Component {
                         capability: sources.find_component_source(
                             expose.source_name(),
                             target.abs_moniker(),
@@ -1617,7 +1607,7 @@ where
                     }));
                 }
                 ExposeSource::Framework => {
-                    return Ok(ExposeResult::Source(CapabilitySourceInterface::<C>::Framework {
+                    return Ok(ExposeResult::Source(CapabilitySource::<C>::Framework {
                         capability: sources
                             .framework_source(expose.source_name().clone(), mapper)?,
                         component: target.as_weak(),
@@ -1625,7 +1615,7 @@ where
                 }
                 ExposeSource::Capability(_) => {
                     sources.capability_source()?;
-                    return Ok(ExposeResult::Source(CapabilitySourceInterface::<C>::Capability {
+                    return Ok(ExposeResult::Source(CapabilitySource::<C>::Capability {
                         source_capability: ComponentCapability::Expose(expose.into()),
                         component: target.as_weak(),
                     }));

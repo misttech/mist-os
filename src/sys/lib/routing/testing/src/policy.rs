@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     routing::{
-        capability_source::{CapabilitySourceInterface, ComponentCapability, InternalCapability},
+        capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::ComponentInstanceInterface,
         config::{
             AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey,
@@ -89,7 +89,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap());
 
-        let protocol_capability = CapabilitySourceInterface::<C>::Framework {
+        let protocol_capability = CapabilitySource::<C>::Framework {
             capability: InternalCapability::Protocol(CapabilityName::from(
                 "fuchsia.component.Realm",
             )),
@@ -137,7 +137,7 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
 
-        let protocol_capability = CapabilitySourceInterface::<C>::Namespace {
+        let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.RootResource".into(),
                 source_path: Some("/svc/fuchsia.kernel.RootResource".parse().unwrap()),
@@ -194,7 +194,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
-        let protocol_capability = CapabilitySourceInterface::<C>::Component {
+        let protocol_capability = CapabilitySource::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.foo.FooBar".into(),
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
@@ -246,7 +246,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
-        let protocol_capability = CapabilitySourceInterface::<C>::Capability {
+        let protocol_capability = CapabilitySource::<C>::Capability {
             source_capability: ComponentCapability::Storage(StorageDecl {
                 backing_dir: "/cache".into(),
                 name: "cache".into(),
@@ -306,7 +306,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let component = self.make_component(vec!["foo:0"].try_into().unwrap());
 
-        let protocol_capability = CapabilitySourceInterface::<C>::Component {
+        let protocol_capability = CapabilitySource::<C>::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "debug_service1".into(),
                 source_path: Some("/svc/debug_service1".parse().unwrap()),
@@ -438,7 +438,7 @@ where
 
         for (source, dest, env) in valid_cases {
             let component = self.make_component(source.clone().try_into().unwrap());
-            let protocol_capability = CapabilitySourceInterface::<C>::Component {
+            let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
@@ -460,7 +460,7 @@ where
 
         for (source, dest, env) in invalid_cases {
             let component = self.make_component(source.clone().try_into().unwrap());
-            let protocol_capability = CapabilitySourceInterface::<C>::Component {
+            let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
@@ -566,7 +566,7 @@ where
 
         for (source, dest, env) in valid_cases {
             let component = self.make_component(source.clone().try_into().unwrap());
-            let protocol_capability = CapabilitySourceInterface::<C>::Component {
+            let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
@@ -588,7 +588,7 @@ where
 
         for (source, dest, env) in invalid_cases {
             let component = self.make_component(source.clone().try_into().unwrap());
-            let protocol_capability = CapabilitySourceInterface::<C>::Component {
+            let protocol_capability = CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Protocol(ProtocolDecl {
                     name: "debug_service1".into(),
                     source_path: Some("/svc/debug_service1".parse().unwrap()),
@@ -628,7 +628,7 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
 
-        let dir_capability = CapabilitySourceInterface::<C>::Builtin {
+        let dir_capability = CapabilitySource::<C>::Builtin {
             capability: InternalCapability::Directory(CapabilityName::from("hub")),
             top_instance: Weak::new(),
         };
@@ -675,7 +675,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
-        let protocol_capability = CapabilitySourceInterface::<C>::Namespace {
+        let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.RootResource".into(),
                 source_path: Some("/svc/fuchsia.kernel.RootResource".parse().unwrap()),
@@ -732,7 +732,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
-        let protocol_capability = CapabilitySourceInterface::<C>::Namespace {
+        let protocol_capability = CapabilitySource::<C>::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.RootResource".into(),
                 source_path: Some("/svc/fuchsia.kernel.RootResource".parse().unwrap()),
