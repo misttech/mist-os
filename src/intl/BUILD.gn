@@ -28,6 +28,13 @@ group("tests") {
   ]
 }
 
+# For targets that use icu flavoring, e.g. icu_fuchsia_component, use
+#
+# icu_deps = [ "//src/lib/icu:icudtl" ]
+#
+# directly instead of:
+#
+# deps = [ "//src/intl:icudtl" ]
 group("icudtl") {
   public_deps = [ "//src/lib/icu:icudtl" ]
 }

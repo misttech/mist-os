@@ -57,6 +57,7 @@ std::optional<std::string> MessageFormatter::FormatStringById(
     }
   }
   std::vector<icu::UnicodeString> icu_arg_names;
+  icu_arg_names.reserve(arg_names.size());
   for (auto& name : arg_names) {
     icu_arg_names.emplace_back(name.c_str());
   }
@@ -86,8 +87,9 @@ std::optional<std::string> MessageFormatter::FormatStringById(
 
   icu::UnicodeString unicode_result;
   status = U_ZERO_ERROR;
-  message_format.format(icu_arg_names.data(), icu_arg_values.data(), icu_arg_values.size(),
-                        unicode_result, status);
+  message_format.format(icu_arg_names.data(), icu_arg_values.data(),
+                        // icu_arg_values should never be larger than int32_t.
+                        static_cast<int32_t>(icu_arg_values.size()), unicode_result, status);
   if (U_FAILURE(status)) {
     FX_LOGS(ERROR) << "Failed to format message";
     return std::nullopt;

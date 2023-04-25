@@ -3,15 +3,16 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/icu/icu_group.gni")
 
-group("lib") {
+icu_group("lib") {
+  icu_public_deps = [ "screen_reader:screen_reader" ]
   public_deps = [
     "annotation",
     "configuration",
     "focus_chain",
     "gesture_manager",
     "magnifier",
-    "screen_reader",
     "screen_reader/focus",
     "screen_reader/util",
     "semantics",

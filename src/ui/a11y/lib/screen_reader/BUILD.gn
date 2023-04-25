@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("screen_reader") {
+import("//build/icu/icu_source_set.gni")
+
+icu_source_set("screen_reader") {
   sources = [
     "change_range_value_action.cc",
     "change_range_value_action.h",
@@ -34,6 +36,8 @@ source_set("screen_reader") {
     "three_finger_swipe_action.h",
   ]
 
+  icu_public_deps = [ "//src/ui/a11y/lib/screen_reader/i18n:i18n" ]
+
   public_deps = [
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture_hlcpp",
@@ -45,7 +49,6 @@ source_set("screen_reader") {
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//src/ui/a11y/lib/screen_reader/focus",
-    "//src/ui/a11y/lib/screen_reader/i18n:i18n",
     "//src/ui/a11y/lib/screen_reader/i18n:resources",
   ]
 
@@ -64,7 +67,4 @@ source_set("screen_reader") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }

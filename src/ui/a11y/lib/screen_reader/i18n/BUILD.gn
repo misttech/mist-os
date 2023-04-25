@@ -2,10 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/icu/icu_source_set.gni")
 import("//build/intl/intl_strings.gni")
 import("//src/lib/icu/third_party_icu_headers.gni")
 
 third_party_icu_headers("icu_headers") {
+  icu_assembly = true
   headers = [
     "third_party/icu/source/i18n/unicode/msgfmt.h",
     "third_party/icu/source/common/unicode/ucnv.h",
@@ -19,26 +21,24 @@ group("resources") {
   ]
 }
 
-source_set("i18n") {
+icu_source_set("i18n") {
   sources = [
     "message_formatter.cc",
     "message_formatter.h",
     "messages.h",
   ]
 
-  public_deps = [
-    ":fuchsia.intl.l10n_hlcpp",
+  icu_public_deps = [
     ":icu_headers",
     "//src/lib/intl/lookup/cpp:lib",
   ]
+
+  public_deps = [ ":fuchsia.intl.l10n_hlcpp" ]
 
   deps = [
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
   ]
-
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 intl_strings("l10n") {
