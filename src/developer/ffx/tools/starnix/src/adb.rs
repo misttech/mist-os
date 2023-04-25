@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Result},
-    async_net::{TcpListener, TcpStream},
-    component_debug::cli,
-    ffx_core::ffx_plugin,
-    ffx_starnix_adb_args::AdbStarnixCommand,
-    fidl::Status,
-    fidl_fuchsia_developer_remotecontrol as rc,
-    fidl_fuchsia_starnix_container::ControllerMarker,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    futures::io::AsyncReadExt,
-    futures::stream::StreamExt,
-    lazy_static::lazy_static,
-    regex::Regex,
-    signal_hook::{consts::signal::SIGINT, iterator::Signals},
-};
+use anyhow::{anyhow, bail, Context, Result};
+use argh::FromArgs;
+use async_net::{TcpListener, TcpStream};
+use component_debug::cli;
+use fho::SimpleWriter;
+use fidl::Status;
+use fidl_fuchsia_developer_remotecontrol as rc;
+use fidl_fuchsia_starnix_container::ControllerMarker;
+use fidl_fuchsia_sys2 as fsys;
+use fuchsia_async as fasync;
+use futures::io::AsyncReadExt;
+use futures::stream::StreamExt;
+use lazy_static::lazy_static;
+use regex::Regex;
+use signal_hook::{consts::signal::SIGINT, iterator::Signals};
 
 const ADB_DEFAULT_PORT: u32 = 5555;
 
@@ -65,7 +64,9 @@ async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<St
         .collect();
 
     if containers.is_empty() {
-        bail!("unable to find Starnix container in the session.\nPlease specify a container with --moniker");
+        println!("Unable to find Starnix container in the session.");
+        println!("Please specify a container with --moniker");
+        bail!("cannot find container")
     }
 
     if containers.len() > 1 {
@@ -73,7 +74,8 @@ async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<St
         for container in containers.iter() {
             println!("  {}", container.moniker.to_string())
         }
-        bail!("please specify the container you want with --moniker");
+        println!("Please specify a container with --moniker");
+        bail!("too many containers")
     }
 
     Ok(containers[0].moniker.to_string())
@@ -81,7 +83,7 @@ async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<St
 
 async fn find_moniker(
     rcs_proxy: &rc::RemoteControlProxy,
-    command: &AdbStarnixCommand,
+    command: &StarnixAdbCommand,
 ) -> Result<String> {
     if let Some(moniker) = &command.moniker {
         return Ok(moniker.clone());
@@ -94,10 +96,28 @@ fn moniker_to_selector(moniker: String) -> String {
     return format!("{}:expose:fuchsia.starnix.container.Controller", moniker.replace(":", "\\:"));
 }
 
-#[ffx_plugin("starnix_enabled")]
-pub async fn adb_starnix(
-    rcs_proxy: rc::RemoteControlProxy,
-    command: AdbStarnixCommand,
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "adb",
+    example = "ffx starnix adb",
+    description = "Bridge from host adb to adbd running inside starnix"
+)]
+pub struct StarnixAdbCommand {
+    /// the moniker of the container running adbd
+    /// (defaults to looking for a container in the current session)
+    #[argh(option, short = 'm')]
+    pub moniker: Option<String>,
+
+    /// which port to serve the adb server on
+    #[argh(option, short = 'p', default = "5556")]
+    pub port: u16,
+}
+
+pub async fn starnix_adb(
+    command: &StarnixAdbCommand,
+    rcs_proxy: &rc::RemoteControlProxy,
+    _writer: SimpleWriter,
 ) -> Result<()> {
     let (controller_proxy, controller_server_end) =
         fidl::endpoints::create_proxy::<ControllerMarker>().context("failed to create proxy")?;
@@ -106,7 +126,7 @@ pub async fn adb_starnix(
     rcs::connect_with_timeout(TIMEOUT, &selector, &rcs_proxy, controller_server_end.into_channel())
         .await?;
 
-    println!("adb_starnix - listening");
+    println!("starnix adb - listening");
 
     let mut signals = Signals::new(&[SIGINT]).unwrap();
     let handle = signals.handle();

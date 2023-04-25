@@ -5,7 +5,10 @@
 import("//src/developer/ffx/config.gni")
 
 # The list of tools under this directory
-_tools = [ "echo" ]
+_tools = [
+  "echo",
+  "starnix",
+]
 
 group("tools") {
   public_deps = _tools
