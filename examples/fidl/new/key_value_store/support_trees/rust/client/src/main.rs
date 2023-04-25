@@ -53,7 +53,7 @@ async fn main() -> Result<(), Error> {
     // serve as the entries key.
     for spec in config.write_nested.into_iter() {
         let mut items = vec![];
-        let mut nested_store = NestedStore::EMPTY;
+        let mut nested_store = NestedStore::default();
         let mut lines = spec.split("\n");
         let key = lines.next().unwrap();
 

@@ -61,10 +61,7 @@ async fn start_provider(
     url: &str,
 ) -> fio::DirectoryProxy {
     info!(%name, %url, "creating BankAccount provider");
-    let child_args = fcomponent::CreateChildArgs {
-        numbered_handles: None,
-        ..fcomponent::CreateChildArgs::EMPTY
-    };
+    let child_args = fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
     realm
         .create_child(
             &mut fdecl::CollectionRef { name: COLLECTION_NAME.to_string() },
@@ -73,7 +70,7 @@ async fn start_provider(
                 url: Some(url.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             },
             child_args,
         )

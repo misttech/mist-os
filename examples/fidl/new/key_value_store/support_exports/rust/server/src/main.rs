@@ -65,7 +65,7 @@ fn export(store: &mut HashMap<String, Vec<u8>>, vmo: Vmo) -> Result<Vmo, ExportE
 
     // Build the `Exportable` vector locally. That means iterating over the map, and turning it into
     // a vector of items instead.
-    let mut exportable = Exportable::EMPTY;
+    let mut exportable = Exportable::default();
     let mut items = store
         .iter()
         .map(|entry| return Item { key: entry.0.clone(), value: entry.1.clone() })

@@ -23,8 +23,8 @@ async fn write_next_item(
     value: Value,
     options: WriteOptions,
 ) -> Result<(), Error> {
-    // Create an empty request payload using `::EMPTY`.
-    let mut req = StoreWriteItemRequest::EMPTY;
+    // Create an empty request payload using `::default()`.
+    let mut req = StoreWriteItemRequest::default();
     req.options = Some(options);
 
     // Fill in the `Item` we will be attempting to write.

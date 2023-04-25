@@ -317,7 +317,7 @@ async fn bridged_packet_test(name: &str) {
         let address_state_provider = interfaces::add_address_wait_assigned(
             &control,
             fnet::Subnet { addr: fnet::IpAddress::Ipv4(local_addr), prefix_len: PREFIX_LEN },
-            fnet_interfaces_admin::AddressParameters::EMPTY,
+            fnet_interfaces_admin::AddressParameters::default(),
         )
         .await
         .expect("add IPv4 address to bridge failed");

@@ -76,11 +76,11 @@ async fn create_dynamic_child() {
         name: Some(String::from("lifecycle_dynamic")),
         url: Some(String::from("echo_server#meta/default.cm")),
         startup: Some(StartupMode::Lazy),
-        ..Child::EMPTY
+        ..Default::default()
     };
 
     realm
-        .create_child(&mut collection_ref, child_decl, CreateChildArgs::EMPTY)
+        .create_child(&mut collection_ref, child_decl, CreateChildArgs::default())
         .await
         .expect("create_child failed")
         .expect("failed to create child");

@@ -30,7 +30,7 @@ async fn test_flatland_connection_is_ok() -> Result<(), Error> {
     factory_proxy
         .create(ui_test_context::FactoryCreateRequest {
             context_server: Some(context_server_end),
-            ..ui_test_context::FactoryCreateRequest::EMPTY
+            ..Default::default()
         })
         .expect("create Context");
 
@@ -44,7 +44,7 @@ async fn test_flatland_connection_is_ok() -> Result<(), Error> {
 
     flatland_proxy.create_transform(&mut TRANSFORM_ID.clone()).expect("create transform");
 
-    flatland_proxy.present(PresentArgs::EMPTY).expect("flatland present");
+    flatland_proxy.present(PresentArgs::default()).expect("flatland present");
 
     let ofp = flatland_event_stream
         .next()

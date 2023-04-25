@@ -50,7 +50,7 @@ async fn main() {
                             .into_iter()
                             .flatten();
                         let addresses = Some(ipv4_addresses.chain(ipv6_addresses).collect());
-                        Ok(fnet_name::LookupResult { addresses, ..fnet_name::LookupResult::EMPTY })
+                        Ok(fnet_name::LookupResult { addresses, ..Default::default() })
                     })()))
                 }
                 request => panic!("unexpected request: {:?}", request),

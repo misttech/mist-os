@@ -40,7 +40,7 @@ async fn test_smoke_test() -> Result<()> {
 
     let instance = realm.build().await?;
 
-    instance.driver_test_realm_start(fdt::RealmArgs::EMPTY).await?;
+    instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
     // Connect to a protocol to ensure that it starts, then immediately exit.
     let _ = instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
@@ -56,7 +56,7 @@ async fn test_empty_args() -> Result<()> {
 
     let instance = realm.build().await?;
 
-    instance.driver_test_realm_start(fdt::RealmArgs::EMPTY).await?;
+    instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
     let driver_dev =
         instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
@@ -83,7 +83,7 @@ async fn test_pkg_dir() -> Result<()> {
         | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE
         | fio::OpenFlags::DIRECTORY;
     fuchsia_fs::directory::open_channel_in_namespace("/pkg", pkg_flags, pkg_server).unwrap();
-    let args = fdt::RealmArgs { boot: Some(pkg), ..fdt::RealmArgs::EMPTY };
+    let args = fdt::RealmArgs { boot: Some(pkg), ..Default::default() };
 
     instance.driver_test_realm_start(args).await?;
 
@@ -110,7 +110,7 @@ async fn test_root_driver() -> Result<()> {
     let instance = realm.build().await?;
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
 
     instance.driver_test_realm_start(args).await?;

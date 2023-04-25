@@ -30,7 +30,7 @@ async fn set_then_get() -> Result<(), Error> {
             intl_property_provider.get_profile().await.context("get initial profile")?;
 
         let new_settings = {
-            let mut s = fsettings::IntlSettings::EMPTY;
+            let mut s = fsettings::IntlSettings::default();
             s.locales = Some(vec![fintl::LocaleId { id: "sr-RS".to_string() }]);
             s.time_zone_id = Some(fintl::TimeZoneId { id: "Europe/Belgrade".to_string() });
             s.temperature_unit = Some(fintl::TemperatureUnit::Celsius);
@@ -52,7 +52,7 @@ async fn set_then_get() -> Result<(), Error> {
         let updated_profile =
             intl_property_provider.get_profile().await.context("get updated profile")?;
         let expected_profile = {
-            let mut p = fintl::Profile::EMPTY;
+            let mut p = fintl::Profile::default();
             p.locales = Some(vec![fintl::LocaleId {
                 id: "sr-RS-u-ca-gregory-fw-mon-hc-h23-ms-metric-nu-latn-tz-rsbeg".to_string(),
             }]);
