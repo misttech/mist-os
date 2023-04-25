@@ -1009,7 +1009,7 @@ impl NetstackSeed {
                             socket.serve_with(|rs| socket::raw::serve(rs)).await
                         }
                         WorkItem::Incoming(Service::RoutesState(rs)) => {
-                            routes_fidl_worker::serve_state(rs)
+                            routes_fidl_worker::serve_state(rs, netstack.clone()).await
                         }
                         WorkItem::Incoming(Service::RoutesStateV4(rs)) => {
                             routes_fidl_worker::serve_state_v4(rs, netstack.clone()).await

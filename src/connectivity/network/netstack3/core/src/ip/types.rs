@@ -196,7 +196,7 @@ impl<A: IpAddress, D> From<Entry<A, D>> for EntryEither<D> {
 
 /// The next hop for a [`Destination`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum NextHop<A> {
+pub enum NextHop<A> {
     /// Indicates that the next-hop for a the packet is the remote since it is a
     /// neighboring node (on-link).
     RemoteAsNeighbor,
@@ -206,15 +206,15 @@ pub(crate) enum NextHop<A> {
 }
 
 /// The resolved route to a destination IP address.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedRoute<I: Ip, D> {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, GenericOverIp)]
+pub struct ResolvedRoute<I: Ip, D> {
     /// The source address to use when forwarding packets towards the
     /// destination.
-    pub(crate) src_addr: SpecifiedAddr<I::Addr>,
+    pub src_addr: SpecifiedAddr<I::Addr>,
     /// The device over which this destination can be reached.
-    pub(crate) device: D,
+    pub device: D,
     /// The next hop via which this destination can be reached.
-    pub(crate) next_hop: NextHop<I::Addr>,
+    pub next_hop: NextHop<I::Addr>,
 }
 
 /// The destination of an outbound IP packet.

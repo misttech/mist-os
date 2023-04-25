@@ -59,8 +59,7 @@ use packet::{Buf, BufferMut, EmptyBuf};
 
 use crate::{
     context::{CounterContext, EventContext, RngContext, TimerContext},
-    device::DeviceId,
-    device::{DeviceLayerState, DeviceLayerTimerId},
+    device::{DeviceId, DeviceLayerState, DeviceLayerTimerId},
     ip::{
         device::{DualStackDeviceHandler, Ipv4DeviceTimerId, Ipv6DeviceTimerId},
         icmp::{BufferIcmpContext, IcmpContext},

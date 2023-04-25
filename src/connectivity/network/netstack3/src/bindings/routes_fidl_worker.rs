@@ -7,19 +7,36 @@
 use std::collections::HashSet;
 
 use async_utils::event::Event;
+use either::Either;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _};
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+use fuchsia_zircon::sys::ZX_ERR_ADDRESS_UNREACHABLE;
 use futures::{
     channel::mpsc, lock::Mutex as AsyncMutex, FutureExt, StreamExt as _, TryStream,
     TryStreamExt as _,
 };
 use itertools::Itertools as _;
-use log::warn;
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
+use log::{info, warn};
+use net_types::{
+    ethernet::Mac,
+    ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6},
+    SpecifiedAddr,
+};
+use netstack3_core::{
+    device::{DeviceId, EthernetDeviceId},
+    ip::{
+        device::nud::NeighborLinkAddr,
+        types::{NextHop, ResolvedRoute},
+    },
+};
 use thiserror::Error;
 
-use crate::bindings::{Ctx, Netstack};
+use crate::bindings::{
+    util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
+    BindingsNonSyncCtxImpl, Ctx, Netstack, SyncCtx,
+};
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
 // is allowed to have queued. Clients will be dropped if they exceed this limit.
@@ -28,12 +45,92 @@ use crate::bindings::{Ctx, Netstack};
 const MAX_PENDING_EVENTS: usize = (fnet_routes::MAX_EVENTS * 5) as usize;
 
 /// Serve the `fuchsia.net.routes/State` protocol.
-pub(crate) fn serve_state(_rs: fnet_routes::StateRequestStream) {
-    // TODO(https://fxbug.dev/120878) Implement fuchsia.net.routes/State
-    warn!(
-        "Request to unimplemented FIDL protocol {}; sending PEER_CLOSED",
-        fnet_routes::StateMarker::PROTOCOL_NAME
-    )
+pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ns: Netstack) {
+    rs.try_for_each_concurrent(None, |req| match req {
+        fnet_routes::StateRequest::Resolve { destination, responder } => futures::future::ready(
+            responder.send(&mut resolve(destination, ns.clone()).ok_or(ZX_ERR_ADDRESS_UNREACHABLE)),
+        ),
+    })
+    .await
+    .unwrap_or_else(|e| warn!("error serving {}: {:?}", fnet_routes::StateMarker::PROTOCOL_NAME, e))
+}
+
+/// Resolves the route to the given destination address.
+///
+/// Returns `None` if the destination can't be resolved.
+fn resolve(destination: fnet::IpAddress, ns: Netstack) -> Option<fnet_routes::Resolved> {
+    let addr: IpAddr = destination.into_core();
+    match addr {
+        IpAddr::V4(addr) => resolve_inner(addr, ns),
+        IpAddr::V6(addr) => resolve_inner(addr, ns),
+    }
+}
+
+/// The inner implementation of [`resolve`] that's generic over `Ip`.
+fn resolve_inner<A: IpAddress>(destination: A, ns: Netstack) -> Option<fnet_routes::Resolved> {
+    let mut ctx = ns.ctx.clone();
+    let Ctx { sync_ctx, ref mut non_sync_ctx } = &mut ctx;
+    let ResolvedRoute { device, src_addr, next_hop } =
+        match netstack3_core::ip::resolve_route::<A::Version, _>(sync_ctx, destination) {
+            Err(e) => {
+                info!("Resolve failed for {}, {:?}", destination, e);
+                return None;
+            }
+            Ok(resolved_route) => resolved_route,
+        };
+    let (next_hop_addr, next_hop_type) = match next_hop {
+        NextHop::RemoteAsNeighbor => {
+            (SpecifiedAddr::new(destination), Either::Left(fnet_routes::Resolved::Direct))
+        }
+        NextHop::Gateway(gateway) => (Some(gateway), Either::Right(fnet_routes::Resolved::Gateway)),
+    };
+    let remote_mac = match &device {
+        DeviceId::Loopback(_device) => None,
+        DeviceId::Ethernet(device) => {
+            if let Some(addr) = next_hop_addr {
+                resolve_ethernet_link_addr(sync_ctx, device, &addr)
+            } else {
+                warn!("Cannot attempt Ethernet link resolution for the unspecified address.");
+                return None;
+            }
+        }
+    };
+
+    let destination = {
+        let address =
+            next_hop_addr.map_or(A::Version::UNSPECIFIED_ADDRESS, |a| *a).to_ip_addr().into_fidl();
+        let source_address = src_addr.to_ip_addr().into_fidl();
+        let mac = remote_mac.map(|mac| mac.into_fidl());
+        let interface_id = non_sync_ctx.get_binding_id(device);
+        fnet_routes::Destination {
+            address: Some(address),
+            mac,
+            interface_id: Some(interface_id.get()),
+            source_address: Some(source_address),
+            ..fnet_routes::Destination::EMPTY
+        }
+    };
+
+    Some(either::for_both!(next_hop_type, f => f(destination)))
+}
+
+/// Performs link-layer resolution of the remote IP Address on the given device.
+fn resolve_ethernet_link_addr<A: IpAddress>(
+    sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
+    device: &EthernetDeviceId<BindingsNonSyncCtxImpl>,
+    remote: &SpecifiedAddr<A>,
+) -> Option<Mac> {
+    match netstack3_core::device::ethernet::resolve_ethernet_link_addr::<A::Version, _>(
+        sync_ctx, device, remote,
+    ) {
+        NeighborLinkAddr::Resolved(mac) => Some(mac),
+        NeighborLinkAddr::PendingNeighborResolution => {
+            // TODO(https://fxbug.dev/120878): Properly wait for neighbor
+            // resolution.
+            warn!("Neighbor resolution unimplemented: https://fxbug.dev/120878. Omitting MAC.");
+            None
+        }
+    }
 }
 
 /// Serve the `fuchsia.net.routes/StateV4` protocol.

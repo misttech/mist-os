@@ -15,7 +15,7 @@ use lock_order::{
 use log::trace;
 use net_types::{
     ethernet::Mac,
-    ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Nested, Serializer};
@@ -32,8 +32,6 @@ use packet_formats::{
     utils::NonZeroDuration,
 };
 
-#[cfg(test)]
-use crate::ip::device::nud::NudHandler;
 use crate::{
     context::{
         CounterContext, RecvFrameContext, RngContext, SendFrameContext, TimerContext, TimerHandler,
@@ -59,7 +57,10 @@ use crate::{
         RecvIpFrameMeta,
     },
     ip::{
-        device::nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
+        device::nud::{
+            BufferNudContext, BufferNudHandler, NeighborLinkAddr, NudContext, NudHandler, NudState,
+            NudTimerId,
+        },
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
@@ -1150,6 +1151,39 @@ impl LinkDevice for EthernetLinkDevice {
     type State = EthernetDeviceState;
 }
 
+/// Resolve the link-address of an Ethernet device's neighbor.
+///
+/// Lookup the given destination IP address in the neighbor table for given
+/// Ethernet device, returning the associated link-address.
+// TODO(https://fxbug.dev/120878): Update the doc string to explain how to
+// handle `NeighborLinkAddr::PendingNeighborResolution` once dynamic neighbor
+// resolution is supported.
+pub fn resolve_ethernet_link_addr<I: Ip, NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    device: &EthernetDeviceId<NonSyncCtx>,
+    dst: &SpecifiedAddr<I::Addr>,
+) -> NeighborLinkAddr<Mac> {
+    let sync_ctx = Locked::new(sync_ctx);
+    let IpInvariant(link_addr) = I::map_ip(
+        (IpInvariant((sync_ctx, device)), dst),
+        |(IpInvariant((mut sync_ctx, device)), dst)| {
+            IpInvariant(NudHandler::<Ipv4, EthernetLinkDevice, _>::resolve_link_addr(
+                &mut sync_ctx,
+                device,
+                dst,
+            ))
+        },
+        |(IpInvariant((mut sync_ctx, device)), dst)| {
+            IpInvariant(NudHandler::<Ipv6, EthernetLinkDevice, _>::resolve_link_addr(
+                &mut sync_ctx,
+                device,
+                dst,
+            ))
+        },
+    );
+    link_addr
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{collections::hash_map::HashMap, vec, vec::Vec};
@@ -1279,6 +1313,14 @@ mod tests {
         fn flush(&mut self, _ctx: &mut FakeNonSyncCtx, _device_id: &Self::DeviceId) {
             unimplemented!()
         }
+
+        fn resolve_link_addr(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            _dst: &SpecifiedAddr<Ipv6Addr>,
+        ) -> NeighborLinkAddr<Mac> {
+            unimplemented!()
+        }
     }
 
     impl<B: BufferMut> BufferNudHandler<B, Ipv6, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
@@ -1316,6 +1358,14 @@ mod tests {
         }
 
         fn flush(&mut self, _ctx: &mut FakeNonSyncCtx, _device_id: &Self::DeviceId) {
+            unimplemented!()
+        }
+
+        fn resolve_link_addr(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            _dst: &SpecifiedAddr<Ipv4Addr>,
+        ) -> NeighborLinkAddr<Mac> {
             unimplemented!()
         }
     }

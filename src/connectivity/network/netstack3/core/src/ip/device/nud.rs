@@ -21,7 +21,10 @@ use packet_formats::utils::NonZeroDuration;
 
 use crate::{
     context::{TimerContext, TimerHandler},
-    device::{link::LinkDevice, AnyDevice, DeviceIdContext},
+    device::{
+        link::{LinkAddress, LinkDevice},
+        AnyDevice, DeviceIdContext,
+    },
 };
 
 /// The maximum number of multicast solicitations as defined in [RFC 4861
@@ -55,7 +58,7 @@ enum NeighborState<LinkAddr> {
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-enum DynamicNeighborState<LinkAddr> {
+pub(crate) enum DynamicNeighborState<LinkAddr> {
     Incomplete { transmit_counter: Option<NonZeroU8>, pending_frames: VecDeque<Buf<Vec<u8>>> },
     Complete { link_address: LinkAddr },
 }
@@ -123,6 +126,7 @@ pub(crate) struct NudTimerId<I: Ip, D: LinkDevice, DeviceId> {
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct NudState<I: Ip, LinkAddr> {
+    // TODO(https://fxbug.dev/126138): Key neighbors by `UnicastAddr`.
     neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<LinkAddr>>,
 }
 
@@ -207,10 +211,20 @@ pub(crate) trait NudIpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     fn flush_neighbor_table(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
 }
 
+/// Specifies the link-layer address of a neighbor.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum NeighborLinkAddr<A: LinkAddress> {
+    /// The destination is a known neighbor with the given link-layer address.
+    Resolved(A),
+    /// The destination is not a known neighbor.
+    PendingNeighborResolution,
+}
+
 /// An implementation of NUD for a link device.
 pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C>: DeviceIdContext<D> {
     /// Sets a dynamic neighbor's entry state to the specified values in
     /// response to the source packet.
+    // TODO(https://fxbug.dev/126138): Require that neighbor is a `UnicastAddr`.
     fn set_dynamic_neighbor(
         &mut self,
         ctx: &mut C,
@@ -227,6 +241,7 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C>: DeviceIdContext<D> {
     /// to be a static entry.
     ///
     /// Dynamic updates for the neighbor will be ignored for static entries.
+    // TODO(https://fxbug.dev/126138): Require that neighbor is a `UnicastAddr`.
     fn set_static_neighbor(
         &mut self,
         ctx: &mut C,
@@ -237,6 +252,14 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C>: DeviceIdContext<D> {
 
     /// Clears the neighbor table.
     fn flush(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
+
+    /// Resolve the link-address of a device's neighbor.
+    // TODO(https://fxbug.dev/126138): Require that dst is a `UnicastAddr`.
+    fn resolve_link_addr(
+        &mut self,
+        device: &Self::DeviceId,
+        dst: &SpecifiedAddr<I::Addr>,
+    ) -> NeighborLinkAddr<D::Address>;
 }
 
 /// An implementation of NUD for a link device, with a buffer.
@@ -471,6 +494,34 @@ impl<
                 neighbor
             );
         });
+    }
+
+    // TODO(https://fxbug.dev/120878): Initiate a neighbor probe if the neighbor is
+    // not found, or if its entry is incomplete.
+    fn resolve_link_addr(
+        &mut self,
+        device: &SC::DeviceId,
+        dst: &SpecifiedAddr<I::Addr>,
+    ) -> NeighborLinkAddr<D::Address> {
+        NudContext::with_nud_state_mut(
+            self,
+            device,
+            |NudState { neighbors }: &mut NudState<_, _>| {
+                neighbors.get(dst).map_or(
+                    NeighborLinkAddr::PendingNeighborResolution,
+                    |neighbor_state| match neighbor_state {
+                        NeighborState::Static(link_address)
+                        | NeighborState::Dynamic(DynamicNeighborState::Complete { link_address }) => {
+                            NeighborLinkAddr::Resolved(link_address.clone())
+                        }
+                        NeighborState::Dynamic(DynamicNeighborState::Incomplete {
+                            transmit_counter: _,
+                            pending_frames: _,
+                        }) => NeighborLinkAddr::PendingNeighborResolution,
+                    },
+                )
+            },
+        )
     }
 }
 
@@ -1166,6 +1217,41 @@ mod tests {
             device_id,
             |NudState { neighbors }| assert_eq!(*neighbors, expected),
         )
+    }
+
+    #[ip_test]
+    #[test_case(None, NeighborLinkAddr::PendingNeighborResolution; "no_neighbor")]
+    #[test_case(Some(DynamicNeighborUpdateSource::Confirmation),
+                NeighborLinkAddr::PendingNeighborResolution; "incomplete_neighbor")]
+    #[test_case(Some(DynamicNeighborUpdateSource::Probe),
+                NeighborLinkAddr::Resolved(LINK_ADDR1); "complete_neighbor")]
+    fn resolve_link_addr<I: Ip + TestIpExt>(
+        initial_neighbor_state: Option<DynamicNeighborUpdateSource>,
+        expected_result: NeighborLinkAddr<FakeLinkAddress>,
+    ) {
+        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtx::with_sync_ctx(FakeCtxImpl::<I>::with_state(FakeNudContext {
+                retrans_timer: ONE_SECOND,
+                nud: Default::default(),
+            }));
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(sync_ctx.take_frames(), []);
+
+        if let Some(source) = initial_neighbor_state {
+            NudHandler::set_dynamic_neighbor(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &FakeLinkDeviceId,
+                I::LOOKUP_ADDR1,
+                LINK_ADDR1,
+                source,
+            );
+        }
+
+        assert_eq!(
+            NudHandler::resolve_link_addr(&mut sync_ctx, &FakeLinkDeviceId, &I::LOOKUP_ADDR1),
+            expected_result
+        );
     }
 
     #[test]

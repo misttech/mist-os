@@ -21,7 +21,7 @@ use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
 use net_types::{
     self,
-    ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
 };
 use netstack_testing_common::{
     interfaces,
@@ -43,10 +43,9 @@ async fn resolve(
 }
 
 #[netstack_test]
-async fn resolve_loopback_route(name: &str) {
+async fn resolve_loopback_route<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     let routes = realm
         .connect_to_protocol::<fidl_fuchsia_net_routes::StateMarker>()
         .expect("failed to connect to routes/State");
@@ -70,7 +69,7 @@ async fn resolve_loopback_route(name: &str) {
 }
 
 #[netstack_test]
-async fn resolve_route(name: &str) {
+async fn resolve_route<N: Netstack>(name: &str) {
     const GATEWAY_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const GATEWAY_IP_V6: fidl_fuchsia_net::Subnet = fidl_subnet!("3080::1/64");
     const GATEWAY_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:01:02:03:04:05");
@@ -82,7 +81,7 @@ async fn resolve_route(name: &str) {
 
     // Configure a host.
     let host = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_host", name))
+        .create_netstack_realm::<N, _>(format!("{}_host", name))
         .expect("failed to create client realm");
 
     let host_stack = host
@@ -101,7 +100,7 @@ async fn resolve_route(name: &str) {
 
     // Configure a gateway.
     let gateway = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_gateway", name))
+        .create_netstack_realm::<N, _>(format!("{}_gateway", name))
         .expect("failed to create server realm");
 
     let gateway_ep = gateway
@@ -146,12 +145,22 @@ async fn resolve_route(name: &str) {
                    unspecified: fidl_fuchsia_net::IpAddress,
                    public_ip: fidl_fuchsia_net::IpAddress,
                    source_address: fidl_fuchsia_net::IpAddress| async move {
-        let gateway_node = || fidl_fuchsia_net_routes::Destination {
-            address: Some(gateway),
-            mac: Some(GATEWAY_MAC),
-            interface_id: Some(interface_id),
-            source_address: Some(source_address),
-            ..fidl_fuchsia_net_routes::Destination::EMPTY
+        let gateway_node = || {
+            // TODO(https://fxbug.dev/120878): Expect NS3 to supply the MAC once
+            // `Resolve` initiates dynamic neighbor resolution.
+            let expected_mac = match N::VERSION {
+                NetstackVersion::Netstack3 => None,
+                NetstackVersion::Netstack2
+                | NetstackVersion::Netstack2WithFastUdp
+                | NetstackVersion::ProdNetstack2 => Some(GATEWAY_MAC),
+            };
+            fidl_fuchsia_net_routes::Destination {
+                address: Some(gateway),
+                mac: expected_mac,
+                interface_id: Some(interface_id),
+                source_address: Some(source_address),
+                ..fidl_fuchsia_net_routes::Destination::EMPTY
+            }
         };
 
         // Start asking for a route for something that is directly accessible on the
@@ -159,7 +168,30 @@ async fn resolve_route(name: &str) {
         let resolved = resolve(routes, gateway).await;
         assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Direct(gateway_node()));
         // Fails if MAC unreachable.
-        resolve_fails(unreachable_peer).await;
+        match N::VERSION {
+            // TODO(https://fxbug.dev/120878): Expect NS3 to fail to resolve the
+            // `unreachable_peer`, once `Resolve` initiates dynamic neighbor
+            // resolution.
+            NetstackVersion::Netstack3 => {
+                assert_eq!(
+                    resolve(routes, unreachable_peer).await,
+                    fidl_fuchsia_net_routes::Resolved::Direct(
+                        fidl_fuchsia_net_routes::Destination {
+                            address: Some(unreachable_peer),
+                            mac: None,
+                            interface_id: Some(interface_id),
+                            source_address: Some(source_address),
+                            ..fidl_fuchsia_net_routes::Destination::EMPTY
+                        }
+                    )
+                )
+            }
+            NetstackVersion::Netstack2
+            | NetstackVersion::Netstack2WithFastUdp
+            | NetstackVersion::ProdNetstack2 => {
+                resolve_fails(unreachable_peer).await;
+            }
+        }
         // Fails if route unreachable.
         resolve_fails(public_ip).await;
 
@@ -202,6 +234,9 @@ async fn resolve_route(name: &str) {
     .await;
 }
 
+// TODO(https://fxbug.dev/124960): Test against NS3 once it supports adding
+// static neighbors. It will probably also need a slight rewrite to make use of
+// the out-of-stack DHCPv4 client.
 #[netstack_test]
 async fn resolve_default_route_while_dhcp_is_running(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -285,6 +320,95 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
             source_address: Some(fidl_fuchsia_net::IpAddress::Ipv4(EP_ADDR)),
             ..fidl_fuchsia_net_routes::Destination::EMPTY
         }))
+    );
+}
+
+#[netstack_test]
+async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+    interface.set_link_up(true).await.expect("bring device up");
+    assert!(interface.control().enable().await.expect("send enable").expect("enable interface"));
+
+    let (local, mut remote, subnet) = match I::VERSION {
+        IpVersion::V4 => {
+            (fidl_ip!("192.0.2.1"), fidl_ip!("192.0.2.2"), fidl_subnet!("192.0.2.0/24"))
+        }
+        IpVersion::V6 => {
+            (fidl_ip!("2001:0db8::1"), fidl_ip!("2001:0db8::2"), fidl_subnet!("2001:0db8::/32"))
+        }
+    };
+    const REMOTE_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:01:02:03:04:05");
+
+    // Install a route to the remote.
+    let stack = realm
+        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
+        .expect("failed to connect to netstack");
+    let () = stack
+        .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+            subnet,
+            device_id: interface.id(),
+            next_hop: None,
+            metric: 100,
+        })
+        .await
+        .expect("call add_route")
+        .expect("add route");
+
+    // Configure the remote as a neighbor.
+    let expected_mac = match N::VERSION {
+        // TODO(https://fxbug.dev/124960): Support Adding Neighbors in NS3.
+        // TODO(https://fxbug.dev/120878): Expect NS3 to resolve the MAC once it
+        // supports initiating neighbor resolution.
+        NetstackVersion::Netstack3 => None,
+        NetstackVersion::Netstack2
+        | NetstackVersion::Netstack2WithFastUdp
+        | NetstackVersion::ProdNetstack2 => {
+            let neigh = realm
+                .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
+                .expect("failed to connect to neighbor API");
+            neigh
+                .add_entry(interface.id(), &mut remote, &mut REMOTE_MAC.clone())
+                .await
+                .expect("add_entry FIDL error")
+                .map_err(fuchsia_zircon::Status::from_raw)
+                .expect("add_entry error");
+            Some(REMOTE_MAC)
+        }
+    };
+
+    let routes = realm
+        .connect_to_protocol::<fidl_fuchsia_net_routes::StateMarker>()
+        .expect("failed to connect to routes/State");
+
+    // Verify that resolving the route fails.
+    assert_eq!(
+        routes
+            .resolve(&mut remote)
+            .await
+            .expect("resolve FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw),
+        Err(fuchsia_zircon::Status::ADDRESS_UNREACHABLE)
+    );
+
+    // Install an address on the device.
+    interface
+        .add_address(fidl_fuchsia_net::Subnet { addr: local, prefix_len: I::Addr::BYTES * 8 })
+        .await
+        .expect("failed to add address");
+
+    // Verify that resolving the route succeeds.
+    assert_eq!(
+        routes.resolve(&mut remote).await.expect("resolve FIDL error").expect("resolve failed"),
+        fidl_fuchsia_net_routes::Resolved::Direct(fidl_fuchsia_net_routes::Destination {
+            address: Some(remote),
+            mac: expected_mac,
+            interface_id: Some(interface.id()),
+            source_address: Some(local),
+            ..fidl_fuchsia_net_routes::Destination::EMPTY
+        })
     );
 }
 

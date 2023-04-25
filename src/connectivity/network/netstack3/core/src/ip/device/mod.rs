@@ -6,7 +6,7 @@
 
 pub mod dad;
 pub(crate) mod integration;
-pub(crate) mod nud;
+pub mod nud;
 pub mod route_discovery;
 pub(crate) mod router_solicitation;
 pub mod slaac;

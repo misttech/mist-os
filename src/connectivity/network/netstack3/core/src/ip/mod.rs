@@ -40,7 +40,8 @@ use log::{debug, trace};
 use net_types::ip::IpVersion;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
+        GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
+        Mtu, Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -687,7 +688,7 @@ fn get_local_addr<
 }
 
 /// An error occurred while resolving the route to a destination
-#[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Error, Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
 pub enum ResolveRouteError {
     /// A source address could not be selected.
     #[error("a source address could not be selected")]
@@ -715,10 +716,10 @@ fn resolve_route_to_destination<
     sync_ctx: &mut SC,
     device: Option<&SC::DeviceId>,
     local_ip: Option<SpecifiedAddr<I::Addr>>,
-    addr: SpecifiedAddr<I::Addr>,
+    addr: Option<SpecifiedAddr<I::Addr>>,
 ) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
-    enum LocalDelivery<D> {
-        WeakLoopback,
+    enum LocalDelivery<A, D> {
+        WeakLoopback(A),
         StrongForDevice(D),
     }
 
@@ -734,36 +735,41 @@ fn resolve_route_to_destination<
     //
     // TODO(https://fxbug.dev/93870): Encode the delivery of locally-
     // destined packets to loopback in the route table.
-    let local_delivery_instructions: Option<LocalDelivery<&SC::DeviceId>> = match device {
-        Some(device) => match sync_ctx.address_status_for_device(addr, device) {
-            AddressStatus::Present(status) => {
-                // If the destination is an address assigned to the
-                // requested egress interface, route locally via the strong
-                // host model.
-                is_unicast_assigned::<I>(&status).then_some(LocalDelivery::StrongForDevice(device))
+    let local_delivery_instructions: Option<LocalDelivery<SpecifiedAddr<I::Addr>, &SC::DeviceId>> =
+        addr.and_then(|addr| {
+            match device {
+                Some(device) => match sync_ctx.address_status_for_device(addr, device) {
+                    AddressStatus::Present(status) => {
+                        // If the destination is an address assigned to the
+                        // requested egress interface, route locally via the strong
+                        // host model.
+                        is_unicast_assigned::<I>(&status)
+                            .then_some(LocalDelivery::StrongForDevice(device))
+                    }
+                    AddressStatus::Unassigned => None,
+                },
+                None => {
+                    // If the destination is an address assigned on an interface,
+                    // and an egress interface wasn't specifically selected, route
+                    // via the loopback device operating in a weak host model.
+                    sync_ctx
+                        .with_address_statuses(addr, |mut it| {
+                            it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
+                        })
+                        .then_some(LocalDelivery::WeakLoopback(addr))
+                }
             }
-            AddressStatus::Unassigned => None,
-        },
-        None => {
-            // If the destination is an address assigned on an interface,
-            // and an egress interface wasn't specifically selected, route
-            // via the loopback device operating in a weak host model.
-            sync_ctx
-                .with_address_statuses(addr, |mut it| {
-                    it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
-                })
-                .then_some(LocalDelivery::WeakLoopback)
-        }
-    };
+        });
 
     match local_delivery_instructions {
         Some(local_delivery) => {
-            let Some(loopback) = sync_ctx.loopback_id() else {
-                    return Err(ResolveRouteError::Unreachable)
-                };
+            let loopback = match sync_ctx.loopback_id() {
+                None => return Err(ResolveRouteError::Unreachable),
+                Some(loopback) => loopback,
+            };
 
             let local_ip = match local_delivery {
-                LocalDelivery::WeakLoopback => match local_ip {
+                LocalDelivery::WeakLoopback(addr) => match local_ip {
                     Some(local_ip) => sync_ctx
                         .with_address_statuses(local_ip, |mut it| {
                             it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
@@ -773,7 +779,7 @@ fn resolve_route_to_destination<
                     None => addr,
                 },
                 LocalDelivery::StrongForDevice(device) => {
-                    get_local_addr(sync_ctx, local_ip, device, Some(addr))?
+                    get_local_addr(sync_ctx, local_ip, device, addr)?
                 }
             };
             Ok(ResolvedRoute {
@@ -785,10 +791,12 @@ fn resolve_route_to_destination<
         None => {
             sync_ctx
                 .with_ip_routing_table(|sync_ctx, table| {
-                    let mut matching_with_addr =
-                        table.lookup_filter_map(sync_ctx, device, *addr, |sync_ctx, d| {
-                            Some(get_local_addr(sync_ctx, local_ip, d, Some(addr)))
-                        });
+                    let mut matching_with_addr = table.lookup_filter_map(
+                        sync_ctx,
+                        device,
+                        addr.map_or(I::UNSPECIFIED_ADDRESS, |a| *a),
+                        |sync_ctx, d| Some(get_local_addr(sync_ctx, local_ip, d, addr)),
+                    );
 
                     let first_error = match matching_with_addr.next() {
                         Some((Destination { device, next_hop }, Ok(addr))) => {
@@ -834,7 +842,7 @@ impl<
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         addr: SpecifiedAddr<I::Addr>,
     ) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
-        resolve_route_to_destination(self, device, local_ip, addr)
+        resolve_route_to_destination(self, device, local_ip, Some(addr))
     }
 }
 
@@ -2882,6 +2890,27 @@ impl<
     ) -> O {
         cb(&mut self.lock::<crate::lock_ordering::IcmpTokenBucket<Ipv6>>())
     }
+}
+
+/// Resolve the route to a given destination.
+///
+/// Returns `Some` [`ResolvedRoute`] with details for reaching the destination,
+/// or `None` if the destination is unreachable.
+pub fn resolve_route<I: Ip, NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    destination: I::Addr,
+) -> Result<ResolvedRoute<I, DeviceId<NonSyncCtx>>, ResolveRouteError> {
+    let sync_ctx = Locked::new(sync_ctx);
+    let destination = SpecifiedAddr::new(destination);
+    I::map_ip(
+        (IpInvariant(sync_ctx), destination),
+        |(IpInvariant(mut sync_ctx), destination)| {
+            resolve_route_to_destination::<Ipv4, _, _>(&mut sync_ctx, None, None, destination)
+        },
+        |(IpInvariant(mut sync_ctx), destination)| {
+            resolve_route_to_destination::<Ipv6, _, _>(&mut sync_ctx, None, None, destination)
+        },
+    )
 }
 
 // Used in testing in other modules.
