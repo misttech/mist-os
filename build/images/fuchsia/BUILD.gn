@@ -624,7 +624,7 @@ if (is_fuchsia) {
     image_name = "fuchsia"
     namespace = "netboot"
     forward_variables_from(fuchsia_base, "*")
-    ramdisk_fvm_in_zbi = true
+    ramdisk_in_zbi = true
 
     image_metadata_overrides = {
       zbi = {

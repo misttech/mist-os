@@ -7,9 +7,10 @@
         // This argument is ignored when using Fxfs instead of minfs, which has its own encryption.
         no_zxcrypt: { type: "bool" },
 
-        // Mounts FVM and its contained partitions in a ramdisk.  On-disk FVM partitions will also
-        // be mounted, but its data and blob filesystems will not be mounted.
-        fvm_ramdisk: { type: "bool" },
+        // Mounts FVM (or Fxfs, when fxfs_blob is set) and its contained volumes in a ramdisk.
+        // On-disk FVM partitions will also be mounted, but its data and blob filesystems will
+        // not be mounted.
+        ramdisk_image: { type: "bool" },
 
         // Enables all GPT devices.
         gpt_all: { type: "bool" },

@@ -208,10 +208,10 @@ async fn write_data_file(
     filename: &str,
     payload: zx::Vmo,
 ) -> Result<(), Error> {
-    if !config.fvm_ramdisk && !config.netboot {
+    if !config.ramdisk_image && !config.netboot {
         return Err(anyhow!(
             "Can't WriteDataFile from a non-recovery build;
-            fvm_ramdisk must be set."
+            ramdisk_image must be set."
         ));
     }
 
@@ -338,7 +338,7 @@ async fn shred_data_volume(
         return Err(zx::Status::NOT_SUPPORTED);
     }
     // If we expect Fxfs to be live, just erase the key bag.
-    if config.data && !config.fvm_ramdisk {
+    if config.data && !config.ramdisk_image {
         std::fs::remove_file(KEY_BAG_FILE)?;
         debug_log("Erased key bag");
     } else {
@@ -438,10 +438,10 @@ pub fn fshost_admin(
                     Ok(fshost::AdminRequest::WipeStorage { responder, blobfs_root }) => {
                         tracing::info!("admin wipe storage called");
                         let mut ignored_paths = matcher_lock.lock().await;
-                        let mut res = if !config.fvm_ramdisk {
+                        let mut res = if !config.ramdisk_image {
                             tracing::error!(
                                 "Can't WipeStorage from a non-recovery build; \
-                                fvm_ramdisk must be set."
+                                ramdisk_image must be set."
                             );
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         } else {

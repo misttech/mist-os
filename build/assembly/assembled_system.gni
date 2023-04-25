@@ -210,7 +210,10 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [bool] Whether to include an account partition in the FVM image.
 #
 #   ramdisk_fvm_in_zbi (optional)
-#     [bool] Whether the FVM should be embedded into the ZBI as a ramdisk.
+#     DEPRECTATED, use ramdisk_in_zbi.
+#
+#   ramdisk_in_zbi (optional)
+#     [bool] Whether the FVM or Fxfs image should be embedded into the ZBI as a ramdisk.
 #
 #   assembly_fvm_slice_size (optional; default: 1048576)
 #     [int] The slice size of the FVM.
@@ -518,9 +521,13 @@ template("assembled_system") {
     not_needed(invoker, [ "system_image_deps" ])
   }
 
-  embed_fvm_in_zbi = false
+  ramdisk_in_zbi = false
   if (defined(invoker.ramdisk_fvm_in_zbi)) {
-    embed_fvm_in_zbi = invoker.ramdisk_fvm_in_zbi && _supports_blobs
+    ramdisk_in_zbi = invoker.ramdisk_fvm_in_zbi && _supports_blobs
+  }
+  if (defined(invoker.ramdisk_in_zbi)) {
+    ramdisk_in_zbi =
+        (invoker.ramdisk_in_zbi && _supports_blobs) || ramdisk_in_zbi
   }
 
   devmgr_config = []
@@ -578,9 +585,9 @@ template("assembled_system") {
         # Override with anything passed from `fshost_config`
         forward_variables_from(fshost_config, "*")
 
-        # Always set fvm_ramdisk if this is an fvm-in-ramdisk assembly.
-        if (embed_fvm_in_zbi) {
-          fvm_ramdisk = true
+        # Always set ramdisk_image if the assmebled ZBI contains a ramdisk.
+        if (ramdisk_in_zbi) {
+          ramdisk_image = true
         }
 
         fxfs_blob = fxfs_blob
@@ -1013,10 +1020,10 @@ template("assembled_system") {
       args += [ "--include-account" ]
     }
 
-    if (embed_fvm_in_zbi) {
+    if (ramdisk_in_zbi) {
       args += [
         "--mode",
-        "fvm-in-zbi",
+        "embed-in-zbi",
       ]
     } else if (!_supports_blobs) {
       args += [

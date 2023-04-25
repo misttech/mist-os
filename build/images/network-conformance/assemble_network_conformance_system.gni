@@ -59,7 +59,7 @@ template("assemble_network_conformance_system") {
 
     generate_fvm = !bootfs_only && !fxfs_blob
     generate_fxfs = !bootfs_only && fxfs_blob
-    ramdisk_fvm_in_zbi = true
+    ramdisk_in_zbi = true
 
     include_component_id_index = true
     devmgr_config = [ "virtcon.disable=true" ] + zedboot_devmgr_config

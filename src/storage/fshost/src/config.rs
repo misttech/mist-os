@@ -21,7 +21,7 @@ pub fn default_config() -> fshost_config::Config {
         format_data_on_corruption: true,
         check_filesystems: true,
         fvm: true,
-        fvm_ramdisk: false,
+        ramdisk_image: false,
         fvm_slice_size: 1024 * 1024, // Default to 1 MiB slice size for tests.
         fxfs_blob: false,
         gpt: true,

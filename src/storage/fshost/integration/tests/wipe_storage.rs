@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! Test cases which simulate fshost running in the configuration used in recovery builds (which,
-//! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
+//! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
 use {
     crate::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec},
@@ -44,7 +44,7 @@ async fn write_test_blob(directory: &fio::DirectoryProxy) {
 // TODO(fxbug.dev/112142): Due to a race between the block watcher and some fshost functionality
 // (e.g. WipeStorage), we have to wait for the block watcher to finish binding all expected drivers.
 //
-// Regardless of the `fvm_ramdisk` / `gpt_all` config options, fshost will match
+// Regardless of the `ramdisk_image` / `gpt_all` config options, fshost will match
 // the first block device with a GPT or FVM partition and bind those drivers.
 async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) {
     let ramdisk = fixture.ramdisks.first().unwrap();
@@ -68,7 +68,7 @@ async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) 
 #[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn no_fvm_device() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
@@ -96,7 +96,7 @@ async fn write_blob() {
     let mut builder = new_builder();
     // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
     // treating them as "real" storage devices.
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
     // content sniffing of the FVM magic.
     builder.with_disk().format_volumes(volumes_spec()).with_gpt();
@@ -126,7 +126,7 @@ async fn write_blob() {
 #[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn blobfs_formatted() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec()).with_gpt();
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
@@ -189,7 +189,7 @@ async fn blobfs_formatted() {
 async fn data_unformatted() {
     const BUFF_LEN: usize = 512;
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
@@ -272,7 +272,7 @@ async fn handles_corrupt_fvm() {
     let mut builder = new_builder();
     // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
     // treating them as "real" storage devices.
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().with_unformatted_fvm();
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());

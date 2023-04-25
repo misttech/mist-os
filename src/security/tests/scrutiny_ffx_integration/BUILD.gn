@@ -35,7 +35,7 @@ if (is_fuchsia) {
     ]
   }
 
-  # `assembled_system` builds a zbi, specifying `ramdisk_fvm_in_zbi = true`
+  # `assembled_system` builds a zbi, specifying `ramdisk_in_zbi = true`
   # tests the path where the blobfs exists in the zbi and is automatically
   # extracted as part of the zbi, such as in recovery images.
   assembled_system(_assemble_system_recovery_target_name) {
@@ -43,7 +43,7 @@ if (is_fuchsia) {
     generate_fvm = true
     product_assembly_config_label = "//build/assembly:default_product_config"
     bootfs_labels = []
-    ramdisk_fvm_in_zbi = true
+    ramdisk_in_zbi = true
     base_packages = [
       ":empty-pkg",
       ":empty_config",

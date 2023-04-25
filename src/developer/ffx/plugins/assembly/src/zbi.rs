@@ -28,7 +28,7 @@ pub fn construct_zbi(
     product: &ImageAssemblyConfig,
     zbi_config: &Zbi,
     base_package: Option<&BasePackage>,
-    fvm: Option<impl Into<Utf8PathBuf>>,
+    ramdisk_image: Option<impl Into<Utf8PathBuf>>,
 ) -> Result<Utf8PathBuf> {
     let mut zbi_builder = ZbiBuilder::new(zbi_tool);
 
@@ -96,9 +96,9 @@ pub fn construct_zbi(
         zbi_builder.add_bootfs_file(&bootfs_entry.source, &bootfs_entry.destination);
     }
 
-    // Add the FVM as a ramdisk in the ZBI if necessary.
-    if let Some(fvm) = fvm {
-        zbi_builder.add_ramdisk(fvm);
+    // Add the ramdisk image in the ZBI if necessary.
+    if let Some(ramdisk) = ramdisk_image {
+        zbi_builder.add_ramdisk(ramdisk);
     }
 
     // Set the zbi compression to use.

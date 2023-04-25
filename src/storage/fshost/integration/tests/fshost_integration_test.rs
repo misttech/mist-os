@@ -210,8 +210,8 @@ async fn data_formatted_with_small_initial_volume_big_target() {
     fixture.tear_down().await;
 }
 
-// Ensure WipeStorage is not supported in the normal mode of operation (i.e. when the `fvm_ramdisk`
-// option is false). WipeStorage should only function within a recovery context.
+// Ensure WipeStorage is not supported in the normal mode of operation (i.e. when the
+// `ramdisk_image` option is false). WipeStorage should only function within a recovery context.
 #[fuchsia::test]
 async fn wipe_storage_not_supported() {
     let builder = new_builder();
@@ -235,7 +235,7 @@ async fn wipe_storage_not_supported() {
 #[fuchsia::test]
 async fn ramdisk_blob_and_data_mounted() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder
         .with_zbi_ramdisk()
         .format_volumes(volumes_spec())
@@ -251,7 +251,7 @@ async fn ramdisk_blob_and_data_mounted() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/124455): Figure out fvm_ramdisk semantics for fxblob and fake out the
+// TODO(https://fxbug.dev/124455): Figure out ramdisk_image semantics for fxblob and fake out the
 // fshost ramdisk accordingly in this test.
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn ramdisk_data_ignores_non_ramdisk() {
@@ -259,7 +259,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     // Fake out the cpp fshost ramdisk checking by providing a nonsense ramdisk prefix. The rust
     // fshost has tighter behavior - it only matches on the ramdisk path it created itself (which
     // is also not this one).
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder
         .with_disk()
         .format_volumes(volumes_spec())
@@ -413,9 +413,9 @@ async fn netboot_set() {
 }
 
 #[fuchsia::test]
-async fn fvm_ramdisk_serves_zbi_ramdisk_contents_with_unformatted_data() {
+async fn ramdisk_image_serves_zbi_ramdisk_contents_with_unformatted_data() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
@@ -590,7 +590,7 @@ async fn shred_data_volume_from_recovery() {
     // a ramdisk it launches, binding the fvm on the "regular" disk but otherwise leaving it alone.
     let mut builder =
         new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 

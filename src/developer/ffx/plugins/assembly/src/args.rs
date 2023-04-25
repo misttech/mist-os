@@ -69,11 +69,11 @@ pub struct CreateSystemArgs {
 /// Mode indicating where to place packages.
 #[derive(Debug, PartialEq)]
 pub enum PackageMode {
-    /// Put packages in a FVM.
-    Fvm,
+    /// Put packages in a disk image (FVM or Fxfs).
+    DiskImage,
 
-    /// Put packages in a FVM as a ramdisk in the ZBI.
-    FvmInZbi,
+    /// Put packages in a disk image (FVM or Fxfs) as a ramdisk in the ZBI.
+    DiskImageInZbi,
 
     /// Put packages into BootFS.
     BootFS,
@@ -83,8 +83,8 @@ impl FromStr for PackageMode {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "fvm" => Ok(PackageMode::Fvm),
-            "fvm-in-zbi" => Ok(PackageMode::FvmInZbi),
+            "disk" => Ok(PackageMode::DiskImage),
+            "embed-in-zbi" => Ok(PackageMode::DiskImageInZbi),
             "bootfs" => Ok(PackageMode::BootFS),
             _ => Err(anyhow!("invalid package mode: {}", s)),
         }
@@ -92,7 +92,7 @@ impl FromStr for PackageMode {
 }
 
 fn default_package_mode() -> PackageMode {
-    PackageMode::Fvm
+    PackageMode::DiskImage
 }
 
 /// construct an UpdatePackage using images and package.

@@ -59,7 +59,6 @@ if (is_fuchsia) {
     testonly = true
     generate_fvm = false
     bootfs_labels = [ ":bootfs" ]
-    ramdisk_fvm_in_zbi = true
     base_packages = []
     cmdline = [
       "abc",

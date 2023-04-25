@@ -65,7 +65,7 @@ protocol Admin {
     /// partition if it isn't already formatted.  Overwrites file if it already exists.
     ///
     /// This can only be called while the data partition isn't already mounted, which is typically
-    /// in recovery builds where fshost is running with the `fvm_ramdisk` flag set.
+    /// in recovery builds where fshost is running with the `ramdisk_image` flag set.
     WriteDataFile(resource struct {
         filename fuchsia.io.Path;
         payload zx.Handle:VMO;
@@ -75,7 +75,7 @@ protocol Admin {
     /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`.
     ///
     /// This function will pause the fshost block watcher regardless of success or failure.
-    /// Requires fshost to be started with the `fvm_ramdisk` config option set to true.
+    /// Requires fshost to be started with the `ramdisk_image` config option set to true.
     ///
     /// **WARNING**: This will cause irreversible data loss. Use with caution.
     ///

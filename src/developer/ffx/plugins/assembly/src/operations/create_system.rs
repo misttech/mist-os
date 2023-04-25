@@ -74,13 +74,13 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         _ => None,
     });
 
-    // Determine whether blobfs should be compressed.
-    // We refrain from compressing blobfs if the FVM is destined for the ZBI,
-    // because the ZBI compression will be more optimized.
-    let compress_blobfs = !matches!(&mode, PackageMode::FvmInZbi);
-
     // Create all the filesystems and FVMs.
     if let Some(fvm_config) = fvm_config {
+        // Determine whether blobfs should be compressed.
+        // We refrain from compressing blobfs if the FVM is destined for the ZBI, because the ZBI
+        // compression will be more optimized.
+        let compress_blobfs = !matches!(&mode, PackageMode::DiskImageInZbi);
+
         // TODO: warn if bootfs_only mode
         if let Some(base_package) = &base_package {
             construct_fvm(
@@ -107,10 +107,11 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         info!("Skipping fvm creation");
     };
 
-    // Find the first standard FVM that was generated.
-    let fvm_for_zbi: Option<Utf8PathBuf> = match &mode {
-        PackageMode::FvmInZbi => assembly_manifest.images.iter().find_map(|i| match i {
+    // Find the first standard disk image that was generated.
+    let disk_image_for_zbi: Option<Utf8PathBuf> = match &mode {
+        PackageMode::DiskImageInZbi => assembly_manifest.images.iter().find_map(|i| match i {
             assembly_manifest::Image::FVM(path) => Some(path.clone()),
+            assembly_manifest::Image::Fxfs { path, .. } => Some(path.clone()),
             _ => None,
         }),
         _ => None,
@@ -131,7 +132,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
             &image_assembly_config,
             zbi_config,
             base_package.as_ref(),
-            fvm_for_zbi,
+            disk_image_for_zbi,
         )?)
     } else {
         info!("Skipping zbi creation");

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! Test cases which simulate fshost running in the configuration used in recovery builds (which,
-//! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
+//! among other things, sets the ramdisk_image flag to prevent binding of the on-disk filesystems.)
 
 use {
     super::{blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec},
@@ -31,7 +31,7 @@ async fn call_write_data_file(admin: &AdminProxy) -> AdminWriteDataFileResult {
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
@@ -95,7 +95,7 @@ async fn unformatted_netboot() {
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder
         .with_disk()
         .format_volumes(volumes_spec())
@@ -139,7 +139,7 @@ async fn unformatted_small_disk() {
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
@@ -177,7 +177,7 @@ async fn formatted() {
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted_file_in_root() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 

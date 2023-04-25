@@ -4,7 +4,7 @@
 
 //! Functionality for extracting a ramdisk image from the zircon boot items. This ramdisk contains
 //! an fvm with blobfs and data volumes, and is intended to be used in conjunction with the
-//! fvm_ramdisk option, in run modes where we need to operate on the real disk and can't run
+//! ramdisk_image option, in run modes where we need to operate on the real disk and can't run
 //! filesystems off it, such as recovery.
 
 use {

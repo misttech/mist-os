@@ -87,7 +87,7 @@ template("generated_fshost_config") {
       disable_block_watcher = false
       factory = false
       fvm = true
-      fvm_ramdisk = false
+      ramdisk_image = false
       fxfs_blob = false
       gpt = true
       gpt_all = false

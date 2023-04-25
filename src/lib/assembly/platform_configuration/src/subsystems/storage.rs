@@ -33,7 +33,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("disable_block_watcher", false)?
                 .field("factory", false)?
                 .field("fvm", true)?
-                .field("fvm_ramdisk", false)?
+                .field("ramdisk_image", false)?
                 .field("gpt", true)?
                 .field("gpt_all", false)?
                 .field("mbr", false)?

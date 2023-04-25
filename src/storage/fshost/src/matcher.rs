@@ -69,24 +69,24 @@ impl Matchers {
         if config.nand {
             matchers.push(Box::new(NandMatcher::new()));
         }
-        // TODO(https://fxbug.dev/124455): Figure out fvm_ramdisk semantics for fxblob.
         if config.fxfs_blob {
+            // TODO(https://fxbug.dev/124455): Figure out netboot semantics for fxblob.
             if !config.netboot {
                 matchers.push(Box::new(FxblobMatcher::new(
                     DiskFormat::Fxfs,
-                    if config.fvm_ramdisk { ramdisk_path } else { None },
+                    if config.ramdisk_image { ramdisk_path } else { None },
                 )));
             }
         } else {
-            // If fvm_ramdisk is true but we don't actually have a ramdisk launching, we skip making
-            // the fvm+blobfs+data matcher entirely.
-            if !config.fvm_ramdisk || ramdisk_path.is_some() {
+            // If ramdisk_image is true but we don't actually have a ramdisk launching, we skip
+            // making the fvm+blobfs+data matcher entirely.
+            if !config.ramdisk_image || ramdisk_path.is_some() {
                 let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
                     DiskFormat::Fvm,
                     false,
                     FVM_DRIVER_PATH,
                     "/fvm",
-                    if config.fvm_ramdisk { ramdisk_path } else { None },
+                    if config.ramdisk_image { ramdisk_path } else { None },
                 ));
                 if !config.netboot {
                     if config.blobfs {
@@ -101,7 +101,7 @@ impl Matchers {
                 }
             }
 
-            if config.fvm && config.fvm_ramdisk {
+            if config.fvm && config.ramdisk_image {
                 // Add another matcher for the non-ramdisk version of fvm.
                 let non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
                     DiskFormat::Fvm,
@@ -786,11 +786,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_partition_map_matcher_ramdisk_prefix() {
-        // If fvm_ramdisk is true and one of the devices matches the ramdisk prefix, we will match
+        // If ramdisk_image is true and one of the devices matches the ramdisk prefix, we will match
         // two fvm devices, and the third one will fail.
         let mut matchers = Matchers::new(
             &fshost_config::Config {
-                fvm_ramdisk: true,
+                ramdisk_image: true,
                 data_filesystem_format: "minfs".to_string(),
                 ..default_config()
             },
@@ -850,11 +850,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn partition_map_matcher_wrong_prefix_match() {
-        // If fvm_ramdisk is true but no devices match the prefix, only the first device will
+        // If ramdisk_image is true but no devices match the prefix, only the first device will
         // match.
         let mut matchers = Matchers::new(
             &fshost_config::Config {
-                fvm_ramdisk: true,
+                ramdisk_image: true,
                 data_filesystem_format: "fxfs".to_string(),
                 ..default_config()
             },
@@ -888,11 +888,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn partition_map_matcher_no_prefix_match() {
-        // If fvm_ramdisk is true but no ramdisk path is provided, only the first device will
+        // If ramdisk_image is true but no ramdisk path is provided, only the first device will
         // match.
         let mut matchers = Matchers::new(
             &fshost_config::Config {
-                fvm_ramdisk: true,
+                ramdisk_image: true,
                 data_filesystem_format: "fxfs".to_string(),
                 ..default_config()
             },
