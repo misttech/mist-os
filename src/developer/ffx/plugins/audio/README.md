@@ -25,6 +25,7 @@ ultrasound renderer and capturer by specifying usage to ultrasound.
 See what devices are connected. The device ID field is used for other device commands.
 
 `ffx audio list-devices`
+`ffx --machine json audio list-devices`
 
 Print additional information about a specific device.
 
