@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -134,7 +135,7 @@ class AmlogicDisplay
 
   void Dump() { vout_->Dump(); }
 
-  void SetFormatSupportCheck(fit::function<bool(zx_pixel_format_t)> fn) {
+  void SetFormatSupportCheck(fit::function<bool(fuchsia_images2::wire::PixelFormat)> fn) {
     format_support_check_ = std::move(fn);
   }
 
@@ -246,7 +247,7 @@ class AmlogicDisplay
   zx::interrupt hpd_irq_;
   thrd_t hpd_thread_;
 
-  fit::function<bool(zx_pixel_format_t format)> format_support_check_ = nullptr;
+  fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
 };
 
 }  // namespace amlogic_display

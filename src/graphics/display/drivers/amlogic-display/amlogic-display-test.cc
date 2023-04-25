@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -478,7 +479,6 @@ TEST_F(FakeSysmemTest, ImportImage) {
   const image_t kDefaultConfig = {
       .width = 1024,
       .height = 768,
-      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
@@ -510,18 +510,6 @@ TEST_F(FakeSysmemTest, ImportImage) {
                                                        kInvalidBufferCollectionIndex),
             ZX_ERR_OUT_OF_RANGE);
 
-  // Invalid import: Unsupported format.
-  constexpr zx_pixel_format_t kUnsupportedPixelFormat = ZX_PIXEL_FORMAT_I420;
-  display_->SetFormatSupportCheck([](zx_pixel_format_t pixel_format) -> bool {
-    return pixel_format != kUnsupportedPixelFormat;
-  });
-  invalid_config = kDefaultConfig;
-  invalid_config.pixel_format = kUnsupportedPixelFormat;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
-                                                       /*index=*/0),
-            ZX_ERR_INVALID_ARGS);
-  display_->SetFormatSupportCheck([](auto) { return true; });
-
   // Valid import.
   image_t valid_config = kDefaultConfig;
   EXPECT_EQ(valid_config.handle, 0u);
@@ -551,7 +539,6 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   const image_t kDefaultConfig = {
       .width = 1024,
       .height = 768,
-      .pixel_format = ZX_PIXEL_FORMAT_RGB_888,
       .type = IMAGE_TYPE_CAPTURE,
       .handle = 0,
   };
@@ -621,8 +608,8 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
     collection = new_buffer_collection.get();
     return new_buffer_collection;
   });
-  display_->SetFormatSupportCheck([](zx_pixel_format_t format) {
-    return format == ZX_PIXEL_FORMAT_RGB_x888 || format == ZX_PIXEL_FORMAT_ARGB_8888;
+  display_->SetFormatSupportCheck([](fuchsia_images2::wire::PixelFormat format) {
+    return format == fuchsia_images2::wire::PixelFormat::kBgra32;
   });
 
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();

@@ -15,6 +15,7 @@
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/channel.h>
 #include <threads.h>
@@ -198,7 +199,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uin
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (image->type != IMAGE_TYPE_SIMPLE || !format_support_check_(image->pixel_format)) {
+  if (image->type != IMAGE_TYPE_SIMPLE) {
     status = ZX_ERR_INVALID_ARGS;
     return status;
   }
@@ -237,6 +238,14 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uin
   if (!collection_info.settings.has_image_format_constraints ||
       index >= collection_info.buffer_count) {
     return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  if (const auto v2_pixel_format = sysmem::V2CopyFromV1PixelFormatType(
+          collection_info.settings.image_format_constraints.pixel_format.type);
+      !format_support_check_(v2_pixel_format)) {
+    zxlogf(ERROR, "Cannot import image: pixel format %u not supported",
+           static_cast<uint32_t>(v2_pixel_format));
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   ZX_DEBUG_ASSERT(
@@ -595,8 +604,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     // instead.
     constraints.image_format_constraints_count = 0;
     ZX_DEBUG_ASSERT(format_support_check_ != nullptr);
-    if (format_support_check_(ZX_PIXEL_FORMAT_RGB_x888) ||
-        format_support_check_(ZX_PIXEL_FORMAT_ARGB_8888)) {
+    if (format_support_check_(fuchsia_images2::wire::PixelFormat::kBgra32)) {
       for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierLinear,
                                          fuchsia_sysmem::wire::kFormatModifierArmLinearTe}) {
         const size_t index = constraints.image_format_constraints_count++;
@@ -605,8 +613,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
                                          format_modifier, image_constraints);
       }
     }
-    if (format_support_check_(ZX_PIXEL_FORMAT_BGR_888x) ||
-        format_support_check_(ZX_PIXEL_FORMAT_ABGR_8888)) {
+    if (format_support_check_(fuchsia_images2::wire::PixelFormat::kR8G8B8A8)) {
       for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierLinear,
                                          fuchsia_sysmem::wire::kFormatModifierArmLinearTe,
                                          fuchsia_sysmem::wire::kFormatModifierArmAfbc16X16,

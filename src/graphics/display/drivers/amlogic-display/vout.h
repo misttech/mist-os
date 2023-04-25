@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VOUT_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VOUT_H_
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
@@ -32,7 +33,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   zx_status_t RestartDisplay();
 
   void PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id);
-  bool IsFormatSupported(zx_pixel_format_t format);
+  bool IsFormatSupported(fuchsia_images2::wire::PixelFormat format);
 
   VoutType type() { return type_; }
   bool supports_afbc() const { return supports_afbc_; }
