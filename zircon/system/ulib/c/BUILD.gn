@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/checkout.gni")
 import("//build/components.gni")
 import("//build/config/zircon/standard.gni")
 import("//build/cpp/verify_public_symbols.gni")
@@ -40,6 +41,18 @@ group("components") {
   deps = libc_components
 }
 
+# When submoduels are enabled, git changes location.
+if (submodules) {
+  git_link_path_list =
+      read_file("//third_party/llvm-libc/src/.git/HEAD", "list lines")
+  git_link_path = git_link_path_list[0]
+  relative_git_dir_split = string_split(git_link_path)
+  relative_git_dir = relative_git_dir_split[1]
+  git_head = "${relative_git_dir}/HEAD"
+} else {
+  git_head = "//third_party/llvm-libc/src/.git/HEAD"
+}
+
 # This isn't a test per se, but using libc_test will apply the test configs
 # we want.
 libc_test("test_utils") {
@@ -47,8 +60,7 @@ libc_test("test_utils") {
   sources = []
 
   # TODO(fxbug.dev/125727): Add TestLogger.cpp unconditionally after roll.
-  git_revision =
-      read_file("//third_party/llvm-libc/src/.git/HEAD", "list lines")
+  git_revision = read_file(git_head, "list lines")
   if (git_revision != [ "be99ff5de207dbb5befde108055c29635bc62e58" ]) {
     sources += [ "TestLogger.cpp" ]
   }
