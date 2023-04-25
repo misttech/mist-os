@@ -43,7 +43,7 @@ use crate::{
     },
     device::{Id, Mtu, StrongId, WeakId},
     ip::types::RawMetric,
-    sync::{RwLock, StrongRc, WeakRc},
+    sync::{StrongRc, WeakRc},
     NonSyncContext, SyncCtx,
 };
 
@@ -218,7 +218,6 @@ pub(super) struct LoopbackDeviceState {
     metric: RawMetric,
     rx_queue: ReceiveQueue<(), Buf<Vec<u8>>>,
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
-    sockets: RwLock<DeviceSockets>,
 }
 
 impl LoopbackDeviceState {
@@ -228,7 +227,6 @@ impl LoopbackDeviceState {
             metric,
             rx_queue: Default::default(),
             tx_queue: Default::default(),
-            sockets: Default::default(),
         }
     }
 }
@@ -287,10 +285,10 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {
-        self.link.sockets.read()
+        self.sockets.read()
     }
     fn write_lock(&self) -> Self::WriteData<'_> {
-        self.link.sockets.write()
+        self.sockets.write()
     }
 }
 

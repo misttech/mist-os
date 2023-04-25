@@ -17,8 +17,9 @@ use net_types::ethernet::Mac;
 use netstack3_core::{
     device::{
         socket::{
-            Frame, NonSyncContext, Protocol, SendDatagramError, SendDatagramParams, SendFrameError,
-            SendFrameParams, SocketId, SocketInfo, TargetDevice,
+            DeviceSocketTypes, Frame, NonSyncContext, Protocol, SendDatagramError,
+            SendDatagramParams, SendFrameError, SendFrameParams, SocketId, SocketInfo,
+            TargetDevice,
         },
         DeviceId, FrameDestination, WeakDeviceId,
     },
@@ -51,9 +52,11 @@ pub(crate) struct SocketState {
     kind: fppacket::Kind,
 }
 
-impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
+impl DeviceSocketTypes for BindingsNonSyncCtxImpl {
     type SocketState = SocketState;
+}
 
+impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
     fn receive_frame(
         &self,
         state: &Self::SocketState,

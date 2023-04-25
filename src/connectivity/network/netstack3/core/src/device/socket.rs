@@ -62,11 +62,15 @@ pub struct SocketInfo<D> {
     pub device: TargetDevice<D>,
 }
 
-/// Non-sync context for packet sockets.
-pub trait NonSyncContext<DeviceId> {
+/// Provides associated types for device sockets provided by the non-sync
+/// context.
+pub trait DeviceSocketTypes {
     /// State for the socket held by core and exposed to bindings.
     type SocketState: Debug;
+}
 
+/// Non-sync context for packet sockets.
+pub trait NonSyncContext<DeviceId>: DeviceSocketTypes {
     /// Called for each received frame that matches the provided socket.
     ///
     /// `frame` and `raw_frame` are parsed and raw views into the same data.
@@ -775,9 +779,11 @@ mod tests {
         sent: Vec<(DeviceSocketMetadata<D>, Vec<u8>)>,
     }
 
-    impl<D: Clone + Debug> NonSyncContext<D> for FakeNonSyncCtx<D> {
+    impl<D: Clone + Debug> DeviceSocketTypes for FakeNonSyncCtx<D> {
         type SocketState = ExternalSocketState<D>;
+    }
 
+    impl<D: Clone + Debug> NonSyncContext<D> for FakeNonSyncCtx<D> {
         fn receive_frame(
             &self,
             state: &ExternalSocketState<D>,

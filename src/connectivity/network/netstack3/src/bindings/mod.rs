@@ -67,7 +67,7 @@ use netstack3_core::{
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
     device::{
-        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceLayerTypes,
+        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
         DeviceSendFrameError, EthernetDeviceId,
     },
     error::NetstackError,
@@ -321,7 +321,7 @@ impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl DeviceLayerTypes for BindingsNonSyncCtxImpl {
+impl DeviceLayerStateTypes for BindingsNonSyncCtxImpl {
     type LoopbackDeviceState = LoopbackInfo;
     type EthernetDeviceState = NetdeviceInfo;
 }

@@ -1182,8 +1182,6 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
 impl<C: socket::NonSyncContext<DeviceId<C>> + DeviceLayerEventDispatcher>
     socket::NonSyncContext<EthernetDeviceId<C>> for C
 {
-    type SocketState = C::SocketState;
-
     fn receive_frame(
         &self,
         state: &Self::SocketState,
@@ -1629,13 +1627,21 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
 }
 
 /// Provides associated types used in the device layer.
-pub trait DeviceLayerTypes: InstantContext {
+pub trait DeviceLayerStateTypes: InstantContext {
     /// The state associated with loopback devices.
     type LoopbackDeviceState: Send + Sync;
 
     /// The state associated with ethernet devices.
     type EthernetDeviceState: Send + Sync;
 }
+
+/// Provides associated types used in the device layer.
+///
+/// This trait groups together state types used throughout the device layer. It
+/// is blanket-implemented for all types that implement
+/// [`socket::DeviceSocketTypes`] and [`DeviceLayerStateTypes`].
+pub trait DeviceLayerTypes: DeviceLayerStateTypes + socket::DeviceSocketTypes {}
+impl<C: DeviceLayerStateTypes + socket::DeviceSocketTypes> DeviceLayerTypes for C {}
 
 /// An event dispatcher for the device layer.
 ///

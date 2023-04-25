@@ -29,7 +29,7 @@ use crate::{
     },
     device::{
         ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
-        DeviceLayerTypes, DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId,
+        DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId,
         WeakDeviceId,
     },
     ip::{
@@ -849,8 +849,11 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
     }
 }
 
-impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
+impl crate::device::socket::DeviceSocketTypes for FakeNonSyncCtx {
     type SocketState = ();
+}
+
+impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_frame(
         &self,
         _state: &Self::SocketState,
@@ -861,7 +864,7 @@ impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl DeviceLayerTypes for FakeNonSyncCtx {
+impl DeviceLayerStateTypes for FakeNonSyncCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
 }

@@ -409,7 +409,6 @@ impl EthernetDeviceStateBuilder {
             static_state: StaticEthernetDeviceState { mac, max_frame_size, metric },
             dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
             tx_queue: Default::default(),
-            sockets: Default::default(),
         }
     }
 }
@@ -457,8 +456,6 @@ pub(crate) struct EthernetDeviceState {
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
 
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
-
-    sockets: RwLock<DeviceSockets>,
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
@@ -500,10 +497,10 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {
-        self.link.sockets.read()
+        self.sockets.read()
     }
     fn write_lock(&self) -> Self::WriteData<'_> {
-        self.link.sockets.write()
+        self.sockets.write()
     }
 }
 
