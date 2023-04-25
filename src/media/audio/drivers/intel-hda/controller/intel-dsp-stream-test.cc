@@ -147,7 +147,6 @@ class FakeController : public FakeControllerType, public ddk::IhdaCodecProtocol<
 
 class SstStreamTest : public zxtest::Test {
  public:
-
   void SetUp() override {
     fake_controller_ = new FakeController(root_.get());
     ASSERT_OK(fake_controller_->Bind());  // fake_controller_ is owned by mock ddk.
@@ -190,12 +189,16 @@ TEST_F(SstStreamTest, GetStreamProperties) {
   auto result = stream_client->GetProperties();
   ASSERT_OK(result.status());
 
+  auto& properties = result->properties;
+
   const char* kManufacturer = "Intel";
-  ASSERT_BYTES_EQ(result.value().properties.manufacturer().data(), kManufacturer,
-                  strlen(kManufacturer));
-  ASSERT_BYTES_EQ(result.value().properties.product_name().data(), kTestProductName,
-                  strlen(kTestProductName));
-  EXPECT_EQ(result.value().properties.is_input(), false);
+  ASSERT_BYTES_EQ(properties.manufacturer().data(), kManufacturer, strlen(kManufacturer));
+  ASSERT_BYTES_EQ(properties.product_name().data(), kTestProductName, strlen(kTestProductName));
+  EXPECT_EQ(properties.is_input(), false);
+
+  // Must report a clock domain. Reports monotonic, i.e. 0.
+  ASSERT_TRUE(properties.has_clock_domain());
+  ASSERT_EQ(properties.clock_domain(), 0);
 }
 
 TEST_F(SstStreamTest, Reset) {

@@ -383,6 +383,10 @@ TEST_F(AmlG12TdmDaiTest, GetPropertiesOutputDai) {
   ASSERT_FALSE(properties_out.is_input());
   ASSERT_TRUE(properties_out.manufacturer() == kTestString);
   ASSERT_TRUE(properties_out.product_name() == std::string(""));
+
+  // Must report a clock domain. Reports monotonic, i.e. 0.
+  ASSERT_TRUE(properties_out.has_clock_domain());
+  ASSERT_EQ(properties_out.clock_domain(), 0);
 }
 
 TEST_F(AmlG12TdmDaiTest, GetPropertiesInputDai) {
@@ -418,6 +422,10 @@ TEST_F(AmlG12TdmDaiTest, GetPropertiesInputDai) {
   ASSERT_TRUE(properties_out.is_input());
   ASSERT_TRUE(properties_out.product_name() == kTestString);
   ASSERT_TRUE(properties_out.manufacturer() == std::string(""));
+
+  // Must report a clock domain. Reports monotonic, i.e. 0.
+  ASSERT_TRUE(properties_out.has_clock_domain());
+  ASSERT_TRUE(properties_out.clock_domain() == 0);
 }
 
 TEST_F(AmlG12TdmDaiTest, RingBufferOperations) {

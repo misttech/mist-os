@@ -25,6 +25,29 @@ type DaiProperties = table {
     /// If not included, there is no unique id for the driver.
     @available(added=HEAD)
     4: unique_id array<uint8, UNIQUE_ID_SIZE>;
+
+    /// An identifier for the clock domain in which this hardware operates. If
+    /// two hardware devices have the same clock domain, their clock rates are
+    /// identical and perfectly synchronized. Although these two clocks have the
+    /// same rate, the clock positions may be offset from each other by an
+    /// arbitrary (but fixed) amount. The clock_domain typically comes from a
+    /// system wide entity, such as a platform bus or global clock tree.
+    ///
+    /// There are two special values:
+    ///
+    /// *  CLOCK_DOMAIN_MONOTONIC means the hardware is operating at the same
+    ///    rate as the system montonic clock.
+    ///
+    /// *  CLOCK_DOMAIN_EXTERNAL means the hardware is operating at an unknown
+    ///    rate and is not synchronized with any known clock, not even with
+    ///    other clocks in domain CLOCK_DOMAIN_EXTERNAL.
+    ///
+    /// If the domain is not CLOCK_DOMAIN_MONOTONIC, client must use position
+    /// notification updates to recover the hardware's clock.
+    ///
+    /// Required.
+    @available(added=HEAD)
+    5: clock_domain ClockDomain;
 };
 
 /// For an overview see

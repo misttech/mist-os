@@ -288,6 +288,7 @@ void IntelHDADaiBase::GetProperties(
   auto manufacturer = fidl::StringView::FromExternal(reinterpret_cast<char*>(resp_manufacturer.str),
                                                      resp_manufacturer.strlen);
   response.set_manufacturer(fidl::ObjectView<fidl::StringView>::FromExternal(&manufacturer));
+  response.set_clock_domain(fuchsia_hardware_audio::wire::kClockDomainMonotonic);
 
   completer.Reply(response);
 }

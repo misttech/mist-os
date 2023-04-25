@@ -263,6 +263,7 @@ void AmlG12TdmDai::GetProperties(::fuchsia::hardware::audio::Dai::GetPropertiesC
   props.set_is_input(metadata_.is_input);
   props.set_manufacturer(metadata_.manufacturer);
   props.set_product_name(metadata_.product_name);
+  props.set_clock_domain(::fuchsia::hardware::audio::CLOCK_DOMAIN_MONOTONIC);
   callback(std::move(props));
 }
 
