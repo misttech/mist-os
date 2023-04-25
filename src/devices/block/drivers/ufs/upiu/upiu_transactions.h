@@ -16,6 +16,13 @@ namespace ufs {
 
 constexpr uint16_t kUpiuAligment = 16;
 
+// for test
+namespace ufs_mock_device {
+class TransferRequestProcessor;
+class QueryRequestProcessor;
+class ScsiCommandProcessor;
+}  // namespace ufs_mock_device
+
 // UFS Specification Version 3.1, section 10.5 "UPIU Transactions".
 enum UpiuTransactionCodes {
   kNopOut = 0x00,
@@ -113,6 +120,11 @@ class ResponseUpiu {
 
   explicit ResponseUpiu() { data_.header.set_trans_code(UpiuTransactionCodes::kResponse); }
   static uint16_t GetDataSize() { return sizeof(ResponseUpiu::Data); }
+
+ private:
+  // for test
+  friend class ufs_mock_device::TransferRequestProcessor;
+  friend class ufs_mock_device::ScsiCommandProcessor;
 };
 
 // UFS Specification Version 3.1, section 10.7.1 "COMMAND UPIU".
@@ -150,6 +162,11 @@ class CommandUpiu : public RequestUpiu {
   uint16_t GetResponseLength() const override {
     return fbl::round_up(ResponseUpiu::GetDataSize(), kUpiuAligment);
   }
+
+ private:
+  // for test
+  friend class ufs_mock_device::TransferRequestProcessor;
+  friend class ufs_mock_device::ScsiCommandProcessor;
 };
 
 // UFS Specification Version 3.1, section 10.7.7 "TASK MANAGEMENT RESPONSE UPIU".
@@ -272,6 +289,11 @@ class QueryResponseUpiu {
     data_.idn = type;
   }
   static uint16_t GetDataSize() { return sizeof(QueryResponseUpiu::Data); }
+
+ private:
+  // for test
+  friend class ufs_mock_device::TransferRequestProcessor;
+  friend class ufs_mock_device::QueryRequestProcessor;
 };
 
 // UFS Specification Version 3.1, section 10.7.8 "QUERY REQUEST UPIU".
@@ -324,6 +346,11 @@ class QueryRequestUpiu : public RequestUpiu {
   uint16_t GetResponseLength() const override {
     return fbl::round_up(QueryResponseUpiu::GetDataSize(), kUpiuAligment);
   }
+
+ private:
+  // for test
+  friend class ufs_mock_device::TransferRequestProcessor;
+  friend class ufs_mock_device::QueryRequestProcessor;
 };
 
 // UFS Specification Version 3.1, section 10.7.12 "NOP IN UPIU".
@@ -340,6 +367,10 @@ class NopInUpiu {
  public:
   explicit NopInUpiu() { data_.header.set_trans_code(UpiuTransactionCodes::kNopIn); }
   static uint16_t GetDataSize() { return sizeof(NopInUpiu::Data); }
+
+ private:
+  // for test
+  friend class ufs_mock_device::TransferRequestProcessor;
 };
 
 // UFS Specification Version 3.1, section 10.7.11 "NOP OUT UPIU".

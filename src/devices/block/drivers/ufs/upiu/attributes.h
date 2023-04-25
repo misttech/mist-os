@@ -45,6 +45,7 @@ enum class Attributes {
   bRefreshFreq = 0x2d,
   bRefreshUnit = 0x2e,
   bRefreshMethod = 0x2f,
+  kAttributeCount = 0x30,
 };
 
 class ReadAttributeUpiu : public QueryReadRequestUpiu {

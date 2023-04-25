@@ -50,7 +50,6 @@ enum RegisterMap {
   kUICCMDARG3 = 0x9c,
   // Crypto
   kCCAP = 0x100,
-
   kRegisterSize = 0x104,
 };
 

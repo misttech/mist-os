@@ -23,6 +23,7 @@ enum class Flags {
   fPermanentlyDisableFwUpdate = 0xb,
   fWBBufferFlushEn = 0xf,
   fWBBufferFlushDuringHibernate = 0x10,
+  kFlagCount = 0x11,
 };
 
 class ReadFlagUpiu : public QueryReadRequestUpiu {
