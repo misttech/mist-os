@@ -22,6 +22,7 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/pixelformat.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -1114,15 +1115,22 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
 
     config->id = displays_added[i];
 
-    if (!controller_->GetSupportedPixelFormats(config->id, &config->pixel_formats_)) {
-      zxlogf(WARNING, "Failed to get pixel formats when processing hotplug");
+    zx::result get_supported_pixel_formats_result =
+        controller_->GetSupportedPixelFormats(config->id);
+    if (get_supported_pixel_formats_result.is_error()) {
+      zxlogf(WARNING, "Failed to get pixel formats when processing hotplug: %s",
+             zx_status_get_string(get_supported_pixel_formats_result.error_value()));
       continue;
     }
+    config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
 
-    if (!controller_->GetCursorInfo(config->id, &config->cursor_infos_)) {
-      zxlogf(WARNING, "Failed to get cursor info when processing hotplug");
+    zx::result get_cursor_infos_result = controller_->GetCursorInfo(config->id);
+    if (get_cursor_infos_result.is_error()) {
+      zxlogf(WARNING, "Failed to get cursor info when processing hotplug: %s",
+             zx_status_get_string(get_cursor_infos_result.error_value()));
       continue;
     }
+    config->cursor_infos_ = std::move(get_cursor_infos_result.value());
 
     const fbl::Vector<edid::timing_params_t>* edid_timings;
     const display_params_t* params;

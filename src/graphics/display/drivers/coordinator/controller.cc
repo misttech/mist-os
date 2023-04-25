@@ -694,26 +694,42 @@ bool Controller::GetPanelConfig(uint64_t display_id,
   return false;
 }
 
-#define GET_DISPLAY_INFO(FN_NAME, FIELD, TYPE)                                \
-  bool Controller::FN_NAME(uint64_t display_id, fbl::Array<TYPE>* data_out) { \
-    ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);                         \
-    for (auto& display : displays_) {                                         \
-      if (display.id == display_id) {                                         \
-        fbl::AllocChecker ac;                                                 \
-        size_t size = display.FIELD.size();                                   \
-        *data_out = fbl::Array<TYPE>(new (&ac) TYPE[size], size);             \
-        if (!ac.check()) {                                                    \
-          return false;                                                       \
-        }                                                                     \
-        memcpy(data_out->data(), display.FIELD.data(), sizeof(TYPE) * size);  \
-        return true;                                                          \
-      }                                                                       \
-    }                                                                         \
-    return false;                                                             \
+zx::result<fbl::Array<cursor_info_t>> Controller::GetCursorInfo(uint64_t display_id) {
+  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
+  fbl::Array<cursor_info_t> cursor_info_out;
+  for (auto& display : displays_) {
+    if (display.id == display_id) {
+      fbl::AllocChecker ac;
+      size_t size = display.cursor_infos.size();
+      cursor_info_out = fbl::Array<cursor_info_t>(new (&ac) cursor_info_t[size], size);
+      if (!ac.check()) {
+        return zx::error(ZX_ERR_NO_MEMORY);
+      }
+      std::copy(display.cursor_infos.begin(), display.cursor_infos.end(), cursor_info_out.begin());
+      return zx::ok(std::move(cursor_info_out));
+    }
   }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
 
-GET_DISPLAY_INFO(GetCursorInfo, cursor_infos, cursor_info_t)
-GET_DISPLAY_INFO(GetSupportedPixelFormats, pixel_formats, zx_pixel_format_t)
+zx::result<fbl::Array<zx_pixel_format_t>> Controller::GetSupportedPixelFormats(
+    uint64_t display_id) {
+  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
+  fbl::Array<zx_pixel_format_t> formats_out;
+  for (auto& display : displays_) {
+    if (display.id == display_id) {
+      fbl::AllocChecker ac;
+      size_t size = display.pixel_formats.size();
+      formats_out = fbl::Array<zx_pixel_format_t>(new (&ac) zx_pixel_format_t[size], size);
+      if (!ac.check()) {
+        return zx::error(ZX_ERR_NO_MEMORY);
+      }
+      std::copy(display.pixel_formats.begin(), display.pixel_formats.end(), formats_out.begin());
+      return zx::ok(std::move(formats_out));
+    }
+  }
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
 
 bool Controller::GetDisplayIdentifiers(uint64_t display_id, const char** manufacturer_name,
                                        const char** monitor_name, const char** monitor_serial) {

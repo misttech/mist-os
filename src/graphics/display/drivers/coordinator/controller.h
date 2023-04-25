@@ -93,10 +93,9 @@ class Controller : public DeviceType,
   // |mtx()| must be held for as long as |edid| and |params| are retained.
   bool GetPanelConfig(uint64_t display_id, const fbl::Vector<edid::timing_params_t>** timings,
                       const display_params_t** params) __TA_REQUIRES(mtx());
-  bool GetSupportedPixelFormats(uint64_t display_id, fbl::Array<zx_pixel_format_t>* fmts_out)
+  zx::result<fbl::Array<zx_pixel_format_t>> GetSupportedPixelFormats(uint64_t display_id)
       __TA_REQUIRES(mtx());
-  bool GetCursorInfo(uint64_t display_id, fbl::Array<cursor_info_t>* cursor_info_out)
-      __TA_REQUIRES(mtx());
+  zx::result<fbl::Array<cursor_info_t>> GetCursorInfo(uint64_t display_id) __TA_REQUIRES(mtx());
   bool GetDisplayIdentifiers(uint64_t display_id, const char** manufacturer_name,
                              const char** monitor_name, const char** monitor_serial)
       __TA_REQUIRES(mtx());
