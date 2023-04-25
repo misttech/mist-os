@@ -30,8 +30,7 @@ constexpr uintptr_t kZbiBootDataAlignment = 1 << 12;
       csrw satp, zero
       mv a0, %[hartid]
       mv a1, %[zbi]
-      mv s0, zero
-      mv s2, zero
+      mv fp, zero
       mv ra, zero
       mv gp, zero
       mv tp, zero

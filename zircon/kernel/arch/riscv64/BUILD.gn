@@ -37,6 +37,9 @@ if (toolchain_base_environment == "kernel") {
       "-mabi=lp64",  # vs lp64d for userland.
     ]
 
+    # s11 (x27) is used for percpu pointer, so tell the compiler not to use it.
+    cflags += [ "-ffixed-x27" ]
+
     if (!is_gcc) {
       cflags += [
         # Use shadow-call-stack rather than safe-stack for the kernel,

@@ -36,6 +36,7 @@
   mv sp, zero
 
   // Clear the gp register in case anything tries to use it.
+  // When shadow-call-stack is enabled, this is shadow_call_sp and set below.
   mv gp, zero
 
   // Mask all interrupts in case the boot loader left them on.

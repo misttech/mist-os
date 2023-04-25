@@ -16,14 +16,15 @@
 #define __has_feature(x) 0
 #endif
 
-/// This is used by linker relaxations generally and otherwise reserved so the
-/// compiler won't use it.  Kernel code is compiled with -msmall-data-limit=0
-/// so the linker relaxations won't happen.
-#define percpu_ptr gp
+// Kernel code is compiled with -ffixed-x27 (x27 == s11) so the compiler won't
+// use it.
+#define percpu_ptr s11
 
-/// This register is permanently reserved by the ABI in the compiler.
-/// #if __has_feature(shadow_call_stack) it's used for the SCSP.
-#define shadow_call_sp s2
+// This register is permanently reserved by the ABI in the compiler.
+// #if __has_feature(shadow_call_stack) it's used for the SCSP.
+#define shadow_call_sp gp
+
+#define DWARF_REGNO_shadow_call_sp 3 // x3 == gp
 
 .macro assert.fail
   unimp
@@ -56,12 +57,12 @@
 .macro .prologue.shadow_call_sp
 #if __has_feature(shadow_call_stack)
   sd ra, (shadow_call_sp)
-  // Set the ra (x1) rule to DW_CFA_expression{DW_OP_breg18(-8)}.
-  .cfi_escape 0x0f, 1, 2, 0x70 + 18, (-8) & 0x7f
+  // Set the ra (x1) rule to DW_CFA_expression{DW_OP_breg3(-8)}.
+  .cfi_escape 0x0f, 1, 2, 0x70 + DWARF_REGNO_shadow_call_sp, (-8) & 0x7f
   add shadow_call_sp, shadow_call_sp, 8
-  // Set the x18 (s2) rule to DW_CFA_val_expression{DW_OP_breg18(-8)} to
+  // Set the x3 (gp) rule to DW_CFA_val_expression{DW_OP_breg3(-8)} to
   // compensate for the increment just done.
-  .cfi_escape 0x16, 18, 2, 0x70 + 18, (-8) & 0x7f
+  .cfi_escape 0x16, DWARF_REGNO_shadow_call_sp, 2, 0x70 + DWARF_REGNO_shadow_call_sp, (-8) & 0x7f
 #endif
 .endm
 
