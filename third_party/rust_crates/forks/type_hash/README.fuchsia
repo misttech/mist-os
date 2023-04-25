@@ -1,4 +1,7 @@
+Name: type_hash
+License File: LICENSE
 Source: https://github.com/peterjoel/type_hash
+Description:
 
 * This crate creates hashes (fingerprints) of the layout of rust structs.
 * It's used to identify format-breaking changes in Fxfs.

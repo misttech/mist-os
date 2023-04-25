@@ -1,3 +1,6 @@
+Name: zstd
+Description:
+
 # What is this crate used for?
 
 The `zstd` crate uses it for bindings to the native zstd library.

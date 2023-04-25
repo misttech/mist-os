@@ -1,3 +1,7 @@
+Name: rustls
+License File: LICENSE
+Description:
+
 # What is this crate used for?
 
 At the time of writing, TLS negotiation for ffx.

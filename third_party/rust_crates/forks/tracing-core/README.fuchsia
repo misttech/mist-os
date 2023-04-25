@@ -1,3 +1,7 @@
+Name: tracing-core
+License File: LICENSE
+Description:
+
 # What is this crate used for?
 
 This is a dependency of the `tracing` crate.

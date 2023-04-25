@@ -1,3 +1,7 @@
+Name: RustyLine
+License File: LICENSE
+Description:
+
 * What is this crate used for?
   Various 'readline' use cases throughout Fuchsia.
 

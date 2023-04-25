@@ -1,3 +1,7 @@
+Name: Rust FAT FS
+License File: LICENSE.txt
+Description:
+
 # What is this crate used for?
 
 Working with FAT filesystems.

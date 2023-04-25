@@ -1,3 +1,7 @@
+Name: fuse3
+License File: LICENSE
+Description:
+
 * What is this crate used for?
 We have an intern working on an fxfs fuse implementation.
 fuse3 is a prerequisite to them being able to submit their code.

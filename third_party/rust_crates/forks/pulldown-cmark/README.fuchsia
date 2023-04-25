@@ -1,3 +1,7 @@
+Name: pulldown-cmark
+License File: LICENSE
+Description:
+
 # What is this crate used for?
 
 Documentation tooling at the time of writing.

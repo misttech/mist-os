@@ -1,3 +1,7 @@
+Name: Hound
+License File: license
+Description:
+
 # What is this crate used for?
 
 At the time of writing, reading and writing WAV files for use in the ffx audio plugin.

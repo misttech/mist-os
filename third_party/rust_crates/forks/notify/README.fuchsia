@@ -1,3 +1,7 @@
+Name: Notify
+License File: LICENSE.ARTISTIC
+Description:
+
 # What is this crate used for?
 
 At time of writing, a cross platform filesystem notification library.

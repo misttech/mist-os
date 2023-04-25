@@ -1,3 +1,7 @@
+Name: Rust bindings to *nix APIs
+License File: LICENSE
+Description:
+
 nix is used in various places for host-side networking and tooling.
 
 This fork comes from the commit in https://github.com/nix-rust/nix/issues/1975 which came out a rust-tp review (https://fxrev.dev/780283).
