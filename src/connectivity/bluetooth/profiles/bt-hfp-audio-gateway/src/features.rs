@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::format_err;
 use bitflags::bitflags;
+use fidl_fuchsia_media as media;
 use std::string::ToString;
 
+use crate::audio::AudioError;
 use crate::config::AudioGatewayFeatureSupport;
 
 bitflags! {
@@ -116,6 +119,53 @@ impl std::fmt::Display for CodecId {
             0x02 => write!(f, "{}", "MSBC"),
             unknown => write!(f, "Unknown({:#x})", unknown),
         }
+    }
+}
+
+impl TryFrom<CodecId> for media::PcmFormat {
+    type Error = AudioError;
+    fn try_from(value: CodecId) -> Result<Self, Self::Error> {
+        let frames_per_second = match value {
+            CodecId::CVSD => 64000,
+            CodecId::MSBC => 16000,
+            _ => {
+                return Err(AudioError::UnsupportedParameters {
+                    source: format_err!("Unsupported CodecID {value}"),
+                })
+            }
+        };
+        Ok(media::PcmFormat {
+            pcm_mode: media::AudioPcmMode::Linear,
+            bits_per_sample: 16,
+            frames_per_second,
+            channel_map: vec![media::AudioChannelId::Lf],
+        })
+    }
+}
+
+#[cfg(test)]
+impl TryFrom<CodecId> for fidl_fuchsia_hardware_audio::Format {
+    type Error = AudioError;
+    fn try_from(value: CodecId) -> Result<Self, Self::Error> {
+        let frame_rate = match value {
+            CodecId::CVSD => 64000,
+            CodecId::MSBC => 16000,
+            _ => {
+                return Err(AudioError::UnsupportedParameters {
+                    source: format_err!("Unsupported CodecID {value}"),
+                })
+            }
+        };
+        Ok(Self {
+            pcm_format: Some(fidl_fuchsia_hardware_audio::PcmFormat {
+                number_of_channels: 1u8,
+                sample_format: fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned,
+                bytes_per_sample: 2u8,
+                valid_bits_per_sample: 16u8,
+                frame_rate,
+            }),
+            ..Self::EMPTY
+        })
     }
 }
 
