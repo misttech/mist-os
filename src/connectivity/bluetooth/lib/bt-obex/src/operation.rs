@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use packet_encoding::decodable_enum;
+use packet_encoding::{decodable_enum, Decodable, Encodable};
 
 use crate::error::PacketError;
+use crate::header::HeaderSet;
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(u8)]
@@ -106,6 +107,66 @@ impl TryFrom<u8> for OpCode {
     }
 }
 
+/// An OBEX request packet.
+#[derive(Debug, PartialEq)]
+pub struct RequestPacket {
+    /// The opcode associated with the request.
+    code: OpCode,
+    /// The headers describing the request - there can be 0 or more Headers included in the request.
+    data: HeaderSet,
+}
+
+impl RequestPacket {
+    /// The minimum packet consists of an opcode (1 byte) and packet length (2 bytes).
+    const MIN_PACKET_SIZE: usize = 3;
+
+    pub fn new(code: OpCode, data: HeaderSet) -> Self {
+        Self { code, data }
+    }
+}
+
+impl Encodable for RequestPacket {
+    type Error = PacketError;
+
+    fn encoded_len(&self) -> usize {
+        Self::MIN_PACKET_SIZE + self.data.encoded_len()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        if buf.len() < self.encoded_len() {
+            return Err(PacketError::BufferTooSmall);
+        }
+
+        // Per OBEX 1.5 Section 3.1, the first byte contains the opcode and bytes 1,2 contain
+        // the packet length - this includes the opcode / length fields.
+        buf[0] = (&self.code).into();
+        let packet_length_bytes = (self.encoded_len() as u16).to_be_bytes();
+        buf[1..Self::MIN_PACKET_SIZE].copy_from_slice(&packet_length_bytes[..]);
+        self.data.encode(&mut buf[Self::MIN_PACKET_SIZE..])
+    }
+}
+
+impl Decodable for RequestPacket {
+    type Error = PacketError;
+
+    fn decode(buf: &[u8]) -> Result<Self, Self::Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
+            return Err(PacketError::BufferTooSmall);
+        }
+
+        let code = OpCode::try_from(buf[0])?;
+        let packet_length =
+            u16::from_be_bytes(buf[1..Self::MIN_PACKET_SIZE].try_into().expect("checked length"));
+
+        if buf.len() < packet_length.into() {
+            return Err(PacketError::BufferTooSmall);
+        }
+
+        let data = HeaderSet::decode(&buf[Self::MIN_PACKET_SIZE..])?;
+        Ok(Self::new(code, data))
+    }
+}
+
 decodable_enum! {
     /// Response codes that an OBEX server may send to the Client after receiving a request.
     /// The most significant bit of the response code is the Final Bit. This is always set in OBEX
@@ -156,6 +217,8 @@ decodable_enum! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::header::Header;
 
     use assert_matches::assert_matches;
 
@@ -234,5 +297,41 @@ mod tests {
         // Opcode is reserved for future use (final bit set).
         let reserved = 0x8f;
         assert_matches!(OpCode::try_from(reserved), Err(PacketError::Reserved));
+    }
+
+    #[fuchsia::test]
+    fn encode_request_packet_success() {
+        let headers = HeaderSet::from_headers(vec![Header::Permissions(2)]).unwrap();
+        let request = RequestPacket::new(OpCode::Abort, headers);
+        // 3 bytes for prefix + 5 bytes for Permissions Header.
+        assert_eq!(request.encoded_len(), 8);
+        let mut buf = vec![0; request.encoded_len()];
+        request.encode(&mut buf[..]).expect("can encode request");
+        let expected = [0xff, 0x00, 0x08, 0xd6, 0x00, 0x00, 0x00, 0x02];
+        assert_eq!(buf, expected);
+    }
+
+    #[fuchsia::test]
+    fn encode_request_packet_no_headers_success() {
+        let request = RequestPacket::new(OpCode::Abort, HeaderSet::new());
+        // 3 bytes for prefix - no additional headers.
+        assert_eq!(request.encoded_len(), 3);
+        let mut buf = vec![0; request.encoded_len()];
+        request.encode(&mut buf[..]).expect("can encode request");
+        let expected = [0xff, 0x00, 0x03];
+        assert_eq!(buf, expected);
+    }
+
+    #[fuchsia::test]
+    fn decode_request_packet_success() {
+        let request_buf = [
+            0x80, // OpCode = Connect
+            0x00, 0x0e, // Total Length = 14 bytes (3 for prefix, 11 for "Name" Header)
+            0x01, 0x00, 0xb, 0x00, 0x66, 0x00, 0x75, 0x00, 0x6e, 0x00, 0x00, // Name = "fun"
+        ];
+        let decoded = RequestPacket::decode(&request_buf[..]).expect("valid request");
+        let expected_headers = HeaderSet::from_headers(vec![Header::Name("fun".into())]).unwrap();
+        let expected = RequestPacket::new(OpCode::Connect, expected_headers);
+        assert_eq!(decoded, expected);
     }
 }

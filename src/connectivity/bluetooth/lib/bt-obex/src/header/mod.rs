@@ -7,8 +7,11 @@ use fuchsia_bluetooth::types::Uuid;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
 use tracing::trace;
 
+pub use self::header_set::HeaderSet;
 use crate::error::PacketError;
 use crate::obex_string::ObexString;
+
+mod header_set;
 
 /// Specifies the type of action of the Action Operation.
 /// Defined in OBEX 1.5 Section 2.2.20.
@@ -78,7 +81,7 @@ decodable_enum! {
 /// upper 2 bits indicate the header encoding and the lower 6 bits indicate the type of the
 /// header.
 /// Defined in OBEX 1.5 Section 2.1.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
 pub enum HeaderIdentifier {
     /// Number of objects.

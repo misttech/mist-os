@@ -4,11 +4,15 @@
 
 use thiserror::Error;
 
+use crate::header::HeaderIdentifier;
+
 /// Errors that occur during the use of the OBEX library.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Error parsing packet: {:?}", .0)]
     Packet(#[from] PacketError),
+    #[error("Duplicate add of {:?} to HeaderSet", .0)]
+    Duplicate(HeaderIdentifier),
 }
 
 /// Errors that occur during the encoding & decoding of OBEX packets.
