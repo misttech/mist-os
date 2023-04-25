@@ -216,6 +216,15 @@ impl SignalInfo {
                     ..Default::default()
                 }
             ),
+            SignalDetail::SigSys { call_addr, syscall, arch } => make_siginfo!(
+                self,
+                _sigsys,
+                __sifields__bindgen_ty_7 {
+                    _call_addr: call_addr,
+                    _syscall: syscall as c_int,
+                    _arch: arch as c_uint,
+                }
+            ),
             SignalDetail::Raw { data } => {
                 let header = SignalInfoHeader {
                     signo: self.signal.number(),
@@ -236,6 +245,7 @@ impl SignalInfo {
 pub enum SignalDetail {
     None,
     SigChld { pid: pid_t, uid: uid_t, status: i32 },
+    SigSys { call_addr: usize, syscall: i32, arch: u32 },
     Raw { data: [u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE] },
 }
 

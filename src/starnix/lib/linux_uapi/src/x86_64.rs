@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 
 use zerocopy::{AsBytes, FromBytes};
 
@@ -4445,7 +4446,7 @@ pub struct __kernel_sockaddr_storage {
 #[derive(Copy, Clone)]
 pub union __kernel_sockaddr_storage__bindgen_ty_1 {
     pub __bindgen_anon_1: __kernel_sockaddr_storage__bindgen_ty_1__bindgen_ty_1,
-    pub __align: *mut crate::x86_64_types::c_void,
+    pub __align: usize,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -4912,7 +4913,7 @@ pub struct sigaction {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sigaltstack {
-    pub ss_sp: *mut crate::x86_64_types::c_void,
+    pub ss_sp: usize,
     pub ss_flags: crate::x86_64_types::c_int,
     pub __bindgen_padding_0: [u8; 4usize],
     pub ss_size: __kernel_size_t,
@@ -6746,7 +6747,7 @@ pub struct sk_msg_md {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_1 {
-    pub data: *mut crate::x86_64_types::c_void,
+    pub data: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6769,7 +6770,7 @@ impl sk_msg_md__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_2 {
-    pub data_end: *mut crate::x86_64_types::c_void,
+    pub data_end: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6838,7 +6839,7 @@ pub struct sk_reuseport_md {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_1 {
-    pub data: *mut crate::x86_64_types::c_void,
+    pub data: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -6861,7 +6862,7 @@ impl sk_reuseport_md__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_2 {
-    pub data_end: *mut crate::x86_64_types::c_void,
+    pub data_end: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7275,7 +7276,7 @@ impl bpf_sock_ops__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_3 {
-    pub skb_data: *mut crate::x86_64_types::c_void,
+    pub skb_data: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7298,7 +7299,7 @@ impl bpf_sock_ops__bindgen_ty_3 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_4 {
-    pub skb_data_end: *mut crate::x86_64_types::c_void,
+    pub skb_data_end: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7696,7 +7697,7 @@ impl bpf_sockopt__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_2 {
-    pub optval: *mut crate::x86_64_types::c_void,
+    pub optval: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7719,7 +7720,7 @@ impl bpf_sockopt__bindgen_ty_2 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_3 {
-    pub optval_end: *mut crate::x86_64_types::c_void,
+    pub optval_end: usize,
     pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
@@ -7828,7 +7829,7 @@ impl bpf_sk_lookup {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct btf_ptr {
-    pub ptr: *mut crate::x86_64_types::c_void,
+    pub ptr: usize,
     pub type_id: __u32,
     pub flags: __u32,
 }
@@ -8155,11 +8156,11 @@ pub struct sock_filter {
     pub k: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, FromBytes)]
 pub struct sock_fprog {
     pub len: crate::x86_64_types::c_ushort,
     pub __bindgen_padding_0: [u8; 6usize],
-    pub filter: *mut sock_filter,
+    pub filter: usize,
 }
 impl Default for sock_fprog {
     fn default() -> Self {
@@ -9812,7 +9813,7 @@ pub union ifreq__bindgen_ty_2 {
     pub ifru_map: ifmap,
     pub ifru_slave: [crate::x86_64_types::c_char; 16usize],
     pub ifru_newname: [crate::x86_64_types::c_char; 16usize],
-    pub ifru_data: *mut crate::x86_64_types::c_void,
+    pub ifru_data: usize,
     pub ifru_settings: if_settings,
 }
 impl Default for ifreq__bindgen_ty_2 {
@@ -10721,7 +10722,7 @@ pub struct seccomp_notif_addfd {
 #[derive(Copy, Clone)]
 pub union sigval {
     pub sival_int: crate::x86_64_types::c_int,
-    pub sival_ptr: *mut crate::x86_64_types::c_void,
+    pub sival_ptr: usize,
 }
 impl Default for sigval {
     fn default() -> Self {
@@ -10797,7 +10798,7 @@ pub struct __sifields__bindgen_ty_4 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __sifields__bindgen_ty_5 {
-    pub _addr: *mut crate::x86_64_types::c_void,
+    pub _addr: usize,
     pub __bindgen_anon_1: __sifields__bindgen_ty_5__bindgen_ty_1,
 }
 #[repr(C)]
@@ -10813,8 +10814,8 @@ pub union __sifields__bindgen_ty_5__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     pub _dummy_bnd: [crate::x86_64_types::c_char; 8usize],
-    pub _lower: *mut crate::x86_64_types::c_void,
-    pub _upper: *mut crate::x86_64_types::c_void,
+    pub _lower: usize,
+    pub _upper: usize,
 }
 impl Default for __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -10864,9 +10865,9 @@ pub struct __sifields__bindgen_ty_6 {
     pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, AsBytes, FromBytes)]
 pub struct __sifields__bindgen_ty_7 {
-    pub _call_addr: *mut crate::x86_64_types::c_void,
+    pub _call_addr: usize,
     pub _syscall: crate::x86_64_types::c_int,
     pub _arch: crate::x86_64_types::c_uint,
 }
@@ -10953,7 +10954,7 @@ pub union sigevent__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone)]
 pub struct sigevent__bindgen_ty_1__bindgen_ty_1 {
     pub _function: ::std::option::Option<unsafe extern "C" fn(arg1: sigval_t)>,
-    pub _attribute: *mut crate::x86_64_types::c_void,
+    pub _attribute: usize,
 }
 impl Default for sigevent__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -11113,7 +11114,7 @@ pub struct termio {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iovec {
-    pub iov_base: *mut crate::x86_64_types::c_void,
+    pub iov_base: usize,
     pub iov_len: __kernel_size_t,
 }
 impl Default for iovec {

@@ -541,7 +541,7 @@ pub fn sys_sched_get_priority_max(_ctx: &CurrentTask, policy: u32) -> Result<i32
 }
 
 pub fn sys_prctl(
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     option: u32,
     arg2: u64,
     arg3: u64,
@@ -654,15 +654,12 @@ pub fn sys_prctl(
             Ok(current_task.read().no_new_privs().into())
         }
         PR_SET_SECCOMP => {
-            // TODO(fxbug.dev/121283): Reenable this when seccomp filters work.  It causes
-            // libminijail to crash when enabled.
-            // if arg2 == SECCOMP_MODE_STRICT as u64 {
-            //     return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
-            // } else if arg2 == SECCOMP_SET_MODE_FILTER as u64 {
-            //     return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
-            // }
-            // error!(EINVAL)
-            not_implemented!(current_task, "prctl(PR_SET_SECCOMP, {})", arg2);
+            if arg2 == SECCOMP_MODE_STRICT as u64 {
+                not_implemented!(current_task, "prctl(PR_SET_SECCOMP, {})", arg2);
+                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
+            } else if arg2 == SECCOMP_MODE_FILTER as u64 {
+                return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
+            }
             Ok(().into())
         }
         PR_GET_CHILD_SUBREAPER => {
@@ -964,10 +961,10 @@ pub fn sys_capset(
 }
 
 pub fn sys_seccomp(
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     operation: u32,
     flags: u32,
-    _args: UserAddress,
+    args: UserAddress,
 ) -> Result<SyscallResult, Errno> {
     match operation {
         SECCOMP_SET_MODE_STRICT => {
@@ -978,13 +975,17 @@ pub fn sys_seccomp(
             error!(ENOSYS)
         }
         SECCOMP_SET_MODE_FILTER => match flags {
-            // Some tests die badly if seccomp doesn't return 0 in
-            // this case, even though we haven't implemented it
             0
             | SECCOMP_FILTER_FLAG_LOG
             | SECCOMP_FILTER_FLAG_NEW_LISTENER
             | SECCOMP_FILTER_FLAG_SPEC_ALLOW
-            | SECCOMP_FILTER_FLAG_TSYNC => Ok(().into()),
+            | SECCOMP_FILTER_FLAG_TSYNC => {
+                // TODO(fxbug.dev/121283): Reenable correct return values
+                // when seccomp filters work fully.  Returning a failure
+                // causes libminijail to crash when enabled.
+                let _ = current_task.add_seccomp_filter(args);
+                Ok(().into())
+            }
             _ => error!(EINVAL),
         },
         SECCOMP_GET_ACTION_AVAIL => {
@@ -1123,14 +1124,14 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_prctl_set_vma_anon_name() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let name_addr = mapped_address + 128u64;
         let name = "test-name\0";
         current_task.mm.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
         sys_prctl(
-            &current_task,
+            &mut current_task,
             PR_SET_VMA,
             PR_SET_VMA_ANON_NAME as u64,
             mapped_address.ptr() as u64,
@@ -1153,8 +1154,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name_special_chars() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -1162,10 +1162,10 @@ mod tests {
 
         for c in 1..255 {
             let vma_name = CString::new([c]).unwrap();
-            mm.write_memory(name_addr, vma_name.as_bytes_with_nul()).unwrap();
+            current_task.mm.write_memory(name_addr, vma_name.as_bytes_with_nul()).unwrap();
 
             let result = sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -1190,8 +1190,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name_long() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -1199,11 +1198,11 @@ mod tests {
 
         let name_too_long = CString::new(vec![b'a'; 256]).unwrap();
 
-        mm.write_memory(name_addr, name_too_long.as_bytes_with_nul()).unwrap();
+        current_task.mm.write_memory(name_addr, name_too_long.as_bytes_with_nul()).unwrap();
 
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -1215,11 +1214,11 @@ mod tests {
 
         let name_just_long_enough = CString::new(vec![b'a'; 255]).unwrap();
 
-        mm.write_memory(name_addr, name_just_long_enough.as_bytes_with_nul()).unwrap();
+        current_task.mm.write_memory(name_addr, name_just_long_enough.as_bytes_with_nul()).unwrap();
 
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -1232,7 +1231,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name_misaligned() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
@@ -1245,7 +1244,7 @@ mod tests {
         // Passing a misaligned pointer to the start of the named region fails.
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 1 + mapping_addr.ptr() as u64,
@@ -1258,7 +1257,7 @@ mod tests {
         // Passing an unaligned length does work, however.
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -1271,16 +1270,16 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_prctl_get_set_dumpable() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
-        sys_prctl(&current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
+        sys_prctl(&mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
 
-        sys_prctl(&current_task, PR_SET_DUMPABLE, 1, 0, 0, 0).expect("failed to set dumpable");
-        sys_prctl(&current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
+        sys_prctl(&mut current_task, PR_SET_DUMPABLE, 1, 0, 0, 0).expect("failed to set dumpable");
+        sys_prctl(&mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
 
         // SUID_DUMP_ROOT not supported.
-        sys_prctl(&current_task, PR_SET_DUMPABLE, 2, 0, 0, 0).expect("failed to set dumpable");
-        sys_prctl(&current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
+        sys_prctl(&mut current_task, PR_SET_DUMPABLE, 2, 0, 0, 0).expect("failed to set dumpable");
+        sys_prctl(&mut current_task, PR_GET_DUMPABLE, 0, 0, 0, 0).expect("failed to get dumpable");
     }
 
     #[::fuchsia::test]
@@ -1318,7 +1317,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_task_name() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task) = create_kernel_and_task();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
         current_task
@@ -1327,12 +1326,14 @@ mod tests {
             .expect("failed to write name");
 
         let result =
-            sys_prctl(&current_task, PR_SET_NAME, mapped_address.ptr() as u64, 0, 0, 0).unwrap();
+            sys_prctl(&mut current_task, PR_SET_NAME, mapped_address.ptr() as u64, 0, 0, 0)
+                .unwrap();
         assert_eq!(SUCCESS, result);
 
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let result =
-            sys_prctl(&current_task, PR_GET_NAME, mapped_address.ptr() as u64, 0, 0, 0).unwrap();
+            sys_prctl(&mut current_task, PR_GET_NAME, mapped_address.ptr() as u64, 0, 0, 0)
+                .unwrap();
         assert_eq!(SUCCESS, result);
 
         let name_length = name.len();

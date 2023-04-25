@@ -2625,18 +2625,17 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         let vma_name = b"vma name".to_vec();
-        mm.write_memory(name_addr, vma_name.as_bytes()).unwrap();
+        current_task.mm.write_memory(name_addr, vma_name.as_bytes()).unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         sys_prctl(
-            &current_task,
+            &mut current_task,
             PR_SET_VMA,
             PR_SET_VMA_ANON_NAME as u64,
             mapping_addr.ptr() as u64,
@@ -2645,16 +2644,18 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(mm.get_mapping_name(mapping_addr).unwrap(), Some(vma_name));
+        assert_eq!(current_task.mm.get_mapping_name(mapping_addr).unwrap(), Some(vma_name));
     }
 
     #[::fuchsia::test]
     fn test_set_vma_name_adjacent_mappings() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+        current_task
+            .mm
+            .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
+            .unwrap();
 
         let first_mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let second_mapping_addr = map_memory_with_flags(
@@ -2667,7 +2668,7 @@ mod tests {
         assert_eq!(first_mapping_addr + *PAGE_SIZE, second_mapping_addr);
 
         sys_prctl(
-            &current_task,
+            &mut current_task,
             PR_SET_VMA,
             PR_SET_VMA_ANON_NAME as u64,
             first_mapping_addr.ptr() as u64,
@@ -2677,7 +2678,7 @@ mod tests {
         .unwrap();
 
         {
-            let state = mm.state.read();
+            let state = current_task.mm.state.read();
 
             // The name should apply to both mappings.
             let (_, mapping) = state.mappings.get(&first_mapping_addr).unwrap();
@@ -2690,21 +2691,23 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name_beyond_end() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+        current_task
+            .mm
+            .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
+            .unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
-        mm.unmap(second_page, *PAGE_SIZE as usize).unwrap();
+        current_task.mm.unmap(second_page, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since it extends past the end of the mapping into unmapped memory.
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -2716,7 +2719,7 @@ mod tests {
 
         // Despite returning an error, the prctl should still assign a name to the region at the start of the region.
         {
-            let state = mm.state.read();
+            let state = current_task.mm.state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
@@ -2725,21 +2728,23 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name_before_start() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+        current_task
+            .mm
+            .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
+            .unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
-        mm.unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
+        current_task.mm.unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since the start of the range is in unmapped memory.
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -2752,7 +2757,7 @@ mod tests {
         // Unlike a range which starts within a mapping and extends past the end, this should not assign
         // a name to any mappings.
         {
-            let state = mm.state.read();
+            let state = current_task.mm.state.read();
 
             let (_, mapping) = state.mappings.get(&second_page).unwrap();
             assert_eq!(mapping.name, MappingName::None);
@@ -2761,17 +2766,19 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_set_vma_name_partial() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (_kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+        current_task
+            .mm
+            .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
+            .unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), 3 * *PAGE_SIZE);
 
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 (mapping_addr + *PAGE_SIZE).ptr() as u64,
@@ -2783,7 +2790,7 @@ mod tests {
 
         // This should split the mapping into 3 pieces with the second piece having the name "foo"
         {
-            let state = mm.state.read();
+            let state = current_task.mm.state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::None);
@@ -2798,17 +2805,19 @@ mod tests {
 
     #[test]
     fn test_preserve_name_snapshot() {
-        let (kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let (kernel, mut current_task) = create_kernel_and_task();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+        current_task
+            .mm
+            .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
+            .unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         assert_eq!(
             sys_prctl(
-                &current_task,
+                &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
                 mapping_addr.ptr() as u64,
@@ -2819,7 +2828,7 @@ mod tests {
         );
 
         let target = create_task(&kernel, "another-task");
-        mm.snapshot_to(&target.mm).expect("snapshot_to failed");
+        current_task.mm.snapshot_to(&target.mm).expect("snapshot_to failed");
 
         {
             let state = target.mm.state.read();

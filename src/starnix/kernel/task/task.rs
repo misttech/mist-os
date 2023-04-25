@@ -9,6 +9,7 @@ use std::convert::TryFrom;
 use std::ffi::CString;
 use std::fmt;
 use std::sync::Arc;
+use ubpf::program::EbpfProgram;
 
 use crate::arch::{registers::RegisterState, task::decode_page_fault_exception_report};
 use crate::auth::*;
@@ -18,8 +19,8 @@ use crate::loader::*;
 use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::{log_warn, not_implemented, set_zx_name};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
-use crate::signals::{types::*, SignalInfo};
-use crate::syscalls::SyscallResult;
+use crate::signals::{send_signal, types::*, SignalInfo};
+use crate::syscalls::{decls::Syscall, SyscallResult};
 use crate::task::*;
 use crate::types::*;
 
@@ -58,6 +59,10 @@ pub struct CurrentTask {
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
     pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
+
+    /// Variable that can tell you whether there are currently seccomp
+    /// filters without holding a lock
+    pub has_seccomp_filters: bool,
 }
 
 type SyscallRestartFunc =
@@ -236,6 +241,9 @@ pub struct TaskMutableState {
     /// true, and it cannot be reverted to false.  Accessor methods
     /// for this field ensure this property.
     no_new_privs: bool,
+
+    /// List of currently installed seccomp_filters; most recently added is last.
+    pub seccomp_filters: Vec<EbpfProgram>,
 }
 
 impl TaskMutableState {
@@ -387,6 +395,7 @@ impl Task {
                 uts_ns,
                 restricted_state_addr_and_size: None,
                 no_new_privs,
+                seccomp_filters: vec![],
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
         };
@@ -922,11 +931,13 @@ impl Task {
 
 impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
+        let hsf = !task.read().seccomp_filters.is_empty();
         CurrentTask {
             task: Arc::new(task),
             dt_debug_address: None,
             registers: RegisterState::default(),
             syscall_restart_func: None,
+            has_seccomp_filters: hsf,
         }
     }
 
@@ -1336,6 +1347,122 @@ impl CurrentTask {
         self.set_command_name(basename);
 
         Ok(())
+    }
+
+    pub fn add_seccomp_filter(&mut self, bpf_filter: UserAddress) -> Result<SyscallResult, Errno> {
+        // TODO: Check the length of the filter <= 4096.
+
+        let fprog: sock_fprog = self.mm.read_object(UserRef::new(bpf_filter))?;
+
+        let mut code: Vec<sock_filter> = vec![Default::default(); fprog.len as usize];
+        self.read_objects(UserRef::new(UserAddress::from_ptr(fprog.filter)), code.as_mut_slice())?;
+
+        match EbpfProgram::from_cbpf(&code) {
+            Ok(program) => {
+                {
+                    let mut state = self.mutable_state.write();
+                    state.seccomp_filters.push(program);
+                }
+
+                self.has_seccomp_filters = true
+            }
+            Err(errmsg) => log_warn!("{}", errmsg),
+        }
+
+        Ok(().into())
+    }
+
+    pub fn run_seccomp_filters(&self, syscall: &Syscall) -> Option<Errno> {
+        #[cfg(target_arch = "x86_64")]
+        let arch_val = AUDIT_ARCH_X86_64;
+        #[cfg(target_arch = "aarch64")]
+        let arch_val = AUDIT_ARCH_AARCH64;
+
+        let mut data = seccomp_data {
+            nr: syscall.decl.number as i32,
+            arch: arch_val,
+            instruction_pointer: self.registers.instruction_pointer_register(),
+            args: [
+                syscall.arg0,
+                syscall.arg1,
+                syscall.arg2,
+                syscall.arg3,
+                syscall.arg4,
+                syscall.arg5,
+            ],
+        };
+
+        let mut result = SECCOMP_RET_ALLOW;
+        {
+            let filters = &self.mutable_state.read().seccomp_filters;
+
+            // Filters are executed in reverse order of addition
+            for filter in filters.iter().rev() {
+                let mut new_result = SECCOMP_RET_ALLOW;
+                if let Ok(r) = filter.run(&mut data) {
+                    new_result = r as u32
+                }
+                if ((new_result & SECCOMP_RET_ACTION_FULL) as i32)
+                    < ((result & SECCOMP_RET_ACTION_FULL) as i32)
+                {
+                    result = new_result;
+                }
+            }
+        }
+
+        match result & !SECCOMP_RET_DATA {
+            // TODO: SECCOMP_RET_KILL_PROCESS, SECCOMP_RET_LOG
+            SECCOMP_RET_ALLOW => None,
+            SECCOMP_RET_ERRNO => Some(errno_from_code!((result & 0xff) as i16)),
+            SECCOMP_RET_KILL_THREAD => {
+                let siginfo = SignalInfo {
+                    signal: SIGSYS,
+                    errno: 0,
+                    code: 0,
+                    detail: SignalDetail::default(),
+                    force: false,
+                };
+
+                {
+                    let is_last_thread = self.thread_group.read().tasks.len() == 1;
+                    let mut task_state = self.write();
+
+                    if is_last_thread {
+                        task_state.dump_on_exit = true;
+                        task_state.exit_status.get_or_insert(ExitStatus::CoreDump(siginfo));
+                    } else {
+                        task_state.exit_status.get_or_insert(ExitStatus::Kill(siginfo));
+                    }
+                }
+                Some(errno_from_code!(0))
+            }
+            SECCOMP_RET_TRACE => {
+                // TODO(fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
+                Some(errno!(ENOSYS))
+            }
+            SECCOMP_RET_TRAP => {
+                // TODO: There may be additional work around making sure the registers the
+                // signal returns have the correct value.
+                let siginfo = SignalInfo {
+                    signal: SIGSYS,
+                    errno: (result & SECCOMP_RET_DATA) as i32,
+                    code: SYS_SECCOMP as i32,
+                    detail: SignalDetail::SigSys {
+                        call_addr: self.registers.instruction_pointer_register() as usize,
+                        syscall: syscall.decl.number as i32,
+                        arch: arch_val,
+                    },
+                    force: false,
+                };
+
+                send_signal(self, siginfo);
+                Some(errno_from_code!(-(syscall.decl.number as i16)))
+            }
+            _ => {
+                log_warn!("seccomp return value {} not implemented", result & 0xff);
+                None
+            }
+        }
     }
 }
 

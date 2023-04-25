@@ -7,7 +7,6 @@ import os, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
 from bindgen import Bindgen
 
-
 RAW_LINES = """
 use zerocopy::{AsBytes, FromBytes};
 
@@ -28,7 +27,6 @@ where
 }
 """
 
-
 # Tell bindgen not to produce records for these types.
 OPAQUE_TYPES = [
     '__sighandler_t',
@@ -36,7 +34,6 @@ OPAQUE_TYPES = [
     'group_filter.*',
     'sigevent',
 ]
-
 
 # Cross-architecture include paths (the ArchInfo class also has an arch-specific one to add).
 INCLUDE_DIRS = [
@@ -46,10 +43,10 @@ INCLUDE_DIRS = [
     'src/starnix/lib/linux_uapi/stub',
 ]
 
-
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
     (r'__IncompleteArrayField', ['AsBytes, FromBytes']),
+    (r'__sifields__bindgen_ty_7', ['AsBytes, FromBytes']),
     (r'binder_transaction_data.*', ['FromBytes']),
     (r'bpf_attr.*', ['FromBytes']),
     (r'flat_binder_object.*', ['FromBytes']),
@@ -60,10 +57,10 @@ AUTO_DERIVE_TRAITS = [
     (r'in6_pktinfo', ['AsBytes', 'FromBytes']),
     (r'ip6t_ip6', ['FromBytes']),
     (r'sockaddr_in*', ['AsBytes', 'FromBytes']),
+    (r'sock_fprog', ['FromBytes']),
     (r'sysinfo', ['AsBytes']),
     (r'xt_counters_info', ['FromBytes']),
-];
-
+]
 
 # General replacements to apply to the contents of the file. These are tuples of
 # compiled regular expressions + the thing to replace matches with.
@@ -76,8 +73,7 @@ REPLACEMENTS = [
     (
         r': &\[u8; [0-9]+(usize)?\] = (b".*\\0");\n',
         ": &'static std::ffi::CStr = "
-        "unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2) };\n"
-    ),
+        "unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2) };\n"),
 
     # Change `__IncompleteArrayField` representation to `transparent`, which is necessary to
     # allow it to derive `AsBytes`.
@@ -86,26 +82,30 @@ REPLACEMENTS = [
     (
         r'#\[repr\(C\)\]\n'
         r'#\[derive\((([A-Za-z]+, )*[A-Za-z]+)\)\]\n'
-        r'pub struct __IncompleteArrayField',
-        '#[repr(transparent)]\n'
+        r'pub struct __IncompleteArrayField', '#[repr(transparent)]\n'
         '#[derive(\\1)]\n'
-        'pub struct __IncompleteArrayField'
-    ),
+        'pub struct __IncompleteArrayField'),
 
     # Add AsBytes/FromBytes to every copyable struct regardless of name.
     # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
     # Remove in favor of bindgen support for custom derives.
     (
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"
-    )
-]
+        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]\n"),
 
+    # The next two allow clients to apply FromBytes to a given struct.  Because the
+    # target of the pointer is in userspace anyway, treating it as an opaque
+    # pointer is harmless.
+    (r'\*mut crate::x86_64_types::c_void', 'usize'),
+    (r'\*mut crate::arm64_types::c_void', 'usize'),
+    (r'\*mut sock_filter', 'usize')
+]
 
 INPUT_FILE = 'src/starnix/lib/linux_uapi/wrapper.h'
 
 
 class ArchInfo:
+
     def __init__(self, name, clang_target, include):
         self.name = name  # Our internal arch name.
         self.clang_target = clang_target  # Clang "triple" name for this arch.
@@ -114,13 +114,12 @@ class ArchInfo:
 
 ARCH_INFO = [
     ArchInfo(
-        'x86_64','x86_64-pc-linux-gnu',
-        'third_party/android/platform/bionic/libc/kernel/uapi/asm-x86' ),
+        'x86_64', 'x86_64-pc-linux-gnu',
+        'third_party/android/platform/bionic/libc/kernel/uapi/asm-x86'),
     ArchInfo(
         'arm64', 'aarch64-linux-gnu',
         'third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64'),
 ]
-
 
 bindgen = Bindgen()
 bindgen.opaque_types = OPAQUE_TYPES

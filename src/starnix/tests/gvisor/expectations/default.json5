@@ -732,12 +732,9 @@
                 "RtSignalTest.ValueDelivered",
 
                 // seccomp_test
-                "SeccompTest.RetErrnoReturnsErrno",
-                "SeccompTest.TsyncAppliesToAllThreads",
-                "SeccompTest.LeastPermissiveFilterReturnValueApplies",
-                "SeccompTest.RetTrapCausesSIGSYS",
-                "SeccompTest.RetKillCausesDeathBySIGSYS",
+                "SeccompTest.RetKillOnlyKillsOneThread",
                 "SeccompTest.FiltersPreservedAcrossForkAndExecve",
+                "SeccompTest.TsyncAppliesToAllThreads",
 
                 // sendfile_test
                 "SendFileTest.InvalidOffset",
@@ -1191,7 +1188,6 @@
                 "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
                 "AllInetTests/SimpleTcpSocketTest.SynRcvdOnListenerShutdown/*",
                 "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
-                "SeccompTest.RetKillOnlyKillsOneThread",
                 "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
                 "FlockTest.TestExclusiveLockFailExclusiveHolderBlocking",
 

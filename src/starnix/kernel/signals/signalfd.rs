@@ -60,6 +60,11 @@ impl FileOps for SignalFd {
                             siginfo.ssi_uid = uid;
                             siginfo.ssi_status = status;
                         }
+                        SignalDetail::SigSys { call_addr, syscall, arch } => {
+                            siginfo.ssi_call_addr = call_addr as u64;
+                            siginfo.ssi_syscall = syscall;
+                            siginfo.ssi_arch = arch;
+                        }
                         SignalDetail::Raw { data } => {
                             // these offsets are taken from the gVisor offsets in the SignalInfo struct
                             // in //pkg/abi/linux/signal.go and the definition of __sifields in

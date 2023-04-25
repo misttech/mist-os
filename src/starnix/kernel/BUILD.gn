@@ -98,6 +98,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/magma",
     "//src/starnix/lib/syncio",
+    "//src/starnix/lib/ubpf",
     "//src/storage/ext4:ext4_metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//src/sys/lib/runner",
