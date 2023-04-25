@@ -14,8 +14,6 @@ sdk_source_set("cpp") {
     "compat.h",
     "connect.cc",
     "connect.h",
-    "context.cc",
-    "context.h",
     "device_server.cc",
     "device_server.h",
     "service_offers.cc",

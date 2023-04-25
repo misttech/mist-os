@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.lifecycle.test/cpp/wire.h>
 #include <fuchsia/lifecycle/test/cpp/banjo.h>
-#include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/devfs/cpp/connector.h>

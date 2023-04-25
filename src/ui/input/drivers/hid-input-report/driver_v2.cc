@@ -7,7 +7,6 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/devfs/cpp/connector.h>

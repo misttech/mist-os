@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.examples.gizmo/cpp/driver/wire.h>
 #include <fidl/fuchsia.gizmo.protocol/cpp/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>

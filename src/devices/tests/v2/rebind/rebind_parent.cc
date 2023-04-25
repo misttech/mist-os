@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.rebind.test/cpp/fidl.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>

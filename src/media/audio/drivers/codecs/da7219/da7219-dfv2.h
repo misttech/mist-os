@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
@@ -138,7 +137,6 @@ class Driver : public fdf::DriverBase {
   std::shared_ptr<Core> core_;
   std::shared_ptr<ServerConnector> server_output_;
   std::shared_ptr<ServerConnector> server_input_;
-  std::unique_ptr<compat::Context> compat_context_;
 };
 
 }  // namespace audio::da7219
