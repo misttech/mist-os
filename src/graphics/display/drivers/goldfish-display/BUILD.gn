@@ -63,6 +63,7 @@ source_set("common") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",

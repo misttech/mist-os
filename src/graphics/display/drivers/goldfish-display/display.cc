@@ -16,6 +16,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
+#include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/pixelformat.h>
 #include <zircon/status.h>
@@ -27,6 +28,7 @@
 #include <sstream>
 #include <vector>
 
+#include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
 #include "fidl/fuchsia.sysmem/cpp/common_types.h"
@@ -292,26 +294,45 @@ zx_status_t Display::InitSysmemAllocatorClientLocked() {
   return ZX_OK;
 }
 
-zx_status_t Display::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset) {
+namespace {
+
+uint32_t GetColorBufferFormatFromSysmemPixelFormat(
+    const fuchsia_sysmem::PixelFormat& pixel_format) {
+  switch (pixel_format.type()) {
+    case fuchsia_sysmem::PixelFormatType::kR8G8B8A8:
+      return GL_BGRA_EXT;
+    case fuchsia_sysmem::PixelFormatType::kBgra32:
+      return GL_RGBA;
+    default:
+      // This should not happen. The sysmem-negotiated pixel format must be supported.
+      ZX_ASSERT_MSG(false, "Import unsupported image: %u",
+                    static_cast<uint32_t>(pixel_format.type()));
+  }
+}
+
+}  // namespace
+
+zx_status_t Display::ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format,
+                                    zx::vmo vmo, size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
+  const uint32_t color_buffer_format = GetColorBufferFormatFromSysmemPixelFormat(pixel_format);
+
+  fidl::Arena unused_arena;
+  const uint32_t bytes_per_pixel =
+      ImageFormatStrideBytesPerWidthPixel(fidl::ToWire(unused_arena, pixel_format));
+  color_buffer->size = fbl::round_up(image->width * image->height * bytes_per_pixel,
+                                     static_cast<uint32_t>(PAGE_SIZE));
 
   // Linear images must be pinned.
-  unsigned pixel_size = ZX_PIXEL_FORMAT_BYTES(image->pixel_format);
-  color_buffer->size = ZX_ROUNDUP(image->width * image->height * pixel_size, PAGE_SIZE);
   color_buffer->pinned_vmo =
       rc_->pipe_io()->PinVmo(vmo, ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, offset, color_buffer->size);
-
-  uint32_t format = (image->pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
-                     image->pixel_format == ZX_PIXEL_FORMAT_ARGB_8888)
-                        ? GL_BGRA_EXT
-                        : GL_RGBA;
 
   color_buffer->vmo = std::move(vmo);
   color_buffer->width = image->width;
   color_buffer->height = image->height;
-  color_buffer->format = format;
+  color_buffer->format = color_buffer_format;
 
-  auto status = rc_->CreateColorBuffer(image->width, image->height, format);
+  auto status = rc_->CreateColorBuffer(image->width, image->height, color_buffer_format);
   if (status.is_error()) {
     zxlogf(ERROR, "%s: failed to create color buffer", kTag);
     return status.error_value();
@@ -409,16 +430,21 @@ zx_status_t Display::DisplayControllerImplImportImage(image_t* image, uint64_t c
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint64_t offset = collection_info.buffers()[index].vmo_usable_start();
-
-  if (collection_info.settings().buffer_settings().heap() !=
-      fuchsia_sysmem::HeapType::kGoldfishDeviceLocal) {
-    return ImportVmoImage(image, std::move(vmo), offset);
+  if (!collection_info.settings().has_image_format_constraints()) {
+    zxlogf(ERROR, "Buffer collection doesn't have valid image format constraints");
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (!collection_info.settings().has_image_format_constraints() || offset) {
-    zxlogf(ERROR, "%s: invalid image format or offset", kTag);
-    return ZX_ERR_OUT_OF_RANGE;
+  uint64_t offset = collection_info.buffers()[index].vmo_usable_start();
+  if (collection_info.settings().buffer_settings().heap() !=
+      fuchsia_sysmem::HeapType::kGoldfishDeviceLocal) {
+    const auto& pixel_format = collection_info.settings().image_format_constraints().pixel_format();
+    return ImportVmoImage(image, pixel_format, std::move(vmo), offset);
+  }
+
+  if (offset != 0) {
+    zxlogf(ERROR, "VMO offset (%lu) not supported for Goldfish device local color buffers", offset);
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   auto color_buffer = std::make_unique<ColorBuffer>();

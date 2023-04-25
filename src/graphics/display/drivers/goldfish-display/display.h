@@ -178,7 +178,8 @@ class Display : public DisplayType,
   // until the device is released.
   zx_status_t InitSysmemAllocatorClientLocked() TA_REQ(lock_);
 
-  zx_status_t ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset);
+  zx_status_t ImportVmoImage(image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format,
+                             zx::vmo vmo, size_t offset);
   zx_status_t PresentDisplayConfig(RenderControl::DisplayId display_id,
                                    const DisplayConfig& display_config);
   zx_status_t SetupDisplay(uint64_t id);
