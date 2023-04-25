@@ -171,6 +171,7 @@ if (is_host) {
     "fuchsia.audio.txt",
     "fuchsia.dart_inspect.txt",
     "fuchsia.diagnostics.txt",
+    "fuchsia.diagnostics_log_rust.core.txt",
     "fuchsia.diagnostics_log_rust.encoding.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
     "fuchsia.fidl_microbenchmarks.dart.txt",

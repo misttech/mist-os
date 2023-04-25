@@ -130,7 +130,7 @@ macro_rules! impl_bench_write_event {
     }
 }
 
-impl_bench_write_event!(1, 5, 7);
+impl_bench_write_event!(1, 4, 7);
 
 fn setup_write_event_benchmarks(bench: criterion::Benchmark) -> criterion::Benchmark {
     bench
@@ -166,12 +166,11 @@ fn setup_write_event_benchmarks(bench: criterion::Benchmark) -> criterion::Bench
         .with_function("Encoder/WriteEvent/MessageWithSomeArguments", |b| {
             let (metadata, fields, values) = make_event_metadata!(
                 message: "this is a log emitted from the benchmark",
-                tag: "log-benching",
                 boolean: true,
                 int: 98765,
                 string: "foobarbaz"
             );
-            bench_write_event_with_5_args(b, metadata, fields, values);
+            bench_write_event_with_4_args(b, metadata, fields, values);
         })
 }
 

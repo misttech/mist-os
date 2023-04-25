@@ -17,7 +17,14 @@ void main() {
         packageName: 'diagnostics-log-rust-benchmarks',
         componentName: 'encoding.cm',
         commandArgs: PerfTestHelper.componentOutputPath,
-        expectedMetricNamesFile:
-            'fuchsia.diagnostics_log_rust.encoding.txt');
+        expectedMetricNamesFile: 'fuchsia.diagnostics_log_rust.encoding.txt');
+  }, timeout: Timeout.none);
+
+  test('diagnostics_log_rust_core_benchmarks', () async {
+    await runTestComponent(
+        packageName: 'diagnostics-log-rust-benchmarks',
+        componentName: 'core.cm',
+        commandArgs: PerfTestHelper.componentOutputPath,
+        expectedMetricNamesFile: 'fuchsia.diagnostics_log_rust.core.txt');
   }, timeout: Timeout.none);
 }

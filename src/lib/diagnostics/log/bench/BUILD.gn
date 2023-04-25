@@ -34,7 +34,16 @@ rustc_binary("core-bin") {
 
   source_root = "src/core.rs"
 
-  deps = [ "//src/developer/fuchsia-criterion" ]
+  deps = [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//src/developer/fuchsia-criterion",
+    "//src/lib/diagnostics/log/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
 
   sources = [ "src/core.rs" ]
 }
