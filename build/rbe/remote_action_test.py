@@ -538,6 +538,47 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 ]))
         self.assertEqual(main_command, command)
 
+    def test_remote_fsatrace_path_default(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        output = Path('hello.txt')
+        fake_fsatrace = fuchsia.FSATRACE_PATH
+        fake_fsatrace_rel = Path(f'../{fake_fsatrace}')
+        p = self._make_main_parser()
+        command = ['touch', str(output)]
+        # Pass "" to use the default fuchsia.FSATRACE_PATH
+        main_args, other = p.parse_known_args(
+            ['--fsatrace-path=', '--'] + command)
+        self.assertEqual(main_args.fsatrace_path, Path(''))
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        self.assertEqual(
+            {fake_fsatrace, fake_fsatrace.with_suffix('.so')},
+            set(action.inputs_relative_to_project_root))
+        self.assertEqual(
+            {
+                build_dir / output,  # relative to exec_root
+                build_dir / (str(output) + '.remote-fsatrace')
+            },
+            set(action.output_files_relative_to_project_root))
+        # Ignore the rewrapper portion of the command
+        cmd_slices = cl_utils.split_into_subsequences(
+            action.launch_command, '--')
+        rewrapper_prefix, fsatrace_prefix, remote_command = cmd_slices
+        # Confirm that the remote command is wrapped with fsatrace
+        self.assertIn(str(fake_fsatrace_rel), fsatrace_prefix)
+        self.assertEqual(
+            fsatrace_prefix + ['--'],
+            action._fsatrace_command_prefix(
+                Path(str(output) + '.remote-fsatrace')))
+        self.assertEqual(remote_command, command)
+
     def test_remote_fsatrace_from_main_args(self):
         exec_root = Path('/home/project')
         build_dir = Path('build-out')

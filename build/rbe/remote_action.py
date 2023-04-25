@@ -597,6 +597,8 @@ class RemoteAction(object):
 
         # TODO(http://fxbug.dev/125627): support remote tracing from Macs
         self._fsatrace_path = fsatrace_path  # relative to working dir
+        if self._fsatrace_path == Path(""):  # then use the default prebuilt
+            self._fsatrace_path = self.exec_root_rel / fuchsia.FSATRACE_PATH
         if self._fsatrace_path:
             self._inputs.extend([self._fsatrace_path, self._fsatrace_so])
             self._output_files.append(self._fsatrace_remote_trace)
@@ -1312,7 +1314,7 @@ Otherwise, BASE will default to the first output file named.""",
         type=Path,
         default=None,  # None means do not trace
         metavar="PATH",
-        help="""Given a path to an fsatrace tool (located under exec_root), this will trace a remote execution's file accesses.  This is useful for diagnosing unexpected differences between local and remote builds.  The trace file will be named '{output_files[0]}.remote-fsatrace' (if there is at least one output), otherwise 'remote-action-output.remote-fsatrace'.""",
+        help="""Given a path to an fsatrace tool (located under exec_root), this will trace a remote execution's file accesses.  This is useful for diagnosing unexpected differences between local and remote builds.  The trace file will be named '{output_files[0]}.remote-fsatrace' (if there is at least one output), otherwise 'remote-action-output.remote-fsatrace'.  Pass the empty string "" to automatically use the prebuilt fsatrace binaries.""",
     )
     main_group.add_argument(
         "--compare",

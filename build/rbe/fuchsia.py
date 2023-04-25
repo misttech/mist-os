@@ -122,6 +122,10 @@ REMOTE_RUSTC_SUBDIR = Path('prebuilt', 'third_party', 'rust', REMOTE_PLATFORM)
 REMOTE_CLANG_SUBDIR = Path('prebuilt', 'third_party', 'clang', REMOTE_PLATFORM)
 REMOTE_GCC_SUBDIR = Path('prebuilt', 'third_party', 'gcc', REMOTE_PLATFORM)
 
+# TODO(http://fxbug.dev/125627): use platform-dependent location
+# Until then, this remote fsatrace only works from linux-x64 hosts.
+FSATRACE_PATH = Path('prebuilt', 'fsatrace', 'fsatrace')
+
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
 def remote_rustc_shlibs(root_rel: Path) -> Iterable[Path]:
