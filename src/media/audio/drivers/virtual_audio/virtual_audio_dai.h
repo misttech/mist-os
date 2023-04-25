@@ -34,16 +34,15 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
  public:
   VirtualAudioDai(const VirtualAudioDeviceImpl::Config& cfg,
                   std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* parent)
-      : VirtualAudioDaiDeviceType(parent),
-        parent_(std::move(owner)),
-        loop_(&kAsyncLoopConfigNeverAttachToThread) {
+      : VirtualAudioDaiDeviceType(parent), parent_(std::move(owner)) {
     ddk_proto_id_ = ZX_PROTOCOL_DAI;
-    loop_.StartThread("virtual-audio-dai-driver");
     sprintf(instance_name_, "virtual-audio-dai-%d", instance_count_++);
     zx_status_t status = DdkAdd(ddk::DeviceAddArgs(instance_name_));
     ZX_ASSERT_MSG(status == ZX_OK, "DdkAdd failed");
   }
-  async_dispatcher_t* dispatcher() override { return loop_.dispatcher(); }
+  async_dispatcher_t* dispatcher() override {
+    return fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  }
   void ShutdownAndRemove() override { DdkAsyncRemove(); }
   void DdkRelease() {}
 
@@ -61,7 +60,7 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
  protected:
   // FIDL LLCPP method for fuchsia.hardware.audio.DaiConnector.
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
-    fidl::BindServer(loop_.dispatcher(), std::move(request->dai_protocol), this);
+    fidl::BindServer(dispatcher(), std::move(request->dai_protocol), this);
   }
 
   // FIDL LLCPP methods for fuchsia.hardware.audio.Dai.
@@ -95,7 +94,6 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   // This should never be invalid: this VirtualAudioStream should always be destroyed before
   // its parent. This field is a weak_ptr to avoid a circular reference count.
   const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
-  async::Loop loop_;
   int instance_count_;
   char instance_name_[64];
 };
