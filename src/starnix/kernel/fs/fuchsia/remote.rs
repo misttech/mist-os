@@ -649,6 +649,7 @@ impl FileOps for RemotePipeObject {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::arch::uapi::epoll_event;
     use crate::fs::buffers::VecOutputBuffer;
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
@@ -717,7 +718,7 @@ mod test {
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
-        let event = EpollEvent::new(FdEvents::POLLIN.bits(), 0);
+        let event = epoll_event::new(FdEvents::POLLIN.bits(), 0);
         epoll_file.add(&current_task, &pipe, &epoll_object, event).expect("poll_file.add");
 
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");

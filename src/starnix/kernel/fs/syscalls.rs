@@ -6,7 +6,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use std::usize;
 
-use crate::arch::uapi::stat_t;
+use crate::arch::uapi::{epoll_event, stat_t};
 use crate::fs::buffers::*;
 use crate::fs::eventfd::*;
 use crate::fs::fuchsia::*;
@@ -1725,7 +1725,7 @@ pub fn sys_epoll_ctl(
     epfd: FdNumber,
     op: u32,
     fd: FdNumber,
-    event: UserRef<EpollEvent>,
+    event: UserRef<epoll_event>,
 ) -> Result<(), Errno> {
     if epfd == fd {
         return error!(EINVAL);
@@ -1754,7 +1754,7 @@ pub fn sys_epoll_ctl(
 fn do_epoll_pwait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<EpollEvent>,
+    events: UserRef<epoll_event>,
     unvalidated_max_events: i32,
     deadline: zx::Time,
     user_sigmask: UserRef<SigSet>,
@@ -1794,7 +1794,7 @@ fn do_epoll_pwait(
 pub fn sys_epoll_pwait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<EpollEvent>,
+    events: UserRef<epoll_event>,
     max_events: i32,
     timeout: i32,
     user_sigmask: UserRef<SigSet>,
@@ -1806,7 +1806,7 @@ pub fn sys_epoll_pwait(
 pub fn sys_epoll_pwait2(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<EpollEvent>,
+    events: UserRef<epoll_event>,
     max_events: i32,
     user_timespec: UserRef<timespec>,
     user_sigmask: UserRef<SigSet>,

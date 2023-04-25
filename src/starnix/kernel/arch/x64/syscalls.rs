@@ -6,13 +6,14 @@ use fuchsia_runtime::utc_time;
 use fuchsia_zircon as zx;
 
 use super::uapi::stat_t;
+use crate::arch::uapi::epoll_event;
 use crate::fs::{
     syscalls::{
         poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
         sys_fchmodat, sys_inotify_init1, sys_mkdirat, sys_mknodat, sys_newfstatat, sys_openat,
         sys_pipe2, sys_readlinkat, sys_renameat, sys_symlinkat, sys_unlinkat,
     },
-    DirentSink, DirentSink32, EpollEvent, FdNumber,
+    DirentSink, DirentSink32, FdNumber,
 };
 use crate::mm::MemoryAccessorExt;
 use crate::syscalls::not_implemented;
@@ -125,7 +126,7 @@ pub fn sys_epoll_create(current_task: &CurrentTask, size: i32) -> Result<FdNumbe
 pub fn sys_epoll_wait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<EpollEvent>,
+    events: UserRef<epoll_event>,
     max_events: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {

@@ -31,3 +31,20 @@ pub struct stat_t {
     pub st_ctim: timespec,
     pub _pad3: [u32; 2],
 }
+
+#[derive(Default, Debug, Copy, Clone, AsBytes, FromBytes)]
+#[repr(packed)]
+#[non_exhaustive]
+pub struct epoll_event {
+    pub events: u32,
+
+    _padding: u32,
+
+    pub data: u64,
+}
+
+impl epoll_event {
+    pub fn new(events: u32, data: u64) -> Self {
+        Self { events, data, _padding: 0 }
+    }
+}
