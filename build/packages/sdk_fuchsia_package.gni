@@ -1,0 +1,142 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Defines an in-tree package for distribution in the SDK.
+#
+# Example:
+# ```
+# fuchsia_package("my-package") {
+#   deps = [
+#     ":main_component",
+#   ]
+# }
+#
+# sdk_fuchsia_package("my-sdk-package") {
+#   package_label = ":my-package"
+#   category = "public"
+#   api_level = 9
+#   expected_files_exact = [
+#     "relative/path/to/file_a",
+#   ]
+#   removal_api_level = 11
+# }
+# ```
+#
+# Parameters
+#
+#   package_label
+#     The fuchsia_package to distribute. Must point to a fuchsia_package() target, or
+#     one of its wrappers (e.g. fuchsia_test_package())
+#     Type: label
+#
+#   package_name (optional)
+#     Name of the package. This value must be consistent with the fuchsia_package()
+#     definition. Defaults to name specified by package_label.
+#     Type: string
+#
+#   category
+#     The SDK category for the package. See //build/sdk/sdk_atom.gni for
+#     possible values.
+#     Type: string
+#
+#   api_level
+#     API level at which the package was added to the SDK. API level defined at:
+#     https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning#sdk
+#     Type: unsigned integer
+#
+#   expected_files_exact (optional)
+#     List of paths, relative to the package's root, for all files that
+#     participate in that package's API definition. Their content hash will be
+#     compared to the ones in //sdk/packages/${package_name}.api. All other
+#     files in the package must be listed in expected_files_internal instead.
+#     Type: list of relative package paths
+#
+#   expected_files_internal (optional)
+#     List of paths, relative to the package's root, for all files that
+#     do not participate in that package's API definition. Their content
+#     does not matter for API verification, but these paths must appear in
+#     the golden //sdk/package/${package_name}.api file, and in the same order.
+#     Any paths missing from this list will be included in the generated API definition,
+#     while any paths specified in this list that are not found in the specified
+#     manifest will cause an error during API definition generation.
+#     Type: list of relative package paths
+#
+#   removal_api_level (optional)
+#     [optional] Level at which the package is scheduled for removal from the SDK.
+#     Type: unsigned integer
+#
+
+template("sdk_fuchsia_package") {
+  assert(defined(invoker.package_label), "Must define a package to distribute.")
+  if (defined(invoker.package_name)) {
+    package_name = invoker.package_name
+  } else {
+    package_name = get_label_info(invoker.package_label, "name")
+  }
+  assert(defined(invoker.category),
+         "Must define an SDK category for this package.")
+  valid_categories = [
+    "excluded",
+    "experimental",
+    "internal",
+    "cts",
+    "partner_internal",
+    "partner",
+    "public",
+  ]
+  assert(
+      valid_categories + [ invoker.category ] - [ invoker.category ] !=
+          valid_categories,
+      "Unknown SDK category ${invoker.category}, must be one of ${valid_categories}")
+
+  assert(defined(invoker.api_level),
+         "Must define an SDK api level for this package.")
+  if (defined(invoker.expected_files_exact)) {
+    expected_files_exact = invoker.expected_files_exact
+  } else {
+    expected_files_exact = []
+  }
+  if (defined(invoker.expected_files_internal)) {
+    expected_files_internal = invoker.expected_files_internal
+  } else {
+    expected_files_internal = []
+  }
+
+  package_out_dir = get_label_info(invoker.package_label, "target_out_dir") +
+                    "/" + get_label_info(invoker.package_label, "name")
+
+  package_manifest_file = "${package_out_dir}/package_manifest.json"
+  computed_api_file = "${root_out_dir}/sdk/packages/${package_name}.api"
+  golden_api_file = "//sdk/packages/${package_name}.api"
+
+  action(target_name) {
+    script = "//build/packages/generate_sdk_package_api.py"
+
+    inputs = [ package_manifest_file ]
+    outputs = [ computed_api_file ]
+    deps = [ invoker.package_label ]
+
+    args = [
+      "--manifest",
+      rebase_path(package_manifest_file, root_build_dir),
+      "--output",
+      rebase_path(computed_api_file, root_build_dir),
+      "--reference",
+      rebase_path("${golden_api_file}"),
+    ]
+
+    foreach(exact_file, expected_files_exact) {
+      args += [
+        "--expected-files-exact",
+        exact_file,
+      ]
+    }
+    foreach(exact_file, expected_files_internal) {
+      args += [
+        "--expected-files-internal",
+        exact_file,
+      ]
+    }
+  }
+}
