@@ -11,25 +11,34 @@ import("//build/board.gni")
 # are non-hermetic) without accidentally including other partitions targets.
 
 _gn_x64_partitions_config_target = "//boards/partitions:x64"
-verify_partitions_configuration("x64") {
+verify_partitions_configuration("verify_x64") {
   testonly = true
   gn_partitions_config_target = _gn_x64_partitions_config_target
   bazel_partitions_config_target = ":x64"
   bazel_inputs = [ "//build/images/flash:esp.bazel_input" ]
 }
 
-verify_partitions_configuration("qemu-x64") {
+verify_partitions_configuration("verify_qemu-x64") {
   testonly = true
   gn_partitions_config_target = "//boards/partitions:qemu-x64"
   bazel_partitions_config_target = ":qemu-x64"
 }
 
+verify_partitions_configuration("verify_vim3") {
+  testonly = true
+  gn_partitions_config_target = "//boards/partitions:vim3"
+  bazel_partitions_config_target = ":vim3"
+}
+
 group("verifications") {
   testonly = true
-  deps = [ ":qemu-x64" ]
+  deps = [
+    ":verify_qemu-x64",
+    ":verify_vim3",
+  ]
 
   # Avoid building ESP in other configurations.
   if (partitions_config_label == _gn_x64_partitions_config_target) {
-    deps += [ ":x64" ]
+    deps += [ ":verify_x64" ]
   }
 }
