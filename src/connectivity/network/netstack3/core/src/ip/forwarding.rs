@@ -8,14 +8,14 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, slice::Iter};
 
 use log::debug;
-use net_types::{
-    ip::{Ip, Subnet},
-    SpecifiedAddr,
-};
+use net_types::ip::{Ip, Subnet};
 use thiserror::Error;
 
 use crate::ip::{
-    types::{AddableEntry, AddableMetric, DecomposedAddableEntry, Entry, Metric, RawMetric},
+    types::{
+        AddableEntry, AddableMetric, DecomposedAddableEntry, Destination, Entry, Metric, NextHop,
+        RawMetric,
+    },
     AnyDevice, DeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
 };
 
@@ -101,38 +101,6 @@ fn observe_metric<SC: IpForwardingDeviceContext>(
             Metric::MetricTracksInterface(sync_ctx.get_routing_metric(device))
         }
     }
-}
-
-/// The next hop for a [`Destination`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum NextHop<A> {
-    /// Indicates that the next-hop for a the packet is the remote since it is a
-    /// neighboring node (on-link).
-    RemoteAsNeighbor,
-    /// Indicates that the next-hop is a gateway/router since the remote is not
-    /// a neighboring node (off-link).
-    Gateway(SpecifiedAddr<A>),
-}
-
-impl<A> NextHop<A> {
-    pub(crate) fn as_gateway(self) -> Option<SpecifiedAddr<A>> {
-        match self {
-            NextHop::RemoteAsNeighbor => None,
-            NextHop::Gateway(gateway) => Some(gateway),
-        }
-    }
-}
-
-/// The destination of an outbound IP packet.
-///
-/// Outbound IP packets are sent to a particular device (specified by the
-/// `device` field).
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct Destination<A, D> {
-    /// Indicates the next hop via which this destination can be reached.
-    pub(crate) next_hop: NextHop<A>,
-    /// Indicates the device over which this destination can be reached.
-    pub(crate) device: D,
 }
 
 /// An IP forwarding table.
@@ -351,7 +319,10 @@ mod tests {
     use itertools::Itertools;
     use log::trace;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::{
+        ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+        SpecifiedAddr,
+    };
 
     use super::*;
     use crate::{

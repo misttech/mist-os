@@ -26,7 +26,10 @@ use net_types::{
 use netstack3_core::{
     device::DeviceId,
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
-    ip::socket::{IpSockCreationError, IpSockRouteError, IpSockSendError, IpSockUnroutableError},
+    ip::{
+        socket::{IpSockCreationError, IpSockSendError},
+        ResolveRouteError,
+    },
     socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
     transport::{tcp, udp},
 };
@@ -529,20 +532,11 @@ impl IntoErrno for SocketError {
     }
 }
 
-impl IntoErrno for IpSockRouteError {
+impl IntoErrno for ResolveRouteError {
     fn into_errno(self) -> Errno {
         match self {
-            IpSockRouteError::NoLocalAddrAvailable => Errno::Eaddrnotavail,
-            IpSockRouteError::Unroutable(e) => e.into_errno(),
-        }
-    }
-}
-
-impl IntoErrno for IpSockUnroutableError {
-    fn into_errno(self) -> Errno {
-        match self {
-            IpSockUnroutableError::LocalAddrNotAssigned => Errno::Eaddrnotavail,
-            IpSockUnroutableError::NoRouteToRemoteAddr => Errno::Enetunreach,
+            ResolveRouteError::NoSrcAddr => Errno::Eaddrnotavail,
+            ResolveRouteError::Unreachable => Errno::Enetunreach,
         }
     }
 }

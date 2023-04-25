@@ -52,6 +52,7 @@ use packet_formats::{
     ipv4::{Ipv4FragmentType, Ipv4Packet, Ipv4PacketBuilder},
     ipv6::{Ipv6Packet, Ipv6PacketBuilder},
 };
+use thiserror::Error;
 
 use crate::{
     context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},
@@ -63,7 +64,7 @@ use crate::{
             state::IpDeviceStateIpExt, BufferIpv4DeviceHandler, IpDeviceIpExt,
             IpDeviceNonSyncContext,
         },
-        forwarding::{Destination, ForwardingTable, IpForwardingDeviceContext, NextHop},
+        forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
             BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpSockets,
             Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder,
@@ -75,9 +76,9 @@ use crate::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
         socket::{
-            BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockRoute, IpSockRouteError,
-            IpSockUnroutableError, IpSocketContext, IpSocketHandler,
+            BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSocketContext, IpSocketHandler,
         },
+        types::{Destination, NextHop, ResolvedRoute},
     },
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
@@ -675,15 +676,145 @@ fn get_local_addr<
     local_ip: Option<SpecifiedAddr<I::Addr>>,
     device: &SC::DeviceId,
     remote_addr: Option<SpecifiedAddr<I::Addr>>,
-) -> Result<SpecifiedAddr<I::Addr>, IpSockRouteError> {
+) -> Result<SpecifiedAddr<I::Addr>, ResolveRouteError> {
     if let Some(local_ip) = local_ip {
         is_local_assigned_address(sync_ctx, device, local_ip)
             .then_some(local_ip)
-            .ok_or(IpSockUnroutableError::LocalAddrNotAssigned.into())
+            .ok_or(ResolveRouteError::NoSrcAddr)
     } else {
-        sync_ctx
-            .get_local_addr_for_remote(device, remote_addr)
-            .ok_or(IpSockRouteError::NoLocalAddrAvailable)
+        sync_ctx.get_local_addr_for_remote(device, remote_addr).ok_or(ResolveRouteError::NoSrcAddr)
+    }
+}
+
+/// An error occurred while resolving the route to a destination
+#[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ResolveRouteError {
+    /// A source address could not be selected.
+    #[error("a source address could not be selected")]
+    NoSrcAddr,
+    /// The destination in unreachable.
+    #[error("no route exists to the destination IP address")]
+    Unreachable,
+}
+
+// Returns the forwarding instructions for reaching the given destination.
+//
+// If a `device` is specified, the resolved route is limited to those that
+// egress over the device.
+//
+// If `local_ip` is specified the resolved route is limited to those that egress
+// over a device with the address assigned.
+fn resolve_route_to_destination<
+    I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
+    C: IpDeviceNonSyncContext<I, SC::DeviceId> + IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpLayerContext<I, C>
+        + device::IpDeviceConfigurationContext<I, C>
+        + IpDeviceStateContext<I, C>
+        + NonTestCtxMarker,
+>(
+    sync_ctx: &mut SC,
+    device: Option<&SC::DeviceId>,
+    local_ip: Option<SpecifiedAddr<I::Addr>>,
+    addr: SpecifiedAddr<I::Addr>,
+) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
+    enum LocalDelivery<D> {
+        WeakLoopback,
+        StrongForDevice(D),
+    }
+
+    // Check if locally destined. If the destination is an address assigned
+    // on an interface, and an egress interface wasn't specifically
+    // selected, route via the loopback device. This lets us operate as a
+    // strong host when an outgoing interface is explicitly requested while
+    // still enabling local delivery via the loopback interface, which is
+    // acting as a weak host. Note that if the loopback interface is
+    // requested as an outgoing interface, route selection is still
+    // performed as a strong host! This makes the loopback interface behave
+    // more like the other interfaces on the system.
+    //
+    // TODO(https://fxbug.dev/93870): Encode the delivery of locally-
+    // destined packets to loopback in the route table.
+    let local_delivery_instructions: Option<LocalDelivery<&SC::DeviceId>> = match device {
+        Some(device) => match sync_ctx.address_status_for_device(addr, device) {
+            AddressStatus::Present(status) => {
+                // If the destination is an address assigned to the
+                // requested egress interface, route locally via the strong
+                // host model.
+                is_unicast_assigned::<I>(&status).then_some(LocalDelivery::StrongForDevice(device))
+            }
+            AddressStatus::Unassigned => None,
+        },
+        None => {
+            // If the destination is an address assigned on an interface,
+            // and an egress interface wasn't specifically selected, route
+            // via the loopback device operating in a weak host model.
+            sync_ctx
+                .with_address_statuses(addr, |mut it| {
+                    it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
+                })
+                .then_some(LocalDelivery::WeakLoopback)
+        }
+    };
+
+    match local_delivery_instructions {
+        Some(local_delivery) => {
+            let Some(loopback) = sync_ctx.loopback_id() else {
+                    return Err(ResolveRouteError::Unreachable)
+                };
+
+            let local_ip = match local_delivery {
+                LocalDelivery::WeakLoopback => match local_ip {
+                    Some(local_ip) => sync_ctx
+                        .with_address_statuses(local_ip, |mut it| {
+                            it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
+                        })
+                        .then_some(local_ip)
+                        .ok_or(ResolveRouteError::NoSrcAddr)?,
+                    None => addr,
+                },
+                LocalDelivery::StrongForDevice(device) => {
+                    get_local_addr(sync_ctx, local_ip, device, Some(addr))?
+                }
+            };
+            Ok(ResolvedRoute {
+                src_addr: local_ip,
+                device: loopback,
+                next_hop: NextHop::RemoteAsNeighbor,
+            })
+        }
+        None => {
+            sync_ctx
+                .with_ip_routing_table(|sync_ctx, table| {
+                    let mut matching_with_addr =
+                        table.lookup_filter_map(sync_ctx, device, *addr, |sync_ctx, d| {
+                            Some(get_local_addr(sync_ctx, local_ip, d, Some(addr)))
+                        });
+
+                    let first_error = match matching_with_addr.next() {
+                        Some((Destination { device, next_hop }, Ok(addr))) => {
+                            return Ok((Destination { device: device.clone(), next_hop }, addr))
+                        }
+                        Some((_, Err(e))) => e,
+                        None => return Err(ResolveRouteError::Unreachable),
+                    };
+
+                    matching_with_addr
+                        .filter_map(|(d, r)| {
+                            // Select successful routes. We ignore later errors
+                            // since we've already saved the first one.
+                            r.ok_checked::<ResolveRouteError>().map(|a| (d, a))
+                        })
+                        .next()
+                        .map_or(Err(first_error), |(Destination { device, next_hop }, addr)| {
+                            Ok((Destination { device: device.clone(), next_hop }, addr))
+                        })
+                })
+                .map(|(Destination { device, next_hop }, local_ip)| ResolvedRoute {
+                    src_addr: local_ip,
+                    device,
+                    next_hop,
+                })
+        }
     }
 }
 
@@ -702,102 +833,8 @@ impl<
         device: Option<&SC::DeviceId>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         addr: SpecifiedAddr<I::Addr>,
-    ) -> Result<IpSockRoute<I, SC::DeviceId>, IpSockRouteError> {
-        enum LocalDelivery<D> {
-            WeakLoopback,
-            StrongForDevice(D),
-        }
-
-        // Check if locally destined. If the destination is an address assigned
-        // on an interface, and an egress interface wasn't specifically
-        // selected, route via the loopback device. This lets us operate as a
-        // strong host when an outgoing interface is explicitly requested while
-        // still enabling local delivery via the loopback interface, which is
-        // acting as a weak host. Note that if the loopback interface is
-        // requested as an outgoing interface, route selection is still
-        // performed as a strong host! This makes the loopback interface behave
-        // more like the other interfaces on the system.
-        //
-        // TODO(https://fxbug.dev/93870): Encode the delivery of locally-
-        // destined packets to loopback in the route table.
-        let local_delivery_instructions: Option<LocalDelivery<&SC::DeviceId>> = match device {
-            Some(device) => match self.address_status_for_device(addr, device) {
-                AddressStatus::Present(status) => {
-                    // If the destination is an address assigned to the
-                    // requested egress interface, route locally via the strong
-                    // host model.
-                    is_unicast_assigned::<I>(&status)
-                        .then_some(LocalDelivery::StrongForDevice(device))
-                }
-                AddressStatus::Unassigned => None,
-            },
-            None => {
-                // If the destination is an address assigned on an interface,
-                // and an egress interface wasn't specifically selected, route
-                // via the loopback device operating in a weak host model.
-                self.with_address_statuses(addr, |mut it| {
-                    it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
-                })
-                .then_some(LocalDelivery::WeakLoopback)
-            }
-        };
-
-        match local_delivery_instructions {
-            Some(local_delivery) => {
-                let Some(loopback) = self.loopback_id() else {
-                    return Err(IpSockUnroutableError::NoRouteToRemoteAddr.into())
-                };
-
-                let local_ip = match local_delivery {
-                    LocalDelivery::WeakLoopback => match local_ip {
-                        Some(local_ip) => self
-                            .with_address_statuses(local_ip, |mut it| {
-                                it.any(|(_device, status)| is_unicast_assigned::<I>(&status))
-                            })
-                            .then_some(local_ip)
-                            .ok_or(IpSockUnroutableError::LocalAddrNotAssigned)?,
-                        None => addr,
-                    },
-                    LocalDelivery::StrongForDevice(device) => {
-                        get_local_addr(self, local_ip, device, Some(addr))?
-                    }
-                };
-                Ok(IpSockRoute {
-                    local_ip,
-                    destination: Destination {
-                        device: loopback,
-                        next_hop: NextHop::RemoteAsNeighbor,
-                    },
-                })
-            }
-            None => self
-                .with_ip_routing_table(|sync_ctx, table| {
-                    let mut matching_with_addr =
-                        table.lookup_filter_map(sync_ctx, device, *addr, |sync_ctx, d| {
-                            Some(get_local_addr(sync_ctx, local_ip, d, Some(addr)))
-                        });
-
-                    let first_error = match matching_with_addr.next() {
-                        Some((Destination { device, next_hop }, Ok(addr))) => {
-                            return Ok((Destination { device: device.clone(), next_hop }, addr))
-                        }
-                        Some((_, Err(e))) => e,
-                        None => return Err(IpSockUnroutableError::NoRouteToRemoteAddr.into()),
-                    };
-
-                    matching_with_addr
-                        .filter_map(|(d, r)| {
-                            // Select successful routes. We ignore later errors
-                            // since we've already saved the first one.
-                            r.ok_checked::<IpSockRouteError>().map(|a| (d, a))
-                        })
-                        .next()
-                        .map_or(Err(first_error), |(Destination { device, next_hop }, addr)| {
-                            Ok((Destination { device: device.clone(), next_hop }, addr))
-                        })
-                })
-                .map(|(destination, local_ip)| IpSockRoute { local_ip, destination }),
-        }
+    ) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
+        resolve_route_to_destination(self, device, local_ip, addr)
     }
 }
 
@@ -1787,6 +1824,10 @@ pub(crate) fn receive_ipv4_packet<
             );
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
+            let next_hop = match next_hop {
+                NextHop::RemoteAsNeighbor => dst_ip,
+                NextHop::Gateway(gateway) => gateway,
+            };
             let ttl = packet.ttl();
             if ttl > 1 {
                 trace!("receive_ipv4_packet: forwarding");
@@ -1798,7 +1839,7 @@ pub(crate) fn receive_ipv4_packet<
                     sync_ctx,
                     ctx,
                     &dst_device,
-                    next_hop.as_gateway().unwrap_or(dst_ip),
+                    next_hop,
                     buffer,
                 ) {
                     Ok(()) => (),
@@ -2071,6 +2112,10 @@ pub(crate) fn receive_ipv6_packet<
                     Ipv6PacketAction::ProcessFragment => unreachable!("When forwarding packets, we should only ever look at the hop by hop options extension header (if present)"),
                 }
 
+                let next_hop = match next_hop {
+                    NextHop::RemoteAsNeighbor => dst_ip,
+                    NextHop::Gateway(gateway) => gateway,
+                };
                 packet.set_ttl(ttl - 1);
                 let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                     drop_packet_and_undo_parse!(packet, buffer);
@@ -2078,7 +2123,7 @@ pub(crate) fn receive_ipv6_packet<
                     sync_ctx,
                     ctx,
                     &dst_device,
-                    next_hop.as_gateway().unwrap_or(dst_ip),
+                    next_hop,
                     buffer,
                 ) {
                     // TODO(https://fxbug.dev/86247): Encode the MTU error more
@@ -4818,7 +4863,7 @@ mod tests {
         egress_device: Option<Device>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         dest_ip: SpecifiedAddr<I::Addr>,
-    ) -> Result<IpSockRoute<I, Device>, IpSockRouteError>
+    ) -> Result<ResolvedRoute<I, Device>, ResolveRouteError>
     where
         for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
             IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
@@ -4833,9 +4878,9 @@ mod tests {
             dest_ip,
         )
         // Convert device IDs in any route so it's easier to compare.
-        .map(|IpSockRoute { local_ip, destination: Destination { next_hop, device } }| {
+        .map(|ResolvedRoute { src_addr, device, next_hop }| {
             let device = Device::from_index(device_ids.iter().position(|d| d == &device).unwrap());
-            IpSockRoute { local_ip, destination: Destination { next_hop, device } }
+            ResolvedRoute { src_addr, device, next_hop }
         })
     }
 
@@ -4843,83 +4888,72 @@ mod tests {
     #[test_case(None,
                 None,
                 Device::First.ip_address(),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback,
-                }}); "local delivery")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
+                    next_hop: NextHop::RemoteAsNeighbor }); "local delivery")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 Device::First.ip_address(),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
-                }}); "local delivery specified local addr")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
+                    next_hop: NextHop::RemoteAsNeighbor }); "local delivery specified local addr")]
     #[test_case(Some(Device::First.ip_address()),
                 Some(Device::First),
                 Device::First.ip_address(),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
-                }}); "local delivery specified device and addr")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
+                    next_hop: NextHop::RemoteAsNeighbor });
+                    "local delivery specified device and addr")]
     #[test_case(None,
                 Some(Device::Loopback),
                 Device::First.ip_address(),
-                Err(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr));
+                Err(ResolveRouteError::Unreachable);
                 "local delivery specified loopback device no addr")]
     #[test_case(None,
                 Some(Device::Loopback),
                 Device::Loopback.ip_address(),
-                Ok(IpSockRoute { local_ip: Device::Loopback.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
-                }}); "local delivery to loopback addr via specified loopback device no addr")]
+                Ok(ResolvedRoute { src_addr: Device::Loopback.ip_address(), device: Device::Loopback,
+                    next_hop: NextHop::RemoteAsNeighbor,
+                }); "local delivery to loopback addr via specified loopback device no addr")]
     #[test_case(None,
                 Some(Device::Second),
                 Device::First.ip_address(),
-                Err(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr));
+                Err(ResolveRouteError::Unreachable);
                 "local delivery specified mismatched device no addr")]
     #[test_case(Some(Device::First.ip_address()),
                 Some(Device::Loopback),
                 Device::First.ip_address(),
-                Err(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr));
-                "local delivery specified loopback device")]
+                Err(ResolveRouteError::Unreachable); "local delivery specified loopback device")]
     #[test_case(Some(Device::First.ip_address()),
                 Some(Device::Second),
                 Device::First.ip_address(),
-                Err(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr));
-                "local delivery specified mismatched device")]
+                Err(ResolveRouteError::Unreachable); "local delivery specified mismatched device")]
     #[test_case(None,
                 None,
                 remote_ip::<I>(),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
-                }}); "remote delivery")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
+                    next_hop: NextHop::RemoteAsNeighbor }); "remote delivery")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 remote_ip::<I>(),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
-                }}); "remote delivery specified addr")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
+                    next_hop: NextHop::RemoteAsNeighbor }); "remote delivery specified addr")]
     #[test_case(Some(Device::Second.ip_address()), None, remote_ip::<I>(),
-                Err(IpSockRouteError::Unroutable(IpSockUnroutableError::LocalAddrNotAssigned));
-                "remote delivery specified addr no route")]
+                Err(ResolveRouteError::NoSrcAddr); "remote delivery specified addr no route")]
     #[test_case(None,
                 Some(Device::First),
                 remote_ip::<I>(),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
-                }}); "remote delivery specified device")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
+                    next_hop: NextHop::RemoteAsNeighbor }); "remote delivery specified device")]
     #[test_case(None, Some(Device::Second), remote_ip::<I>(),
-                Err(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr));
-                "remote delivery specified device no route")]
+                Err(ResolveRouteError::Unreachable); "remote delivery specified device no route")]
     #[test_case(Some(Device::Second.ip_address()),
                 None,
                 Device::First.ip_address(),
-                Ok(IpSockRoute {local_ip: Device::Second.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
-                }});
-                "local delivery cross device")]
+                Ok(ResolvedRoute {src_addr: Device::Second.ip_address(), device: Device::Loopback,
+                    next_hop: NextHop::RemoteAsNeighbor }); "local delivery cross device")]
     fn lookup_route<I: Ip + TestIpExt + IpDeviceIpExt + IpLayerIpExt>(
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         egress_device: Option<Device>,
         dest_ip: SpecifiedAddr<I::Addr>,
-        expected_result: Result<IpSockRoute<I, Device>, IpSockRouteError>,
+        expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
     ) where
         for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
             IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
@@ -4955,33 +4989,27 @@ mod tests {
     #[ip_test]
     #[test_case(None,
                 None,
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
-                }}); "no constraints")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
+                    next_hop: NextHop::RemoteAsNeighbor }); "no constraints")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
-                }}); "constrain local addr")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
+                    next_hop: NextHop::RemoteAsNeighbor }); "constrain local addr")]
     #[test_case(Some(Device::Second.ip_address()), None,
-                Ok(IpSockRoute { local_ip: Device::Second.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Second
-                }});
-                "constrain local addr to second device")]
+                Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
+                    next_hop: NextHop::RemoteAsNeighbor });
+                    "constrain local addr to second device")]
     #[test_case(None,
                 Some(Device::First),
-                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
-                }}); "constrain device")]
+                Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
+                    next_hop: NextHop::RemoteAsNeighbor }); "constrain device")]
     #[test_case(None, Some(Device::Second),
-                Ok(IpSockRoute { local_ip: Device::Second.ip_address(), destination: Destination {
-                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Second
-                }});
-                "constrain to second device")]
+                Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
+                    next_hop: NextHop::RemoteAsNeighbor }); "constrain to second device")]
     fn lookup_route_multiple_devices_with_route<I: Ip + TestIpExt + IpDeviceIpExt + IpLayerIpExt>(
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         egress_device: Option<Device>,
-        expected_result: Result<IpSockRoute<I, Device>, IpSockRouteError>,
+        expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
     ) where
         for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
             IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,

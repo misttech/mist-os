@@ -19,9 +19,9 @@ use crate::{
     context::{CounterContext, InstantContext, NonTestCtxMarker},
     ip::{
         device::state::{IpDeviceStateIpExt, Ipv6AddressEntry},
-        forwarding::Destination,
+        types::{NextHop, ResolvedRoute},
         AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceContext, IpExt, IpLayerIpExt,
-        SendIpPacketMeta,
+        ResolveRouteError, SendIpPacketMeta,
     },
 };
 
@@ -67,7 +67,7 @@ pub enum IpSockSendError {
     Mtu,
     /// The socket is currently unroutable.
     #[error("the socket is currently unroutable: {}", _0)]
-    Unroutable(#[from] IpSockUnroutableError),
+    Unroutable(#[from] ResolveRouteError),
 }
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
@@ -203,7 +203,7 @@ pub(crate) enum MmsError {
     /// Cannot find the device that is used for the ip socket, possibly because
     /// there is no route.
     #[error("cannot find the device: {}", _0)]
-    NoDevice(#[from] IpSockRouteError),
+    NoDevice(#[from] ResolveRouteError),
     /// The MTU provided by the device is too small such that there is no room
     /// for a transport message at all.
     #[error("invalid MTU: {:?}", _0)]
@@ -232,39 +232,7 @@ where
 pub enum IpSockCreationError {
     /// An error occurred while looking up a route.
     #[error("a route cannot be determined: {}", _0)]
-    Route(#[from] IpSockRouteError),
-}
-
-/// An error encountered when looking up a route for an IP socket.
-#[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
-pub enum IpSockRouteError {
-    /// No local IP address was specified, and one could not be automatically
-    /// selected.
-    #[error("a local IP address could not be automatically selected")]
-    NoLocalAddrAvailable,
-    /// The socket is unroutable.
-    #[error("the socket is unroutable: {}", _0)]
-    Unroutable(#[from] IpSockUnroutableError),
-}
-
-/// An error encountered when attempting to compute the routing information on
-/// an IP socket.
-///
-/// An `IpSockUnroutableError` can occur when creating a socket or when updating
-/// an existing socket in response to changes to the forwarding table or to the
-/// set of IP addresses assigned to devices.
-#[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
-pub enum IpSockUnroutableError {
-    /// The specified local IP address is not one of our assigned addresses.
-    ///
-    /// For IPv6, this error will also be returned if the specified local IP
-    /// address exists on one of our devices, but it is in the "temporary"
-    /// state.
-    #[error("the specified local IP address is not one of our assigned addresses")]
-    LocalAddrNotAssigned,
-    /// No route exists to the specified remote IP address.
-    #[error("no route exists to the remote IP address")]
-    NoRouteToRemoteAddr,
+    Route(#[from] ResolveRouteError),
 }
 
 /// An IP socket.
@@ -348,16 +316,6 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // the caller. We will still need to have a separate enforcement mechanism for
 // raw IP sockets once we support those.
 
-/// The route for a socket.
-#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-pub(super) struct IpSockRoute<I: Ip, D> {
-    /// The local IP to use for the socket.
-    pub(super) local_ip: SpecifiedAddr<I::Addr>,
-
-    /// The destination for packets originating from the socket.
-    pub(super) destination: Destination<I::Addr, D>,
-}
-
 /// The non-synchronized execution context for IP sockets.
 pub(super) trait IpSocketNonSyncContext: InstantContext + CounterContext {}
 impl<C: InstantContext + CounterContext> IpSocketNonSyncContext for C {}
@@ -381,7 +339,7 @@ where
         device: Option<&Self::DeviceId>,
         src_ip: Option<SpecifiedAddr<I::Addr>>,
         dst_ip: SpecifiedAddr<I::Addr>,
-    ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError>;
+    ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError>;
 }
 
 /// The context required in order to implement [`BufferIpSocketHandler`].
@@ -418,12 +376,7 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
             if let Some(device) = device.as_strong_ref(self) {
                 Some(device)
             } else {
-                return Err((
-                    IpSockCreationError::Route(IpSockRouteError::Unroutable(
-                        IpSockUnroutableError::NoRouteToRemoteAddr,
-                    )),
-                    options,
-                ));
+                return Err((IpSockCreationError::Route(ResolveRouteError::Unreachable), options));
             }
         } else {
             None
@@ -435,14 +388,14 @@ impl<I: Ip + IpExt + IpDeviceStateIpExt, C: IpSocketNonSyncContext, SC: IpSocket
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
-        let IpSockRoute { local_ip, destination: _ } =
+        let ResolvedRoute { src_addr, device: _, next_hop: _ } =
             match self.lookup_route(ctx, device, local_ip, remote_ip) {
                 Ok(r) => r,
                 Err(e) => return Err((e.into(), options)),
             };
 
         let definition = IpSockDefinition {
-            local_ip,
+            local_ip: src_addr,
             remote_ip,
             device: device.map(|d| self.downgrade_device_id(&d)),
             proto,
@@ -504,25 +457,25 @@ fn send_ip_packet<
 
     let device = if let Some(device) = device {
         let Some(device) = sync_ctx.upgrade_weak_device_id(device) else {
-            return Err((body, IpSockUnroutableError::NoRouteToRemoteAddr.into()));
+            return Err((body, ResolveRouteError::Unreachable.into()));
         };
         Some(device)
     } else {
         None
     };
 
-    let IpSockRoute { local_ip: got_local_ip, destination: Destination { device, next_hop } } =
+    let ResolvedRoute { src_addr: got_local_ip, device, next_hop } =
         match sync_ctx.lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip) {
             Ok(o) => o,
-            Err(IpSockRouteError::NoLocalAddrAvailable) => {
-                unreachable!("local IP {} was specified", local_ip)
-            }
-            Err(IpSockRouteError::Unroutable(e)) => {
-                return Err((body, IpSockSendError::Unroutable(e)))
-            }
+            Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
         };
 
     assert_eq!(*local_ip, got_local_ip);
+
+    let next_hop = match next_hop {
+        NextHop::RemoteAsNeighbor => remote_ip.clone(),
+        NextHop::Gateway(gateway) => gateway,
+    };
 
     BufferIpSocketContext::send_ip_packet(
         sync_ctx,
@@ -531,7 +484,7 @@ fn send_ip_packet<
             device: &device,
             src_ip: *local_ip,
             dst_ip: *remote_ip,
-            next_hop: next_hop.as_gateway().unwrap_or(*remote_ip),
+            next_hop,
             ttl: options.hop_limit(remote_ip),
             proto: *proto,
             mtu,
@@ -582,13 +535,10 @@ impl<
         let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
         let device = device
             .as_ref()
-            .map(|d| {
-                self.upgrade_weak_device_id(d)
-                    .ok_or(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr))
-            })
+            .map(|d| self.upgrade_weak_device_id(d).ok_or(ResolveRouteError::Unreachable))
             .transpose()?;
 
-        let IpSockRoute { destination: Destination { next_hop: _, device }, local_ip: _ } = self
+        let ResolvedRoute { src_addr: _, device, next_hop: _ } = self
             .lookup_route(ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, C>::get_mtu(self, &device);
@@ -951,7 +901,7 @@ pub(crate) mod testutil {
             device::state::{AddrConfig, AssignedAddress as _, IpDeviceState, Ipv6DadState},
             forwarding::ForwardingTable,
             testutil::FakeIpDeviceIdCtx,
-            types::{Metric, RawMetric},
+            types::{Destination, Metric, RawMetric},
             HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
             DEFAULT_HOP_LIMITS,
         },
@@ -1042,7 +992,7 @@ pub(crate) mod testutil {
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
-        ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError> {
+        ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             let FakeIpSocketCtx { device_state, table, ip_device_id_ctx } = self;
 
             let (destination, ()) = table
@@ -1053,15 +1003,13 @@ pub(crate) mod testutil {
                         .and_then(|state| state.addrs.read().find(local_ip).map(|_| ())),
                 })
                 .next()
-                .ok_or(IpSockUnroutableError::NoRouteToRemoteAddr)?;
+                .ok_or(ResolveRouteError::Unreachable)?;
 
             let Destination { device, next_hop } = destination;
             let addrs = device_state.get(&device).unwrap().addrs.read();
             let mut addrs = addrs.iter();
             let local_ip = match local_ip {
-                None => {
-                    addrs.map(|e| e.addr()).next().ok_or(IpSockRouteError::NoLocalAddrAvailable)?
-                }
+                None => addrs.map(|e| e.addr()).next().ok_or(ResolveRouteError::NoSrcAddr)?,
                 Some(local_ip) => {
                     // We already constrained the set of devices so this
                     // should be a given.
@@ -1075,10 +1023,7 @@ pub(crate) mod testutil {
                 }
             };
 
-            Ok(IpSockRoute {
-                local_ip,
-                destination: Destination { next_hop, device: device.clone() },
-            })
+            Ok(ResolvedRoute { src_addr: local_ip, device: device.clone(), next_hop })
         }
     }
 
@@ -1101,7 +1046,7 @@ pub(crate) mod testutil {
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
-        ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError> {
+        ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.get_mut().as_mut().lookup_route(ctx, device, local_ip, addr)
         }
     }
@@ -1490,19 +1435,13 @@ mod tests {
             local_ip_type: AddressType::Unroutable,
             remote_ip_type: AddressType::Remote,
             device_type: DeviceType::Unspecified,
-            expected_result: Err(IpSockRouteError::Unroutable(
-                IpSockUnroutableError::LocalAddrNotAssigned,
-            )
-            .into()),
+            expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
         }; "unroutable local to remote")]
     #[test_case(NewSocketTestCase {
             local_ip_type: AddressType::LocallyOwned,
             remote_ip_type: AddressType::Unroutable,
             device_type: DeviceType::Unspecified,
-            expected_result: Err(IpSockRouteError::Unroutable(
-                IpSockUnroutableError::NoRouteToRemoteAddr,
-            )
-            .into()),
+            expected_result: Err(ResolveRouteError::Unreachable.into()),
         }; "local to unroutable remote")]
     #[test_case(NewSocketTestCase {
             local_ip_type: AddressType::LocallyOwned,
@@ -1526,25 +1465,19 @@ mod tests {
             local_ip_type: AddressType::Unspecified { can_select: true },
             remote_ip_type: AddressType::Remote,
             device_type: DeviceType::OtherDevice,
-            expected_result: Err(IpSockRouteError::Unroutable(
-                IpSockUnroutableError::NoRouteToRemoteAddr,
-            )
-            .into()),
+            expected_result: Err(ResolveRouteError::Unreachable.into()),
         }; "unspecified to remote through other device")]
     #[test_case(NewSocketTestCase {
             local_ip_type: AddressType::Unspecified { can_select: false },
             remote_ip_type: AddressType::Remote,
             device_type: DeviceType::Unspecified,
-            expected_result: Err(IpSockRouteError::NoLocalAddrAvailable.into()),
+            expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
         }; "new unspcified to remote can't select")]
     #[test_case(NewSocketTestCase {
             local_ip_type: AddressType::Remote,
             remote_ip_type: AddressType::Remote,
             device_type: DeviceType::Unspecified,
-            expected_result: Err(IpSockRouteError::Unroutable(
-                IpSockUnroutableError::LocalAddrNotAssigned,
-            )
-            .into()),
+            expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
         }; "new remote to remote")]
     #[test_case(NewSocketTestCase {
             local_ip_type: AddressType::LocallyOwned,
@@ -1562,10 +1495,7 @@ mod tests {
             local_ip_type: AddressType::Remote,
             remote_ip_type: AddressType::LocallyOwned,
             device_type: DeviceType::Unspecified,
-            expected_result: Err(IpSockRouteError::Unroutable(
-                IpSockUnroutableError::LocalAddrNotAssigned,
-            )
-            .into()),
+            expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
         }; "new remote to local")]
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
@@ -1943,10 +1873,7 @@ mod tests {
             small_body_serializer,
             None,
         );
-        assert_matches!(
-            res,
-            Err((_, IpSockSendError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr)))
-        );
+        assert_matches!(res, Err((_, IpSockSendError::Unroutable(ResolveRouteError::Unreachable))));
     }
 
     #[ip_test]
@@ -2139,9 +2066,7 @@ mod tests {
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
             crate::device::remove_ethernet_device(&mut sync_ctx, &mut non_sync_ctx, eth_device_id);
-            Err(MmsError::NoDevice(IpSockRouteError::Unroutable(
-                IpSockUnroutableError::NoRouteToRemoteAddr,
-            )))
+            Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(
                 IpDeviceContext::<I, _>::get_mtu(&mut Locked::new(sync_ctx), &device_id),

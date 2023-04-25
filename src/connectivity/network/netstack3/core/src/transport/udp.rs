@@ -2339,12 +2339,9 @@ mod tests {
         ip::{
             device::state::IpDeviceStateIpExt,
             icmp::{Icmpv4ErrorCode, Icmpv6ErrorCode},
-            socket::{
-                testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
-                IpSockRouteError, IpSockUnroutableError,
-            },
+            socket::testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
             testutil::FakeIpDeviceIdCtx,
-            SendIpPacketMeta,
+            ResolveRouteError, SendIpPacketMeta,
         },
         socket::{self, datagram::MulticastInterfaceSelector},
         testutil::{assert_empty, set_logger_for_test, TestIpExt as _},
@@ -2872,12 +2869,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert_eq!(
-            conn_err,
-            SockCreationError::Ip(
-                IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr).into()
-            )
-        );
+        assert_eq!(conn_err, SockCreationError::Ip(ResolveRouteError::Unreachable.into()));
     }
 
     /// Tests that UDP listener creation fails with an appropriate error when
@@ -2915,10 +2907,7 @@ mod tests {
     #[ip_test]
     #[test_case(
         true,
-        Err(IpSockCreationError::Route(IpSockRouteError::Unroutable(
-            IpSockUnroutableError::NoRouteToRemoteAddr,
-        )).into()); "remove device"
-    )]
+        Err(IpSockCreationError::Route(ResolveRouteError::Unreachable).into()); "remove device")]
     #[test_case(false, Ok(()); "dont remove device")]
     fn test_udp_conn_device_removed<I: Ip + TestIpExt>(
         remove_device: bool,
@@ -3110,9 +3099,8 @@ mod tests {
             ),
             Err((
                 ConnectListenerError::Ip(
-                IpSockCreationError::Route(IpSockRouteError::Unroutable(
-                    IpSockUnroutableError::NoRouteToRemoteAddr
-                ))),
+                IpSockCreationError::Route(ResolveRouteError::Unreachable)
+                ),
                 listener
             )) => listener
         );
@@ -3238,7 +3226,7 @@ mod tests {
         .expect_err("reconnect_udp should fail");
         assert_matches!(
             error,
-            ConnectListenerError::Ip(IpSockCreationError::Route(IpSockRouteError::Unroutable(_)))
+            ConnectListenerError::Ip(IpSockCreationError::Route(ResolveRouteError::Unreachable))
         );
 
         assert_eq!(
@@ -3385,7 +3373,7 @@ mod tests {
                 true,
                 Err((
                     Buf::new(Vec::new(), ..),
-                    IpSockSendError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr),
+                    IpSockSendError::Unroutable(ResolveRouteError::Unreachable),
                 )),
             ),
         ] {
