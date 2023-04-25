@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DRIVERS_VIRTIO_GPU_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/virtio/device.h>
@@ -51,6 +52,7 @@ class GpuDevice : public Device,
     size_t offset = 0;
     uint32_t bytes_per_pixel = 0;
     uint32_t bytes_per_row = 0;
+    fuchsia_images2::wire::PixelFormat pixel_format;
   };
   zx::result<BufferInfo> GetAllocatedBufferInfoForImage(uint64_t collection_id, uint32_t index,
                                                         const image_t* image) const;
@@ -114,11 +116,11 @@ class GpuDevice : public Device,
   template <typename RequestType, typename ResponseType>
   void send_command_response(const RequestType* cmd, ResponseType** res);
   zx_status_t Import(zx::vmo vmo, image_t* image, size_t offset, uint32_t pixel_size,
-                     uint32_t row_bytes);
+                     uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format);
 
   zx_status_t get_display_info();
   zx_status_t allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                   zx_pixel_format_t pixel_format);
+                                   fuchsia_images2::wire::PixelFormat pixel_format);
   zx_status_t attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len);
   zx_status_t set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
                           uint32_t height);
@@ -173,8 +175,7 @@ class GpuDevice : public Device,
   config_stamp_t displayed_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
 
   // TODO(fxbug.dev/122802): Support more formats.
-  static constexpr std::array<zx_pixel_format_t, 2> kSupportedFormats = {
-      ZX_PIXEL_FORMAT_RGB_x888,
+  static constexpr std::array<zx_pixel_format_t, 1> kSupportedFormats = {
       ZX_PIXEL_FORMAT_ARGB_8888,
   };
 };

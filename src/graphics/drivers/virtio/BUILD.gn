@@ -33,6 +33,7 @@ source_set("gpu_lib") {
     "//src/lib/ddktl",
     "//src/lib/fsl",
     "//zircon/system/ulib/image-format",
+    "//zircon/system/ulib/sysmem-version",
   ]
 }
 

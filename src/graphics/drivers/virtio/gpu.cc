@@ -4,11 +4,13 @@
 
 #include "gpu.h"
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zircon-internal/align.h>
 #include <string.h>
 #include <sys/param.h>
@@ -155,6 +157,7 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
       .offset = collection_info.buffers[index].vmo_usable_start,
       .bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(format_constraints.pixel_format),
       .bytes_per_row = minimum_row_bytes,
+      .pixel_format = sysmem::V2CopyFromV1PixelFormatType(format_constraints.pixel_format.type),
   });
 }
 
@@ -212,11 +215,11 @@ zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image, uint64_t
   }
   BufferInfo& buffer_info = buffer_info_result.value();
   return Import(std::move(buffer_info.vmo), image, buffer_info.offset, buffer_info.bytes_per_pixel,
-                buffer_info.bytes_per_row);
+                buffer_info.bytes_per_row, buffer_info.pixel_format);
 }
 
 zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32_t pixel_size,
-                              uint32_t row_bytes) {
+                              uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format) {
   if (image->type != IMAGE_TYPE_SIMPLE) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -237,7 +240,7 @@ zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32
   }
 
   status = allocate_2d_resource(&import_data->resource_id, row_bytes / pixel_size, image->height,
-                                image->pixel_format);
+                                pixel_format);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to allocate 2d resource", tag());
     return status;
@@ -466,7 +469,7 @@ zx_status_t GpuDevice::get_display_info() {
 }
 
 zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                            zx_pixel_format_t pixel_format) {
+                                            fuchsia_images2::wire::PixelFormat pixel_format) {
   LTRACEF("dev %p\n", this);
 
   ZX_ASSERT(resource_id);
@@ -481,10 +484,7 @@ zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
 
   // TODO(fxbug.dev/122802): Support more formats.
   switch (pixel_format) {
-    case ZX_PIXEL_FORMAT_RGB_x888:
-      req.format = VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM;
-      break;
-    case ZX_PIXEL_FORMAT_ARGB_8888:
+    case fuchsia_images2::PixelFormat::kBgra32:
       req.format = VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM;
       break;
     default:

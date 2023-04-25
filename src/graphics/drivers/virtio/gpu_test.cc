@@ -238,7 +238,6 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   const image_t kDefaultImage = {
       .width = 4,
       .height = 4,
-      .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
@@ -274,7 +273,6 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   const image_t kDefaultImage = {
       .width = 4,
       .height = 4,
-      .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
@@ -386,7 +384,6 @@ TEST_F(VirtioGpuTest, ImportImage) {
   const image_t kDefaultImage = {
       .width = 800,
       .height = 600,
-      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
