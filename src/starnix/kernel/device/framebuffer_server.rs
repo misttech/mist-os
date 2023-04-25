@@ -74,6 +74,7 @@ impl FramebufferServer {
         connect_channel_to_protocol::<fuicomposition::FlatlandMarker>(server_end)
             .map_err(|_| errno!(ENOENT))?;
         let flatland = fuicomposition::FlatlandSynchronousProxy::new(client_end);
+        flatland.set_debug_name("Starnix").map_err(|_| errno!(EINVAL))?;
 
         let collection = init_scene(&flatland, &allocator).map_err(|_| errno!(EINVAL))?;
 
