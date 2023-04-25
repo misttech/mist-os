@@ -213,6 +213,15 @@ executable("driver_manager") {
   ]
 
   configs += [ "//build/config:all_source" ]
+
+  if (toolchain_variant.libprefix != "") {
+    # The libprefix always ends with a / but that's not part of the
+    # "config" string in the loader-service protocol.
+    ldsvc_config =
+        get_path_info("${toolchain_variant.libprefix}libfoo.so", "dir")
+    assert(ldsvc_config != "" && ldsvc_config != ".")
+    defines = [ "DRIVERHOST_LDSVC_CONFIG=\"$ldsvc_config\"" ]
+  }
 }
 
 test("driver_manager_test") {

@@ -97,8 +97,9 @@ int RunDfv2(driver_manager_config::Config config,
           return client.take_error();
         }
     // TODO(https://fxbug.dev/125244): Find a better way to set this config.
-#if __has_feature(address_sanitizer)
-        fidl::WireResult result = fidl::WireCall(client.value())->Config("asan-ubsan");
+#ifdef DRIVERHOST_LDSVC_CONFIG
+        // Inform the loader service to look for libraries of the right variant.
+        fidl::WireResult result = fidl::WireCall(client.value())->Config(DRIVERHOST_LDSVC_CONFIG);
         if (!result.ok()) {
           return zx::error(result.status());
         }
