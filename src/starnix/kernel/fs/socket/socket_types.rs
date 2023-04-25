@@ -17,7 +17,7 @@ bitflags! {
         const DONTROUTE = MSG_DONTROUTE;
         const TRYHARD = MSG_TRYHARD;
         const CTRUNC = MSG_CTRUNC;
-        const PROBE = MSG_PROBE;
+        const PROXY = MSG_PROXY;
         const TRUNC = MSG_TRUNC;
         const DONTWAIT = MSG_DONTWAIT;
         const EOR = MSG_EOR;

@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
 
 use zerocopy::{AsBytes, FromBytes};
 
@@ -148,6 +149,55 @@ pub const SOCK_DCCP: u32 = 6;
 pub const SOCK_PACKET: u32 = 10;
 pub const SOCK_CLOEXEC: u32 = 524288;
 pub const SOCK_NONBLOCK: u32 = 2048;
+pub const AF_UNSPEC: u32 = 0;
+pub const AF_LOCAL: u32 = 1;
+pub const AF_UNIX: u32 = 1;
+pub const AF_FILE: u32 = 1;
+pub const AF_INET: u32 = 2;
+pub const AF_AX25: u32 = 3;
+pub const AF_IPX: u32 = 4;
+pub const AF_APPLETALK: u32 = 5;
+pub const AF_NETROM: u32 = 6;
+pub const AF_BRIDGE: u32 = 7;
+pub const AF_ATMPVC: u32 = 8;
+pub const AF_X25: u32 = 9;
+pub const AF_INET6: u32 = 10;
+pub const AF_ROSE: u32 = 11;
+pub const AF_DECnet: u32 = 12;
+pub const AF_NETBEUI: u32 = 13;
+pub const AF_SECURITY: u32 = 14;
+pub const AF_KEY: u32 = 15;
+pub const AF_NETLINK: u32 = 16;
+pub const AF_ROUTE: u32 = 16;
+pub const AF_PACKET: u32 = 17;
+pub const AF_ASH: u32 = 18;
+pub const AF_ECONET: u32 = 19;
+pub const AF_ATMSVC: u32 = 20;
+pub const AF_RDS: u32 = 21;
+pub const AF_SNA: u32 = 22;
+pub const AF_IRDA: u32 = 23;
+pub const AF_PPPOX: u32 = 24;
+pub const AF_WANPIPE: u32 = 25;
+pub const AF_LLC: u32 = 26;
+pub const AF_IB: u32 = 27;
+pub const AF_MPLS: u32 = 28;
+pub const AF_CAN: u32 = 29;
+pub const AF_TIPC: u32 = 30;
+pub const AF_BLUETOOTH: u32 = 31;
+pub const AF_IUCV: u32 = 32;
+pub const AF_RXRPC: u32 = 33;
+pub const AF_ISDN: u32 = 34;
+pub const AF_PHONET: u32 = 35;
+pub const AF_IEEE802154: u32 = 36;
+pub const AF_CAIF: u32 = 37;
+pub const AF_ALG: u32 = 38;
+pub const AF_NFC: u32 = 39;
+pub const AF_VSOCK: u32 = 40;
+pub const AF_KCM: u32 = 41;
+pub const AF_QIPCRTR: u32 = 42;
+pub const AF_SMC: u32 = 43;
+pub const AF_XDP: u32 = 44;
+pub const AF_MAX: u32 = 45;
 pub const SO_DEBUG: u32 = 1;
 pub const SO_REUSEADDR: u32 = 2;
 pub const SO_TYPE: u32 = 3;
