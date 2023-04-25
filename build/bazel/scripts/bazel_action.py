@@ -799,6 +799,11 @@ def main():
         help=
         'Allow directory outputs in `--bazel-outputs`, NOTE timestamps on directories do NOT accurately reflect content freshness, which can lead to incremental build incorrectness.'
     )
+    parser.add_argument(
+        '--path-mapping',
+        help=
+        'If specified, write a mapping of Ninja outputs to realpaths Bazel outputs'
+    )
     parser.add_argument('extra_bazel_args', nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -1047,6 +1052,18 @@ def main():
 
     for src_path, dst_path in zip(src_paths, args.ninja_outputs):
         copy_file_if_changed(src_path, dst_path)
+
+    if args.path_mapping:
+        # When determining source path of the copied output, follow links to get
+        # out of bazel-bin, because the content of bazel-bin is not guaranteed
+        # to be stable after subsequent `bazel` commands.
+        with open(args.path_mapping, 'w') as f:
+            f.write(
+                '\n'.join(
+                    dst_path + ':' +
+                    os.path.relpath(os.path.realpath(src_path), current_dir)
+                    for src_path, dst_path in zip(
+                        src_paths, args.ninja_outputs)))
 
     if args.depfile:
         # Perform a cquery to get all source inputs for the targets, this

@@ -404,6 +404,9 @@ template("bazel_action") {
       }
     }
 
+    _path_mapping = "${target_gen_dir}/${target_name}.path_mapping"
+    outputs += [ _path_mapping ]
+
     args = [
              "--bazel-launcher",
              rebase_path(bazel_launcher, root_build_dir),
@@ -425,6 +428,8 @@ template("bazel_action") {
              rebase_path("//", root_build_dir),
              "--depfile",
              rebase_path(depfile, root_build_dir),
+             "--path-mapping",
+             rebase_path(_path_mapping, root_build_dir),
            ]
 
     if (_allow_directory_in_outputs) {
