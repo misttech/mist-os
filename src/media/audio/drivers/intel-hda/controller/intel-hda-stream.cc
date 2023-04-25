@@ -111,9 +111,14 @@ void IntelHDAStream::EnsureStopped(MMIO_PTR hda_stream_desc_regs_t* regs) {
   hw_wmb();
   zx_nanosleep(zx_deadline_after(IHDA_SD_STOP_HOLD_TIME_NSEC));
 
-  constexpr uint32_t SET = HDA_SD_REG_STS32_ACK;
+  // Ack status bits using a byte write to keep QEMU's HDA emulation happy.
+  // A word write is more convenient but QEMU doesn't handle it correctly.
+  //   https://gitlab.com/qemu-project/qemu/-/issues/1618
+  // This should also behave correctly on real hardware.
+  constexpr uint8_t ACK = HDA_SD_REG_STS8_ACK;
+  REG_WR(&regs->ctl_sts.b.sts, ACK);
   constexpr uint32_t CLR = HDA_SD_REG_CTRL_IOCE | HDA_SD_REG_CTRL_FEIE | HDA_SD_REG_CTRL_DEIE;
-  REG_MOD(&regs->ctl_sts.w, CLR, SET);
+  REG_CLR_BITS(&regs->ctl_sts.w, CLR);
   hw_wmb();
 }
 
@@ -550,8 +555,15 @@ void IntelHDAStream::Start(StartCompleter::Sync& completer) {
     //
     // For now, we just assume that transmission starts "very soon" after we
     // whack the bit.
-    constexpr uint32_t SET = HDA_SD_REG_CTRL_RUN | HDA_SD_REG_CTRL_IOCE | HDA_SD_REG_CTRL_FEIE |
-                             HDA_SD_REG_CTRL_DEIE | HDA_SD_REG_STS32_ACK;
+
+    // Ack status bits using a byte write to keep QEMU's HDA emulation happy.
+    // A word write is more convenient but QEMU doesn't handle it correctly.
+    //   https://gitlab.com/qemu-project/qemu/-/issues/1618
+    // This should also behave correctly on real hardware.
+    constexpr uint8_t ACK = HDA_SD_REG_STS8_ACK;
+    REG_WR(&regs_->ctl_sts.b.sts, ACK);
+    constexpr uint32_t SET =
+        HDA_SD_REG_CTRL_RUN | HDA_SD_REG_CTRL_IOCE | HDA_SD_REG_CTRL_FEIE | HDA_SD_REG_CTRL_DEIE;
     REG_SET_BITS(&regs_->ctl_sts.w, SET);
     hw_wmb();
     start_time = zx::clock::get_monotonic().get();
