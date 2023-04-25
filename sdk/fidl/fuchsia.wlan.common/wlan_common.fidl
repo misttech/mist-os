@@ -86,7 +86,8 @@ const MAX_SUPPORTED_PHY_TYPES uint8 = 64;
 
 // Numbers defined to guarantee consistent numbering between all code bindings
 // to ease conversion.
-type WlanMacRole = strict enum {
+@available(added=13)
+type WlanMacRole = flexible enum {
     CLIENT = 1;
     AP = 2;
     MESH = 3;

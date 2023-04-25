@@ -120,6 +120,13 @@ async fn on_iface_added_legacy(listener: &Listener, iface_id: u16) -> Result<(),
         fidl_common::WlanMacRole::Mesh => {
             return Err(format_err!("Unexpectedly observed a mesh iface: {}", iface_id))
         }
+        fidl_common::WlanMacRoleUnknown!() => {
+            return Err(format_err!(
+                "Unknown WlanMacRole type {:?} on iface {}",
+                response.role,
+                iface_id
+            ))
+        }
     }
 
     info!("new iface {} added successfully", iface_id);
@@ -266,6 +273,39 @@ mod tests {
 
         // Nothing special should happen for the AP interface and the future should complete.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+    }
+
+    #[fuchsia::test]
+    fn test_add_legacy_unknown_iface() {
+        let mut exec = fasync::TestExecutor::new();
+        let mut test_values = test_setup(false, false);
+
+        let listener = Listener::new(
+            test_values.monitor_proxy,
+            IfaceRef::new(),
+            test_values.phy_manager.clone(),
+            test_values.iface_manager.clone(),
+        );
+
+        let fut = on_iface_added_legacy(&listener, 0);
+        pin_mut!(fut);
+
+        // Run the future until it queries the interface's properties.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Reply to the query indicating that this is an AP.
+        let iface_response = Some(fidl_service::QueryIfaceResponse {
+            role: fidl_common::WlanMacRole::unknown(),
+            id: 0,
+            phy_id: 0,
+            phy_assigned_id: 0,
+            sta_addr: [0, 1, 2, 3, 4, 5],
+        });
+        send_query_iface_response(&mut exec, &mut test_values.monitor_stream, iface_response);
+
+        // The future should return an error in this case since an unknown WlanMacRole is not
+        // supported.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
     #[fuchsia::test]

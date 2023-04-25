@@ -456,7 +456,7 @@ class WlanPhyImplDevice
     auto reply_vec = fidl::VectorView<wlan_common::WlanMacRole>::FromExternal(supported, 1);
 
     zxlogf(INFO, "%s: received a 'GetSupportedMacRoles' DDK request. Responding with roles = {%u}",
-           name_.c_str(), phy_config_->mac_role);
+           name_.c_str(), static_cast<uint32_t>(phy_config_->mac_role));
 
     fidl::Arena fidl_arena;
     auto response =

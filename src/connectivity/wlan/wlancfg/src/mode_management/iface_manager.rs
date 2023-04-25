@@ -651,6 +651,9 @@ impl IfaceManagerService {
             fidl_fuchsia_wlan_common::WlanMacRole::Mesh => {
                 // Mesh roles are not currently supported.
             }
+            fidl_fuchsia_wlan_common::WlanMacRoleUnknown!() => {
+                error!("Unknown WlanMacRole type {:?} on iface {}", iface_info.role, iface_id);
+            }
         }
 
         Ok(())
@@ -1089,6 +1092,9 @@ async fn handle_terminated_state_machine(
         }
         fidl_fuchsia_wlan_common::WlanMacRole::Mesh => {
             // Not yet supported.
+            unimplemented!();
+        }
+        fidl_fuchsia_wlan_common::WlanMacRoleUnknown!() => {
             unimplemented!();
         }
     }

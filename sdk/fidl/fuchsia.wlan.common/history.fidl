@@ -64,3 +64,12 @@ type WlanPhyType = strict enum {
     /// Supports rates of up to 9.6 Gbps (whew!)
     HE = 12;
 };
+
+// Numbers defined to guarantee consistent numbering between all code bindings
+// to ease conversion.
+@available(removed=13)
+type WlanMacRole = strict enum {
+    CLIENT = 1;
+    AP = 2;
+    MESH = 3;
+};

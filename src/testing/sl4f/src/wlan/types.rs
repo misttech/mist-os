@@ -223,17 +223,27 @@ pub(crate) struct ClientStatusResponseWrapper(
 );
 
 #[derive(Serialize)]
-#[serde(remote = "fidl_fuchsia_wlan_common::WlanMacRole")]
 pub(crate) enum WlanMacRoleDef {
     Client = 1,
     Ap = 2,
     Mesh = 3,
+    Unknown = 255,
+}
+
+impl From<fidl_fuchsia_wlan_common::WlanMacRole> for WlanMacRoleDef {
+    fn from(fidl_type: fidl_fuchsia_wlan_common::WlanMacRole) -> Self {
+        match fidl_type {
+            fidl_fuchsia_wlan_common::WlanMacRole::Client => Self::Client,
+            fidl_fuchsia_wlan_common::WlanMacRole::Ap => Self::Ap,
+            fidl_fuchsia_wlan_common::WlanMacRole::Mesh => Self::Mesh,
+            fidl_fuchsia_wlan_common::WlanMacRoleUnknown!() => Self::Unknown,
+        }
+    }
 }
 
 #[derive(Serialize)]
 pub(crate) struct QueryIfaceResponseDef {
-    #[serde(with = "WlanMacRoleDef")]
-    pub role: fidl_fuchsia_wlan_common::WlanMacRole,
+    pub role: WlanMacRoleDef,
     pub id: u16,
     pub phy_id: u16,
     pub phy_assigned_id: u16,
@@ -246,7 +256,7 @@ pub(crate) struct QueryIfaceResponseWrapper(pub QueryIfaceResponseDef);
 impl From<fidl_fuchsia_wlan_device_service::QueryIfaceResponse> for QueryIfaceResponseDef {
     fn from(resp: fidl_fuchsia_wlan_device_service::QueryIfaceResponse) -> QueryIfaceResponseDef {
         QueryIfaceResponseDef {
-            role: resp.role,
+            role: resp.role.into(),
             id: resp.id,
             phy_id: resp.phy_id,
             phy_assigned_id: resp.phy_assigned_id,

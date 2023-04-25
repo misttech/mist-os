@@ -51,6 +51,8 @@ pub enum FullmacMlmeError {
     FailedToConvertMacSublayerSupport(anyhow::Error),
     #[error("Failed to create persistence proxy: {0}")]
     FailedToCreatePersistenceProxy(fidl::Error),
+    #[error("Failed to create sme: {0}")]
+    FailedToCreateSme(anyhow::Error),
 }
 
 #[derive(Debug)]
@@ -291,7 +293,7 @@ impl FullmacMlme {
         let (persistence_req_sender, _persistence_req_forwarder_fut) =
             auto_persist::create_persistence_req_sender(persistence_proxy);
 
-        let (mlme_request_stream, sme_fut) = create_sme(
+        let (mlme_request_stream, sme_fut) = match create_sme(
             cfg.into(),
             mlme_event_receiver,
             &device_info,
@@ -302,7 +304,13 @@ impl FullmacMlme {
             wlan_hasher,
             persistence_req_sender,
             generic_sme_stream,
-        );
+        ) {
+            Ok((mlme_request_stream, sme_fut)) => (mlme_request_stream, sme_fut),
+            Err(e) => {
+                startup_sender.send(Err(FullmacMlmeError::FailedToCreateSme(e))).unwrap();
+                return;
+            }
+        };
 
         let mlme = Self {
             device,

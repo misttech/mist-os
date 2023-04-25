@@ -344,6 +344,10 @@ impl PhyManagerApi for PhyManager {
                 fidl_common::WlanMacRole::Mesh => {
                     return Err(PhyManagerError::Unsupported);
                 }
+                fidl_common::WlanMacRoleUnknown!() => {
+                    error!("Unknown WlanMacRole type {:?}", query_iface_response.role);
+                    return Err(PhyManagerError::Unsupported);
+                }
             }
         }
         Ok(())
@@ -1462,6 +1466,77 @@ mod tests {
         // fake client
         let phy_container = phy_manager.phys.get(&fake_phy_id).unwrap();
         assert!(phy_container.client_ifaces.contains_key(&fake_iface_id));
+    }
+
+    #[fuchsia::test]
+    fn on_iface_added_unknown_role_is_unsupported() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = PhyManager::new(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+        );
+
+        // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
+        // iface is added.
+        let fake_phy_id = 1;
+        let fake_mac_roles = vec![];
+
+        let phy_container = PhyContainer::new(fake_mac_roles);
+
+        // Create an IfaceResponse to be sent to the PhyManager when the iface ID is queried
+        let fake_role = fidl_common::WlanMacRole::unknown();
+        let fake_iface_id = 1;
+        let fake_phy_assigned_id = 1;
+        let fake_sta_addr = [0, 1, 2, 3, 4, 5];
+        let iface_response = create_iface_response(
+            fake_role,
+            fake_iface_id,
+            fake_phy_id,
+            fake_phy_assigned_id,
+            fake_sta_addr,
+        );
+
+        {
+            // Inject the fake PHY information
+            let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
+
+            // Add the fake iface
+            let on_iface_added_fut = phy_manager.on_iface_added(fake_iface_id);
+            pin_mut!(on_iface_added_fut);
+            assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
+
+            send_query_iface_response(
+                &mut exec,
+                &mut test_values.monitor_stream,
+                Some(iface_response),
+            );
+
+            assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
+
+            let mut feature_support_stream =
+                serve_feature_support(&mut exec, &mut test_values.monitor_stream);
+
+            assert!(exec.run_until_stalled(&mut on_iface_added_fut).is_pending());
+
+            send_security_support(
+                &mut exec,
+                &mut feature_support_stream,
+                Some(fake_security_support()),
+            );
+
+            // Show that on_iface_added results in an error since unknown WlanMacRole is unsupported
+            assert_variant!(
+                exec.run_until_stalled(&mut on_iface_added_fut),
+                Poll::Ready(Err(PhyManagerError::Unsupported))
+            );
+        }
+
+        // Expect that the PhyContainer associated with the fake PHY has been updated with the
+        // fake client
+        let phy_container = phy_manager.phys.get(&fake_phy_id).unwrap();
+        assert!(!phy_container.client_ifaces.contains_key(&fake_iface_id));
     }
 
     /// This test mimics a client of the DeviceWatcher watcher receiving an OnIfaceAdded event for

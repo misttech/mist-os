@@ -265,7 +265,7 @@ async fn wlansoftmac_thread(
         wpa1_supported: legacy_privacy_support.wpa1_supported,
     };
 
-    let (mlme_request_stream, sme_fut) = create_sme(
+    let (mlme_request_stream, sme_fut) = match create_sme(
         config,
         mlme_event_receiver,
         &device_info,
@@ -276,7 +276,13 @@ async fn wlansoftmac_thread(
         wlan_hasher,
         persistence_req_sender,
         generic_sme_stream,
-    );
+    ) {
+        Ok((mlme_request_stream, sme_fut)) => (mlme_request_stream, sme_fut),
+        Err(e) => {
+            startup_sender.send(Err(format_err!("Failed to create sme: {}", e))).unwrap();
+            return;
+        }
+    };
 
     let mlme_fut: Pin<Box<dyn Future<Output = ()>>> = match softmac_info.mac_role {
         banjo_common::WlanMacRole::CLIENT => {

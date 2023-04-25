@@ -101,7 +101,7 @@ pub fn create_and_serve_sme(
         inspect_tree.hasher.clone(),
         persistence_req_sender,
         generic_sme_stream,
-    );
+    )?;
     let forward_mlme_msgs_fut = forward_mlme_msgs(
         mlme_proxy.clone(),
         mlme_req_stream,

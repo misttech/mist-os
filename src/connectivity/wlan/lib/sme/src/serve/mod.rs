@@ -138,7 +138,7 @@ pub fn create_sme(
     hasher: WlanHasher,
     persistence_req_sender: auto_persist::PersistenceReqSender,
     generic_sme_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
-) -> (MlmeStream, impl Future<Output = Result<(), anyhow::Error>>) {
+) -> Result<(MlmeStream, impl Future<Output = Result<(), anyhow::Error>>), anyhow::Error> {
     let device_info = device_info.clone();
     let (server, mlme_req_sink, mlme_req_stream, telemetry_sender, sme_fut) = match device_info.role
     {
@@ -190,6 +190,9 @@ pub fn create_sme(
                 FutureObj::new(Box::new(fut)),
             )
         }
+        fidl_common::WlanMacRoleUnknown!() => {
+            return Err(format_err!("Unknown WlanMacRole type: {:?}", device_info.role));
+        }
     };
     let (feature_support_sender, feature_support_receiver) = mpsc::unbounded();
     let feature_support_fut =
@@ -209,7 +212,7 @@ pub fn create_sme(
             feature_support_fut = feature_support_fut.fuse() => feature_support_fut,
         }
     };
-    (mlme_req_stream, unified_fut)
+    Ok((mlme_req_stream, unified_fut))
 }
 
 async fn handle_feature_support_query(
@@ -351,6 +354,37 @@ mod tests {
     const PLACEHOLDER_HASH_KEY: [u8; 8] = [88, 77, 66, 55, 44, 33, 22, 11];
 
     #[test]
+    fn create_sme_fails_startup_role_unknown() {
+        let mut _exec = fasync::TestExecutor::new();
+        let inspector = Inspector::default();
+        let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
+        let iface_tree_holder = IfaceTreeHolder::new(inspector.root().create_child("sme"));
+        let (persistence_req_sender, _persistence_stream) =
+            test_utils::create_inspect_persistence_channel();
+        let (_generic_sme_proxy, generic_sme_stream) =
+            create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
+                .expect("failed to create MlmeProxy");
+        let device_info = fidl_mlme::DeviceInfo {
+            role: fidl_common::WlanMacRole::unknown(),
+            ..test_utils::fake_device_info([0; 6])
+        };
+        let result = create_sme(
+            crate::Config::default(),
+            mlme_event_stream,
+            &device_info,
+            fake_mac_sublayer_support(),
+            fake_security_support(),
+            fake_spectrum_management_support_empty(),
+            Arc::new(iface_tree_holder),
+            WlanHasher::new(PLACEHOLDER_HASH_KEY),
+            persistence_req_sender,
+            generic_sme_stream,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn sme_shutdown_on_generic_sme_closed() {
         let mut exec = fasync::TestExecutor::new();
         let (_mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
@@ -372,7 +406,8 @@ mod tests {
             WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
-        );
+        )
+        .unwrap();
         pin_mut!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
@@ -398,7 +433,10 @@ mod tests {
 
     fn start_generic_sme_test(
         role: fidl_common::WlanMacRole,
-    ) -> (GenericSmeTestHelper, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>) {
+    ) -> Result<
+        (GenericSmeTestHelper, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>),
+        anyhow::Error,
+    > {
         let mut exec = fasync::TestExecutor::new();
         let inspector = Inspector::default();
         let (mlme_event_sender, mlme_event_stream) = mpsc::unbounded();
@@ -420,11 +458,11 @@ mod tests {
             WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
-        );
+        )?;
         let mut serve_fut = Box::pin(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        (
+        Ok((
             GenericSmeTestHelper {
                 proxy: generic_sme_proxy,
                 mlme_req_stream,
@@ -434,12 +472,13 @@ mod tests {
                 exec,
             },
             serve_fut,
-        )
+        ))
     }
 
     #[test]
     fn generic_sme_get_client() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Client);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
 
         let (client_proxy, client_server) = create_proxy().unwrap();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
@@ -459,7 +498,8 @@ mod tests {
 
     #[test]
     fn generic_sme_get_ap_from_client_fails() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Client);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
 
         let (_ap_proxy, ap_server) = create_proxy().unwrap();
         let mut client_sme_fut = helper.proxy.get_ap_sme(ap_server);
@@ -472,7 +512,8 @@ mod tests {
 
     #[test]
     fn generic_sme_get_ap() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Ap);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
         let (ap_proxy, ap_server) = create_proxy().unwrap();
         let mut ap_sme_fut = helper.proxy.get_ap_sme(ap_server);
@@ -489,7 +530,8 @@ mod tests {
 
     #[test]
     fn generic_sme_get_client_from_ap_fails() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Ap);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
         let (_client_proxy, client_server) = create_proxy().unwrap();
         let mut client_sme_fut = helper.proxy.get_client_sme(client_server);
@@ -513,7 +555,8 @@ mod tests {
 
     #[test]
     fn generic_sme_get_histogram_stats_for_client() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Client);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
         let telemetry_proxy = get_telemetry_proxy(&mut helper, &mut serve_fut);
 
         // Forward request to MLME.
@@ -533,7 +576,8 @@ mod tests {
 
     #[test]
     fn generic_sme_get_counter_stats_for_client() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Client);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
         let telemetry_proxy = get_telemetry_proxy(&mut helper, &mut serve_fut);
 
         // Forward request to MLME.
@@ -553,7 +597,8 @@ mod tests {
 
     #[test]
     fn generic_sme_get_telemetry_for_ap_fails() {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(fidl_common::WlanMacRole::Ap);
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Ap).unwrap();
 
         let (_telemetry_proxy, telemetry_server) = create_proxy().unwrap();
         let mut telemetry_fut = helper.proxy.get_sme_telemetry(telemetry_server);
@@ -575,7 +620,7 @@ mod tests {
     #[test_case(fidl_common::WlanMacRole::Client)]
     #[test_case(fidl_common::WlanMacRole::Ap)]
     fn generic_sme_discovery_support_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role);
+        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
         let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
 
         let mut discovery_support_fut = feature_support_proxy.query_discovery_support();
@@ -600,7 +645,7 @@ mod tests {
     #[test_case(fidl_common::WlanMacRole::Client)]
     #[test_case(fidl_common::WlanMacRole::Ap)]
     fn generic_sme_mac_sublayer_support_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role);
+        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
         let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
 
         let mut mac_sublayer_support_fut = feature_support_proxy.query_mac_sublayer_support();
@@ -629,7 +674,7 @@ mod tests {
     #[test_case(fidl_common::WlanMacRole::Client)]
     #[test_case(fidl_common::WlanMacRole::Ap)]
     fn generic_sme_security_support_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role);
+        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
         let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
 
         let mut security_support_fut = feature_support_proxy.query_security_support();
@@ -654,7 +699,7 @@ mod tests {
     #[test_case(fidl_common::WlanMacRole::Client)]
     #[test_case(fidl_common::WlanMacRole::Ap)]
     fn generic_sme_spectrum_management_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role);
+        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
         let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
 
         let mut spectrum_support_fut = feature_support_proxy.query_spectrum_management_support();
@@ -675,7 +720,7 @@ mod tests {
     #[test_case(fidl_common::WlanMacRole::Client)]
     #[test_case(fidl_common::WlanMacRole::Ap)]
     fn generic_sme_support_query_cancelled(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role);
+        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
         let feature_support_proxy = get_feature_support_proxy(&mut helper, &mut serve_fut);
 
         let mut discovery_support_fut = feature_support_proxy.query_discovery_support();
@@ -693,7 +738,7 @@ mod tests {
     #[test_case(fidl_common::WlanMacRole::Client)]
     #[test_case(fidl_common::WlanMacRole::Ap)]
     fn generic_sme_query(mac_role: fidl_common::WlanMacRole) {
-        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role);
+        let (mut helper, mut serve_fut) = start_generic_sme_test(mac_role).unwrap();
 
         let mut query_fut = helper.proxy.query();
         assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);

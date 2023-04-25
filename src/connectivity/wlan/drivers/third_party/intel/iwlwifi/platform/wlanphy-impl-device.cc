@@ -123,7 +123,8 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
       create_iface_req.role = WLAN_MAC_ROLE_MESH;
       break;
     default:
-      IWL_ERR(this, "Unrecognized role from the request. Requested role: %u\n", request->role());
+      IWL_ERR(this, "Unrecognized WlanMacRole type from the request. Requested role: %u\n",
+              static_cast<uint32_t>(request->role()));
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
   }

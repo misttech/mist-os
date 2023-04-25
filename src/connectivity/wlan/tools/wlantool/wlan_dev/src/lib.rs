@@ -494,6 +494,9 @@ async fn print_iface_status(iface_id: u16, monitor_proxy: DeviceMonitor) -> Resu
             );
         }
         WlanMacRole::Mesh => println!("Iface {}: Mesh not supported", iface_id),
+        fidl_fuchsia_wlan_common::WlanMacRoleUnknown!() => {
+            println!("Iface {}: Unknown WlanMacRole type {:?}", iface_id, result.role);
+        }
     }
     Ok(())
 }
