@@ -846,7 +846,8 @@ function fx-run-ninja {
   # TERM is passed for the pretty ninja UI
   # PATH is passed as some tools are referenced via $PATH due to platform differences.
   # TMPDIR is passed for Goma on macOS.
-  # NINJA_STATUS is passed to control Ninja progress status.
+  # NINJA_STATUS, NINJA_STATUS_MAX_COMMANDS and NINJA_STATUS_REFRESH_MILLIS
+  # are passed to control Ninja progress status.
   # GOMA_DISABLED is passed to forcefully disabling Goma.
   #
   # GOMA_DISABLED and TMPDIR must be set, or unset, not empty. Some Dart
@@ -875,6 +876,8 @@ function fx-run-ninja {
     "PATH=${newpath}"
     # By default, also show the number of actively running actions.
     "NINJA_STATUS=${NINJA_STATUS:-"[%f/%t](%r) "}"
+    "NINJA_STATUS_MAX_COMMANDS=${NINJA_STATUS_MAX_COMMANDS:-0}"
+    "NINJA_STATUS_REFRESH_MILLIS=${NINJA_STATUS_REFRESH_MILLIS:-100}"
     ${GOMA_DISABLED+"GOMA_DISABLED=$GOMA_DISABLED"}
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
