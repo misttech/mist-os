@@ -6,7 +6,9 @@
 #define ZIRCON_KERNEL_LIB_USERABI_VDSO_PRIVATE_H_
 
 #include <zircon/compiler.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
+#include <zircon/testonly-syscalls.h>
 
 // This defines the struct shared with the kernel.
 #include <lib/userabi/vdso-constants.h>
