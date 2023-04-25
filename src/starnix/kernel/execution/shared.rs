@@ -70,22 +70,7 @@ pub fn execute_syscall(
 
     let syscall = Syscall::new(syscall_decl, current_task);
 
-    #[cfg(target_arch = "x86_64")]
-    {
-        // The `rax` register read from the thread's state is clobbered by zircon with
-        // ZX_ERR_BAD_SYSCALL, but it really should be the syscall number.
-        current_task.registers.rax = syscall.decl.number;
-
-        // `orig_rax` should hold the original value loaded into `rax` by the userspace process.
-        current_task.registers.orig_rax = syscall.decl.number;
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    {
-        // The x0 register may be clobbered during syscall handling (for the return value), but is
-        // needed when restarting a syscall.
-        current_task.registers.orig_x0 = current_task.registers.r[0];
-    }
+    current_task.registers.save_registers_for_restart(&syscall);
 
     match dispatch_syscall(current_task, &syscall) {
         Ok(return_value) => {

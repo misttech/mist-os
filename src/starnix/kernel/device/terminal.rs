@@ -43,10 +43,7 @@ pub struct TTYState {
 
 impl TTYState {
     pub fn new() -> Self {
-        Self {
-            terminals: RwLock::new(HashMap::new()),
-            pts_ids_set: Mutex::new(PtsIdsSet::new(DEVPTS_COUNT)),
-        }
+        Self::default()
     }
 
     /// Returns the next available terminal.
@@ -62,6 +59,15 @@ impl TTYState {
         self.pts_ids_set.lock().release(id);
         self.terminals.write().remove(&id);
         Ok(())
+    }
+}
+
+impl Default for TTYState {
+    fn default() -> Self {
+        Self {
+            terminals: RwLock::new(HashMap::new()),
+            pts_ids_set: Mutex::new(PtsIdsSet::new(DEVPTS_COUNT)),
+        }
     }
 }
 

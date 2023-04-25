@@ -16,6 +16,7 @@ struct PidEntry {
     process_group: Option<Weak<ProcessGroup>>,
 }
 
+#[derive(Default)]
 pub struct PidTable {
     /// The most-recently allocated pid in this table.
     last_pid: pid_t,
@@ -26,7 +27,7 @@ pub struct PidTable {
 
 impl PidTable {
     pub fn new() -> PidTable {
-        PidTable { last_pid: 0, table: HashMap::new() }
+        Self::default()
     }
 
     fn get_entry(&self, pid: pid_t) -> Option<&PidEntry> {

@@ -28,6 +28,7 @@ struct IpTable {
 type IpTablesName = [c_char; 32usize];
 
 /// Stores [`IpTable`]s associated with each protocol.
+#[derive(Default)]
 pub struct IpTables {
     ipv4: HashMap<IpTablesName, IpTable>,
     ipv6: HashMap<IpTablesName, IpTable>,
@@ -35,7 +36,7 @@ pub struct IpTables {
 
 impl IpTables {
     pub fn new() -> Self {
-        IpTables { ipv4: HashMap::new(), ipv6: HashMap::new() }
+        Self::default()
     }
 
     /// Returns `true` if the sockopt can be handled by [`IpTables`].

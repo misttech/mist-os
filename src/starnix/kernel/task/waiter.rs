@@ -348,6 +348,12 @@ impl std::fmt::Debug for Waiter {
     }
 }
 
+impl Default for Waiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A weak reference to a Waiter. Intended for holding in wait queues or stashing elsewhere for
 /// calling queue_events later.
 #[derive(Default)]

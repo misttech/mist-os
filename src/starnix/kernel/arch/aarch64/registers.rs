@@ -4,6 +4,8 @@
 
 use fuchsia_zircon as zx;
 
+use crate::syscalls::decls::Syscall;
+
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].
 ///
@@ -24,6 +26,13 @@ pub struct RegisterState {
 }
 
 impl RegisterState {
+    /// Saves any register state required to restart `syscall`.
+    pub fn save_registers_for_restart(&mut self, _syscall: &Syscall) {
+        // The x0 register may be clobbered during syscall handling (for the return value), but is
+        // needed when restarting a syscall.
+        self.orig_x0 = self.r[0];
+    }
+
     /// Returns the register that indicates the single-machine-word return value from a
     /// function call.
     pub fn instruction_pointer_register(&self) -> u64 {

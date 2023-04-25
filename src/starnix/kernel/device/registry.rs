@@ -72,16 +72,7 @@ pub struct DeviceRegistry {
 
 impl DeviceRegistry {
     pub fn new() -> Self {
-        let mut registry = Self {
-            char_devices: BTreeMap::new(),
-            dyn_devices: Default::default(),
-            next_anon_minor: 1,
-            listeners: Default::default(),
-            next_listener_id: 0,
-            next_event_id: 0,
-        };
-        registry.char_devices.insert(DYN_MAJOR, Box::new(Arc::clone(&registry.dyn_devices)));
-        registry
+        Self::default()
     }
 
     /// Creates a `DeviceRegistry` and populates it with common drivers such as /dev/null.
@@ -163,6 +154,21 @@ impl DeviceRegistry {
                 .open(current_task, dev, node, flags),
             DeviceMode::Block => error!(ENODEV),
         }
+    }
+}
+
+impl Default for DeviceRegistry {
+    fn default() -> Self {
+        let mut registry = Self {
+            char_devices: BTreeMap::new(),
+            dyn_devices: Default::default(),
+            next_anon_minor: 1,
+            listeners: Default::default(),
+            next_listener_id: 0,
+            next_event_id: 0,
+        };
+        registry.char_devices.insert(DYN_MAJOR, Box::new(Arc::clone(&registry.dyn_devices)));
+        registry
     }
 }
 
