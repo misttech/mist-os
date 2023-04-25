@@ -6,63 +6,58 @@
 
 use camino::Utf8PathBuf;
 use emulator_instance::{EmulatorConfiguration, NetworkingMode};
-use ffx_emulator_common::tuntap::TAP_INTERFACE_NAME;
+use ffx_emulator_config::ShowDetail;
 use sdk_metadata::{
     virtual_device::{Cpu, Hardware},
     ElementType, InputDevice, VirtualDeviceV1,
 };
-use serde_json;
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Command};
 
-pub(crate) fn net(emu_config: &EmulatorConfiguration) {
-    if emu_config.runtime.config_override {
-        println!(
-            "Configuration was provided manually to the start command using the --config flag.\n\
-            Network details for this instance cannot be shown with this tool; try\n    \
-                `ffx emu show --config`\n\
-            to review the emulator flags directly."
-        );
-        return;
+pub(crate) fn command(cmd: &Command) -> ShowDetail {
+    let mut env: HashMap<String, String> = HashMap::new();
+    for (k, v) in cmd.get_envs() {
+        if let Some(value) = v {
+            env.insert(k.to_string_lossy().to_string(), value.to_string_lossy().to_string());
+        }
     }
-    println!("Networking Mode: {}", emu_config.host.networking);
+    ShowDetail::Cmd {
+        program: Some(String::from(cmd.get_program().to_string_lossy())),
+        args: Some(cmd.get_args().into_iter().map(|a| String::from(a.to_string_lossy())).collect()),
+        env: Some(env),
+    }
+}
+pub(crate) fn net(emu_config: &EmulatorConfiguration) -> ShowDetail {
     match emu_config.host.networking {
-        NetworkingMode::Tap => {
-            println!("  MAC: {}", emu_config.runtime.mac_address);
-            println!("  Interface: {}", TAP_INTERFACE_NAME);
-            if emu_config.runtime.upscript.is_some() {
-                println!(
-                    "  Upscript: {}", 
-                    emu_config.runtime.upscript.as_ref().unwrap().display()
-                );
-            }
-        }
-        NetworkingMode::User => {
-            println!("  MAC: {}", emu_config.runtime.mac_address);
-            println!("  Ports:");
-            for name in emu_config.host.port_map.keys() {
-                let ports = emu_config.host.port_map.get(name).unwrap();
-                println!(
-                    "    {}:\n      guest: {}\n      host: {}", 
-                    name,
-                    ports.guest,
-                    // Every port in the map must be assigned before start-up.
-                    ports.host.unwrap(),
-                )
-            }
-        }
+        NetworkingMode::Tap =>
+            ShowDetail::Net {
+                mode: Some(emu_config.host.networking.clone()),
+                mac_address: Some(emu_config.runtime.mac_address.clone()),
+                upscript: emu_config.runtime.upscript.clone(),
+                ports: None
+            },
+        NetworkingMode::User =>
+            ShowDetail::Net {
+                mode: Some(emu_config.host.networking.clone()),
+                mac_address: Some(emu_config.runtime.mac_address.clone()),
+                upscript: None,
+                ports: Some(emu_config.host.port_map.clone())
+            },
         NetworkingMode::Auto |  /* Auto will already be resolved, so skip */
-        NetworkingMode::None => /* nothing to add, networking is disabled */ (),
+        NetworkingMode::None =>
+           ShowDetail::Net {
+            mode: Some(emu_config.host.networking.clone()),
+            mac_address: None,
+            upscript: None,
+            ports: None
+        }
     }
 }
 
-pub(crate) fn config(emu_config: &EmulatorConfiguration) {
-    match serde_json::to_string_pretty(&emu_config.flags) {
-        Ok(flags) => println!("{}", flags),
-        Err(e) => eprintln!("{:?}", e),
-    }
+pub(crate) fn config(emu_config: &EmulatorConfiguration) -> ShowDetail {
+    ShowDetail::Config { flags: Some(emu_config.flags.clone()) }
 }
 
-pub(crate) fn device(emu_config: &EmulatorConfiguration) {
+pub(crate) fn device(emu_config: &EmulatorConfiguration) -> ShowDetail {
     let mut device = VirtualDeviceV1 {
         name: format!("{}_device", emu_config.runtime.name),
         description: Some(format!(
@@ -91,8 +86,5 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) {
         device.ports = Some(ports.clone());
     }
 
-    match serde_json::to_string_pretty(&device) {
-        Ok(text) => println!("{}", text),
-        Err(e) => eprintln!("{:?}", e),
-    }
+    ShowDetail::Device { device: Some(device) }
 }

@@ -73,7 +73,7 @@ pub trait EmulatorEngine: Send + Sync {
     /// instantiated from a saved and serialized instance, so no additional initialization should be
     /// needed. This function will output text to the terminal describing the instance, its status,
     /// and its configuration. This is an engine-specific output with more detail than `ffx list`.
-    fn show(&self, _details: Vec<ShowDetail>) {
+    fn show(&self, _details: Vec<ShowDetail>) -> Vec<ShowDetail> {
         let bt = Backtrace::force_capture();
         unimplemented!(
             "These default trait implementations are to allow for easier testing and \

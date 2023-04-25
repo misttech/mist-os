@@ -552,30 +552,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         Ok(0)
     }
 
-    fn show(&self, details: Vec<ShowDetail>) {
-        if details.contains(&ShowDetail::Raw) {
-            if self.emu_config().runtime.config_override {
-                println!(
-                    "Configuration was provided manually to the start command using the --config\n\
-                    flag. Details are likely inconsistent between the EmulatorConfiguration and\n\
-                    the FlagData used to invoke the emulator.\n"
-                );
-            }
-            println!("{:#?}", self.emu_config());
-        } else {
-            for segment in details {
-                match segment {
-                    ShowDetail::Cmd => println!("Command line:  {:#?}", self.build_emulator_cmd()),
-                    ShowDetail::Config => show_output::config(self.emu_config()),
-                    ShowDetail::Device => show_output::device(self.emu_config()),
-                    ShowDetail::Net => show_output::net(self.emu_config()),
-                    ShowDetail::Raw | ShowDetail::All =>
-                        /* already handled, just needed for completeness */
-                        {}
+    fn show(&self, details: Vec<ShowDetail>) -> Vec<ShowDetail> {
+        let mut results: Vec<ShowDetail> = vec![];
+        for segment in details {
+            match segment {
+                ShowDetail::Raw { .. } => {
+                    results.push(ShowDetail::Raw { config: Some(self.emu_config().clone()) })
                 }
-                println!();
-            }
+                ShowDetail::Cmd { .. } => {
+                    results.push(show_output::command(&self.build_emulator_cmd()))
+                }
+                ShowDetail::Config { .. } => results.push(show_output::config(self.emu_config())),
+                ShowDetail::Device { .. } => results.push(show_output::device(self.emu_config())),
+                ShowDetail::Net { .. } => results.push(show_output::net(self.emu_config())),
+                _ => {}
+            };
         }
+        results
     }
 
     async fn stop_emulator(&mut self) -> Result<()> {

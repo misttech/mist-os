@@ -83,7 +83,7 @@ impl EmulatorEngine for QemuEngine {
         self.run(emulator_cmd, proxy).await
     }
 
-    fn show(&self, details: Vec<ShowDetail>) {
+    fn show(&self, details: Vec<ShowDetail>) -> Vec<ShowDetail> {
         <Self as QemuBasedEngine>::show(self, details)
     }
 

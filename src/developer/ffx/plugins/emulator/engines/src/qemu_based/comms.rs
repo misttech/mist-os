@@ -14,6 +14,8 @@
 //! exposed.
 
 use anyhow::{Context, Result};
+use fidl_fuchsia_developer_ffx::MAX_PATH;
+use nix::NixPath;
 use std::env;
 use std::ffi::OsStr;
 use std::io::{Read, Write};
@@ -70,30 +72,51 @@ impl QemuSocket {
 }
 
 impl CommsBackend<UnixStream> for QemuSocket {
-    fn connect(socket_path: &PathBuf) -> Result<UnixStream> {
+    fn connect(absolute_socket_path: &PathBuf) -> Result<UnixStream> {
         // On Linux, the path length to a socket file is severely limited. To work around this,
         // we temporarily change the working directory to the same location as the socket, then
         // access it with a relative "./socket" path instead of the absolute path stored in the
         // configuration.
-        let cwd = env::current_dir().context("Getting current working directory.")?;
 
-        // This ensures we are running in the right location relative to the socket file. If the
-        // socket_path has no parent, we stay in the current directory.
-        let path = socket_path.parent().unwrap_or(&cwd);
-        env::set_current_dir(path)
-            .context(format!("Changing to instance directory {}.", path.display()))?;
+        let stream_result = if absolute_socket_path.len() > MAX_PATH.try_into()? {
+            let cwd = env::current_dir().context("Getting current working directory.")?;
 
-        // Connect to the indicated socket. If the path has no filename component, the connect call
-        // will fail and the error will be returned to the caller along with the invalid path.
-        let console = socket_path.file_name().unwrap_or(OsStr::new(""));
-        let result = UnixStream::connect(console);
+            // This ensures we are running in the right location relative to the socket file. If the
+            // socket_path has no parent, we stay in the current directory.
+            //
+            // The downside is changing the current working directory for the process while creating the
+            // socket which potentially could confuse other parts of the code that are doing cwd()
+            // relative paths.
+            //
+            // Print a warning and log the fact that we did this risky thing.
+            let msg_start = "Warning: path to emulator socket is too long, temporaily changing the working directory.";
+            let msg_restored = "Current directory restored";
+            eprintln!("{msg_start}");
+            tracing::warn!("{msg_start}");
+            let path = absolute_socket_path.parent().unwrap_or(&cwd);
+            env::set_current_dir(path)
+                .context(format!("Changing to instance directory {}.", path.display()))?;
 
-        // Reset the working directory before dealing with the result of the connect() call. This
-        // way, even if we failed to connect to the socket, we revert the CWD every time.
-        env::set_current_dir(cwd).context("Returning to original working directory.")?;
+            // Connect to the indicated socket. If the path has no filename component, the connect call
+            // will fail and the error will be returned to the caller along with the invalid path.
+            let console = absolute_socket_path.file_name().unwrap_or(OsStr::new(""));
+            let result = UnixStream::connect(console);
 
-        let stream = result
-            .context(format!("Connecting to socket backend at {}.", socket_path.display()))?;
+            // Reset the working directory before dealing with the result of the connect() call. This
+            // way, even if we failed to connect to the socket, we revert the CWD every time.
+            env::set_current_dir(cwd).context("Returning to original working directory.")?;
+
+            eprintln!("{msg_restored}");
+            tracing::warn!("{msg_restored}");
+            result
+        } else {
+            UnixStream::connect(absolute_socket_path)
+        };
+
+        let stream = stream_result.context(format!(
+            "Connecting to socket backend at {}.",
+            absolute_socket_path.display()
+        ))?;
 
         Ok(stream)
     }
@@ -151,40 +174,33 @@ mod tests {
         // Set up a temporary directory.
         let temp = tempdir()?.path().to_path_buf();
         create_dir_all(&temp)?;
-        let thread_temp = temp.clone();
 
-        // The current working directory should never change from the caller's perspective.
-        let cwd = env::current_dir()?;
+        let socket_path = temp.join(TEST_CONSOLE);
+        assert!(socket_path.len() < MAX_PATH.try_into()?);
 
         // Set up a structure to hold the connection.
-        let mut socket = QemuSocket::new(&temp.join(TEST_CONSOLE));
+        let mut socket = QemuSocket::new(&socket_path);
 
         // Attempt to connect, when there's nothing to connect to, expect failure.
         assert!(socket.connect().is_err());
         assert!(socket.stream().is_none());
-        assert_eq!(env::current_dir()?, cwd);
 
-        env::set_current_dir(&thread_temp)?;
-        let listener = UnixListener::bind(TEST_CONSOLE)?;
-
+        let listener = UnixListener::bind(&socket_path)?;
         // Set up a side thread that will accept an incoming connection and then exit.
         std::thread::spawn(move || -> Result<()> {
             let _ = listener.accept()?;
             Ok(())
         });
-        env::set_current_dir(&cwd)?;
 
         // Use the main thread to connect to the socket, then assert we got it.
         let result = socket.connect();
         assert!(result.is_ok(), "{:?}", result.err());
         assert!(socket.stream().is_some());
-        assert_eq!(env::current_dir()?, cwd);
 
         // Connect again, knowing that the backing thread is not accepting, but there's already a
         // connection established, should still be Ok(());
         let result = socket.connect();
         assert!(result.is_ok(), "{:?}", result.err());
-        assert_eq!(env::current_dir()?, cwd);
 
         Ok(())
     }
