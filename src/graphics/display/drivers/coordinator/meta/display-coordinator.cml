@@ -9,13 +9,9 @@
     ],
     program: {
         runner: "driver",
-
-        // TODO(fxbug.com/122937): Rename to "display-coordinator.bindbc".
-        bind: "meta/bind/display.bindbc",
+        bind: "meta/bind/display-coordinator.bindbc",
         colocate: "true",
-
-        // TODO(fxbug.com/122937): Rename to "display-coordinator.so".
-        compat: "driver/display.so",
+        compat: "driver/display-coordinator.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

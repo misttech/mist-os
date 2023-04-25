@@ -8,15 +8,13 @@ import("//build/drivers.gni")
 driver_bind_rules("coordinator_bind") {
   rules = "coordinator.bind"
   header_output = "coordinator-bind.h"
-
-  # TODO(fxbug.com/122937): Rename to "display-coordinator.bindbc".
-  bind_output = "display.bindbc"
+  bind_output = "display-coordinator.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.display" ]
 }
 
 fuchsia_driver("coordinator-driver") {
-  output_name = "display"
+  output_name = "display-coordinator"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -29,8 +27,7 @@ fuchsia_driver("coordinator-driver") {
 }
 
 fuchsia_driver_component("coordinator") {
-  # TODO(fxbug.com/122937): Rename component to "display-coordinator".
-  component_name = "display"
+  component_name = "display-coordinator"
   deps = [ ":coordinator-driver" ]
   info = "coordinator-info.json"
   manifest = "meta/display-coordinator.cml"
