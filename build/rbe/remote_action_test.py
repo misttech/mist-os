@@ -384,7 +384,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         main_args, other = p.parse_known_args([f'--cfg={cfg}', '--', 'echo'])
         self.assertEqual(main_args.cfg, cfg)
         action = remote_action.remote_action_from_args(main_args)
-        self.assertEqual(action.local_command, ['echo'])
+        self.assertEqual(action.local_only_command, ['echo'])
         self.assertEqual(action.options, ['--cfg', str(cfg)])
 
     def test_bindir(self):
@@ -394,14 +394,17 @@ class RemoteActionMainParserTests(unittest.TestCase):
             ['--bindir', str(bindir), '--', 'echo'])
         self.assertEqual(main_args.bindir, bindir)
         action = remote_action.remote_action_from_args(main_args)
-        self.assertEqual(action.local_command, ['echo'])
+        self.assertEqual(action.local_only_command, ['echo'])
 
     def test_local_command_with_env(self):
         local_command = (['FOO=BAR', 'echo'])
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(['--'] + local_command)
         action = remote_action.remote_action_from_args(main_args)
-        self.assertEqual(action.local_command, [cl_utils._ENV] + local_command)
+        self.assertEqual(
+            action.local_only_command, [cl_utils._ENV] + local_command)
+        self.assertEqual(
+            action.remote_only_command, [cl_utils._ENV] + local_command)
 
     def test_verbose(self):
         p = self._make_main_parser()
@@ -425,7 +428,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         main_args, other = p.parse_known_args(['--auto-reproxy', '--', 'echo'])
         self.assertTrue(main_args.auto_reproxy)
         action = remote_action.remote_action_from_args(main_args)
-        self.assertEqual(action.local_command, ['echo'])
+        self.assertEqual(action.local_only_command, ['echo'])
         rewrapper_prefix, _, remote_command = cl_utils.partition_sequence(
             action.launch_command, '--')
         self.assertEqual(Path(rewrapper_prefix[0]).name, 'rewrapper')
@@ -436,7 +439,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         main_args, other = p.parse_known_args(['--save-temps', '--', 'echo'])
         self.assertTrue(main_args.save_temps)
         action = remote_action.remote_action_from_args(main_args)
-        self.assertEqual(action.local_command, ['echo'])
+        self.assertEqual(action.local_only_command, ['echo'])
         self.assertTrue(action.save_temps)
 
     def test_label(self):
@@ -1016,7 +1019,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             exec_root=exec_root,
             working_dir=working_dir,
         )
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertTrue(action.canonicalize_working_dir)
         self.assertIn(canonical_dir_option, action.options)
         with mock.patch.object(output_leak_scanner, 'preflight_checks',
@@ -1048,7 +1051,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             exec_root=exec_root,
             working_dir=working_dir,
         )
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertTrue(action.canonicalize_working_dir)
         self.assertIn(canonical_dir_option, action.options)
         with mock.patch.object(
@@ -1073,7 +1076,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             exec_root=exec_root,
             working_dir=working_dir,
         )
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertTrue(action.canonicalize_working_dir)
         self.assertIn(canonical_dir_option, action.options)
         with mock.patch.object(
@@ -1209,7 +1212,8 @@ class RemoteActionConstructionTests(unittest.TestCase):
     def test_minimal(self):
         command = ['cat', 'meow.txt']
         action = self._make_remote_action(command=command)
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.remote_only_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
         self.assertEqual(action.exec_root_rel, Path('..'))
         self.assertFalse(action.save_temps)
@@ -1345,7 +1349,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             command=command,
             save_temps=True,
         )
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
         self.assertTrue(action.save_temps)
         with mock.patch.object(
@@ -1365,13 +1369,13 @@ class RemoteActionConstructionTests(unittest.TestCase):
             'cat', '--remote-flag=--exec_strategy=racing', '../src/cow/moo.txt'
         ]
         action = self._make_remote_action(command=command)
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.options, [])
 
     def test_fail_no_retry(self):
         command = ['echo', 'hello']
         action = self._make_remote_action(command=command)
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
         for exit_code in (1, 2):
@@ -1389,7 +1393,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
     def test_file_not_found_no_retry(self):
         command = ['echo', 'hello']
         action = self._make_remote_action(command=command)
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
         with mock.patch.object(
@@ -1409,7 +1413,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
     def test_retry_once_successful(self):
         command = ['echo', 'hello']
         action = self._make_remote_action(command=command)
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
         for exit_code in remote_action._RETRIABLE_REWRAPPER_STATUSES:
@@ -1433,7 +1437,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
     def test_retry_once_fails_again(self):
         command = ['echo', 'hello']
         action = self._make_remote_action(command=command)
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
         for exit_code in remote_action._RETRIABLE_REWRAPPER_STATUSES:
@@ -1453,6 +1457,57 @@ class RemoteActionConstructionTests(unittest.TestCase):
             mock_cleanup.assert_called_once()
             # expect called twice, second time is the retry
             self.assertEqual(len(mock_call.call_args_list), 2)
+
+    def _test_local_execution_strategy(
+            self, exec_strategy: str, local_status: int):
+        remote_command = ['echo', 'hello']
+        local_command = ['repeat-after-me', 'hello']
+        action = self._make_remote_action(
+            command=remote_command,
+            local_only_command=local_command,
+            exec_strategy=exec_strategy,
+        )
+        self.assertEqual(action.local_only_command, local_command)
+        self.assertEqual(action.remote_only_command, remote_command)
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(2)) as mock_remote:
+            with mock.patch.object(remote_action.RemoteAction, '_run_locally',
+                                   return_value=local_status) as mock_local:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_cleanup') as mock_cleanup:
+                    self.assertEqual(
+                        action.run(), local_status)  # fallback success
+
+        mock_remote.assert_called_with()
+        mock_local.assert_called_with()
+        mock_cleanup.assert_called_with()
+
+    def test_strategy_local_fallback_different_command_succeeds(self):
+        self._test_local_execution_strategy(
+            exec_strategy="remote_local_fallback",
+            local_status=0,
+        )
+
+    def test_strategy_local_fallback_different_command_fails(self):
+        self._test_local_execution_strategy(
+            exec_strategy="remote_local_fallback",
+            local_status=1,
+        )
+
+    def test_strategy_local_only_different_command_succeeds(self):
+        self._test_local_execution_strategy(
+            exec_strategy="local",
+            local_status=0,
+        )
+
+    def test_strategy_local_only_different_command_fails(self):
+        self._test_local_execution_strategy(
+            exec_strategy="local",
+            local_status=3,
+        )
 
 
 class DownloadStubsTests(unittest.TestCase):
@@ -1497,7 +1552,7 @@ class DownloadStubsTests(unittest.TestCase):
             working_dir=working_dir,
             output_files=[Path(output)],
         )
-        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.local_only_command, command)
         self.assertFalse(action.download_outputs)
         options = action.options
         self.assertIn(download_option, options)

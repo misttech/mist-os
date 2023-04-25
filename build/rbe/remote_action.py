@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import dataclasses
+import difflib
 import filecmp
 import glob
 import os
@@ -506,6 +507,7 @@ class RemoteAction(object):
         self,
         rewrapper: Path,
         command: Sequence[str],
+        local_only_command: Sequence[str] = None,
         options: Sequence[str] = None,
         exec_root: Optional[Path] = None,
         working_dir: Optional[Path] = None,
@@ -530,6 +532,8 @@ class RemoteAction(object):
           rewrapper: path to rewrapper binary
           options: rewrapper options (not already covered by other parameters)
           command: the command to execute remotely
+          local_only_command: local command equivalent to the remote command.
+            Only pass this if the local and remote commands differ.
           cfg: rewrapper config file (optional)
           exec_strategy: rewrapper --exec_strategy (optional)
           exec_root: an absolute path location that is parent to all of this
@@ -575,13 +579,19 @@ class RemoteAction(object):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or PROJECT_ROOT).absolute()
         # Parse and strip out --remote-* flags from command.
-        self._remote_command = command
+        self._remote_only_command = command
         self._remote_disable = disable
         self._compare_with_local = compare_with_local
         self._check_determinism = check_determinism
         self._options = (options or [])
         self._post_remote_run_success_action = post_remote_run_success_action
         self._remote_debug_command = remote_debug_command or []
+
+        # By default, the local and remote commands match, but there are
+        # circumstances that require them to be different.  It is the caller's
+        # responsibility to ensure that they produce consistent results
+        # (which can be verified with --compare [compare_with_local]).
+        self._local_only_command = local_only_command or self._remote_only_command
 
         # Detect some known rewrapper options
         self._rewrapper_known_options, _ = _REWRAPPER_ARG_PARSER.parse_known_args(
@@ -672,11 +682,28 @@ class RemoteAction(object):
         return self._compare_with_local
 
     @property
-    def local_command(self) -> Sequence[str]:
+    def local_only_command(self) -> Sequence[str]:
         """This is the original command that would have been run locally.
         All of the --remote-* flags have been removed at this point.
         """
-        return cl_utils.auto_env_prefix_command(self._remote_command)
+        return cl_utils.auto_env_prefix_command(self._local_only_command)
+
+    @property
+    def remote_only_command(self) -> Sequence[str]:
+        return cl_utils.auto_env_prefix_command(self._remote_only_command)
+
+    def show_local_remote_command_differences(self):
+        if self._local_only_command != self._remote_only_command:
+            return  # no differences to show
+
+        print('local vs. remote command differences:')
+        diffs = difflib.unified_diff(
+            [tok + '\n' for tok in self.local_only_command],
+            [tok + '\n' for tok in self.remote_only_command],
+            fromfile='local.command',
+            tofile='remote.command',
+        )
+        sys.stdout.writelines(diffs)
 
     @property
     def remote_debug_command(self) -> Sequence[str]:
@@ -869,7 +896,7 @@ class RemoteAction(object):
             yield from self._fsatrace_command_prefix(
                 self._fsatrace_remote_trace)
 
-        yield from self.local_command
+        yield from self.remote_only_command
 
     def _generate_check_determinism_prefix(self) -> Iterable[str]:
         yield from [
@@ -892,6 +919,7 @@ class RemoteAction(object):
         yield '--'
 
     def _generate_local_launch_command(self) -> Iterable[str]:
+        """The local launch command may include some prefix wrappers."""
         # When requesting fsatrace, log to a different file than the
         # remote log, so they can be compared.
         if self.check_determinism:
@@ -900,7 +928,7 @@ class RemoteAction(object):
         if self._fsatrace_path:
             yield from self._fsatrace_command_prefix(self._fsatrace_local_trace)
 
-        yield from self.local_command
+        yield from self.local_only_command
 
     @property
     def local_launch_command(self) -> Sequence[str]:
@@ -963,7 +991,7 @@ class RemoteAction(object):
         if self.canonicalize_working_dir:
             leak_status = output_leak_scanner.preflight_checks(
                 paths=self.output_files_relative_to_working_dir,
-                command=self.local_command,
+                command=self.local_only_command,
                 pattern=output_leak_scanner.PathPattern(self.build_subdir),
             )
             if leak_status != 0:
@@ -1009,15 +1037,32 @@ class RemoteAction(object):
 
                 return result.returncode
 
+            # From here onward, remote return code was != 0
+
+            exec_strategy = self.exec_strategy or "remote"  # rewrapper default
+            # rewrapper assumes that the command it was given is suitable for
+            # both local and remote execution, but this isn't always the case,
+            # e.g. remote cross-compiling may require invoking different
+            # binaries.  We know however, whether the local/remote commands
+            # match and can take the appropriate local fallback action,
+            # like running a different command than the remote one.
+            if exec_strategy in {"local", "remote_local_fallback"}:
+                if self._local_only_command != self._remote_only_command:
+                    local_exit_code = self._run_locally()
+                    if local_exit_code == 0:
+                        # local succeeded where remote failed
+                        self.show_local_remote_command_differences()
+
+                    return local_exit_code
+
+                # Not an RBE issue if local execution failed.
+                return result.returncode
+
             if not self.diagnose_nonzero:
                 return result.returncode
 
-            # Not an RBE issue if local execution failed.
-            exec_strategy = self.exec_strategy or "remote"  # rewrapper default
-            if exec_strategy in {"local", "remote_local_fallback"}:
-                return result.returncode
-
-            # Otherwise, continue to analyze log files
+            # Otherwise, there was some remote execution failure.
+            # Continue to analyze log files.
             analyze_rbe_logs(
                 rewrapper_pid=result.pid,
                 action_log=self._action_log,
@@ -1115,11 +1160,11 @@ class RemoteAction(object):
     def _run_locally(self) -> int:
         # Run the job locally.
         # Local command may include an fsatrace prefix.
-        local_command = list(self._generate_local_launch_command())
-        local_command_str = cl_utils.command_quoted_str(local_command)
+        local_command = self.local_launch_command
         exit_code = subprocess.call(local_command)
         if exit_code != 0:
             # Presumably, we want to only compare against local successes.
+            local_command_str = cl_utils.command_quoted_str(local_command)
             msg(
                 f"Local command failed for comparison (exit={exit_code}): {local_command_str}"
             )
@@ -1193,6 +1238,8 @@ class RemoteAction(object):
             # Also compare file access traces, if available.
             if self._fsatrace_path:
                 self._compare_fsatraces()
+
+            self.show_local_remote_command_differences()
 
             return 1
 
