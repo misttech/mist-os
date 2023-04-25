@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/repo"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -45,6 +45,7 @@ type Repository struct {
 	Dir string
 	// BlobsDir should be a directory called `blobs` where all the blobs are.
 	BlobStore BlobStore
+	ffx       *ffx.FFXTool
 }
 
 type signed struct {
@@ -65,41 +66,31 @@ type custom struct {
 
 // NewRepository parses the repository from the specified directory. It returns
 // an error if the repository does not exist, or it contains malformed metadata.
-func NewRepository(ctx context.Context, dir string, blobStore BlobStore) (*Repository, error) {
+func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ffx.FFXTool) (*Repository, error) {
 	logger.Infof(ctx, "creating a repository for %q and %q", dir, blobStore.Dir())
 
 	// The repository may have out of date metadata. This updates the repository to
 	// the latest version so TUF won't complain about the data being old.
-	repo, err := repo.New(dir, blobStore.Dir())
-	if err != nil {
-		return nil, err
-	}
-	// Add an empty list of packages, which should update the targets
-	// expiration date.
-	if err := repo.AddTargets([]string{}, nil); err != nil {
-		return nil, err
-	}
-	// Commit the update, which should update the snapshot and timestamp
-	// expiration date.
-	if err := repo.CommitUpdates(true); err != nil {
+	if err := ffx.RepositoryPublish(ctx, dir, []string{}, "--refresh-root"); err != nil {
 		return nil, err
 	}
 
 	return &Repository{
 		Dir:       filepath.Join(dir, "repository"),
 		BlobStore: blobStore,
+		ffx:       ffx,
 	}, nil
 }
 
 // NewRepositoryFromTar extracts a repository from a tar.gz, and returns a
 // Repository parsed from it. It returns an error if the repository does not
 // exist, or contains malformed metadata.
-func NewRepositoryFromTar(ctx context.Context, dst string, src string) (*Repository, error) {
+func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.FFXTool) (*Repository, error) {
 	if err := util.Untar(ctx, dst, src); err != nil {
 		return nil, fmt.Errorf("failed to extract packages: %w", err)
 	}
 
-	return NewRepository(ctx, filepath.Join(dst, "amber-files"), NewDirBlobStore(filepath.Join(dst, "amber-files", "repository", "blobs")))
+	return NewRepository(ctx, filepath.Join(dst, "amber-files"), NewDirBlobStore(filepath.Join(dst, "amber-files", "repository", "blobs")), ffx)
 }
 
 // OpenPackage opens a package from the repository.
@@ -363,4 +354,10 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 			}
 			return editFunc(tempDir)
 		})
+}
+
+func (r *Repository) Publish(ctx context.Context, packageManifestPath string) error {
+	repoDir := filepath.Dir(r.Dir)
+
+	return r.ffx.RepositoryPublish(ctx, repoDir, []string{packageManifestPath}, "--blob-repo-dir", r.BlobStore.Dir())
 }

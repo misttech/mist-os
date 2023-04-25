@@ -17,7 +17,6 @@ import (
 	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pkg"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/repo"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -146,13 +145,6 @@ func latestABIRevision() uint64 {
 // Publish the package to the repository. Returns the TUF package path and
 // merkle on success, or a error on failure.
 func (p *PackageBuilder) Publish(ctx context.Context, pkgRepo *Repository) (string, string, error) {
-	// Open repository
-	// Repository.Dir contains a trailing `repository` in the path that we don't want.
-	repoDir := path.Dir(pkgRepo.Dir)
-	pmRepo, err := repo.New(repoDir, pkgRepo.BlobStore.Dir())
-	if err != nil {
-		return "", "", fmt.Errorf("failed to open repository at %q. %w", pkgRepo.Dir, err)
-	}
 	// Create Config.
 	dir, err := os.MkdirTemp("", "pm-temp-config")
 	if err != nil {
@@ -243,15 +235,10 @@ func (p *PackageBuilder) Publish(ctx context.Context, pkgRepo *Repository) (stri
 	}
 
 	// Publish new config to repo.
-	_, err = pmRepo.PublishManifest(outputManifestPath)
+	err = pkgRepo.Publish(ctx, outputManifestPath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to publish manifest: %w", err)
 	}
-
-	if err = pmRepo.CommitUpdates(true); err != nil {
-		return "", "", fmt.Errorf("failed to commit updates to repo: %w", err)
-	}
-
 	logger.Infof(ctx, "package %q as %q published and committed", pkgPath, pkgMerkle)
 
 	return pkgPath, pkgMerkle, nil

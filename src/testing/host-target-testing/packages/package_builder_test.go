@@ -9,12 +9,13 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"testing"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/repo"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 )
 
 // createTestPackage fills the given directory with a new repository.
@@ -24,13 +25,6 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	// Initialize a repo.
 	t.Logf("Creating repo at %s", dir)
 	blobsDir := filepath.Join(dir, "blobs")
-	pmRepo, err := repo.New(dir, blobsDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = pmRepo.Init(); err != nil {
-		t.Fatal(err)
-	}
 
 	// Create a config.
 	config := build.TestConfig()
@@ -42,8 +36,8 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	defer os.RemoveAll(filepath.Dir(config.OutputDir))
 
 	// Grab the merkle of the config's package manifest.
-	manifestDir := filepath.Join(config.OutputDir, "package_manifest.json")
-	manifest, err := os.ReadFile(manifestDir)
+	manifestPath := filepath.Join(config.OutputDir, "package_manifest.json")
+	manifest, err := os.ReadFile(manifestPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,15 +56,26 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	}
 
 	// Publish the config to the repo.
-	if _, err = pmRepo.PublishManifest(manifestDir); err != nil {
-		t.Fatalf("failed to publish manifest: %s", err)
+	ffx, err := ffx.NewFFXTool("host-tools/ffx")
+	if err != nil {
+		t.Fatalf("failed to create FFXTool: %s", err)
 	}
-	if err = pmRepo.CommitUpdates(true); err != nil {
-		t.Fatalf("failed to commit updates to repo: %s", err)
+	keysDir := "host_x64/test_data/ffx_lib_pkg/empty-repo/keys"
+	err = ffx.RepositoryCreate(ctx, dir, keysDir)
+	if err != nil {
+		t.Fatalf("failed to create repository: %s", err)
 	}
-	pkgRepo, err := NewRepository(ctx, dir, NewDirBlobStore(blobsDir))
+	err = exec.Command("cp", "-r", keysDir, dir).Run()
+	if err != nil {
+		t.Fatalf("failed to copy keys: %s", err)
+	}
+	pkgRepo, err := NewRepository(ctx, dir, NewDirBlobStore(blobsDir), ffx)
 	if err != nil {
 		t.Fatalf("failed to read repo: %s", err)
+	}
+	err = pkgRepo.Publish(ctx, manifestPath)
+	if err != nil {
+		t.Fatalf("failed to publish package: %s", err)
 	}
 	return pkgRepo, metaMerkle
 }
@@ -199,7 +204,11 @@ func TestPublish(t *testing.T) {
 		t.Fatalf("package path should be %q, not %q", fullPkgName, actualPkgName)
 	}
 
-	pkgRepo, err = NewRepository(ctx, path.Dir(pkgRepo.Dir), pkgRepo.BlobStore)
+	ffx, err := ffx.NewFFXTool("host-tools/ffx")
+	if err != nil {
+		t.Fatalf("failed to create FFXTool: %s", err)
+	}
+	pkgRepo, err = NewRepository(ctx, path.Dir(pkgRepo.Dir), pkgRepo.BlobStore, ffx)
 
 	// Confirm that the package is published and updated.
 	pkg, err = pkgRepo.OpenPackage(ctx, fullPkgName)

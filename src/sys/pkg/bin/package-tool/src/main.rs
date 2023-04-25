@@ -69,6 +69,7 @@ struct RepoCommand {
     subcommands: RepoSubCommands,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(FromArgs)]
 #[argh(subcommand)]
 enum RepoSubCommands {

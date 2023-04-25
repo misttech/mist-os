@@ -114,6 +114,12 @@ impl FileSystemRepositoryBuilder {
         self
     }
 
+    /// Set the path to the blob repo.
+    pub fn blob_repo_path(mut self, blob_repo_path: Utf8PathBuf) -> Self {
+        self.blob_repo_path = blob_repo_path;
+        self
+    }
+
     /// Build a [FileSystemRepository].
     pub fn build(self) -> FileSystemRepository {
         FileSystemRepository {

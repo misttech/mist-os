@@ -212,6 +212,10 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
         repo_builder = repo_builder.blobfs_compression_path(path.clone());
     }
 
+    if let Some(path) = &cmd.blob_repo_dir {
+        repo_builder = repo_builder.blob_repo_path(path.clone());
+    }
+
     let repo = repo_builder.build();
 
     let mut deps = BTreeSet::new();
@@ -519,6 +523,7 @@ mod tests {
             blobfs_compression_path: None,
             ignore_missing_packages: false,
             blob_manifest: None,
+            blob_repo_dir: None,
             repo_path: "".into(),
         }
     }

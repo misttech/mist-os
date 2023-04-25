@@ -43,14 +43,14 @@ type Build interface {
 	// GetBootserver returns the path to the bootserver used for paving.
 	GetBootserver(ctx context.Context) (string, error)
 
-	// GetFfx returns the FFXTool used for flashing.
+	// GetFfx returns the FFXTool from this build.
 	GetFfx(ctx context.Context) (*ffx.FFXTool, error)
 
 	// GetFlashManifest returns the path to the flash manifest used for flashing.
 	GetFlashManifest(ctx context.Context) (string, error)
 
 	// GetPackageRepository returns a Repository for this build.
-	GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode) (*packages.Repository, error)
+	GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error)
 
 	// GetPaverDir downloads and returns the directory containing the images
 	// and image manifest.
@@ -107,7 +107,7 @@ func (b *ArtifactsBuild) GetFlashManifest(ctx context.Context) (string, error) {
 // GetPackageRepository returns a Repository for this build. It tries to
 // download a package when all the artifacts are stored in individual files,
 // which is how modern builds publish their build artifacts.
-func (b *ArtifactsBuild) GetPackageRepository(ctx context.Context, fetchMode BlobFetchMode) (*packages.Repository, error) {
+func (b *ArtifactsBuild) GetPackageRepository(ctx context.Context, fetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error) {
 	if b.packages != nil {
 		return b.packages, nil
 	}
@@ -166,7 +166,15 @@ func (b *ArtifactsBuild) GetPackageRepository(ctx context.Context, fetchMode Blo
 		}
 	}
 
-	p, err := packages.NewRepository(ctx, packagesDir, &proxyBlobStore{b, blobsDir})
+	if ffx == nil {
+		build_ffx, err := b.GetFfx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ffx: %w", err)
+		}
+		ffx = build_ffx
+	}
+
+	p, err := packages.NewRepository(ctx, packagesDir, &proxyBlobStore{b, blobsDir}, ffx)
 	if err != nil {
 		return nil, err
 	}
@@ -395,9 +403,16 @@ func (b *FuchsiaDirBuild) GetFlashManifest(ctx context.Context) (string, error) 
 	return filepath.Join(b.dir, "flash.json"), nil
 }
 
-func (b *FuchsiaDirBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode) (*packages.Repository, error) {
+func (b *FuchsiaDirBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error) {
 	blobFS := packages.NewDirBlobStore(filepath.Join(b.dir, "amber-files", "repository", "blobs"))
-	return packages.NewRepository(ctx, filepath.Join(b.dir, "amber-files"), blobFS)
+	if ffx == nil {
+		build_ffx, err := b.GetFfx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ffx: %w", err)
+		}
+		ffx = build_ffx
+	}
+	return packages.NewRepository(ctx, filepath.Join(b.dir, "amber-files"), blobFS, ffx)
 }
 
 func (b *FuchsiaDirBuild) GetPaverDir(ctx context.Context) (string, error) {
@@ -478,7 +493,7 @@ func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, e
 	return b.dir, nil
 }
 
-func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode) (*packages.Repository, error) {
+func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error) {
 	// TODO (fxb/114760) Change to use ffx tool to start package server
 	pbJSON := filepath.Join(b.dir, ProductBundleManifest)
 	f, err := os.Open(pbJSON)
@@ -496,7 +511,14 @@ func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFe
 	}
 
 	blobFS := packages.NewDirBlobStore(filepath.Join(b.dir, productBundle.Repositories[0].BlobsPath))
-	return packages.NewRepository(ctx, b.dir, blobFS)
+	if ffx == nil {
+		build_ffx, err := b.GetFfx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ffx: %w", err)
+		}
+		ffx = build_ffx
+	}
+	return packages.NewRepository(ctx, b.dir, blobFS, ffx)
 }
 
 func (b *ProductBundleDirBuild) GetPaverDir(ctx context.Context) (string, error) {
@@ -586,8 +608,8 @@ func (b *OmahaBuild) GetFlashManifest(ctx context.Context) (string, error) {
 }
 
 // GetPackageRepository returns a Repository for this build.
-func (b *OmahaBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode) (*packages.Repository, error) {
-	return b.build.GetPackageRepository(ctx, blobFetchMode)
+func (b *OmahaBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error) {
+	return b.build.GetPackageRepository(ctx, blobFetchMode, ffx)
 }
 
 func (b *OmahaBuild) GetPaverDir(ctx context.Context) (string, error) {

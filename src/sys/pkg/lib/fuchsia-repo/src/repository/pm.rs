@@ -72,6 +72,12 @@ impl PmRepositoryBuilder {
         self
     }
 
+    /// Set the path to the blob repo.
+    pub fn blob_repo_path(mut self, blob_repo_path: Utf8PathBuf) -> Self {
+        self.builder = self.builder.blob_repo_path(blob_repo_path);
+        self
+    }
+
     pub fn build(self) -> PmRepository {
         PmRepository { pm_repo_path: self.pm_repo_path, repo: self.builder.build() }
     }

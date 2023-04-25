@@ -195,6 +195,10 @@ pub struct RepoPublishCommand {
     #[argh(option)]
     pub blob_manifest: Option<Utf8PathBuf>,
 
+    /// path to the blobs directory (default '$repo_path/repository/blobs')
+    #[argh(option)]
+    pub blob_repo_dir: Option<Utf8PathBuf>,
+
     /// path to the repository directory
     #[argh(positional)]
     pub repo_path: Utf8PathBuf,

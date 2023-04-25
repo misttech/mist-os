@@ -10,12 +10,12 @@ if (is_host) {
     testonly = true
     deps = [
       "../avb",
+      "../ffx",
       "../util",
       "../zbi",
       "//src/lib/versioning/version-history/go:version-history",
       "//src/sys/pkg/bin/pm/build",
       "//src/sys/pkg/bin/pm/pkg",
-      "//src/sys/pkg/bin/pm/repo",
       "//src/sys/pkg/lib/far/go:far",
       "//src/sys/pkg/lib/repo",
       "//third_party/golibs:github.com/theupdateframework/go-tuf",
@@ -34,5 +34,9 @@ if (is_host) {
 
   go_test("host-target-testing-packages-test") {
     library = ":packages"
+    data_deps = [
+      "//src/developer/ffx:test_data",
+      "//src/developer/ffx/lib/pkg:empty-repo-keys",
+    ]
   }
 }

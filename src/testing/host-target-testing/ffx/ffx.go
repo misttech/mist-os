@@ -167,3 +167,31 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 	logger.Infof(ctx, "finished running %s %q: %q", path, args, cmdRet)
 	return cmdRet
 }
+
+func (f *FFXTool) RepositoryCreate(ctx context.Context, repoDir, keysDir string) error {
+	args := []string{
+		"--config", "ffx_repository=true",
+		"repository",
+		"create",
+		"--keys", keysDir,
+		repoDir,
+	}
+
+	return f.runFFXCmd(ctx, args...)
+}
+
+func (f *FFXTool) RepositoryPublish(ctx context.Context, repoDir string, packageManifests []string, additionalArgs ...string) error {
+	args := []string{
+		"repository",
+		"publish",
+	}
+
+	for _, manifest := range packageManifests {
+		args = append(args, "--package", manifest)
+	}
+
+	args = append(args, additionalArgs...)
+	args = append(args, repoDir)
+
+	return f.runFFXCmd(ctx, args...)
+}
