@@ -40,10 +40,10 @@ __asan_weak_ref("memset")
 #define SHADOW_CALL_STACK_DWARF_REGNO 18
 #define SHADOW_CALL_STACK_INIT "str %[ra], [x18], #8\n"
 #elif defined(__riscv)
-#define SHADOW_CALL_STACK_DWARF_REGNO 18
+#define SHADOW_CALL_STACK_DWARF_REGNO 3
 #define SHADOW_CALL_STACK_INIT \
-  "add s2, s2, 8\n"            \
-  "sd %[ra], -8(s2)\n"
+  "add gp, gp, 8\n"            \
+  "sd %[ra], -8(gp)\n"
 #endif
 
 // This gets called via inline assembly below, after switching onto
@@ -82,8 +82,8 @@ static void start_main(const struct start_params* p) {
   uint32_t envc = p->procargs->environ_num;
   uint32_t namec = p->procargs->names_num;
 
-  // Now that it is safe to call safe-stack enabled functions, go ahead and install the UTC
-  // reference clock, if one was provided to us.
+  // Now that it is safe to call safe-stack enabled functions, go ahead and
+  // install the UTC reference clock, if one was provided to us.
   if (p->utc_reference != ZX_HANDLE_INVALID) {
     zx_handle_t old_clock = ZX_HANDLE_INVALID;
 
@@ -196,14 +196,14 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t 
   struct start_params p = {.main = main, .utc_reference = ZX_HANDLE_INVALID};
   zx_status_t status = processargs_message_size(bootstrap, &p.nbytes, &p.nhandles);
 
-  // TODO(44088): Right now, we _always_ expect to receive at least some handles
-  // and some bytes in the initial startup message.  Make sure that we have both
-  // so that we do not accidentally end up declaring a 0-length VLA on the stack
-  // (which is UDB in C11).  See the bug referenced in the TODO, however.  We do
-  // not currently formally state that this is a requirement for starting a
-  // process, nor do we declare a maximum number of handles which can be sent
-  // during startup.  Restructuring and formalizing the process-args startup
-  // protocol could help with this situation.
+  // TODO(44088): Right now, we _always_ expect to receive at least some
+  // handles and some bytes in the initial startup message.  Make sure that we
+  // have both so that we do not accidentally end up declaring a 0-length VLA
+  // on the stack (which is UDB in C11).  See the bug referenced in the TODO,
+  // however.  We do not currently formally state that this is a requirement
+  // for starting a process, nor do we declare a maximum number of handles
+  // which can be sent during startup.  Restructuring and formalizing the
+  // process-args startup protocol could help with this situation.
   if ((status == ZX_OK) && p.nbytes && p.nhandles) {
     PROCESSARGS_BUFFER(buffer, p.nbytes);
     zx_handle_t handles[p.nhandles];
@@ -375,9 +375,9 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t 
         // to the bottom of the FP, PC pair.
         "add fp, sp, 16\n"
 
-        // Save the caller's s2 in another call-saved register.
-        "mv s3, s2\n"
-        ".cfi_register s2, s3\n"
+        // Save the caller's gp in another call-saved register.
+        "mv s2, gp\n"
+        ".cfi_register gp, s2\n"
 
         // Switch to the new shadow call stack.  Then push our own return
         // address on the shadow call stack so it appears in a backtrace just
@@ -385,11 +385,11 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t 
         // call stack protocol.  Before that, push a zero return address as an
         // end marker similar to how CFI unwinding marks the base frame by
         // having its return address column compute zero.
-        "add s2, %[shadow_call_stack], 16\n"
-        "sd zero, -16(s2)\n"
-        "sd %[return_address], -8(s2)\n"
+        "add gp, %[shadow_call_stack], 16\n"
+        "sd zero, -16(gp)\n"
+        "sd %[return_address], -8(gp)\n"
 
-        // Neither sp, fp, nor s2 might be used as an input operand, but a0
+        // Neither sp, fp, nor gp might be used as an input operand, but a0
         // might be.  So clobber a0 last.  We don't need to declare it to the
         // compiler as a clobber since we'll never come back and it's fine if
         // it's used as an input operand.
@@ -404,7 +404,7 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t 
           [frame_address] "r"(__builtin_frame_address(0)),
           "m"(p),  // Tell the compiler p's fields are all still alive.
           [arg] "r"(&p)
-        : "s1", "s3");
+        : "s1", "s2");
 #else
 #error what architecture?
 #endif

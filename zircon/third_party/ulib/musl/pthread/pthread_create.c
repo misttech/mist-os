@@ -28,11 +28,11 @@ LIBC_NO_SAFESTACK NO_ASAN static pthread_t prestart(void* arg, void* caller) {
   // return address column compute zero.
   __asm__ volatile("stp xzr, %0, [x18], #16" : : "r"(caller));
 #elif defined(__riscv)
-  __asm__ volatile("ld s2, %0" : : "m"(self->shadow_call_stack.iov_base));
+  __asm__ volatile("ld gp, %0" : : "m"(self->shadow_call_stack.iov_base));
   __asm__ volatile(
-      "add s2, s2, 16\n"
-      "sd zero, -16(s2)\n"
-      "sd %0, -8(s2)\n"
+      "add gp, gp, 16\n"
+      "sd zero, -16(gp)\n"
+      "sd %0, -8(gp)\n"
       :
       : "r"(caller));
 #endif
