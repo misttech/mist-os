@@ -57,6 +57,7 @@ template("verify_images_manifest") {
     _bazel_assembled_system_name =
         get_label_info(invoker.bazel_assembled_system_target, "name")
     _bazel_assembled_system_file = "${_bazel_assembled_system_out_dir}/${_bazel_assembled_system_name}/images.json"
+    _bazel_assembled_system_path_mapping = "${_bazel_assembled_system_out_dir}/${_bazel_assembled_system_name}.path_mapping"
 
     _gn_assembled_system_out_dir =
         get_label_info(invoker.gn_assembled_system_target, "target_out_dir")
@@ -69,6 +70,7 @@ template("verify_images_manifest") {
     inputs = [
       _gn_assembled_system_file,
       _bazel_assembled_system_file,
+      _bazel_assembled_system_path_mapping,
     ]
 
     # The images configs after cleanup by the script for diffing.
@@ -89,13 +91,11 @@ template("verify_images_manifest") {
     script = "//build/bazel/assembly/assembly_outputs/verify_images_manifest.py"
     args = [
       "--images_manifest_gn",
-      rebase_path(inputs[0], root_build_dir),
-      "--root_dir_gn",
-      ".",
+      rebase_path(_gn_assembled_system_file, root_build_dir),
       "--images_manifest_bzl",
-      rebase_path(inputs[1], root_build_dir),
-      "--root_dir_bzl",
-      bazel_main_top_dir_rebased + "/workspace",
+      rebase_path(_bazel_assembled_system_file, root_build_dir),
+      "--path-mapping",
+      rebase_path(_bazel_assembled_system_path_mapping, root_build_dir),
       "--depfile",
       rebase_path(depfile, root_build_dir),
       "--output1",

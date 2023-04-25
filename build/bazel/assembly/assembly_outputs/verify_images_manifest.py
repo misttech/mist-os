@@ -43,54 +43,17 @@ def package_key(package):
     return package["name"]
 
 
-# TODO(fxbug.dev/124200): Remove this method once images.json references
-# are valid.
-def rebase_bazel_path(path, root_dir, gn_root_dir):
-    """
-    Rebase a bazel path to the path of the file
-    """
-
-    # Replace Bazel AIB references with GN AIB references
-    # The exact path to the Bazel buildroot can vary based on settings,
-    # so the number of ../ in the prefix is not known.
-    # Match an arbitrary traversal up and remove it
-    aib_prefixes = [
-        r"^\.\./assembly_input_bundles/platform_(eng|user|userdebug)/",
-        r"^(\.\.\/)+build/bazel/assembly/assembly_input_bundles/platform_(eng|user|userdebug)/"
-    ]
-
-    relative_path = os.path.relpath(gn_root_dir, root_dir)
-    for prefix in aib_prefixes:
-        if re.match(prefix, path):
-            # Get path from Bazel gendir
-            rebased = os.path.join(
-                relative_path, "obj/bundles/assembly", re.sub(prefix, "", path))
-            return rebased
-
-    legacy_outputs_prefix_regex = r"^(\.\.\/)+external/legacy_ninja_build_outputs/"
-    if re.match(legacy_outputs_prefix_regex, path):
-        # Strip prefix
-        path_from_gn_buildroot = re.sub(
-            legacy_outputs_prefix_regex, "", path, 1)
-        path_from_gn_buildroot = re.sub(
-            "fuchsia.bazel_legacy_aib", "legacy", path_from_gn_buildroot)
-        # Transform relative to Bazel gendir
-        rebased = os.path.join(relative_path, path_from_gn_buildroot)
-        return rebased
-
-    return path
+def strip_manifest_path(package):
+    package["manifest"] = ""
+    return package
 
 
 def normalize(
-        config, root_dir, gn_root_dir, exclude_packages, exclude_images,
-        extra_files_read):
+        config, root_dir, exclude_packages, exclude_images, extra_files_read):
     """
     Clean up the input for diffing.
     """
     for image in config:
-        # Rebase references to AIBs from the Bazel execroot to the GN-built
-        # bundles, since the bundles are not copied out
-        image["path"] = rebase_bazel_path(image["path"], root_dir, gn_root_dir)
         if not image["path"]:
             raise ValueError(
                 "Paths should not be missing from images.json entries",
@@ -108,29 +71,19 @@ def normalize(
         image["path"] = os.path.basename(image["path"])
 
         if image.get("name") == "blob":
-            # Sort the blobs in-place for when we print the file for debugging
-            image["contents"]["packages"]["base"].sort(key=package_key)
-            image["contents"]["packages"]["cache"].sort(key=package_key)
+            pkgs = image["contents"]["packages"]
+            for pkg_set in ('base', 'cache'):
+                # Sort the blobs in-place for when we print the file for
+                # debugging.
+                pkgs[pkg_set].sort(key=package_key)
 
-            filtered_base_packages = []
-            for package in image["contents"]["packages"]["base"]:
-                if package["name"] in exclude_packages:
-                    continue
-
-                # We can ignore the manifest for now and just make sure the blobs are the same
-                package["manifest"] = ""
-                filtered_base_packages.append(package)
-            image["contents"]["packages"]["base"] = filtered_base_packages
-
-            filtered_cache_packages = []
-            for package in image["contents"]["packages"]["cache"]:
-                if package["name"] in exclude_packages:
-                    continue
-
-                # We can ignore the manifest for now and just make sure the blobs are the same
-                package["manifest"] = ""
-                filtered_cache_packages.append(package)
-            image["contents"]["packages"]["cache"] = filtered_cache_packages
+                pkgs[pkg_set] = [
+                    # We can ignore the manifest for now and just make sure the
+                    # blobs are the same.
+                    strip_manifest_path(pkg)
+                    for pkg in pkgs[pkg_set]
+                    if pkg["name"] not in exclude_packages
+                ]
 
     config.sort(key=image_key)
 
@@ -211,17 +164,9 @@ def main():
     parser.add_argument(
         "--images_manifest_gn", type=argparse.FileType("r"), required=True)
     parser.add_argument(
-        "--root_dir_gn",
-        help="Directory where paths in --images_manifest_gn are relative to",
-        required=True,
-    )
-    parser.add_argument(
         "--images_manifest_bzl", type=argparse.FileType("r"), required=True)
     parser.add_argument(
-        "--root_dir_bzl",
-        help="Directory where paths in --images_manifest_bzl are relative to",
-        required=True,
-    )
+        "--path-mapping", type=argparse.FileType("r"), required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
     parser.add_argument("--output1", type=argparse.FileType("w"), required=True)
     parser.add_argument("--output2", type=argparse.FileType("w"), required=True)
@@ -242,13 +187,20 @@ def main():
     if args.exclude_images:
         exclude_images = args.exclude_images
 
-    normalize(
-        images_manifest_gn, os.path.dirname(args.images_manifest_gn.name),
-        args.root_dir_gn, exclude_packages, exclude_images, extra_files_read)
+    bazel_images_manifest_dir = ""
+    for line in args.path_mapping:
+        gn_path, bazel_path = line.split(":")
+        if gn_path.endswith('_create_system'):
+            bazel_images_manifest_dir = bazel_path
+            break
 
     normalize(
-        images_manifest_bzl, os.path.dirname(args.images_manifest_bzl.name),
-        args.root_dir_gn, exclude_packages, exclude_images, extra_files_read)
+        images_manifest_gn, os.path.dirname(args.images_manifest_gn.name),
+        exclude_packages, exclude_images, extra_files_read)
+
+    normalize(
+        images_manifest_bzl, bazel_images_manifest_dir, exclude_packages,
+        exclude_images, extra_files_read)
 
     images_manifest_gn_str = json_format(images_manifest_gn)
     images_manifest_bzl_str = json_format(images_manifest_bzl)
