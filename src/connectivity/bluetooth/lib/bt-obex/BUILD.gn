@@ -27,8 +27,8 @@ rustc_library("bt-obex") {
     "src/error.rs",
     "src/header/header_set.rs",
     "src/header/mod.rs",
+    "src/header/obex_string.rs",
     "src/lib.rs",
-    "src/obex_string.rs",
     "src/operation.rs",
   ]
 

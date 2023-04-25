@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(unused)]
-use packet_encoding::{Decodable, Encodable};
 use std::string::ToString;
 
 use crate::error::PacketError;
 
+/// Represents the String type that is sent/received in an OBEX packet.
+/// Encoded as null-terminated UTF-16 text.
+/// Defined in OBEX 1.5. Section 2.1.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObexString(pub String);
 
@@ -18,7 +19,7 @@ impl ObexString {
 
     pub fn to_be_bytes(&self) -> Vec<u8> {
         let mut encoded_buf: Vec<u16> = self.0.encode_utf16().collect();
-        encoded_buf.push(0); // Add null terminator
+        encoded_buf.push(0); // Add the null terminator
         encoded_buf.into_iter().map(|v| v.to_be_bytes()).flatten().collect()
     }
 }

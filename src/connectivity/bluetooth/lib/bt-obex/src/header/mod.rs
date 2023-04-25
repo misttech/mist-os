@@ -8,10 +8,13 @@ use packet_encoding::{decodable_enum, Decodable, Encodable};
 use tracing::trace;
 
 pub use self::header_set::HeaderSet;
+use self::obex_string::ObexString;
 use crate::error::PacketError;
-use crate::obex_string::ObexString;
 
+/// A collection of Headers sent & received in an OBEX packet.
 mod header_set;
+/// Definition of an OBEX-specific String type used in Headers.
+mod obex_string;
 
 /// Specifies the type of action of the Action Operation.
 /// Defined in OBEX 1.5 Section 2.2.20.
