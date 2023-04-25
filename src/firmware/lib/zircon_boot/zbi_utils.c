@@ -253,8 +253,8 @@ zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const 
 static bool GetKernelLength(const zbi_header_t* zbi, size_t* kernel_len,
                             size_t* kernel_and_scratch_memory_len) {
   const zircon_kernel_t* kernel = (const zircon_kernel_t*)zbi;
-  if (kernel->hdr_file.type != ZBI_TYPE_CONTAINER ||
-      kernel->hdr_kernel.type != ZBI_TYPE_KERNEL_ARM64) {
+  zbi_result_t bootable_res = zbi_check_bootable(zbi, NULL);
+  if (bootable_res != ZBI_RESULT_OK) {
     return false;
   }
   *kernel_len = kernel->hdr_kernel.length + 2 * sizeof(zbi_header_t);

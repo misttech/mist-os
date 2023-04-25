@@ -79,11 +79,21 @@ TestZirconKernelImage CreateTestZirconKernelImage() {
   TestZirconKernelImage test_kernel;
   EXPECT_EQ(zbi_init(&test_kernel, sizeof(test_kernel)), ZBI_RESULT_OK);
   void* payload;
-  EXPECT_EQ(zbi_create_entry(
-                &test_kernel, sizeof(test_kernel), ZBI_TYPE_KERNEL_ARM64, 0, 0,
-                sizeof(test_kernel.kernel.data_kernel) + sizeof(test_kernel.kernel.kernel_payload),
-                &payload),
-            ZBI_RESULT_OK);
+  EXPECT_EQ(
+      zbi_create_entry(
+          &test_kernel, sizeof(test_kernel),
+#ifdef __aarch64__
+          ZBI_TYPE_KERNEL_ARM64,
+#elif defined(__x86_64__) || defined(__i386__)
+          ZBI_TYPE_KERNEL_X64,
+#elif defined(__riscv)
+          ZBI_TYPE_KERNEL_RISCV64,
+#else
+#error "what architecture?"
+#endif
+          0, 0, sizeof(test_kernel.kernel.data_kernel) + sizeof(test_kernel.kernel.kernel_payload),
+          &payload),
+      ZBI_RESULT_OK);
   test_kernel.kernel.data_kernel.entry = kKernelEntryValue;
   test_kernel.kernel.data_kernel.reserve_memory_size = kKernelReserveMemeorySizeValue;
   memset(test_kernel.kernel.kernel_payload, 0xaa, sizeof(test_kernel.kernel.kernel_payload));
