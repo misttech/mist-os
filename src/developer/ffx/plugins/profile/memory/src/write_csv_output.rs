@@ -190,8 +190,8 @@ mod tests {
             processes: vec![],
             vmos: vec![],
             buckets: vec![
-                Bucket { name: "Bucket0".to_string(), size: 42 },
-                Bucket { name: "Bucket1".to_string(), size: 43 },
+                Bucket { name: "Bucket0".to_string(), size: 42, vmos: HashSet::new() },
+                Bucket { name: "Bucket1".to_string(), size: 43, vmos: HashSet::new() },
             ],
         })
     }

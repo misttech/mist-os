@@ -735,8 +735,8 @@ mod tests {
         pretty_assertions::assert_eq!(
             buckets,
             vec![
-                Bucket { name: "bucket0".to_string(), size: 400 },
-                Bucket { name: "bucket1".to_string(), size: 100 }
+                Bucket { name: "bucket0".to_string(), size: 400, vmos: HashSet::from([1, 3]) },
+                Bucket { name: "bucket1".to_string(), size: 100, vmos: HashSet::from([2]) }
             ]
         );
     }

@@ -16,6 +16,8 @@ pub struct Bucket {
     pub name: String,
     /// Sum of the committed bytes of the VMOs that are in this bucket.
     pub size: u64,
+    /// List of koids of VMOs matching this bucket
+    pub vmos: HashSet<u64>,
 }
 
 /// If `regex_str` is empty, returns the ".*" regex.
@@ -57,6 +59,7 @@ pub fn compute_buckets(
             regex_that_matches_everything_if_string_empty(&bucket_definition.process);
 
         let mut bucket_size = 0;
+        let mut bucket_vmos = HashSet::new();
 
         for process in processes {
             if !process_regex.is_match(&process.name) {
@@ -72,10 +75,11 @@ pub fn compute_buckets(
                     continue;
                 }
                 bucket_size += vmo.committed_bytes;
+                bucket_vmos.insert(*vmo_koid);
                 digested_vmos.insert(vmo_koid);
             }
         }
-        buckets.push(Bucket { name: bucket_definition.name.clone(), size: bucket_size });
+        buckets.push(Bucket { name: bucket_definition.name.clone(), size: bucket_size, vmos: bucket_vmos });
     }
     buckets
 }
@@ -202,17 +206,17 @@ mod tests {
         // Step 3/3:
         // Run `compute_buckets`, and check the output.
         let buckets = compute_buckets(&buckets_definitions, &processes, &koid_to_vmo);
-        pretty_assertions::assert_eq!(buckets[0], Bucket { name: "bucket0".to_string(), size: 0 });
-        pretty_assertions::assert_eq!(buckets[1], Bucket { name: "bucket1".to_string(), size: 0 });
-        pretty_assertions::assert_eq!(buckets[2], Bucket { name: "bucket2".to_string(), size: 0 });
+        pretty_assertions::assert_eq!(buckets[0], Bucket { name: "bucket0".to_string(), size: 0, vmos: HashSet::new() });
+        pretty_assertions::assert_eq!(buckets[1], Bucket { name: "bucket1".to_string(), size: 0, vmos: HashSet::new() });
+        pretty_assertions::assert_eq!(buckets[2], Bucket { name: "bucket2".to_string(), size: 0, vmos: HashSet::new() });
         pretty_assertions::assert_eq!(
             buckets[3],
-            Bucket { name: "bucket3".to_string(), size: vmos_defs[0].bytes + vmos_defs[1].bytes }
+            Bucket { name: "bucket3".to_string(), size: vmos_defs[0].bytes + vmos_defs[1].bytes, vmos: HashSet::from([0, 1]) }
         );
-        pretty_assertions::assert_eq!(buckets[4], Bucket { name: "bucket4".to_string(), size: 0 });
+        pretty_assertions::assert_eq!(buckets[4], Bucket { name: "bucket4".to_string(), size: 0, vmos: HashSet::new() });
         pretty_assertions::assert_eq!(
             buckets[5],
-            Bucket { name: "bucket5".to_string(), size: vmos_defs[2].bytes }
+            Bucket { name: "bucket5".to_string(), size: vmos_defs[2].bytes, vmos: HashSet::from([2]) }
         );
         pretty_assertions::assert_eq!(buckets.len(), 6);
     }
