@@ -64,8 +64,9 @@ fuchsia_package("pkg") {
   deps = [ ":component" ]
 }
 
-core_shard("driver-playground-core-shard") {
-  shard_file = "meta/driver_playground.core_shard.cml"
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("driver-playground-core-shard") {
 }
 
 fuchsia_unittest_package("driver-playground-tests") {

@@ -92,7 +92,6 @@ legacy_cache_package_labels += [ "//src/developer/ffx:runtime" ]
 
 legacy_universe_package_labels += [
   "//bundles/tools",
-  "//src/devices/bin/driver_playground:pkg",
   "//src/testing/metrics-logger",
 
   # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
