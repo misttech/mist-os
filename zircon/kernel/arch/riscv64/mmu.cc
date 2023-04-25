@@ -948,6 +948,12 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
         if (status != ZX_ERR_ALREADY_EXISTS || existing_action == ExistingEntryAction::Error) {
           return status;
         }
+        // If we're here, then we got ZX_ERR_ALREADY_EXISTS from MapPages and
+        // the caller passed ExistingEntryAction::Skip. However, as stated in
+        // https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/kernel/vm/include/vm/arch_vm_aspace.h;l=72,
+        // we expect the returned |mapped| value to include existing pages, so
+        // set ret to PAGE_SIZE.
+        ret = PAGE_SIZE;
       }
 
       v += PAGE_SIZE;
