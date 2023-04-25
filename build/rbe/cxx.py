@@ -236,6 +236,8 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-MF",
         type=Path,
+        dest="depfile",
+        default=None,
         help="name depfile",
         metavar="DEPFILE",
     )
@@ -260,6 +262,8 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
 
 _C_PREPROCESS_ARG_PARSER = _c_preprocess_arg_parser()
 
+# These are flags that are joined with their arguments with
+# no separator (no '=' or space).
 _CPP_FUSED_FLAGS = {'-I', '-D', '-L', '-U', '-isystem'}
 
 
@@ -277,6 +281,11 @@ class CxxAction(object):
         self._sources = list(_compile_action_sources(remaining_args))
         self._dialect = _infer_dialect_from_sources(self._sources)
 
+        canonical_command = cl_utils.expand_fused_flags(
+            self._command, _CPP_FUSED_FLAGS)
+        self._cpp_attributes, self._command_without_cpp_options = _C_PREPROCESS_ARG_PARSER.parse_known_args(
+            canonical_command)
+
     @property
     def command(self) -> Sequence[str]:
         return self._command
@@ -292,6 +301,10 @@ class CxxAction(object):
     @property
     def compiler(self) -> CompilerTool:
         return self._compiler
+
+    @property
+    def depfile(self) -> Optional[Path]:
+        return self._cpp_attributes.depfile
 
     @property
     def target(self) -> str:
@@ -363,7 +376,6 @@ class CxxAction(object):
         if self.crash_diagnostics_dir:
             yield self.crash_diagnostics_dir
 
-    @property
     def _preprocess_only_command(self) -> Iterable[str]:
         # replace the output with a preprocessor output
         for tok in self._command:
@@ -381,16 +393,10 @@ class CxxAction(object):
         if self.compiler_is_clang:
             yield '-fno-blocks'
 
-    @property
     def _compile_with_preprocessed_input_command(self) -> Iterable[str]:
-        canonical_command = cl_utils.expand_fused_flags(
-            self._command, _CPP_FUSED_FLAGS)
-        unused_cpp_attributes, remaining_command = _C_PREPROCESS_ARG_PARSER.parse_known_args(
-            canonical_command)
-
         # replace the first named source file with the preprocessed output
         used_preprocessed_input = False
-        for tok in remaining_command:
+        for tok in self._command_without_cpp_options:
             if tok.endswith('.c') or tok.endswith('.cc') or tok.endswith(
                     '.cxx') or tok.endswith('.cpp'):
                 if used_preprocessed_input:  # ignore other sources after the first
@@ -409,8 +415,9 @@ class CxxAction(object):
           C-preprocessing command, and
           modified compile command using preprocessed input
         """
-        return list(self._preprocess_only_command), list(
-            self._compile_with_preprocessed_input_command)
+        return (list(self._preprocess_only_command()),
+                list(self._compile_with_preprocessed_input_command()),
+                )
 
 
 # TODO: write a main() routine just for printing debug info about a compile

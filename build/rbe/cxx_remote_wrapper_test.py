@@ -271,7 +271,8 @@ class CxxRemoteActionTests(unittest.TestCase):
         compiler = Path('g++')
         source = Path('hello.cc')
         output = Path('hello.o')
-        command = _strs([compiler, '-c', source, '-o', output])
+        depfile = Path('hello.d')
+        command = _strs([compiler, '-MF', depfile, '-c', source, '-o', output])
         c = cxx_remote_wrapper.CxxRemoteAction(
             ['--'] + command,
             working_dir=fake_cwd,
@@ -287,6 +288,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.cpp_strategy, 'integrated')
         self.assertEqual(c.original_compile_command, command)
         self.assertFalse(c.local_only)
+        self.assertEqual(c.depfile, depfile)
 
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
@@ -300,12 +302,21 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(
             c.remote_compile_action.output_files_relative_to_project_root,
             [fake_builddir / output])
+
         with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
-                               '_run_remote_action',
-                               return_value=0) as mock_call:
-            exit_code = c.run()
+                               '_rewrite_depfile') as mock_rewrite:
+            with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                   '_depfile_exists',
+                                   return_value=True) as mock_exists:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_run_maybe_remotely',
+                                       return_value=cl_utils.SubprocessResult(
+                                           0)) as mock_remote:
+                    exit_code = c.run()
+
         self.assertEqual(exit_code, 0)
-        mock_call.assert_called_once()
+        mock_rewrite.assert_called_with()
+        mock_exists.assert_called_with()
 
     def test_remote_cross_compile_clang_with_integrated_preprocessing(self):
         fake_root = remote_action.PROJECT_ROOT

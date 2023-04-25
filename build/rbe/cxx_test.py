@@ -62,6 +62,7 @@ class CxxActionTests(unittest.TestCase):
             [cxx.Source(file=source, dialect=cxx.SourceLanguage.CXX)])
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
+        self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
         self.assertIsNone(c.profile_list)
         self.assertEqual(list(c.input_files()), [source])
@@ -97,6 +98,7 @@ class CxxActionTests(unittest.TestCase):
             c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertTrue(c.dialect_is_c)
+        self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
         self.assertIsNone(c.profile_list)
         self.assertEqual(list(c.input_files()), [source])
@@ -169,6 +171,7 @@ class CxxActionTests(unittest.TestCase):
             [cxx.Source(file=source, dialect=cxx.SourceLanguage.CXX)])
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
+        self.assertIsNone(c.depfile)
         self.assertIsNone(c.crash_diagnostics_dir)
         self.assertEqual(c.preprocessed_output, ii_file)
         preprocess, compile = c.split_preprocessing()
@@ -197,6 +200,7 @@ class CxxActionTests(unittest.TestCase):
             c.sources, [cxx.Source(file=source, dialect=cxx.SourceLanguage.C)])
         self.assertFalse(c.dialect_is_cxx)
         self.assertTrue(c.dialect_is_c)
+        self.assertIsNone(c.depfile)
         self.assertIsNone(c.crash_diagnostics_dir)
         self.assertEqual(c.preprocessed_output, i_file)
         preprocess, compile = c.split_preprocessing()
@@ -255,19 +259,21 @@ class CxxActionTests(unittest.TestCase):
         source = Path('hello.cc')
         ii_file = Path('hello.ii')
         output = Path('hello.o')
+        depfile = Path('hello.d')
         c = cxx.CxxAction(
             _strs(
                 [
                     'clang++', '-DNDEBUG', '-I/opt/include', '-stdlib=libc++',
-                    '-M', '-MF', 'hello.d', '-c', source, '-o', output
+                    '-M', '-MF', depfile, '-c', source, '-o', output
                 ]))
+        self.assertEqual(c.depfile, depfile)
         preprocess, compile = c.split_preprocessing()
         self.assertEqual(
             preprocess,
             _strs(
                 [
                     'clang++', '-DNDEBUG', '-I/opt/include', '-stdlib=libc++',
-                    '-M', '-MF', 'hello.d', '-c', source, '-o', ii_file, '-E',
+                    '-M', '-MF', depfile, '-c', source, '-o', ii_file, '-E',
                     '-fno-blocks'
                 ]),
         )

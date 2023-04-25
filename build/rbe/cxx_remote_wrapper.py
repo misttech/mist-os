@@ -144,6 +144,15 @@ class CxxRemoteAction(object):
     def compiler_type(self) -> cxx.Compiler:
         return self.cxx_action.compiler.type
 
+    @property
+    def depfile(self) -> Optional[Path]:
+        return self.cxx_action.depfile
+
+    @property
+    def _depfile_exists(self) -> bool:
+        # Defined for easy precise mocking.
+        return self.depfile and self.depfile.exists()
+
     def check_preconditions(self):
         if not self.cxx_action.target and self.cxx_action.compiler_is_clang:
             raise Exception(
@@ -178,6 +187,18 @@ class CxxRemoteAction(object):
             Path(p) for p in cl_utils.flatten_comma_list(
                 self._main_args.output_directories)
         ]
+
+    def _post_remote_success_action(self) -> int:
+        # Remotely generated gcc depfiles may contain absolute paths
+        # that are not suitable for local use.  Rewrite them.
+        if self.compiler_type == cxx.Compiler.GCC and self._depfile_exists():
+            self._rewrite_depfile()
+        # TODO: if downloads were skipped, need to force-download depfile
+        return 0
+
+    def _rewrite_depfile(self):
+        remote_action.remove_working_dir_abspaths_from_depfile_in_place(
+            self.depfile, self.remote_action.remote_working_dir)
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
@@ -254,6 +275,7 @@ class CxxRemoteAction(object):
             output_dirs=remote_output_dirs,
             working_dir=self.working_dir,
             exec_root=self.exec_root,
+            post_remote_run_success_action=self._post_remote_success_action,
         )
 
         self._prepare_status = 0
