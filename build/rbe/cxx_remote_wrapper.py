@@ -239,6 +239,12 @@ class CxxRemoteAction(object):
             # Let --remote_wrapper apply the prefix to the command remotely.
             remote_options.append(f'--remote_wrapper={compiler_swapper_rel}')
 
+        if self.verbose:
+            msg(f'remote inputs: {remote_inputs}')
+            msg(f'remote output files: {remote_output_files}')
+            msg(f'remote output dirs: {remote_output_dirs}')
+            msg(f'rewrapper options: {remote_options}')
+
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
             remote_options=remote_options,

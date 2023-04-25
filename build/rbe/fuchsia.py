@@ -156,10 +156,25 @@ def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
     libexec_dirs = list(libexec_base.glob("*"))  # dir is a version number
     if not libexec_dirs:
         return
-    libexec_dir = libexec_base / libexec_dirs[0]
+
+    libexec_dir = Path(libexec_dirs[0])
     yield libexec_dir / "cc1"
     yield libexec_dir / "cc1plus"
     # yield libexec_dir / "collect2"  # needed only if linking remotely
+
+    # Workaround: gcc builds a COMPILER_PATH to its related tools with
+    # non-normalized paths like:
+    # ".../gcc/linux-x64/bin/../lib/gcc/x86_64-elf/12.2.1/../../../../x86_64-elf/bin"
+    # The problem is that every partial path of the non-normalized path needs
+    # to exist, even if nothing in the partial path is actually used.
+    # Here we need the "lib/gcc/x86_64-elf/VERSION" path to exist in the
+    # remote environment.  One way to achieve this is to pick an arbitrary
+    # file in that directory to include as a remote input, and all of its
+    # parent directories will be created in the remote environment.
+    version = libexec_dir.name
+    # need this dir to exist remotely:
+    lib_base = install_root / "lib/gcc/x86_64-elf" / version
+    yield lib_base / "crtbegin.o"  # arbitrary unused file, just to setup its dir
 
 
 def rust_stdlib_subdir(target_triple: str) -> str:
