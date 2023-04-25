@@ -174,7 +174,12 @@ func (b *ArtifactsBuild) GetPackageRepository(ctx context.Context, fetchMode Blo
 		ffx = build_ffx
 	}
 
-	p, err := packages.NewRepository(ctx, packagesDir, &proxyBlobStore{b, blobsDir}, ffx)
+	blobType, err := build.GetDeliveryBlobType(deliveryBlobConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get delivery blob type: %w", err)
+	}
+
+	p, err := packages.NewRepository(ctx, packagesDir, &proxyBlobStore{b, blobsDir}, ffx, blobType)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +328,7 @@ func (b *ArtifactsBuild) getFlasher(ctx context.Context) (*flasher.BuildFlasher,
 		return nil, fmt.Errorf("failed to make ffxPath executable: %w", err)
 	}
 
-	ffx, err := ffx.NewFFXTool(ffxPath)
+	ffx, err := ffx.NewFFXTool(ffxPath, "")
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +401,8 @@ func (b *FuchsiaDirBuild) GetBootserver(ctx context.Context) (string, error) {
 
 func (b *FuchsiaDirBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
 	ffxPath := filepath.Join(b.dir, "host_x64/ffx")
-	return ffx.NewFFXTool(ffxPath)
+	blobfsCompressionPath := filepath.Join(b.dir, "host_x64/blobfs-compression")
+	return ffx.NewFFXTool(ffxPath, blobfsCompressionPath)
 }
 
 func (b *FuchsiaDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
@@ -412,7 +418,11 @@ func (b *FuchsiaDirBuild) GetPackageRepository(ctx context.Context, blobFetchMod
 		}
 		ffx = build_ffx
 	}
-	return packages.NewRepository(ctx, filepath.Join(b.dir, "amber-files"), blobFS, ffx)
+	blobType, err := build.GetDeliveryBlobType(filepath.Join(b.dir, "delivery_blob_config.json"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get delivery blob type: %w", err)
+	}
+	return packages.NewRepository(ctx, filepath.Join(b.dir, "amber-files"), blobFS, ffx, blobType)
 }
 
 func (b *FuchsiaDirBuild) GetPaverDir(ctx context.Context) (string, error) {
@@ -486,7 +496,7 @@ func (b *ProductBundleDirBuild) GetBootserver(ctx context.Context) (string, erro
 
 func (b *ProductBundleDirBuild) GetFfx(ctx context.Context) (*ffx.FFXTool, error) {
 	ffxPath := filepath.Join(b.dir, "ffx")
-	return ffx.NewFFXTool(ffxPath)
+	return ffx.NewFFXTool(ffxPath, "")
 }
 
 func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
@@ -518,7 +528,8 @@ func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFe
 		}
 		ffx = build_ffx
 	}
-	return packages.NewRepository(ctx, b.dir, blobFS, ffx)
+	// TODO(fxbug.dev/126107): Read delivery blob type from product bundle.
+	return packages.NewRepository(ctx, b.dir, blobFS, ffx, nil)
 }
 
 func (b *ProductBundleDirBuild) GetPaverDir(ctx context.Context) (string, error) {

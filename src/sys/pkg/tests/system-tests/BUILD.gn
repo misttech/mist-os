@@ -11,11 +11,15 @@ if (is_host) {
   host_test_data("test_tools") {
     sources = [
       "$host_tools_dir/ffx",
+      "$root_build_dir/host_x64/blobfs-compression",
       "//prebuilt/tools/artifacts/artifacts",
       "//prebuilt/tools/lkg/lkg",
     ]
     outputs = [ "$root_out_dir/test_data/system-tests/{{source_file_part}}" ]
-    public_deps = [ "//src/developer/ffx:host($host_toolchain)" ]
+    public_deps = [
+      "//src/developer/ffx:host($host_toolchain)",
+      "//src/storage/tools/blobfs-compression",
+    ]
   }
 
   non_go_deps = [ ":test_tools" ]

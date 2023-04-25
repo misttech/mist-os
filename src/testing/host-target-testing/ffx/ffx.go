@@ -17,16 +17,17 @@ import (
 )
 
 type FFXTool struct {
-	ffxToolPath string
-	isolateDir  string
-	stdout      io.Writer
+	ffxToolPath           string
+	isolateDir            string
+	stdout                io.Writer
+	blobfsCompressionPath string
 }
 
-func NewFFXTool(ffxToolPath string) (*FFXTool, error) {
-	return NewFFXToolWithStdout(ffxToolPath, nil)
+func NewFFXTool(ffxToolPath, blobfsCompressionPath string) (*FFXTool, error) {
+	return NewFFXToolWithStdout(ffxToolPath, blobfsCompressionPath, nil)
 }
 
-func NewFFXToolWithStdout(ffxToolPath string, stdout io.Writer) (*FFXTool, error) {
+func NewFFXToolWithStdout(ffxToolPath, blobfsCompressionPath string, stdout io.Writer) (*FFXTool, error) {
 	isolateDir, err := os.MkdirTemp("", "systemTestIsoDir*")
 	if err != nil {
 		return nil, err
@@ -35,9 +36,10 @@ func NewFFXToolWithStdout(ffxToolPath string, stdout io.Writer) (*FFXTool, error
 		return nil, fmt.Errorf("error accessing %v: %w", ffxToolPath, err)
 	}
 	return &FFXTool{
-		ffxToolPath: ffxToolPath,
-		isolateDir:  isolateDir,
-		stdout:      stdout,
+		ffxToolPath:           ffxToolPath,
+		isolateDir:            isolateDir,
+		stdout:                stdout,
+		blobfsCompressionPath: blobfsCompressionPath,
 	}, nil
 }
 
@@ -188,6 +190,10 @@ func (f *FFXTool) RepositoryPublish(ctx context.Context, repoDir string, package
 
 	for _, manifest := range packageManifests {
 		args = append(args, "--package", manifest)
+	}
+
+	if f.blobfsCompressionPath != "" {
+		args = append(args, "--blobfs-compression-path", f.blobfsCompressionPath)
 	}
 
 	args = append(args, additionalArgs...)

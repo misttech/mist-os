@@ -56,7 +56,7 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	}
 
 	// Publish the config to the repo.
-	ffx, err := ffx.NewFFXTool("host-tools/ffx")
+	ffx, err := ffx.NewFFXTool("host-tools/ffx", "host_x64/blobfs-compression")
 	if err != nil {
 		t.Fatalf("failed to create FFXTool: %s", err)
 	}
@@ -69,7 +69,8 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	if err != nil {
 		t.Fatalf("failed to copy keys: %s", err)
 	}
-	pkgRepo, err := NewRepository(ctx, dir, NewDirBlobStore(blobsDir), ffx)
+	blobType := 1
+	pkgRepo, err := NewRepository(ctx, dir, NewDirBlobStore(blobsDir), ffx, &blobType)
 	if err != nil {
 		t.Fatalf("failed to read repo: %s", err)
 	}
@@ -195,7 +196,7 @@ func TestPublish(t *testing.T) {
 	pkgBuilder.AddResource(newResource, bytes.NewReader([]byte(newResource)))
 
 	// Update repo with updated package. We don't check the merkle since the package includes randomly generated files.
-	actualPkgName, _, err := pkgBuilder.Publish(ctx, pkgRepo)
+	actualPkgName, pkgMerkle, err := pkgBuilder.Publish(ctx, pkgRepo)
 	if err != nil {
 		t.Fatalf("Publishing package failed. %s", err)
 	}
@@ -204,11 +205,16 @@ func TestPublish(t *testing.T) {
 		t.Fatalf("package path should be %q, not %q", fullPkgName, actualPkgName)
 	}
 
-	ffx, err := ffx.NewFFXTool("host-tools/ffx")
+	_, err = pkgRepo.BlobStore.OpenBlob(ctx, "1/"+pkgMerkle)
+	if err != nil {
+		t.Fatalf("Delivery blob does not exist '%s'. %s", pkgMerkle, err)
+	}
+
+	ffx, err := ffx.NewFFXTool("host-tools/ffx", "host_x64/blobfs-compression")
 	if err != nil {
 		t.Fatalf("failed to create FFXTool: %s", err)
 	}
-	pkgRepo, err = NewRepository(ctx, path.Dir(pkgRepo.Dir), pkgRepo.BlobStore, ffx)
+	pkgRepo, err = NewRepository(ctx, path.Dir(pkgRepo.Dir), pkgRepo.BlobStore, ffx, nil)
 
 	// Confirm that the package is published and updated.
 	pkg, err = pkgRepo.OpenPackage(ctx, fullPkgName)

@@ -44,8 +44,9 @@ func (fs *DirBlobStore) Dir() string {
 type Repository struct {
 	Dir string
 	// BlobsDir should be a directory called `blobs` where all the blobs are.
-	BlobStore BlobStore
-	ffx       *ffx.FFXTool
+	BlobStore        BlobStore
+	ffx              *ffx.FFXTool
+	deliveryBlobType *int
 }
 
 type signed struct {
@@ -66,7 +67,7 @@ type custom struct {
 
 // NewRepository parses the repository from the specified directory. It returns
 // an error if the repository does not exist, or it contains malformed metadata.
-func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ffx.FFXTool) (*Repository, error) {
+func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ffx.FFXTool, deliveryBlobType *int) (*Repository, error) {
 	logger.Infof(ctx, "creating a repository for %q and %q", dir, blobStore.Dir())
 
 	// The repository may have out of date metadata. This updates the repository to
@@ -76,21 +77,22 @@ func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ff
 	}
 
 	return &Repository{
-		Dir:       filepath.Join(dir, "repository"),
-		BlobStore: blobStore,
-		ffx:       ffx,
+		Dir:              filepath.Join(dir, "repository"),
+		BlobStore:        blobStore,
+		ffx:              ffx,
+		deliveryBlobType: deliveryBlobType,
 	}, nil
 }
 
 // NewRepositoryFromTar extracts a repository from a tar.gz, and returns a
 // Repository parsed from it. It returns an error if the repository does not
 // exist, or contains malformed metadata.
-func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.FFXTool) (*Repository, error) {
+func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.FFXTool, deliveryBlobType *int) (*Repository, error) {
 	if err := util.Untar(ctx, dst, src); err != nil {
 		return nil, fmt.Errorf("failed to extract packages: %w", err)
 	}
 
-	return NewRepository(ctx, filepath.Join(dst, "amber-files"), NewDirBlobStore(filepath.Join(dst, "amber-files", "repository", "blobs")), ffx)
+	return NewRepository(ctx, filepath.Join(dst, "amber-files"), NewDirBlobStore(filepath.Join(dst, "amber-files", "repository", "blobs")), ffx, deliveryBlobType)
 }
 
 // OpenPackage opens a package from the repository.
@@ -359,5 +361,10 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 func (r *Repository) Publish(ctx context.Context, packageManifestPath string) error {
 	repoDir := filepath.Dir(r.Dir)
 
-	return r.ffx.RepositoryPublish(ctx, repoDir, []string{packageManifestPath}, "--blob-repo-dir", r.BlobStore.Dir())
+	extraArgs := []string{"--blob-repo-dir", r.BlobStore.Dir()}
+	if r.deliveryBlobType != nil {
+		extraArgs = append(extraArgs, "--delivery-blob-type", fmt.Sprint(*r.deliveryBlobType))
+	}
+
+	return r.ffx.RepositoryPublish(ctx, repoDir, []string{packageManifestPath}, extraArgs...)
 }
