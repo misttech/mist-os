@@ -44,7 +44,6 @@
 #include "fidl/fuchsia.process.lifecycle/cpp/markers.h"
 #include "lib/async/cpp/task.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
-#include "src/devices/bin/driver_manager/devfs/devfs_exporter.h"
 #include "src/devices/bin/driver_manager/device_watcher.h"
 #include "src/devices/bin/driver_manager/v2/driver_development_service.h"
 #include "src/devices/lib/log/log.h"
@@ -233,13 +232,6 @@ int RunDfv1(driver_manager_config::Config dm_config,
   coordinator.InitOutgoingServices(outgoing);
 
   std::optional<driver_manager::DriverDevelopmentService> driver_development_service;
-
-  // Launch devfs_exporter.
-  std::optional<Devnode>& root_node = coordinator.root_devnode();
-  ZX_ASSERT(root_node.has_value());
-  driver_manager::DevfsExporter devfs_exporter(coordinator.devfs(), &root_node.value(),
-                                               loop.dispatcher());
-  devfs_exporter.PublishExporter(outgoing);
 
   fbl::unique_fd lib_fd;
   {

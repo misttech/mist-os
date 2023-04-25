@@ -40,7 +40,6 @@
 #include "lib/async/cpp/task.h"
 #include "main.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
-#include "src/devices/bin/driver_manager/devfs/devfs_exporter.h"
 #include "src/devices/bin/driver_manager/device_watcher.h"
 #include "src/devices/bin/driver_manager/v2/driver_development_service.h"
 #include "src/devices/bin/driver_manager/v2/shutdown_manager.h"
@@ -114,11 +113,6 @@ int RunDfv2(driver_manager_config::Config config,
   // Setup devfs.
   std::optional<Devfs> devfs;
   driver_runner.root_node()->SetupDevfsForRootNode(devfs, std::move(diagnostics_client.value()));
-
-  std::optional<Devnode>& root_devnode = driver_runner.root_node()->topological_devnode();
-  driver_manager::DevfsExporter devfs_exporter(devfs.value(), &root_devnode.value(),
-                                               loop.dispatcher());
-  devfs_exporter.PublishExporter(outgoing);
 
   driver_runner.PublishComponentRunner(outgoing);
 

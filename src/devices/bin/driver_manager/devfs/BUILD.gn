@@ -10,8 +10,6 @@ source_set("devfs") {
     "builtin_devices.h",
     "devfs.cc",
     "devfs.h",
-    "devfs_exporter.cc",
-    "devfs_exporter.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",

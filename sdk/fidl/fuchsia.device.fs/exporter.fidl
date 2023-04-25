@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.device.fs;
 
-using fuchsia.io;
-
 using zx;
 
 /// A protocol that lets a client connect to another protocol.
@@ -13,25 +11,4 @@ protocol Connector {
     Connect(resource struct {
         server zx.Handle:CHANNEL;
     });
-};
-
-/// Protocol through which a driver can export services to devfs.
-@discoverable
-protocol Exporter {
-    /// Export a device in devfs.
-    ///
-    /// * error `ZX_ERR_ALREADY_EXISTS` if `topological_path` already exists.
-    /// * error `ZX_ERR_NOT_FOUND` if `class_name` doesn't match a valid class name.
-    Export(resource struct {
-        /// This is the connector that will have Connect called on it when a client opens the
-        /// device. If the server end of this connection is dropped the export will automatically be
-        /// cleaned up.
-        open_client client_end:Connector;
-
-        /// If this is present, then the device will be exported at this topological path.
-        topological_path string:<fuchsia.io.MAX_PATH_LENGTH, optional>;
-
-        /// If this is present, then the device will be exported into "/dev/class/{class_name}/".
-        class_name string:<fuchsia.io.MAX_NAME_LENGTH, optional>;
-    }) -> () error zx.Status;
 };
