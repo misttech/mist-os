@@ -152,7 +152,7 @@ Continuing the previous example, a caller can enable the screen reader with the
 following code:
 
 ```rust
-let new_settings = AccessibilitySettings::EMPTY;
+let new_settings = AccessibilitySettings::default();
 new_settings.screen_reader = Some(true);
 proxy.set(new_settings).await.expect("request completed").expect("request succeeded");
 ```

@@ -110,7 +110,7 @@ loop {
               acquire_fences: None,
               release_fences: None,
               unsquashable: Some(present_parameters.unsquashable),
-              ..fland::PresentArgs::EMPTY
+              ..Default::default()
           })
           .unwrap_or(());
 

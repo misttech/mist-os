@@ -537,6 +537,12 @@ impl FunctionApplication {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { func: None, args: None, flags: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for FunctionApplication {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for FunctionApplication {}
 
 fidl_table! {
@@ -569,6 +575,12 @@ impl TableMember {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { table_data: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for TableMember {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for TableMember {}
 

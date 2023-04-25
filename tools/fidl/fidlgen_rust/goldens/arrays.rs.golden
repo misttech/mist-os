@@ -165,6 +165,12 @@ impl TableLargeArray {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for TableLargeArray {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for TableLargeArray {}
 
 fidl_table! {
@@ -189,6 +195,12 @@ impl TableSmallArray {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for TableSmallArray {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for TableSmallArray {}
 

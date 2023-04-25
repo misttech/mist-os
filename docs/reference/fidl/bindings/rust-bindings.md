@@ -333,23 +333,19 @@ The FIDL toolchain generates a `struct` `User` with optional members:
 pub struct User {
   pub age: Option<u8>,
   pub name: Option<String>,
-  pub unknown_data: Option<BTreeMap<u64, Vec<u8>>>,
-  #[deprecated = "Use `..Foo::EMPTY` to construct and `..` to match."]
+  #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
   #[doc(hidden)]
   pub __non_exhaustive: (),
 }
 ```
-
-And the following associated constants:
-
-* `const EMPTY: User`: A `User` with each member initialized to `None`.
 
 If any unknown fields are encountered during decoding, they are discarded. There
 is no way to access them or determine if they occurred.
 
 The `__non_exhaustive` member prevents intializing the table exhaustively, which
 causes API breakage when new fields are added. Instead, you should use the
-struct update syntax to fill in unspecified fields with `EMPTY`. For example:
+struct update syntax to fill in unspecified fields with `Default::default()`.
+For example:
 
 ```rust
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/fidl_crates/src/main.rs" region_tag="tables_init" adjust_indentation="auto" %}

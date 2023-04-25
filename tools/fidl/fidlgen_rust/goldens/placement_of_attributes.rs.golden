@@ -194,6 +194,12 @@ impl ExampleTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { member: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for ExampleTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for ExampleTable {}
 
 fidl_table! {

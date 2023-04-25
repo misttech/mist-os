@@ -42,6 +42,12 @@ impl EmptyTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
+
+impl std::default::Default for EmptyTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for EmptyTable {}
 
 fidl_table! {
@@ -61,6 +67,12 @@ impl ExtensionTable {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
+}
+
+impl std::default::Default for ExtensionTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for ExtensionTable {}
 
@@ -84,6 +96,12 @@ impl NewerSimpleTable {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, y: None, z: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for NewerSimpleTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for NewerSimpleTable {}
 
@@ -118,6 +136,12 @@ impl OlderSimpleTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for OlderSimpleTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for OlderSimpleTable {}
 
 fidl_table! {
@@ -144,6 +168,12 @@ impl ReverseOrdinalTable {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { z: None, y: None, x: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for ReverseOrdinalTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for ReverseOrdinalTable {}
 
@@ -178,6 +208,12 @@ impl SimpleTable {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, y: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for SimpleTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for SimpleTable {}
 
@@ -336,6 +372,12 @@ impl SixtyFourOrdinalTable {
         v64: None,
         __non_exhaustive: (),
     };
+}
+
+impl std::default::Default for SixtyFourOrdinalTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for SixtyFourOrdinalTable {}
 
@@ -613,6 +655,12 @@ impl TableWithAttributes {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for TableWithAttributes {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for TableWithAttributes {}
 

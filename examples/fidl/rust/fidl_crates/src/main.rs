@@ -79,7 +79,7 @@ mod test {
         }
 
         // [START tables_init]
-        let user = fex::User { age: Some(20), ..fex::User::EMPTY };
+        let user = fex::User { age: Some(20), ..Default::default() };
         println!("{:?}", user);
         assert!(user.age.is_some());
         // [END tables_init]

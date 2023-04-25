@@ -1310,6 +1310,12 @@ impl ResourceTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
+
+impl std::default::Default for ResourceTable {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Standalone for ResourceTable {}
 
 fidl_table! {
@@ -1330,6 +1336,12 @@ impl Table {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
+}
+
+impl std::default::Default for Table {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for Table {}
 

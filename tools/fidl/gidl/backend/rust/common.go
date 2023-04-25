@@ -252,7 +252,7 @@ func onTable(value ir.Record, decl *mixer.TableDecl) string {
 		tableFields = append(tableFields, fmt.Sprintf("%s: Some(%s)", fieldName, fieldValueStr))
 	}
 	tableName := declName(decl)
-	tableFields = append(tableFields, fmt.Sprintf("..%s::EMPTY", tableName))
+	tableFields = append(tableFields, "..Default::default()")
 	valueStr := fmt.Sprintf("%s { %s }", tableName, strings.Join(tableFields, ", "))
 	return wrapNullable(decl, valueStr)
 }

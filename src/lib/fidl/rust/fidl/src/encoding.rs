@@ -3137,7 +3137,7 @@ macro_rules! fidl_table {
         impl $crate::encoding::Decode<$name> for $name {
             #[inline(always)]
             fn new_empty() -> Self {
-                Self::EMPTY
+                Self::default()
             }
 
             unsafe fn decode(&mut self, decoder: &mut $crate::encoding::Decoder<'_>, offset: usize, mut depth: $crate::encoding::Depth) -> $crate::Result<()> {
@@ -5402,14 +5402,16 @@ mod test {
 
     #[derive(Debug, Clone, PartialEq)]
     struct TestSampleTable {
-        #[deprecated = "Use `..TestSampleTable::EMPTY` to construct and `..` to match."]
+        #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
         #[doc(hidden)]
         __non_exhaustive: (),
     }
 
-    impl TestSampleTable {
-        #[allow(deprecated)]
-        pub const EMPTY: Self = Self { __non_exhaustive: () };
+    impl Default for TestSampleTable {
+        fn default() -> Self {
+            #[allow(deprecated)]
+            Self { __non_exhaustive: () }
+        }
     }
 
     fidl_table! {

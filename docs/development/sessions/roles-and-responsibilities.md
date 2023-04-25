@@ -48,7 +48,7 @@ the view on a connected display.
             view_holder_token: Some(token_pair.view_holder_token),
             view_ref: Some(view_ref_dup),
             annotations: Some(annotations),
-            ..ViewSpec::EMPTY
+            ..Default::default()
         };
 
         let (view_controller_proxy, server_end) = create_proxy::<ViewControllerMarker>()?;

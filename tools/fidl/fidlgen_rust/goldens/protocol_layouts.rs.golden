@@ -305,6 +305,12 @@ impl LocalTablePayload {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for LocalTablePayload {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for LocalTablePayload {}
 
 fidl_table! {
@@ -329,6 +335,12 @@ impl MainProtocolOneWayAnonRequest {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for MainProtocolOneWayAnonRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
 
@@ -355,6 +367,12 @@ impl MainProtocolTwoWayAnonResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for MainProtocolTwoWayAnonResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
 
 fidl_table! {
@@ -380,6 +398,12 @@ impl MainProtocolTwoWayAnonWithErrorRequest {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for MainProtocolTwoWayAnonWithErrorRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 fidl_table! {
@@ -404,6 +428,12 @@ impl MainProtocolOnAnonWithErrorResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for MainProtocolOnAnonWithErrorResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
 

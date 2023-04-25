@@ -22,19 +22,7 @@ pub struct {{ .Name }} {
 }
 
 impl {{ .Name }} {
-    {{/*
-        Note: We use a constant below since this is currently the only way the
-        to make the functional update syntax work. For example:
-
-            SomeTable { some_member: some_value, ..SomeTable::EMPTY }
-
-        Using a constant (::EMPTY) will only create members that do not have a
-        value explicitly specified, whereas using a function (::empty()) will
-        fully instantiate an instance of the struct and overwrite the members
-        that do not have a value specified. The latter prevents creating const
-        tables because overwiting heap allocated values (even when wrapped in
-        Option<_> and set to None) will first drop them, which is not const.
-    */}}
+    {{- /* TODO(fxbug.dev/102876): Remove the EMPTY const. */}}
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self {
@@ -43,6 +31,12 @@ impl {{ .Name }} {
         {{- end }}
         __non_exhaustive: (),
     };
+}
+
+impl std::default::Default for {{ .Name }} {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 
 {{- if .IsResourceType }}

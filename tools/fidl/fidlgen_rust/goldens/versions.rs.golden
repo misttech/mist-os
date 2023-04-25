@@ -238,6 +238,12 @@ impl Table {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for Table {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for Table {}
 
 fidl_table! {

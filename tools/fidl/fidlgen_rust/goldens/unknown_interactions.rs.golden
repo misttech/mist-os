@@ -1777,6 +1777,12 @@ impl UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
 
 fidl_table! {
@@ -1801,6 +1807,12 @@ impl UnknownInteractionsAjarProtocolStrictEventTableRequest {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsAjarProtocolStrictEventTableRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
 
@@ -1827,6 +1839,12 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
 
 fidl_table! {
@@ -1851,6 +1869,12 @@ impl UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
 
@@ -1877,6 +1901,12 @@ impl UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
 
 fidl_table! {
@@ -1901,6 +1931,12 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
 
@@ -1927,6 +1963,12 @@ impl UnknownInteractionsClosedProtocolStrictEventTableRequest {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsClosedProtocolStrictEventTableRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
 
 fidl_table! {
@@ -1951,6 +1993,12 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
 
@@ -1977,6 +2025,12 @@ impl UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
 
 fidl_table! {
@@ -2001,6 +2055,12 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
 
@@ -2027,6 +2087,12 @@ impl UnknownInteractionsProtocolFlexibleEventTableRequest {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsProtocolFlexibleEventTableRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
 
 fidl_table! {
@@ -2051,6 +2117,12 @@ impl UnknownInteractionsProtocolStrictEventTableRequest {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsProtocolStrictEventTableRequest {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
 
@@ -2077,6 +2149,12 @@ impl UnknownInteractionsProtocolStrictTwoWayTableResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsProtocolStrictTwoWayTableResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
 
 fidl_table! {
@@ -2101,6 +2179,12 @@ impl UnknownInteractionsProtocolFlexibleEventTableErrResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsProtocolFlexibleEventTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
 
@@ -2127,6 +2211,12 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
 
 fidl_table! {
@@ -2151,6 +2241,12 @@ impl UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
 
@@ -2177,6 +2273,12 @@ impl UnknownInteractionsProtocolStrictEventTableErrResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
 }
+
+impl std::default::Default for UnknownInteractionsProtocolStrictEventTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
 
 fidl_table! {
@@ -2201,6 +2303,12 @@ impl UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     /// An empty table with every field set to `None`.
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { some_field: None, __non_exhaustive: () };
+}
+
+impl std::default::Default for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 impl fidl::encoding::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
 

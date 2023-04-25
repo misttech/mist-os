@@ -293,7 +293,7 @@ fn test_golden_bits_struct_v2_encode() {
 
 #[test]
 fn test_golden_table_struct_v1_encode() {
-    let value = &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..test_conformance::GoldenTable::EMPTY } };
+    let value = &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..Default::default() } };
     let bytes = &mut Vec::new();
     let handle_dispositions = &mut Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -310,7 +310,7 @@ fn test_golden_table_struct_v1_encode() {
 
 #[test]
 fn test_golden_table_struct_v2_encode() {
-    let value = &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..test_conformance::GoldenTable::EMPTY } };
+    let value = &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..Default::default() } };
     let bytes = &mut Vec::new();
     let handle_dispositions = &mut Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -1082,7 +1082,7 @@ fn test_golden_table_struct_v1_decode() {
     let handle_infos = &mut Vec::new();
     let value = &mut fidl::new_empty!(test_conformance::GoldenTableStruct);
     Decoder::decode_with_context::<test_conformance::GoldenTableStruct>(_V1_CONTEXT, bytes, handle_infos, value).unwrap();
-    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..test_conformance::GoldenTable::EMPTY } });
+    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..Default::default() } });
 }
 
 #[test]
@@ -1095,7 +1095,7 @@ fn test_golden_table_struct_v2_decode() {
     let handle_infos = &mut Vec::new();
     let value = &mut fidl::new_empty!(test_conformance::GoldenTableStruct);
     Decoder::decode_with_context::<test_conformance::GoldenTableStruct>(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
-    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..test_conformance::GoldenTable::EMPTY } });
+    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..Default::default() } });
 }
 
 #[test]
@@ -1513,7 +1513,7 @@ HandleDef{
 0,]);
     let value = &mut fidl::new_empty!(test_conformance::GoldenTableStruct);
     Decoder::decode_with_context::<test_conformance::GoldenTableStruct>(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
-    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { ..test_conformance::GoldenTable::EMPTY } });
+    assert_eq!(value, &test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { ..Default::default() } });
     let unused_handles = select_raw_handle_infos(&handle_defs, &[
 0,]);
     assert_eq!(
