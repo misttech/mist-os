@@ -8,7 +8,10 @@ import("//src/starnix/kernel/starnix.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("runner") {
-  deps = [ ":starnix_package" ]
+  deps = [
+    ":starnix_package",
+    "//src/starnix/kernel:starnix_kernel_package",
+  ]
 }
 
 rustc_binary("starnix_runner_bin") {
@@ -47,6 +50,4 @@ fuchsia_package_with_single_component("starnix_package") {
   component_name = "starnix_runner"
 
   deps = [ ":starnix_runner_bin" ]
-
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 }

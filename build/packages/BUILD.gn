@@ -49,7 +49,6 @@ group("allowed_to_use_subpackages") {
     "//sdk/ctf:*",
     "//sdk/ctf/release:*",
     "//src/performance/trace_manager:trace_manager",
-    "//src/starnix/runner:starnix_package",
     "//src/sys/pkg/lib/fuchsia-pkg:package_for_archive",
     "//src/tests/microbenchmarks:starnix_microbenchmarks_perftestmode",
     "//src/virtualization/bin/guest_manager:debian_guest_manager",
