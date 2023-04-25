@@ -192,7 +192,7 @@ impl BindingData {
 
 #[derive(Debug)]
 struct State {
-    id: SocketId,
+    id: SocketId<BindingsNonSyncCtxImpl>,
     kind: fppacket::Kind,
 }
 

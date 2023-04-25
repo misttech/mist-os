@@ -5,7 +5,7 @@
 //! Link-layer sockets (analogous to Linux's AF_PACKET sockets).
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroU16};
 use net_types::ethernet::Mac;
 use packet::{BufferMut, Serializer};
 
@@ -80,12 +80,19 @@ pub trait NonSyncContext<DeviceId> {
 }
 
 /// Identifier for a socket.
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct SocketId(usize);
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Hash(bound = ""),
+    Eq(bound = ""),
+    PartialEq(bound = "")
+)]
+pub struct SocketId<C>(usize, PhantomData<C>);
 
-impl EntryKey for SocketId {
+impl<C> EntryKey for SocketId<C> {
     fn get_key_index(&self) -> usize {
-        let Self(index) = self;
+        let Self(index, _marker) = self;
         *index
     }
 }
@@ -174,24 +181,24 @@ pub(crate) trait DeviceSocketAccessor: DeviceIdContext<AnyDevice> {
 /// Internal implementation trait that allows abstracting over device ID types.
 trait SocketHandler<C: NonSyncContext<Self::DeviceId>>: DeviceIdContext<AnyDevice> {
     /// Creates a new packet socket.
-    fn create(&mut self, external_state: C::SocketState) -> SocketId;
+    fn create(&mut self, external_state: C::SocketState) -> SocketId<C>;
 
     /// Sets the device for a packet socket without affecting the protocol.
-    fn set_device(&mut self, socket: &mut SocketId, device: TargetDevice<&Self::DeviceId>);
+    fn set_device(&mut self, socket: &mut SocketId<C>, device: TargetDevice<&Self::DeviceId>);
 
     /// Sets both the device and protocol for a packet socket.
     fn set_device_and_protocol(
         &mut self,
-        id: &mut SocketId,
+        id: &mut SocketId<C>,
         device: TargetDevice<&Self::DeviceId>,
         protocol: Protocol,
     );
 
     /// Gets information about a socket.
-    fn get_info(&mut self, id: &SocketId) -> SocketInfo<Self::WeakDeviceId>;
+    fn get_info(&mut self, id: &SocketId<C>) -> SocketInfo<Self::WeakDeviceId>;
 
     /// Removes a packet socket.
-    fn remove(&mut self, id: SocketId);
+    fn remove(&mut self, id: SocketId<C>);
 }
 
 /// An error encountered when sending a frame.
@@ -238,7 +245,7 @@ trait BufferSocketSendHandler<B: BufferMut, C: NonSyncContext<Self::DeviceId>>:
     fn send_frame<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut C,
-        socket: &SocketId,
+        socket: &SocketId<C>,
         params: SendFrameParams<Self::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendFrameError)>;
@@ -248,7 +255,7 @@ trait BufferSocketSendHandler<B: BufferMut, C: NonSyncContext<Self::DeviceId>>:
     fn send_datagram<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut C,
-        socket: &SocketId,
+        socket: &SocketId<C>,
         params: SendDatagramParams<Self::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendDatagramError)>;
@@ -261,11 +268,11 @@ enum MaybeUpdate<T> {
 
 fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>>(
     sync_ctx: &mut SC,
-    socket: &SocketId,
+    socket: &SocketId<C>,
     new_device: TargetDevice<&SC::DeviceId>,
     protocol_update: MaybeUpdate<Protocol>,
 ) {
-    let SocketId(index) = socket;
+    let SocketId(index, _marker) = socket;
     sync_ctx.with_sockets_mut(|Sockets(sockets), sync_ctx| {
         let SocketState { protocol, device, external_state: _ } =
             sockets.get_mut(*index).unwrap_or_else(|| panic!("invalid socket ID {:?}", socket));
@@ -310,7 +317,7 @@ fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId
 }
 
 impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>> SocketHandler<C> for SC {
-    fn create(&mut self, external_state: C::SocketState) -> SocketId {
+    fn create(&mut self, external_state: C::SocketState) -> SocketId<C> {
         let index =
             self.with_sockets_mut(|Sockets(sockets), _: &mut SC::DeviceSocketAccessor<'_>| {
                 sockets.push(SocketState {
@@ -319,25 +326,25 @@ impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>> SocketHandler<C> for S
                     protocol: None,
                 })
             });
-        SocketId(index)
+        SocketId(index, Default::default())
     }
 
-    fn set_device(&mut self, socket: &mut SocketId, device: TargetDevice<&SC::DeviceId>) {
+    fn set_device(&mut self, socket: &mut SocketId<C>, device: TargetDevice<&SC::DeviceId>) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NoChange)
     }
 
     fn set_device_and_protocol(
         &mut self,
-        socket: &mut SocketId,
+        socket: &mut SocketId<C>,
         device: TargetDevice<&SC::DeviceId>,
         protocol: Protocol,
     ) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NewValue(protocol))
     }
 
-    fn get_info(&mut self, id: &SocketId) -> SocketInfo<Self::WeakDeviceId> {
+    fn get_info(&mut self, id: &SocketId<C>) -> SocketInfo<Self::WeakDeviceId> {
         self.with_sockets(|Sockets(sockets), _: &mut SC::DeviceSocketAccessor<'_>| {
-            let SocketId(index) = id;
+            let SocketId(index, _marker) = id;
             let SocketState { protocol, device, external_state: _ } =
                 sockets.get(*index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
             let device = device.clone();
@@ -345,8 +352,8 @@ impl<SC: SyncContext<C>, C: NonSyncContext<SC::DeviceId>> SocketHandler<C> for S
         })
     }
 
-    fn remove(&mut self, id: SocketId) {
-        let SocketId(index) = id;
+    fn remove(&mut self, id: SocketId<C>) {
+        let SocketId(index, _marker) = id;
         self.with_sockets_mut(|Sockets(sockets), sync_ctx| {
             let SocketState { device, protocol: _, external_state: _ } =
                 sockets.remove(index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
@@ -398,11 +405,11 @@ where
     fn send_frame<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut C,
-        id: &SocketId,
+        id: &SocketId<C>,
         params: SendFrameParams<SC::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendFrameError)> {
-        let SocketId(index) = id;
+        let SocketId(index, _marker) = id;
         self.with_sockets(|Sockets(sockets), sync_ctx| {
             let state = sockets.get(*index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
             send_socket_frame(state, params, sync_ctx, ctx, body, None)
@@ -412,11 +419,11 @@ where
     fn send_datagram<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut C,
-        id: &SocketId,
+        id: &SocketId<C>,
         params: SendDatagramParams<Self::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendDatagramError)> {
-        let SocketId(index) = id;
+        let SocketId(index, _marker) = id;
         self.with_sockets(|Sockets(sockets), sync_ctx| {
             let state = sockets.get(*index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
             let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
@@ -477,7 +484,7 @@ fn send_socket_frame<
 pub fn create<C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     external_state: C::SocketState,
-) -> SocketId {
+) -> SocketId<C> {
     let mut sync_ctx = Locked::new(sync_ctx);
     SocketHandler::create(&mut sync_ctx, external_state)
 }
@@ -485,7 +492,7 @@ pub fn create<C: crate::NonSyncContext>(
 /// Sets the device for which a packet socket will receive packets.
 pub fn set_device<C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
-    id: &mut SocketId,
+    id: &mut SocketId<C>,
     device: TargetDevice<&DeviceId<C>>,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
@@ -495,7 +502,7 @@ pub fn set_device<C: crate::NonSyncContext>(
 /// Sets the device and protocol for which a socket will receive packets.
 pub fn set_device_and_protocol<C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
-    id: &mut SocketId,
+    id: &mut SocketId<C>,
     device: TargetDevice<&DeviceId<C>>,
     protocol: Protocol,
 ) {
@@ -506,14 +513,14 @@ pub fn set_device_and_protocol<C: crate::NonSyncContext>(
 /// Gets the bound info for a socket.
 pub fn get_info<C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
-    id: &SocketId,
+    id: &SocketId<C>,
 ) -> SocketInfo<WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     SocketHandler::get_info(&mut sync_ctx, id)
 }
 
 /// Removes a bound socket.
-pub fn remove<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>, id: SocketId) {
+pub fn remove<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>, id: SocketId<C>) {
     let mut sync_ctx = Locked::new(sync_ctx);
     SocketHandler::remove(&mut sync_ctx, id)
 }
@@ -522,7 +529,7 @@ pub fn remove<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>, id: SocketId) {
 pub fn send_frame<C: crate::NonSyncContext, B: BufferMut>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: &mut SocketId,
+    id: &mut SocketId<C>,
     params: SendFrameParams<DeviceId<C>>,
     body: B,
 ) -> Result<(), (B, SendFrameError)> {
@@ -534,7 +541,7 @@ pub fn send_frame<C: crate::NonSyncContext, B: BufferMut>(
 pub fn send_datagram<C: crate::NonSyncContext, B: BufferMut>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: &mut SocketId,
+    id: &mut SocketId<C>,
     params: SendDatagramParams<DeviceId<C>>,
     body: B,
 ) -> Result<(), (B, SendDatagramError)> {
@@ -992,7 +999,7 @@ mod tests {
         let FakeSockets { device_sockets, shared_sockets: _ } = sync_ctx.get_ref();
         if let TargetDevice::SpecificDevice(d) = device {
             let DeviceSockets(indexes) = device_sockets.get(&d).expect("device state exists");
-            let SocketId(index) = bound;
+            let SocketId(index, _marker) = bound;
             assert_eq!(indexes, &[index]);
         }
     }
@@ -1030,7 +1037,7 @@ mod tests {
             .map(|(d, DeviceSockets(indexes))| (d, indexes.as_slice()))
             .collect::<HashMap<_, _>>();
 
-        let SocketId(index) = bound;
+        let SocketId(index, _marker) = bound;
         assert_eq!(
             device_socket_lists,
             HashMap::from([
@@ -1089,7 +1096,7 @@ mod tests {
         assert_eq!(
             removed,
             DeviceSockets(vec![{
-                let SocketId(index) = bound;
+                let SocketId(index, _marker) = bound;
                 index
             }])
         );
@@ -1112,7 +1119,7 @@ mod tests {
         let FakeSockets { device_sockets, shared_sockets: _ } = sync_ctx.get_ref();
         let DeviceSockets(indexes) =
             device_sockets.get(&MultipleDevicesId::B).expect("device state exists");
-        let SocketId(index) = bound;
+        let SocketId(index, _marker) = bound;
         assert_eq!(indexes, &[index]);
     }
 
@@ -1142,7 +1149,7 @@ mod tests {
         device: TargetDevice<SC::DeviceId>,
         protocol: Option<Protocol>,
         state: C::SocketState,
-    ) -> SocketId {
+    ) -> SocketId<C> {
         let mut id = SocketHandler::create(sync_ctx, state);
         let device = match &device {
             TargetDevice::AnyDevice => TargetDevice::AnyDevice,
