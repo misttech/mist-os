@@ -5,7 +5,7 @@
 pub mod blob;
 pub mod component;
 mod device;
-mod directory;
+pub mod directory;
 mod errors;
 pub mod file;
 mod memory_pressure;
@@ -15,7 +15,7 @@ pub mod pager;
 mod remote_crypt;
 mod symlink;
 pub mod vmo_data_buffer;
-mod volume;
+pub mod volume;
 mod volumes_directory;
 
 #[cfg(test)]

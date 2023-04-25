@@ -1190,6 +1190,26 @@ class Directory : public Remote<fio::Directory> {
     }
   }
 
+  zx_status_t CreateSymlink(const char* name, size_t name_len, const uint8_t* target,
+                            size_t target_len) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    fidl::Arena arena;
+    const fidl::WireResult result =
+        client()->CreateSymlink(fidl::StringView(arena, std::string_view(name, name_len)),
+                                fidl::VectorView<uint8_t>(arena, cpp20::span(target, target_len)));
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    return ZX_OK;
+#else
+    return ZX_ERR_NOT_SUPPORTED;
+#endif
+  }
+
   static const zxio_ops_t kOps;
 };
 
@@ -1227,6 +1247,8 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   ops.flags_get = Adaptor::From<&Directory::FlagsGet>;
   ops.flags_set = Adaptor::From<&Directory::FlagsSet>;
   ops.advisory_lock = Adaptor::From<&Directory::AdvisoryLock>;
+
+  ops.create_symlink = Adaptor::From<&Directory::CreateSymlink>;
   return ops;
 })();
 

@@ -505,6 +505,12 @@ ZXIO_EXPORT zx_status_t zxio_ioctl(zxio_t* io, int request, int16_t* out_code, v
 ZXIO_EXPORT zx_status_t zxio_read_link(zxio_t* io, const uint8_t** out_target,
                                        size_t* out_target_len);
 
+// Creates a symbolic link.
+//
+// See fuchsia.io's CreateSymlink method.
+ZXIO_EXPORT zx_status_t zxio_create_symlink(zxio_t* io, const char* name, size_t name_len,
+                                            const uint8_t* target, size_t target_len);
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_INCLUDE_LIB_ZXIO_ZXIO_H_

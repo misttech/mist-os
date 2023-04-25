@@ -72,10 +72,10 @@ test("standalone") {
   configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
 }
 
-rustc_test("symlink_test") {
+rustc_test("zxio_rust_test") {
   edition = "2021"
-  sources = [ "symlink-test.rs" ]
-  source_root = "symlink-test.rs"
+  sources = [ "zxio-test.rs" ]
+  source_root = "zxio-test.rs"
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
@@ -83,6 +83,7 @@ rustc_test("symlink_test") {
     "//src/lib/storage/vfs/rust:vfs",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/syncio",
+    "//src/storage/fxfs/platform:fxfs-testing",
     "//third_party/rust_crates:async-trait",
   ]
 }
@@ -92,14 +93,15 @@ fuchsia_unittest_component("zxio-test") {
   deps = [ ":zxio" ]
 }
 
-fuchsia_unittest_component("symlink-test") {
-  deps = [ ":symlink_test" ]
+fuchsia_unittest_component("zxio-rust-test") {
+  manifest = "meta/zxio-rust-test.cml"
+  deps = [ ":zxio_rust_test" ]
 }
 
 fuchsia_test_package("zxio-unittest-package") {
   test_components = [
     ":zxio-test",
-    ":symlink-test",
+    ":zxio-rust-test",
   ]
 }
 

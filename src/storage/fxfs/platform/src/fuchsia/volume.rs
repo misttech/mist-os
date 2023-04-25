@@ -504,8 +504,7 @@ impl FxVolumeAndRoot {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub(super) fn into_volume(self) -> Arc<FxVolume> {
+    pub fn into_volume(self) -> Arc<FxVolume> {
         self.volume
     }
 

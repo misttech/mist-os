@@ -839,6 +839,15 @@ extern "C" {
         out_target_len: *mut usize,
     ) -> zx_status_t;
 }
+extern "C" {
+    pub fn zxio_create_symlink(
+        io: *mut zxio_t,
+        name: *const ::std::os::raw::c_char,
+        name_len: usize,
+        target: *const u8,
+        target_len: usize,
+    ) -> zx_status_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iovec {

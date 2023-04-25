@@ -752,6 +752,20 @@ impl Zxio {
         // SAFETY: target will live as long as the underlying zxio object lives.
         unsafe { Ok(std::slice::from_raw_parts(target, target_len)) }
     }
+
+    pub fn create_symlink(&self, name: &str, target: &[u8]) -> Result<(), zx::Status> {
+        let name = name.as_bytes();
+        let status = unsafe {
+            zxio::zxio_create_symlink(
+                self.as_ptr(),
+                name.as_ptr() as *const ::std::os::raw::c_char,
+                name.len(),
+                target.as_ptr(),
+                target.len(),
+            )
+        };
+        Ok(zx::ok(status)?)
+    }
 }
 
 impl Drop for Zxio {
