@@ -140,6 +140,7 @@ if (use_bringup_assembly) {
 
     deps = [
       ":all_package_manifests.list",
+      ":assembly_cache_packages.list",
       ":base_packages.list",
       ":cache_packages.list",
       ":universe_packages.list",
