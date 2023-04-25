@@ -133,7 +133,7 @@ impl Snapshot for SnapshotV1 {
             let compressed_stack_trace =
                 resources_table.get_compressed_stack_trace(stack_trace_key)?;
             let uncompressed_stack_trace =
-                stack_trace_compression::uncompress(compressed_stack_trace);
+                stack_trace_compression::uncompress(compressed_stack_trace)?;
 
             // Split long stack traces in chunks so that they can be paginated.
             const MAX_ENTRIES_PER_CHUNK: usize = 32;
@@ -268,14 +268,10 @@ mod tests {
 
     // Generate a very long stack trace to verify that the pagination mechanism works.
     fn generate_fake_long_stack_trace() -> Vec<u64> {
-        // Ideally we would like to test with a stack trace whose uncompressed size is bigger than
-        // ZX_CHANNEL_MAX_MSG_BYTES. However, given that stack trace compression has not been
-        // implemented yet, ResourcesTableWriter will refuse to insert such stack traces.
-        // This is the longest possible stack trace length that ResourcesTableWriter can store right
-        // now.
-        // TODO(fxbug.dev/123360): Raise this number to its maximum value when compression is
-        // implemented.
-        const NUM_FRAMES: usize = (u16::MAX as usize) / std::mem::size_of::<u64>();
+        // Generate a stack trace such that its uncompressed size is four times bigger than
+        // ZX_CHANNEL_MAX_MSG_BYTES.
+        const UNCOMPRESSED_SIZE: usize = zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize * 4;
+        const NUM_FRAMES: usize = UNCOMPRESSED_SIZE / std::mem::size_of::<u64>();
         (0..NUM_FRAMES as u64).collect()
     }
 

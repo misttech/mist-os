@@ -24,7 +24,6 @@ rustc_library("heapdump_vmo") {
     "//third_party/rust_crates:crc",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [
