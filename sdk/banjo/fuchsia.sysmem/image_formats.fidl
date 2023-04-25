@@ -22,7 +22,7 @@ type PixelFormat = struct {
 /// Each of these values is opinionated re. the color spaces that can be
 /// contained within (in contrast with Vulkan).
 ///
-/// This should be kept in sync with fuchsia.sysmem2.PixelFormatType.
+/// This should be kept in sync with fuchsia.images2.PixelFormat.
 //
 // TODO(dustingreen): Add more comment text re. pixel data layout for each of
 // these.
@@ -97,6 +97,20 @@ type PixelFormatType = strict enum {
     /// 16bpp RG, 1 plane. 8 bits R, 8 bits G.
     /// Compatible with VK_FORMAT_R8G8_UNORM.
     R8G8 = 114;
+
+    /// 32bpp RGBA, 1 plane. 2 bits A, 10 bits R/G/B.
+    ///
+    /// Compatible with VK_FORMAT_A2R10G10B10_UNORM_PACK32.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_ARGB_2_10_10_10.
+    A2R10G10B10 = 115;
+
+    /// 32bpp BGRA, 1 plane. 2 bits A, 10 bits R/G/B.
+    ///
+    /// Compatible with VK_FORMAT_A2B10G10R10_UNORM_PACK32.
+    ///
+    /// Compatible with ZX_PIXEL_FORMAT_ABGR_2_10_10_10.
+    A2B10G10R10 = 116;
 
     /// The sysmem client is explicitly indicating that the sysmem client does
     /// not care which pixel format is chosen / used.  When setting this value,
