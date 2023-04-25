@@ -29,7 +29,6 @@ wlandevicemonitor_deps = [
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_rust",
   "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_rust",
-  "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_rust",
   "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
   "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
@@ -96,7 +95,6 @@ fuchsia_structured_config_values("wlandevicemonitor-values") {
   values = {
     wep_supported = false
     wpa1_supported = false
-    wlanstack_supported = false
   }
 }
 
@@ -105,18 +103,6 @@ fuchsia_structured_config_values("wlandevicemonitor-legacy-privacy-values") {
   values = {
     wep_supported = true
     wpa1_supported = true
-    wlanstack_supported = false
-  }
-}
-
-fuchsia_structured_config_values("wlandevicemonitor-legacy-wlanstack-values") {
-  cm_label = ":wlandevicemonitor-manifest"
-  values = {
-    # `wep_supported` and `wpa1_supported` have no effect here, as wlanstack itself
-    # already defines equivalent configs
-    wep_supported = false
-    wpa1_supported = false
-    wlanstack_supported = true
   }
 }
 
@@ -135,14 +121,6 @@ fuchsia_package("wlandevicemonitor-legacy-privacy") {
   package_name = "wlandevicemonitor"
   deps = [
     ":wlandevicemonitor-legacy-privacy-values",
-    ":wlandevicemonitor_component",
-  ]
-}
-
-fuchsia_package("wlandevicemonitor-legacy-wlanstack") {
-  package_name = "wlandevicemonitor"
-  deps = [
-    ":wlandevicemonitor-legacy-wlanstack-values",
     ":wlandevicemonitor_component",
   ]
 }

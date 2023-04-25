@@ -11,11 +11,8 @@ mod watcher_service;
 
 use {
     anyhow::Error,
-    fidl_fuchsia_wlan_device_service as fidl_svc, fuchsia_async as fasync,
-    fuchsia_component::{
-        client::connect_to_protocol,
-        server::{ServiceFs, ServiceObjLocal},
-    },
+    fuchsia_async as fasync,
+    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect::{Inspector, InspectorConfig},
     futures::{
         channel::mpsc,
@@ -34,7 +31,6 @@ async fn serve_fidl(
     phys: Arc<device::PhyMap>,
     ifaces: Arc<device::IfaceMap>,
     watcher_service: watcher_service::WatcherService<device::PhyDevice, device::IfaceDevice>,
-    dev_svc: fidl_svc::DeviceServiceProxy,
     new_iface_sink: mpsc::UnboundedSender<device::NewIface>,
     iface_counter: Arc<service::IfaceCounter>,
     cfg: wlandevicemonitor_config::Config,
@@ -45,7 +41,6 @@ async fn serve_fidl(
             phys.clone(),
             ifaces.clone(),
             watcher_service.clone(),
-            dev_svc.clone(),
             new_iface_sink.clone(),
             iface_counter.clone(),
             wlandevicemonitor_config::Config { ..cfg },
@@ -81,8 +76,6 @@ async fn main() -> Result<(), Error> {
     let (ifaces, iface_events) = device::IfaceMap::new();
     let ifaces = Arc::new(ifaces);
 
-    let dev_svc = connect_to_protocol::<fidl_svc::DeviceServiceMarker>()?;
-
     let (watcher_service, watcher_fut) =
         watcher_service::serve_watchers(phys.clone(), ifaces.clone(), phy_events, iface_events);
 
@@ -104,7 +97,6 @@ async fn main() -> Result<(), Error> {
         phys.clone(),
         ifaces.clone(),
         watcher_service,
-        dev_svc,
         new_iface_sink,
         iface_counter,
         cfg,
