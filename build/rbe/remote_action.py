@@ -522,6 +522,7 @@ class RemoteAction(object):
         compare_with_local: bool = False,
         check_determinism: bool = False,
         post_remote_run_success_action: Callable[[], int] = None,
+        remote_debug_command: Sequence[str] = None,
     ):
         """RemoteAction constructor.
 
@@ -563,6 +564,8 @@ class RemoteAction(object):
                 the trace name "rbe-action-output.remote-fsatrace"
           diagnose_nonzero: if True, attempt to examine logs and determine
             a cause of error.
+          remote_debug_command: if True, run different command remotely instead of
+            the original command, for debugging the remote inputs setup.
         """
         self._rewrapper = rewrapper
         self._config = cfg  # can be None
@@ -578,6 +581,7 @@ class RemoteAction(object):
         self._check_determinism = check_determinism
         self._options = (options or [])
         self._post_remote_run_success_action = post_remote_run_success_action
+        self._remote_debug_command = remote_debug_command or []
 
         # Detect some known rewrapper options
         self._rewrapper_known_options, _ = _REWRAPPER_ARG_PARSER.parse_known_args(
@@ -673,6 +677,10 @@ class RemoteAction(object):
         All of the --remote-* flags have been removed at this point.
         """
         return cl_utils.auto_env_prefix_command(self._remote_command)
+
+    @property
+    def remote_debug_command(self) -> Sequence[str]:
+        return self._remote_debug_command
 
     def _generate_options(self) -> Iterable[str]:
         if self.config:
@@ -836,11 +844,19 @@ class RemoteAction(object):
                 '--',
             ])
 
-    def _generate_remote_launch_command(self) -> Iterable[str]:
+    def _generate_remote_command_prefix(self) -> Iterable[str]:
         # No need to prepend with fuchsia.REPROXY_WRAP here,
         # because auto_relaunch_with_reproxy() does that.
         yield from self._generate_rewrapper_command_prefix()
         yield '--'
+
+    def _generate_remote_debug_command(self) -> Iterable[str]:
+        """List files in the remote execution environment."""
+        yield from self._generate_remote_command_prefix()
+        yield from self.remote_debug_command
+
+    def _generate_remote_launch_command(self) -> Iterable[str]:
+        yield from self._generate_remote_command_prefix()
 
         if self._remote_log_name:
             yield from self._remote_log_command_prefix
@@ -920,6 +936,16 @@ class RemoteAction(object):
             if f.exists():
                 f.unlink()  # does os.remove for files, rmdir for dirs
 
+    def remote_debug(self) -> cl_utils.SubprocessResult:
+        """Perform all remote setup, but run a different diagnostic command.
+
+        An example debug command could be: "ls -lR ../.."
+        This is a dignostic tool for verifying the remote environment.
+        """
+        return cl_utils.subprocess_call(
+            list(self._generate_remote_debug_command()),
+            cwd=self.working_dir)
+
     def _run_maybe_remotely(self) -> cl_utils.SubprocessResult:
         return cl_utils.subprocess_call(
             self.launch_command, cwd=self.working_dir)
@@ -945,6 +971,12 @@ class RemoteAction(object):
                     f"Error: Detected local output dir leaks '{self.build_subdir}' in the command.  Aborting remote execution."
                 )
                 return leak_status
+
+        if self.remote_debug_command:
+            self.remote_debug()
+            # Return non-zero to signal that the expected outputs were not
+            # produced in this mode.
+            return 1
 
         try:
             result = self._run_maybe_remotely()
@@ -1200,6 +1232,10 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
 _REWRAPPER_ARG_PARSER = _rewrapper_arg_parser()
 
 
+def _string_split(text: str) -> Sequence[str]:
+    return text.split()
+
+
 def inherit_main_arg_parser_flags(
     parser: argparse.ArgumentParser,
     default_cfg: Path = None,
@@ -1344,6 +1380,13 @@ Otherwise, BASE will default to the first output file named.""",
         help=
         """On nonzero exit statuses, attempt to diagnose potential RBE issues.  This scans various reproxy logs for information, and can be noisy."""
     )
+    main_group.add_argument(
+        "--remote-debug-command",
+        type=_string_split,
+        default=None,
+        help=
+        f"""Alternate command to execute remotely, while doing the setup for the original command.  e.g. --remote-debug-command="ls -l -R {PROJECT_ROOT_REL}" ."""
+    )
     # Positional args are the command and arguments to run.
     parser.add_argument(
         "command", nargs="*", help="The command to run remotely")
@@ -1399,6 +1442,7 @@ def remote_action_from_args(
         remote_log=main_args.remote_log,
         fsatrace_path=main_args.fsatrace_path,
         diagnose_nonzero=main_args.diagnose_nonzero,
+        remote_debug_command=main_args.remote_debug_command,
         **kwargs,
     )
 

@@ -376,6 +376,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertFalse(main_args.compare)
         self.assertFalse(main_args.diagnose_nonzero)
         self.assertEqual(main_args.command, ['echo', 'hello'])
+        self.assertIsNone(main_args.remote_debug_command)
 
     def test_cfg(self):
         p = self._make_main_parser()
@@ -451,6 +452,33 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertTrue(main_args.diagnose_nonzero)
         action = remote_action.remote_action_from_args(main_args)
         self.assertTrue(action.diagnose_nonzero)
+
+    def test_remote_debug_command(self):
+        exec_root = Path('/home/project')
+        build_dir = Path('build-out')
+        working_dir = exec_root / build_dir
+        input = Path('hello.txt')
+        debug = "ls -l -R .."
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            _strs([f'--remote-debug-command={debug}', '--', 'cat', input]))
+        action = remote_action.remote_action_from_args(
+            main_args,
+            inputs=[input],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        self.assertEqual(action.remote_debug_command, debug.split())
+        self.assertEqual(
+            {build_dir / input}, set(action.inputs_relative_to_project_root))
+        with mock.patch.object(cl_utils, 'subprocess_call') as mock_remote:
+            self.assertEqual(action.run(), 1)
+        mock_remote.assert_called_once()
+        arg, kwargs = mock_remote.call_args_list[0]
+        full_command = arg[0]
+        rewrapper_prefix, sep, remote_command = cl_utils.partition_sequence(full_command, '--')
+        self.assertEqual(remote_command, debug.split())
 
     def test_remote_log_named(self):
         p = self._make_main_parser()
