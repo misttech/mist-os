@@ -32,7 +32,7 @@ fn main() {
                             source_name: Some(protocol),
                             target_path: Some(target_path),
                             availability: Some(Availability::Required),
-                            ..UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     );
                     return false;
@@ -59,9 +59,9 @@ fn main() {
                         value: Some(Box::new(fdata::DictionaryValue::Str("notify".to_string()))),
                     },
                 ]),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             }),
-            ..Program::EMPTY
+            ..Default::default()
         };
         let uses = vec![
             Use::Service(UseService {
@@ -70,7 +70,7 @@ fn main() {
                 source_name: Some("fuchsia.fonts.Provider".to_string()),
                 target_path: Some("/svc/fuchsia.fonts.Provider".to_string()),
                 availability: Some(Availability::Required),
-                ..UseService::EMPTY
+                ..Default::default()
             }),
             Use::Protocol(UseProtocol {
                 dependency_type: Some(DependencyType::Strong),
@@ -78,7 +78,7 @@ fn main() {
                 source_name: Some("fuchsia.fonts.LegacyProvider".to_string()),
                 target_path: Some("/svc/fuchsia.fonts.OldProvider".to_string()),
                 availability: Some(Availability::Optional),
-                ..UseProtocol::EMPTY
+                ..Default::default()
             }),
             Use::Protocol(UseProtocol {
                 dependency_type: Some(DependencyType::Strong),
@@ -86,7 +86,7 @@ fn main() {
                 source_name: Some("fuchsia.log.LegacyLog".to_string()),
                 target_path: Some("/svc/fuchsia.log.LegacyLog".to_string()),
                 availability: Some(Availability::Required),
-                ..UseProtocol::EMPTY
+                ..Default::default()
             }),
             Use::EventStream(UseEventStream {
                 source_name: Some("events".to_string()),
@@ -97,7 +97,7 @@ fn main() {
                     name: "logger".to_string(),
                 })]),
                 availability: Some(Availability::Required),
-                ..UseEventStream::EMPTY
+                ..Default::default()
             }),
             Use::EventStream(UseEventStream {
                 source_name: Some("other".to_string()),
@@ -108,7 +108,7 @@ fn main() {
                     name: "logger".to_string(),
                 })]),
                 availability: Some(Availability::Required),
-                ..UseEventStream::EMPTY
+                ..Default::default()
             }),
             Use::EventStream(UseEventStream {
                 source_name: Some("some".to_string()),
@@ -119,14 +119,14 @@ fn main() {
                     name: "logger".to_string(),
                 })]),
                 availability: Some(Availability::Required),
-                ..UseEventStream::EMPTY
+                ..Default::default()
             }),
             Use::EventStream(UseEventStream {
                 source_name: Some("filtered".to_string()),
                 source: Some(Ref::Parent(ParentRef {})),
                 target_path: Some("/svc/fuchsia.component.EventStream".to_string()),
                 availability: Some(Availability::Required),
-                ..UseEventStream::EMPTY
+                ..Default::default()
             }),
             Use::Protocol(UseProtocol {
                 dependency_type: Some(DependencyType::Strong),
@@ -134,7 +134,7 @@ fn main() {
                 source_name: Some("fuchsia.logger.LogSink".to_string()),
                 target_path: Some("/svc/fuchsia.logger.LogSink".to_string()),
                 availability: Some(Availability::Required),
-                ..UseProtocol::EMPTY
+                ..Default::default()
             }),
         ];
         let exposes = vec![
@@ -143,14 +143,14 @@ fn main() {
                 source_name: Some("fuchsia.logger.Log".to_string()),
                 target_name: Some("fuchsia.logger.Log".to_string()),
                 target: Some(Ref::Parent(ParentRef {})),
-                ..ExposeService::EMPTY
+                ..Default::default()
             }),
             Expose::Protocol(ExposeProtocol {
                 source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
                 source_name: Some("fuchsia.logger.LegacyLog".to_string()),
                 target_name: Some("fuchsia.logger.OldLog".to_string()),
                 target: Some(Ref::Parent(ParentRef {})),
-                ..ExposeProtocol::EMPTY
+                ..Default::default()
             }),
             Expose::Directory(ExposeDirectory {
                 source: Some(Ref::Self_(SelfRef {})),
@@ -159,7 +159,7 @@ fn main() {
                 target: Some(Ref::Parent(ParentRef {})),
                 rights: None,
                 subdir: Some("blob".to_string()),
-                ..ExposeDirectory::EMPTY
+                ..Default::default()
             }),
             Expose::EventStream(ExposeEventStream {
                 source: Some(Ref::Framework(FrameworkRef {})),
@@ -170,7 +170,7 @@ fn main() {
                     collection: None,
                 })]),
                 target_name: Some("started".to_string()),
-                ..ExposeEventStream::EMPTY
+                ..Default::default()
             }),
             Expose::EventStream(ExposeEventStream {
                 source: Some(Ref::Framework(FrameworkRef {})),
@@ -181,7 +181,7 @@ fn main() {
                     collection: None,
                 })]),
                 target_name: Some("stopped".to_string()),
-                ..ExposeEventStream::EMPTY
+                ..Default::default()
             }),
         ];
         let offers = vec![
@@ -191,7 +191,7 @@ fn main() {
                 target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
                 target_name: Some("fuchsia.logger.Log".to_string()),
                 availability: Some(Availability::Required),
-                ..OfferService::EMPTY
+                ..Default::default()
             }),
             Offer::Protocol(OfferProtocol {
                 source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
@@ -200,7 +200,7 @@ fn main() {
                 target_name: Some("fuchsia.logger.OldLog".to_string()),
                 dependency_type: Some(DependencyType::Strong),
                 availability: Some(Availability::Required),
-                ..OfferProtocol::EMPTY
+                ..Default::default()
             }),
             Offer::EventStream(OfferEventStream {
                 source_name: Some("directory_ready".to_string()),
@@ -211,11 +211,11 @@ fn main() {
                         key: "name".to_string(),
                         value: Some(Box::new(DictionaryValue::Str("diagnostics".to_string()))),
                     }]),
-                    ..Dictionary::EMPTY
+                    ..Default::default()
                 }),
                 target_name: Some("directory_ready".to_string()),
                 availability: Some(Availability::SameAsTarget),
-                ..OfferEventStream::EMPTY
+                ..Default::default()
             }),
             Offer::EventStream(OfferEventStream {
                 source_name: Some("started".to_string()),
@@ -227,7 +227,7 @@ fn main() {
                 })]),
                 target_name: Some("started".to_string()),
                 availability: Some(Availability::Required),
-                ..OfferEventStream::EMPTY
+                ..Default::default()
             }),
             Offer::EventStream(OfferEventStream {
                 source_name: Some("stopped".to_string()),
@@ -239,7 +239,7 @@ fn main() {
                 })]),
                 target_name: Some("stopped".to_string()),
                 availability: Some(Availability::Required),
-                ..OfferEventStream::EMPTY
+                ..Default::default()
             }),
             Offer::Protocol(OfferProtocol {
                 source: Some(Ref::VoidType(VoidRef {})),
@@ -248,7 +248,7 @@ fn main() {
                 target_name: Some("fuchsia.logger.OldLog2".to_string()),
                 dependency_type: Some(DependencyType::Strong),
                 availability: Some(Availability::Optional),
-                ..OfferProtocol::EMPTY
+                ..Default::default()
             }),
             Offer::Protocol(OfferProtocol {
                 source: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
@@ -257,7 +257,7 @@ fn main() {
                 target_name: Some("fuchsia.logger.OldLog3".to_string()),
                 dependency_type: Some(DependencyType::Strong),
                 availability: Some(Availability::Required),
-                ..OfferProtocol::EMPTY
+                ..Default::default()
             }),
             Offer::Protocol(OfferProtocol {
                 source: Some(Ref::Parent(ParentRef {})),
@@ -266,19 +266,19 @@ fn main() {
                 target_name: Some("fuchsia.logger.OldLog4".to_string()),
                 dependency_type: Some(DependencyType::Strong),
                 availability: Some(Availability::Optional),
-                ..OfferProtocol::EMPTY
+                ..Default::default()
             }),
         ];
         let capabilities = vec![
             Capability::Service(Service {
                 name: Some("fuchsia.logger.Log".to_string()),
                 source_path: Some("/svc/fuchsia.logger.Log".to_string()),
-                ..Service::EMPTY
+                ..Default::default()
             }),
             Capability::Protocol(Protocol {
                 name: Some("fuchsia.logger.Log2".to_string()),
                 source_path: Some("/svc/fuchsia.logger.Log2".to_string()),
-                ..Protocol::EMPTY
+                ..Default::default()
             }),
             Capability::Directory(Directory {
                 name: Some("blobfs".to_string()),
@@ -293,7 +293,7 @@ fn main() {
                         | fio::Operations::TRAVERSE
                         | fio::Operations::MODIFY_DIRECTORY,
                 ),
-                ..Directory::EMPTY
+                ..Default::default()
             }),
             Capability::Storage(Storage {
                 name: Some("minfs".to_string()),
@@ -301,17 +301,17 @@ fn main() {
                 backing_dir: Some("data".to_string()),
                 subdir: None,
                 storage_id: Some(StorageId::StaticInstanceIdOrMoniker),
-                ..Storage::EMPTY
+                ..Default::default()
             }),
             Capability::Runner(Runner {
                 name: Some("dart_runner".to_string()),
                 source_path: Some("/svc/fuchsia.sys2.Runner".to_string()),
-                ..Runner::EMPTY
+                ..Default::default()
             }),
             Capability::Resolver(Resolver {
                 name: Some("pkg_resolver".to_string()),
                 source_path: Some("/svc/fuchsia.pkg.Resolver".to_string()),
-                ..Resolver::EMPTY
+                ..Default::default()
             }),
         ];
         let children = vec![Child {
@@ -319,7 +319,7 @@ fn main() {
             url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
             startup: Some(StartupMode::Lazy),
             environment: Some("env_one".to_string()),
-            ..Child::EMPTY
+            ..Default::default()
         }];
         let collections = vec![
             Collection {
@@ -329,7 +329,7 @@ fn main() {
                 allowed_offers: None,
                 allow_long_names: None,
                 persistent_storage: None,
-                ..Collection::EMPTY
+                ..Default::default()
             },
             Collection {
                 name: Some("explicit_static".to_string()),
@@ -338,7 +338,7 @@ fn main() {
                 allowed_offers: Some(AllowedOffers::StaticOnly),
                 allow_long_names: None,
                 persistent_storage: None,
-                ..Collection::EMPTY
+                ..Default::default()
             },
             Collection {
                 name: Some("explicit_dynamic".to_string()),
@@ -347,7 +347,7 @@ fn main() {
                 allowed_offers: Some(AllowedOffers::StaticAndDynamic),
                 allow_long_names: None,
                 persistent_storage: None,
-                ..Collection::EMPTY
+                ..Default::default()
             },
             Collection {
                 name: Some("long_child_names".to_string()),
@@ -356,7 +356,7 @@ fn main() {
                 allowed_offers: None,
                 allow_long_names: Some(true),
                 persistent_storage: None,
-                ..Collection::EMPTY
+                ..Default::default()
             },
             Collection {
                 name: Some("persistent_storage".to_string()),
@@ -365,7 +365,7 @@ fn main() {
                 allowed_offers: None,
                 allow_long_names: None,
                 persistent_storage: Some(true),
-                ..Collection::EMPTY
+                ..Default::default()
             },
         ];
         let facets = fdata::Dictionary {
@@ -385,7 +385,7 @@ fn main() {
                     value: Some(Box::new(fdata::DictionaryValue::Str("2018".to_string()))),
                 },
             ]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         };
         let envs = vec![
             Environment {
@@ -395,7 +395,7 @@ fn main() {
                 runners: None,
                 resolvers: None,
                 debug_capabilities: None,
-                ..Environment::EMPTY
+                ..Default::default()
             },
             Environment {
                 name: Some("env_two".to_string()),
@@ -411,22 +411,22 @@ fn main() {
                             collection: None,
                         })),
                         target_name: Some("fuchsia.logger.LegacyLog".to_string()),
-                        ..DebugProtocolRegistration::EMPTY
+                        ..Default::default()
                     }),
                     DebugRegistration::Protocol(DebugProtocolRegistration {
                         source_name: Some("fuchsia.logger.OtherLog".to_string()),
                         source: Some(Ref::Parent(ParentRef {})),
                         target_name: Some("fuchsia.logger.OtherLog".to_string()),
-                        ..DebugProtocolRegistration::EMPTY
+                        ..Default::default()
                     }),
                     DebugRegistration::Protocol(DebugProtocolRegistration {
                         source_name: Some("fuchsia.logger.Log2".to_string()),
                         source: Some(Ref::Self_(SelfRef {})),
                         target_name: Some("fuchsia.logger.Log2".to_string()),
-                        ..DebugProtocolRegistration::EMPTY
+                        ..Default::default()
                     }),
                 ]),
-                ..Environment::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -439,7 +439,7 @@ fn main() {
                         parameters: Some(vec![]),
                         constraints: vec![],
                     }),
-                    ..ConfigField::EMPTY
+                    ..Default::default()
                 },
                 ConfigField {
                     key: Some("my_string".to_string()),
@@ -448,7 +448,7 @@ fn main() {
                         constraints: vec![LayoutConstraint::MaxSize(100)],
                         parameters: Some(vec![]),
                     }),
-                    ..ConfigField::EMPTY
+                    ..Default::default()
                 },
                 ConfigField {
                     key: Some("my_uint8".to_string()),
@@ -457,7 +457,7 @@ fn main() {
                         parameters: Some(vec![]),
                         constraints: vec![],
                     }),
-                    ..ConfigField::EMPTY
+                    ..Default::default()
                 },
                 ConfigField {
                     key: Some("my_vector_of_string".to_string()),
@@ -470,7 +470,7 @@ fn main() {
                             parameters: Some(vec![]),
                         })]),
                     }),
-                    ..ConfigField::EMPTY
+                    ..Default::default()
                 },
             ]),
             checksum: Some(ConfigChecksum::Sha256([
@@ -478,7 +478,7 @@ fn main() {
                 240, 41, 165, 95, 117, 57, 203, 42, 186, 167, 84, 26, 25, 231,
             ])),
             value_source: Some(ConfigValueSource::PackagePath("meta/example.cvf".to_string())),
-            ..ConfigSchema::EMPTY
+            ..Default::default()
         };
 
         Component {
@@ -492,7 +492,7 @@ fn main() {
             facets: Some(facets),
             environments: Some(envs),
             config: Some(config),
-            ..Component::EMPTY
+            ..Default::default()
         }
     };
     assert_eq!(cm_decl, expected_decl);

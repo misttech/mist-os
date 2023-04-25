@@ -76,7 +76,7 @@ pub fn compile(
                 }
             })
             .transpose()?,
-        ..fdecl::Component::EMPTY
+        ..Default::default()
     })
 }
 
@@ -87,7 +87,7 @@ fn dictionary_from_map(in_obj: Map<String, Value>) -> Result<fdata::Dictionary, 
         let value = value_to_dictionary_value(v)?;
         entries.push(fdata::DictionaryEntry { key, value });
     }
-    Ok(fdata::Dictionary { entries: Some(entries), ..fdata::Dictionary::EMPTY })
+    Ok(fdata::Dictionary { entries: Some(entries), ..Default::default() })
 }
 
 // Converts a serde_json::Value into a fuchsia DictionaryValue.
@@ -181,7 +181,7 @@ fn dictionary_from_nested_map(map: IndexMap<String, Value>) -> Result<fdata::Dic
         .into_iter()
         .flatten()
         .collect();
-    Ok(fdata::Dictionary { entries: Some(entries), ..fdata::Dictionary::EMPTY })
+    Ok(fdata::Dictionary { entries: Some(entries), ..Default::default() })
 }
 
 /// Translates a [`Program`] to a [`fuchsa.sys2.Program`].
@@ -189,7 +189,7 @@ fn translate_program(program: &Program) -> Result<fdecl::Program, Error> {
     Ok(fdecl::Program {
         runner: program.runner.as_ref().map(|r| r.to_string()),
         info: Some(dictionary_from_nested_map(program.info.clone())?),
-        ..fdecl::Program::EMPTY
+        ..Default::default()
     })
 }
 
@@ -218,7 +218,7 @@ fn translate_use(
                         use_.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
                     ),
                     availability: Some(availability),
-                    ..fdecl::UseService::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = &use_.protocol {
@@ -237,7 +237,7 @@ fn translate_use(
                         use_.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
                     ),
                     availability: Some(availability),
-                    ..fdecl::UseProtocol::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = &use_.directory {
@@ -256,7 +256,7 @@ fn translate_use(
                     use_.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
                 ),
                 availability: Some(availability),
-                ..fdecl::UseDirectory::EMPTY
+                ..Default::default()
             }));
         } else if let Some(n) = &use_.storage {
             let target_path = one_target_use_path(use_, use_)?;
@@ -265,7 +265,7 @@ fn translate_use(
                 source_name: Some(n.clone().into()),
                 target_path: Some(target_path.into()),
                 availability: Some(availability),
-                ..fdecl::UseStorage::EMPTY
+                ..Default::default()
             }));
         } else if let Some(names) = &use_.event_stream {
             let source_names: Vec<String> =
@@ -314,7 +314,7 @@ fn translate_use(
                         None => None,
                     },
                     availability: Some(availability),
-                    ..fdecl::UseEventStream::EMPTY
+                    ..Default::default()
                 }));
             }
         } else {
@@ -347,7 +347,7 @@ fn translate_expose(
                         source_name: Some(source_name.clone().into()),
                         target_name: Some(target_name.clone().into()),
                         target: Some(clone_ref(&target)?),
-                        ..fdecl::ExposeService::EMPTY
+                        ..Default::default()
                     }))
                 }
             }
@@ -363,7 +363,7 @@ fn translate_expose(
                     source_name: Some(source_name.clone().into()),
                     target_name: Some(target_name.into()),
                     target: Some(clone_ref(&target)?),
-                    ..fdecl::ExposeProtocol::EMPTY
+                    ..Default::default()
                 }))
             }
         } else if let Some(n) = expose.directory() {
@@ -382,7 +382,7 @@ fn translate_expose(
                     target: Some(clone_ref(&target)?),
                     rights,
                     subdir: subdir.as_ref().map(|s| s.clone().into()),
-                    ..fdecl::ExposeDirectory::EMPTY
+                    ..Default::default()
                 }))
             }
         } else if let Some(n) = expose.runner() {
@@ -397,7 +397,7 @@ fn translate_expose(
                     source_name: Some(source_name.clone().into()),
                     target: Some(clone_ref(&target)?),
                     target_name: Some(target_name.into()),
-                    ..fdecl::ExposeRunner::EMPTY
+                    ..Default::default()
                 }))
             }
         } else if let Some(n) = expose.resolver() {
@@ -412,7 +412,7 @@ fn translate_expose(
                     source_name: Some(source_name.clone().into()),
                     target: Some(clone_ref(&target)?),
                     target_name: Some(target_name.into()),
-                    ..fdecl::ExposeResolver::EMPTY
+                    ..Default::default()
                 }))
             }
         } else if let Some(n) = expose.event_stream() {
@@ -445,7 +445,7 @@ fn translate_expose(
                         }
                         None => None,
                     },
-                    ..fdecl::ExposeEventStream::EMPTY
+                    ..Default::default()
                 }))
             }
         } else {
@@ -602,7 +602,7 @@ fn translate_offer(
                     target: Some(target),
                     target_name: Some(target_name.into()),
                     availability: Some(availability),
-                    ..fdecl::OfferService::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = offer.protocol() {
@@ -631,7 +631,7 @@ fn translate_offer(
                         offer.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
                     ),
                     availability: Some(availability),
-                    ..fdecl::OfferProtocol::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = offer.directory() {
@@ -662,7 +662,7 @@ fn translate_offer(
                         offer.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
                     ),
                     availability: Some(availability),
-                    ..fdecl::OfferDirectory::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = offer.storage() {
@@ -688,7 +688,7 @@ fn translate_offer(
                     target: Some(target),
                     target_name: Some(target_name.into()),
                     availability: Some(availability),
-                    ..fdecl::OfferStorage::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = offer.runner() {
@@ -705,7 +705,7 @@ fn translate_offer(
                     source_name: Some(source_name.into()),
                     target: Some(target),
                     target_name: Some(target_name.into()),
-                    ..fdecl::OfferRunner::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = offer.resolver() {
@@ -722,7 +722,7 @@ fn translate_offer(
                     source_name: Some(source_name.into()),
                     target: Some(target),
                     target_name: Some(target_name.into()),
-                    ..fdecl::OfferResolver::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = offer.event_stream() {
@@ -772,7 +772,7 @@ fn translate_offer(
                         None => None,
                     },
                     availability: Some(availability),
-                    ..fdecl::OfferEventStream::EMPTY
+                    ..Default::default()
                 }));
             }
         } else {
@@ -791,7 +791,7 @@ fn translate_children(children_in: &Vec<Child>) -> Result<Vec<fdecl::Child>, Err
             startup: Some(child.startup.clone().into()),
             environment: extract_environment_ref(child.environment.as_ref()).map(|e| e.into()),
             on_terminate: child.on_terminate.as_ref().map(|r| r.clone().into()),
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         });
     }
     Ok(out_children)
@@ -809,7 +809,7 @@ fn translate_collections(
             allowed_offers: collection.allowed_offers.clone().map(|a| a.into()),
             allow_long_names: collection.allow_long_names.clone(),
             persistent_storage: collection.persistent_storage.clone(),
-            ..fdecl::Collection::EMPTY
+            ..Default::default()
         });
     }
     Ok(out_collections)
@@ -897,7 +897,7 @@ fn translate_config(
         fidl_fields.push(fdecl::ConfigField {
             key: Some(key.to_string()),
             type_: Some(translate_value_type(value)),
-            ..fdecl::ConfigField::EMPTY
+            ..Default::default()
         });
 
         hasher.update(key.as_str());
@@ -913,7 +913,7 @@ fn translate_config(
         checksum: Some(checksum),
         // for now we only support ELF components that look up config by package path
         value_source: Some(fdecl::ConfigValueSource::PackagePath(package_path.to_owned())),
-        ..fdecl::ConfigSchema::EMPTY
+        ..Default::default()
     }
 }
 
@@ -959,7 +959,7 @@ fn translate_environments(
                     })
                     .transpose()?,
                 stop_timeout_ms: env.stop_timeout_ms.map(|s| s.0),
-                ..fdecl::Environment::EMPTY
+                ..Default::default()
             })
         })
         .collect()
@@ -972,7 +972,7 @@ fn translate_runner_registration(
         source_name: Some(reg.runner.clone().into()),
         source: Some(extract_single_offer_source(reg, None)?),
         target_name: Some(reg.r#as.as_ref().unwrap_or(&reg.runner).clone().into()),
-        ..fdecl::RunnerRegistration::EMPTY
+        ..Default::default()
     })
 }
 
@@ -989,7 +989,7 @@ fn translate_resolver_registration(
                 .map_err(|e| Error::internal(format!("invalid URL scheme: {}", e)))?
                 .into(),
         ),
-        ..fdecl::ResolverRegistration::EMPTY
+        ..Default::default()
     })
 }
 
@@ -1023,7 +1023,7 @@ fn translate_debug_capabilities(
                         source: Some(clone_ref(&source)?),
                         source_name: Some(source_name.into()),
                         target_name: Some(target_name.into()),
-                        ..fdecl::DebugProtocolRegistration::EMPTY
+                        ..Default::default()
                     },
                 ));
             }
@@ -1426,7 +1426,7 @@ pub fn translate_capabilities(
                 out_capabilities.push(fdecl::Capability::Service(fdecl::Service {
                     name: Some(n.clone().into()),
                     source_path: source_path,
-                    ..fdecl::Service::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(protocol) = &capability.protocol {
@@ -1444,7 +1444,7 @@ pub fn translate_capabilities(
                 out_capabilities.push(fdecl::Capability::Protocol(fdecl::Protocol {
                     name: Some(n.clone().into()),
                     source_path: source_path,
-                    ..fdecl::Protocol::EMPTY
+                    ..Default::default()
                 }));
             }
         } else if let Some(n) = &capability.directory {
@@ -1459,7 +1459,7 @@ pub fn translate_capabilities(
                 name: Some(n.clone().into()),
                 source_path: source_path,
                 rights: Some(rights),
-                ..fdecl::Directory::EMPTY
+                ..Default::default()
             }));
         } else if let Some(n) = &capability.storage {
             if as_builtin {
@@ -1485,7 +1485,7 @@ pub fn translate_capabilities(
                 storage_id: Some(
                     capability.storage_id.clone().expect("storage is missing storage_id").into(),
                 ),
-                ..fdecl::Storage::EMPTY
+                ..Default::default()
             }));
         } else if let Some(n) = &capability.runner {
             let source_path = match as_builtin {
@@ -1497,7 +1497,7 @@ pub fn translate_capabilities(
             out_capabilities.push(fdecl::Capability::Runner(fdecl::Runner {
                 name: Some(n.clone().into()),
                 source_path: source_path,
-                ..fdecl::Runner::EMPTY
+                ..Default::default()
             }));
         } else if let Some(n) = &capability.resolver {
             let source_path = match as_builtin {
@@ -1509,7 +1509,7 @@ pub fn translate_capabilities(
             out_capabilities.push(fdecl::Capability::Resolver(fdecl::Resolver {
                 name: Some(n.clone().into()),
                 source_path: source_path,
-                ..fdecl::Resolver::EMPTY
+                ..Default::default()
             }));
         } else if let Some(ns) = &capability.event_stream {
             if !as_builtin {
@@ -1520,7 +1520,7 @@ pub fn translate_capabilities(
             for n in ns {
                 out_capabilities.push(fdecl::Capability::EventStream(fdecl::EventStream {
                     name: Some(n.clone().into()),
-                    ..fdecl::EventStream::EMPTY
+                    ..Default::default()
                 }));
             }
         } else {
@@ -1644,7 +1644,7 @@ mod tests {
 }
 
     fn default_component_decl() -> fdecl::Component {
-        fdecl::Component::EMPTY
+        fdecl::Component::default()
     }
 
     test_compile! {
@@ -1698,7 +1698,7 @@ mod tests {
                         target_name: Some("LogSink2".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1710,7 +1710,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1721,19 +1721,19 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![fdecl::Child {
                     name: Some("logger".into()),
                     url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".into()),
                     startup: Some(fdecl::StartupMode::Lazy),
-                    ..fdecl::Child::EMPTY
+                    ..Default::default()
                 }]),
                 collections: Some(vec![fdecl::Collection {
                     name: Some("coll".into()),
                     durability: Some(fdecl::Durability::Transient),
-                    ..fdecl::Collection::EMPTY
+                    ..Default::default()
                 }]),
                 ..default_component_decl()
             },
@@ -1787,7 +1787,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LegacyLog".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1799,7 +1799,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1811,7 +1811,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1822,7 +1822,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1834,7 +1834,7 @@ mod tests {
                         target_name: Some("fuchsia.inspect.InspectSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1846,7 +1846,7 @@ mod tests {
                         target_name: Some("fuchsia.inspect.InspectSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1857,7 +1857,7 @@ mod tests {
                         target_name: Some("fuchsia.inspect.InspectSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -1865,7 +1865,7 @@ mod tests {
                         name: Some("logger".into()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".into()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("something".into()),
@@ -1873,13 +1873,13 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 collections: Some(vec![fdecl::Collection {
                     name: Some("coll".into()),
                     durability: Some(fdecl::Durability::Transient),
-                    ..fdecl::Collection::EMPTY
+                    ..Default::default()
                 }]),
                 ..default_component_decl()
             },
@@ -1946,7 +1946,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1958,7 +1958,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1969,7 +1969,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1980,7 +1980,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1992,7 +1992,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -2000,7 +2000,7 @@ mod tests {
                         name: Some("logger".into()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".into()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("something".into()),
@@ -2008,7 +2008,7 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("something-v2".into()),
@@ -2016,17 +2016,17 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something-v2.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 collections: Some(vec![fdecl::Collection {
                     name: Some("coll".into()),
                     durability: Some(fdecl::Durability::Transient),
-                    ..fdecl::Collection::EMPTY
+                    ..Default::default()
                 }, fdecl::Collection {
                     name: Some("coll2".into()),
                     durability: Some(fdecl::Durability::Transient),
-                    ..fdecl::Collection::EMPTY
+                    ..Default::default()
                 }]),
                 ..default_component_decl()
             },
@@ -2071,7 +2071,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -2086,7 +2086,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -2094,7 +2094,7 @@ mod tests {
                         name: Some("logger".into()),
                         url: Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".into()),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("something".into()),
@@ -2102,7 +2102,7 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("something-v2".into()),
@@ -2110,7 +2110,7 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something-v2.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -2150,7 +2150,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -2162,7 +2162,7 @@ mod tests {
                         target_name: Some("fuchsia.inspect.InspectSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -2172,7 +2172,7 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -2212,7 +2212,7 @@ mod tests {
                         target_name: Some("fuchsia.logger.LogSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -2224,7 +2224,7 @@ mod tests {
                         target_name: Some("fuchsia.inspect.InspectSink".into()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::OfferProtocol::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -2234,7 +2234,7 @@ mod tests {
                             "fuchsia-pkg://fuchsia.com/something/stable#meta/something.cm".into(),
                         ),
                         startup: Some(fdecl::StartupMode::Lazy),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -2256,9 +2256,9 @@ mod tests {
                             key: "binary".to_string(),
                             value: Some(Box::new(fdata::DictionaryValue::Str("bin/app".to_string()))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 ..default_component_decl()
             },
@@ -2292,9 +2292,9 @@ mod tests {
                                 value: Some(Box::new(fdata::DictionaryValue::Str("six".to_string()))),
                             },
                         ]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 ..default_component_decl()
             },
@@ -2350,7 +2350,7 @@ mod tests {
                                                                 value: Some(Box::new(fdata::DictionaryValue::Str("device".to_string()))),
                                                             }
                                                         ]),
-                                                        ..fdata::Dictionary::EMPTY
+                                                        ..Default::default()
                                                     },
                                                     fdata::Dictionary {
                                                         entries: Some(vec![
@@ -2363,7 +2363,7 @@ mod tests {
                                                                 value: Some(Box::new(fdata::DictionaryValue::Str("emu".to_string()))),
                                                             }
                                                         ]),
-                                                        ..fdata::Dictionary::EMPTY
+                                                        ..Default::default()
                                                     },
                                                 ])))
                                             },
@@ -2372,14 +2372,14 @@ mod tests {
                                                 value: Some(Box::new(fdata::DictionaryValue::Str("external_network".to_string()))),
                                             },
                                         ]),
-                                        ..fdata::Dictionary::EMPTY
+                                        ..Default::default()
                                     }
                                 ]))),
                             },
                         ]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 ..default_component_decl()
             },
@@ -2447,7 +2447,7 @@ mod tests {
                             source_name: Some("LegacyCoolFonts".to_string()),
                             target_path: Some("/svc/fuchsia.fonts.LegacyProvider".to_string()),
                             availability: Some(fdecl::Availability::Optional),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -2457,7 +2457,7 @@ mod tests {
                             source_name: Some("fuchsia.sys2.LegacyRealm".to_string()),
                             target_path: Some("/svc/fuchsia.sys2.LegacyRealm".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -2467,7 +2467,7 @@ mod tests {
                             source_name: Some("fuchsia.sys2.StorageAdmin".to_string()),
                             target_path: Some("/svc/fuchsia.sys2.StorageAdmin".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -2477,7 +2477,7 @@ mod tests {
                             source_name: Some("fuchsia.sys2.DebugProto".to_string()),
                             target_path: Some("/svc/fuchsia.sys2.DebugProto".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -2487,7 +2487,7 @@ mod tests {
                             source_name: Some("fuchsia.sys2.Echo".to_string()),
                             target_path: Some("/svc/fuchsia.sys2.Echo".to_string()),
                             availability: Some(fdecl::Availability::Transitional),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Directory (
@@ -2499,7 +2499,7 @@ mod tests {
                             rights: Some(fio::Operations::READ_BYTES),
                             subdir: None,
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Directory (
@@ -2511,7 +2511,7 @@ mod tests {
                             rights: Some(fio::Operations::READ_BYTES),
                             subdir: Some("fonts".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Storage (
@@ -2519,7 +2519,7 @@ mod tests {
                             source_name: Some("hippos".to_string()),
                             target_path: Some("/hippos".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseStorage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Storage (
@@ -2527,7 +2527,7 @@ mod tests {
                             source_name: Some("cache".to_string()),
                             target_path: Some("/tmp".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseStorage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::EventStream(fdecl::UseEventStream {
@@ -2535,7 +2535,7 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         target_path: Some("/svc/fuchsia.component.EventStream".to_string()),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseEventStream::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source_name: Some("foobar".to_string()),
@@ -2543,7 +2543,7 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         target_path: Some("/svc/fuchsia.component.EventStream".to_string()),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseEventStream::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source_name: Some("stream".to_string()),
@@ -2551,14 +2551,14 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         target_path: Some("/svc/fuchsia.component.EventStream".to_string()),
                         availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseEventStream::EMPTY
+                        ..Default::default()
                     })
                 ]),
                 collections:Some(vec![
                     fdecl::Collection{
                         name:Some("modular".to_string()),
                         durability:Some(fdecl::Durability::Transient),
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 capabilities: Some(vec![
@@ -2568,7 +2568,7 @@ mod tests {
                         backing_dir: Some("minfs".to_string()),
                         subdir: None,
                         storage_id: Some(fdecl::StorageId::StaticInstanceIdOrMoniker),
-                        ..fdecl::Storage::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -2577,7 +2577,7 @@ mod tests {
                         url:Some("fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm".to_string()),
                         startup:Some(fdecl::StartupMode::Lazy),
                         environment: Some("env_one".to_string()),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 ..default_component_decl()
@@ -2667,7 +2667,7 @@ mod tests {
                             source_name: Some("fuchsia.logger.Log".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("fuchsia.logger.LegacyLog".to_string()),
-                            ..fdecl::ExposeProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Protocol (
@@ -2676,7 +2676,7 @@ mod tests {
                             source_name: Some("A".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("A".to_string()),
-                            ..fdecl::ExposeProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Protocol (
@@ -2685,7 +2685,7 @@ mod tests {
                             source_name: Some("B".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("B".to_string()),
-                            ..fdecl::ExposeProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Protocol (
@@ -2696,7 +2696,7 @@ mod tests {
                             source_name: Some("C".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("C".to_string()),
-                            ..fdecl::ExposeProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Directory (
@@ -2711,7 +2711,7 @@ mod tests {
                                 fio::Operations::GET_ATTRIBUTES
                             ),
                             subdir: None,
-                            ..fdecl::ExposeDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Directory (
@@ -2725,7 +2725,7 @@ mod tests {
                             target_name: Some("blob2".to_string()),
                             rights: None,
                             subdir: None,
-                            ..fdecl::ExposeDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Directory (
@@ -2739,7 +2739,7 @@ mod tests {
                             target_name: Some("blob3".to_string()),
                             rights: None,
                             subdir: None,
-                            ..fdecl::ExposeDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Directory (
@@ -2750,7 +2750,7 @@ mod tests {
                             target_name: Some("hub".to_string()),
                             rights: None,
                             subdir: None,
-                            ..fdecl::ExposeDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Runner (
@@ -2762,7 +2762,7 @@ mod tests {
                             source_name: Some("web".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("web-rename".to_string()),
-                            ..fdecl::ExposeRunner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Runner (
@@ -2774,7 +2774,7 @@ mod tests {
                             source_name: Some("runner_a".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("runner_a".to_string()),
-                            ..fdecl::ExposeRunner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Runner (
@@ -2786,7 +2786,7 @@ mod tests {
                             source_name: Some("runner_b".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("runner_b".to_string()),
-                            ..fdecl::ExposeRunner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Resolver (
@@ -2798,7 +2798,7 @@ mod tests {
                             source_name: Some("my_resolver".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("pkg_resolver".to_string()),
-                            ..fdecl::ExposeResolver::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Resolver (
@@ -2810,7 +2810,7 @@ mod tests {
                             source_name: Some("resolver_a".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("resolver_a".to_string()),
-                            ..fdecl::ExposeResolver::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Resolver (
@@ -2822,7 +2822,7 @@ mod tests {
                             source_name: Some("resolver_b".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("resolver_b".to_string()),
-                            ..fdecl::ExposeResolver::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::EventStream (
@@ -2834,7 +2834,7 @@ mod tests {
                             source_name: Some("started".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("started".to_string()),
-                            ..fdecl::ExposeEventStream::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::EventStream (
@@ -2846,7 +2846,7 @@ mod tests {
                             source_name: Some("stopped".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("stopped".to_string()),
-                            ..fdecl::ExposeEventStream::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::EventStream (
@@ -2858,7 +2858,7 @@ mod tests {
                             source_name: Some("running".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("running_stream".to_string()),
-                            ..fdecl::ExposeEventStream::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -2868,14 +2868,14 @@ mod tests {
                         fdecl::Protocol {
                             name: Some("A".to_string()),
                             source_path: Some("/svc/A".to_string()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Protocol (
                         fdecl::Protocol {
                             name: Some("B".to_string()),
                             source_path: Some("/svc/B".to_string()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Directory (
@@ -2886,14 +2886,14 @@ mod tests {
                                 fio::Operations::TRAVERSE | fio::Operations::READ_BYTES |
                                 fio::Operations::GET_ATTRIBUTES
                             ),
-                            ..fdecl::Directory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Runner (
                         fdecl::Runner {
                             name: Some("web".to_string()),
                             source_path: Some("/svc/fuchsia.component.ComponentRunner".to_string()),
-                            ..fdecl::Runner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Storage(fdecl::Storage {
@@ -2902,7 +2902,7 @@ mod tests {
                         backing_dir: Some("minfs".to_string()),
                         subdir: None,
                         storage_id: Some(fdecl::StorageId::StaticInstanceIdOrMoniker),
-                        ..fdecl::Storage::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 children: Some(vec![
@@ -2912,7 +2912,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 ..default_component_decl()
@@ -3076,7 +3076,7 @@ mod tests {
                             target_name: Some("fuchsia.logger.LegacyLog".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Weak),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Protocol (
@@ -3092,7 +3092,7 @@ mod tests {
                             target_name: Some("fuchsia.logger.LegacySysLog".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Protocol (
@@ -3105,7 +3105,7 @@ mod tests {
                             target_name: Some("fuchsia.logger.LegacySysLog2".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Optional),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Protocol (
@@ -3118,7 +3118,7 @@ mod tests {
                             target_name: Some("fuchsia.setui.SetUiService".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Optional),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Protocol (
@@ -3131,7 +3131,7 @@ mod tests {
                             target_name: Some("fuchsia.test.service.Name".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Optional),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Protocol (
@@ -3146,7 +3146,7 @@ mod tests {
                             target_name: Some("fuchsia.sys2.StorageAdmin".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3162,7 +3162,7 @@ mod tests {
                             subdir: None,
                             dependency_type: Some(fdecl::DependencyType::WeakForMigration),
                             availability: Some(fdecl::Availability::SameAsTarget),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3177,7 +3177,7 @@ mod tests {
                             subdir: None,
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3192,7 +3192,7 @@ mod tests {
                             subdir: None,
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3208,7 +3208,7 @@ mod tests {
                             subdir: None,
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3224,7 +3224,7 @@ mod tests {
                             subdir: None,
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3239,7 +3239,7 @@ mod tests {
                             subdir: Some("index/file".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Directory (
@@ -3254,7 +3254,7 @@ mod tests {
                             subdir: None,
                             dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Storage (
@@ -3267,7 +3267,7 @@ mod tests {
                             })),
                             target_name: Some("data".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferStorage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Storage (
@@ -3279,7 +3279,7 @@ mod tests {
                             })),
                             target_name: Some("data".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferStorage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Storage (
@@ -3292,7 +3292,7 @@ mod tests {
                             })),
                             target_name: Some("storage_a".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferStorage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Storage (
@@ -3305,7 +3305,7 @@ mod tests {
                             })),
                             target_name: Some("storage_b".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferStorage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Runner (
@@ -3316,7 +3316,7 @@ mod tests {
                                 name: "modular".to_string(),
                             })),
                             target_name: Some("elf-renamed".to_string()),
-                            ..fdecl::OfferRunner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Runner (
@@ -3328,7 +3328,7 @@ mod tests {
                                 collection: None,
                             })),
                             target_name: Some("runner_a".to_string()),
-                            ..fdecl::OfferRunner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Runner (
@@ -3340,7 +3340,7 @@ mod tests {
                                 collection: None,
                             })),
                             target_name: Some("runner_b".to_string()),
-                            ..fdecl::OfferRunner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Resolver (
@@ -3351,7 +3351,7 @@ mod tests {
                                 name: "modular".to_string(),
                             })),
                             target_name: Some("pkg_resolver".to_string()),
-                            ..fdecl::OfferResolver::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Resolver (
@@ -3363,7 +3363,7 @@ mod tests {
                                 collection: None,
                             })),
                             target_name: Some("resolver_a".to_string()),
-                            ..fdecl::OfferResolver::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Resolver (
@@ -3375,7 +3375,7 @@ mod tests {
                                 collection: None,
                             })),
                             target_name: Some("resolver_b".to_string()),
-                            ..fdecl::OfferResolver::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::EventStream (
@@ -3388,7 +3388,7 @@ mod tests {
                             })),
                             target_name: Some("running".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEventStream::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::EventStream (
@@ -3401,7 +3401,7 @@ mod tests {
                             })),
                             target_name: Some("started".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEventStream::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::EventStream (
@@ -3425,11 +3425,11 @@ mod tests {
                                         ),
                                     },
                                 ]),
-                                ..fdata::Dictionary::EMPTY
+                                ..Default::default()
                             }),
                             target_name: Some("some_other_event".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEventStream::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -3444,7 +3444,7 @@ mod tests {
                             backing_dir: Some("minfs".to_string()),
                             subdir: None,
                             storage_id: Some(fdecl::StorageId::StaticInstanceIdOrMoniker),
-                            ..fdecl::Storage::EMPTY
+                            ..Default::default()
                         }
                     )
                 ]),
@@ -3455,7 +3455,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("netstack".to_string()),
@@ -3463,7 +3463,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 collections: Some(vec![
@@ -3472,7 +3472,7 @@ mod tests {
                         durability: Some(fdecl::Durability::Transient),
                         environment: None,
                         allowed_offers: None,
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 ..default_component_decl()
@@ -3514,7 +3514,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("gmail".to_string()),
@@ -3522,7 +3522,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Eager),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("echo".to_string()),
@@ -3530,7 +3530,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: Some("myenv".to_string()),
                         on_terminate: Some(fdecl::OnTerminate::Reboot),
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 environments: Some(vec![
@@ -3540,7 +3540,7 @@ mod tests {
                         runners: None,
                         resolvers: None,
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 ..default_component_decl()
@@ -3574,14 +3574,14 @@ mod tests {
                         durability: Some(fdecl::Durability::SingleRun),
                         environment: None,
                         allowed_offers: None,
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Collection {
                         name: Some("tests".to_string()),
                         durability: Some(fdecl::Durability::Transient),
                         environment: Some("myenv".to_string()),
                         allowed_offers: None,
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 environments: Some(vec![
@@ -3591,7 +3591,7 @@ mod tests {
                         runners: None,
                         resolvers: None,
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 ..default_component_decl()
@@ -3650,28 +3650,28 @@ mod tests {
                         fdecl::Protocol {
                             name: Some("myprotocol".to_string()),
                             source_path: Some("/protocol".to_string()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Protocol (
                         fdecl::Protocol {
                             name: Some("myprotocol2".to_string()),
                             source_path: Some("/svc/myprotocol2".to_string()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Protocol (
                         fdecl::Protocol {
                             name: Some("myprotocol3".to_string()),
                             source_path: Some("/svc/myprotocol3".to_string()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Protocol (
                         fdecl::Protocol {
                             name: Some("myprotocol4".to_string()),
                             source_path: Some("/svc/myprotocol4".to_string()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Directory (
@@ -3679,7 +3679,7 @@ mod tests {
                             name: Some("mydirectory".to_string()),
                             source_path: Some("/directory".to_string()),
                             rights: Some(fio::Operations::CONNECT),
-                            ..fdecl::Directory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Storage (
@@ -3692,7 +3692,7 @@ mod tests {
                             backing_dir: Some("storage".to_string()),
                             subdir: None,
                             storage_id: Some(fdecl::StorageId::StaticInstanceIdOrMoniker),
-                            ..fdecl::Storage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Storage (
@@ -3705,21 +3705,21 @@ mod tests {
                             backing_dir: Some("storage2".to_string()),
                             subdir: None,
                             storage_id: Some(fdecl::StorageId::StaticInstanceId),
-                            ..fdecl::Storage::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Runner (
                         fdecl::Runner {
                             name: Some("myrunner".to_string()),
                             source_path: Some("/runner".to_string()),
-                            ..fdecl::Runner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Resolver (
                         fdecl::Resolver {
                             name: Some("myresolver".to_string()),
                             source_path: Some("/resolver".to_string()),
-                            ..fdecl::Resolver::EMPTY
+                            ..Default::default()
                         }
                     )
                 ]),
@@ -3730,7 +3730,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 ..default_component_decl()
@@ -3768,7 +3768,7 @@ mod tests {
                                 value: Some(Box::new(fdata::DictionaryValue::Str("2018".to_string()))),
                             },
                         ]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }
             ),
             ..default_component_decl()
@@ -3800,7 +3800,7 @@ mod tests {
                         runners: None,
                         resolvers: None,
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Environment {
                         name: Some("myenv2".to_string()),
@@ -3808,7 +3808,7 @@ mod tests {
                         runners: None,
                         resolvers: None,
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Environment {
                         name: Some("myenv3".to_string()),
@@ -3816,7 +3816,7 @@ mod tests {
                         runners: None,
                         resolvers: None,
                         stop_timeout_ms: Some(8000),
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -3854,7 +3854,7 @@ mod tests {
                                 source_name: Some("dart".to_string()),
                                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                                 target_name: Some("dart".to_string()),
-                                ..fdecl::RunnerRegistration::EMPTY
+                                ..Default::default()
                             }
                         ]),
                         resolvers: Some(vec![
@@ -3862,11 +3862,11 @@ mod tests {
                                 resolver: Some("pkg_resolver".to_string()),
                                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                                 scheme: Some("fuchsia-pkg".to_string()),
-                                ..fdecl::ResolverRegistration::EMPTY
+                                ..Default::default()
                             }
                         ]),
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -3898,12 +3898,12 @@ mod tests {
                                 source_name: Some("dart".to_string()),
                                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                                 target_name: Some("my-dart".to_string()),
-                                ..fdecl::RunnerRegistration::EMPTY
+                                ..Default::default()
                             }
                         ]),
                         resolvers: None,
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -3936,7 +3936,7 @@ mod tests {
                         fdecl::Protocol {
                             name : Some("fuchsia.serve.service".to_owned()),
                             source_path: Some("/svc/fuchsia.serve.service".to_owned()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     )
                 ]),
@@ -3949,13 +3949,13 @@ mod tests {
                                 source_name: Some("fuchsia.serve.service".to_string()),
                                 source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                                 target_name: Some("my-service".to_string()),
-                                ..fdecl::DebugProtocolRegistration::EMPTY
+                                ..Default::default()
                             }),
                         ]),
                         resolvers: None,
                         runners: None,
                         stop_timeout_ms: None,
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 ..default_component_decl()
@@ -4044,9 +4044,9 @@ mod tests {
                             key: "binary".to_string(),
                             value: Some(Box::new(fdata::DictionaryValue::Str("bin/app".to_string()))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 uses: Some(vec![
                     fdecl::Use::Protocol (
@@ -4056,7 +4056,7 @@ mod tests {
                             source_name: Some("LegacyCoolFonts".to_string()),
                             target_path: Some("/svc/fuchsia.fonts.LegacyProvider".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -4066,7 +4066,7 @@ mod tests {
                             source_name: Some("ReallyGoodFonts".to_string()),
                             target_path: Some("/svc/ReallyGoodFonts".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -4076,7 +4076,7 @@ mod tests {
                             source_name: Some("IWouldNeverUseTheseFonts".to_string()),
                             target_path: Some("/svc/IWouldNeverUseTheseFonts".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Protocol (
@@ -4086,7 +4086,7 @@ mod tests {
                             source_name: Some("DebugProtocol".to_string()),
                             target_path: Some("/svc/DebugProtocol".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -4103,7 +4103,7 @@ mod tests {
                                 fio::Operations::GET_ATTRIBUTES
                             ),
                             subdir: None,
-                            ..fdecl::ExposeDirectory::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -4122,7 +4122,7 @@ mod tests {
                             target_name: Some("fuchsia.logger.LegacyLog".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Weak),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Protocol (
@@ -4138,7 +4138,7 @@ mod tests {
                             target_name: Some("fuchsia.logger.LegacyLog".to_string()),
                             dependency_type: Some(fdecl::DependencyType::Weak),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferProtocol::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -4151,21 +4151,21 @@ mod tests {
                                 fio::Operations::TRAVERSE | fio::Operations::READ_BYTES |
                                 fio::Operations::GET_ATTRIBUTES
                             ),
-                            ..fdecl::Directory::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Runner (
                         fdecl::Runner {
                             name: Some("myrunner".to_string()),
                             source_path: Some("/runner".to_string()),
-                            ..fdecl::Runner::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Protocol(
                         fdecl::Protocol {
                             name : Some("fuchsia.serve.service".to_owned()),
                             source_path: Some("/svc/fuchsia.serve.service".to_owned()),
-                            ..fdecl::Protocol::EMPTY
+                            ..Default::default()
                         }
                     )
                 ]),
@@ -4176,7 +4176,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("netstack".to_string()),
@@ -4184,7 +4184,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                 ]),
                 collections: Some(vec![
@@ -4193,7 +4193,7 @@ mod tests {
                         durability: Some(fdecl::Durability::Transient),
                         environment: None,
                         allowed_offers: None,
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 environments: Some(vec![
@@ -4208,7 +4208,7 @@ mod tests {
                                 source_name: Some("fuchsia.serve.service".to_string()),
                                 source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                                 target_name: Some("my-service".to_string()),
-                                ..fdecl::DebugProtocolRegistration::EMPTY
+                                ..Default::default()
                             }),
                             fdecl::DebugRegistration::Protocol( fdecl::DebugProtocolRegistration {
                                 source_name: Some("fuchsia.logger.LegacyLog".to_string()),
@@ -4217,10 +4217,10 @@ mod tests {
                                     collection: None,
                                 })),
                                 target_name: Some("fuchsia.logger.LegacyLog".to_string()),
-                                ..fdecl::DebugProtocolRegistration::EMPTY
+                                ..Default::default()
                             }),
                         ]),
-                        ..fdecl::Environment::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 facets: Some(fdata::Dictionary {
@@ -4234,9 +4234,9 @@ mod tests {
                                 value: Some(Box::new(fdata::DictionaryValue::Str("2018".to_string()))),
                             },
                         ]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
     }

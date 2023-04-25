@@ -86,7 +86,7 @@ mod test {
         let target = TargetInfo {
             nodename: Some("kiriona".to_string()),
             addresses: Some(vec![src]),
-            ..TargetInfo::EMPTY
+            ..Default::default()
         };
 
         let got = build_ssh_args(target, 8081)?;
@@ -121,7 +121,8 @@ mod test {
             scope_id: 2,
         });
 
-        let target = TargetInfo { nodename: None, addresses: Some(vec![src]), ..TargetInfo::EMPTY };
+        let target =
+            TargetInfo { nodename: None, addresses: Some(vec![src]), ..Default::default() };
 
         let got = build_ssh_args(target, 8081)?;
 
@@ -150,13 +151,13 @@ mod test {
     fn test_make_args_returns_err_on_no_addresses() {
         let nodename = Some("cytherea".to_string());
         {
-            let target = TargetInfo { nodename: nodename.clone(), ..TargetInfo::EMPTY };
+            let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
             let res = build_ssh_args(target, 9091);
             assert!(res.is_err());
         }
         {
             let target =
-                TargetInfo { nodename: nodename.clone(), addresses: None, ..TargetInfo::EMPTY };
+                TargetInfo { nodename: nodename.clone(), addresses: None, ..Default::default() };
             let res = build_ssh_args(target, 9091);
             assert!(res.is_err());
         }
@@ -164,7 +165,7 @@ mod test {
             let target = TargetInfo {
                 nodename: nodename.clone(),
                 addresses: Some(vec![]),
-                ..TargetInfo::EMPTY
+                ..Default::default()
             };
             let res = build_ssh_args(target, 9091);
             assert!(res.is_err());
@@ -176,7 +177,7 @@ mod test {
         let target = TargetInfo {
             nodename: Some("cytherera".to_string()),
             addresses: None,
-            ..TargetInfo::EMPTY
+            ..Default::default()
         };
         let res = build_ssh_args(target, 9091);
         assert!(res.is_err());

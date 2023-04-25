@@ -557,16 +557,16 @@ mod test {
     fn test_cpp_update_code_for_use_declaration() -> Result<()> {
         let use_protocol_1 = Use::Protocol(UseProtocol {
             source_name: Some("fuchsia.diagnostics.ArchiveAccessor".to_string()),
-            ..UseProtocol::EMPTY
+            ..Default::default()
         });
         let use_protocol_2 = Use::Protocol(UseProtocol {
             source_name: Some("fuchsia.metrics.MetricEventLoggerFactory".to_string()),
-            ..UseProtocol::EMPTY
+            ..Default::default()
         });
         let use_dir = Use::Directory(UseDirectory {
             source_name: Some("config-data".to_string()),
             target_path: Some("/config/data".to_string()),
-            ..UseDirectory::EMPTY
+            ..Default::default()
         });
         let component_name = "foo_bar";
         let uses = vec![use_protocol_1, use_protocol_2, use_dir];
@@ -614,16 +614,16 @@ mod test {
     fn test_rust_update_code_for_use_declaration() -> Result<()> {
         let use_protocol_1 = Use::Protocol(UseProtocol {
             source_name: Some("fuchsia.diagnostics.ArchiveAccessor".to_string()),
-            ..UseProtocol::EMPTY
+            ..Default::default()
         });
         let use_protocol_2 = Use::Protocol(UseProtocol {
             source_name: Some("fuchsia.metrics.MetricEventLoggerFactory".to_string()),
-            ..UseProtocol::EMPTY
+            ..Default::default()
         });
         let use_dir = Use::Directory(UseDirectory {
             source_name: Some("config-data".to_string()),
             target_path: Some("/config/data".to_string()),
-            ..UseDirectory::EMPTY
+            ..Default::default()
         });
         let component_name = "foo_bar";
         let uses = vec![use_protocol_1, use_protocol_2, use_dir];
@@ -698,7 +698,7 @@ use fuchsia_component::server::*;"#;
             Case { name: "rust w/o mocks", cpp: false, generate_mocks: false },
         ] {
             let code = &mut CppTestCode::new("test");
-            let decl = Component { ..Component::EMPTY };
+            let decl = Component { ..Default::default() };
             update_code_for_use_declaration(
                 &decl.uses.as_ref().unwrap_or(&Vec::new()),
                 code,

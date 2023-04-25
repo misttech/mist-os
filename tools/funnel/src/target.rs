@@ -87,14 +87,14 @@ mod test {
         let input = b"1";
         let output = Vec::new();
         let targets = vec![
-            TargetInfo { nodename: Some("cytherera".to_string()), ..TargetInfo::EMPTY },
-            TargetInfo { nodename: Some("alecto".to_string()), ..TargetInfo::EMPTY },
+            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() },
+            TargetInfo { nodename: Some("alecto".to_string()), ..Default::default() },
         ];
 
         let res = prompt_for_target(&input[..], output, targets).await?;
         assert_eq!(
             res,
-            TargetInfo { nodename: Some("cytherera".to_string()), ..TargetInfo::EMPTY }
+            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() }
         );
         Ok(())
     }
@@ -104,8 +104,8 @@ mod test {
         let input = b"asdf";
         let output = Vec::new();
         let targets = vec![
-            TargetInfo { nodename: Some("cytherera".to_string()), ..TargetInfo::EMPTY },
-            TargetInfo { nodename: Some("alecto".to_string()), ..TargetInfo::EMPTY },
+            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() },
+            TargetInfo { nodename: Some("alecto".to_string()), ..Default::default() },
         ];
 
         let res = prompt_for_target(&input[..], output, targets).await;
@@ -119,8 +119,8 @@ mod test {
         let input = b"4";
         let output = Vec::new();
         let targets = vec![
-            TargetInfo { nodename: Some("cytherera".to_string()), ..TargetInfo::EMPTY },
-            TargetInfo { nodename: Some("alecto".to_string()), ..TargetInfo::EMPTY },
+            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() },
+            TargetInfo { nodename: Some("alecto".to_string()), ..Default::default() },
         ];
 
         let res = prompt_for_target(&input[..], output, targets).await;

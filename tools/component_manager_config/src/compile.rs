@@ -127,22 +127,22 @@ impl Into<component_internal::AllowlistedCapability> for CapabilityTypeName {
     fn into(self) -> component_internal::AllowlistedCapability {
         match &self {
             CapabilityTypeName::Directory => component_internal::AllowlistedCapability::Directory(
-                component_internal::AllowlistedDirectory::EMPTY,
+                component_internal::AllowlistedDirectory::default(),
             ),
             CapabilityTypeName::Protocol => component_internal::AllowlistedCapability::Protocol(
-                component_internal::AllowlistedProtocol::EMPTY,
+                component_internal::AllowlistedProtocol::default(),
             ),
             CapabilityTypeName::Service => component_internal::AllowlistedCapability::Service(
-                component_internal::AllowlistedService::EMPTY,
+                component_internal::AllowlistedService::default(),
             ),
             CapabilityTypeName::Storage => component_internal::AllowlistedCapability::Storage(
-                component_internal::AllowlistedStorage::EMPTY,
+                component_internal::AllowlistedStorage::default(),
             ),
             CapabilityTypeName::Runner => component_internal::AllowlistedCapability::Runner(
-                component_internal::AllowlistedRunner::EMPTY,
+                component_internal::AllowlistedRunner::default(),
             ),
             CapabilityTypeName::Resolver => component_internal::AllowlistedCapability::Resolver(
-                component_internal::AllowlistedResolver::EMPTY,
+                component_internal::AllowlistedResolver::default(),
             ),
         }
     }
@@ -159,7 +159,7 @@ impl Into<component_internal::AllowlistedDebugRegistration> for DebugRegistratio
         match &self {
             DebugRegistrationTypeName::Protocol => {
                 component_internal::AllowlistedDebugRegistration::Protocol(
-                    component_internal::AllowlistedProtocol::EMPTY,
+                    component_internal::AllowlistedProtocol::default(),
                 )
             }
         }
@@ -256,7 +256,7 @@ impl TryFrom<Config> for component_internal::Config {
                 .realm_builder_resolver_and_runner
                 .map(Into::into),
             abi_revision_policy: config.abi_revision_policy.map(Into::into),
-            ..Self::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -274,7 +274,7 @@ fn translate_security_policy(
         debug_registration_policy: debug_registration_policy
             .map(translate_debug_registration_policy),
         child_policy: child_policy.map(translate_child_policy),
-        ..component_internal::SecurityPolicy::EMPTY
+        ..Default::default()
     }
 }
 
@@ -285,7 +285,7 @@ fn translate_job_policy(
         ambient_mark_vmo_exec: job_policy.ambient_mark_vmo_exec,
         main_process_critical: job_policy.main_process_critical,
         create_raw_processes: job_policy.create_raw_processes,
-        ..component_internal::JobPolicyAllowlists::EMPTY
+        ..Default::default()
     }
 }
 
@@ -294,7 +294,7 @@ fn translate_child_policy(
 ) -> component_internal::ChildPolicyAllowlists {
     component_internal::ChildPolicyAllowlists {
         reboot_on_terminate: child_policy.reboot_on_terminate,
-        ..component_internal::ChildPolicyAllowlists::EMPTY
+        ..Default::default()
     }
 }
 
@@ -309,12 +309,12 @@ fn translate_capability_policy(
             source: e.source.clone().map_or_else(|| None, |t| Some(t.into())),
             capability: e.capability.clone().map_or_else(|| None, |t| Some(t.into())),
             target_monikers: e.target_monikers.clone(),
-            ..component_internal::CapabilityAllowlistEntry::EMPTY
+            ..Default::default()
         })
         .collect::<Vec<_>>();
     component_internal::CapabilityPolicyAllowlists {
         allowlist: Some(allowlist),
-        ..component_internal::CapabilityPolicyAllowlists::EMPTY
+        ..Default::default()
     }
 }
 
@@ -329,12 +329,12 @@ fn translate_debug_registration_policy(
             debug: e.debug.clone().map_or_else(|| None, |t| Some(t.into())),
             target_moniker: e.target_moniker.clone(),
             environment_name: e.environment_name.clone(),
-            ..component_internal::DebugRegistrationAllowlistEntry::EMPTY
+            ..Default::default()
         })
         .collect::<Vec<_>>();
     component_internal::DebugRegistrationPolicyAllowlists {
         allowlist: Some(allowlist),
-        ..component_internal::DebugRegistrationPolicyAllowlists::EMPTY
+        ..Default::default()
     }
 }
 
@@ -599,7 +599,7 @@ mod tests {
                         main_process_critical: Some(vec!["/".to_string(), "/bar".to_string()]),
                         ambient_mark_vmo_exec: Some(vec!["/foo".to_string()]),
                         create_raw_processes: Some(vec!["/baz".to_string()]),
-                        ..component_internal::JobPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
                     capability_policy: Some(component_internal::CapabilityPolicyAllowlists {
                         allowlist: Some(vec![component_internal::CapabilityAllowlistEntry {
@@ -607,16 +607,16 @@ mod tests {
                             source_name: Some("fuchsia.kernel.RootResource".to_string()),
                             source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                             capability: Some(component_internal::AllowlistedCapability::Protocol(
-                                component_internal::AllowlistedProtocol::EMPTY
+                                component_internal::AllowlistedProtocol::default()
                             )),
                             target_monikers: Some(vec![
                                 "/root".to_string(),
                                 "/root/bootstrap".to_string(),
                                 "/root/core".to_string()
                             ]),
-                            ..component_internal::CapabilityAllowlistEntry::EMPTY
+                            ..Default::default()
                         },]),
-                        ..component_internal::CapabilityPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
                     debug_registration_policy: Some(
                         component_internal::DebugRegistrationPolicyAllowlists {
@@ -626,66 +626,66 @@ mod tests {
                                     source_name: Some("fuchsia.kernel.RootResource".to_string()),
                                     debug: Some(
                                         component_internal::AllowlistedDebugRegistration::Protocol(
-                                            component_internal::AllowlistedProtocol::EMPTY
+                                            component_internal::AllowlistedProtocol::default()
                                         )
                                     ),
                                     target_moniker: Some("/foo".to_string()),
                                     environment_name: Some("my_env".to_string()),
-                                    ..component_internal::DebugRegistrationAllowlistEntry::EMPTY
+                                    ..Default::default()
                                 }
                             ]),
-                            ..component_internal::DebugRegistrationPolicyAllowlists::EMPTY
+                            ..Default::default()
                         }
                     ),
                     child_policy: Some(component_internal::ChildPolicyAllowlists {
                         reboot_on_terminate: Some(vec!["/buz".to_string()]),
-                        ..component_internal::ChildPolicyAllowlists::EMPTY
+                        ..Default::default()
                     }),
-                    ..component_internal::SecurityPolicy::EMPTY
+                    ..Default::default()
                 }),
                 namespace_capabilities: Some(vec![
                     fdecl::Capability::Protocol(fdecl::Protocol {
                         name: Some("foo_svc".into()),
                         source_path: Some("/svc/foo_svc".into()),
-                        ..fdecl::Protocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::Directory(fdecl::Directory {
                         name: Some("bar_dir".into()),
                         source_path: Some("/bar".into()),
                         rights: Some(fio::Operations::CONNECT),
-                        ..fdecl::Directory::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 builtin_capabilities: Some(vec![
                     fdecl::Capability::Protocol(fdecl::Protocol {
                         name: Some("foo_protocol".into()),
                         source_path: None,
-                        ..fdecl::Protocol::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::Directory(fdecl::Directory {
                         name: Some("foo_dir".into()),
                         source_path: None,
                         rights: Some(fio::Operations::CONNECT),
-                        ..fdecl::Directory::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::Service(fdecl::Service {
                         name: Some("foo_svc".into()),
                         source_path: None,
-                        ..fdecl::Service::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::Runner(fdecl::Runner {
                         name: Some("foo_runner".into()),
                         source_path: None,
-                        ..fdecl::Runner::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::Resolver(fdecl::Resolver {
                         name: Some("foo_resolver".into()),
                         source_path: None,
-                        ..fdecl::Resolver::EMPTY
+                        ..Default::default()
                     }),
                     fdecl::Capability::EventStream(fdecl::EventStream {
                         name: Some("foo_event_stream".into()),
-                        ..fdecl::EventStream::EMPTY
+                        ..Default::default()
                     }),
                 ]),
                 num_threads: Some(321),
@@ -698,7 +698,7 @@ mod tests {
                 realm_builder_resolver_and_runner: Some(
                     component_internal::RealmBuilderResolverAndRunner::Namespace
                 ),
-                ..component_internal::Config::EMPTY
+                ..Default::default()
             }
         );
     }

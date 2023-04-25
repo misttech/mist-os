@@ -309,7 +309,7 @@ fn update_tags_from_manifest(
         Ok(())
     } else {
         let decl = cm_decl_from_meta_far(&meta_far_path, cm_path)?;
-        update_tags_from_facets(test_tags, &decl.facets.unwrap_or(fdata::Dictionary::EMPTY))?;
+        update_tags_from_facets(test_tags, &decl.facets.unwrap_or(fdata::Dictionary::default()))?;
         Ok(())
     }
 }
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn test_update_tags_from_facets() {
         // Test that empty facets return the hermetic tags.
-        let mut facets = fdata::Dictionary::EMPTY;
+        let mut facets = fdata::Dictionary::default();
         let mut tags = FuchsiaTestTags::default();
         update_tags_from_facets(&mut tags, &facets).expect("failed get tags in tags_from_facets");
         let hermetic_tags = FuchsiaTestTags {

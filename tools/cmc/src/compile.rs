@@ -221,7 +221,7 @@ mod tests {
     }
 
     fn default_component_decl() -> fdecl::Component {
-        fdecl::Component::EMPTY
+        fdecl::Component::default()
     }
 
     test_compile_with_features! { FeatureSet::from(vec![]), {
@@ -243,25 +243,25 @@ mod tests {
                         fdecl::Service {
                             name: Some("myservice".to_string()),
                             source_path: Some("/service".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Service (
                         fdecl::Service {
                             name: Some("myservice2".to_string()),
                             source_path: Some("/svc/myservice2".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Service (
                         fdecl::Service {
                             name: Some("myservice3".to_string()),
                             source_path: Some("/svc/myservice3".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
         test_compile_use_service => {
@@ -282,7 +282,7 @@ mod tests {
                             source_name: Some("CoolFonts".to_string()),
                             target_path: Some("/svc/fuchsia.fonts.Provider".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Service (
@@ -292,7 +292,7 @@ mod tests {
                             source_name: Some("fuchsia.component.Realm".to_string()),
                             target_path: Some("/svc/fuchsia.component.Realm".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Service (
@@ -302,7 +302,7 @@ mod tests {
                             source_name: Some("myservice".to_string()),
                             target_path: Some("/svc/myservice".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Service (
@@ -312,7 +312,7 @@ mod tests {
                             source_name: Some("myservice2".to_string()),
                             target_path: Some("/svc/myservice2".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Use::Service (
@@ -322,11 +322,11 @@ mod tests {
                             source_name: Some("myservice3".to_string()),
                             target_path: Some("/svc/myservice3".to_string()),
                             availability: Some(fdecl::Availability::Optional),
-                            ..fdecl::UseService::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
         test_compile_offer_service => {
@@ -403,7 +403,7 @@ mod tests {
                             })),
                             target_name: Some("fuchsia.logger.Log".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -418,7 +418,7 @@ mod tests {
                             })),
                             target_name: Some("fuchsia.logger.Log2".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -434,7 +434,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.Service".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -450,7 +450,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.Service2".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -463,7 +463,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.Service".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -476,7 +476,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.Service2".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -489,7 +489,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.CollectionService".to_string()),
                             availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Offer::Service (
@@ -502,7 +502,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.CollectionService2".to_string()),
                             availability: Some(fdecl::Availability::SameAsTarget),
-                            ..fdecl::OfferService::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -511,14 +511,14 @@ mod tests {
                         fdecl::Service {
                             name: Some("my.service.Service".to_string()),
                             source_path: Some("/svc/my.service.Service".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Service (
                         fdecl::Service {
                             name: Some("my.service.Service2".to_string()),
                             source_path: Some("/svc/my.service.Service2".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -529,7 +529,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     },
                     fdecl::Child {
                         name: Some("netstack".to_string()),
@@ -537,7 +537,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 collections: Some(vec![
@@ -547,10 +547,10 @@ mod tests {
                         environment: None,
                         allowed_offers: None,
                         allow_long_names: None,
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     }
                 ]),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
         test_compile_expose_service => {
@@ -605,7 +605,7 @@ mod tests {
                             source_name: Some("fuchsia.logger.Log".to_string()),
                             target_name: Some("fuchsia.logger.Log2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            ..fdecl::ExposeService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Service (
@@ -617,7 +617,7 @@ mod tests {
                             source_name: Some("my.service.Service".to_string()),
                             target_name: Some("my.service.Service".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            ..fdecl::ExposeService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Service (
@@ -626,7 +626,7 @@ mod tests {
                             source_name: Some("my.service.Service".to_string()),
                             target_name: Some("my.service.Service".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            ..fdecl::ExposeService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Service (
@@ -638,7 +638,7 @@ mod tests {
                             source_name: Some("my.service.Service2".to_string()),
                             target_name: Some("my.service.Service2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            ..fdecl::ExposeService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Service (
@@ -647,7 +647,7 @@ mod tests {
                             source_name: Some("my.service.Service2".to_string()),
                             target_name: Some("my.service.Service2".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            ..fdecl::ExposeService::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Expose::Service (
@@ -656,7 +656,7 @@ mod tests {
                             source_name: Some("my.service.CollectionService".to_string()),
                             target_name: Some("my.service.CollectionService".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            ..fdecl::ExposeService::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -665,14 +665,14 @@ mod tests {
                         fdecl::Service {
                             name: Some("my.service.Service".to_string()),
                             source_path: Some("/svc/my.service.Service".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                     fdecl::Capability::Service (
                         fdecl::Service {
                             name: Some("my.service.Service2".to_string()),
                             source_path: Some("/svc/my.service.Service2".to_string()),
-                            ..fdecl::Service::EMPTY
+                            ..Default::default()
                         }
                     ),
                 ]),
@@ -683,7 +683,7 @@ mod tests {
                         startup: Some(fdecl::StartupMode::Lazy),
                         environment: None,
                         on_terminate: None,
-                        ..fdecl::Child::EMPTY
+                        ..Default::default()
                     }
                 ]),
                 collections: Some(vec![
@@ -693,10 +693,10 @@ mod tests {
                         environment: None,
                         allowed_offers: None,
                         allow_long_names: None,
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     }
                 ]),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
     }}
@@ -719,10 +719,10 @@ mod tests {
                         durability: Some(fdecl::Durability::Transient),
                         allowed_offers: None,
                         allow_long_names: Some(true),
-                        ..fdecl::Collection::EMPTY
+                        ..Default::default()
                     }
                 ]),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
     }}
@@ -767,7 +767,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![fdecl::LayoutConstraint::MaxSize(50)]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                         fdecl::ConfigField {
                             key: Some("test2".to_string()),
@@ -782,7 +782,7 @@ mod tests {
                                 )]),
                                 constraints: vec![fdecl::LayoutConstraint::MaxSize(100)]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                         fdecl::ConfigField {
                             key: Some("test3".to_string()),
@@ -791,7 +791,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                         fdecl::ConfigField {
                             key: Some("test4".to_string()),
@@ -800,7 +800,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                         fdecl::ConfigField {
                             key: Some("test5".to_string()),
@@ -809,7 +809,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                         fdecl::ConfigField {
                             key: Some("test6".to_string()),
@@ -818,7 +818,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                         fdecl::ConfigField {
                             key: Some("test7".to_string()),
@@ -827,7 +827,7 @@ mod tests {
                                 parameters: Some(vec![]),
                                 constraints: vec![]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
 
                         fdecl::ConfigField {
@@ -843,7 +843,7 @@ mod tests {
                                 )]),
                                 constraints: vec![fdecl::LayoutConstraint::MaxSize(100)]
                             }),
-                            ..fdecl::ConfigField::EMPTY
+                            ..Default::default()
                         },
                     ]),
                     checksum: Some(fdecl::ConfigChecksum::Sha256([
@@ -851,9 +851,9 @@ mod tests {
                         91, 155, 38, 197, 126, 10, 71, 100, 157, 39, 114, 195, 190, 132, 83, 65
                     ])),
                     value_source: Some(fdecl::ConfigValueSource::PackagePath("test.cvf".to_string())),
-                    ..fdecl::ConfigSchema::EMPTY
+                    ..Default::default()
                 }),
-                ..fdecl::Component::EMPTY
+                ..Default::default()
             },
         },
     }}
@@ -942,9 +942,9 @@ mod tests {
                                 "bin/test".to_string(),
                             ))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 ..default_component_decl()
             },
@@ -1010,7 +1010,7 @@ mod tests {
                     target_name: Some("fuchsia.logger.LogSink".into()),
                     dependency_type: Some(fdecl::DependencyType::Strong),
                     availability: Some(fdecl::Availability::Required),
-                    ..fdecl::OfferProtocol::EMPTY
+                    ..Default::default()
                 }),
                 fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -1022,14 +1022,14 @@ mod tests {
                     target_name: Some("fuchsia.inspect.InspectSink".into()),
                     dependency_type: Some(fdecl::DependencyType::Strong),
                     availability: Some(fdecl::Availability::Required),
-                    ..fdecl::OfferProtocol::EMPTY
+                    ..Default::default()
                 }),
             ]),
             children: Some(vec![fdecl::Child {
                 name: Some("foo".into()),
                 url: Some("fuchsia-pkg://fuchsia.com/foo/stable#meta/foo.cm".into()),
                 startup: Some(fdecl::StartupMode::Lazy),
-                ..fdecl::Child::EMPTY
+                ..Default::default()
             }]),
             ..default_component_decl()
         };
@@ -1078,9 +1078,9 @@ mod tests {
                                 "bin/test".to_string(),
                             ))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 ..default_component_decl()
             },
@@ -1125,9 +1125,9 @@ mod tests {
                                 "bin/test".to_string(),
                             ))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 ..default_component_decl()
             },
@@ -1253,9 +1253,9 @@ mod tests {
                                 "bin/test".to_string(),
                             ))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
-                    ..fdecl::Program::EMPTY
+                    ..Default::default()
                 }),
                 uses: Some(vec![fdecl::Use::Protocol(fdecl::UseProtocol {
                     dependency_type: Some(fdecl::DependencyType::Strong),
@@ -1263,7 +1263,7 @@ mod tests {
                     source_name: Some("foo".to_string()),
                     target_path: Some("/svc/foo".to_string()),
                     availability: Some(fdecl::Availability::Required),
-                    ..fdecl::UseProtocol::EMPTY
+                    ..Default::default()
                 })]),
                 ..default_component_decl()
             },
