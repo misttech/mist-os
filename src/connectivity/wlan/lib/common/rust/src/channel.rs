@@ -61,15 +61,21 @@ impl Cbw {
         }
     }
 
-    pub fn from_fidl(fidl_cbw: fidl_common::ChannelBandwidth, fidl_secondary80: u8) -> Self {
+    pub fn from_fidl(
+        fidl_cbw: fidl_common::ChannelBandwidth,
+        fidl_secondary80: u8,
+    ) -> Result<Self, anyhow::Error> {
         match fidl_cbw {
-            fidl_common::ChannelBandwidth::Cbw20 => Cbw::Cbw20,
-            fidl_common::ChannelBandwidth::Cbw40 => Cbw::Cbw40,
-            fidl_common::ChannelBandwidth::Cbw40Below => Cbw::Cbw40Below,
-            fidl_common::ChannelBandwidth::Cbw80 => Cbw::Cbw80,
-            fidl_common::ChannelBandwidth::Cbw160 => Cbw::Cbw160,
+            fidl_common::ChannelBandwidth::Cbw20 => Ok(Cbw::Cbw20),
+            fidl_common::ChannelBandwidth::Cbw40 => Ok(Cbw::Cbw40),
+            fidl_common::ChannelBandwidth::Cbw40Below => Ok(Cbw::Cbw40Below),
+            fidl_common::ChannelBandwidth::Cbw80 => Ok(Cbw::Cbw80),
+            fidl_common::ChannelBandwidth::Cbw160 => Ok(Cbw::Cbw160),
             fidl_common::ChannelBandwidth::Cbw80P80 => {
-                Cbw::Cbw80P80 { secondary80: fidl_secondary80 }
+                Ok(Cbw::Cbw80P80 { secondary80: fidl_secondary80 })
+            }
+            fidl_common::ChannelBandwidthUnknown!() => {
+                Err(format_err!("Unknown channel bandwidth from fidl: {:?}", fidl_cbw))
             }
         }
     }
@@ -301,18 +307,21 @@ impl From<&Channel> for fidl_common::WlanChannel {
     }
 }
 
-impl From<fidl_common::WlanChannel> for Channel {
-    fn from(fidl_channel: fidl_common::WlanChannel) -> Channel {
-        Channel::from(&fidl_channel)
+impl TryFrom<fidl_common::WlanChannel> for Channel {
+    type Error = anyhow::Error;
+    fn try_from(fidl_channel: fidl_common::WlanChannel) -> Result<Channel, Self::Error> {
+        Channel::try_from(&fidl_channel)
     }
 }
 
-impl From<&fidl_common::WlanChannel> for Channel {
-    fn from(fidl_channel: &fidl_common::WlanChannel) -> Channel {
-        Channel {
+impl TryFrom<&fidl_common::WlanChannel> for Channel {
+    type Error = anyhow::Error;
+
+    fn try_from(fidl_channel: &fidl_common::WlanChannel) -> Result<Channel, Self::Error> {
+        Ok(Channel {
             primary: fidl_channel.primary,
-            cbw: Cbw::from_fidl(fidl_channel.cbw, fidl_channel.secondary80),
-        }
+            cbw: Cbw::from_fidl(fidl_channel.cbw, fidl_channel.secondary80)?,
+        })
     }
 }
 
@@ -556,19 +565,28 @@ mod tests {
                 && f.secondary80 == 155
         );
 
-        let mut c = Channel::from(fidl_common::WlanChannel {
+        let mut c = Channel::try_from(fidl_common::WlanChannel {
             primary: 11,
             cbw: fidl_common::ChannelBandwidth::Cbw40Below,
             secondary80: 123,
-        });
+        })
+        .unwrap();
         assert!(c.primary == 11 && c.cbw == Cbw::Cbw40Below);
         c = fidl_common::WlanChannel {
             primary: 149,
             cbw: fidl_common::ChannelBandwidth::Cbw80P80,
             secondary80: 42,
         }
-        .into();
+        .try_into()
+        .unwrap();
         assert!(c.primary == 149 && c.cbw == Cbw::Cbw80P80 { secondary80: 42 });
+
+        let r = Channel::try_from(fidl_common::WlanChannel {
+            primary: 11,
+            cbw: fidl_common::ChannelBandwidth::unknown(),
+            secondary80: 123,
+        });
+        assert!(r.is_err());
     }
 
     const RX_PRIMARY_CHAN: u8 = 11;

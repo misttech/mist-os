@@ -62,10 +62,18 @@ async fn handle_fidl_request(
 }
 
 async fn start(sme: &Mutex<Sme>, config: fidl_sme::ApConfig) -> fidl_sme::StartApResultCode {
+    let radio_cfg = match RadioConfig::try_from(config.radio_cfg) {
+        Ok(radio_cfg) => radio_cfg,
+        Err(e) => {
+            error!("Could not convert RadioConfig from ApConfig: {:?}", e);
+            return fidl_sme::StartApResultCode::InternalError;
+        }
+    };
+
     let sme_config = ap_sme::Config {
         ssid: Ssid::from_bytes_unchecked(config.ssid),
         password: config.password,
-        radio_cfg: RadioConfig::from(config.radio_cfg),
+        radio_cfg,
     };
 
     let receiver = sme.lock().unwrap().on_start_command(sme_config);

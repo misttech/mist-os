@@ -62,12 +62,14 @@ wlan_tap::TxArgs ToTxArgs(const wlan_softmac::WlanTxPacket pkt) {
       pkt.info.phy > wlan_common::WlanPhyType::kHe) {
     ZX_PANIC("Unknown PHY in wlan_tx_packet_t: %u.", static_cast<uint32_t>(pkt.info.phy));
   }
+
+  auto cbw = static_cast<uint32_t>(pkt.info.channel_bandwidth);
   wlan_tap::WlanTxInfo tap_info = {
       .tx_flags = pkt.info.tx_flags,
       .valid_fields = pkt.info.valid_fields,
       .tx_vector_idx = pkt.info.tx_vector_idx,
       .phy = pkt.info.phy,
-      .cbw = static_cast<uint8_t>(pkt.info.channel_bandwidth),
+      .cbw = static_cast<uint8_t>(cbw),
       .mcs = pkt.info.mcs,
   };
   auto tx_args = wlan_tap::TxArgs{

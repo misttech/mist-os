@@ -89,7 +89,6 @@ pub(crate) enum ProtectionDef {
 // The following definitions derive Serialize and Deserialize for remote types, i.e. types
 // defined in other crates. See https://serde.rs/remote-derive.html for more info.
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "fidl_common::ChannelBandwidth")]
 #[repr(u32)]
 pub(crate) enum ChannelBandwidthDef {
     Cbw20 = 0,
@@ -98,15 +97,62 @@ pub(crate) enum ChannelBandwidthDef {
     Cbw80 = 3,
     Cbw160 = 4,
     Cbw80P80 = 5,
+    Unknown = u32::MAX,
+}
+
+impl From<fidl_common::ChannelBandwidth> for ChannelBandwidthDef {
+    fn from(fidl_type: fidl_common::ChannelBandwidth) -> Self {
+        match fidl_type {
+            fidl_common::ChannelBandwidth::Cbw20 => Self::Cbw20,
+            fidl_common::ChannelBandwidth::Cbw40 => Self::Cbw40,
+            fidl_common::ChannelBandwidth::Cbw40Below => Self::Cbw40Below,
+            fidl_common::ChannelBandwidth::Cbw80 => Self::Cbw80,
+            fidl_common::ChannelBandwidth::Cbw160 => Self::Cbw160,
+            fidl_common::ChannelBandwidth::Cbw80P80 => Self::Cbw80P80,
+            fidl_common::ChannelBandwidthUnknown!() => Self::Unknown,
+        }
+    }
+}
+
+impl From<ChannelBandwidthDef> for fidl_common::ChannelBandwidth {
+    fn from(serde_type: ChannelBandwidthDef) -> Self {
+        match serde_type {
+            ChannelBandwidthDef::Cbw20 => Self::Cbw20,
+            ChannelBandwidthDef::Cbw40 => Self::Cbw40,
+            ChannelBandwidthDef::Cbw40Below => Self::Cbw40Below,
+            ChannelBandwidthDef::Cbw80 => Self::Cbw80,
+            ChannelBandwidthDef::Cbw160 => Self::Cbw160,
+            ChannelBandwidthDef::Cbw80P80 => Self::Cbw80P80,
+            ChannelBandwidthDef::Unknown => Self::unknown(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "fidl_common::WlanChannel")]
 pub(crate) struct WlanChannelDef {
     pub primary: u8,
-    #[serde(with = "ChannelBandwidthDef")]
-    pub cbw: fidl_common::ChannelBandwidth,
+    pub cbw: ChannelBandwidthDef,
     pub secondary80: u8,
+}
+
+impl From<fidl_common::WlanChannel> for WlanChannelDef {
+    fn from(fidl_type: fidl_common::WlanChannel) -> Self {
+        Self {
+            primary: fidl_type.primary,
+            cbw: fidl_type.cbw.into(),
+            secondary80: fidl_type.secondary80,
+        }
+    }
+}
+
+impl From<WlanChannelDef> for fidl_common::WlanChannel {
+    fn from(serde_type: WlanChannelDef) -> Self {
+        Self {
+            primary: serde_type.primary,
+            cbw: serde_type.cbw.into(),
+            secondary80: serde_type.secondary80,
+        }
+    }
 }
 
 // Since fidl_internal::BssType is a flexible enum, the generated Rust enum is declared
@@ -155,8 +201,7 @@ pub(crate) struct BssDescriptionDef {
     pub beacon_period: u16,
     pub capability_info: u16,
     pub ies: Vec<u8>,
-    #[serde(with = "WlanChannelDef")]
-    pub channel: fidl_common::WlanChannel,
+    pub channel: WlanChannelDef,
     pub rssi_dbm: i8,
     pub snr_db: i8,
 }
@@ -169,7 +214,7 @@ impl From<BssDescriptionDef> for fidl_internal::BssDescription {
             beacon_period: serde_type.beacon_period,
             capability_info: serde_type.capability_info,
             ies: serde_type.ies,
-            channel: serde_type.channel,
+            channel: serde_type.channel.into(),
             rssi_dbm: serde_type.rssi_dbm,
             snr_db: serde_type.snr_db,
         }
@@ -184,7 +229,7 @@ impl From<fidl_internal::BssDescription> for BssDescriptionDef {
             beacon_period: fidl_type.beacon_period,
             capability_info: fidl_type.capability_info,
             ies: fidl_type.ies,
-            channel: fidl_type.channel,
+            channel: fidl_type.channel.into(),
             rssi_dbm: fidl_type.rssi_dbm,
             snr_db: fidl_type.snr_db,
         }
@@ -192,16 +237,27 @@ impl From<fidl_internal::BssDescription> for BssDescriptionDef {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "fidl_sme::ServingApInfo")]
 pub(crate) struct ServingApInfoDef {
     pub bssid: [u8; 6],
     pub ssid: Vec<u8>,
     pub rssi_dbm: i8,
     pub snr_db: i8,
-    #[serde(with = "WlanChannelDef")]
-    pub channel: fidl_common::WlanChannel,
+    pub channel: WlanChannelDef,
     #[serde(with = "ProtectionDef")]
     pub protection: fidl_sme::Protection,
+}
+
+impl From<fidl_sme::ServingApInfo> for ServingApInfoDef {
+    fn from(fidl_type: fidl_sme::ServingApInfo) -> Self {
+        Self {
+            bssid: fidl_type.bssid,
+            ssid: fidl_type.ssid,
+            rssi_dbm: fidl_type.rssi_dbm,
+            snr_db: fidl_type.snr_db,
+            channel: fidl_type.channel.into(),
+            protection: fidl_type.protection,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -209,18 +265,22 @@ pub(crate) struct ServingApInfoDef {
 pub(crate) struct SmeEmptyDef;
 
 #[derive(Serialize)]
-#[serde(remote = "fidl_sme::ClientStatusResponse")]
 pub(crate) enum ClientStatusResponseDef {
-    Connected(#[serde(with = "ServingApInfoDef")] fidl_sme::ServingApInfo),
+    Connected(ServingApInfoDef),
     Connecting(Vec<u8>),
     #[serde(with = "SmeEmptyDef")]
     Idle(fidl_sme::Empty),
 }
 
-#[derive(Serialize)]
-pub(crate) struct ClientStatusResponseWrapper(
-    #[serde(with = "ClientStatusResponseDef")] pub fidl_sme::ClientStatusResponse,
-);
+impl From<fidl_sme::ClientStatusResponse> for ClientStatusResponseDef {
+    fn from(fidl_type: fidl_sme::ClientStatusResponse) -> Self {
+        match fidl_type {
+            fidl_sme::ClientStatusResponse::Connected(info) => Self::Connected(info.into()),
+            fidl_sme::ClientStatusResponse::Connecting(vec) => Self::Connecting(vec),
+            fidl_sme::ClientStatusResponse::Idle(empty) => Self::Idle(empty),
+        }
+    }
+}
 
 #[derive(Serialize)]
 pub(crate) enum WlanMacRoleDef {

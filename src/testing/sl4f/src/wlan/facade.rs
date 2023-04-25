@@ -139,7 +139,7 @@ impl WlanFacade {
             .context("Disconnect: Failed to disconnect ifaces")
     }
 
-    pub async fn status(&self) -> Result<types::ClientStatusResponseWrapper, Error> {
+    pub async fn status(&self) -> Result<types::ClientStatusResponseDef, Error> {
         // get the first client interface
         let sme_proxy = wlan_service_util::client::get_first_sme(&self.monitor_svc)
             .await
@@ -147,7 +147,7 @@ impl WlanFacade {
 
         let rsp = sme_proxy.status().await.context("failed to get status from sme_proxy")?;
 
-        Ok(types::ClientStatusResponseWrapper(rsp))
+        Ok(rsp.into())
     }
 
     pub async fn query_iface(

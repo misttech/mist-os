@@ -73,3 +73,13 @@ type WlanMacRole = strict enum {
     AP = 2;
     MESH = 3;
 };
+
+@available(removed=13)
+type ChannelBandwidth = strict enum { // Channel Bandwidth
+    CBW20 = 0;
+    CBW40 = 1;
+    CBW40BELOW = 2;
+    CBW80 = 3;
+    CBW160 = 4;
+    CBW80P80 = 5;
+};

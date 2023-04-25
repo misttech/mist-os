@@ -720,7 +720,7 @@ zx_status_t HtDataRateLookup(const ::fuchsia::wlan::common::ChannelBandwidth& cb
       break;
     default:
       // The validation above should have prevented failed lookups.
-      errorf("Invalid HT channel bandwidth value: %d\n", cbw);
+      errorf("Invalid HT channel bandwidth value: %u\n", static_cast<uint32_t>(cbw));
       return (ZX_ERR_INTERNAL);
   }
   // Check for invalid rates, which exist for some combinations of parameters.
@@ -771,7 +771,7 @@ zx_status_t VhtDataRateLookup(const ::fuchsia::wlan::common::ChannelBandwidth& c
       break;
     default:
       // The validation above should have prevented failed lookups.
-      errorf("Invalid VHT channel bandwidth value: %d\n", cbw);
+      errorf("Invalid VHT channel bandwidth value: %d\n", static_cast<uint32_t>(cbw));
       return (ZX_ERR_INTERNAL);
   }
   // Check for invalid rates, which exist for some combinations of parameters.

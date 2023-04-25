@@ -13,7 +13,9 @@ use {
     zerocopy::AsBytes,
 };
 
-pub fn ddk_channel_from_fidl(fc: fidl_common::WlanChannel) -> banjo_common::WlanChannel {
+pub fn ddk_channel_from_fidl(
+    fc: fidl_common::WlanChannel,
+) -> Result<banjo_common::WlanChannel, Error> {
     let cbw = match fc.cbw {
         fidl_common::ChannelBandwidth::Cbw20 => banjo_common::ChannelBandwidth::CBW20,
         fidl_common::ChannelBandwidth::Cbw40 => banjo_common::ChannelBandwidth::CBW40,
@@ -21,8 +23,11 @@ pub fn ddk_channel_from_fidl(fc: fidl_common::WlanChannel) -> banjo_common::Wlan
         fidl_common::ChannelBandwidth::Cbw80 => banjo_common::ChannelBandwidth::CBW80,
         fidl_common::ChannelBandwidth::Cbw160 => banjo_common::ChannelBandwidth::CBW160,
         fidl_common::ChannelBandwidth::Cbw80P80 => banjo_common::ChannelBandwidth::CBW80P80,
+        fidl_common::ChannelBandwidthUnknown!() => {
+            return Err(format_err!("Unknown channel bandwidth {:?}", fc.cbw));
+        }
     };
-    banjo_common::WlanChannel { primary: fc.primary, cbw, secondary80: fc.secondary80 }
+    Ok(banjo_common::WlanChannel { primary: fc.primary, cbw, secondary80: fc.secondary80 })
 }
 
 pub fn build_ddk_assoc_cfg(

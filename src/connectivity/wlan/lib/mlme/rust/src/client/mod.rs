@@ -375,7 +375,9 @@ impl ClientMlme {
             )
         })?;
 
-        let channel = crate::ddk_converter::ddk_channel_from_fidl(bss.channel.into());
+        let channel = crate::ddk_converter::ddk_channel_from_fidl(bss.channel.into())
+            .map_err(|e| Error::Internal(e))?;
+
         self.set_main_channel(channel)
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
@@ -1452,6 +1454,26 @@ mod tests {
         })
         .expect("valid ConnectRequest should be handled successfully");
         me.get_bound_client().expect("client sta should have been created by now.");
+    }
+
+    #[test]
+    fn fails_to_connect_if_channel_unknown() {
+        let exec = fasync::TestExecutor::new();
+        let mut m = MockObjects::new(&exec);
+        let mut me = m.make_mlme();
+        assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
+        let mut req = fidl_mlme::ConnectRequest {
+            selected_bss: fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
+            connect_failure_timeout: 100,
+            auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
+            sae_password: vec![],
+            wep_key: None,
+            security_ie: vec![],
+        };
+
+        req.selected_bss.channel.cbw = fidl_fuchsia_wlan_common::ChannelBandwidth::unknown();
+        me.on_sme_connect(req).expect_err("ConnectRequest with unknown channel should be rejected");
+        assert!(me.get_bound_client().is_none());
     }
 
     #[test]

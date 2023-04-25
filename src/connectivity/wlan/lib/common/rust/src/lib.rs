@@ -62,9 +62,10 @@ impl From<RadioConfig> for fidl_sme::RadioConfig {
     }
 }
 
-impl From<fidl_sme::RadioConfig> for RadioConfig {
-    fn from(fidl_radio_cfg: fidl_sme::RadioConfig) -> RadioConfig {
-        RadioConfig { phy: fidl_radio_cfg.phy, channel: fidl_radio_cfg.channel.into() }
+impl TryFrom<fidl_sme::RadioConfig> for RadioConfig {
+    type Error = anyhow::Error;
+    fn try_from(fidl_radio_cfg: fidl_sme::RadioConfig) -> Result<RadioConfig, Self::Error> {
+        Ok(RadioConfig { phy: fidl_radio_cfg.phy, channel: fidl_radio_cfg.channel.try_into()? })
     }
 }
 

@@ -103,7 +103,8 @@ const MAX_SUPPORTED_MAC_ROLES uint8 = 16;
 @namespaced
 const MAX_BANDS uint8 = 16;
 
-type ChannelBandwidth = strict enum { // Channel Bandwidth
+@available(added=13)
+type ChannelBandwidth = flexible enum { // Channel Bandwidth
     CBW20 = 0;
     CBW40 = 1;
     CBW40BELOW = 2;

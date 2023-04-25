@@ -616,7 +616,7 @@ impl TryFrom<fidl_internal::BssDescription> for BssDescription {
             bss_type: bss.bss_type,
             beacon_period: bss.beacon_period,
             capability_info: bss.capability_info,
-            channel: bss.channel.into(),
+            channel: bss.channel.try_into()?,
             rssi_dbm: bss.rssi_dbm,
             snr_db: bss.snr_db,
             ies: bss.ies,

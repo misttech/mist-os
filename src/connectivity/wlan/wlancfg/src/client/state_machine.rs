@@ -2671,7 +2671,7 @@ mod tests {
         // Check that the channel is included.
         assert_eq!(
             stats.quality_data.channel,
-            wlan_common::channel::Channel::from(bss_description.channel)
+            wlan_common::channel::Channel::try_from(bss_description.channel).unwrap()
         );
 
         // Send a second signal report with higher RSSI and SNR than the previous reports.
@@ -2710,7 +2710,7 @@ mod tests {
         // Check that the channel is included.
         assert_eq!(
             stats.quality_data.channel,
-            wlan_common::channel::Channel::from(bss_description.channel)
+            wlan_common::channel::Channel::try_from(bss_description.channel).unwrap()
         );
     }
 
