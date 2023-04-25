@@ -35,6 +35,22 @@ pub fn dev_pts_fs(kernel: &Kernel) -> &FileSystemHandle {
     kernel.dev_pts_fs.get_or_init(|| init_devpts(kernel))
 }
 
+/// Creates a terminal and returns the main pty and an associated replica pts.
+///
+/// This function assumes that `/dev/ptmx` is the `DevPtmxFile` and that devpts
+/// is mounted at `/dev/pts`. These assumptions are necessary so that the
+/// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
+pub fn create_main_and_replica(
+    current_task: &CurrentTask,
+) -> Result<(FileHandle, FileHandle), Errno> {
+    let pty_file = current_task.open_file(b"/dev/ptmx", OpenFlags::RDWR)?;
+    let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
+    pty.terminal.write().locked = true;
+    let pts_path = format!("/dev/pts/{}", pty.terminal.id);
+    let pts_file = current_task.open_file(pts_path.as_bytes(), OpenFlags::RDWR)?;
+    Ok((pty_file, pts_file))
+}
+
 fn init_devpts(kernel: &Kernel) -> FileSystemHandle {
     let state = Arc::new(TTYState::new());
     let device = DevPtsDevice::new(state.clone());

@@ -363,7 +363,7 @@ impl OutputBuffer for VecOutputBuffer {
     }
 }
 
-/// An OutputBuffer that read data from an internal buffer.
+/// An InputBuffer that read data from an internal buffer.
 #[derive(Debug)]
 pub struct VecInputBuffer {
     buffer: Vec<u8>,

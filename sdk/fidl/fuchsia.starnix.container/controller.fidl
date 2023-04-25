@@ -12,4 +12,13 @@ protocol Controller {
         port uint32;
         bridge_socket zx.Handle:SOCKET;
     });
+
+    SpawnConsole(resource table {
+        1: console zx.Handle:SOCKET;
+        2: binary_path string:MAX;
+        3: argv vector<string:MAX>:MAX;
+        4: environ vector<string:MAX>:MAX;
+    }) -> (struct {
+        exit_code uint8;
+    }) error zx.Status;
 };

@@ -9,13 +9,20 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_zircon as zx;
 use futures::TryStreamExt;
+use futures::{AsyncReadExt, AsyncWriteExt};
+use std::ffi::CString;
 use std::sync::Arc;
 
-use crate::execution::Container;
+use crate::execution::{execute_task, Container};
+use crate::fs::buffers::*;
+use crate::fs::devpts::create_main_and_replica;
 use crate::fs::fuchsia::create_fuchsia_pipe;
+use crate::fs::*;
 use crate::logging::log_error;
-use crate::types::{errno, OpenFlags};
+use crate::task::*;
+use crate::types::*;
 
 use super::*;
 
@@ -56,6 +63,44 @@ pub async fn serve_container_controller(
                 connect_to_vsock(port, bridge_socket, &container).await.unwrap_or_else(|e| {
                     log_error!("failed to connect to vsock {:?}", e);
                 });
+            }
+            fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
+                if let (Some(console), Some(binary_path)) = (payload.console, payload.binary_path) {
+                    let binary_path = CString::new(binary_path)?;
+                    let argv = payload
+                        .argv
+                        .unwrap_or(vec![])
+                        .into_iter()
+                        .map(CString::new)
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let environ = payload
+                        .environ
+                        .unwrap_or(vec![])
+                        .into_iter()
+                        .map(CString::new)
+                        .collect::<Result<Vec<_>, _>>()?;
+                    match create_task_with_pty(&container.kernel, binary_path, argv, environ) {
+                        Ok((current_task, pty)) => {
+                            execute_task(current_task, move |result| {
+                                let _ = match result {
+                                    Ok(ExitStatus::Exit(exit_code)) => {
+                                        responder.send(&mut Ok(exit_code))
+                                    }
+                                    _ => responder.send(&mut Err(zx::Status::CANCELED.into_raw())),
+                                };
+                            });
+                            let _ = forward_to_pty(&container, console, pty).map_err(|e| {
+                                log_error!("failed to forward to terminal {:?}", e);
+                            });
+                        }
+                        Err(errno) => {
+                            log_error!("failed to create task with pty {:?}", errno);
+                            responder.send(&mut Err(zx::Status::IO.into_raw()))?;
+                        }
+                    }
+                } else {
+                    responder.send(&mut Err(zx::Status::INVALID_ARGS.into_raw()))?;
+                }
             }
         }
     }
@@ -119,6 +164,60 @@ async fn connect_to_vsock(
         OpenFlags::RDWR | OpenFlags::NONBLOCK,
     )?;
     socket.remote_connection(&container.system_task, pipe)?;
+
+    Ok(())
+}
+
+fn create_task_with_pty(
+    kernel: &Arc<Kernel>,
+    binary_path: CString,
+    argv: Vec<CString>,
+    environ: Vec<CString>,
+) -> Result<(CurrentTask, FileHandle), Errno> {
+    let mut current_task = Task::create_init_child_process(kernel, &binary_path)?;
+    let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+    current_task.exec(executable, binary_path, argv, environ)?;
+    let (pty, pts) = create_main_and_replica(&current_task)?;
+    let fd_flags = FdFlags::empty();
+    assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
+    assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
+    assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
+    Ok((current_task, pty))
+}
+
+fn forward_to_pty(
+    container: &Arc<Container>,
+    console: fidl::Socket,
+    pty: FileHandle,
+) -> Result<(), Error> {
+    // Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
+    const BUFFER_CAPACITY: usize = 8192;
+
+    let (mut rx, mut tx) = fuchsia_async::Socket::from_socket(console)?.split();
+    let kernel = &container.kernel;
+    let current_task = container.system_task.clone();
+    let pty_sink = pty.clone();
+    kernel.thread_pool.dispatch(move || {
+        let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
+            let mut buffer = vec![0u8; BUFFER_CAPACITY];
+            loop {
+                let bytes = rx.read(&mut buffer[..]).await?;
+                pty_sink.write(&current_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
+            }
+        });
+    });
+
+    let current_task = container.system_task.clone();
+    let pty_source = pty;
+    kernel.thread_pool.dispatch(move || {
+        let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
+            let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
+            loop {
+                pty_source.read(&current_task, &mut buffer)?;
+                tx.write_all(buffer.data()).await?;
+            }
+        });
+    });
 
     Ok(())
 }
