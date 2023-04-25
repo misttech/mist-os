@@ -326,8 +326,18 @@ libc_test("gwp_asan-unittests") {
     sources += [ "tests/never_allocated.cpp" ]
   }
 
-  deps += [ ":gwp_asan.testonly" ]
+  deps += [
+    ":gwp_asan.testonly",
+    ":gwp_asan_test_printf",
+  ]
 
   # Suppress warnings from third party code
   configs += [ "//build/config:Wno-extra-semi" ]
+}
+
+source_set("gwp_asan_test_printf") {
+  testonly = true
+  include_dirs = [ "//third_party/scudo" ]
+  deps = [ ":gwp_asan.testonly" ]
+  sources = [ "gwp_asan_test_printf.cc" ]
 }
