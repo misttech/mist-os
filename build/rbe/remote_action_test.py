@@ -480,7 +480,8 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_remote.assert_called_once()
         arg, kwargs = mock_remote.call_args_list[0]
         full_command = arg[0]
-        rewrapper_prefix, sep, remote_command = cl_utils.partition_sequence(full_command, '--')
+        rewrapper_prefix, sep, remote_command = cl_utils.partition_sequence(
+            full_command, '--')
         self.assertEqual(remote_command, debug.split())
 
     def test_remote_log_named(self):
@@ -1418,19 +1419,45 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
 
+        exit_code = 2
         with mock.patch.object(
                 remote_action.RemoteAction,
                 '_run_maybe_remotely',
                 return_value=cl_utils.SubprocessResult(
-                    returncode=2, stderr=['ERROR: file not found: /bin/smash',
-                                          'going home now']),
+                    returncode=exit_code,
+                    stderr=['ERROR: file not found: /bin/smash',
+                            'going home now']),
         ) as mock_call:
             with mock.patch.object(remote_action.RemoteAction,
                                    '_cleanup') as mock_cleanup:
-                self.assertEqual(action.run(), 2)
+                self.assertEqual(action.run(), exit_code)
 
         mock_cleanup.assert_called_once()
         mock_call.assert_called_once()  # no retry
+
+    def test_fail_to_dial_retry(self):
+        command = ['echo', 'hello']
+        action = self._make_remote_action(command=command)
+        self.assertEqual(action.local_only_command, command)
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        exit_code = 5
+        with mock.patch.object(
+                remote_action.RemoteAction,
+                '_run_maybe_remotely',
+                return_value=cl_utils.
+                SubprocessResult(returncode=exit_code, stderr=[
+                    'F0424 15:20:57.829003 1410923 main.go:112] Fail to dial unix:///b/s/w/ir/x/w/recipe_cleanup/rbedt_5k30r/reproxy.sock: context deadline exceeded',
+                    'other uninteresting log message'
+                ]),
+        ) as mock_call:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                self.assertEqual(action.run(), exit_code)
+
+        mock_cleanup.assert_called_once()
+        mock_call.assert_called()
+        self.assertEqual(len(mock_call.call_args_list), 2)
 
     def test_retry_once_successful(self):
         command = ['echo', 'hello']

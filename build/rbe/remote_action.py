@@ -258,6 +258,10 @@ def _matches_file_not_found(line: str) -> bool:
     return "fatal error:" in line and "file not found" in line
 
 
+def _matches_fail_to_dial(line: str) -> bool:
+    return "Fail to dial" in line and "context deadline exceeded" in line
+
+
 def _should_retry_remote_action(status: cl_utils.SubprocessResult) -> bool:
     """Heuristic for deciding when it is worth retrying rewrapper.
 
@@ -276,6 +280,12 @@ def _should_retry_remote_action(status: cl_utils.SubprocessResult) -> bool:
     # Do not retry missing file errors, the user should address those.
     if any(_matches_file_not_found(line) for line in status.stderr):
         return False
+
+    # Reproxy is now required to be running, so it is not possible
+    # to "forget" to run reproxy (via fuchsia.REPROXY_WRAP).
+    # It makes sense to retry rewrapper now.
+    if any(_matches_fail_to_dial(line) for line in status.stderr):
+        return True
 
     return status.returncode in _RETRIABLE_REWRAPPER_STATUSES
 
@@ -971,8 +981,7 @@ class RemoteAction(object):
         This is a dignostic tool for verifying the remote environment.
         """
         return cl_utils.subprocess_call(
-            list(self._generate_remote_debug_command()),
-            cwd=self.working_dir)
+            list(self._generate_remote_debug_command()), cwd=self.working_dir)
 
     def _run_maybe_remotely(self) -> cl_utils.SubprocessResult:
         return cl_utils.subprocess_call(
