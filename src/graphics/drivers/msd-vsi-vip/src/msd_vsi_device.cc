@@ -341,6 +341,8 @@ void MsdVsiDevice::HangCheckTimeout() {
   }
   KillCurrentContext();
   Reset();
+
+  ProcessRequestBacklog();
 }
 
 void MsdVsiDevice::StartDeviceThread(bool disable_suspend) {
