@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{fmt::Write, path::PathBuf, process::ExitStatus};
+use std::{collections::HashSet, fmt::Write, path::PathBuf, process::ExitStatus};
 
 use crate::{Error, FfxCommandLine, MetricsSession};
 use anyhow::Result;
@@ -126,17 +126,21 @@ pub trait ToolSuite: Sized {
 }
 
 fn print_command_list(w: &mut impl Write, commands: &[FfxToolInfo]) -> Result<(), std::fmt::Error> {
+    let mut found = HashSet::new();
     let mut built_in = None;
     let mut workspace = None;
     let mut sdk = None;
     for cmd in commands {
         use FfxToolSource::*;
-        let kind = match cmd.source {
-            BuiltIn => built_in.get_or_insert_with(String::new),
-            Workspace => workspace.get_or_insert_with(String::new),
-            Sdk => sdk.get_or_insert_with(String::new),
-        };
-        cmd.write_description(kind);
+        if !found.contains(&cmd.name) {
+            found.insert(cmd.name.clone());
+            let kind = match cmd.source {
+                BuiltIn => built_in.get_or_insert_with(String::new),
+                Workspace => workspace.get_or_insert_with(String::new),
+                Sdk => sdk.get_or_insert_with(String::new),
+            };
+            cmd.write_description(kind);
+        }
     }
 
     if let Some(built_in) = built_in {
