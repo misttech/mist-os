@@ -686,6 +686,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
             working_dir=working_dir,
         )
         self.assertTrue(action.remote_disable)
+        self.assertTrue(action.compare_with_local)
 
         with mock.patch.object(remote_action.RemoteAction, 'run',
                                return_value=0) as mock_run:
@@ -782,6 +783,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             exec_root=exec_root,
             working_dir=working_dir,
         )
+        self.assertTrue(action.compare_with_local)
 
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
@@ -831,6 +833,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             exec_root=exec_root,
             working_dir=working_dir,
         )
+        self.assertTrue(action.compare_with_local)
 
         unnamed_mocks = [
             # we don't bother to check the call details of these mocks
@@ -1188,6 +1191,9 @@ class RemoteActionConstructionTests(unittest.TestCase):
             action.launch_command,
             [str(self._rewrapper), f'--exec_root={self._PROJECT_ROOT}', '--'] +
             command)
+        self.assertFalse(action.compare_with_local)
+        self.assertFalse(action.check_determinism)
+        self.assertFalse(action.diagnose_nonzero)
 
     def test_path_setup_implicit(self):
         command = ['beep', 'boop']

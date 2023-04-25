@@ -519,6 +519,7 @@ class RemoteAction(object):
         remote_log: str = "",
         fsatrace_path: Optional[Path] = None,
         diagnose_nonzero: bool = False,
+        compare_with_local: bool = False,
         check_determinism: bool = False,
         post_remote_run_success_action: Callable[[], int] = None,
     ):
@@ -540,6 +541,7 @@ class RemoteAction(object):
           output_dirs: directories to be fetched after remote execution, relative to the
             current working dir.
           disable: if true, execute locally.
+          compare_with_local: if true, also run locally and compare outputs.
           check_determinism: if true, compare outputs of two local executions.
           save_temps: if true, keep around temporarily generated files after execution.
           remote_log: "" means disabled.  Any other value, remote logging is
@@ -572,6 +574,7 @@ class RemoteAction(object):
         # Parse and strip out --remote-* flags from command.
         self._remote_command = command
         self._remote_disable = disable
+        self._compare_with_local = compare_with_local
         self._check_determinism = check_determinism
         self._options = (options or [])
         self._post_remote_run_success_action = post_remote_run_success_action
@@ -659,6 +662,10 @@ class RemoteAction(object):
         # The information contained in this log is the same,
         # but is much easier to find than in the cumulative log.
         return Path(self._default_auxiliary_file_basename + '.rrpl')
+
+    @property
+    def compare_with_local(self) -> bool:
+        return self._compare_with_local
 
     @property
     def local_command(self) -> Sequence[str]:
@@ -951,7 +958,16 @@ class RemoteAction(object):
                 # TODO: output_leak_scanner.postflight_checks() here,
                 #   but only when requested, because inspecting output
                 #   contents takes time.
-                if not self.download_outputs:
+                if self.download_outputs:
+                    # TODO: in compare-mode, force-download outputs,
+                    # overriding and taking precedence over
+                    # --download_outputs=false, because comparison is intended
+                    # to be done locally with downloaded artifacts.
+                    if self.compare_with_local and not self.remote_disable:
+                        # Also run locally, and compare outputs.
+                        # If running only --local, there is nothing to compare.
+                        return self._compare_against_local()
+                else:
                     self._make_download_stubs()
 
                 if not self.remote_disable and self._post_remote_run_success_action:
@@ -974,6 +990,7 @@ class RemoteAction(object):
                 rewrapper_pid=result.pid,
                 action_log=self._action_log,
             )
+
             return result.returncode
 
         finally:
@@ -1002,18 +1019,10 @@ class RemoteAction(object):
             msg(f"[dry-run only]{label_str}{command_str}")
             return 0
 
-        main_exit_code = self.run()
-
-        if main_args.compare and not main_args.local:
-            # Also run locally, and compare outputs.
-            # If running only --local, there is nothing to compare.
-            return self._compare_against_local()
-
-        return main_exit_code
+        return self.run()
 
     def _rewrite_local_outputs_for_comparison_workaround(self):
-        # TODO: tag each output with information about its type,
-        # rather than inferring it based on file extension.
+        # TODO: move this logic into post_(remote)_run_success_action hook.
         for f in self.output_files_relative_to_working_dir:
             if f.suffix == '.map':  # intended for linker map files
                 # Workaround https://fxbug.dev/89245: relative-ize absolute path of
@@ -1085,6 +1094,11 @@ class RemoteAction(object):
         return exit_code
 
     def _compare_against_local(self) -> int:
+        """Compare outputs from remote and local execution.
+
+        Returns:
+          exit code 0 for success (all outputs match) else non-zero.
+        """
         # Backup outputs from remote execution first to '.remote'.
 
         # The fsatrace files will be handled separately because they are
@@ -1379,6 +1393,7 @@ def remote_action_from_args(
         output_files=output_files,
         output_dirs=output_dirs,
         disable=main_args.local,
+        compare_with_local=main_args.compare,
         check_determinism=main_args.check_determinism,
         save_temps=main_args.save_temps,
         remote_log=main_args.remote_log,
