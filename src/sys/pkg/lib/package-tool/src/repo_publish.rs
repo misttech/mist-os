@@ -9,6 +9,7 @@ use {
     },
     anyhow::{format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
+    chrono::{TimeZone, Utc},
     fidl_fuchsia_developer_ffx::ListFields,
     fidl_fuchsia_developer_ffx_ext::RepositoryPackage,
     fuchsia_async as fasync,
@@ -22,7 +23,7 @@ use {
         repo_keys::RepoKeys,
         repository::{Error as RepoError, PmRepository},
     },
-    futures::StreamExt,
+    futures::{AsyncReadExt as _, StreamExt as _},
     sdk_metadata::get_repositories,
     std::{
         collections::BTreeSet,
@@ -31,7 +32,12 @@ use {
         str::FromStr,
     },
     tracing::{error, info, warn},
-    tuf::{metadata::RawSignedMetadata, Error as TufError},
+    tuf::{
+        metadata::{MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata},
+        pouf::Pouf1,
+        repository::RepositoryProvider as _,
+        Error as TufError,
+    },
 };
 
 /// Time in seconds after which the attempt to get a lock file is considered failed.
@@ -201,9 +207,11 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
         .copy_mode(cmd.copy_mode)
         .delivery_blob_type(cmd.delivery_blob_type);
+
     if let Some(path) = &cmd.blobfs_compression_path {
         repo_builder = repo_builder.blobfs_compression_path(path.clone());
     }
+
     let repo = repo_builder.build();
 
     let mut deps = BTreeSet::new();
@@ -233,35 +241,7 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
 
     // Try to connect to the repository. This should succeed if we have at least some root metadata
     // in the repository. If none exists, we'll create a new repository.
-    let client = if let Some(trusted_root_path) = &cmd.trusted_root {
-        let buf = async_fs::read(&trusted_root_path)
-            .await
-            .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
-
-        let trusted_root = RawSignedMetadata::new(buf);
-
-        Some(RepoClient::from_trusted_root(&trusted_root, &repo).await?)
-    } else {
-        match RepoClient::from_trusted_remote(&repo).await {
-            Ok(mut client) => {
-                // Make sure our client has the latest metadata. It's okay if this fails with missing
-                // metadata since we'll create it when we publish to the repository.
-                match client.update().await {
-                    Ok(_) | Err(RepoError::Tuf(TufError::MetadataNotFound { .. })) => {}
-                    Err(err) => {
-                        return Err(err.into());
-                    }
-                }
-
-                Some(client)
-            }
-            Err(RepoError::Tuf(TufError::MetadataNotFound { .. })) => None,
-            Err(err) => {
-                return Err(err.into());
-            }
-        }
-    };
-
+    let client = get_client(cmd, &repo).await?;
     let mut repo_builder = if let Some(client) = &client {
         RepoBuilder::from_database(&repo, &repo_trusted_keys, client.database())
     } else {
@@ -320,6 +300,53 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     }
 
     Ok(())
+}
+
+async fn get_trusted_root(
+    cmd: &RepoPublishCommand,
+    repo: &PmRepository,
+) -> Result<Option<RawSignedMetadata<Pouf1, RootMetadata>>> {
+    if let Some(trusted_root_path) = &cmd.trusted_root {
+        let buf = async_fs::read(&trusted_root_path)
+            .await
+            .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
+
+        return Ok(Some(RawSignedMetadata::new(buf)));
+    }
+
+    // Otherwise, try to read the latest version.
+    match repo.fetch_metadata(&MetadataPath::root(), MetadataVersion::None).await {
+        Ok(mut file) => {
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf).await?;
+
+            Ok(Some(RawSignedMetadata::new(buf)))
+        }
+        Err(TufError::MetadataNotFound { .. }) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Try to connect to the repository. This should succeed if we have at least
+/// some root metadata in the repository.
+async fn get_client<'a>(
+    cmd: &'a RepoPublishCommand,
+    repo: &'a PmRepository,
+) -> Result<Option<RepoClient<&'a PmRepository>>> {
+    let Some(trusted_root) = get_trusted_root(cmd, repo).await? else {
+        return Ok(None);
+    };
+
+    let mut client = RepoClient::from_trusted_root(&trusted_root, repo).await?;
+
+    // Make sure our client has the latest metadata. It's okay if this fails
+    // with missing metadata since we'll create it when we publish to the
+    // repository. We'll allow any expired metadata since we're going to be
+    // generating new versions.
+    match client.update_with_start_time(&Utc.timestamp(0, 0)).await {
+        Ok(_) | Err(RepoError::Tuf(TufError::MetadataNotFound { .. })) => Ok(Some(client)),
+        Err(err) => Err(err.into()),
+    }
 }
 
 fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -> Result<RepoKeys> {
@@ -945,6 +972,34 @@ mod tests {
 
         assert_matches!(repo_client.update().await, Ok(true));
         assert_eq!(repo_client.database().trusted_root().version(), 1);
+    }
+
+    #[fuchsia::test]
+    async fn test_expired_metadata_without_trusted_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let keys_dir = root.join("keys");
+        test_utils::make_repo_keys_dir(&keys_dir);
+
+        // Create an empty repository with a zeroed expiration.
+        let pm_repo = PmRepository::new(root.to_path_buf());
+        let repo_keys = RepoKeys::from_dir(keys_dir.as_std_path()).unwrap();
+
+        RepoBuilder::create(&pm_repo, &repo_keys)
+            .current_time(Utc.timestamp(0, 0))
+            .commit()
+            .await
+            .unwrap();
+
+        // Make sure we can publish to this repository.
+        let cmd = RepoPublishCommand {
+            clean: true,
+            repo_path: root.to_path_buf(),
+            ..default_command_for_test()
+        };
+
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
     }
 
     #[fuchsia::test]
