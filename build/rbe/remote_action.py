@@ -1011,7 +1011,8 @@ class RemoteAction(object):
 
             # Under certain error conditions, do a one-time retry
             # for flake/fault-tolerance.
-            if _should_retry_remote_action(result):
+            if not self.remote_disable and _should_retry_remote_action(result):
+                msg('One-time retry for a possible remote-execution flake.')
                 result = self._run_maybe_remotely()
 
             if result.returncode == 0:  # success, nothing to see

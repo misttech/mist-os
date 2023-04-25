@@ -1372,7 +1372,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.local_only_command, command)
         self.assertEqual(action.options, [])
 
-    def test_fail_no_retry(self):
+    def test_remote_fail_no_retry(self):
         command = ['echo', 'hello']
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
@@ -1389,6 +1389,28 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
             mock_cleanup.assert_called_once()
             mock_call.assert_called_once()  # no retry
+
+    def test_local_fail_no_retry(self):
+        command = ['echo', 'hello']
+        action = self._make_remote_action(
+            command=command,
+            disable=True,  # local-only
+        )
+        self.assertTrue(action.remote_disable)
+        self.assertEqual(action.local_only_command, command)
+        self.assertEqual(action.launch_command, command)  # no rewrapper
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        exit_code = 4
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                self.assertEqual(action.run(), exit_code)
+
+        mock_cleanup.assert_called_once()
+        mock_call.assert_called_once()  # no retry
 
     def test_file_not_found_no_retry(self):
         command = ['echo', 'hello']
