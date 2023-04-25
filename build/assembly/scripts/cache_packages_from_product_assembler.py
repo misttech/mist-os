@@ -8,6 +8,7 @@ Script to extract line-separated cache package paths with image_assembly.json fr
 
 import argparse
 import json
+import os
 import sys
 
 
@@ -21,14 +22,24 @@ def main():
         required=True,
         help="Path to image_assembly.json created by `ffx assembly product`.")
     parser.add_argument(
+        "--rebase",
+        required=False,
+        help=
+        "Optionally rebase the package manifest paths from the assembly manifest."
+    )
+    parser.add_argument(
         "--output",
         required=True,
         help="Path to which to write desired output list.")
     args = parser.parse_args()
 
+    assert not args.rebase or os.path.isdir(
+        args.rebase), "--rebase needs to specify a valid directory path!"
     assembly_manifest = json.load(args.assembly_manifest)
     with open(args.output, 'w') as output:
         for cache_package in assembly_manifest["cache"]:
+            if args.rebase:
+                output.write(args.rebase.rstrip("/") + "/")
             output.write(cache_package)
             output.write("\n")
 

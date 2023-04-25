@@ -19,3 +19,9 @@ bazel_launcher = bazel_main_top_dir + "/bazel"
 
 # Location of the Bazel workspace, relative to the source root.
 bazel_workspace_dir = bazel_main_top_dir + "/workspace"
+
+# Location of the Bazel output base, relative to the source root.
+bazel_output_base = bazel_main_top_dir + "/output_base"
+
+# Location of the Bazel execroot, relative to the source root.
+bazel_execroot = bazel_output_base + "/execroot/main"
