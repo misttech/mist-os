@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-canvas.h"
+#include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/runtime/testing/runtime/dispatcher.h>
@@ -11,40 +11,36 @@
 
 #include <vector>
 
-#include <mock-mmio-reg/mock-mmio-reg.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+#include <mock-mmio-range/mock-mmio-range.h>
 
-#include "dmc-regs.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-
-namespace {
-constexpr uint32_t kMmioRegSize = sizeof(uint32_t);
-constexpr uint32_t kMmioRegCount = (aml_canvas::kDmcCavMaxRegAddr + kMmioRegSize) / kMmioRegSize;
-constexpr uint32_t kVmoTestSize = PAGE_SIZE;
-
-constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasInfo test_canvas_info = []() {
-  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo ci = {};
-  ci.height = 240;
-  ci.stride_bytes = 16;
-  ci.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
-  return ci;
-}();
-
-constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasInfo invalid_canvas_info = []() {
-  fuchsia_hardware_amlogiccanvas::wire::CanvasInfo ci = {};
-  ci.height = 240;
-  ci.stride_bytes = 15;
-  ci.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
-  return ci;
-}();
-}  // namespace
+#include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace aml_canvas {
 
-template <typename T>
-ddk_mock::MockMmioReg& GetMockReg(ddk_mock::MockMmioRegRegion& registers) {
-  return registers[T::Get().addr()];
-}
+namespace {
+
+constexpr uint32_t kVmoTestSize = PAGE_SIZE;
+
+constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasInfo test_canvas_info = {
+    .height = 240,
+    .stride_bytes = 16,
+    .blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear,
+};
+
+constexpr fuchsia_hardware_amlogiccanvas::wire::CanvasInfo invalid_canvas_info = {
+    .height = 240,
+    .stride_bytes = 15,
+    .blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear,
+};
+
+// Register addresses from the A311D datasgeet section 13.1.2 "DDR" >
+// "Register description". DMC is typo-ed as DC.
+constexpr int kCanvasLutDataLowOffset = 0x0012 * 4;
+constexpr int kCanvasLutDataHighOffset = 0x0013 * 4;
+constexpr int kCanvasLutAddressOffset = 0x0014 * 4;
 
 class AmlCanvasWrap {
  public:
@@ -68,25 +64,25 @@ class AmlCanvasWrap {
   std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
 };
 
-class AmlCanvasTest : public zxtest::Test {
+class AmlCanvasTest : public testing::Test {
  public:
-  AmlCanvasTest() : mock_regs_(ddk_mock::MockMmioRegRegion(kMmioRegSize, kMmioRegCount)) {
-    fdf::MmioBuffer mmio(mock_regs_.GetMmioBuffer());
-
+  void SetUp() override {
     zx::bti bti;
     EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
-    ASSERT_OK(endpoints);
+    zx::result<fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>> endpoints =
+        fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
+    ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-    canvas_.SyncCall(&AmlCanvasWrap::Init, std::move(mmio), std::move(bti));
+    canvas_.SyncCall(&AmlCanvasWrap::Init, mmio_range_.GetMmioBuffer(), std::move(bti));
     canvas_.SyncCall(&AmlCanvasWrap::Serve, std::move(endpoints.value().server));
 
     canvas_client_.Bind(std::move(endpoints.value().client));
   }
 
   void TestLifecycle() {
-    std::string name = "aml-canvas";
+    const std::string name = "aml-canvas";
+
     EXPECT_OK(canvas_.SyncCall(&AmlCanvasWrap::DdkAdd, name));
     canvas_.SyncCall(&AmlCanvasWrap::release);
   }
@@ -156,21 +152,25 @@ class AmlCanvasTest : public zxtest::Test {
   }
 
   void SetRegisterExpectations() {
-    GetMockReg<CanvasLutDataLow>(mock_regs_).ExpectWrite(CanvasLutDataLowValue());
-    GetMockReg<CanvasLutDataHigh>(mock_regs_).ExpectWrite(CanvasLutDataHighValue());
-    GetMockReg<CanvasLutAddr>(mock_regs_).ExpectWrite(CanvasLutAddrValue(NextCanvasIndex()));
+    // TODO(costan): Remove the read expectations when we get rid of the unnecessary R/M/W.
+    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+        {.address = kCanvasLutDataLowOffset, .value = CanvasLutDataLowValue(), .write = true},
+        {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue(), .write = true},
+        {.address = kCanvasLutAddressOffset,
+         .value = CanvasLutAddrValue(NextCanvasIndex()),
+         .write = true},
+        {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue()},
+    }));
   }
 
   void SetRegisterExpectations(uint8_t index) {
-    GetMockReg<CanvasLutDataLow>(mock_regs_).ExpectWrite(CanvasLutDataLowValue());
-    GetMockReg<CanvasLutDataHigh>(mock_regs_).ExpectWrite(CanvasLutDataHighValue());
-    GetMockReg<CanvasLutAddr>(mock_regs_).ExpectWrite(CanvasLutAddrValue(index));
-  }
-
-  void VerifyAll() {
-    GetMockReg<CanvasLutDataLow>(mock_regs_).VerifyAndClear();
-    GetMockReg<CanvasLutDataHigh>(mock_regs_).VerifyAndClear();
-    GetMockReg<CanvasLutAddr>(mock_regs_).VerifyAndClear();
+    // TODO(costan): Remove the read expectations when we get rid of the unnecessary R/M/W.
+    mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+        {.address = kCanvasLutDataLowOffset, .value = CanvasLutDataLowValue(), .write = true},
+        {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue(), .write = true},
+        {.address = kCanvasLutAddressOffset, .value = CanvasLutAddrValue(index), .write = true},
+        {.address = kCanvasLutDataHighOffset, .value = CanvasLutDataHighValue()},
+    }));
   }
 
  private:
@@ -208,7 +208,10 @@ class AmlCanvasTest : public zxtest::Test {
   fdf_testing::DriverRuntimeEnv env_;
   fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherNoDefaultAllowSync};
   std::vector<uint8_t> canvas_indices_;
-  ddk_mock::MockMmioRegRegion mock_regs_;
+
+  constexpr static int kMmioRangeSize = 0x100;
+  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+
   async_patterns::TestDispatcherBound<AmlCanvasWrap> canvas_{dispatcher_.dispatcher(),
                                                              std::in_place};
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_client_;
@@ -219,7 +222,6 @@ TEST_F(AmlCanvasTest, DdkLifecyle) { TestLifecycle(); }
 TEST_F(AmlCanvasTest, CanvasConfigFreeSingle) {
   SetRegisterExpectations();
   EXPECT_OK(CreateNewCanvas());
-  ASSERT_NO_FATAL_FAILURE(VerifyAll());
 
   EXPECT_OK(FreeAllCanvases());
 }
@@ -229,7 +231,6 @@ TEST_F(AmlCanvasTest, CanvasConfigFreeMultipleSequential) {
   for (int i = 0; i < 5; i++) {
     SetRegisterExpectations();
     EXPECT_OK(CreateNewCanvas());
-    ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   // Free all 5 canvases created above.
@@ -241,7 +242,6 @@ TEST_F(AmlCanvasTest, CanvasConfigFreeMultipleInterleaved) {
   for (int i = 0; i < 5; i++) {
     SetRegisterExpectations();
     EXPECT_OK(CreateNewCanvas());
-    ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   // Free canvas index 1, so the next one created has index 1.
@@ -249,14 +249,12 @@ TEST_F(AmlCanvasTest, CanvasConfigFreeMultipleInterleaved) {
 
   SetRegisterExpectations(1);
   EXPECT_OK(CreateNewCanvas());
-  ASSERT_NO_FATAL_FAILURE(VerifyAll());
 
   // Free canvas index 3, so the next one created has index 3.
   EXPECT_OK(FreeCanvas(3));
 
   SetRegisterExpectations(3);
   EXPECT_OK(CreateNewCanvas());
-  ASSERT_NO_FATAL_FAILURE(VerifyAll());
 
   EXPECT_OK(FreeAllCanvases());
 }
@@ -271,7 +269,6 @@ TEST_F(AmlCanvasTest, CanvasConfigMaxLimit) {
   for (size_t i = 0; i < kNumCanvasEntries; i++) {
     SetRegisterExpectations();
     EXPECT_OK(CreateNewCanvas());
-    ASSERT_NO_FATAL_FAILURE(VerifyAll());
   }
 
   // Try to create another canvas, and verify that it fails.
@@ -285,5 +282,7 @@ TEST_F(AmlCanvasTest, CanvasConfigUnaligned) {
   // and verify that it fails.
   EXPECT_EQ(CreateNewCanvasInvalid(), ZX_ERR_INVALID_ARGS);
 }
+
+}  // namespace
 
 }  //  namespace aml_canvas
