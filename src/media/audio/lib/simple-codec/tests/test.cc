@@ -351,9 +351,6 @@ TEST_F(SimpleCodecTest, PlugStateHardwired) {
     audio_fidl::CodecSyncPtr codec_client;
     codec_client.Bind(std::move(channel_local));
 
-    audio_fidl::PlugDetectCapabilities out_plug_detect_capabilities;
-    ASSERT_OK(codec_client->GetPlugDetectCapabilities(&out_plug_detect_capabilities));
-    ASSERT_EQ(out_plug_detect_capabilities, audio_fidl::PlugDetectCapabilities::HARDWIRED);
     audio_fidl::PlugState out_plug_state;
     ASSERT_OK(codec_client->WatchPlugState(&out_plug_state));
     ASSERT_EQ(out_plug_state.plugged(), true);
@@ -368,9 +365,6 @@ TEST_F(SimpleCodecTest, PlugStateHardwired) {
     audio_fidl::CodecSyncPtr codec_client;
     codec_client.Bind(std::move(channel_local));
 
-    audio_fidl::PlugDetectCapabilities out_plug_detect_capabilities;
-    ASSERT_OK(codec_client->GetPlugDetectCapabilities(&out_plug_detect_capabilities));
-    ASSERT_EQ(out_plug_detect_capabilities, audio_fidl::PlugDetectCapabilities::HARDWIRED);
     audio_fidl::PlugState out_plug_state;
     ASSERT_OK(codec_client->WatchPlugState(&out_plug_state));
     ASSERT_EQ(out_plug_state.plugged(), true);

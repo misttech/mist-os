@@ -147,16 +147,6 @@ void SimpleCodecServerInternal<T>::Start(Codec::StartCallback callback,
 }
 
 template <class T>
-void SimpleCodecServerInternal<T>::GetInfo(Codec::GetInfoCallback callback) {
-  auto info = static_cast<T*>(this)->GetInfo();
-  callback({
-      .unique_id = info.unique_id,
-      .manufacturer = info.manufacturer,
-      .product_name = info.product_name,
-  });
-}
-
-template <class T>
 void SimpleCodecServerInternal<T>::GetProperties(Codec::GetPropertiesCallback callback) {
   Info info = static_cast<T*>(this)->GetInfo();
   fuchsia::hardware::audio::CodecProperties properties;
@@ -450,13 +440,6 @@ void SimpleCodecServerInternal<T>::SetTopology(
   }
   callback(signal_fidl::SignalProcessing_SetTopology_Result::WithResponse(
       signal_fidl::SignalProcessing_SetTopology_Response()));
-}
-
-template <class T>
-void SimpleCodecServerInternal<T>::GetPlugDetectCapabilities(
-    Codec::GetPlugDetectCapabilitiesCallback callback) {
-  // Only hardwired in simple codec.
-  callback(audio_fidl::PlugDetectCapabilities::HARDWIRED);
 }
 
 template <class T>

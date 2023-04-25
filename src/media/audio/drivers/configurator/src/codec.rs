@@ -70,13 +70,6 @@ impl CodecInterface {
         self.get_proxy()?.clone().get_properties().err_into().await
     }
 
-    /// Get plug detect capabilities from the codec.
-    pub async fn get_plug_detect_capabilities(
-        &self,
-    ) -> Result<fidl_fuchsia_hardware_audio::PlugDetectCapabilities, Error> {
-        self.get_proxy()?.clone().get_plug_detect_capabilities().err_into().await
-    }
-
     /// Reset codec.
     pub async fn reset(&self) -> Result<(), Error> {
         self.get_proxy()?.clone().reset().err_into().await

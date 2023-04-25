@@ -68,7 +68,6 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   void Reset(ResetCompleter::Sync& completer) override;
   void Stop(StopCompleter::Sync& completer) override;
   void Start(StartCompleter::Sync& completer) override;
-  void GetInfo(GetInfoCompleter::Sync& completer) override;
   void GetProperties(GetPropertiesCompleter::Sync& completer) override;
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override;
   void IsBridgeable(IsBridgeableCompleter::Sync& completer) override;
@@ -77,7 +76,6 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override;
   void SetDaiFormat(SetDaiFormatRequestView request,
                     SetDaiFormatCompleter::Sync& completer) override;
-  void GetPlugDetectCapabilities(GetPlugDetectCapabilitiesCompleter::Sync& completer) override;
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) override;
   void SignalProcessingConnect(SignalProcessingConnectRequestView request,
                                SignalProcessingConnectCompleter::Sync& completer) override;

@@ -87,7 +87,6 @@ class FakeCodecDevice : public ddk::CodecProtocol<FakeCodecDevice, ddk::base_pro
   void Reset(ResetCompleter::Sync& completer) override { completer.Reply(); }
   void Stop(StopCompleter::Sync& completer) override { completer.Reply({}); }
   void Start(StartCompleter::Sync& completer) override { completer.Reply({}); }
-  void GetInfo(GetInfoCompleter::Sync& completer) override { completer.Reply({}); }
   void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override { completer.Reply({}); }
   void IsBridgeable(IsBridgeableCompleter::Sync& completer) override { completer.Reply({}); }
@@ -99,9 +98,6 @@ class FakeCodecDevice : public ddk::CodecProtocol<FakeCodecDevice, ddk::base_pro
   void SetDaiFormat(SetDaiFormatRequestView request,
                     SetDaiFormatCompleter::Sync& completer) override {
     completer.ReplySuccess({});
-  }
-  void GetPlugDetectCapabilities(GetPlugDetectCapabilitiesCompleter::Sync& completer) override {
-    completer.Reply({});
   }
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) override { completer.Reply({}); }
   void SignalProcessingConnect(SignalProcessingConnectRequestView request,

@@ -45,27 +45,9 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.GetGainFormat",
-        "ordinal": "6412026000006221797",
-        "type": "() -> (fuchsia.hardware.audio/GainFormat gain_format)"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.hardware.audio/Codec.GetHealthState",
         "ordinal": "5626242144218069636",
         "type": "() -> (fuchsia.hardware.audio/HealthState state)"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.GetInfo",
-        "ordinal": "8873402704708262796",
-        "type": "() -> (fuchsia.hardware.audio/CodecInfo info)"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.GetPlugDetectCapabilities",
-        "ordinal": "4848398471123002498",
-        "type": "() -> (fuchsia.hardware.audio/PlugDetectCapabilities plug_detect_capabilities)"
     },
     {
         "kind": "protocol/member",
@@ -93,12 +75,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.SetGainState",
-        "ordinal": "4618560359998229598",
-        "type": "(fuchsia.hardware.audio/GainState target_state)"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.hardware.audio/Codec.SignalProcessingConnect",
         "ordinal": "757045078484476565",
         "type": "(server_end:fuchsia.hardware.audio.signalprocessing/SignalProcessing protocol)"
@@ -114,12 +90,6 @@
         "name": "fuchsia.hardware.audio/Codec.Stop",
         "ordinal": "6642308132950453693",
         "type": "() -> (int64 start_time)"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.hardware.audio/Codec.WatchGainState",
-        "ordinal": "5642379786507124956",
-        "type": "() -> (fuchsia.hardware.audio/GainState gain_state)"
     },
     {
         "kind": "protocol/member",
@@ -162,28 +132,6 @@
     {
         "kind": "table",
         "name": "fuchsia.hardware.audio/CodecFormatInfo"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.audio/CodecInfo.manufacturer",
-        "ordinal": "2",
-        "type": "string:256"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.audio/CodecInfo.product_name",
-        "ordinal": "3",
-        "type": "string:256"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.hardware.audio/CodecInfo.unique_id",
-        "ordinal": "1",
-        "type": "string:16"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.hardware.audio/CodecInfo"
     },
     {
         "kind": "struct/member",
@@ -581,46 +529,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.hardware.audio/GainFormat.can_agc",
-        "ordinal": "6",
-        "type": "bool"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio/GainFormat.can_mute",
-        "ordinal": "5",
-        "type": "bool"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio/GainFormat.gain_step",
-        "ordinal": "4",
-        "type": "float32"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio/GainFormat.max_gain",
-        "ordinal": "3",
-        "type": "float32"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio/GainFormat.min_gain",
-        "ordinal": "2",
-        "type": "float32"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.hardware.audio/GainFormat.type",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.audio/GainType"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.hardware.audio/GainFormat"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.hardware.audio/GainState.agc_enabled",
         "ordinal": "2",
         "type": "bool"
@@ -640,22 +548,6 @@
     {
         "kind": "table",
         "name": "fuchsia.hardware.audio/GainState"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.audio/GainType.DECIBELS",
-        "value": "1"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.audio/GainType.PERCENT",
-        "value": "2"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.hardware.audio/GainType",
-        "strictness": "strict",
-        "type": "uint8"
     },
     {
         "kind": "enum/member",

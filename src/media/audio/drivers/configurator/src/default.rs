@@ -560,7 +560,9 @@ impl Configurator for DefaultConfigurator {
             }
         }
 
-        let plug_detect_capabilities = interface.get_plug_detect_capabilities().await?;
+        let plug_detect_capabilities = properties
+            .plug_detect_capabilities
+            .ok_or(anyhow!("Codec with no plug detect capabilities"))?;
 
         let inner = self.inner.clone();
         let mut inner = inner.lock().await;
@@ -1478,14 +1480,6 @@ mod tests {
                 CodecRequest::Reset { responder } => {
                     responder.send()?;
                 }
-                CodecRequest::GetInfo { responder } => {
-                    let mut info = CodecInfo {
-                        unique_id: "".to_string(),
-                        manufacturer: "test".to_string(),
-                        product_name: "testy".to_string(),
-                    };
-                    responder.send(&mut info)?;
-                }
                 CodecRequest::GetProperties { responder } => {
                     let info = CodecProperties {
                         unique_id: Some("".to_string()),
@@ -1515,9 +1509,6 @@ mod tests {
                     responder.send(&mut formats)?;
                 }
                 CodecRequest::SetDaiFormat { responder: _, format: _ } => {}
-                CodecRequest::GetPlugDetectCapabilities { responder } => {
-                    responder.send(PlugDetectCapabilities::Hardwired)?;
-                }
                 CodecRequest::WatchPlugState { responder } => {
                     responder.send(PlugState {
                         plugged: Some(TEST_CODEC_PLUGGED),

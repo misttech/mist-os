@@ -54,7 +54,6 @@ class SimpleCodecServerInternal {
   void Reset(Codec::ResetCallback callback, SimpleCodecServerInstance<T>* instance);
   void Stop(Codec::StopCallback callback, SimpleCodecServerInstance<T>* instance);
   void Start(Codec::StartCallback callback, SimpleCodecServerInstance<T>* instance);
-  void GetInfo(Codec::GetInfoCallback callback);
   void GetProperties(Codec::GetPropertiesCallback callback);
   void GetHealthState(Codec::GetHealthStateCallback callback) { callback({}); }
   void IsBridgeable(Codec::IsBridgeableCallback callback);
@@ -62,7 +61,6 @@ class SimpleCodecServerInternal {
   void GetDaiFormats(Codec::GetDaiFormatsCallback callback);
   void SetDaiFormat(fuchsia::hardware::audio::DaiFormat format,
                     Codec::SetDaiFormatCallback callback);
-  void GetPlugDetectCapabilities(Codec::GetPlugDetectCapabilitiesCallback callback);
   void WatchPlugState(Codec::WatchPlugStateCallback callback,
                       SimpleCodecServerInstance<T>* instance);
 
@@ -122,7 +120,6 @@ class SimpleCodecServerInstance
   void Reset(ResetCallback callback) override { parent_->Reset(std::move(callback), this); }
   void Stop(StopCallback callback) override { parent_->Stop(std::move(callback), this); }
   void Start(StartCallback callback) override { parent_->Start(std::move(callback), this); }
-  void GetInfo(GetInfoCallback callback) override { parent_->GetInfo(std::move(callback)); }
   void GetProperties(GetPropertiesCallback callback) override {
     parent_->GetProperties(std::move(callback));
   }
@@ -168,9 +165,6 @@ class SimpleCodecServerInstance
   void SetDaiFormat(fuchsia::hardware::audio::DaiFormat format,
                     SetDaiFormatCallback callback) override {
     parent_->SetDaiFormat(std::move(format), std::move(callback));
-  }
-  void GetPlugDetectCapabilities(GetPlugDetectCapabilitiesCallback callback) override {
-    parent_->GetPlugDetectCapabilities(std::move(callback));
   }
   void WatchPlugState(WatchPlugStateCallback callback) override {
     parent_->WatchPlugState(std::move(callback), this);

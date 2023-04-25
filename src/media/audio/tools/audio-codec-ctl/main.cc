@@ -32,8 +32,6 @@ Audio hardware codec driver control.
 
 Usage:
   audio-codec-ctl [-d|--device <device>] f[ormats]
-  audio-codec-ctl [-d|--device <device>] i[nfo]
-  audio-codec-ctl [-d|--device <device>] c[apabilities_plug_detect]
   audio-codec-ctl [-d|--device <device>] b[ridgeable]
   audio-codec-ctl [-d|--device <device>] r[eset]
   audio-codec-ctl [-d|--device <device>] m[ode_bridged] true|false
@@ -290,28 +288,6 @@ int main(int argc, char** argv) {
         return -1;
       }
       std::cout << FidlString(result->formats()) << std::endl;
-      return 0;
-    }
-
-    case 'i': {
-      auto result = GetCodecClient(path)->GetInfo();
-      if (result.is_error()) {
-        std::cerr << "get info failed: " << result.error_value().FormatDescription() << std::endl;
-        return -1;
-      } else {
-        std::cout << FidlString(result->info()) << std::endl;
-      }
-      return 0;
-    }
-
-    case 'c': {
-      auto result = GetCodecClient(path)->GetPlugDetectCapabilities();
-      if (!result.is_ok()) {
-        std::cerr << "get plug detect capabilities failed: "
-                  << result.error_value().FormatDescription() << std::endl;
-        return -1;
-      }
-      std::cout << FidlString(result->plug_detect_capabilities()) << std::endl;
       return 0;
     }
 

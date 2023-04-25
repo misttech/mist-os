@@ -319,12 +319,6 @@ void Server::Reset(ResetCompleter::Sync& completer) {
   completer.Reply();
 }
 
-void Server::GetInfo(GetInfoCompleter::Sync& completer) {
-  fuchsia_hardware_audio::wire::CodecInfo info{
-      .unique_id = "", .manufacturer = "Dialog", .product_name = "DA7219"};
-  completer.Reply(info);
-}
-
 void Server::GetProperties(GetPropertiesCompleter::Sync& completer) {
   fidl::Arena arena;
   auto properties = fuchsia_hardware_audio::wire::CodecProperties::Builder(arena);
@@ -443,10 +437,6 @@ void Server::SetDaiFormat(SetDaiFormatRequestView request, SetDaiFormatCompleter
     return;
   }
   completer.ReplySuccess({});
-}
-
-void Server::GetPlugDetectCapabilities(GetPlugDetectCapabilitiesCompleter::Sync& completer) {
-  completer.Reply(fuchsia_hardware_audio::wire::PlugDetectCapabilities::kCanAsyncNotify);
 }
 
 void Server::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {

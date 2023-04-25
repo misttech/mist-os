@@ -16,10 +16,6 @@ to play, record, and configure audio streams.
 ```none
   audio-codec-ctl [-d|--device <device>] f[ormats]
 
-  audio-codec-ctl [-d|--device <device>] i[nfo]
-
-  audio-codec-ctl [-d|--device <device>] c[apabilities_plug_detect]
-
   audio-codec-ctl [-d|--device <device>] b[ridgeable]
 
   audio-codec-ctl [-d|--device <device>] r[eset]
