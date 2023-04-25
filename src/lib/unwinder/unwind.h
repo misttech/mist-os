@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "src/lib/unwinder/cfi_unwinder.h"
+#include "src/lib/unwinder/error.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
 #include "src/lib/unwinder/registers.h"
@@ -32,13 +33,15 @@ struct Frame {
   // Trust level of the frame.
   Trust trust;
 
-  // Error when unwinding from this frame, which should be empty except for the
-  // last frame.
-  Error error;
+  // Error when unwinding from this frame, which could be non-fatal and present in any frames.
+  Error error = Success();
+
+  // Whether the above error is fatal and aborts the unwinding, causing the stack to be incomplete.
+  // This could only be true for the last frame.
+  bool fatal_error = false;
 
   // Disallow default constructors.
-  Frame(Registers regs, Trust trust, Error error)
-      : regs(std::move(regs)), trust(trust), error(std::move(error)) {}
+  Frame(Registers regs, Trust trust) : regs(std::move(regs)), trust(trust) {}
 
   // Useful for debugging.
   std::string Describe() const;
@@ -62,7 +65,10 @@ class Unwinder {
 
  private:
   // Unwind one frame.
-  Error Step(Memory* stack, const Frame& current, Frame& next);
+  //
+  // |current.regs| will be used. |current.error| and |current.fatal_error| will be populated.
+  // If |current.fatal_error| is false, |next.regs| and |next.trust| will be populated.
+  void Step(Memory* stack, Frame& current, Frame& next);
 
   CfiUnwinder cfi_unwinder_;
 };

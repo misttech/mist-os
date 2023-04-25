@@ -90,8 +90,8 @@ static std::vector<Frame> unwind_from_unwinder(zx_handle_t process, zx_handle_t 
         source += "context";
         break;
     }
-    if (frame.error.has_err()) {
-      source += "\nerror: " + frame.error.msg();
+    if (frame.fatal_error) {
+      source += "\nunwinding aborted: " + frame.error.msg();
     }
     res.push_back({pc, source});
   }

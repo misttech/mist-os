@@ -59,15 +59,14 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
     stack = &unavailable_memory;
   }
 
-  std::vector<Frame> res = {{registers, Frame::Trust::kContext, /*placeholder*/ Success()}};
+  std::vector<Frame> res = {{registers, Frame::Trust::kContext}};
 
   while (--max_depth) {
     Frame& current = res.back();
 
-    Frame next(Registers(current.regs.arch()), /*placeholder*/ Frame::Trust::kCFI,
-               /*placeholder*/ Success());
+    Frame next(Registers(current.regs.arch()), /*placeholder*/ Frame::Trust::kCFI);
 
-    current.error = Step(stack, current, next);
+    Step(stack, current, next);
 
     // An undefined PC (e.g. on Linux) or 0 PC (e.g. on Fuchsia) marks the end of the unwinding.
     // Don't include this in the output because it's not a real frame and provides no information.
@@ -82,7 +81,7 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
   return res;
 }
 
-Error Unwinder::Step(Memory* stack, const Frame& current, Frame& next) {
+void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   FramePointerUnwinder fp_unwinder(&cfi_unwinder_);
   PltUnwinder plt_unwinder(&cfi_unwinder_);
   ShadowCallStackUnwinder scs_unwinder;
@@ -130,10 +129,10 @@ Error Unwinder::Step(Memory* stack, const Frame& current, Frame& next) {
     }
   }
 
+  current.fatal_error = !success;
   if (!err_msg.empty()) {
-    return Error(err_msg);
+    current.error = Error(err_msg);
   }
-  return Success();
 }
 
 std::vector<Frame> Unwind(Memory* memory, const std::vector<uint64_t>& modules,
