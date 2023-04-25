@@ -148,7 +148,6 @@ class CxxRemoteAction(object):
     def depfile(self) -> Optional[Path]:
         return self.cxx_action.depfile
 
-    @property
     def _depfile_exists(self) -> bool:
         # Defined for easy precise mocking.
         return self.depfile and self.depfile.exists()
