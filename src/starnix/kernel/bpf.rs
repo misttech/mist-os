@@ -27,6 +27,9 @@ use crate::task::Kernel;
 use crate::types::as_any::AsAny;
 use crate::types::*;
 
+/// The default selinux context to use for each BPF object.
+const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";
+
 trait BpfObject: Send + Sync + AsAny + 'static {}
 
 /// A reference to a BPF object that can be stored in either an FD or an entry in the /sys/fs/bpf
@@ -148,6 +151,16 @@ fn get_bpf_fd(current_task: &CurrentTask, fd: u32) -> Result<BpfHandle, Errno> {
         .downcast_file::<BpfHandle>()
         .ok_or_else(|| errno!(EBADF))?
         .clone())
+}
+
+// TODO(b/278731253): Returns custom selinux context for everything under /sys/fs/bpf/net_shared/*.
+// Otherwise, returns default selinux context for BPF objects.
+fn get_selinux_context(path: &FsStr) -> FsString {
+    if String::from_utf8_lossy(path).contains("net_shared") {
+        b"u:object_r:fs_bpf_net_shared:s0".to_vec()
+    } else {
+        DEFAULT_BPF_SELINUX_CONTEXT.to_vec()
+    }
 }
 
 pub fn sys_bpf(
@@ -273,11 +286,12 @@ pub fn sys_bpf(
                 &pathname,
             )?;
             parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
+            let selinux_context = get_selinux_context(&pathname);
             parent.entry.add_node_ops(
                 current_task,
                 basename,
                 mode!(IFREG, 0o600),
-                BpfFsObject(object),
+                BpfFsObject::new(object, &selinux_context),
             )?;
             Ok(SUCCESS)
         }
@@ -293,7 +307,7 @@ pub fn sys_bpf(
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let node =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;
-            install_bpf_handle_fd(current_task, node.0.clone())
+            install_bpf_handle_fd(current_task, node.handle.clone())
         }
 
         // Obtain information about the eBPF object corresponding to bpf_fd.
@@ -360,7 +374,7 @@ pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new_with_permanent_entries(kernel, BpfFs);
-        let node = FsNode::new_root(BpfFsDir);
+        let node = FsNode::new_root(BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT));
         {
             let mut info = node.info_write();
             info.mode |= FileMode::ISVTX;
@@ -389,8 +403,23 @@ impl FileSystemOps for BpfFs {
     }
 }
 
-struct BpfFsDir;
+struct BpfFsDir {
+    xattrs: MemoryXattrStorage,
+}
+
+impl BpfFsDir {
+    fn new(selinux_context: &FsStr) -> Self {
+        let xattrs = MemoryXattrStorage::default();
+        xattrs
+            .set_xattr(b"security.selinux", selinux_context, XattrOp::Create)
+            .expect("Failed to set selinux context.");
+        Self { xattrs }
+    }
+}
+
 impl FsNodeOps for BpfFsDir {
+    fs_node_impl_xattr_delegate!(self, self.xattrs);
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
@@ -411,11 +440,12 @@ impl FsNodeOps for BpfFsDir {
     fn mkdir(
         &self,
         node: &FsNode,
-        _name: &FsStr,
+        name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        Ok(node.fs().create_node(BpfFsDir, mode | FileMode::ISVTX, owner))
+        let selinux_context = get_selinux_context(name);
+        Ok(node.fs().create_node(BpfFsDir::new(&selinux_context), mode | FileMode::ISVTX, owner))
     }
 
     fn mknod(
@@ -448,8 +478,24 @@ impl FsNodeOps for BpfFsDir {
     }
 }
 
-struct BpfFsObject(BpfHandle);
+struct BpfFsObject {
+    handle: BpfHandle,
+    xattrs: MemoryXattrStorage,
+}
+
+impl BpfFsObject {
+    fn new(handle: BpfHandle, selinux_context: &FsStr) -> Self {
+        let xattrs = MemoryXattrStorage::default();
+        xattrs
+            .set_xattr(b"security.selinux", selinux_context, XattrOp::Create)
+            .expect("Failed to set selinux context.");
+        Self { handle, xattrs }
+    }
+}
+
 impl FsNodeOps for BpfFsObject {
+    fs_node_impl_xattr_delegate!(self, self.xattrs);
+
     fn create_file_ops(
         &self,
         _node: &FsNode,
