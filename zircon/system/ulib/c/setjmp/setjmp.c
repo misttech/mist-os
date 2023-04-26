@@ -8,4 +8,10 @@
 
 #include "setjmp_impl.h"
 
-static_assert(sizeof(__jmp_buf) == sizeof(uint64_t) * JB_COUNT, "fix __jmp_buf definition");
+// TODO(fxbug.dev/125629): The size has been expanded to accommodate a checksum
+// word, but this is not yet used until callers can be expected to use the new
+// larger size.
+#define JB_COUNT_UNUSED 1
+
+static_assert(sizeof(__jmp_buf) == sizeof(uint64_t) * (JB_COUNT + JB_COUNT_UNUSED),
+              "fix __jmp_buf definition");
