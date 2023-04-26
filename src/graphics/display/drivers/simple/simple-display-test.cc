@@ -220,7 +220,7 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   constexpr uint32_t kWidth = 800;
   constexpr uint32_t kHeight = 600;
   constexpr uint32_t kStride = 800;
-  constexpr zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_RGB_x888;
+  constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
 
   SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(sysmem_client)),
                         fake_mmio.MmioBuffer(), kWidth, kHeight, kStride, kPixelFormat);
@@ -284,11 +284,12 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   constexpr uint32_t kWidth = 800;
   constexpr uint32_t kHeight = 600;
   constexpr uint32_t kStride = 800;
-  constexpr zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_RGB_x888;
+  constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
+  constexpr size_t kBytesPerPixel = 4;
 
   // `framebuffer_vmo` must outlive `fake_sysmem`.
   zx::vmo framebuffer_vmo;
-  size_t kImageBytes = kStride * kHeight * ZX_PIXEL_FORMAT_BYTES(kPixelFormat);
+  size_t kImageBytes = uint64_t{kStride} * kHeight * kBytesPerPixel;
   EXPECT_OK(zx::vmo::create(/*size=*/kImageBytes, /*options=*/0, &framebuffer_vmo));
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
@@ -329,7 +330,6 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   const image_t kDefaultImage = {
       .width = kWidth,
       .height = kHeight,
-      .pixel_format = kPixelFormat,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
@@ -357,12 +357,6 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   // Invalid import: bad height
   invalid_image = kDefaultImage;
   invalid_image.height = invalid_image.height * 2;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
-            ZX_ERR_INVALID_ARGS);
-
-  // Invalid import: bad format
-  invalid_image = kDefaultImage;
-  invalid_image.pixel_format = ZX_PIXEL_FORMAT_NV12;
   EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 

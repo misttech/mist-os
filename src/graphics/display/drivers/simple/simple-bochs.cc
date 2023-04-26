@@ -14,9 +14,14 @@
 #include "simple-display.h"
 #include "src/graphics/display/drivers/simple/simple-bochs-bind.h"
 
-#define DISPLAY_WIDTH 1024
-#define DISPLAY_HEIGHT 768
-#define DISPLAY_FORMAT ZX_PIXEL_FORMAT_RGB_x888
+namespace {
+
+constexpr int kDisplayWidth = 1024;
+constexpr int kDisplayHeight = 768;
+constexpr auto kDisplayFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
+constexpr int kBitsPerPixel = 32;
+
+}  // namespace
 
 inline uint16_t bochs_vbe_dispi_read(MMIO_PTR void* base, uint32_t reg) {
   return MmioRead16(reinterpret_cast<MMIO_PTR uint16_t*>(reinterpret_cast<MMIO_PTR uint8_t*>(base) +
@@ -43,26 +48,12 @@ inline void bochs_vbe_dispi_write(MMIO_PTR void* base, uint32_t reg, uint16_t va
 #define BOCHS_VBE_DISPI_ENABLED 0x01
 #define BOCHS_VBE_DISPI_LFB_ENABLED 0x40
 
-static int zx_display_format_to_bpp(zx_pixel_format_t format) {
-  unsigned bpp = ZX_PIXEL_FORMAT_BYTES(format) * 8;
-  if (bpp == 0) {
-    // unknown
-    return -1;
-  } else {
-    return bpp;
-  }
-}
-
 static void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height,
-                        zx_pixel_format_t format) {
+                        uint16_t bits_per_pixel) {
   zxlogf(TRACE, "id: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
 
-  int bpp = zx_display_format_to_bpp(format);
-  assert(bpp >= 0);
-  assert(bpp < 256);
-
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_ENABLE, 0);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_BPP, static_cast<uint16_t>(bpp));
+  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_BPP, bits_per_pixel);
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_XRES, width);
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_YRES, height);
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_BANK, 0);
@@ -102,12 +93,12 @@ static zx_status_t bochs_vbe_bind(void* ctx, zx_device_t* dev) {
     return status;
   }
 
-  set_hw_mode(mmio.vaddr, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_FORMAT);
+  set_hw_mode(mmio.vaddr, kDisplayWidth, kDisplayHeight, kBitsPerPixel);
 
   mmio_buffer_release(&mmio);
 
-  return bind_simple_pci_display(dev, "bochs_vbe", 0u, DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_WIDTH,
-                                 DISPLAY_FORMAT);
+  return bind_simple_pci_display(dev, "bochs_vbe", 0u, kDisplayWidth, kDisplayHeight,
+                                 /*stride=*/kDisplayWidth, kDisplayFormat);
 }
 
 static zx_driver_ops_t bochs_vbe_driver_ops = {

@@ -10,11 +10,12 @@
 #include <zircon/errors.h>
 #include <zircon/pixelformat.h>
 
-#include "fbl/mutex.h"
+#include <fbl/mutex.h>
 
 #if __cplusplus
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -42,7 +43,7 @@ class SimpleDisplay : public DeviceType,
  public:
   SimpleDisplay(zx_device_t* parent, fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem,
                 fdf::MmioBuffer framebuffer_mmio, uint32_t width, uint32_t height, uint32_t stride,
-                zx_pixel_format_t format);
+                fuchsia_images2::wire::PixelFormat format);
   ~SimpleDisplay() = default;
 
   void DdkRelease();
@@ -127,7 +128,11 @@ class SimpleDisplay : public DeviceType,
   const uint32_t width_;
   const uint32_t height_;
   const uint32_t stride_;
-  const zx_pixel_format_t format_;
+  const fuchsia_images2::wire::PixelFormat format_;
+  // TODO(fxbug.dev/71410): Delete usage of zx_pixel_format_t.
+  zx_pixel_format_t zx_format_;
+
+  const uint64_t kFormatModifier = fuchsia_images2::wire::kFormatModifierLinear;
 
   // Only used on the vsync thread.
   zx::time next_vsync_time_;
@@ -139,11 +144,11 @@ class SimpleDisplay : public DeviceType,
 __BEGIN_CDECLS
 zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                     uint32_t width, uint32_t height, uint32_t stride,
-                                    zx_pixel_format_t format);
+                                    fuchsia_images2::wire::PixelFormat format);
 
 zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                          uint32_t width, uint32_t height, uint32_t stride,
-                                         zx_pixel_format_t format);
+                                         fuchsia_images2::wire::PixelFormat format);
 
 zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar,
                                                bool use_fidl);

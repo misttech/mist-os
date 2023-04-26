@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -14,9 +15,13 @@
 #include "src/graphics/display/drivers/simple/simple-display.h"
 #include "src/graphics/display/drivers/simple/simple-gga-bind.h"
 
-// GGA device only supports RGB888 format.
-#define GGA_DISPLAY_FORMAT ZX_PIXEL_FORMAT_RGB_888
-#define GGA_DISPLAY_BPP 24
+namespace {
+
+// GGA (Google Graphics Array) device only supports RGB888 format.
+constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgr24;
+constexpr int kBitsPerPixel = 24;
+
+}  // namespace
 
 #define GGA_VBE_DISPI_ID 0x0
 #define GGA_VBE_DISPI_XRES 0x1
@@ -64,7 +69,7 @@ __attribute__((unused)) static void gga_dump_regs() {
   }
 }
 
-static zx_status_t gga_disp_setup(uint16_t width, uint16_t height) {
+static zx_status_t gga_disp_setup(uint16_t width, uint16_t height, uint16_t bits_per_pixel) {
   // TODO(fxbug.dev/84561): Drivers shouldn't request root resource to get IO
   // ports. Instead the board driver should provide the port access over PCI
   // root protocol and PCI bus driver should pass them to corresponding devices.
@@ -88,7 +93,7 @@ static zx_status_t gga_disp_setup(uint16_t width, uint16_t height) {
 
   gga_write_reg(GGA_VBE_DISPI_XRES, width);
   gga_write_reg(GGA_VBE_DISPI_YRES, height);
-  gga_write_reg(GGA_VBE_DISPI_BPP, GGA_DISPLAY_BPP);
+  gga_write_reg(GGA_VBE_DISPI_BPP, bits_per_pixel);
   gga_write_reg(GGA_VBE_DISPI_ENABLE,
                 GGA_VBE_DISPI_ENABLE_FLAG_ENABLED | GGA_VBE_DISPI_ENABLE_FLAG_LFB_ENABLED);
 
@@ -126,7 +131,8 @@ static zx_status_t gga_disp_bind(void* ctx, zx_device_t* dev) {
     zxlogf(ERROR, "%s: unsupported large width/height: %d %d\n", __func__, width, height);
     return ZX_ERR_NOT_SUPPORTED;
   }
-  status = gga_disp_setup(static_cast<uint16_t>(width), static_cast<uint16_t>(height));
+  status = gga_disp_setup(static_cast<uint16_t>(width), static_cast<uint16_t>(height),
+                          static_cast<uint16_t>(kBitsPerPixel));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot set up GGA device registers: %d", __func__, status);
     return status;
@@ -136,7 +142,7 @@ static zx_status_t gga_disp_bind(void* ctx, zx_device_t* dev) {
   // GGA devices only support RGB888 format, thus we should always override
   // the format information we got from bootloader framebuffer.
   return bind_simple_pci_display(dev, "gga", /*bar=*/0u, width, height, /*stride=*/width,
-                                 GGA_DISPLAY_FORMAT);
+                                 kPixelFormat);
 }
 
 static zx_driver_ops_t gga_disp_driver_ops = {

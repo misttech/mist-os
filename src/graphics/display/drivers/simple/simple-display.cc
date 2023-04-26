@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/default.h>
@@ -13,6 +14,8 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/image-format/image_format.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,9 +31,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "fidl/fuchsia.sysmem/cpp/markers.h"
-#include "lib/fidl/cpp/wire/channel.h"
 
 namespace {
 
@@ -92,7 +92,7 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   args.panel.params.height = height_;
   args.panel.params.width = width_;
   args.panel.params.refresh_rate_e2 = kRefreshRateHz * 100;
-  args.pixel_format_list = &format_;
+  args.pixel_format_list = &zx_format_;
   args.pixel_format_count = 1;
 
   intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
@@ -184,9 +184,18 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image, uint
     zxlogf(ERROR, "no image format constraints");
     return ZX_ERR_INVALID_ARGS;
   }
+
   if (index > 0) {
     zxlogf(ERROR, "invalid index %d, greater than 0", index);
     return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  auto sysmem2_collection_format = sysmem::V2CopyFromV1PixelFormatType(
+      collection_info.settings.image_format_constraints.pixel_format.type);
+  if (sysmem2_collection_format != format_) {
+    zxlogf(ERROR, "Image format from sysmem (%u) doesn't match expected format (%u)",
+           static_cast<uint32_t>(sysmem2_collection_format), static_cast<uint32_t>(format_));
+    return ZX_ERR_INVALID_ARGS;
   }
 
   zx::vmo vmo = std::move(collection_info.buffers[0].vmo);
@@ -201,7 +210,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image, uint
   if (import_info.koid != framebuffer_koid_) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (image->width != width_ || image->height != height_ || image->pixel_format != format_) {
+  if (image->width != width_ || image->height != height_) {
     return ZX_ERR_INVALID_ARGS;
   }
   image->handle = kImageHandle;
@@ -285,7 +294,9 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
       constraints.buffer_memory_constraints;
   buffer_constraints.min_size_bytes = 0;
-  uint32_t bytes_per_row = stride_ * ZX_PIXEL_FORMAT_BYTES(format_);
+  const uint32_t bytes_per_pixel =
+      ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(format_, kFormatModifier));
+  uint32_t bytes_per_row = stride_ * bytes_per_pixel;
   buffer_constraints.max_size_bytes = height_ * bytes_per_row;
   buffer_constraints.physically_contiguous_required = false;
   buffer_constraints.secure_required = false;
@@ -296,22 +307,9 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   constraints.image_format_constraints_count = 1;
   fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
       constraints.image_format_constraints[0];
-  switch (format_) {
-    case ZX_PIXEL_FORMAT_ARGB_8888:
-    case ZX_PIXEL_FORMAT_RGB_x888:
-      image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
-      break;
-    case ZX_PIXEL_FORMAT_ABGR_8888:
-    case ZX_PIXEL_FORMAT_BGR_888x:
-      image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8;
-      break;
-    case ZX_PIXEL_FORMAT_RGB_888:
-      image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgr24;
-      break;
-  }
+  image_constraints.pixel_format.type = sysmem::V1CopyFromV2PixelFormatType(format_);
   image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value =
-      fuchsia_sysmem::wire::kFormatModifierLinear;
+  image_constraints.pixel_format.format_modifier.value = kFormatModifier;
   image_constraints.color_spaces_count = 1;
   image_constraints.color_space[0].type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb;
   image_constraints.min_coded_width = width_;
@@ -432,8 +430,8 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
   // when device goes out of scope.
   [[maybe_unused]] auto ptr = vbe_ptr->release();
 
-  zxlogf(INFO, "%s: initialized display, %u x %u (stride=%u format=%08x)", name, width_, height_,
-         stride_, format_);
+  zxlogf(INFO, "%s: initialized display, %u x %u (stride=%u format=%u)", name, width_, height_,
+         stride_, static_cast<uint32_t>(format_));
 
   return ZX_OK;
 }
@@ -467,7 +465,7 @@ zx_status_t SimpleDisplay::InitSysmemAllocatorClient() {
 SimpleDisplay::SimpleDisplay(zx_device_t* parent,
                              fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem,
                              fdf::MmioBuffer framebuffer_mmio, uint32_t width, uint32_t height,
-                             uint32_t stride, zx_pixel_format_t format)
+                             uint32_t stride, fuchsia_images2::wire::PixelFormat format)
     : DeviceType(parent),
       sysmem_(std::move(sysmem)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
@@ -479,6 +477,10 @@ SimpleDisplay::SimpleDisplay(zx_device_t* parent,
       stride_(stride),
       format_(format),
       next_vsync_time_(zx::clock::get_monotonic()) {
+  ZX_ASSERT_MSG(ImageFormatConvertSysmemToZx(format_, &zx_format_),
+                "Cannot convert sysmem format %u to zx_pixel_format_t",
+                static_cast<uint32_t>(format_));
+
   // Start thread. Heap server must be running on a separate
   // thread as sysmem might be making synchronous allocation requests
   // from the main thread.
@@ -512,15 +514,22 @@ zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* nam
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (use_fidl) {
-    return bind_simple_fidl_pci_display(dev, name, bar, width, height, stride, format);
+  auto sysmem2_format_type_result = ImageFormatConvertZxToSysmemPixelFormat_v2(format);
+  if (!sysmem2_format_type_result.is_ok()) {
+    zxlogf(ERROR, "%s: failed to convert framebuffer format: %u", name, format);
+    return ZX_ERR_NOT_SUPPORTED;
   }
-  return bind_simple_pci_display(dev, name, bar, width, height, stride, format);
+  fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
+
+  if (use_fidl) {
+    return bind_simple_fidl_pci_display(dev, name, bar, width, height, stride, sysmem2_format);
+  }
+  return bind_simple_pci_display(dev, name, bar, width, height, stride, sysmem2_format);
 }
 
 zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                     uint32_t width, uint32_t height, uint32_t stride,
-                                    zx_pixel_format_t format) {
+                                    fuchsia_images2::wire::PixelFormat format) {
   ddk::Pci pci(dev, "pci");
   if (!pci.is_valid()) {
     zxlogf(ERROR, "%s: could not get PCI protocol", name);
@@ -562,7 +571,7 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
 
 zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                          uint32_t width, uint32_t height, uint32_t stride,
-                                         zx_pixel_format_t format) {
+                                         fuchsia_images2::wire::PixelFormat format) {
   zx::result client =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_pci::Service::Device>(
           dev, "pci");
