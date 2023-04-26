@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::num::NonZeroU64;
+
 use async_trait::async_trait;
 use dhcp_client_core::deps::PacketSocketProvider;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use fuchsia_async as fasync;
-use sockaddr::{IntoSockAddr as _, TryToSockaddrLl as _};
+use sockaddr::{EthernetSockaddr, IntoSockAddr as _, TryToSockaddrLl as _};
 
 pub(crate) struct PacketSocket {
-    interface_id: u64,
+    interface_id: NonZeroU64,
     inner: fasync::net::DatagramSocket,
 }
 
@@ -186,44 +188,6 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
     }
 }
 
-/// Specifies only the fields that need to vary within our `PacketSocket` implementation.
-struct SockaddrLl {
-    interface_id: u64,
-
-    // This DHCP client is assumed to operate only on Ethernet links.
-    // TODO(https://fxbug.dev/124899): Generalize to other link types (like PPP).
-    addr: net_types::ethernet::Mac,
-}
-
-impl From<SockaddrLl> for libc::sockaddr_ll {
-    fn from(value: SockaddrLl) -> Self {
-        let SockaddrLl { interface_id, addr } = value;
-
-        let mut sll_addr = [0; 8];
-        sll_addr[..addr.bytes().len()].copy_from_slice(&addr.bytes());
-
-        let ethertype_ipv4 = u16::from(packet_formats::ethernet::EtherType::Ipv4);
-        libc::sockaddr_ll {
-            sll_family: libc::AF_PACKET
-                .try_into()
-                .expect("libc::AF_PACKET should fit in sll_family field"),
-            sll_ifindex: (interface_id)
-                .try_into()
-                .expect("interface_id should fit in sll_ifindex field"),
-            // Network order is big endian.
-            sll_protocol: ethertype_ipv4.to_be(),
-            sll_halen: addr
-                .bytes()
-                .len()
-                .try_into()
-                .expect("hardware address length should fit in sll_halen field"),
-            sll_addr,
-            sll_hatype: 0,  // unused by sendto() or bind()
-            sll_pkttype: 0, // unused by sendto() or bind()
-        }
-    }
-}
-
 // TODO(https://fxbug.dev/124913): expose this from `libc` crate on fuchsia.
 const ARPHRD_ETHER: libc::c_ushort = 1;
 
@@ -236,7 +200,11 @@ impl dhcp_client_core::deps::Socket<net_types::ethernet::Mac> for PacketSocket {
     ) -> Result<(), dhcp_client_core::deps::SocketError> {
         let Self { interface_id, inner } = self;
 
-        let sockaddr_ll = libc::sockaddr_ll::from(SockaddrLl { interface_id: *interface_id, addr });
+        let sockaddr_ll = libc::sockaddr_ll::from(EthernetSockaddr {
+            interface_id: Some(*interface_id),
+            addr,
+            protocol: packet_formats::ethernet::EtherType::Ipv4,
+        });
 
         let n =
             inner.send_to(buf, sockaddr_ll.into_sockaddr()).await.map_err(translate_io_error)?;
@@ -281,11 +249,11 @@ impl dhcp_client_core::deps::Socket<net_types::ethernet::Mac> for PacketSocket {
 
 pub(crate) struct PacketSocketProviderImpl {
     provider: fpacket::ProviderProxy,
-    interface_id: u64,
+    interface_id: NonZeroU64,
 }
 
 impl PacketSocketProviderImpl {
-    pub(crate) fn new(provider: fpacket::ProviderProxy, interface_id: u64) -> Self {
+    pub(crate) fn new(provider: fpacket::ProviderProxy, interface_id: NonZeroU64) -> Self {
         PacketSocketProviderImpl { provider, interface_id }
     }
 
@@ -331,9 +299,10 @@ impl PacketSocketProvider for PacketSocketProviderImpl {
             })?;
         let socket: socket2::Socket = fdio::create_fd(sock.into()).unwrap();
 
-        let sockaddr_ll = libc::sockaddr_ll::from(SockaddrLl {
-            interface_id: *interface_id,
+        let sockaddr_ll = libc::sockaddr_ll::from(EthernetSockaddr {
+            interface_id: Some(*interface_id),
             addr: net_types::ethernet::Mac::UNSPECIFIED, // unused by bind()
+            protocol: packet_formats::ethernet::EtherType::Ipv4,
         });
 
         socket.bind(&sockaddr_ll.into_sockaddr()).map_err(translate_io_error)?;
@@ -400,14 +369,14 @@ mod test {
             .expect("join network with realm_b");
 
         let socket_a = PacketSocketProviderImpl {
-            interface_id: iface_a.id(),
+            interface_id: NonZeroU64::new(iface_a.id()).expect("ID is nonzero"),
             provider: realm_a.connect_to_protocol::<fpacket::ProviderMarker>().unwrap(),
         }
         .get_packet_socket()
         .await
         .expect("get packet socket");
         let socket_b = PacketSocketProviderImpl {
-            interface_id: iface_b.id(),
+            interface_id: NonZeroU64::new(iface_b.id()).unwrap(),
             provider: realm_b.connect_to_protocol::<fpacket::ProviderMarker>().unwrap(),
         }
         .get_packet_socket()
@@ -478,7 +447,7 @@ mod test {
             .expect("join network with realm");
 
         let provider = PacketSocketProviderImpl {
-            interface_id: iface.id(),
+            interface_id: NonZeroU64::new(iface.id()).unwrap(),
             provider: realm.connect_to_protocol::<fpacket::ProviderMarker>().unwrap(),
         };
         assert_eq!(provider.get_mac().await.expect("get mac"), MAC);

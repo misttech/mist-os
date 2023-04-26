@@ -1,20 +1,22 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use std::{cell::RefCell, collections::HashSet, num::NonZeroU64};
 
 use fidl_fuchsia_net_dhcp::{ClientExitReason, ClientProviderRequest, ClientProviderRequestStream};
 use fidl_fuchsia_posix_socket_packet as fpacket;
 use futures::{StreamExt as _, TryStreamExt as _};
-use std::{cell::RefCell, collections::HashSet};
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {
+    #[error("the interface identifier was zero")]
+    InvalidInterfaceIdentifier,
     #[error("tried to create multiple DHCP clients with interface_id={0}; exiting")]
-    MultipleClientsOnSameInterface(u64),
+    MultipleClientsOnSameInterface(NonZeroU64),
 }
 
 struct InterfacesInUse {
-    set: RefCell<HashSet<u64>>,
+    set: RefCell<HashSet<NonZeroU64>>,
 }
 
 impl InterfacesInUse {
@@ -24,7 +26,7 @@ impl InterfacesInUse {
 
     fn mark_interface_in_use(
         &self,
-        interface_id: u64,
+        interface_id: NonZeroU64,
     ) -> Result<InterfaceInUseHandle<'_>, AlreadyInUse> {
         let Self { set } = self;
         if set.borrow_mut().insert(interface_id) {
@@ -34,7 +36,7 @@ impl InterfacesInUse {
         }
     }
 
-    fn remove(&self, interface_id: u64) {
+    fn remove(&self, interface_id: NonZeroU64) {
         let Self { set } = self;
         assert!(set.borrow_mut().remove(&interface_id));
     }
@@ -43,7 +45,7 @@ impl InterfacesInUse {
 #[must_use]
 struct InterfaceInUseHandle<'a> {
     parent: &'a InterfacesInUse,
-    interface_id: u64,
+    interface_id: NonZeroU64,
 }
 
 impl<'a> Drop for InterfaceInUseHandle<'a> {
@@ -80,6 +82,8 @@ pub(crate) async fn serve_client_provider(
                     request,
                     control_handle: _,
                 } => {
+                    let interface_id =
+                        NonZeroU64::new(interface_id).ok_or(Error::InvalidInterfaceIdentifier)?;
                     let (client_requests_stream, control_handle) =
                         request.into_stream_and_control_handle().expect("fidl error");
                     let _handle: InterfaceInUseHandle<'_> = {

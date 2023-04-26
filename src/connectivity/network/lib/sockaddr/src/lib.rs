@@ -6,6 +6,8 @@
 
 #![deny(missing_docs)]
 
+use std::num::NonZeroU64;
+
 /// Socket addresses that can be converted to `libc::sockaddr_ll`.
 pub trait TryToSockaddrLl {
     /// Converts `self` to a `libc::sockaddr_ll`, returning `None` if `self`'s
@@ -78,6 +80,46 @@ impl IntoSockAddr for libc::sockaddr_ll {
                  our init fn always returns Ok(())",
         );
         sock_addr
+    }
+}
+
+/// Socket address for an Ethernet packet socket.
+pub struct EthernetSockaddr {
+    /// The interface identifier, or `None` for no interface.
+    pub interface_id: Option<NonZeroU64>,
+    /// The link address.
+    pub addr: net_types::ethernet::Mac,
+    /// The Ethernet frame type.
+    pub protocol: packet_formats::ethernet::EtherType,
+}
+
+impl From<EthernetSockaddr> for libc::sockaddr_ll {
+    fn from(value: EthernetSockaddr) -> Self {
+        let EthernetSockaddr { interface_id, addr, protocol } = value;
+
+        let mut sll_addr = [0; 8];
+        let addr_bytes = addr.bytes();
+        sll_addr[..addr_bytes.len()].copy_from_slice(&addr_bytes);
+
+        let ethertype = u16::from(protocol);
+        libc::sockaddr_ll {
+            sll_family: libc::AF_PACKET
+                .try_into()
+                .expect("libc::AF_PACKET should fit in sll_family field"),
+            sll_ifindex: interface_id
+                .map_or(0, NonZeroU64::get)
+                .try_into()
+                .expect("interface_id should fit in sll_ifindex field"),
+            // Network order is big endian.
+            sll_protocol: ethertype.to_be(),
+            sll_halen: addr_bytes
+                .len()
+                .try_into()
+                .expect("hardware address length should fit in sll_halen field"),
+            sll_addr,
+            sll_hatype: 0,  // unused by sendto() or bind()
+            sll_pkttype: 0, // unused by sendto() or bind()
+        }
     }
 }
 
