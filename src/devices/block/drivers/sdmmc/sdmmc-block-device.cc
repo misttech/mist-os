@@ -202,7 +202,9 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
     return st;
   }
 
-  // TODO(fxbug.dev/124654): Consider enabling for SD as well.
+  // TODO(fxbug.dev/124654): Consider enabling for SD as well. Also consider reviving
+  // SDMMC_READ_BLOCK/SDMMC_WRITE_BLOCK for single-block transfers, now that FUA won't be supported
+  // for SDMMC.
   const bool pre_defined_transfer_mode = !is_sd_;
 
   uint32_t cmd_idx = 0;
@@ -211,8 +213,7 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
   bool manual_stop_transmission = false;
   // For single-block transfers, we could get higher performance by using SDMMC_READ_BLOCK/
   // SDMMC_WRITE_BLOCK without the need to SDMMC_SET_BLOCK_COUNT or SDMMC_STOP_TRANSMISSION.
-  // However, we always do multiple-block transfers for simplicity (FUA access requires
-  // SDMMC_SET_BLOCK_COUNT, which adds to the complexity).
+  // However, we always do multiple-block transfers for simplicity.
   if (kBlockOp(txn.command) == BLOCK_OP_READ) {
     cmd_idx = SDMMC_READ_MULTIPLE_BLOCK;
     cmd_flags = SDMMC_READ_MULTIPLE_BLOCK_FLAGS;
@@ -221,12 +222,12 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const block_read_write_t& txn,
     cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS;
   }
   if (pre_defined_transfer_mode) {
-    // TODO(fxbug.dev/123882): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
+    // TODO(fxbug.dev/126205): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
     // performance.
     set_block_count = {
         .cmd_idx = SDMMC_SET_BLOCK_COUNT,
         .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
-        .arg = static_cast<uint32_t>(txn.length),  // TODO(fxbug.dev/123882): Support FUA.
+        .arg = static_cast<uint32_t>(txn.length),
     };
   } else {
     if (sdmmc_.host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
@@ -487,6 +488,7 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
         BlockComplete(txn, status);
         return;
       }
+      // MMC supports FUA writes, but not FUA reads. SD does not support FUA.
       if (btxn->command & BLOCK_FL_FORCE_ACCESS) {
         BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
         return;

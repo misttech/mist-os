@@ -469,8 +469,6 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
     }
   }
 
-  // TODO(fxbug.dev/123882): Support FUA.
-
   return ZX_OK;
 }
 
