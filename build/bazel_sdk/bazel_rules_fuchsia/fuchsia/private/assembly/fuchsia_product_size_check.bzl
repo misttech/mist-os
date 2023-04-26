@@ -21,7 +21,9 @@ $FFX \
     product \
     --assembly-manifest $IMAGES_PATH \
     --size-breakdown-output $SIZE_FILE \
-    --visualization-dir $VISUALIZATION_DIR
+    --visualization-dir $VISUALIZATION_DIR \
+    --gerrit-output $SIZE_REPORT_PRODUCT_FILE \
+    --blobfs-creep-budget $CREEP_LIMIT
 """
 
 def _fuchsia_product_size_check_impl(ctx):
@@ -29,12 +31,13 @@ def _fuchsia_product_size_check_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
     size_file = ctx.actions.declare_file(ctx.label.name + "_size_breakdown.txt")
+    size_report_product_file = ctx.actions.declare_file(ctx.label.name + "_size_report_product.json")
     visualization_dir = ctx.actions.declare_file(ctx.label.name + "_visualization")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     ctx.actions.run_shell(
         inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
-        outputs = [size_file, visualization_dir, ffx_isolate_dir],
+        outputs = [size_file, visualization_dir, ffx_isolate_dir, size_report_product_file],
         command = _SIZE_CHECKER_RUNNER_SH,
         env = {
             "FFX": fuchsia_toolchain.ffx.path,
@@ -42,10 +45,12 @@ def _fuchsia_product_size_check_impl(ctx):
             "IMAGES_PATH": images_out.path + "/images.json",
             "SIZE_FILE": size_file.path,
             "VISUALIZATION_DIR": visualization_dir.path,
+            "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,
+            "CREEP_LIMIT": ctx.attr.creep_limit
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
-    deps = [size_file, visualization_dir]
+    deps = [size_file, visualization_dir, size_report_product_file]
 
     return [DefaultInfo(files = depset(direct = deps))]
 
@@ -58,6 +63,10 @@ fuchsia_product_size_check = rule(
             doc = "fuchsia_product_image target to check size",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
+        ),
+        "blobfs_creep_limit": attr.int(
+            doc = "Creep limit for Blobfs, this is how much BlobFS contents can increase in one CL",
+            default = 102400
         ),
     },
 )
