@@ -92,6 +92,12 @@ zbi_test("zbi-boot-shim-core-tests") {
     ":zbi-boot-shim",
     "//zircon/system/utest/core:core-tests.zbi($default_toolchain)",
   ]
+
+  # TODO(https://fxbug.dev/126120): The Bti.DecommitRace test case takes 15
+  # to 17 minutes on RISC-V, so extend the timeout in that case.
+  if (current_cpu == "riscv64") {
+    timeout = 1800
+  }
 }
 
 zbi_executable("debugdata-boot-shim-test") {
