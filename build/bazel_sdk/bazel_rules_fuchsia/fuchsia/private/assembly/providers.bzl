@@ -156,6 +156,8 @@ FuchsiaProductImageInfo = provider(
     doc = "Info needed to pave a Fuchsia image",
     fields = {
         "images_out": "images out directory",
+        "product_assembly_out": "product assembly out directory",
+        "platform_aibs": "platform aibs file listing path to platform AIBS",
     },
 )
 
@@ -163,6 +165,7 @@ FuchsiaProductAssemblyInfo = provider(
     doc = "Info populated by product assembly",
     fields = {
         "product_assembly_out": "product assembly out directory",
+        "platform_aibs": "platform aibs file listing path to platform AIBS",
     },
 )
 

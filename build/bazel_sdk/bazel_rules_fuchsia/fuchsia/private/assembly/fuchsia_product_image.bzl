@@ -50,6 +50,20 @@ def _fuchsia_product_assembly_impl(ctx):
     legacy_aib = ctx.attr.legacy_aib[FuchsiaProductAssemblyBundleInfo]
     platform_aibs = ctx.attr.platform_aibs[FuchsiaProductAssemblyBundleInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
+    platform_aibs_file = ctx.actions.declare_file(ctx.label.name + "_platform_assembly_input_bundles.json")
+
+    # Create platform_assembly_input_bundles.json file
+    ctx.actions.run(
+        outputs = [platform_aibs_file],
+        inputs = platform_aibs.files,
+        executable = ctx.executable._create_platform_aibs_file,
+        arguments = [
+            "--platform-aibs",
+            platform_aibs.dir.path,
+            "--output",
+            platform_aibs_file.path,
+        ],
+    )
 
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
@@ -108,7 +122,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ],
     )
 
-    deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list] + ffx_inputs
+    deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file] + ffx_inputs
 
     return [
         DefaultInfo(files = depset(direct = deps)),
@@ -118,6 +132,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ),
         FuchsiaProductAssemblyInfo(
             product_assembly_out = out_dir,
+            platform_aibs = platform_aibs_file,
         ),
     ]
 
@@ -154,6 +169,11 @@ fuchsia_product_assembly = rule(
         ),
         "_create_package_manifest_list": attr.label(
             default = "//fuchsia/tools:create_package_manifest_list",
+            executable = True,
+            cfg = "exec",
+        ),
+        "_create_platform_aibs_file": attr.label(
+            default = "//fuchsia/tools:create_platform_aibs_file",
             executable = True,
             cfg = "exec",
         ),
@@ -203,6 +223,8 @@ def _fuchsia_product_create_system_impl(ctx):
         ),
         FuchsiaProductImageInfo(
             images_out = out_dir,
+            platform_aibs = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].platform_aibs,
+            product_assembly_out = product_assembly_out,
         ),
     ]
 

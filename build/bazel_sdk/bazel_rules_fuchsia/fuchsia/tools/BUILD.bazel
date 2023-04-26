@@ -51,6 +51,12 @@ py_binary(
     python_version = "PY3",
 )
 
+py_binary(
+    name = "create_platform_aibs_file",
+    srcs = ["create_platform_aibs_file.py"],
+    python_version = "PY3",
+)
+
 py_library(
     name = "fuchsia_task_lib",
     srcs = ["fuchsia_task_lib.py"],
