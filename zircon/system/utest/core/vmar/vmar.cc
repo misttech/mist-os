@@ -2493,14 +2493,7 @@ TEST(Vmar, BadRangeOpNestedVmar) {
 }
 
 // Test zx_vmar_op_range ZX_VMAR_OP_COMMIT.
-//
-// TODO(fxbug.dev/125951): Test fails on riscv64.
-#if defined(__riscv)
-#define MAYBE_RangeOpCommit DISABLED_RangeOpCommit
-#else
-#define MAYBE_RangeOpCommit RangeOpCommit
-#endif
-TEST(Vmar, MAYBE_RangeOpCommit) {
+TEST(Vmar, RangeOpCommit) {
   // Create a temporary VMAR to work with.
   auto root_vmar = zx::vmar::root_self();
   zx::vmar vmar;
