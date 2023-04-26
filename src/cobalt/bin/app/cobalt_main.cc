@@ -14,10 +14,10 @@
 #include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <stdlib.h>
-#include <zircon/boot/image.h>
 #include <zircon/processargs.h>
 #include <zircon/types.h>
 #include <zircon/utc.h>

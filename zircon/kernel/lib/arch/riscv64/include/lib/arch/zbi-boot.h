@@ -7,8 +7,8 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_RISCV64_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 #define ZIRCON_KERNEL_LIB_ARCH_RISCV64_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <cstdint>
 

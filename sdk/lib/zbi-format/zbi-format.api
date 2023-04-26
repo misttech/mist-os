@@ -1,3 +1,5 @@
 {
-  "pkg/zbi-format/include/lib/zbi-format/driver-config.h": "4f369e61f82291792a72dd4fa7ca87f3"
+  "pkg/zbi-format/include/lib/zbi-format/driver-config.h": "4f369e61f82291792a72dd4fa7ca87f3",
+  "pkg/zbi-format/include/lib/zbi-format/zbi.h": "f3e906174d3c63abc4de3da98c483bb2",
+  "pkg/zbi-format/include/zircon/boot/image.h": "e3a48108cedc44db8ca8c4bfd980094f"
 }

@@ -10,7 +10,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/unsafe.h>
 #include <lib/fpromise/bridge.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/status.h>
 
 #include <sstream>

@@ -6,7 +6,7 @@
  */
 
 /*
- * This provides the zbi_kernel_t (see <zircon/boot/image.h>) payload header
+ * This provides the zbi_kernel_t (see <lib/zbi-format/zbi.h>) payload header
  * for ZBI executables, inserted immediately after the ZBI container and item
  * headers zbi-header.S generates.  For BFD ld, this file must be listed in a
  * -T switch *before* the -T switch for phys.ld so that the `INSERT` clause

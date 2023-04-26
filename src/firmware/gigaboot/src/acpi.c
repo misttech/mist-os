@@ -5,11 +5,11 @@
 #include "acpi.h"
 
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <xefi.h>
-#include <zircon/boot/image.h>
 
 const efi_guid kAcpiTableGuid = ACPI_TABLE_GUID;
 const efi_guid kAcpi20TableGuid = ACPI_20_TABLE_GUID;

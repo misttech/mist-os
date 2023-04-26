@@ -44,6 +44,7 @@ test("devicetree-tests") {
     deps += [
       "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",
       "//sdk/lib/sys/cpp",
+      "//sdk/lib/zbi-format",
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zx",
     ]
@@ -94,6 +95,7 @@ executable("devicetree-extract") {
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/zbi-format",
     "//zircon/system/ulib/zx",
   ]
 }

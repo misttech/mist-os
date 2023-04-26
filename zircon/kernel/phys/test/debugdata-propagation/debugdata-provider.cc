@@ -5,11 +5,11 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-shim/debugdata.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/debugdata.h>
 #include <stdio.h>
 #include <turducken.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/array.h>
 #include <ktl/string_view.h>

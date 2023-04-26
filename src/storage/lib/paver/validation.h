@@ -6,7 +6,7 @@
 #define SRC_STORAGE_LIB_PAVER_VALIDATION_H_
 
 #include <lib/stdcompat/span.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 

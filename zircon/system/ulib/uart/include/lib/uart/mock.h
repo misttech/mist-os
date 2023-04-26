@@ -10,9 +10,9 @@
 // It also serves to demonstrate the API required by uart::KernelDriver.
 
 #include <lib/mock-function/mock-function.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <string_view>
 #include <type_traits>

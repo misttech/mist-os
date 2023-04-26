@@ -58,6 +58,7 @@ sdk_static_library("ddk") {
     # <ddk/io-buffer.h> has #include <zircon/syscalls.h>.
 
     "//sdk/lib/driver/runtime:driver_runtime",
+    "//sdk/lib/zbi-format",
     "//zircon/system/ulib/async:async",
     "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/syslog:syslog-headers",

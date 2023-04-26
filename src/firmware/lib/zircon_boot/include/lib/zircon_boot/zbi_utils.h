@@ -69,7 +69,7 @@ zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const 
 // entry point address on success. Only applies to ARM kernel type.
 //
 // This is needed because zircon booting requires additional scratch memory following the kernel.
-// See zircon/system/public/zircon/boot/image.h for more details.
+// See sdk/lib/zbi-format/include/lib/zbi-format/zbi.h for more details.
 //
 // @zbi: Pointer to the zbi image.
 // @relocate_addr: Pointer to the relocation address.

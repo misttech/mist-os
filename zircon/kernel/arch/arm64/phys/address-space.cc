@@ -14,7 +14,7 @@
 #include <lib/page-table/arch/arm64/builder.h>
 #include <lib/page-table/builder.h>
 #include <lib/page-table/types.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <ktl/byte.h>
 #include <ktl/optional.h>

@@ -4,10 +4,10 @@
 #include "zbi.h"
 
 #include <assert.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 
 #include <cstring>

@@ -567,7 +567,7 @@ build_api_module("fuzzers") {
 #     miscellaneous formats, this is just "bin" and the consumer is
 #     expected to understand what the particular format is for particular
 #     $name, $cpu combinations.  Other types include:
-#      * "zbi": the ZBI (<zircon/boot/image.h>) format
+#      * "zbi": the ZBI (<lib/zbi-format/zbi.h>) format
 #      * "efi": an EFI executable that an EFI boot loader can load
 #      * "kernel": some other format loaded by a boot loader or emulator
 #      * "blk": contents to be written to a storage device or partition

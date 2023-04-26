@@ -15,7 +15,7 @@ A boot loader loads the kernel into memory and transfers control to the
 kernel's startup code.  The details of the boot loader protocols are not
 described here.  The boot loaders used with Zircon load both the kernel
 image and a data blob in Zircon Boot Image format.
-The [ZBI format](/zircon/system/public/zircon/boot/image.h) is a
+The [ZBI format](/sdk/lib/zbi-format/include/lib/zbi-format/zbi.h) is a
 simple container format that embeds items passed by the boot loader,
 including hardware-specific information,
 the [kernel "command line"](/docs/reference/kernel/kernel_cmdline.md) giving boot options, and RAM

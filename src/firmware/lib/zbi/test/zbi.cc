@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 #include <assert.h>
 #include <lib/fit/defer.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 
 #include <cstring>

@@ -10,6 +10,7 @@ zx_library("topology") {
   sources = [ "system-topology.cc" ]
   deps = [
     ":test",
+    "//sdk/lib/zbi-format",
     "//zircon/kernel/lib/ktl",
     "//zircon/system/ulib/fbl",
   ]

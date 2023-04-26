@@ -141,6 +141,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_cpp_wire",
     "//sdk/lib/stdcompat",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/zbi-format",
     "//src/lib/ddk",
     "//src/lib/fidl/cpp",
     "//src/virtualization/bin/vmm/device:lib",

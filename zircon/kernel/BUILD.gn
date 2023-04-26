@@ -119,6 +119,9 @@ if (current_toolchain == default_toolchain) {
         # <platform.h> has #include <lib/arch/ticks.h>.
         "//zircon/kernel/lib/arch/$kernel_cpu:headers.config",
         "//zircon/kernel/lib/arch:common-headers.config",
+
+        # Many headers have #include <lib/zbi-format/zbi.h>.
+        "//sdk/lib/zbi-format:public_config",
       ]
 
       configs = [ "//zircon/kernel:kernel_config" ]

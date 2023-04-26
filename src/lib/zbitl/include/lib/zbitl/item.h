@@ -5,7 +5,7 @@
 #ifndef SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEM_H_
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEM_H_
 
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <string_view>
 

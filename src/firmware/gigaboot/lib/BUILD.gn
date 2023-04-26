@@ -50,7 +50,10 @@ source_set("shared") {
 source_set("bootbyte") {
   sources = [ "bootbyte.c" ]
 
-  public_deps = [ "//zircon/kernel/lib/efi" ]
+  public_deps = [
+    "//sdk/lib/zbi-format",
+    "//zircon/kernel/lib/efi",
+  ]
 
   public_configs = [ ":shared_config" ]
 }

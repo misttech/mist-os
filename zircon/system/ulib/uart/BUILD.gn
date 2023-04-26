@@ -20,6 +20,7 @@ zx_library("uart") {
   sources = [ "parse.cc" ]
   public_deps = [
     # Most headers have #include <lib/zbi-format/driver-config.h>.
+    # Most headers have #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
 
     # <lib/uart/uart.h> has #include <lib/arch/intrin.h>.

@@ -11,6 +11,7 @@
 #include <lib/fit/defer.h>
 #include <lib/instrumentation/asan.h>
 #include <lib/syscalls/forward.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/macros.h>
 #include <mexec.h>
 #include <platform.h>
@@ -18,7 +19,6 @@
 #include <sys/types.h>
 #include <trace.h>
 #include <zircon/boot/crash-reason.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/resource.h>
 #include <zircon/syscalls/system.h>

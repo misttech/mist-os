@@ -10,9 +10,9 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/crypto/entropy_pool.h>
 #include <lib/fit/result.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
 #include <stdio.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/byte.h>
 #include <ktl/optional.h>

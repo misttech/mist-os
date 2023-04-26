@@ -6,7 +6,7 @@
 
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <array>
 #include <string_view>

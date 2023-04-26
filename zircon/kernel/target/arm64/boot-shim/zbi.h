@@ -4,7 +4,7 @@
 
 // ZBI Processing Library
 // This library is meant to be a generic processing library for the ZBI format
-// defined in system/public/zircon/boot/image.h
+// defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 //
 // This library has several features:
 // (1) Zero allocations / Exceptions
@@ -15,7 +15,7 @@
 //     environment:
 //      + A C99 compliant compiler
 //      + Support for sized integer types (uint8_t and uint32_t)
-//      + zircon/boot/image.h
+//      + lib/zbi-format/zbi.h
 //      + Implementations of memcmp and memcpy
 // (3) Tested
 //     Tests for this library can be found at zircon/system/utest/zbi/*
@@ -23,8 +23,8 @@
 #ifndef ZIRCON_KERNEL_TARGET_ARM64_BOOT_SHIM_ZBI_H_
 #define ZIRCON_KERNEL_TARGET_ARM64_BOOT_SHIM_ZBI_H_
 
+#include <lib/zbi-format/zbi.h>
 #include <stddef.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS

@@ -4,7 +4,7 @@
 
 #include "lib/zbitl/items/debugdata.h"
 
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <string_view>
 #include <type_traits>

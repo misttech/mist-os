@@ -5,10 +5,10 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/zbi-boot.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <string_view>
 

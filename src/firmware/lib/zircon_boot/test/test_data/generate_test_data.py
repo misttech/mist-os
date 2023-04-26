@@ -58,7 +58,8 @@ def GenerateTestImageCArrayDeclaration(
 
         # Set reserved scratch memory size to 0. Otherwise it's a random (huge) number
         kernel_zbi_bytes = bytearray(kernel_zbi.read_bytes())
-        # See `zircon_kernel_t`` defined at zircon/system/public/zircon/boot/image.h
+        # See `zircon_kernel_t` defined at
+        # sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
         # 2*zbi_header_t + uint64_t = 2 * 32 + 8
         kernel_zbi_bytes[72:80] = b"\x00" * 8
         kernel_zbi.write_bytes(kernel_zbi_bytes)

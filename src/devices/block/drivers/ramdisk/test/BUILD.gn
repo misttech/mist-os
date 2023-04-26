@@ -16,6 +16,7 @@ test("ramdisk") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/zbi-format",
     "//src/devices/lib/block",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/storage/block_client/cpp",

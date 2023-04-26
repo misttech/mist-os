@@ -109,6 +109,7 @@ executable("app") {
     ":lib",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
+    "//sdk/lib/zbi-format",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
   ]

@@ -6,9 +6,9 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/metadata.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <zircon/boot/image.h>
 #include <zircon/process.h>
 
 #include <atomic>

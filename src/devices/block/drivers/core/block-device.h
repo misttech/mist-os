@@ -17,6 +17,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/operation/block.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/vmo.h>
@@ -26,7 +27,6 @@
 #include <string.h>
 #include <sys/param.h>
 #include <threads.h>
-#include <zircon/boot/image.h>
 #include <zircon/process.h>
 
 #include <algorithm>

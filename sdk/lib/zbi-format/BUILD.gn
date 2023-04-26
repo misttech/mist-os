@@ -14,10 +14,14 @@ sdk_source_set("zbi-format") {
   api = "zbi-format.api"
 
   public = [
-    # TODO(b/271475507): move each of these files over.
+    # TODO(b/271475507): Move each of these files over.
     # "include/lib/zbi-format/pixel-format.h",
-    # "include/lib/zbi-format/zbi.h",
     "include/lib/zbi-format/driver-config.h",
+    "include/lib/zbi-format/zbi.h",
+
+    # TODO(b/271475507): Delete once everyone consumes <lib/zbi-format/zbi.h>
+    # directly.
+    "include/zircon/boot/image.h",
   ]
 
   public_configs = [ ":public_config" ]

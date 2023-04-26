@@ -9,7 +9,7 @@
 
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <cstdint>
 #include <string_view>

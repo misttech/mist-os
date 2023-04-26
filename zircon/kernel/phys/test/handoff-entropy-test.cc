@@ -7,8 +7,8 @@
 #include "../handoff-entropy.h"
 
 #include <lib/unittest/unittest.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/array.h>
 #include <ktl/move.h>

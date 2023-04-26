@@ -4,10 +4,10 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/view.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/optional.h>
 #include <ktl/span.h>

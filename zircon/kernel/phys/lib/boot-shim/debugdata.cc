@@ -6,8 +6,8 @@
 
 #include "lib/boot-shim/debugdata.h"
 
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <limits>
 

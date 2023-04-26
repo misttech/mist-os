@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <lib/zbi-format/zbi.h>
 #include <sys/stat.h>
-#include <zircon/boot/image.h>
 
 #include <gtest/gtest.h>
 

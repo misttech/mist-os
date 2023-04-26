@@ -11,8 +11,8 @@
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdio.h>
-#include <zircon/boot/image.h>
 
 #include <array>
 #include <string_view>

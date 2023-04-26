@@ -8,10 +8,10 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
 #include <threads.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 #include <zircon/types.h>
 
 #include <atomic>

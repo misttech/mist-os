@@ -9,9 +9,9 @@
 
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/view.h>
-#include <zircon/boot/image.h>
 
 #include <cstdint>
 #include <optional>

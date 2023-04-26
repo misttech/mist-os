@@ -17,6 +17,7 @@
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/completion.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/iommu.h>
 #include <lib/zx/resource.h>
@@ -24,7 +25,6 @@
 #include <lib/zx/vmo.h>
 #include <stdint.h>
 #include <threads.h>
-#include <zircon/boot/image.h>
 #include <zircon/types.h>
 
 #include <map>

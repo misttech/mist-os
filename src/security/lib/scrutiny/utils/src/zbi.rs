@@ -79,7 +79,7 @@ pub struct ZbiSection {
     pub buffer: Vec<u8>,
 }
 
-/// Rust clone of zircon/boot/image.h
+/// Rust clone of sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize, Clone)]
 struct ZbiHeader {

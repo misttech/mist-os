@@ -9,8 +9,8 @@
 #include <inttypes.h>
 #include <lib/arch/zbi-boot.h>
 #include <lib/memalloc/range.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
-#include <zircon/boot/image.h>
 
 #include <phys/main.h>
 #include <phys/stdio.h>

@@ -12,10 +12,10 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/boot/image.h>
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>

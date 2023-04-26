@@ -21,10 +21,10 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
 #include <lib/vfs/cpp/remote_dir.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/job.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
-#include <zircon/boot/image.h>
 #include <zircon/status.h>
 
 #include <charconv>

@@ -16,8 +16,8 @@
 #include <lib/fdio/fd.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/time.h>
-#include <zircon/boot/image.h>
 #include <zircon/status.h>
 
 #include <fbl/unique_fd.h>

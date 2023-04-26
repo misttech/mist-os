@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/zbi-format/zbi.h>
 #include <platform.h>
-#include <zircon/boot/image.h>
 
 namespace {
 zbi_hw_reboot_reason_t g_platform_hw_reboot_reason = ZbiHwRebootReason::Undefined;

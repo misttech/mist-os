@@ -81,6 +81,7 @@ source_set("netsvc_common") {
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/zbi-format",
     "//src/bringup/lib/mexec",
     "//src/lib/zbitl",
     "//src/storage/gpt",

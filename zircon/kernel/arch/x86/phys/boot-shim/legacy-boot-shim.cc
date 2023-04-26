@@ -12,8 +12,8 @@
 #include <lib/memalloc/pool.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdlib.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/optional.h>
 #include <phys/address-space.h>

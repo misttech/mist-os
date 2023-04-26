@@ -12,10 +12,10 @@
 #include <lib/uart/all.h>
 #include <lib/uart/ns8250.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/image.h>
 #include <stdlib.h>
-#include <zircon/boot/image.h>
 #include <zircon/pixelformat.h>
 
 #include <ktl/iterator.h>

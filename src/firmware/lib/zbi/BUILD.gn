@@ -9,6 +9,7 @@ common_vars = {
   sdk = "source"
   sdk_headers = [ "lib/zbi/zbi.h" ]
   sources = [ "zbi.c" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 # SDK library.
@@ -26,6 +27,6 @@ zx_library("in_tree") {
   deps = [ "//zircon/system/public" ]
 
   if (is_kernel) {
-    public_deps = [ "//zircon/kernel/lib/libc" ]
+    public_deps += [ "//zircon/kernel/lib/libc" ]
   }
 }

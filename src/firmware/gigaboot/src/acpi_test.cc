@@ -5,8 +5,8 @@
 #include "acpi.h"
 
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <xefi.h>
-#include <zircon/boot/image.h>
 
 #include <vector>
 

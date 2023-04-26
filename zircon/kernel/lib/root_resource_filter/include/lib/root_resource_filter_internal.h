@@ -8,9 +8,9 @@
 #define ZIRCON_KERNEL_LIB_ROOT_RESOURCE_FILTER_INCLUDE_LIB_ROOT_RESOURCE_FILTER_INTERNAL_H_
 
 #include <assert.h>
+#include <lib/zbi-format/zbi.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <zircon/boot/image.h>
 #include <zircon/syscalls/resource.h>
 
 #include <fbl/intrusive_single_list.h>

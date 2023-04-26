@@ -14,7 +14,7 @@
 #include <lib/memalloc/pool.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/qemu.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>

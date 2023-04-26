@@ -182,6 +182,7 @@ if (current_toolchain != default_toolchain) {
     sources = [ "backtrace-test.cc" ]
     deps = [
       ":test-main",
+      "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/libc",
     ]
@@ -274,6 +275,7 @@ if (current_toolchain != default_toolchain) {
       "..:allocation",
       "..:boot-zbi",
       "..:symbolize",
+      "//sdk/lib/zbi-format",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",

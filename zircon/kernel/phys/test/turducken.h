@@ -25,8 +25,8 @@
 // behavior (ducks all the way down).
 
 #include <lib/arch/ticks.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
-#include <zircon/boot/image.h>
 
 #include <cstdint>
 

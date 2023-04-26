@@ -7,11 +7,11 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -33,9 +33,7 @@ class Sysdev : public SysdevType {
                             zx_handle_t items_svc_handle);
 
   // Device protocol implementation.
-  void DdkRelease() {
-    delete this;
-  }
+  void DdkRelease() { delete this; }
 
   zx_status_t MakeComposite();
   zx_status_t AddTestParent();
@@ -51,9 +49,7 @@ class TestParent : public TestParentType {
   static zx_status_t Create(zx_device_t* parent);
 
   // Device protocol implementation.
-  void DdkRelease() {
-    delete this;
-  }
+  void DdkRelease() { delete this; }
 };
 
 zx_status_t TestParent::Create(zx_device_t* parent) {

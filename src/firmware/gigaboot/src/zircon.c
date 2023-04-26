@@ -6,12 +6,12 @@
 #include <inttypes.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xefi.h>
-#include <zircon/boot/image.h>
 #include <zircon/limits.h>
 #include <zircon/pixelformat.h>
 

@@ -6,13 +6,13 @@
 
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/range.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/items/cpu-topology.h>
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <efi/types.h>
 #include <ktl/algorithm.h>

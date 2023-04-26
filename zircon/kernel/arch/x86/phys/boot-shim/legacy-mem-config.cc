@@ -4,9 +4,9 @@
 
 #include "legacy-mem-config.h"
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/e820.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <efi/boot-services.h>
 

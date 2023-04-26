@@ -8,8 +8,8 @@
 #include <inttypes.h>
 #include <lib/cksum.h>
 #include <lib/fit/result.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <algorithm>
 #include <functional>

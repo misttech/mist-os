@@ -7,7 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <variant>
 

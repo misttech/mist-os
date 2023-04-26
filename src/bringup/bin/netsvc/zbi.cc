@@ -4,11 +4,11 @@
 
 #include "src/bringup/bin/netsvc/zbi.h"
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/vmo.h>
 #include <stdio.h>
-#include <zircon/boot/image.h>
 #include <zircon/status.h>
 
 zx_status_t netboot_prepare_zbi(zx::vmo zbi_in, std::string_view cmdline, zx::vmo* kernel_zbi,

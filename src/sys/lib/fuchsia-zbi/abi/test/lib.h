@@ -5,7 +5,7 @@
 #ifndef SRC_SYS_LIB_FUCHSIA_ZBI_ABI_TEST_LIB_H_
 #define SRC_SYS_LIB_FUCHSIA_ZBI_ABI_TEST_LIB_H_
 
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <cstring>
 

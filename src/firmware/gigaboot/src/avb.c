@@ -4,11 +4,11 @@
 
 #include "avb.h"
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/boot/image.h>
 #include <zircon/hw/gpt.h>
 
 #include <libavb/libavb.h>

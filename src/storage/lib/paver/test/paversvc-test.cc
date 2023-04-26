@@ -20,8 +20,8 @@
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/paver/provider.h>
 #include <lib/sysconfig/sync-client.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
-#include <zircon/boot/image.h>
 #include <zircon/hw/gpt.h>
 
 #include <memory>

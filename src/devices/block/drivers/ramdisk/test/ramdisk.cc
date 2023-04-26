@@ -18,6 +18,7 @@
 #include <lib/fzl/fifo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sync/completion.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/time.h>
@@ -29,7 +30,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <zircon/boot/image.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 

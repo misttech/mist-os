@@ -7,8 +7,8 @@
 #include <lib/fit/defer.h>
 #include <lib/memalloc/pool.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
 

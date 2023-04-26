@@ -5,8 +5,8 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_INCLUDE_SHARED_BOOTBYTE_H_
 #define SRC_FIRMWARE_GIGABOOT_INCLUDE_SHARED_BOOTBYTE_H_
 
+#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 
 #include <efi/runtime-services.h>

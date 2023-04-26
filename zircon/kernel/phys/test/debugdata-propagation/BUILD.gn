@@ -30,6 +30,7 @@ zbi_test_executable("early-boot-debugdata-test") {
   testonly = true
   sources = [ "debugdata-test.cc" ]
   deps = [
+    "//sdk/lib/zbi-format",
     "//src/lib/zbitl",
     "//src/zircon/testing/standalone-test",
     "//zircon/system/ulib/zxtest",

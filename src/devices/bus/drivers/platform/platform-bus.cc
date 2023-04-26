@@ -18,11 +18,11 @@
 #include <lib/driver/outgoing/cpp/handlers.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/boot/image.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/status.h>

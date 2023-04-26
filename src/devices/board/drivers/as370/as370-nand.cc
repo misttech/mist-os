@@ -7,7 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/hw/gpt.h>
 
 #include <memory>

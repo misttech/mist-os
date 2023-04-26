@@ -6,7 +6,7 @@
 #define LIB_UART_AMLOGIC_H_
 
 #include <lib/zbi-format/driver-config.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <algorithm>
 

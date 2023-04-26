@@ -9,10 +9,10 @@
 #include <ctype.h>
 #include <lib/boot-options/word-view.h>
 #include <lib/memalloc/range.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <stdio.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <cstdint>
 

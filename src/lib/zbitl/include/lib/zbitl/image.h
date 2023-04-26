@@ -6,7 +6,7 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_IMAGE_H_
 
 #include <lib/cksum.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include "checking.h"
 #include "view.h"

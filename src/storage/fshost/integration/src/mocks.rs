@@ -18,7 +18,7 @@ use {
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path, service},
 };
 
-/// Identifier for ramdisk storage. Defined in zircon/system/public/zircon/boot/image.h.
+/// Identifier for ramdisk storage. Defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 const ZBI_TYPE_STORAGE_RAMDISK: u32 = 0x4b534452;
 
 pub async fn new_mocks(

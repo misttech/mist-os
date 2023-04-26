@@ -42,6 +42,7 @@ source_set("src") {
   include_dirs = [ "." ]
   deps = [
     "../lib",
+    "//sdk/lib/zbi-format",
     "//src/firmware/gigaboot/lib:bootbyte",
     "//src/firmware/lib/abr",
     "//src/firmware/lib/zbi",

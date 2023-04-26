@@ -6,12 +6,12 @@
 
 #include "zbi.h"
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/view.h>
 #include <lib/zbitl/vmo.h>
 #include <lib/zircon-internal/align.h>
 #include <stdarg.h>
-#include <zircon/boot/image.h>
 #include <zircon/status.h>
 
 #include "option.h"

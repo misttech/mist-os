@@ -64,6 +64,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit-promise",
+    "//sdk/lib/zbi-format",
     "//src/devices/block/lib/common",
     "//src/lib/ddk",
     "//src/lib/ddktl",

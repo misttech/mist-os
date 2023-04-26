@@ -10,7 +10,7 @@
 #include <lib/acpi_lite.h>
 #include <lib/arch/x86/apic-id.h>
 #include <lib/arch/x86/cache.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <fbl/vector.h>
 #include <ktl/forward.h>

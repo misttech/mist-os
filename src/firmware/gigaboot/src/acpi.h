@@ -6,9 +6,9 @@
 #define SRC_FIRMWARE_GIGABOOT_SRC_ACPI_H_
 
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
 #include <xefi.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 
 #define ACPI_TABLE_SIGNATURE_SIZE 4

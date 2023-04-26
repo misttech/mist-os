@@ -6,9 +6,9 @@
 #define SRC_LIB_DDK_INCLUDE_LIB_DDK_METADATA_H_
 
 #include <assert.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <zircon/boot/image.h>
 
 // This file contains metadata types for device_get_metadata()
 //

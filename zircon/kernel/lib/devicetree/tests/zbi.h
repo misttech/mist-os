@@ -4,11 +4,14 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#ifndef ZIRCON_KERNEL_LIB_DEVICETREE_TESTS_ZBI_H_
+#define ZIRCON_KERNEL_LIB_DEVICETREE_TESTS_ZBI_H_
+
 #include <fuchsia/boot/cpp/fidl.h>
 #include <lib/fdio/directory.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <zircon/boot/image.h>
 
 struct DevicetreeItem {
   zx::vmo vmo;
@@ -31,3 +34,5 @@ struct DevicetreeItem {
     return zx::ok(std::move(item));
   }
 };
+
+#endif  // ZIRCON_KERNEL_LIB_DEVICETREE_TESTS_ZBI_H_

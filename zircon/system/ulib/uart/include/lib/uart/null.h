@@ -8,8 +8,8 @@
 // uart::null::Driver is a bit bucket.
 // It also serves to demonstrate the API required by uart::KernelDriver.
 
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <string_view>
 

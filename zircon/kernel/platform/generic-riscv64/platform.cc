@@ -60,9 +60,9 @@
 #include <kernel/thread.h>
 #endif
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/memory.h>
-#include <zircon/boot/image.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/smc.h>

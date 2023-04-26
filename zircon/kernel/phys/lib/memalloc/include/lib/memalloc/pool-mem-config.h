@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_POOL_MEM_CONFIG_H_
 #define ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_POOL_MEM_CONFIG_H_
 
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <algorithm>
 

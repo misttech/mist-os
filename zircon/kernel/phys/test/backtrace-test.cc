@@ -5,10 +5,10 @@
 // https://opensource.org/licenses/MIT
 
 #include <inttypes.h>
+#include <lib/zbi-format/zbi.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/iterator.h>
 #include <phys/stack.h>

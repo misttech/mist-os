@@ -5,8 +5,8 @@
 #ifndef LIB_UART_ALL_H_
 #define LIB_UART_ALL_H_
 
+#include <lib/zbi-format/zbi.h>
 #include <stdio.h>
-#include <zircon/boot/image.h>
 
 #include <utility>
 #include <variant>

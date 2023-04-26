@@ -25,6 +25,7 @@ zx_library("boot-shim") {
     "//sdk/lib/stdcompat",
 
     # <lib/boot-shim/acpi.h> has #include <lib/zbi-format/driver-config.h>.
+    # <lib/boot-shim/item-base.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
 
     # <lib/boot-shim/uart.h> has #include <lib/uart/all.h>.

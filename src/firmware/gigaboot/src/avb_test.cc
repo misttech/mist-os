@@ -6,8 +6,8 @@
 
 #include <lib/efi/testing/fake_disk_io_protocol.h>
 #include <lib/efi/testing/stub_boot_services.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
-#include <zircon/boot/image.h>
 #include <zircon/hw/gpt.h>
 
 #include <efi/boot-services.h>

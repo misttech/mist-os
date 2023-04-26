@@ -17,7 +17,6 @@ sdk_source_set("public") {
 
   public = [
     "zircon/analyzer.h",
-    "zircon/boot/image.h",
     "zircon/compiler.h",
     "zircon/errors.h",
     "zircon/limits.h",

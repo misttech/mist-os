@@ -6,8 +6,8 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_CHECKING_H_
 
 #include <lib/fit/result.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <string_view>
 

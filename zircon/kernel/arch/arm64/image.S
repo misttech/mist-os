@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <asm.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 
 // This file lays out the final kernel image seen by the boot loader.

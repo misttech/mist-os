@@ -7,10 +7,10 @@
 
 #include <lib/arch/intrin.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <cstdlib>
 #include <optional>

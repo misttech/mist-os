@@ -7,7 +7,7 @@
 #include <lib/boot-options/word-view.h>
 #include <lib/boot-shim/test-serial-number.h>
 #include <lib/stdcompat/string_view.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 namespace boot_shim {
 

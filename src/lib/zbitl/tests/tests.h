@@ -5,12 +5,12 @@
 #ifndef SRC_LIB_ZBITL_TESTS_TESTS_H_
 #define SRC_LIB_ZBITL_TESTS_TESTS_H_
 
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/item.h>
 #include <lib/zbitl/json.h>
 #include <lib/zbitl/view.h>
-#include <zircon/boot/image.h>
 
 #include <iterator>
 #include <string>

@@ -10,6 +10,7 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
 #include <stdio.h>
@@ -17,7 +18,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <zircon/boot/image.h>
 #include <zircon/status.h>
 
 #include <zxtest/zxtest.h>

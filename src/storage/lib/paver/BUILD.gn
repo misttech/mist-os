@@ -58,6 +58,7 @@ source_set("paver-core") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp_wire",
+    "//sdk/lib/zbi-format",
     "//src/firmware/lib/abr",
     "//src/lib/storage/block_client/cpp",
     "//src/lib/uuid",

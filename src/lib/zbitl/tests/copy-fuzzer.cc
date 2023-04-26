@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/view.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <cstddef>
 #include <iterator>

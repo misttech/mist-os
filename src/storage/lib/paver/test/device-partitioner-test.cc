@@ -16,7 +16,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/stdcompat/span.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/hw/gpt.h>
 #include <zircon/status.h>

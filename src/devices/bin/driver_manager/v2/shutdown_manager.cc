@@ -7,11 +7,11 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>  // fidl::WireCall
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/item.h>
 #include <lib/zbitl/vmo.h>
-#include <zircon/boot/image.h>
 #include <zircon/processargs.h>  // PA_LIFECYCLE
 #include <zircon/syscalls/system.h>
 

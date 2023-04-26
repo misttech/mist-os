@@ -14,7 +14,7 @@ use {
     zerocopy::FromBytes,
 };
 
-/// The following types and constants are defined in zircon/system/public/zircon/boot/image.h.
+/// The following types and constants are defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 const ZBI_TYPE_STORAGE_RAMDISK: u32 = 0x4b534452;
 const ZBI_FLAGS_VERSION: u32 = 0x00010000;
 const ZBI_ITEM_MAGIC: u32 = 0xb5781729;

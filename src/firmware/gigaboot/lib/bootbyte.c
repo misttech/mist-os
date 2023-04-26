@@ -4,8 +4,8 @@
 
 #include "bootbyte.h"
 
+#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
-#include <zircon/boot/image.h>
 #include <zircon/compiler.h>
 
 #include <efi/runtime-services.h>

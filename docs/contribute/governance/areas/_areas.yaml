@@ -227,7 +227,7 @@
       </li>
       <li>
         The interface with bootloaders, the most important being the
-        <a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/public/zircon/boot/image.h">
+        <a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/zbi-format/include/lib/zbi-format/zbi.h">
           ZBI
         </a>.
       </li>

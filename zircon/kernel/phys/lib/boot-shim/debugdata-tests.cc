@@ -7,8 +7,8 @@
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/boot-shim/debugdata.h>
 #include <lib/boot-shim/test-helper.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/debugdata.h>
-#include <zircon/boot/image.h>
 
 #include <cstring>
 

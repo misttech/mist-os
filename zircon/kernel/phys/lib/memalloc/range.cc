@@ -6,7 +6,7 @@
 
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/span.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <string_view>
 #include <type_traits>

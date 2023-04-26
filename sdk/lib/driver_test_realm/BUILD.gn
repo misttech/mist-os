@@ -64,6 +64,7 @@ executable("bin") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/syslog/cpp",
+    "//sdk/lib/zbi-format",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl",

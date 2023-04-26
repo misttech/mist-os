@@ -67,7 +67,7 @@
 #include <kernel/thread.h>
 #endif
 
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/smc.h>

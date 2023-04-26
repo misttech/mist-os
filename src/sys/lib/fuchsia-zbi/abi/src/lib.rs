@@ -35,7 +35,7 @@ pub fn is_zbi_type_driver_metadata(zbi_type_raw: u32) -> bool {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 /// Defines the types supported by the Rust ZBI parser. This is a subset from
-/// zircon/system/public/zircon/boot/image.h, and should be updated as needed.
+/// sdk/lib/zbi-format/include/lib/zbi-format/zbi.h, and should be updated as needed.
 pub enum ZbiType {
     Container = 0x544f_4f42,
     Cmdline = 0x4c44_4d43,
@@ -110,7 +110,8 @@ pub fn zbi_container_header(length: u32) -> zbi_header_t {
 
 #[repr(C)]
 #[derive(Copy, Clone, FromBytes)]
-/// Defines the Rust version of `zbi_topology_node_t` in zircon/system/public/zircon/boot/image.h.
+/// Defines the Rust version of `zbi_topology_node_t` in
+/// sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 pub struct ZbiTopologyNode {
     // Should be one of ZbiTopologyEntityType.
     pub entity_type: u8,
@@ -172,7 +173,7 @@ pub union ArchitectureInfo {
 #[derive(Copy, Clone, FromBytes)]
 pub struct ZbiTopologyCluster {
     // Relative performance level of this processor in the system.
-    // Refer to zircon/system/public/zircon/boot/image.h for more details.
+    // Refer to sdk/lib/zbi-format/include/lib/zbi-format/zbi.h for more details.
     pub performance_class: u8,
 }
 

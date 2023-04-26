@@ -6,7 +6,7 @@
 #define SRC_VIRTUALIZATION_BIN_VMM_MEMORY_H_
 
 #include <fuchsia/virtualization/cpp/fidl.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 #include <vector>
 

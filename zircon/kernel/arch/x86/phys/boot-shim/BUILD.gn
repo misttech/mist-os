@@ -132,6 +132,9 @@ source_set("legacy-mem-config") {
   public_deps = [
     "//sdk/lib/stdcompat",
 
+    # legacy-mem-config.h has #include <lib/zbi-format/zbi.h>
+    "//sdk/lib/zbi-format",
+
     # legacy-mem-config.h has #include <efi/boot-services.h>
     "//zircon/kernel/lib/efi",
 

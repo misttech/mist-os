@@ -14,7 +14,6 @@ board_name = "imx8mmevk"
 board_configs += [ "//build/config/arm64:cortex-a53" ]
 
 # The Zircon Boot Image (ZBI) contains everything needed to boot.
-# //zircon/system/public/zircon/boot/image.h
 max_fuchsia_zbi_size = 33554432  # 32 mebibytes (MiB)
 
 # Zedboot is a minimal recovery image that's used to install and boot a full

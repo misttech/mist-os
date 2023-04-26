@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/asm.h>
-#include <zircon/boot/image.h>
+#include <lib/zbi-format/zbi.h>
 
 // The linker script (phys.ld) places this section first in the image.  It
 // provides the ZBI headers for the kernel so that the whole load image is

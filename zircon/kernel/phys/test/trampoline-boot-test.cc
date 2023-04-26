@@ -10,6 +10,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/item.h>
 #include <stdint.h>
@@ -17,7 +18,6 @@
 #include <stdlib.h>
 #include <string-file.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <fbl/alloc_checker.h>
 #include <ktl/algorithm.h>

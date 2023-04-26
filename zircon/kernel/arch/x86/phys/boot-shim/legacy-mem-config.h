@@ -7,9 +7,9 @@
 
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/storage-traits.h>
 #include <lib/zircon-internal/e820.h>
-#include <zircon/boot/image.h>
 
 #include <iterator>
 #include <string_view>

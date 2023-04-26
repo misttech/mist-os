@@ -11,8 +11,8 @@
 #include <lib/trivial-allocator/basic-leaky-allocator.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/single-heap-allocator.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
-#include <zircon/boot/image.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_single_list.h>

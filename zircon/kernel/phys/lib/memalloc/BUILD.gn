@@ -40,6 +40,9 @@ zx_library("memalloc") {
     # <lib/memalloc/range.h> has #include <lib/fit/function.h>.
     "//sdk/lib/fit:headers",
 
+    # <lib/memalloc/range.h> has #include <lib/zbi-format/zbi.h>.
+    "//sdk/lib/zbi-format",
+
     # <lib/memalloc/pool.h> has #include <fbl/intrusive_double_list.h>.
     "//zircon/system/ulib/fbl:headers",
 

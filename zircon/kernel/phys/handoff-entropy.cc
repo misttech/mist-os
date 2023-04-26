@@ -7,9 +7,9 @@
 #include "handoff-entropy.h"
 
 #include <ctype.h>
+#include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <cstdint>
 

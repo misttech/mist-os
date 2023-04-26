@@ -48,7 +48,7 @@ There are multiple configurations that would allow a bootloader to load a Fuchsi
 
 *  The bootloader supports Fuchsia: Adding support for Fuchsia in the bootloader is the best
    option. In this case the Zircon Boot Image (ZBI)
-   [specification](https://fuchsia.googlesource.com/fuchsia/+/main/zircon/system/public/zircon/boot/image.h)
+   [specification](https://fuchsia.googlesource.com/fuchsia/+/main/sdk/lib/zbi-format/include/lib/zbi-format/zbi.h)
    is implemented by the [Firmware
    SDK](https://fuchsia.googlesource.com/fuchsia/+/main/src/firmware/README.md). An example of this
    is the [support added](https://third-party-mirror.googlesource.com/u-boot/+log/refs/heads/vim3)

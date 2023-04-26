@@ -10,9 +10,9 @@
 #include <lib/arch/ticks.h>
 #include <lib/crypto/entropy_pool.h>
 #include <lib/uart/all.h>
+#include <lib/zbi-format/zbi.h>
 #include <stddef.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 #include <zircon/types.h>
 
 #include <ktl/array.h>

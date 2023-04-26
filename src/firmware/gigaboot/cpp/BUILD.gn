@@ -36,6 +36,7 @@ source_set("lib") {
 
   public_deps = [
     "//sdk/lib/fit",
+    "//sdk/lib/zbi-format",
     "//src/firmware/gigaboot/lib:bootbyte",
     "//src/firmware/lib/fastboot:fastboot-base",
     "//src/firmware/lib/zbi:in_tree",

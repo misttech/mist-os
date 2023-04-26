@@ -5,8 +5,8 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <ktl/byte.h>
 #include <ktl/span.h>

@@ -7,8 +7,8 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <lib/zbi-format/zbi.h>
 #include <trace.h>
-#include <zircon/boot/image.h>
 #include <zircon/errors.h>
 
 #include <ktl/move.h>

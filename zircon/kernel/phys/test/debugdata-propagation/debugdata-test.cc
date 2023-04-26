@@ -5,10 +5,10 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/standalone-test/standalone.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/debugdata.h>
 #include <lib/zbitl/view.h>
 #include <lib/zbitl/vmo.h>
-#include <zircon/boot/image.h>
 
 #include <array>
 #include <optional>

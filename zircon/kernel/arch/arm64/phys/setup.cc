@@ -6,9 +6,9 @@
 
 #include <lib/arch/arm64/system.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
 #include <stdio.h>
-#include <zircon/boot/image.h>
 
 #include <phys/exception.h>
 #include <phys/main.h>

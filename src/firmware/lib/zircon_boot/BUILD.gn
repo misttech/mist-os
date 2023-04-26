@@ -22,12 +22,13 @@ common_vars = {
     "zircon_vboot.c",
     "zircon_vboot.h",
   ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 # SDK library.
 zx_library("zircon_boot") {
   forward_variables_from(common_vars, "*")
-  public_deps = [
+  public_deps += [
     "//src/firmware/lib/abr",
     "//src/firmware/lib/zbi",
     "//third_party/android/platform/external/avb",
@@ -41,7 +42,7 @@ zx_library("zircon_boot") {
 # targets.
 zx_library("in_tree") {
   forward_variables_from(common_vars, "*")
-  public_deps = [
+  public_deps += [
     "//src/firmware/lib/abr:in_tree",
     "//src/firmware/lib/zbi:in_tree",
   ]

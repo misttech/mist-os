@@ -7,9 +7,9 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/directory.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
-#include <zircon/boot/image.h>
 
 #include <memory>
 #include <optional>

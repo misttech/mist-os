@@ -8,6 +8,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-string.h>
 #include <lib/zbitl/fd.h>
 #include <lib/zbitl/image.h>
@@ -18,7 +19,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zircon/assert.h>
-#include <zircon/boot/image.h>
 
 #include <iterator>
 

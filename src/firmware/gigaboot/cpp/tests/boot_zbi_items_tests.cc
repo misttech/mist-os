@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/abr/abr.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/limits.h>
 
 #include <array>
@@ -16,7 +17,6 @@
 #include "gpt.h"
 #include "mock_boot_service.h"
 #include "utils.h"
-#include "zircon/boot/image.h"
 #include "zircon/pixelformat.h"
 
 extern "C" efi_status generate_efi_memory_attributes_table_item(
