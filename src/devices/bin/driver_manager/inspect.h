@@ -32,16 +32,7 @@ static const inline ProtocolInfo kProtoInfos[] = {
 
 class InspectDevfs {
  public:
-  // Use Create instead.
-  explicit InspectDevfs(fbl::RefPtr<fs::PseudoDir> root_dir, fbl::RefPtr<fs::PseudoDir> class_dir);
-
   static zx::result<InspectDevfs> Create(const fbl::RefPtr<fs::PseudoDir>& root_dir);
-
-  std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> GetProtoDir(uint32_t id);
-  // Get protocol |id| directory if it exists, else create one.
-  std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> GetOrCreateProtoDir(uint32_t id);
-  // Delete protocol |id| directory if no files are present.
-  void RemoveEmptyProtoDir(uint32_t id);
 
   // Publishes a device. Should be called when there's a new devices.
   // This returns a string, `link_name`, representing the device that was just published.
@@ -52,32 +43,52 @@ class InspectDevfs {
   // Unpublishes a device. Should be called when a device is being removed.
   void Unpublish(uint32_t protocol_id, fbl::RefPtr<fs::VmoFile> file, std::string_view link_name);
 
+  std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> GetProtoDir(uint32_t id);
+
  private:
+  explicit InspectDevfs(fbl::RefPtr<fs::PseudoDir> root_dir, fbl::RefPtr<fs::PseudoDir> class_dir);
+
+  // Delete protocol |id| directory if no files are present.
+  void RemoveEmptyProtoDir(uint32_t id);
+
+  // Get protocol |id| directory if it exists, else create one.
+  std::tuple<fbl::RefPtr<fs::PseudoDir>, uint32_t*> GetOrCreateProtoDir(uint32_t id);
+
   fbl::RefPtr<fs::PseudoDir> root_dir_;
   fbl::RefPtr<fs::PseudoDir> class_dir_;
   std::array<ProtocolInfo, std::size(kProtoInfos)> proto_infos_;
 };
 
+class DeviceInspect;
+
 class InspectManager {
  public:
-  explicit InspectManager(async_dispatcher_t* dispatcher);
+  // Information that all devices end up editing.
+  struct Info : fbl::RefCounted<Info> {
+    explicit Info(inspect::Node& root_node)
+        : device_count(root_node.CreateUint("device_count", 0)),
+          devices(root_node.CreateChild("devices")) {}
 
+    // The total count of devices.
+    inspect::UintProperty device_count;
+    // The top level node for devices.
+    inspect::Node devices;
+  };
+
+  explicit InspectManager(async_dispatcher_t* dispatcher);
   InspectManager() = delete;
 
+  // Create a new device within inspect.
+  DeviceInspect CreateDevice(std::string name, zx::vmo vmo);
+
+  // Start serving the inspect directory.
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Connect();
 
+  // Accessor methods.
   fs::PseudoDir& diagnostics_dir() { return *diagnostics_dir_; }
-
   fbl::RefPtr<fs::PseudoDir> driver_host_dir() { return driver_host_dir_; }
-
   inspect::Node& root_node() { return inspector_.GetRoot(); }
-
-  inspect::Node& devices() { return devices_; }
-
-  inspect::UintProperty& device_count() { return device_count_; }
-
   inspect::Inspector& inspector() { return inspector_; }
-
   std::optional<InspectDevfs>& devfs() { return devfs_; }
 
  private:
@@ -87,8 +98,7 @@ class InspectManager {
   fbl::RefPtr<fs::PseudoDir> diagnostics_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
   fbl::RefPtr<fs::PseudoDir> driver_host_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
 
-  inspect::UintProperty device_count_;
-  inspect::Node devices_;
+  fbl::RefPtr<Info> info_;
 
   // The inspect devfs instance
   std::optional<InspectDevfs> devfs_;
@@ -96,10 +106,6 @@ class InspectManager {
 
 class DeviceInspect {
  public:
-  // |devices| and |device_count| should outlive DeviceInspect class
-  DeviceInspect(inspect::Node& devices, inspect::UintProperty& device_count, std::string name,
-                zx::vmo vmo);
-
   ~DeviceInspect();
 
   inspect::Node& device_node() { return device_node_; }
@@ -117,7 +123,14 @@ class DeviceInspect {
   void set_local_id(uint64_t local_id) { local_id_.Set(local_id); }
 
  private:
-  inspect::UintProperty& device_count_node_;
+  friend InspectManager;
+
+  // To get a DeviceInspect object you should call InspectManager::CreateDevice.
+  DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, zx::vmo vmo);
+
+  fbl::RefPtr<InspectManager::Info> info_;
+
+  // The inspect node for this device.
   inspect::Node device_node_;
 
   // Reference to nodes with static properties

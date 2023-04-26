@@ -194,8 +194,7 @@ InspectManager::InspectManager(async_dispatcher_t* dispatcher) {
     diagnostics_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher);
   }
 
-  devices_ = root_node().CreateChild("devices");
-  device_count_ = root_node().CreateUint("device_count", 0);
+  info_ = fbl::MakeRefCounted<Info>(root_node());
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InspectManager::Connect() {
@@ -208,9 +207,12 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InspectManager::Connect() {
                          std::move(client));
 }
 
-DeviceInspect::DeviceInspect(inspect::Node& devices, inspect::UintProperty& device_count,
-                             std::string name, zx::vmo vmo)
-    : device_count_node_(device_count) {
+DeviceInspect InspectManager::CreateDevice(std::string name, zx::vmo vmo) {
+  return DeviceInspect(info_, std::move(name), std::move(vmo));
+}
+
+DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, zx::vmo vmo)
+    : info_(std::move(info)) {
   // Devices are sometimes passed bogus handles. Fun!
   if (vmo.is_valid()) {
     uint64_t size;
@@ -218,9 +220,9 @@ DeviceInspect::DeviceInspect(inspect::Node& devices, inspect::UintProperty& devi
     ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
     vmo_file_.emplace(fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), size));
   }
-  device_node_ = devices.CreateChild(name);
+  device_node_ = info_->devices.CreateChild(name);
   // Increment device count.
-  device_count_node_.Add(1);
+  info_->device_count.Add(1);
 
   // create properties with default values
   state_ = device_node_.CreateString("state", "");
@@ -228,8 +230,10 @@ DeviceInspect::DeviceInspect(inspect::Node& devices, inspect::UintProperty& devi
 }
 
 DeviceInspect::~DeviceInspect() {
-  // Decrement device count.
-  device_count_node_.Subtract(1);
+  if (info_) {
+    // Decrement device count.
+    info_->device_count.Subtract(1);
+  }
 }
 
 void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_t protocol_id,

@@ -73,8 +73,7 @@ Device::Device(Coordinator* coord, fbl::String name, fbl::String parent_driver_u
         coordinator->bind_driver_manager().BindDevice(fbl::RefPtr(this));
       }),
       outgoing_dir_(std::move(outgoing_dir)),
-      inspect_(coord->inspect_manager().devices(), coord->inspect_manager().device_count(),
-               name_.c_str(), std::move(inspect)) {
+      inspect_(coord->inspect_manager().CreateDevice(name_.c_str(), std::move(inspect))) {
   if (device_controller.is_valid()) {
     device_controller_.Bind(std::move(device_controller), coordinator->dispatcher());
   }
