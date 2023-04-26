@@ -51,3 +51,17 @@ Total objects:            1139
          Koid:   5449    Related Koid:      0    Peer Owner Koid:      0
 (...)
 ```
+
+## Run tests
+
+Build the Fuchsia image with the following additional package:
+
+```
+$ fx set [...] --with //src/developer/ffx:tests
+```
+
+Run the unit tests:
+
+```
+$ fx test ffx_process_explorer_test
+```
