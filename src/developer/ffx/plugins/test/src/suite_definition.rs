@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
+use fidl_fuchsia_diagnostics::{ComponentSelector, Interest, LogInterestSelector, StringSelector};
 use fidl_fuchsia_sys2 as fsys;
 use run_test_suite_lib::TestParams;
 use std::io::Read;
@@ -36,6 +37,7 @@ pub async fn test_params_from_reader<R: Read>(
                     also_run_disabled_tests,
                     parallel,
                     max_severity_logs,
+                    min_severity_logs,
                     realm,
                 } = component_execution;
                 let mut provided_realm = None;
@@ -52,6 +54,21 @@ pub async fn test_params_from_reader<R: Read>(
                         })?,
                     );
                 }
+                let mut min_severity_selectors = vec![];
+                if let Some(min_severity) = min_severity_logs {
+                    min_severity_selectors.push(LogInterestSelector {
+                        selector: ComponentSelector {
+                            moniker_segments: Some(vec![StringSelector::StringPattern(
+                                "**".into(),
+                            )]),
+                            ..ComponentSelector::EMPTY
+                        },
+                        interest: Interest {
+                            min_severity: Some(min_severity.into()),
+                            ..Interest::EMPTY
+                        },
+                    });
+                }
                 result.push(TestParams {
                     test_url: component_url,
                     realm: provided_realm.into(),
@@ -61,6 +78,7 @@ pub async fn test_params_from_reader<R: Read>(
                     also_run_disabled_tests,
                     parallel,
                     max_severity_logs,
+                    min_severity_logs: min_severity_selectors,
                     tags,
                 });
             }

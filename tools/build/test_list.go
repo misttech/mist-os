@@ -43,6 +43,7 @@ type ExecutionDef struct {
 	TimeoutSeconds  int    `json:"timeout_seconds,omitempty"`
 	Parallel        uint16 `json:"parallel,omitempty"`
 	MaxSeverityLogs string `json:"max_severity_logs,omitempty"`
+	MinSeverityLogs string `json:"min_severity_logs,omitempty"`
 	Realm           string `json:"realm,omitempty"`
 }
 

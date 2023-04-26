@@ -25,6 +25,7 @@ class TestDefinition {
   final String os;
   final PackageUrl? packageUrl;
   final String? maxLogSeverity;
+  final String? minLogSeverity;
   final String? parallel;
   final String? timeoutSeconds;
 
@@ -47,6 +48,7 @@ class TestDefinition {
     this.packageManifests,
     this.path,
     this.maxLogSeverity,
+    this.minLogSeverity,
     this.parallel,
     this.timeoutSeconds,
     this.testEnvironments = const [],
@@ -91,6 +93,7 @@ class TestDefinition {
           : PackageUrl.fromString(testDetails['package_url']),
       path: testDetails['path'] ?? '',
       maxLogSeverity: logSettings['max_severity'],
+      minLogSeverity: logSettings['min_severity'],
       parallel: testDetails['parallel']?.toString(),
       timeoutSeconds: testDetails['timeout_secs']?.toString(),
       testEnvironments: testEnvironments,

@@ -296,6 +296,20 @@ class TestBundle {
           break;
       }
     }
+    if (testDefinition.minLogSeverity != null) {
+      switch (testType) {
+        case TestType.suite:
+          flags.add('--min-severity-logs');
+          flags.add(testDefinition.minLogSeverity!);
+          break;
+        case TestType.suiteFallbackRunTestSuite:
+          flags.add('--min-severity-logs');
+          flags.add(testDefinition.minLogSeverity!);
+          break;
+        default:
+          break;
+      }
+    }
 
     CommandTokens commandTokens = executionHandle.getInvocationTokens(flags);
 

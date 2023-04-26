@@ -57,6 +57,7 @@ struct TestEntry {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct LogSettings {
     max_severity: Option<diagnostics_data::Severity>,
+    min_severity: Option<diagnostics_data::Severity>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
@@ -131,6 +132,9 @@ impl FuchsiaTestTags {
 impl TestEntry {
     fn get_max_log_severity(&self) -> Option<diagnostics_data::Severity> {
         self.log_settings.as_ref().map(|settings| settings.max_severity).unwrap_or(None)
+    }
+    fn get_min_log_severity(&self) -> Option<diagnostics_data::Severity> {
+        self.log_settings.as_ref().map(|settings| settings.min_severity).unwrap_or(None)
     }
 }
 
@@ -219,6 +223,7 @@ fn to_test_list_entry(test_entry: &TestEntry, realm: Option<String>) -> TestList
             also_run_disabled_tests: false,
             parallel: None,
             max_severity_logs: test_entry.get_max_log_severity(),
+            min_severity_logs: test_entry.get_min_log_severity(),
             realm: realm,
         })),
         None => None,
@@ -633,7 +638,7 @@ mod tests {
             ..TestEntry::default()
         };
 
-        let make_expected_test_list_entry = |max_severity_logs| TestListEntry {
+        let make_expected_test_list_entry = |max_severity_logs, min_severity_logs| TestListEntry {
             name: "test-name".to_string(),
             labels: vec!["test-label".to_string()],
             tags: vec![],
@@ -647,29 +652,33 @@ mod tests {
                 also_run_disabled_tests: false,
                 parallel: None,
                 max_severity_logs,
+                min_severity_logs,
                 realm: None,
             })),
         };
 
         // Default severity.
         let test_list_entry = to_test_list_entry(&make_test_entry(None), None);
-        assert_eq!(test_list_entry, make_expected_test_list_entry(None),);
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None),);
 
         // Inner default severity.
-        let test_list_entry =
-            to_test_list_entry(&make_test_entry(Some(LogSettings { max_severity: None })), None);
-        assert_eq!(test_list_entry, make_expected_test_list_entry(None),);
+        let test_list_entry = to_test_list_entry(
+            &make_test_entry(Some(LogSettings { max_severity: None, min_severity: None })),
+            None,
+        );
+        assert_eq!(test_list_entry, make_expected_test_list_entry(None, None),);
 
         // Explicit severity
         let test_list_entry = to_test_list_entry(
             &make_test_entry(Some(LogSettings {
                 max_severity: Some(diagnostics_data::Severity::Error),
+                min_severity: None,
             })),
             None,
         );
         assert_eq!(
             test_list_entry,
-            make_expected_test_list_entry(Some(diagnostics_data::Severity::Error))
+            make_expected_test_list_entry(Some(diagnostics_data::Severity::Error), None)
         );
 
         // pass in realm
@@ -689,6 +698,7 @@ mod tests {
                 also_run_disabled_tests: false,
                 parallel: None,
                 max_severity_logs: None,
+                min_severity_logs: None,
                 realm: Some("/some/moniker".into()),
             })),
         };
@@ -1013,7 +1023,8 @@ mod tests {
                         "cpu": "x64",
                         "label": "//build/components/tests:echo-integration-test_test_echo-client-test(//build/toolchain/fuchsia:x64)",
                         "log_settings": {
-                            "max_severity": "WARN"
+                            "max_severity": "WARN",
+                            "min_severity": "DEBUG"
                         },
                         "name": "fuchsia-pkg://fuchsia.com/echo-integration-test#meta/echo-client-test.cm",
                         "os": "fuchsia",
@@ -1043,7 +1054,10 @@ mod tests {
                         package_manifests: Some(vec![
                             "obj/build/components/tests/echo-integration-test/package_manifest.json".to_string(),
                         ]),
-                        log_settings: Some(LogSettings { max_severity: Some(diagnostics_data::Severity::Warn) }),
+                        log_settings: Some(LogSettings {
+                            max_severity: Some(diagnostics_data::Severity::Warn),
+                            min_severity: Some(diagnostics_data::Severity::Debug),
+                        }),
                         ..TestEntry::default()
                     },
                 }

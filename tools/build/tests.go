@@ -82,8 +82,12 @@ func (t *Test) IsComponentV2() bool {
 }
 
 type LogSettings struct {
-	// Max severity of logs produced by the test.
+	// Max severity of logs produced by the test. Message more severe than this value will cause the
+	// test to fail.
 	MaxSeverity string `json:"max_severity,omitempty"`
+	// Min severity of logs produced by the test. Messages less severe than this value will not be
+	// printed.
+	MinSeverity string `json:"min_severity,omitempty"`
 }
 
 // Environment describes the full environment a test requires.

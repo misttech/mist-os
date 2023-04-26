@@ -90,6 +90,12 @@ pub struct FuchsiaComponentExecutionEntry {
     /// this level.
     pub max_severity_logs: Option<diagnostics_data::Severity>,
 
+    /// The minimum severity of logs the test will be asked to produce.
+    ///
+    /// This may be used to request DEBUG or TRACE level logs from tests
+    /// which only produce INFO and above by default.
+    pub min_severity_logs: Option<diagnostics_data::Severity>,
+
     /// The moniker of the realm to to run this test in.
     pub realm: Option<String>,
 }

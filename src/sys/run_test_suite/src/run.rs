@@ -125,13 +125,18 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             .timeout_seconds
             .map(|seconds| std::time::Duration::from_secs(seconds.get() as u64));
 
+        // If the test spec includes minimum log severity, combine that with any selectors we
+        // got from the command line.
+        let mut combined_log_interest = run_params.min_severity_logs.clone();
+        combined_log_interest.extend(params.min_severity_logs.iter().cloned());
+
         let run_options = fidl_fuchsia_test_manager::RunOptions {
             parallel: params.parallel,
             arguments: Some(params.test_args),
             run_disabled_tests: Some(params.also_run_disabled_tests),
             case_filters_to_run: params.test_filters,
             log_iterator: Some(run_params.log_protocol.unwrap_or_else(diagnostics::get_type)),
-            log_interest: Some(run_params.min_severity_logs.clone()),
+            log_interest: Some(combined_log_interest),
             ..fidl_fuchsia_test_manager::RunOptions::EMPTY
         };
         let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;

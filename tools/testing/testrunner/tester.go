@@ -576,6 +576,7 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 			TimeoutSeconds:  int(test.Timeout.Seconds()),
 			Parallel:        test.Parallel,
 			MaxSeverityLogs: test.LogSettings.MaxSeverity,
+			MinSeverityLogs: test.LogSettings.MinSeverity,
 			Realm:           test.Realm,
 		},
 		Tags: test.Tags,
@@ -1428,6 +1429,9 @@ func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duratio
 			}
 			if test.LogSettings.MaxSeverity != "" {
 				command = append(command, "--max-severity-logs", fmt.Sprintf("%s", test.LogSettings.MaxSeverity))
+			}
+			if test.LogSettings.MinSeverity != "" {
+				command = append(command, "--min-severity-logs", fmt.Sprintf("%s", test.LogSettings.MinSeverity))
 			}
 			if test.Parallel != 0 {
 				command = append(command, "--parallel", fmt.Sprintf("%d", test.Parallel))

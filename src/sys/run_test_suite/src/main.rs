@@ -195,7 +195,7 @@ async fn main() {
         experimental_parallel_execution: None,
         accumulate_debug_data: true, // must be true to support coverage via scp
         log_protocol: Some(LogsIteratorOption::ArchiveIterator),
-        min_severity_logs,
+        min_severity_logs: min_severity_logs.clone(),
         // TODO(https://fxbug.dev/107998): make this configurable
         show_full_moniker: true,
     };
@@ -215,6 +215,7 @@ async fn main() {
                 parallel,
                 test_args,
                 max_severity_logs,
+                min_severity_logs,
                 tags: vec![],
             };
             count as usize

@@ -34,6 +34,9 @@ pub struct TestParams {
     /// Maximum allowable log severity for the test.
     pub max_severity_logs: Option<Severity>,
 
+    /// Minimum requested log severity to print for the test.
+    pub min_severity_logs: Vec<LogInterestSelector>,
+
     /// List of tags to associate with this test's output.
     pub tags: Vec<TestTag>,
 }

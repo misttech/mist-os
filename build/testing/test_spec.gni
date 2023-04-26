@@ -11,7 +11,7 @@ declare_args() {
   allowed_test_device_types = []
 }
 
-_max_severity_allowed_val = [
+_log_severity_allowed_val = [
   "FATAL",
   "ERROR",
   "WARN",
@@ -94,6 +94,11 @@ _max_severity_allowed_val = [
 #       if any component in its environment produces log with greater severity
 #       than defined here.
 #
+#     min_severity (optional)
+#       [string] Defines minimum severity of logs for the test environment to produce,
+#       overriding default values in the binaries themselves (usually INFO). Messages
+#       below this severity will not be printed.
+#
 #   parallel (optional)
 #     [int] Defines maximum concurrent test cases to run. This only works with v2 tests.
 #     If not defined, test runner will decide the default value.
@@ -149,10 +154,17 @@ template("test_spec") {
     if (!defined(_log_settings.max_severity)) {
       _log_settings.max_severity = "WARN"
     }
+    if (defined(_log_settings.min_severity)) {
+      assert(
+          _log_severity_allowed_val + [ _log_settings.min_severity ] -
+              [ _log_settings.min_severity ] != _log_severity_allowed_val,
+          "Invalid 'log_settings.min_severity': ${_log_settings.min_severity}, valid values are ${_log_severity_allowed_val}")
+    }
 
-    assert(_max_severity_allowed_val + [ _log_settings.max_severity ] -
-               [ _log_settings.max_severity ] != _max_severity_allowed_val,
-           "Invalid 'log_settings.max_severity': " + _log_settings.max_severity)
+    assert(
+        _log_severity_allowed_val + [ _log_settings.max_severity ] -
+            [ _log_settings.max_severity ] != _log_severity_allowed_val,
+        "Invalid 'log_settings.max_severity': ${_log_settings.max_severity}, valid values are ${_log_severity_allowed_val}")
 
     if (defined(invoker.package_url)) {
       s = string_split(invoker.package_url, ".cm")

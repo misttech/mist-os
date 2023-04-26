@@ -29,6 +29,7 @@ group("tests") {
     ":fshost-metrics-tests",
     ":legacy-metrics-tests",
     ":log-stats-inspect-tests",
+    ":log_settings_min_severity",
   ]
 
   if (data_filesystem_format == "fxfs") {
@@ -261,5 +262,32 @@ fuchsia_unittest_package("diagnostics-persistence-inspect-tests") {
         }
       },
     ]
+  }
+}
+
+rustc_test("log_settings_min_severity_bin") {
+  edition = "2021"
+  source_root = "src/log_settings_min_severity.rs"
+  sources = [ source_root ]
+  deps = [
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_unittest_package("log_settings_min_severity") {
+  manifest = "meta/log_settings_min_severity.cml"
+
+  deps = [ ":log_settings_min_severity_bin" ]
+
+  # This test expects to observe its own TRACE-level log messages but does not configure that as
+  # the static severity level in the binary. The test relies on the configuration below to pass.
+  test_specs = {
+    log_settings = {
+      min_severity = "TRACE"
+    }
   }
 }
