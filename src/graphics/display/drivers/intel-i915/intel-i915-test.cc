@@ -465,7 +465,6 @@ TEST(IntelI915Display, ImportImage) {
   const image_t kDefaultImage = {
       .width = 32,
       .height = 32,
-      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0u,
   };
@@ -488,20 +487,6 @@ TEST(IntelI915Display, ImportImage) {
   // Invalid import: bad type
   invalid_image = kDefaultImage;
   invalid_image.type = IMAGE_TYPE_CAPTURE;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
-      ZX_ERR_INVALID_ARGS);
-
-  // Invalid import: non-sysmem format
-  invalid_image = kDefaultImage;
-  invalid_image.pixel_format = ZX_PIXEL_FORMAT_ARGB_2_10_10_10;
-  EXPECT_EQ(
-      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
-      ZX_ERR_INVALID_ARGS);
-
-  // Invalid import: mismatched format
-  invalid_image = kDefaultImage;
-  invalid_image.pixel_format = ZX_PIXEL_FORMAT_NV12;
   EXPECT_EQ(
       display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
       ZX_ERR_INVALID_ARGS);
@@ -533,7 +518,6 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   loop_.RunUntilIdle();
 
   image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
 
   EXPECT_OK(
       display_.DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
@@ -544,54 +528,6 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
   EXPECT_TRUE(collection->set_constraints_called());
-}
-
-TEST_F(ControllerWithFakeSysmemTest, SysmemNoneFormat) {
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints.is_ok());
-
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
-
-  loop_.RunUntilIdle();
-
-  image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_NONE;
-
-  EXPECT_OK(
-      display_.DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
-
-  loop_.RunUntilIdle();
-
-  MockAllocator& allocator = sysmem_.mock_allocators().front();
-  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
-  ASSERT_TRUE(collection);
-  EXPECT_TRUE(collection->set_constraints_called());
-}
-
-TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidFormat) {
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints.is_ok());
-
-  constexpr uint64_t kBufferCollectionId = 1u;
-  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBufferCollectionId, token_endpoints->client.TakeChannel()));
-
-  loop_.RunUntilIdle();
-
-  image_t image = {};
-  image.pixel_format = UINT32_MAX;
-
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, kBufferCollectionId));
-
-  loop_.RunUntilIdle();
-
-  MockAllocator& allocator = sysmem_.mock_allocators().front();
-  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
-  ASSERT_TRUE(collection);
-  EXPECT_FALSE(collection->set_constraints_called());
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
@@ -605,9 +541,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   loop_.RunUntilIdle();
 
   image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.type = 1000000;
-  image.pixel_format = UINT32_MAX;
 
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
                                      &image, kBufferCollectionId));
@@ -703,7 +637,6 @@ TEST_F(IntegrationTest, SysmemImport) {
       kBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.width = 128;
   image.height = kImageHeight;
   EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
@@ -749,7 +682,6 @@ TEST_F(IntegrationTest, SysmemRotated) {
   collection->set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
 
   image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.width = 128;
   image.height = kImageHeight;
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.

@@ -13,6 +13,7 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
 #include <threads.h>
 
@@ -182,6 +183,10 @@ class Controller : public DeviceType,
   // GTT. Returns the Gtt region representing the image.
   const GttRegion& SetupGttImage(const image_t* image, uint32_t rotation);
 
+  // Returns the pixel format negotiated by sysmem for an imported `image`.
+  // `image` must be successfully imported and not yet released.
+  PixelFormatAndModifier GetImportedImagePixelFormat(const image_t* image) const;
+
  private:
   // Perform short-running initialization of all subcomponents and instruct the DDK to publish the
   // device. On success, returns ZX_OK and the ownership of the Controller instance is claimed by
@@ -280,11 +285,15 @@ class Controller : public DeviceType,
   bool ready_for_callback_ __TA_GUARDED(display_lock_) = false;
 
   Gtt gtt_ __TA_GUARDED(gtt_lock_);
-  mtx_t gtt_lock_;
+  mutable mtx_t gtt_lock_;
   // These regions' VMOs are not owned
   fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_images_ __TA_GUARDED(gtt_lock_);
   // These regions' VMOs are owned
   fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_gtt_regions_ __TA_GUARDED(gtt_lock_);
+
+  // Pixel formats of imported images.
+  std::unordered_map</*handle*/ uint64_t, PixelFormatAndModifier> imported_image_pixel_formats_
+      __TA_GUARDED(gtt_lock_);
 
   IgdOpRegion igd_opregion_;  // Read only, no locking
   Interrupts interrupts_;     // Internal locking

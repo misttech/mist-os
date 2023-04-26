@@ -227,6 +227,9 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* config,
         config, config_stamp,
         [controller = controller_](const image_t* image, uint32_t rotation) -> const GttRegion& {
           return controller->SetupGttImage(image, rotation);
+        },
+        [controller = controller_](const image_t* image) -> PixelFormatAndModifier {
+          return controller->GetImportedImagePixelFormat(image);
         });
   }
 }

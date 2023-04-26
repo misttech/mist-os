@@ -4,8 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <float.h>
 #include <lib/ddk/debug.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <math.h>
@@ -380,7 +382,8 @@ void Pipe::LoadActiveMode(display_mode_t* mode) {
 }
 
 void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp_t* config_stamp,
-                              const SetupGttImageFunc& get_gtt_region_fn) {
+                              const SetupGttImageFunc& get_gtt_region_fn,
+                              const GetImagePixelFormatFunc& get_pixel_format) {
   ZX_ASSERT(config);
   ZX_ASSERT(config_stamp);
 
@@ -460,7 +463,7 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
       }
     }
     ConfigurePrimaryPlane(plane, primary, !!config->cc_flags, &scaler_1_claimed, &regs,
-                          current_config_stamp_seqno, get_gtt_region_fn);
+                          current_config_stamp_seqno, get_gtt_region_fn, get_pixel_format);
   }
   cursor_layer_t* cursor = nullptr;
   if (config->layer_count &&
@@ -493,7 +496,8 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
 void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary,
                                  bool enable_csc, bool* scaler_1_claimed,
                                  registers::pipe_arming_regs_t* regs, uint64_t config_stamp_seqno,
-                                 const SetupGttImageFunc& setup_gtt_image) {
+                                 const SetupGttImageFunc& setup_gtt_image,
+                                 const GetImagePixelFormatFunc& get_pixel_format) {
   registers::PipeRegs pipe_regs(pipe_id());
 
   auto plane_ctrl = pipe_regs.PlaneControl(plane_num).ReadFrom(mmio_space_);
@@ -611,9 +615,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   stride_reg.WriteTo(mmio_space_);
 
   registers::PlaneControlAlphaMode alpha_mode;
-  if (primary->alpha_mode == ALPHA_DISABLE ||
-      primary->image.pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
-      primary->image.pixel_format == ZX_PIXEL_FORMAT_BGR_888x) {
+  if (primary->alpha_mode == ALPHA_DISABLE) {
     alpha_mode = registers::PlaneControlAlphaMode::kAlphaIgnored;
   } else if (primary->alpha_mode == ALPHA_PREMULTIPLIED) {
     alpha_mode = registers::PlaneControlAlphaMode::kAlphaPreMultiplied;
@@ -656,12 +658,24 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     plane_ctrl.set_source_pixel_format_kaby_lake(
         registers::PlaneControl::ColorFormatKabyLake::kRgb8888);
   }
-  if (primary->image.pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
-      primary->image.pixel_format == ZX_PIXEL_FORMAT_BGR_888x) {
-    plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kRgbx);
-  } else {
-    plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kBgrx);
+
+  PixelFormatAndModifier pixel_format = get_pixel_format(&primary->image);
+  switch (pixel_format.pixel_format) {
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
+      plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kRgbx);
+      break;
+    case fuchsia_images2::PixelFormat::kBgra32:
+      plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kBgrx);
+      break;
+    default:
+      // This should not happen. The sysmem-negotiated pixel format type can
+      // only be RGBA or BGRA.
+      // TODO(fxbug.dev/126049): Support other formats.
+      ZX_ASSERT_MSG(false,
+                    "Sysmem-negotiated pixel format %u does not meet the constraints we placed",
+                    static_cast<uint32_t>(pixel_format.pixel_format));
   }
+
   if (primary->image.type == IMAGE_TYPE_SIMPLE) {
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kLinear);
   } else if (primary->image.type == IMAGE_TYPE_X_TILED) {

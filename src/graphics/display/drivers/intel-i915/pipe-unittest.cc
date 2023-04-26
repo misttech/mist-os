@@ -6,6 +6,7 @@
 
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/pixelformat.h>
 
 #include <memory>
@@ -48,6 +49,12 @@ class TestGttRegionImpl : public GttRegion {
 
 std::map<uint64_t, TestGttRegionImpl> region_map;
 
+PixelFormatAndModifier GetPixelFormat(const image_t* image) {
+  return PixelFormatAndModifier(
+      fuchsia_images2::PixelFormat::kBgra32,
+      /*pixel_format_modifier_param=*/fuchsia_images2::kFormatModifierLinear);
+}
+
 const GttRegion& GetGttImageHandle(const image_t* image, uint32_t rotation) {
   auto it = region_map.find(image->handle);
   if (it != region_map.end()) {
@@ -68,7 +75,6 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle, uint32_t z_index = 1u) {
           {
               .width = kWidth,
               .height = kHeight,
-              .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
               .type = IMAGE_TYPE_SIMPLE,
               .handle = handle,
           },
@@ -119,7 +125,7 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .apply_gamma_table = false,
   };
   config_stamp_t stamp_1 = {.value = 1u};
-  pipe.ApplyConfiguration(&config, &stamp_1, GetGttImageHandle);
+  pipe.ApplyConfiguration(&config, &stamp_1, GetGttImageHandle, GetPixelFormat);
 
   // For images that are not registered with Pipe yet, GetVsyncConfigStamp()
   // should return nullopt.
@@ -145,7 +151,7 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
       .apply_gamma_table = false,
   };
   config_stamp_t stamp_2 = {.value = 2u};
-  pipe.ApplyConfiguration(&config_2, &stamp_2, GetGttImageHandle);
+  pipe.ApplyConfiguration(&config_2, &stamp_2, GetGttImageHandle, GetPixelFormat);
 
   // It is possible that a layer update is slower than other layers, so on
   // Vsync time the device may have layers from different configurations. In

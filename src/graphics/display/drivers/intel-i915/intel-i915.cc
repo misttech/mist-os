@@ -16,6 +16,7 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/image-format/image_format.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
@@ -979,21 +980,6 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, uint64_
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fidl::Arena allocator;
-  auto format_result = ImageFormatConvertZxToSysmem_v1(allocator, image->pixel_format);
-  if (!format_result.is_ok()) {
-    zxlogf(ERROR, "Pixel format %d can't be converted to sysmem", image->pixel_format);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (format_result.value().type !=
-      collection_info.settings.image_format_constraints.pixel_format.type) {
-    zxlogf(ERROR, "Sysmem pixel format from image %d doesn't match format from collection %d",
-           format_result.value().type,
-           collection_info.settings.image_format_constraints.pixel_format.type);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   fbl::AutoLock lock(&gtt_lock_);
   fbl::AllocChecker ac;
   imported_images_.reserve(imported_images_.size() + 1, &ac);
@@ -1055,11 +1041,19 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, uint64_
   gtt_region->set_bytes_per_row(format.value().bytes_per_row);
   image->handle = gtt_region->base();
   imported_images_.push_back(std::move(gtt_region));
+
+  ZX_DEBUG_ASSERT_MSG(
+      imported_image_pixel_formats_.find(image->handle) == imported_image_pixel_formats_.end(),
+      "Image handle (%lu) exists in imported image pixel formats map", image->handle);
+  imported_image_pixel_formats_.emplace(
+      image->handle, sysmem::V2CopyFromV1PixelFormat(format.value().pixel_format));
+
   return ZX_OK;
 }
 
 void Controller::DisplayControllerImplReleaseImage(image_t* image) {
   fbl::AutoLock lock(&gtt_lock_);
+  imported_image_pixel_formats_.erase(image->handle);
   for (unsigned i = 0; i < imported_images_.size(); i++) {
     if (imported_images_[i]->base() == image->handle) {
       imported_images_[i]->ClearRegion();
@@ -1067,6 +1061,15 @@ void Controller::DisplayControllerImplReleaseImage(image_t* image) {
       return;
     }
   }
+}
+
+PixelFormatAndModifier Controller::GetImportedImagePixelFormat(const image_t* image) const {
+  fbl::AutoLock lock(&gtt_lock_);
+  auto it = imported_image_pixel_formats_.find(image->handle);
+  if (it != imported_image_pixel_formats_.end()) {
+    return it->second;
+  }
+  ZX_ASSERT_MSG(false, "imported image (handle %lu) not found", image->handle);
 }
 
 const std::unique_ptr<GttRegionImpl>& Controller::GetGttRegionImpl(uint64_t handle) {
@@ -1152,7 +1155,21 @@ bool Controller::CalculateMinimumAllocations(
       } else {
         uint32_t plane_source_width;
         uint32_t min_scan_lines;
-        uint32_t bytes_per_pixel = ZX_PIXEL_FORMAT_BYTES(primary->image.pixel_format);
+
+        // TODO(fxbug.dev/126049): Currently we assume only RGBA/BGRA formats
+        // are supported and hardcode the bytes-per-pixel value to avoid pixel
+        // format check and stride calculation (which requires holding the GTT
+        // lock). This may change when we need to support non-RGBA/BGRA images.
+        // Note that this may be used by CheckConfiguration() where the handle
+        // of primary->image is not propagated yet. CheckConfiguration() may
+        // need to populate the image_t.handle of pending layers first so that
+        // the image of primary layer can be correctly resolved.
+        constexpr int bytes_per_pixel = 4;
+        if (primary->image.handle != 0) {
+          ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
+                                                 GetImportedImagePixelFormat(&primary->image)));
+        }
+
         if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
             primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
           plane_source_width = primary->src_frame.width;
@@ -1314,8 +1331,19 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> dis
             primary->src_frame.width * primary->src_frame.width / primary->dest_frame.width;
         uint32_t scaled_height =
             primary->src_frame.height * primary->src_frame.height / primary->dest_frame.height;
-        data_rate[pipe_id][plane_num] =
-            scaled_width * scaled_height * ZX_PIXEL_FORMAT_BYTES(primary->image.pixel_format);
+
+        // TODO(fxbug.dev/126049): Currently we assume only RGBA/BGRA formats
+        // are supported and hardcode the bytes-per-pixel value to avoid pixel
+        // format check and stride calculation (which requires holding the GTT
+        // lock). This may change when we need to support non-RGBA/BGRA images.
+        constexpr int bytes_per_pixel = 4;
+        // Plane buffers are recalculated only on valid configurations. So all
+        // images must be valid.
+        ZX_DEBUG_ASSERT(primary->image.handle != 0);
+        ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
+                                               GetImportedImagePixelFormat(&primary->image)));
+
+        data_rate[pipe_id][plane_num] = uint64_t{scaled_width} * scaled_height * bytes_per_pixel;
       } else if (layer->type == LAYER_TYPE_CURSOR) {
         // Use a tiny data rate so the cursor gets the minimum number of buffers
         data_rate[pipe_id][plane_num] = 1;
@@ -1655,9 +1683,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           }
           bool found = false;
           for (unsigned x = 0; x < std::size(kCursorInfos) && !found; x++) {
-            found = image->width == kCursorInfos[x].width &&
-                    image->height == kCursorInfos[x].height &&
-                    image->pixel_format == kCursorInfos[x].format;
+            found =
+                image->width == kCursorInfos[x].width && image->height == kCursorInfos[x].height;
           }
           if (!found) {
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
@@ -1870,50 +1897,25 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.heap_permitted[0] = fuchsia_sysmem::wire::HeapType::kSystemRam;
   unsigned image_constraints_count = 0;
 
-  fuchsia_sysmem::wire::PixelFormatType pixel_format;
-  switch (config->pixel_format) {
-    case ZX_PIXEL_FORMAT_NONE:
-      pixel_format = fuchsia_sysmem::wire::PixelFormatType::kInvalid;
-      break;
-    case ZX_PIXEL_FORMAT_ARGB_8888:
-    case ZX_PIXEL_FORMAT_RGB_x888:
-      pixel_format = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
-      break;
-    case ZX_PIXEL_FORMAT_ABGR_8888:
-    case ZX_PIXEL_FORMAT_BGR_888x:
-      pixel_format = fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8;
-      break;
-    default:
-      zxlogf(ERROR, "Config has unsupported pixel format %d", config->pixel_format);
-      return ZX_ERR_INVALID_ARGS;
-  }
-
   // Loop over all combinations of supported image types and pixel formats, adding
   // an image format constraints for each unless the config is asking for a specific
   // format or type.
   static_assert(std::size(kImageTypes) * std::size(kPixelFormatTypes) <=
                 std::size(constraints.image_format_constraints));
-  for (unsigned i = 0; i < std::size(kImageTypes); ++i) {
+  for (uint32_t image_type : kImageTypes) {
     // Skip if image type was specified and different from current type. This
     // makes it possible for a different participant to select preferred
     // modifiers.
-    if (config->type && config->type != kImageTypes[i]) {
+    if (config->type && config->type != image_type) {
       continue;
     }
-    for (unsigned j = 0; j < std::size(kPixelFormatTypes); ++j) {
-      // Skip if pixel format was specified and different from current format.
-      // This makes it possible for a different participant to select preferred
-      // format.
-      if (pixel_format != fuchsia_sysmem::wire::PixelFormatType::kInvalid &&
-          pixel_format != kPixelFormatTypes[j]) {
-        continue;
-      }
+    for (fuchsia_sysmem::wire::PixelFormatType pixel_format_type : kPixelFormatTypes) {
       fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
           constraints.image_format_constraints[image_constraints_count++];
 
-      image_constraints.pixel_format.type = kPixelFormatTypes[j];
+      image_constraints.pixel_format.type = pixel_format_type;
       image_constraints.pixel_format.has_format_modifier = true;
-      switch (kImageTypes[i]) {
+      switch (image_type) {
         case IMAGE_TYPE_SIMPLE:
           image_constraints.pixel_format.format_modifier.value =
               fuchsia_sysmem::wire::kFormatModifierLinear;

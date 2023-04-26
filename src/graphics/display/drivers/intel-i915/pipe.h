@@ -9,6 +9,7 @@
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/vmo.h>
 
 #include <cstdint>
@@ -46,10 +47,12 @@ class Pipe {
 
   void ApplyModeConfig(const display_mode_t& mode);
 
+  using GetImagePixelFormatFunc = fit::function<PixelFormatAndModifier(const image_t* image)>;
   using SetupGttImageFunc =
       fit::function<const GttRegion&(const image_t* image, uint32_t rotation)>;
   void ApplyConfiguration(const display_config_t* config, const config_stamp_t* config_stamp,
-                          const SetupGttImageFunc& setup_gtt_image);
+                          const SetupGttImageFunc& setup_gtt_image,
+                          const GetImagePixelFormatFunc& get_pixel_format);
 
   // Reset pipe registers and transcoders.
   void Reset();
@@ -104,7 +107,8 @@ class Pipe {
  private:
   void ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary, bool enable_csc,
                              bool* scaler_1_claimed, registers::pipe_arming_regs* regs,
-                             uint64_t config_stamp_seqno, const SetupGttImageFunc& setup_gtt_image);
+                             uint64_t config_stamp_seqno, const SetupGttImageFunc& setup_gtt_image,
+                             const GetImagePixelFormatFunc& get_pixel_format);
   void ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
                             registers::pipe_arming_regs* regs, uint64_t config_stamp_seqno);
   void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
