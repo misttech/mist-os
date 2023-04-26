@@ -40,6 +40,7 @@ fuchsia_driver("msd_vsi-driver") {
     "$magma_build_root/src/magma_util/platform:logger_for_system_drivers",
     "src",
   ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
 
 fuchsia_driver_component("msd_vsi") {
@@ -57,6 +58,7 @@ fuchsia_driver("msd_vsi_test-driver") {
     "$magma_build_root/src/magma_util/platform:logger_for_system_drivers",
     "src",
   ]
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 }
 
 fuchsia_driver_component("msd_vsi_test") {
@@ -88,7 +90,11 @@ driver_bind_rules("msd_vsi_test_bind") {
 }
 
 magma_pdev_entry("msd_vsi_entry") {
-  deps = [ ":msd_vsi_bind" ]
+  deps = [
+    ":msd_vsi_bind",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/trace-vthread",
+  ]
 }
 
 magma_pdev_entry("msd_vsi_test_entry") {
@@ -98,6 +104,8 @@ magma_pdev_entry("msd_vsi_test_entry") {
     "tests/unit_tests:hardware_tests",
     "//src/graphics/lib/magma/tests/unit_tests:magma_platform_device_tests",
     "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/trace-vthread",
   ]
 }
 

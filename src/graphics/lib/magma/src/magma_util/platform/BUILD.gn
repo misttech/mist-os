@@ -387,8 +387,8 @@ source_set("trace_header") {
   if (is_fuchsia) {
     if (magma_enable_tracing) {
       public_deps = [
-        "//zircon/system/ulib/trace:trace-with-static-engine",
-        "//zircon/system/ulib/trace-vthread:trace-vthread-with-static-engine",
+        "//zircon/system/ulib/trace:trace-headers",  #trace-with-static-engine",
+        "//zircon/system/ulib/trace-vthread:trace-vthread-headers",  #trace-vthread-with-static-engine",
       ]
     }
   }

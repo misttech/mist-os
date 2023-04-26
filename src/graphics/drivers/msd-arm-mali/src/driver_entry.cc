@@ -23,8 +23,6 @@
 #include "magma_util/platform/zircon/zircon_platform_status.h"
 #include "magma_util/short_macros.h"
 #include "platform_logger.h"
-#include "platform_trace_provider.h"
-#include "platform_trace_provider_with_fdio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/parent_device.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
 #include "sys_driver_cpp/magma_driver.h"
@@ -83,8 +81,6 @@ void GpuDevice::DdkRelease() {
 
   delete this;
   MAGMA_LOG(INFO, "Finished device_release");
-
-  magma::PlatformTraceProvider::Shutdown();
 }
 
 zx_status_t GpuDevice::Init() {
@@ -112,9 +108,6 @@ static zx_status_t driver_bind(void* context, zx_device_t* parent) {
   auto gpu = std::make_unique<GpuDevice>(parent);
   if (!gpu)
     return ZX_ERR_NO_MEMORY;
-
-  if (magma::PlatformTraceProvider::Get())
-    magma::InitializeTraceProviderWithFdio(magma::PlatformTraceProvider::Get());
 
   zx_status_t status = gpu->Init();
   if (status != ZX_OK) {

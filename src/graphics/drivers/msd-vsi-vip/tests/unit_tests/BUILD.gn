@@ -27,6 +27,8 @@ executable("nonhardware_tests") {
     "//src/graphics/lib/magma/tests/mock:mmio",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/trace-vthread",
   ]
 }
 

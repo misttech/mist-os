@@ -50,6 +50,27 @@ set_defaults("trace_library") {
   configs = default_common_binary_configs
 }
 
+source_set("trace-headers") {
+  sources = [
+    "include/lib/trace/event.h",
+    "include/lib/trace/event_args.h",
+    "include/lib/trace/internal/event_args.h",
+    "include/lib/trace/internal/event_common.h",
+    "include/lib/trace/internal/event_internal.h",
+    "include/lib/trace/internal/pairs_internal.h",
+    "include/lib/trace/internal/string_traits.h",
+    "include/lib/trace/observer.h",
+  ]
+
+  public_deps = [
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/trace-engine:trace-engine-headers-for-handler",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 # The default version for the normal case, and for the SDK.
 # For the SDK this needs to be published as "source": We're implemented in
 # C++ and C++ SDK libraries can't be published as "static".

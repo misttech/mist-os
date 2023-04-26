@@ -25,8 +25,6 @@
 #include "magma_util/dlog.h"
 #include "msd_defs.h"
 #include "msd_intel_pci_device.h"
-#include "platform_trace_provider.h"
-#include "platform_trace_provider_with_fdio.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 #include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
@@ -91,8 +89,6 @@ void IntelDevice::DdkRelease() {
 
   delete this;
   MAGMA_LOG(INFO, "Finished device_release");
-
-  magma::PlatformTraceProvider::Shutdown();
 }
 
 zx_status_t IntelDevice::Init() {
@@ -131,9 +127,6 @@ static zx_status_t sysdrv_bind(void* ctx, zx_device_t* parent) {
   auto gpu = std::make_unique<IntelDevice>(parent);
   if (!gpu)
     return ZX_ERR_NO_MEMORY;
-
-  if (magma::PlatformTraceProvider::Get())
-    magma::InitializeTraceProviderWithFdio(magma::PlatformTraceProvider::Get());
 
   zx_status_t status = gpu->Init();
   if (status != ZX_OK) {

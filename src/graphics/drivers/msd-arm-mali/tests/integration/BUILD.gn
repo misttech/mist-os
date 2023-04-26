@@ -37,6 +37,8 @@ executable("msd_arm_mali_integration_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/trace-vthread",
     "//zircon/system/ulib/zx",
   ]
 

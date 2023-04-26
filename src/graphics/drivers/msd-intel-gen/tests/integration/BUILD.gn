@@ -39,5 +39,7 @@ executable("msd_intel_gen_integration_tests") {
     "//src/graphics/lib/magma/src/magma_util:short_macros",
     "//src/graphics/lib/magma/tests/helper:logger_init_helper",
     "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/trace-vthread",
   ]
 }

@@ -8,6 +8,7 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 fuchsia_driver("msd_arm-driver") {
   output_name = "libmsd_arm"
+  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 
   deps = [
     ":msd_arm_entry",
@@ -26,7 +27,10 @@ fuchsia_driver_component("msd_arm") {
 fuchsia_driver("msd_arm_test-driver") {
   testonly = true
   output_name = "libmsd_arm_test"
-  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver" ]
+  assert_no_deps = [
+    "//src/graphics/lib/magma/src/sys_driver",
+    "//zircon/system/ulib/trace-engine:trace-engine-static",
+  ]
 
   deps = [
     ":msd_arm_test_entry",
@@ -74,14 +78,14 @@ entry_deps = [
   "//src/graphics/lib/magma/src/magma_util:macros",
   "//src/graphics/lib/magma/src/magma_util/platform:logger",
   "//src/graphics/lib/magma/src/magma_util/platform:trace",
-  "//src/graphics/lib/magma/src/magma_util/platform:trace_provider",
-  "//src/graphics/lib/magma/src/magma_util/platform:trace_provider_with_fdio",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
   "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
   "//src/graphics/lib/magma/src/sys_driver_cpp",
   "//src/graphics/lib/magma/src/sys_driver_cpp:device_impl",
   "//src/lib/ddk",
   "//src/lib/ddktl",
+  "//zircon/system/ulib/trace",
+  "//zircon/system/ulib/trace-vthread",
   "//zircon/system/ulib/zx",
 ]
 

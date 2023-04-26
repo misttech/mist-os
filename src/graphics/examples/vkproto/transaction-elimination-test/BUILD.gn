@@ -39,6 +39,7 @@ executable("bin") {
     "//src/lib/vulkan",
     "//third_party/github.com/ARM-software/HWCPipe:mali_profiler",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/trace",
   ]
 
   include_dirs += [ "//src/graphics/examples/vkproto/fuchsia" ]

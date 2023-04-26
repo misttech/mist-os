@@ -19,6 +19,19 @@ config("library_headers_config") {
   ]
 }
 
+source_set("trace-vthread-headers") {
+  sources = [
+    "include/trace-vthread/event_vthread.h",
+    "include/trace-vthread/internal/event_vthread.h",
+  ]
+
+  public_configs = [ ":library_headers_config" ]
+  public_deps = [
+    # <trace-vthread/internal/event_vthread.h> has #include <lib/trace/event_args.h>.
+    "//zircon/system/ulib/trace:trace-headers",
+  ]
+}
+
 # The default version for the normal case.
 zx_library("trace-vthread") {
   sdk = "static"
@@ -32,6 +45,7 @@ zx_library("trace-vthread") {
     "//zircon/system/ulib/trace",
 
     # <trace-vthread/internal/event_vthread.h> has #include <trace-engine/instrumentation.h>.
+    ":trace-vthread-headers",
     "//zircon/system/ulib/trace-engine",
   ]
   deps = [ "//zircon/system/ulib/trace" ]
@@ -55,6 +69,7 @@ zx_library("trace-vthread-with-static-engine") {
     "//zircon/system/ulib/trace:trace-with-static-engine",
 
     # <trace-vthread/internal/event_vthread.h> has #include <trace-engine/instrumentation.h>.
+    ":trace-vthread-headers",
     "//zircon/system/ulib/trace-engine:trace-engine-static",
   ]
   deps = [ "//zircon/system/ulib/trace:trace-with-static-engine" ]

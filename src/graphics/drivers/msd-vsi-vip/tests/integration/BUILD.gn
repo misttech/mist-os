@@ -22,6 +22,7 @@ source_set("magma_vsi_exec") {
     "//src/graphics/lib/magma/src/libmagma",
     "//src/graphics/lib/magma/tests/helper:magma_map_cpu",
     "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -43,6 +44,7 @@ test("msd_vsi_vip_integration_tests") {
     "//src/graphics/lib/magma/tests/helper:test_device_helper",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
+    "//zircon/system/ulib/trace",
   ]
 }
 

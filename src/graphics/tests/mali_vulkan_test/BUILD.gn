@@ -17,6 +17,7 @@ executable("mali_vulkan_test_bin") {
     "//src/lib/vulkan",
     "//third_party/github.com/ARM-software/HWCPipe:mali_profiler",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
 

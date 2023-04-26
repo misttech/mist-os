@@ -42,6 +42,7 @@ executable("magma_conformance_tests") {
     "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/trace",
   ]
 
   if (is_fuchsia) {
