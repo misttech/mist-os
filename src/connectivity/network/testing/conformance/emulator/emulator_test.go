@@ -99,12 +99,8 @@ func TestEmulatorWorksWithFfx(t *testing.T) {
 
 	sourceRootRelativeDir := filepath.Join(
 		hostOutDir,
-		"src",
-		"connectivity",
-		"network",
-		"testing",
-		"conformance",
-		"emulator",
+		"..",
+		"host-tools",
 	)
 
 	tempDir := t.TempDir()

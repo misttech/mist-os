@@ -24,19 +24,16 @@ if (is_linux) {
     library = ":emulator"
     deps = [ "//src/connectivity/network/testing/conformance/ffx" ]
     non_go_deps = [
-      ":ffx_bin",
       "//build/images/network-conformance:network-conformance-base-test-data",
+      "//src/connectivity/network/testing/network-test-realm/ffx:ffx_net_test_realm_tool_test_data",
+      "//src/developer/ffx:test_data",
+      "//src/developer/ffx/plugins/component:ffx_component_tool_test_data",
+      "//src/developer/ffx/plugins/target:ffx_target_tool_test_data",
     ]
   }
 
   out_dir =
       "${root_out_dir}/src/connectivity/network/testing/conformance/emulator"
-
-  host_test_data("ffx_bin") {
-    deps = [ "//src/developer/ffx:host" ]
-    sources = [ "${host_tools_dir}/ffx" ]
-    outputs = [ "${out_dir}/{{source_file_part}}" ]
-  }
 
   host_test_data("zbi_bin") {
     deps = [ "//zircon/tools/zbi" ]
