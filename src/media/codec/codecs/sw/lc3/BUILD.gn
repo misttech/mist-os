@@ -21,6 +21,9 @@ executable("codec_runner_sw_lc3") {
   ]
 
   sources = [
+    "codec_adapter_lc3.h",
+    "codec_adapter_lc3_decoder.cc",
+    "codec_adapter_lc3_decoder.h",
     "codec_adapter_lc3_encoder.cc",
     "codec_adapter_lc3_encoder.h",
     "main.cc",

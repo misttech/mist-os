@@ -16,15 +16,6 @@
 
 namespace {
 
-constexpr char kLc3MimeType[] = "audio/lc3";
-
-// This is an arbitrary cap for now.
-constexpr uint32_t kInputPerPacketBufferBytesMax = 4 * 1024 * 1024;
-
-// LC3 Specification v1.0 section 2.2 Encoder Interfaces.
-constexpr uint16_t kMinExternalByteCount = 20;
-constexpr uint16_t kMaxExternalByteCount = 400;
-
 bool IsAcceptableSamplingFrequency(const uint32_t freq) {
   // See LC3 specification v1.0 section 2.2 and 2.4 for acceptable sampling
   // frequency values for the uncompressed audio.
@@ -45,7 +36,7 @@ Lc3EncoderParams CreateEncoderParams(const fuchsia::media::FormatDetails& format
   auto& settings = format_details.encoder_settings().lc3();
 
   auto num_channels = static_cast<int>(input_format.channel_map.size());
-  std::vector<Lc3CodecContainer> encoders;
+  std::vector<Lc3CodecContainer<lc3_encoder_t>> encoders;
 
   int frame_us =
       (settings.frame_duration() == fuchsia::media::Lc3FrameDuration::D10_MS) ? 10000 : 7500;
@@ -56,10 +47,17 @@ Lc3EncoderParams CreateEncoderParams(const fuchsia::media::FormatDetails& format
                           ? 48000
                           : static_cast<int>(input_format.frames_per_second);
   encoders.reserve(num_channels);
+  auto encoder_size = lc3_encoder_size(frame_us, sampling_freq);
 
   // Set up an encoder for each channel to account for multi-channeled interleaved audio.
   for (int i = 0; i < num_channels; ++i) {
-    encoders.emplace_back(frame_us, sampling_freq);
+    encoders.emplace_back(
+        [&frame_us, &sampling_freq](void* mem) {
+          // Sets up and returns the pointer to the encoder struct. The pointer has the same value
+          // as `mem`.
+          return lc3_setup_encoder(frame_us, sampling_freq, 0, mem);
+        },
+        encoder_size);
   }
 
   return Lc3EncoderParams{

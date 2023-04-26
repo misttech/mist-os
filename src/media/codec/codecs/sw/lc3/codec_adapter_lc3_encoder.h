@@ -12,36 +12,12 @@
 #include <memory>
 #include <vector>
 
+#include "codec_adapter_lc3.h"
 #include "codec_adapter_sw_impl.h"
-
-class Lc3CodecContainer {
- public:
-  explicit Lc3CodecContainer(int frame_us, int freq_hz)
-      : mem_(std::make_unique<uint8_t[]>(lc3_encoder_size(frame_us, freq_hz))) {
-    // Sets up and returns the pointer to the encoder struct. The pointer has the same value
-    // as `mem`.
-    encoder_ = lc3_setup_encoder(frame_us, freq_hz, 0, mem_.get());
-  }
-
-  lc3_encoder_t GetCodec() { return encoder_; }
-
-  // move-only, no copy
-  Lc3CodecContainer(const Lc3CodecContainer&) = delete;
-  Lc3CodecContainer& operator=(const Lc3CodecContainer&) = delete;
-  Lc3CodecContainer(Lc3CodecContainer&&) = default;
-  Lc3CodecContainer& operator=(Lc3CodecContainer&&) = default;
-
- private:
-  // Processes encoding for one audio channel.
-  // It is the same value as `mem_.data()`. When `mem_` goes out of scope, `encoder_` is also
-  // freed, so we don't need to free it explicitly.
-  lc3_encoder_t encoder_;
-  std::unique_ptr<uint8_t[]> mem_;
-};
 
 // See LC3 Specifications v1.0 section 2.2 Encoder Interfaces.
 struct Lc3EncoderParams {
-  std::vector<Lc3CodecContainer> encoders;
+  std::vector<Lc3CodecContainer<lc3_encoder_t>> encoders;
 
   const int num_channels;
   // Frame duration in microseconds.
