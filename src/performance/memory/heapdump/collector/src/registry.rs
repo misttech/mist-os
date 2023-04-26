@@ -47,25 +47,29 @@ impl Registry {
     ) -> Result<(), anyhow::Error> {
         while let Some(request) = stream.next().await.transpose()? {
             match request {
-                fheapdump_client::CollectorRequest::TakeLiveSnapshot {
-                    process_selector,
-                    responder,
-                } => {
+                fheapdump_client::CollectorRequest::TakeLiveSnapshot { payload, responder } => {
+                    let process_selector = payload.process_selector;
+                    let with_contents = payload.with_contents.unwrap_or(false);
+
                     let process = match process_selector {
-                        fheapdump_client::ProcessSelector::ByName(name) => {
+                        Some(fheapdump_client::ProcessSelector::ByName(name)) => {
                             self.find_process_by_name(&name).await
                         }
-                        fheapdump_client::ProcessSelector::ByKoid(koid) => {
+                        Some(fheapdump_client::ProcessSelector::ByKoid(koid)) => {
                             self.find_process_by_koid(&Koid::from_raw(koid)).await
                         }
-                        fheapdump_client::ProcessSelectorUnknown!() => {
+                        Some(process_selector @ fheapdump_client::ProcessSelectorUnknown!()) => {
                             warn!(ordinal = process_selector.ordinal(), "Unknown process selector");
+                            Err(CollectorError::ProcessSelectorUnsupported)
+                        }
+                        None => {
+                            warn!("Missing process selector");
                             Err(CollectorError::ProcessSelectorUnsupported)
                         }
                     };
 
                     match process {
-                        Ok(process) => match process.take_live_snapshot() {
+                        Ok(process) => match process.take_live_snapshot(with_contents) {
                             Ok(snapshot) => {
                                 let (proxy, stream) =
                                     create_proxy::<fheapdump_client::SnapshotReceiverMarker>()
@@ -154,6 +158,7 @@ impl Registry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
@@ -231,17 +236,22 @@ mod tests {
             exit_signal.await?
         }
 
-        fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error> {
+        fn take_live_snapshot(
+            &self,
+            with_contents: bool,
+        ) -> Result<Box<dyn Snapshot>, anyhow::Error> {
             // Either pretend success or failure, depending on the `live_snapshot_succeeds` flag.
             if self.live_snapshot_succeeds {
-                Ok(Box::new(FakeSnapshot {}))
+                Ok(Box::new(FakeSnapshot { with_contents }))
             } else {
                 Err(anyhow::anyhow!("Live snapshot failed"))
             }
         }
     }
 
-    struct FakeSnapshot;
+    struct FakeSnapshot {
+        with_contents: bool,
+    }
 
     // A FakeSnapshot contains a single allocation with these values:
     const FAKE_ALLOCATION_ADDRESS: u64 = 1234;
@@ -249,6 +259,7 @@ mod tests {
     const FAKE_ALLOCATION_STACK_TRACE: [u64; 6] = [11111, 22222, 33333, 22222, 44444, 55555];
     const FAKE_ALLOCATION_STACK_TRACE_KEY: u64 = 9876;
     const FAKE_ALLOCATION_TIMESTAMP: i64 = 123456789;
+    const FAKE_ALLOCATION_CONTENTS: [u8; FAKE_ALLOCATION_SIZE as usize] = *b"foobar!!";
 
     #[async_trait]
     impl Snapshot for FakeSnapshot {
@@ -275,6 +286,20 @@ mod tests {
             );
             fut.await?;
 
+            if self.with_contents {
+                let fut = dest.batch(
+                    &mut [fheapdump_client::SnapshotElement::BlockContents(
+                        fheapdump_client::BlockContents {
+                            address: Some(FAKE_ALLOCATION_ADDRESS),
+                            contents: Some(FAKE_ALLOCATION_CONTENTS.to_vec()),
+                            ..fheapdump_client::BlockContents::EMPTY
+                        },
+                    )]
+                    .iter_mut(),
+                );
+                fut.await?;
+            }
+
             let fut = dest.batch(&mut [].iter_mut());
             fut.await?;
 
@@ -285,7 +310,10 @@ mod tests {
     impl FakeSnapshot {
         /// Receives a Snapshot from a SnapshotReceiver channel and asserts that it matches the
         /// output of `write_to`.
-        async fn receive_and_assert_match(src: fheapdump_client::SnapshotReceiverRequestStream) {
+        async fn receive_and_assert_match(
+            src: fheapdump_client::SnapshotReceiverRequestStream,
+            expect_contents: bool,
+        ) {
             let mut received_snapshot =
                 heapdump_snapshot::Snapshot::receive_from(src).await.unwrap();
 
@@ -294,7 +322,14 @@ mod tests {
             assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
             assert_eq!(allocation.stack_trace.program_addresses, FAKE_ALLOCATION_STACK_TRACE);
             assert_eq!(allocation.timestamp, FAKE_ALLOCATION_TIMESTAMP);
-
+            if expect_contents {
+                assert_eq!(
+                    allocation.contents.expect("contents must be set"),
+                    FAKE_ALLOCATION_CONTENTS
+                );
+            } else {
+                assert_matches!(allocation.contents, None);
+            }
             assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         }
     }
@@ -356,21 +391,28 @@ mod tests {
         assert!(ex.run_until_stalled(&mut serve1_fut).is_pending());
     }
 
-    #[test_case(fheapdump_client::ProcessSelector::ByKoid(3),
-        None ; "valid koid, snapshot succeeds")]
-    #[test_case(fheapdump_client::ProcessSelector::ByName("foo".to_string()),
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByKoid(3)), None,
+        None ; "valid koid implicitly without contents, snapshot succeeds")]
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByKoid(3)), Some(false),
+        None ; "valid koid explicitly without contents, snapshot succeeds")]
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByKoid(3)), Some(true),
+        None ; "valid koid with contents, snapshot succeeds")]
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByName("foo".to_string())), None,
         Some(CollectorError::LiveSnapshotFailed) ; "valid name, snapshot fails")]
-    #[test_case(fheapdump_client::ProcessSelector::ByName("bar".to_string()),
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByName("bar".to_string())), None,
         Some(CollectorError::ProcessSelectorAmbiguous) ; "ambiguous name")]
-    #[test_case(fheapdump_client::ProcessSelector::ByName("baz".to_string()),
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByName("baz".to_string())), None,
         Some(CollectorError::ProcessSelectorNoMatch) ; "no matching name")]
-    #[test_case(fheapdump_client::ProcessSelector::ByKoid(2),
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByKoid(2)), None,
         Some(CollectorError::LiveSnapshotFailed) ; "valid koid, snapshot fails")]
-    #[test_case(fheapdump_client::ProcessSelector::ByKoid(99),
+    #[test_case(Some(fheapdump_client::ProcessSelector::ByKoid(99)), None,
         Some(CollectorError::ProcessSelectorNoMatch) ; "no matching koid")]
+    #[test_case(None, None,
+        Some(CollectorError::ProcessSelectorUnsupported) ; "missing process selector")]
     #[fasync::run_singlethreaded(test)]
     async fn test_take_live_snapshot(
-        mut process_selector: fheapdump_client::ProcessSelector,
+        process_selector: Option<fheapdump_client::ProcessSelector>,
+        with_contents: Option<bool>,
         expect_error: Option<CollectorError>,
     ) {
         // Create three FakeProcess instances, two of which with the same name.
@@ -384,15 +426,21 @@ mod tests {
         let (_registry, proxy) = create_registry_and_proxy([process1, process2, process3]);
 
         // Execute the request.
-        let result =
-            proxy.take_live_snapshot(&mut process_selector).await.expect("FIDL channel error");
+        let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
+            process_selector,
+            with_contents,
+            ..fheapdump_client::CollectorTakeLiveSnapshotRequest::EMPTY
+        };
+        let result = proxy.take_live_snapshot(request).await.expect("FIDL channel error");
 
         // Verify that the result matches our expectation (either success or a specific error).
         if let Some(expect_error) = expect_error {
             assert_eq!(result.expect_err("request should fail"), expect_error);
         } else {
             let result = result.expect("request should succeed");
-            FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap()).await;
+            let expect_contents = with_contents == Some(true);
+            FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap(), expect_contents)
+                .await;
         }
     }
 }

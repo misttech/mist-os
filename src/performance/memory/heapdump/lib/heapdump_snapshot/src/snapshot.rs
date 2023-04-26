@@ -19,7 +19,7 @@ pub struct Snapshot {
     pub executable_regions: HashMap<u64, ExecutableRegion>,
 }
 
-/// Information about an allocated memory block.
+/// Information about an allocated memory block and, optionally, its contents.
 #[derive(Debug)]
 pub struct Allocation {
     /// Block size, in bytes.
@@ -30,6 +30,9 @@ pub struct Allocation {
 
     /// Allocation timestamp, in nanoseconds.
     pub timestamp: i64,
+
+    /// Memory dump of this block's contents.
+    pub contents: Option<Vec<u8>>,
 }
 
 /// A stack trace.
@@ -83,6 +86,7 @@ impl Snapshot {
         let mut allocations: HashMap<u64, (u64, u64, i64)> = HashMap::new();
         let mut stack_traces: HashMap<u64, Vec<u64>> = HashMap::new();
         let mut executable_regions: HashMap<u64, ExecutableRegion> = HashMap::new();
+        let mut contents: HashMap<u64, Vec<u8>> = HashMap::new();
 
         while let Some(fheapdump_client::SnapshotReceiverRequest::Batch {
             batch, responder, ..
@@ -132,6 +136,11 @@ impl Snapshot {
                                 });
                             }
                         }
+                        fheapdump_client::SnapshotElement::BlockContents(block_contents) => {
+                            let address = read_field!(block_contents => BlockContents, address)?;
+                            let mut chunk = read_field!(block_contents => BlockContents, contents)?;
+                            contents.entry(address).or_default().append(&mut chunk);
+                        }
                         _ => return Err(Error::UnexpectedElementType),
                     }
                 }
@@ -150,7 +159,14 @@ impl Snapshot {
                         .get(&stack_trace_key)
                         .ok_or(Error::InvalidCrossReference { element_type: "StackTrace" })?
                         .clone();
-                    final_allocations.insert(address, Allocation { size, stack_trace, timestamp });
+                    let contents = match contents.remove(&address) {
+                        Some(data) if data.len() as u64 != size => {
+                            return Err(Error::ConflictingElement { element_type: "BlockContents" })
+                        }
+                        other => other,
+                    };
+                    final_allocations
+                        .insert(address, Allocation { size, stack_trace, timestamp, contents });
                 }
 
                 return Ok(Snapshot { allocations: final_allocations, executable_regions });
@@ -173,6 +189,7 @@ mod tests {
     const FAKE_ALLOCATION_1_ADDRESS: u64 = 1234;
     const FAKE_ALLOCATION_1_SIZE: u64 = 8;
     const FAKE_ALLOCATION_1_TIMESTAMP: i64 = 888888888;
+    const FAKE_ALLOCATION_1_CONTENTS: [u8; FAKE_ALLOCATION_1_SIZE as usize] = *b"12345678";
     const FAKE_ALLOCATION_2_ADDRESS: u64 = 5678;
     const FAKE_ALLOCATION_2_SIZE: u64 = 4;
     const FAKE_ALLOCATION_2_TIMESTAMP: i64 = -777777777; // test negative value too
@@ -211,10 +228,15 @@ mod tests {
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
-        // Send a batch containing two allocations - whose stack traces can either be listed before
-        // or after the allocation(s) that reference them - and two executable regions.
+        // Send a batch containing two allocations - whose stack traces and contents can be listed
+        // before or after the allocation(s) that reference them - and two executable regions.
         let fut = receiver_proxy.batch(
             &mut [
+                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
+                    ..fheapdump_client::BlockContents::EMPTY
+                }),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
                     fheapdump_client::ExecutableRegion {
                         address: Some(FAKE_REGION_1_ADDRESS),
@@ -276,10 +298,12 @@ mod tests {
         assert_eq!(allocation1.size, FAKE_ALLOCATION_1_SIZE);
         assert_eq!(allocation1.stack_trace.program_addresses, FAKE_STACK_TRACE_2_ADDRESSES);
         assert_eq!(allocation1.timestamp, FAKE_ALLOCATION_1_TIMESTAMP);
+        assert_eq!(allocation1.contents.expect("contents must be set"), FAKE_ALLOCATION_1_CONTENTS);
         let allocation2 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_2_ADDRESS).unwrap();
         assert_eq!(allocation2.size, FAKE_ALLOCATION_2_SIZE);
         assert_eq!(allocation2.stack_trace.program_addresses, FAKE_STACK_TRACE_1_ADDRESSES);
         assert_eq!(allocation2.timestamp, FAKE_ALLOCATION_2_TIMESTAMP);
+        assert_matches!(allocation2.contents, None, "no contents are sent for this allocation");
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         let region1 = received_snapshot.executable_regions.remove(&FAKE_REGION_1_ADDRESS).unwrap();
         assert_eq!(region1.size, FAKE_REGION_1_SIZE);
@@ -355,6 +379,11 @@ mod tests {
                     program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
                     ..fheapdump_client::StackTrace::EMPTY
                 }),
+                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
+                    ..fheapdump_client::BlockContents::EMPTY
+                }),
             ]
             .iter_mut(),
         );
@@ -370,10 +399,12 @@ mod tests {
         assert_eq!(allocation1.size, FAKE_ALLOCATION_1_SIZE);
         assert_eq!(allocation1.stack_trace.program_addresses, FAKE_STACK_TRACE_2_ADDRESSES);
         assert_eq!(allocation1.timestamp, FAKE_ALLOCATION_1_TIMESTAMP);
+        assert_eq!(allocation1.contents.expect("contents must be set"), FAKE_ALLOCATION_1_CONTENTS);
         let allocation2 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_2_ADDRESS).unwrap();
         assert_eq!(allocation2.size, FAKE_ALLOCATION_2_SIZE);
         assert_eq!(allocation2.stack_trace.program_addresses, FAKE_STACK_TRACE_1_ADDRESSES);
         assert_eq!(allocation2.timestamp, FAKE_ALLOCATION_2_TIMESTAMP);
+        assert_matches!(allocation2.contents, None, "no contents are sent for this allocation");
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         let region1 = received_snapshot.executable_regions.remove(&FAKE_REGION_1_ADDRESS).unwrap();
         assert_eq!(region1.size, FAKE_REGION_1_SIZE);
@@ -518,6 +549,59 @@ mod tests {
         receive_worker.await
     }
 
+    #[test_case(|block_contents| block_contents.address = None => matches
+        Err(Error::MissingField { container: "BlockContents", field: "address" }) ; "address")]
+    #[test_case(|block_contents| block_contents.contents = None => matches
+        Err(Error::MissingField { container: "BlockContents", field: "contents" }) ; "contents")]
+    #[test_case(|_| () /* if we do not set any field to None, the result should be Ok */ => matches
+        Ok(_) ; "success")]
+    #[fasync::run_singlethreaded(test)]
+    async fn test_block_contents_required_fields(
+        set_one_field_to_none: fn(&mut fheapdump_client::BlockContents),
+    ) -> Result<Snapshot, Error> {
+        let (receiver_proxy, receiver_stream) =
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+        let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
+
+        // Start with a BlockContents with all the required fields set.
+        let mut block_contents = fheapdump_client::BlockContents {
+            address: Some(FAKE_ALLOCATION_1_ADDRESS),
+            contents: Some(FAKE_ALLOCATION_1_CONTENTS.to_vec()),
+            ..fheapdump_client::BlockContents::EMPTY
+        };
+
+        // Set one of the fields to None, according to the case being tested.
+        set_one_field_to_none(&mut block_contents);
+
+        // Send it to the SnapshotReceiver along with the allocation it references.
+        let fut = receiver_proxy.batch(
+            &mut [
+                fheapdump_client::SnapshotElement::BlockContents(block_contents),
+                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    size: Some(FAKE_ALLOCATION_1_SIZE),
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                    ..fheapdump_client::Allocation::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                    ..fheapdump_client::StackTrace::EMPTY
+                }),
+            ]
+            .iter_mut(),
+        );
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Send the end of stream marker.
+        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Return the result.
+        receive_worker.await
+    }
+
     #[fasync::run_singlethreaded(test)]
     async fn test_conflicting_allocations() {
         let (receiver_proxy, receiver_stream) =
@@ -610,6 +694,49 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
+    async fn test_block_contents_wrong_size() {
+        let (receiver_proxy, receiver_stream) =
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+        let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
+
+        // Send an allocation whose BlockContents has the wrong size.
+        let contents_with_wrong_size = vec![0; FAKE_ALLOCATION_1_SIZE as usize + 1];
+        let fut = receiver_proxy.batch(
+            &mut [
+                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    size: Some(FAKE_ALLOCATION_1_SIZE),
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                    ..fheapdump_client::Allocation::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    contents: Some(contents_with_wrong_size),
+                    ..fheapdump_client::BlockContents::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                    ..fheapdump_client::StackTrace::EMPTY
+                }),
+            ]
+            .iter_mut(),
+        );
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Send the end of stream marker.
+        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Verify expected error.
+        assert_matches!(
+            receive_worker.await,
+            Err(Error::ConflictingElement { element_type: "BlockContents" })
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
     async fn test_empty_stack_trace() {
         let (receiver_proxy, receiver_stream) =
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
@@ -690,6 +817,105 @@ mod tests {
         let mut received_snapshot = receive_worker.await.unwrap();
         let allocation1 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_1_ADDRESS).unwrap();
         assert_eq!(allocation1.stack_trace.program_addresses, [1111, 2222, 3333]);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_empty_block_contents() {
+        let (receiver_proxy, receiver_stream) =
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+        let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
+
+        // Send a zero-sized allocation and its empty contents.
+        let fut = receiver_proxy.batch(
+            &mut [
+                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    size: Some(0),
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                    ..fheapdump_client::Allocation::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                    ..fheapdump_client::StackTrace::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    contents: Some(vec![]),
+                    ..fheapdump_client::BlockContents::EMPTY
+                }),
+            ]
+            .iter_mut(),
+        );
+        fut.await.unwrap();
+
+        // Send the end of stream marker.
+        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        fut.await.unwrap();
+
+        // Verify that the allocation has been reconstructed correctly.
+        let mut received_snapshot = receive_worker.await.unwrap();
+        let allocation1 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_1_ADDRESS).unwrap();
+        assert_eq!(allocation1.contents.expect("contents must be set"), []);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_chunked_block_contents() {
+        let (receiver_proxy, receiver_stream) =
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+        let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
+
+        // Split the contents in two halves.
+        let (content_first_chunk, contents_second_chunk) =
+            FAKE_ALLOCATION_1_CONTENTS.split_at(FAKE_ALLOCATION_1_CONTENTS.len() / 2);
+
+        // Send an allocation and the first chunk of its contents.
+        let fut = receiver_proxy.batch(
+            &mut [
+                fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    size: Some(FAKE_ALLOCATION_1_SIZE),
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
+                    ..fheapdump_client::Allocation::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                    stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
+                    ..fheapdump_client::StackTrace::EMPTY
+                }),
+                fheapdump_client::SnapshotElement::BlockContents(fheapdump_client::BlockContents {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    contents: Some(content_first_chunk.to_vec()),
+                    ..fheapdump_client::BlockContents::EMPTY
+                }),
+            ]
+            .iter_mut(),
+        );
+        fut.await.unwrap();
+
+        // Send the second chunk.
+        let fut = receiver_proxy.batch(
+            &mut [fheapdump_client::SnapshotElement::BlockContents(
+                fheapdump_client::BlockContents {
+                    address: Some(FAKE_ALLOCATION_1_ADDRESS),
+                    contents: Some(contents_second_chunk.to_vec()),
+                    ..fheapdump_client::BlockContents::EMPTY
+                },
+            )]
+            .iter_mut(),
+        );
+        fut.await.unwrap();
+
+        // Send the end of stream marker.
+        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        fut.await.unwrap();
+
+        // Verify that the allocation's block contents have been reconstructed correctly.
+        let mut received_snapshot = receive_worker.await.unwrap();
+        let allocation1 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_1_ADDRESS).unwrap();
+        assert_eq!(allocation1.contents.expect("contents must be set"), FAKE_ALLOCATION_1_CONTENTS);
     }
 
     #[fasync::run_singlethreaded(test)]

@@ -83,11 +83,26 @@ type ExecutableRegion = table {
     4: build_id BuildId;
 };
 
+/// The contents of an allocated memory block.
+///
+/// In order to avoid exceeding the channel's maximum message size, bigger blocks can be split in
+/// chunks. Receivers should be prepared to handle multiple BlockContents with the same address and
+/// reassemble them by concatenating their payloads. Each block's reassembled size always matches
+/// the size field of the corresponding Allocation.
+type BlockContents = table {
+    /// The address of the corresponding memory block.
+    1: address uint64;
+
+    /// The payload.
+    2: contents vector<byte>:MAX;
+};
+
 /// An element that is part of a snapshot.
 type SnapshotElement = flexible union {
     1: allocation Allocation;
     2: stack_trace StackTrace;
     3: executable_region ExecutableRegion;
+    4: block_contents BlockContents;
 };
 
 /// Protocol to transmit a snapshot as a stream of elements.
@@ -105,8 +120,16 @@ protocol SnapshotReceiver {
 @discoverable
 protocol Collector {
     /// Obtains a snapshot of the current live allocations in an instrumented process.
-    TakeLiveSnapshot(struct {
-        process_selector ProcessSelector;
+    TakeLiveSnapshot(table {
+        /// The instrumented process to operate on.
+        ///
+        /// Required.
+        1: process_selector ProcessSelector;
+
+        /// Whether the snapshot should include the contents of each memory block.
+        ///
+        /// If not set, false is assumed.
+        2: with_contents bool;
     }) -> (resource struct {
         receiver server_end:SnapshotReceiver;
     }) error CollectorError;

@@ -42,6 +42,7 @@ rustc_binary("bin") {
   test_deps = [
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:test-case",
   ]

@@ -20,7 +20,7 @@ pub trait Process: Send + Sync {
     async fn serve_until_exit(&self) -> Result<(), anyhow::Error>;
 
     /// Takes a live snapshot.
-    fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error>;
+    fn take_live_snapshot(&self, with_contents: bool) -> Result<Box<dyn Snapshot>, anyhow::Error>;
 }
 
 impl Debug for dyn Process {

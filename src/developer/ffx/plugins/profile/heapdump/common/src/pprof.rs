@@ -144,11 +144,13 @@ mod tests {
                     size: ALLOC_1_SIZE.try_into().unwrap(),
                     stack_trace: Rc::new(StackTrace { program_addresses: ALLOC_1_STACK.to_vec() }),
                     timestamp: ALLOC_1_TIMESTAMP,
+                    contents: None,
                 },
                 ALLOC_2_ADDRESS => Allocation {
                     size: ALLOC_2_SIZE.try_into().unwrap(),
                     stack_trace: Rc::new(StackTrace { program_addresses: ALLOC_2_STACK.to_vec() }),
                     timestamp: ALLOC_2_TIMESTAMP,
+                    contents: None,
                 },
             ],
             executable_regions: hashmap![

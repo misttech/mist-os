@@ -5,10 +5,21 @@
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use fuchsia_zircon::{
     self as zx,
-    sys::{zx_handle_t, zx_status_t},
+    sys::{zx_handle_t, zx_status_t, zx_vaddr_t},
     AsHandleRef,
 };
 use std::ffi::c_void;
+
+/// Reads the contents of the given process' memory range.
+pub fn read_process_memory(
+    process: &zx::Process,
+    address: u64,
+    num_bytes: u64,
+) -> Result<Vec<u8>, zx::Status> {
+    let mut buf = vec![0; num_bytes.try_into().or(Err(zx::Status::FILE_BIG))?];
+    process.read_memory(address as zx_vaddr_t, &mut buf)?;
+    Ok(buf)
+}
 
 /// Returns the list of the executable regions in a given process' address space.
 pub fn find_executable_regions(

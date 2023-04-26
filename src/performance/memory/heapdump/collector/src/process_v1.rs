@@ -12,10 +12,12 @@ use heapdump_vmo::{
     allocations_table_v1::AllocationsTableReader, resources_table_v1::ResourcesTableReader,
     stack_trace_compression,
 };
-use std::{collections::HashSet, sync::Arc};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use tracing::warn;
 
 use crate::process::{Process, Snapshot};
-use crate::utils::find_executable_regions;
+use crate::utils::{find_executable_regions, read_process_memory};
 
 fn get_process_name(process: &zx::Process) -> Result<String, anyhow::Error> {
     Ok(String::from_utf8_lossy(process.get_name()?.as_bytes()).to_string())
@@ -76,11 +78,41 @@ impl Process for ProcessV1 {
         Ok(())
     }
 
-    fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error> {
+    fn take_live_snapshot(&self, with_contents: bool) -> Result<Box<dyn Snapshot>, anyhow::Error> {
         let size = self.allocations_vmo.get_size()?;
         let snapshot = self.allocations_vmo.create_child(zx::VmoChildOptions::SNAPSHOT, 0, size)?;
+
+        let mut block_contents = HashMap::new();
+        if with_contents {
+            let allocations_table = AllocationsTableReader::new(&snapshot)?;
+            for block in allocations_table.iter() {
+                let block = block?;
+                match read_process_memory(&self.process, block.address, block.size) {
+                    Ok(data) => {
+                        block_contents.insert(block.address, data);
+                    }
+                    Err(error) => {
+                        // Do not fail the whole snapshot if reading a block fails. Some failures
+                        // are unavoidable because we do not freeze the process while reading, and
+                        // it can unmap its memory in the meantime.
+                        warn!(
+                            ?error,
+                            address = format!("{:#x}", block.address).as_str(),
+                            size = block.size,
+                            "Error while reading process memory"
+                        );
+                    }
+                }
+            }
+        }
+
         let executable_regions = find_executable_regions(&self.process)?;
-        Ok(Box::new(SnapshotV1::new(snapshot, self.resources_vmo.clone(), executable_regions)))
+        Ok(Box::new(SnapshotV1::new(
+            snapshot,
+            self.resources_vmo.clone(),
+            executable_regions,
+            block_contents,
+        )))
     }
 }
 
@@ -89,6 +121,7 @@ pub struct SnapshotV1 {
     allocations_vmo: zx::Vmo,
     resources_vmo: Arc<zx::Vmo>,
     executable_regions: Vec<fheapdump_client::ExecutableRegion>,
+    block_contents: HashMap<u64, Vec<u8>>,
 }
 
 impl SnapshotV1 {
@@ -96,8 +129,9 @@ impl SnapshotV1 {
         allocations_vmo: zx::Vmo,
         resources_vmo: Arc<zx::Vmo>,
         executable_regions: Vec<fheapdump_client::ExecutableRegion>,
+        block_contents: HashMap<u64, Vec<u8>>,
     ) -> SnapshotV1 {
-        SnapshotV1 { allocations_vmo, resources_vmo, executable_regions }
+        SnapshotV1 { allocations_vmo, resources_vmo, executable_regions, block_contents }
     }
 }
 
@@ -158,6 +192,22 @@ impl Snapshot for SnapshotV1 {
                 .await?;
         }
 
+        for (block_address, block_data) in &self.block_contents {
+            // Split long payloads in chunks so that they can be paginated.
+            const MAX_DATA_PER_CHUNK: usize = 1024;
+            for chunk in block_data.chunks(MAX_DATA_PER_CHUNK) {
+                streamer = streamer
+                    .push_element(fheapdump_client::SnapshotElement::BlockContents(
+                        fheapdump_client::BlockContents {
+                            address: Some(*block_address),
+                            contents: Some(chunk.to_vec()),
+                            ..fheapdump_client::BlockContents::EMPTY
+                        },
+                    ))
+                    .await?;
+            }
+        }
+
         Ok(streamer.end_of_stream().await?)
     }
 }
@@ -165,6 +215,7 @@ impl Snapshot for SnapshotV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
     use futures::pin_mut;
@@ -174,6 +225,8 @@ mod tests {
     };
     use itertools::{assert_equal, Itertools};
     use std::collections::HashMap;
+    use std::pin::Pin;
+    use test_case::test_case;
 
     use crate::registry::Registry;
 
@@ -181,7 +234,8 @@ mod tests {
     /// registry.
     ///
     /// By reusing the current process, instead of creating a new one, we avoid requiring the
-    /// ZX_POL_NEW_PROCESS capability.
+    /// ZX_POL_NEW_PROCESS capability and we can easily control the contents of the "fake" process'
+    /// memory.
     fn setup_fake_process_from_self() -> (
         fheapdump_process::RegistryRequestStream,
         fheapdump_process::SnapshotSinkV1Proxy,
@@ -275,8 +329,14 @@ mod tests {
         (0..NUM_FRAMES as u64).collect()
     }
 
-    #[test]
-    fn test_take_live_snapshot() {
+    // Generate a very long contents blob to verify that the pagination mechanism works.
+    fn generate_fake_long_contents() -> Box<[u8]> {
+        b"foobar".repeat(100000).into_boxed_slice()
+    }
+
+    #[test_case(false ; "without contents")]
+    #[test_case(true ; "with contents")]
+    fn test_take_live_snapshot(with_contents: bool) {
         let mut ex = fasync::TestExecutor::new();
         let registry = std::rc::Rc::new(Registry::new());
 
@@ -290,7 +350,7 @@ mod tests {
         assert!(ex.run_until_stalled(&mut serve_fut).is_pending());
 
         // Record an allocation.
-        let foobar = Box::pin(b"foobar");
+        let foobar = Pin::new(generate_fake_long_contents());
         let foobar_address = foobar.as_ptr() as u64;
         let foobar_size = foobar.len() as u64;
         let foobar_stack_trace = generate_fake_long_stack_trace();
@@ -315,7 +375,7 @@ mod tests {
                 fasync::Task::local(heapdump_snapshot::Snapshot::receive_from(receiver_stream));
 
             let process = registry.get_process(&koid).await.unwrap();
-            let snapshot = process.take_live_snapshot().unwrap();
+            let snapshot = process.take_live_snapshot(with_contents).unwrap();
             snapshot.write_to(receiver_proxy).await.expect("failed to write snapshot");
 
             receive_worker.await.expect("failed to receive snapshot")
@@ -326,7 +386,13 @@ mod tests {
         assert_eq!(foobar_allocation.size, foobar_size);
         assert_eq!(foobar_allocation.stack_trace.program_addresses, foobar_stack_trace);
         assert_eq!(foobar_allocation.timestamp, foobar_timestamp);
-
+        if with_contents {
+            // Verify that it has the expected contents.
+            assert_eq!(foobar_allocation.contents.expect("contents must be set"), *foobar);
+        } else {
+            // Verify that it has no contents.
+            assert_matches!(foobar_allocation.contents, None);
+        }
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
 
         // Verify that it contains the expected executable regions.
