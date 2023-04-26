@@ -5885,6 +5885,9 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  // We might end up removing / clipping zero intervals, so update the generation count.
+  IncrementHierarchyGenerationCountLocked();
+
   const uint64_t start_offset = offset;
   const uint64_t end_offset = offset + len;
 
