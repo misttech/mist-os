@@ -100,11 +100,9 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
 
   bool IsReady() const { return wait_fence_ == nullptr; }
 
-  bool HasSameConfig(const image_t& config) const {
-    return info_.width == config.width && info_.height == config.height &&
-           info_.pixel_format == config.pixel_format && info_.type == config.type;
-  }
-  bool HasSameConfig(const Image& other) const { return HasSameConfig(other.info_); }
+  // True iff the image has the same display properties as the `layer_config`,
+  // which are properties of all images that the corresponding Layer can accept.
+  bool HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const;
 
   const zx::vmo& vmo() { return vmo_; }
 

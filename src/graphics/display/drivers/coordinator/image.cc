@@ -51,7 +51,6 @@ void Image::InitializeInspect(inspect::Node* parent_node) {
   node_.CreateBool("capture_image", capture_image_, &properties_);
   node_.CreateUint("width", info_.width, &properties_);
   node_.CreateUint("height", info_.height, &properties_);
-  node_.CreateUint("pixel_format", info_.pixel_format, &properties_);
   node_.CreateUint("type", info_.type, &properties_);
   presenting_property_ = node_.CreateBool("presenting", false);
   retiring_property_ = node_.CreateBool("retiring", false);
@@ -162,6 +161,27 @@ void Image::ResetFences() {
   wait_fence_ = nullptr;
   armed_retire_fence_ = nullptr;
   retire_fence_ = nullptr;
+}
+
+bool Image::HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const {
+  // TODO(fxbug.dev/126156): Currently this function only compares size and
+  // usage type between current Image and a given Layer's accepted
+  // configuration.
+  //
+  // We don't set the pixel format a Layer can accept, and we don't compare the
+  // Image's pixel format against any accepted pixel format, assuming that all
+  // image buffers allocated by sysmem can always be used for scanout in any
+  // Layer. Currently, this assumption works for all our existing display engine
+  // drivers. However, switching pixel formats in a Layer may cause performance
+  // reduction, or might be not supported by new display engines / new display
+  // formats.
+  //
+  // We should figure out a mechanism to indicate pixel format / modifiers
+  // support for a Layer's image configuration (as opposed of using image_t),
+  // and compare this Image's sysmem buffer collection information against the
+  // Layer's format support.
+  return info_.width == layer_config.width && info_.height == layer_config.height &&
+         info_.type == layer_config.type;
 }
 
 }  // namespace display

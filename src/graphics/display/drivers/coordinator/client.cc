@@ -96,7 +96,9 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
   image_t dc_image = {};
   dc_image.height = request->image_config.height;
   dc_image.width = request->image_config.width;
-  dc_image.pixel_format = request->image_config.pixel_format;
+  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
+  // the `pixel_format` field is deleted.
+  dc_image.pixel_format = ZX_PIXEL_FORMAT_NONE;
   dc_image.type = request->image_config.type;
 
   zx_status_t status = controller_->dc()->ImportImage(
@@ -204,7 +206,9 @@ void Client::SetBufferCollectionConstraints(
   image_t dc_image;
   dc_image.height = request->config.height;
   dc_image.width = request->config.width;
-  dc_image.pixel_format = request->config.pixel_format;
+  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
+  // the `pixel_format` field is deleted.
+  dc_image.pixel_format = ZX_PIXEL_FORMAT_NONE;
   dc_image.type = request->config.type;
 
   zx_status_t status = ZX_ERR_INTERNAL;
@@ -515,7 +519,12 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
   const image_t* cur_image = layer->pending_image();
-  if (!image->HasSameConfig(*cur_image)) {
+  // TODO(fxbug.dev/126156): Warning: Currently we only compare size and usage
+  // type between `image` and `layer`. This implicitly assume that images can
+  // be applied to any layer as long as the format is negotiated by sysmem,
+  // which may not be true in the future. We should figure out a way to better
+  // indicate pixel format support of a Layer in display Controller API.
+  if (!image->HasSameDisplayPropertiesAsLayer(*cur_image)) {
     zxlogf(ERROR, "SetLayerImage with mismatch layer config");
     if (image.IsValid()) {
       image->DiscardAcquire();
@@ -903,25 +912,15 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
         };
         invalid = (!frame_contains(image_frame, layer->src_frame) ||
                    !frame_contains(display_frame, layer->dest_frame));
-
-        if (!invalid) {
-          invalid = true;
-          for (auto fmt : display_config.pixel_formats_) {
-            if (fmt == layer->image.pixel_format) {
-              invalid = false;
-              break;
-            }
-          }
-        }
+        // The formats of layer images are negotiated by sysmem between clients
+        // and display engine drivers when being imported, so they are always
+        // accepted by the display coordinator.
       } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_CURSOR) {
-        invalid = true;
-        auto& cursor_cfg = layer_node.layer->pending_layer_.cfg.cursor;
-        for (auto& cursor_info : display_config.cursor_infos_) {
-          if (cursor_info.format == cursor_cfg.image.pixel_format) {
-            invalid = false;
-            break;
-          }
-        }
+        // TODO(fxbug.dev/126123): Currently we don't check the pixel formats,
+        // nor sizes of the imported image. These should be done when we import
+        // cursor images to the display driver, and the clients should only use
+        // images imported for cursor use on cursor layers.
+        invalid = false;
       } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_COLOR) {
         // There aren't any API constraints on valid colors.
         layer_node.layer->pending_layer_.cfg.color.color_list =

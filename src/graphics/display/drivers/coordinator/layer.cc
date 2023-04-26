@@ -31,15 +31,9 @@ static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedLi
 }
 
 static void populate_image(const fhd::wire::ImageConfig& image, image_t* image_out) {
-  static_assert(offsetof(image_t, width) == offsetof(fhd::wire::ImageConfig, width),
-                "Struct mismatch");
-  static_assert(offsetof(image_t, height) == offsetof(fhd::wire::ImageConfig, height),
-                "Struct mismatch");
-  static_assert(offsetof(image_t, pixel_format) == offsetof(fhd::wire::ImageConfig, pixel_format),
-                "Struct mismatch");
-  static_assert(offsetof(image_t, type) == offsetof(fhd::wire::ImageConfig, type),
-                "Struct mismatch");
-  memcpy(image_out, &image, sizeof(fhd::wire::ImageConfig));
+  image_out->width = image.width;
+  image_out->height = image.height;
+  image_out->type = image.type;
 }
 
 }  // namespace

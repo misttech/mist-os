@@ -50,7 +50,9 @@ TEST_F(ImageTest, MultipleAcquiresAllowed) {
   image_t info = {};
   info.width = 1024;
   info.height = 600;
-  info.pixel_format = ZX_PIXEL_FORMAT_RGB_x888;
+  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
+  // the `pixel_format` field is deleted.
+  info.pixel_format = ZX_PIXEL_FORMAT_NONE;
   auto image = ImportImage(std::move(vmo), info);
 
   EXPECT_TRUE(image->Acquire());
@@ -67,7 +69,9 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   image_t info = {};
   info.width = 1024;
   info.height = 600;
-  info.pixel_format = ZX_PIXEL_FORMAT_RGB_x888;
+  // TODO(fxbug.dev/126113): This field is unused in drivers. Remove this once
+  // the `pixel_format` field is deleted.
+  info.pixel_format = ZX_PIXEL_FORMAT_NONE;
   info.type = 0;
   auto image = ImportImage(std::move(vmo), info);
   auto image_cleanup = fit::defer([image]() {
