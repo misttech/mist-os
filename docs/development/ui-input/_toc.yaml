@@ -11,5 +11,7 @@ toc:
   path: /docs/development/ui-input/flatland_scene_dump.md
 - title: "Tracing input events"
   path: /docs/development/ui-input/tracing.md
+- title: "Life of a touch event"
+  path: /docs/development/ui-input/life_of_a_touch_event.md
 - title: "Magnification"
   path: /docs/development/ui-input/magnification.md
