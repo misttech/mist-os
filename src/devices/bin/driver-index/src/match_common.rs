@@ -5,7 +5,7 @@
 use {
     crate::resolved_driver::ResolvedDriver,
     bind::compiler::Symbol,
-    bind::ddk_bind_constants::BIND_PROTOCOL,
+    bind::ddk_bind_constants::{BIND_AUTOBIND, BIND_PROTOCOL},
     bind::interpreter::decode_bind_rules::DecodedCompositeBindRules,
     bind::interpreter::match_bind::{DeviceProperties, PropertyKey},
     fidl_fuchsia_driver_framework as fdf,
@@ -13,6 +13,7 @@ use {
 };
 
 const BIND_PROTOCOL_KEY: PropertyKey = PropertyKey::NumberKey(BIND_PROTOCOL as u64);
+const BIND_AUTOBIND_KEY: PropertyKey = PropertyKey::NumberKey(BIND_AUTOBIND as u64);
 
 pub fn node_to_device_property(
     node_properties: &Vec<fdf::NodeProperty>,
@@ -62,6 +63,17 @@ pub fn node_to_device_property(
     }
 
     Ok(device_properties)
+}
+
+pub fn node_to_device_property_no_autobind(
+    node_properties: &Vec<fdf::NodeProperty>,
+) -> Result<DeviceProperties, zx_status_t> {
+    let mut properties = node_to_device_property(node_properties)?;
+    if properties.contains_key(&BIND_AUTOBIND_KEY) {
+        properties.remove(&BIND_AUTOBIND_KEY);
+    }
+    properties.insert(BIND_AUTOBIND_KEY, Symbol::NumberValue(0));
+    Ok(properties)
 }
 
 pub fn get_composite_rules_from_composite_driver<'a>(
@@ -158,5 +170,30 @@ mod tests {
             Symbol::NumberValue(10),
         );
         assert_eq!(Ok(expected_properties), node_to_device_property(&node_properties));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_no_autobind() {
+        let node_properties = vec![fdf::NodeProperty {
+            key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+            value: fdf::NodePropertyValue::IntValue(200),
+        }];
+
+        let mut expected_properties = DeviceProperties::new();
+        expected_properties.insert(BIND_PROTOCOL_KEY, Symbol::NumberValue(200));
+        expected_properties.insert(BIND_AUTOBIND_KEY, Symbol::NumberValue(0));
+        assert_eq!(Ok(expected_properties), node_to_device_property_no_autobind(&node_properties));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_no_autobind_override() {
+        let node_properties = vec![fdf::NodeProperty {
+            key: fdf::NodePropertyKey::IntValue(BIND_AUTOBIND.into()),
+            value: fdf::NodePropertyValue::IntValue(1),
+        }];
+
+        let mut expected_properties = DeviceProperties::new();
+        expected_properties.insert(BIND_AUTOBIND_KEY, Symbol::NumberValue(0));
+        assert_eq!(Ok(expected_properties), node_to_device_property_no_autobind(&node_properties));
     }
 }

@@ -258,6 +258,9 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
   fidl::Arena allocator;
   auto args = fdi::wire::MatchDriverArgs::Builder(allocator);
   args.properties(std::move(props));
+  if (!config.driver_url_suffix.empty()) {
+    args.driver_url_suffix(config.driver_url_suffix);
+  }
 
   auto result = driver_index_.sync()->MatchDriversV1(args.Build());
   if (!result.ok()) {

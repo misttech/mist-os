@@ -68,6 +68,11 @@ class NodeManager {
   // track the results.
   virtual void Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) = 0;
 
+  virtual void BindToUrl(Node& node, std::string_view driver_url_suffix,
+                         std::shared_ptr<BindResultTracker> result_tracker) {
+    ZX_PANIC("Unimplemented BindToUrl");
+  }
+
   virtual zx::result<> StartDriver(Node& node, std::string_view url,
                                    fuchsia_driver_index::DriverPackageType package_type) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -124,8 +129,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       std::vector<std::string> parents_names,
       std::vector<fuchsia_driver_framework::wire::NodeProperty> properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, uint32_t primary_index = 0);
-
-  fuchsia_driver_index::wire::MatchDriverArgs CreateMatchArgs(fidl::AnyArena& arena);
 
   void OnBind() const;
 

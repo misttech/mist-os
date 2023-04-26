@@ -436,14 +436,6 @@ std::string Node::MakeComponentMoniker() const {
   return topo_path;
 }
 
-fuchsia_driver_index::wire::MatchDriverArgs Node::CreateMatchArgs(fidl::AnyArena& arena) {
-  return fuchsia_driver_index::wire::MatchDriverArgs::Builder(arena)
-      .name(arena, name())
-      .properties(
-          fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(properties_))
-      .Build();
-}
-
 void Node::OnBind() const {
   if (controller_ref_) {
     fidl::Status result = fidl::WireSendEvent(*controller_ref_)->OnBind();
@@ -885,7 +877,7 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
           CompleteBind(zx::error(ZX_ERR_BAD_STATE));
         }
       });
-  node_manager_.value()->Bind(*this, std::move(tracker));
+  node_manager_.value()->BindToUrl(*this, driver_url_suffix, std::move(tracker));
 }
 
 void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {

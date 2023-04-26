@@ -109,6 +109,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   struct BindRequest {
     std::weak_ptr<Node> node;
+    std::string driver_url_suffix;
     std::shared_ptr<BindResultTracker> tracker;
   };
 
@@ -117,6 +118,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // A nullptr for result_tracker is acceptable if the caller doesn't intend to
   // track the results.
   void Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) override;
+  void BindToUrl(Node& node, std::string_view driver_url_suffix,
+                 std::shared_ptr<BindResultTracker> result_tracker) override;
   void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) override;
 
   zx::result<DriverHost*> CreateDriverHost() override;

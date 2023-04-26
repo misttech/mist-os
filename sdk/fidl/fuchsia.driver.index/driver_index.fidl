@@ -100,6 +100,10 @@ type MatchDriverArgs = table {
 
     /// The name of the node to be matched. Used for debugging purposes.
     2: name fuchsia.driver.framework.NodeName;
+
+    // If this is present, only drivers with URLs that end with this suffix will be checked for
+    // binding.
+    3: driver_url_suffix string:MAX;
 };
 
 /// Protocol through which the driver index can be queried.

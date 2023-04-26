@@ -405,8 +405,14 @@ void DriverRunner::DestroyDriverComponent(dfv2::Node& node,
 }
 
 void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) {
+  BindToUrl(node, {}, std::move(result_tracker));
+}
+
+void DriverRunner::BindToUrl(Node& node, std::string_view driver_url_suffix,
+                             std::shared_ptr<BindResultTracker> result_tracker) {
   BindRequest request = {
       .node = node.weak_from_this(),
+      .driver_url_suffix = std::string(driver_url_suffix),
       .tracker = result_tracker,
   };
   if (bind_orphan_ongoing_) {
@@ -461,14 +467,21 @@ void DriverRunner::BindInternal(BindRequest request,
     return;
   }
 
+  std::string driver_url_suffix = request.driver_url_suffix;
   auto match_callback =
       [this, request = std::move(request),
        match_complete_callback = std::move(match_complete_callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result) mutable {
         OnMatchDriverCallback(std::move(request), result, std::move(match_complete_callback));
       };
-  fidl::Arena<> arena;
-  driver_index_->MatchDriver(node->CreateMatchArgs(arena)).Then(std::move(match_callback));
+  fidl::Arena arena;
+  auto builder = fuchsia_driver_index::wire::MatchDriverArgs::Builder(arena)
+                     .name(node->name())
+                     .properties(node->properties());
+  if (!driver_url_suffix.empty()) {
+    builder.driver_url_suffix(driver_url_suffix);
+  }
+  driver_index_->MatchDriver(builder.Build()).Then(std::move(match_callback));
 }
 
 void DriverRunner::OnMatchDriverCallback(
