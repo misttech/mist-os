@@ -18,4 +18,10 @@
 #undef _LIBCPP_MSVCRT
 #undef _LIBCPP_HAS_OPEN_WITH_WCHAR
 
+// This prevents libc++ from doing fallback to spin locks and the like for
+// cases where is_always_lock_free is not true.  In the kernel, we don't want
+// any behind-the-scenes help like that, we want to get link errors from
+// libcalls if atomics can't be lowered to real hardware instructions.
+#undef _LIBCPP_ATOMIC_ONLY_USE_BUILTINS
+
 #endif  // ZIRCON_KERNEL_LIB_KTL_INCLUDE___CONFIG_

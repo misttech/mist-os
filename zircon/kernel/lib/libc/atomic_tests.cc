@@ -10,8 +10,16 @@
 
 #include <ktl/enforce.h>
 
-// Verify that 16b atomics are unconditionally supported, regardless of compiler intrinsic support.
+// Verify that 16-byte atomics are unconditionally supported, regardless of
+// compiler intrinsic support. But on RISC-V they are not available at all.
 // See atomic.cc for details on 'polyfills'.
+
+#ifndef HAVE_ATOMIC_128
+#error "<ktl/atomic.h> should define HAVE_ATOMIC_128 to 0 or 1"
+#endif
+
+#if HAVE_ATOMIC_128
+
 namespace {
 
 constexpr unsigned __int128 kValue =
@@ -69,14 +77,6 @@ bool CompareExchange16Test() {
   END_TEST;
 }
 
-#ifdef __riscv  // TODO(mcgrathr): unresolved plan for riscv, no atomics > 64
-#define HAVE_ATOMIC_128 0
-#else
-#define HAVE_ATOMIC_128 1
-#endif
-
-#if HAVE_ATOMIC_128
-
 // Most of atomic_ref's tests are in stdcompat, along the rest of the polyfill
 // library.  We test __int128 specifically in the kernel unit tests, since
 // __int128 is unconditionally available in the kernel environment.
@@ -108,15 +108,13 @@ bool KtlAtomicRef128Test() {
   END_TEST;
 }
 
-#endif  // HAVE_ATOMIC_128
-
 }  // namespace
 
 UNITTEST_START_TESTCASE(libc_atomic_tests)
 UNITTEST("load_16", Load16Test)
 UNITTEST("store_16", Store16Test)
 UNITTEST("compare_exchange_16", CompareExchange16Test)
-#if HAVE_ATOMIC_128
 UNITTEST("ktl::atomic_ref_128", KtlAtomicRef128Test)
-#endif
 UNITTEST_END_TESTCASE(libc_atomic_tests, "atomic", "atomic operations test")
+
+#endif  // HAVE_ATOMIC_128

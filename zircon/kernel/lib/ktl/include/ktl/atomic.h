@@ -11,6 +11,14 @@
 
 #include <atomic>
 
+// On arm64 and x86-64, lock-free 128-bit (16-byte) atomics are available.
+// But riscv64 does not support them.
+#ifdef __riscv
+#define HAVE_ATOMIC_128 0
+#else
+#define HAVE_ATOMIC_128 1
+#endif
+
 namespace ktl {
 
 using std::atomic;

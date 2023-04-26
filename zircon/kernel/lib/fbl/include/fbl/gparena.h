@@ -32,7 +32,7 @@ class LockFreeList {
       // we need to reset our intended next pointer every iteration.
       node->next = head_node.head;
       // Build our candidate next head node.
-      next_head_node = HeadNode(node, head_node.gen + 1);
+      next_head_node = HeadNode{.head = node, .gen = head_node.gen + 1};
       // Use release semantics so that any writes to the Persist area, and our write to
       // node->next, are visible before the node can be seen in the free list and reused.
     } while (!head_node_.compare_exchange_strong(
@@ -45,7 +45,10 @@ class LockFreeList {
     // Use an acquire to match with the release in Push.
     HeadNode head_node = head_node_.load(ktl::memory_order_acquire);
     while (head_node.head) {
-      const HeadNode next_head_node(head_node.head->next, head_node.gen + 1);
+      const HeadNode next_head_node{
+          .head = head_node.head->next,
+          .gen = head_node.gen + 1,
+      };
       if (head_node_.compare_exchange_strong(head_node, next_head_node, ktl::memory_order_acquire,
                                              ktl::memory_order_acquire)) {
         return head_node.head;
@@ -70,18 +73,17 @@ class LockFreeList {
   struct alignas(16) HeadNode {
     Node* head = nullptr;
     uint64_t gen = 0;
-    HeadNode() = default;
-    HeadNode(Node* h, uint64_t g) : head(h), gen(g) {}
   };
   ktl::atomic<HeadNode> head_node_{};
 #if defined(__clang__)
   static_assert(ktl::atomic<HeadNode>::is_always_lock_free, "atomic<HeadNode> not lock free");
 #else
-  // For gcc we have a custom libatomic implementation that *is* lock free, but the compiler doesn't
-  // know that at this point. Instead we ensure HeadNode is 16 bytes and has 16 byte alignment to
-  // make sure our atomics will be used.
+  // For gcc we have a custom libatomic implementation that *is* lock free, but
+  // the compiler doesn't know that at this point. Instead we ensure HeadNode
+  // is 16 bytes and has 16 byte alignment to make sure our atomics will be
+  // used.
   static_assert(sizeof(HeadNode) == 16, "HeadNode must be 16 bytes");
-  static_assert(alignof(HeadNode) == 16, "HeadNode must have 16 byte alignment");
+  static_assert(alignof(HeadNode) == 16, "HeadNode must have 16-byte alignment");
 #endif
 };
 
@@ -112,9 +114,20 @@ class SpinlockList {
   Node* head_ TA_GUARDED(&lock_){};
 };
 
-// Growable Persistent Arena (GPArena) is an arena that allows for fast allocation and deallocation
-// of a single kind of object. Compared to other arena style allocators it additionally guarantees
-// that a portion of the objects memory will be preserved between calls to Free+Alloc.
+// LockFreeList is not supported when 16-byte atomics are not available so use
+// the spin-lock-based list instead.
+#if HAVE_ATOMIC_128
+template <typename Node>
+using Fast16List = LockFreeList<Node>;
+#else
+template <typename Node>
+using Fast16List = SpinlockList<Node>;
+#endif
+
+// Growable Persistent Arena (GPArena) is an arena that allows for fast allocation and
+// deallocation of a single kind of object. Compared to other arena style allocators it
+// additionally guarantees that a portion of the objects memory will be preserved between calls to
+// Free+Alloc.
 template <size_t PersistSize, size_t ObjectSize>
 class __OWNER(void) GPArena {
  public:
@@ -240,9 +253,9 @@ class __OWNER(void) GPArena {
     return n >= start_ && n < top_.load(ktl::memory_order_relaxed);
   }
 
-  // Return |address| if it is within the valid range of the arena or the base of the arena if not.
-  // Hardened against Spectre V1 / bounds check bypass speculation attacks - it always returns a
-  // safe value, even under speculation.
+  // Return |address| if it is within the valid range of the arena or the base of the arena if
+  // not. Hardened against Spectre V1 / bounds check bypass speculation attacks - it always
+  // returns a safe value, even under speculation.
   uintptr_t Confine(uintptr_t address) const {
     const size_t size = top_.load(ktl::memory_order_relaxed) - start_;
     uintptr_t offset = address - start_;
@@ -359,17 +372,8 @@ class __OWNER(void) GPArena {
   static_assert((ObjectSize % alignof(FreeNode)) == 0,
                 "ObjectSize must be common alignment multiple");
 
-// LockFreeList is not supported on RISC-V due to the lack of 16-byte atomics so use a spinlock
-// based list instead.
-//
-// TODO(maniscalco): GPArena shouldn't know anything about RISC-V or its lack of 16-byte atomics.
-// Once ktl/atomic.h exports a "has 16-byte atomics" variable, update this code to use it instead of
-// checking the machine architecture.
-#if defined(__riscv)
-  using FreeList = SpinlockList<FreeNode>;
-#else
-  using FreeList = LockFreeList<FreeNode>;
-#endif
+  using FreeList = Fast16List<FreeNode>;
+
   FreeList free_list_;
 };
 
