@@ -181,7 +181,7 @@ group("crypto-mac") {
 }
 
 group("csv") {
-  public_deps = [ ":csv-v1_1_3" ]
+  public_deps = [ ":csv-v1_2_1" ]
 }
 
 group("darling") {
@@ -1952,38 +1952,6 @@ rust_library("blocking-v1_3_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("bstr-v0_2_12") {
-  crate_name = "bstr"
-  crate_root = "//third_party/rust_crates/vendor/bstr-0.2.12/src/lib.rs"
-  output_name = "bstr-e2e94202b5ae2111"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":memchr-v2_4_0" ]
-  deps += [ ":regex-automata-v0_1_9" ]
-  deps += [ ":serde-v1_0_147" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=e2e94202b5ae2111",
-    "-Cextra-filename=-e2e94202b5ae2111",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"lazy_static\"",
-    "--cfg=feature=\"regex-automata\"",
-    "--cfg=feature=\"serde\"",
-    "--cfg=feature=\"serde1\"",
-    "--cfg=feature=\"serde1-nostd\"",
-    "--cfg=feature=\"std\"",
-    "--cfg=feature=\"unicode\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
 rust_library("bumpalo-v3_2_1") {
   crate_name = "bumpalo"
   crate_root = "//third_party/rust_crates/vendor/bumpalo-3.2.1/src/lib.rs"
@@ -2577,7 +2545,7 @@ rust_library("criterion-v0_2_11") {
   deps += [ ":atty-v0_2_11" ]
   deps += [ ":cast-v0_2_2" ]
   deps += [ ":clap-v2_34_0" ]
-  deps += [ ":csv-v1_1_3" ]
+  deps += [ ":csv-v1_2_1" ]
   deps += [ ":itertools-v0_8_0" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":libc-v0_2_138" ]
@@ -2997,16 +2965,15 @@ rust_proc_macro("cstr-v0_2_11") {
   visibility = [ ":*" ]
 }
 
-rust_library("csv-v1_1_3") {
+rust_library("csv-v1_2_1") {
   crate_name = "csv"
   crate_root = "//third_party/rust_crates/ask2patch/csv/src/lib.rs"
-  output_name = "csv-c447310fd6863403"
+  output_name = "csv-37fa29d57667d41d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bstr-v0_2_12" ]
   deps += [ ":csv-core-v0_1_10" ]
-  deps += [ ":itoa-v0_4_3" ]
+  deps += [ ":itoa-v1_0_5" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_147" ]
 
@@ -3014,9 +2981,9 @@ rust_library("csv-v1_1_3") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=c447310fd6863403",
-    "-Cextra-filename=-c447310fd6863403",
+    "--edition=2021",
+    "-Cmetadata=37fa29d57667d41d",
+    "-Cextra-filename=-37fa29d57667d41d",
   ]
 
   visibility = [ ":*" ]
@@ -7641,7 +7608,7 @@ rust_library("prettytable-rs-v0_8_0") {
 
   deps = []
   deps += [ ":atty-v0_2_11" ]
-  deps += [ ":csv-v1_1_3" ]
+  deps += [ ":csv-v1_2_1" ]
   deps += [ ":encode_unicode-v0_3_5" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":term-v0_5_1" ]
@@ -8648,27 +8615,6 @@ rust_library("regex-v1_5_6") {
     "--cfg=feature=\"unicode-perl\"",
     "--cfg=feature=\"unicode-script\"",
     "--cfg=feature=\"unicode-segment\"",
-  ]
-
-  visibility = [ ":*" ]
-}
-
-rust_library("regex-automata-v0_1_9") {
-  crate_name = "regex_automata"
-  crate_root = "//third_party/rust_crates/ask2patch/regex-automata/src/lib.rs"
-  output_name = "regex_automata-cdaa0041c57f3413"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_3_1" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=cdaa0041c57f3413",
-    "-Cextra-filename=-cdaa0041c57f3413",
   ]
 
   visibility = [ ":*" ]

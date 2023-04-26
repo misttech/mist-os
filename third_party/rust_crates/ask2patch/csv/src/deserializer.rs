@@ -1,20 +1,20 @@
-use std::error::Error as StdError;
-use std::fmt;
-use std::iter;
-use std::num;
-use std::str;
+use std::{error::Error as StdError, fmt, iter, num, str};
 
-use serde::de::value::BorrowedBytesDeserializer;
-use serde::de::{
-    Deserialize, DeserializeSeed, Deserializer, EnumAccess,
-    Error as SerdeError, IntoDeserializer, MapAccess, SeqAccess, Unexpected,
-    VariantAccess, Visitor,
+use serde::{
+    de::value::BorrowedBytesDeserializer,
+    de::{
+        Deserialize, DeserializeSeed, Deserializer, EnumAccess,
+        Error as SerdeError, IntoDeserializer, MapAccess, SeqAccess,
+        Unexpected, VariantAccess, Visitor,
+    },
+    serde_if_integer128,
 };
-use serde::serde_if_integer128;
 
-use crate::byte_record::{ByteRecord, ByteRecordIter};
-use crate::error::{Error, ErrorKind};
-use crate::string_record::{StringRecord, StringRecordIter};
+use crate::{
+    byte_record::{ByteRecord, ByteRecordIter},
+    error::{Error, ErrorKind},
+    string_record::{StringRecord, StringRecordIter},
+};
 
 use self::DeserializeErrorKind as DEK;
 
@@ -30,7 +30,7 @@ pub fn deserialize_string_record<'de, D: Deserialize<'de>>(
     D::deserialize(&mut deser).map_err(|err| {
         Error::new(ErrorKind::Deserialize {
             pos: record.position().map(Clone::clone),
-            err: err,
+            err,
         })
     })
 }
@@ -47,7 +47,7 @@ pub fn deserialize_byte_record<'de, D: Deserialize<'de>>(
     D::deserialize(&mut deser).map_err(|err| {
         Error::new(ErrorKind::Deserialize {
             pos: record.position().map(Clone::clone),
-            err: err,
+            err,
         })
     })
 }
@@ -197,10 +197,7 @@ impl<'r> DeRecord<'r> for DeStringRecord<'r> {
     }
 
     fn error(&self, kind: DeserializeErrorKind) -> DeserializeError {
-        DeserializeError {
-            field: Some(self.field.saturating_sub(1)),
-            kind: kind,
-        }
+        DeserializeError { field: Some(self.field.saturating_sub(1)), kind }
     }
 
     fn infer_deserialize<'de, V: Visitor<'de>>(
@@ -291,10 +288,7 @@ impl<'r> DeRecord<'r> for DeByteRecord<'r> {
     }
 
     fn error(&self, kind: DeserializeErrorKind) -> DeserializeError {
-        DeserializeError {
-            field: Some(self.field.saturating_sub(1)),
-            kind: kind,
-        }
+        DeserializeError { field: Some(self.field.saturating_sub(1)), kind }
     }
 
     fn infer_deserialize<'de, V: Visitor<'de>>(
@@ -335,15 +329,14 @@ macro_rules! deserialize_int {
             visitor: V,
         ) -> Result<V::Value, Self::Error> {
             let field = self.next_field()?;
-            let num =
-                if field.starts_with("0x") {
-                    <$inttype>::from_str_radix(&field[2..], 16)
-                } else {
-                    field.parse()
-                };
+            let num = if field.starts_with("0x") {
+                <$inttype>::from_str_radix(&field[2..], 16)
+            } else {
+                field.parse()
+            };
             visitor.$visit(num.map_err(|err| self.error(DEK::ParseInt(err)))?)
         }
-    }
+    };
 }
 
 impl<'a, 'de: 'a, T: DeRecord<'de>> Deserializer<'de>
@@ -558,7 +551,7 @@ impl<'a, 'de: 'a, T: DeRecord<'de>> Deserializer<'de>
         // Read and drop the next field.
         // This code is reached, e.g., when trying to deserialize a header
         // that doesn't exist in the destination struct.
-        let _ = self.next_field()?;
+        let _ = self.next_field_bytes()?;
         visitor.visit_unit()
     }
 }
@@ -802,13 +795,16 @@ fn try_float_bytes(s: &[u8]) -> Option<f64> {
 mod tests {
     use std::collections::HashMap;
 
-    use bstr::BString;
-    use serde::{de::DeserializeOwned, serde_if_integer128, Deserialize};
+    use {
+        bstr::BString,
+        serde::{de::DeserializeOwned, serde_if_integer128, Deserialize},
+    };
+
+    use crate::{
+        byte_record::ByteRecord, error::Error, string_record::StringRecord,
+    };
 
     use super::{deserialize_byte_record, deserialize_string_record};
-    use crate::byte_record::ByteRecord;
-    use crate::error::Error;
-    use crate::string_record::StringRecord;
 
     fn de<D: DeserializeOwned>(fields: &[&str]) -> Result<D, Error> {
         let record = StringRecord::from(fields);
@@ -914,7 +910,7 @@ mod tests {
         struct Foo;
 
         #[derive(Deserialize, Debug, PartialEq)]
-        struct Bar {};
+        struct Bar {}
 
         let got = de_headers::<Foo>(&[], &[]);
         assert_eq!(got.unwrap(), Foo);

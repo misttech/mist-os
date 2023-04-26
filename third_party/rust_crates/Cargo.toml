@@ -75,7 +75,7 @@ crossbeam-utils = "0.8.14"
 crypto-mac = { version = "0.11.1", features = ["std"] }
 cfg-if = "1.0.0"
 chacha20 = "0.8.1"
-csv = "1.0.7"
+csv = "1.2.1"
 darling = "0.12.0"
 data-encoding = "2.1.2"
 derivative = { version = "2.2.0", features = ["use_core"] }
@@ -316,7 +316,6 @@ byteorder = { path = "ask2patch/byteorder" }
 csv = { path = "ask2patch/csv" }
 csv-core = { path = "ask2patch/csv-core" }
 memchr = { path = "ask2patch/memchr" }
-regex-automata = { path = "ask2patch/regex-automata" }
 same-file = { path = "ask2patch/same-file" }
 termcolor = { path = "ask2patch/termcolor" }
 walkdir = { path = "ask2patch/walkdir" }

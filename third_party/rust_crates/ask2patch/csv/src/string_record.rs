@@ -1,16 +1,18 @@
-use std::fmt;
-use std::io;
-use std::iter::FromIterator;
-use std::ops::{self, Range};
-use std::result;
-use std::str;
+use std::{
+    fmt, io,
+    iter::FromIterator,
+    ops::{self, Range},
+    result, str,
+};
 
 use serde::de::Deserialize;
 
-use crate::byte_record::{ByteRecord, ByteRecordIter, Position};
-use crate::deserializer::deserialize_string_record;
-use crate::error::{Error, ErrorKind, FromUtf8Error, Result};
-use crate::reader::Reader;
+use crate::{
+    byte_record::{ByteRecord, ByteRecordIter, Position},
+    deserializer::deserialize_string_record,
+    error::{Error, ErrorKind, FromUtf8Error, Result},
+    reader::Reader,
+};
 
 /// A single CSV record stored as valid UTF-8 bytes.
 ///
@@ -226,9 +228,8 @@ impl StringRecord {
     /// use std::error::Error;
     ///
     /// use csv::StringRecord;
-    /// use serde::Deserialize;
     ///
-    /// #[derive(Deserialize)]
+    /// #[derive(serde::Deserialize)]
     /// struct Row<'a> {
     ///     city: &'a str,
     ///     country: &'a str,
@@ -262,9 +263,8 @@ impl StringRecord {
     /// use std::error::Error;
     ///
     /// use csv::StringRecord;
-    /// use serde::Deserialize;
     ///
-    /// #[derive(Deserialize)]
+    /// #[derive(serde::Deserialize)]
     /// struct Row {
     ///     city: String,
     ///     country: String,
@@ -610,6 +610,14 @@ impl StringRecord {
         self.0
     }
 
+    /// Clone this record, but only copy `fields` up to the end of bounds. This
+    /// is useful when one wants to copy a record, but not necessarily any
+    /// excess capacity in that record.
+    #[inline]
+    pub(crate) fn clone_truncated(&self) -> StringRecord {
+        StringRecord(self.0.clone_truncated())
+    }
+
     /// A safe function for reading CSV data into a `StringRecord`.
     ///
     /// This relies on the internal representation of `StringRecord`.
@@ -638,7 +646,7 @@ impl StringRecord {
         match (read_res, utf8_res) {
             (Err(err), _) => Err(err),
             (Ok(_), Err(err)) => {
-                Err(Error::new(ErrorKind::Utf8 { pos: Some(pos), err: err }))
+                Err(Error::new(ErrorKind::Utf8 { pos: Some(pos), err }))
             }
             (Ok(eof), Ok(())) => Ok(eof),
         }
@@ -699,6 +707,7 @@ impl<'a> IntoIterator for &'a StringRecord {
 ///
 /// The `'r` lifetime variable refers to the lifetime of the `StringRecord`
 /// that is being iterated over.
+#[derive(Clone)]
 pub struct StringRecordIter<'r>(ByteRecordIter<'r>);
 
 impl<'r> Iterator for StringRecordIter<'r> {

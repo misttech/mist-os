@@ -1,15 +1,17 @@
-use std::cmp;
-use std::fmt;
-use std::iter::FromIterator;
-use std::ops::{self, Range};
-use std::result;
+use std::{
+    cmp, fmt,
+    iter::FromIterator,
+    ops::{self, Range},
+    result,
+};
 
-use bstr::{BString, ByteSlice};
 use serde::de::Deserialize;
 
-use crate::deserializer::deserialize_byte_record;
-use crate::error::{new_utf8_error, Result, Utf8Error};
-use crate::string_record::StringRecord;
+use crate::{
+    deserializer::deserialize_byte_record,
+    error::{new_utf8_error, Result, Utf8Error},
+    string_record::StringRecord,
+};
 
 /// A single CSV record stored as raw bytes.
 ///
@@ -68,11 +70,12 @@ impl<'a, T: AsRef<[u8]>> PartialEq<[T]> for &'a ByteRecord {
 
 impl fmt::Debug for ByteRecord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut fields = vec![];
-        for field in self {
-            fields.push(BString::from(field.to_vec()));
-        }
-        write!(f, "ByteRecord({:?})", fields)
+        write!(f, "ByteRecord(")?;
+        f.debug_list()
+            .entries(self.iter().map(crate::debug::Bytes))
+            .finish()?;
+        write!(f, ")")?;
+        Ok(())
     }
 }
 
@@ -370,8 +373,8 @@ impl ByteRecord {
         let mut trimmed =
             ByteRecord::with_capacity(self.as_slice().len(), self.len());
         trimmed.set_position(self.position().cloned());
-        for field in &*self {
-            trimmed.push_field(field.trim());
+        for field in self.iter() {
+            trimmed.push_field(trim_ascii(field));
         }
         *self = trimmed;
     }
@@ -497,6 +500,18 @@ impl ByteRecord {
         &self.0.fields[..self.0.bounds.end()]
     }
 
+    /// Clone this record, but only copy `fields` up to the end of bounds. This
+    /// is useful when one wants to copy a record, but not necessarily any
+    /// excess capacity in that record.
+    #[inline]
+    pub(crate) fn clone_truncated(&self) -> ByteRecord {
+        let mut br = ByteRecord::new();
+        br.0.pos = self.0.pos.clone();
+        br.0.bounds = self.0.bounds.clone();
+        br.0.fields = self.0.fields[..self.0.bounds.end()].to_vec();
+        br
+    }
+
     /// Retrieve the underlying parts of a byte record.
     #[inline]
     pub(crate) fn as_parts(&mut self) -> (&mut Vec<u8>, &mut Vec<usize>) {
@@ -535,7 +550,7 @@ impl ByteRecord {
         // Otherwise, we must check each field individually to ensure that
         // it's valid UTF-8.
         for (i, field) in self.iter().enumerate() {
-            if let Err(err) = field.to_str() {
+            if let Err(err) = std::str::from_utf8(field) {
                 return Err(new_utf8_error(i, err.valid_up_to()));
             }
         }
@@ -669,7 +684,7 @@ impl Bounds {
             None => 0,
             Some(&start) => start,
         };
-        Some(ops::Range { start: start, end: end })
+        Some(ops::Range { start, end })
     }
 
     /// Returns a slice of ending positions of all fields.
@@ -761,6 +776,7 @@ impl<T: AsRef<[u8]>> Extend<T> for ByteRecord {
 ///
 /// The `'r` lifetime variable refers to the lifetime of the `ByteRecord` that
 /// is being iterated over.
+#[derive(Clone)]
 pub struct ByteRecordIter<'r> {
     /// The record we are iterating over.
     r: &'r ByteRecord,
@@ -837,6 +853,32 @@ impl<'r> DoubleEndedIterator for ByteRecordIter<'r> {
             Some(&self.r.0.fields[start..end])
         }
     }
+}
+
+fn trim_ascii(bytes: &[u8]) -> &[u8] {
+    trim_ascii_start(trim_ascii_end(bytes))
+}
+
+fn trim_ascii_start(mut bytes: &[u8]) -> &[u8] {
+    while let [first, rest @ ..] = bytes {
+        if first.is_ascii_whitespace() {
+            bytes = rest;
+        } else {
+            break;
+        }
+    }
+    bytes
+}
+
+fn trim_ascii_end(mut bytes: &[u8]) -> &[u8] {
+    while let [rest @ .., last] = bytes {
+        if last.is_ascii_whitespace() {
+            bytes = rest;
+        } else {
+            break;
+        }
+    }
+    bytes
 }
 
 #[cfg(test)]

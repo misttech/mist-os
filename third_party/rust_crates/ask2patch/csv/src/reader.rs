@@ -1,16 +1,22 @@
-use std::fs::File;
-use std::io::{self, BufRead, Seek};
-use std::marker::PhantomData;
-use std::path::Path;
-use std::result;
+use std::{
+    fs::File,
+    io::{self, BufRead, Seek},
+    marker::PhantomData,
+    path::Path,
+    result,
+};
 
-use csv_core::{Reader as CoreReader, ReaderBuilder as CoreReaderBuilder};
-use serde::de::DeserializeOwned;
+use {
+    csv_core::{Reader as CoreReader, ReaderBuilder as CoreReaderBuilder},
+    serde::de::DeserializeOwned,
+};
 
-use crate::byte_record::{ByteRecord, Position};
-use crate::error::{Error, ErrorKind, Result, Utf8Error};
-use crate::string_record::StringRecord;
-use crate::{Terminator, Trim};
+use crate::{
+    byte_record::{ByteRecord, Position},
+    error::{Error, ErrorKind, Result, Utf8Error},
+    string_record::StringRecord,
+    {Terminator, Trim},
+};
 
 /// Builds a CSV reader with various configuration knobs.
 ///
@@ -686,6 +692,10 @@ impl ReaderBuilder {
 ///   [`ReaderBuilder`](struct.ReaderBuilder.html).
 /// * When reading CSV data from a resource (like a file), it is possible for
 ///   reading from the underlying resource to fail. This will return an error.
+///   For subsequent calls to the `Reader` after encountering a such error
+///   (unless `seek` is used), it will behave as if end of file had been
+///   reached, in order to avoid running into infinite loops when still
+///   attempting to read the next record when one has errored.
 /// * When reading CSV data into `String` or `&str` fields (e.g., via a
 ///   [`StringRecord`](struct.StringRecord.html)), UTF-8 is strictly
 ///   enforced. If CSV data is invalid UTF-8, then an error is returned. If
@@ -741,7 +751,34 @@ struct ReaderState {
     /// Whether the reader has been seeked or not.
     seeked: bool,
     /// Whether EOF of the underlying reader has been reached or not.
-    eof: bool,
+    ///
+    /// IO errors on the underlying reader will be considered as an EOF for
+    /// subsequent read attempts, as it would be incorrect to keep on trying
+    /// to read when the underlying reader has broken.
+    ///
+    /// For clarity, having the best `Debug` impl and in case they need to be
+    /// treated differently at some point, we store whether the `EOF` is
+    /// considered because an actual EOF happened, or because we encoundered
+    /// an IO error.
+    /// This has no additional runtime cost.
+    eof: ReaderEofState,
+}
+
+/// Whether EOF of the underlying reader has been reached or not.
+///
+/// IO errors on the underlying reader will be considered as an EOF for
+/// subsequent read attempts, as it would be incorrect to keep on trying
+/// to read when the underlying reader has broken.
+///
+/// For clarity, having the best `Debug` impl and in case they need to be
+/// treated differently at some point, we store whether the `EOF` is
+/// considered because an actual EOF happened, or because we encoundered
+/// an IO error
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReaderEofState {
+    NotEof,
+    Eof,
+    IOError,
 }
 
 /// Headers encapsulates any data associated with the headers of CSV data.
@@ -798,7 +835,7 @@ impl<R: io::Read> Reader<R> {
                 cur_pos: Position::new(),
                 first: false,
                 seeked: false,
-                eof: false,
+                eof: ReaderEofState::NotEof,
             },
         }
     }
@@ -854,10 +891,7 @@ impl<R: io::Read> Reader<R> {
     /// ```
     /// use std::error::Error;
     ///
-    /// use csv::Reader;
-    /// use serde::Deserialize;
-    ///
-    /// #[derive(Debug, Deserialize, Eq, PartialEq)]
+    /// #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
     /// struct Row {
     ///     city: String,
     ///     country: String,
@@ -871,7 +905,7 @@ impl<R: io::Read> Reader<R> {
     /// city,country,popcount
     /// Boston,United States,4628910
     /// ";
-    ///     let mut rdr = Reader::from_reader(data.as_bytes());
+    ///     let mut rdr = csv::Reader::from_reader(data.as_bytes());
     ///     let mut iter = rdr.deserialize();
     ///
     ///     if let Some(result) = iter.next() {
@@ -911,10 +945,7 @@ impl<R: io::Read> Reader<R> {
     /// ```
     /// use std::error::Error;
     ///
-    /// use csv::ReaderBuilder;
-    /// use serde::Deserialize;
-    ///
-    /// #[derive(Debug, Deserialize, Eq, PartialEq)]
+    /// #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
     /// struct Row {
     ///     label: String,
     ///     values: Vec<i32>,
@@ -923,7 +954,7 @@ impl<R: io::Read> Reader<R> {
     /// # fn main() { example().unwrap(); }
     /// fn example() -> Result<(), Box<dyn Error>> {
     ///     let data = "foo,1,2,3";
-    ///     let mut rdr = ReaderBuilder::new()
+    ///     let mut rdr = csv::ReaderBuilder::new()
     ///         .has_headers(false)
     ///         .from_reader(data.as_bytes());
     ///     let mut iter = rdr.deserialize();
@@ -958,23 +989,20 @@ impl<R: io::Read> Reader<R> {
     /// ```
     /// use std::error::Error;
     ///
-    /// use csv::Reader;
-    /// use serde::Deserialize;
-    ///
-    /// #[derive(Debug, Deserialize, PartialEq)]
+    /// #[derive(Debug, serde::Deserialize, PartialEq)]
     /// struct Row {
     ///     label: Label,
     ///     value: Number,
     /// }
     ///
-    /// #[derive(Debug, Deserialize, PartialEq)]
+    /// #[derive(Debug, serde::Deserialize, PartialEq)]
     /// #[serde(rename_all = "lowercase")]
     /// enum Label {
     ///     Celsius,
     ///     Fahrenheit,
     /// }
     ///
-    /// #[derive(Debug, Deserialize, PartialEq)]
+    /// #[derive(Debug, serde::Deserialize, PartialEq)]
     /// #[serde(untagged)]
     /// enum Number {
     ///     Integer(i64),
@@ -988,7 +1016,7 @@ impl<R: io::Read> Reader<R> {
     /// celsius,22.2222
     /// fahrenheit,72
     /// ";
-    ///     let mut rdr = Reader::from_reader(data.as_bytes());
+    ///     let mut rdr = csv::Reader::from_reader(data.as_bytes());
     ///     let mut iter = rdr.deserialize();
     ///
     ///     // Read the first record.
@@ -1047,10 +1075,7 @@ impl<R: io::Read> Reader<R> {
     /// ```
     /// use std::error::Error;
     ///
-    /// use csv::Reader;
-    /// use serde::Deserialize;
-    ///
-    /// #[derive(Debug, Deserialize, Eq, PartialEq)]
+    /// #[derive(Debug, serde::Deserialize, Eq, PartialEq)]
     /// struct Row {
     ///     city: String,
     ///     country: String,
@@ -1064,7 +1089,7 @@ impl<R: io::Read> Reader<R> {
     /// city,country,popcount
     /// Boston,United States,4628910
     /// ";
-    ///     let rdr = Reader::from_reader(data.as_bytes());
+    ///     let rdr = csv::Reader::from_reader(data.as_bytes());
     ///     let mut iter = rdr.into_deserialize();
     ///
     ///     if let Some(result) = iter.next() {
@@ -1598,13 +1623,17 @@ impl<R: io::Read> Reader<R> {
 
         record.clear();
         record.set_position(Some(self.state.cur_pos.clone()));
-        if self.state.eof {
+        if self.state.eof != ReaderEofState::NotEof {
             return Ok(false);
         }
         let (mut outlen, mut endlen) = (0, 0);
         loop {
             let (res, nin, nout, nend) = {
-                let input = self.rdr.fill_buf()?;
+                let input_res = self.rdr.fill_buf();
+                if input_res.is_err() {
+                    self.state.eof = ReaderEofState::IOError;
+                }
+                let input = input_res?;
                 let (fields, ends) = record.as_parts();
                 self.core.read_record(
                     input,
@@ -1636,7 +1665,7 @@ impl<R: io::Read> Reader<R> {
                     return Ok(true);
                 }
                 End => {
-                    self.state.eof = true;
+                    self.state.eof = ReaderEofState::Eof;
                     return Ok(false);
                 }
             }
@@ -1652,8 +1681,7 @@ impl<R: io::Read> Reader<R> {
     /// # Example: reading the position
     ///
     /// ```
-    /// use std::error::Error;
-    /// use std::io;
+    /// use std::{error::Error, io};
     /// use csv::{Reader, Position};
     ///
     /// # fn main() { example().unwrap(); }
@@ -1695,8 +1723,7 @@ impl<R: io::Read> Reader<R> {
     /// # Example
     ///
     /// ```
-    /// use std::error::Error;
-    /// use std::io;
+    /// use std::{error::Error, io};
     /// use csv::{Reader, Position};
     ///
     /// # fn main() { example().unwrap(); }
@@ -1716,7 +1743,7 @@ impl<R: io::Read> Reader<R> {
     /// }
     /// ```
     pub fn is_done(&self) -> bool {
-        self.state.eof
+        self.state.eof != ReaderEofState::NotEof
     }
 
     /// Returns true if and only if this reader has been configured to
@@ -1771,8 +1798,7 @@ impl<R: io::Read + io::Seek> Reader<R> {
     /// # Example: seek to parse a record twice
     ///
     /// ```
-    /// use std::error::Error;
-    /// use std::io;
+    /// use std::{error::Error, io};
     /// use csv::{Reader, Position};
     ///
     /// # fn main() { example().unwrap(); }
@@ -1817,7 +1843,7 @@ impl<R: io::Read + io::Seek> Reader<R> {
         self.core.reset();
         self.core.set_line(pos.line());
         self.state.cur_pos = pos;
-        self.state.eof = false;
+        self.state.eof = ReaderEofState::NotEof;
         Ok(())
     }
 
@@ -1845,7 +1871,7 @@ impl<R: io::Read + io::Seek> Reader<R> {
         self.core.reset();
         self.core.set_line(pos.line());
         self.state.cur_pos = pos;
-        self.state.eof = false;
+        self.state.eof = ReaderEofState::NotEof;
         Ok(())
     }
 }
@@ -1892,9 +1918,9 @@ impl<R: io::Read, D: DeserializeOwned> DeserializeRecordsIntoIter<R, D> {
             rdr.headers().ok().map(Clone::clone)
         };
         DeserializeRecordsIntoIter {
-            rdr: rdr,
+            rdr,
             rec: StringRecord::new(),
-            headers: headers,
+            headers,
             _priv: PhantomData,
         }
     }
@@ -1950,9 +1976,9 @@ impl<'r, R: io::Read, D: DeserializeOwned> DeserializeRecordsIter<'r, R, D> {
             rdr.headers().ok().map(Clone::clone)
         };
         DeserializeRecordsIter {
-            rdr: rdr,
+            rdr,
             rec: StringRecord::new(),
-            headers: headers,
+            headers,
             _priv: PhantomData,
         }
     }
@@ -1990,7 +2016,7 @@ pub struct StringRecordsIntoIter<R> {
 
 impl<R: io::Read> StringRecordsIntoIter<R> {
     fn new(rdr: Reader<R>) -> StringRecordsIntoIter<R> {
-        StringRecordsIntoIter { rdr: rdr, rec: StringRecord::new() }
+        StringRecordsIntoIter { rdr, rec: StringRecord::new() }
     }
 
     /// Return a reference to the underlying CSV reader.
@@ -2015,7 +2041,7 @@ impl<R: io::Read> Iterator for StringRecordsIntoIter<R> {
     fn next(&mut self) -> Option<Result<StringRecord>> {
         match self.rdr.read_record(&mut self.rec) {
             Err(err) => Some(Err(err)),
-            Ok(true) => Some(Ok(self.rec.clone())),
+            Ok(true) => Some(Ok(self.rec.clone_truncated())),
             Ok(false) => None,
         }
     }
@@ -2032,7 +2058,7 @@ pub struct StringRecordsIter<'r, R: 'r> {
 
 impl<'r, R: io::Read> StringRecordsIter<'r, R> {
     fn new(rdr: &'r mut Reader<R>) -> StringRecordsIter<'r, R> {
-        StringRecordsIter { rdr: rdr, rec: StringRecord::new() }
+        StringRecordsIter { rdr, rec: StringRecord::new() }
     }
 
     /// Return a reference to the underlying CSV reader.
@@ -2052,7 +2078,7 @@ impl<'r, R: io::Read> Iterator for StringRecordsIter<'r, R> {
     fn next(&mut self) -> Option<Result<StringRecord>> {
         match self.rdr.read_record(&mut self.rec) {
             Err(err) => Some(Err(err)),
-            Ok(true) => Some(Ok(self.rec.clone())),
+            Ok(true) => Some(Ok(self.rec.clone_truncated())),
             Ok(false) => None,
         }
     }
@@ -2066,7 +2092,7 @@ pub struct ByteRecordsIntoIter<R> {
 
 impl<R: io::Read> ByteRecordsIntoIter<R> {
     fn new(rdr: Reader<R>) -> ByteRecordsIntoIter<R> {
-        ByteRecordsIntoIter { rdr: rdr, rec: ByteRecord::new() }
+        ByteRecordsIntoIter { rdr, rec: ByteRecord::new() }
     }
 
     /// Return a reference to the underlying CSV reader.
@@ -2091,7 +2117,7 @@ impl<R: io::Read> Iterator for ByteRecordsIntoIter<R> {
     fn next(&mut self) -> Option<Result<ByteRecord>> {
         match self.rdr.read_byte_record(&mut self.rec) {
             Err(err) => Some(Err(err)),
-            Ok(true) => Some(Ok(self.rec.clone())),
+            Ok(true) => Some(Ok(self.rec.clone_truncated())),
             Ok(false) => None,
         }
     }
@@ -2108,7 +2134,7 @@ pub struct ByteRecordsIter<'r, R: 'r> {
 
 impl<'r, R: io::Read> ByteRecordsIter<'r, R> {
     fn new(rdr: &'r mut Reader<R>) -> ByteRecordsIter<'r, R> {
-        ByteRecordsIter { rdr: rdr, rec: ByteRecord::new() }
+        ByteRecordsIter { rdr, rec: ByteRecord::new() }
     }
 
     /// Return a reference to the underlying CSV reader.
@@ -2128,7 +2154,7 @@ impl<'r, R: io::Read> Iterator for ByteRecordsIter<'r, R> {
     fn next(&mut self) -> Option<Result<ByteRecord>> {
         match self.rdr.read_byte_record(&mut self.rec) {
             Err(err) => Some(Err(err)),
-            Ok(true) => Some(Ok(self.rec.clone())),
+            Ok(true) => Some(Ok(self.rec.clone_truncated())),
             Ok(false) => None,
         }
     }
@@ -2138,9 +2164,9 @@ impl<'r, R: io::Read> Iterator for ByteRecordsIter<'r, R> {
 mod tests {
     use std::io;
 
-    use crate::byte_record::ByteRecord;
-    use crate::error::ErrorKind;
-    use crate::string_record::StringRecord;
+    use crate::{
+        byte_record::ByteRecord, error::ErrorKind, string_record::StringRecord,
+    };
 
     use super::{Position, ReaderBuilder, Trim};
 
