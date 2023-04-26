@@ -453,22 +453,21 @@ TEST(RestrictedMode, UnbindState) {
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_unbind_state(0xffffffff));
 }
 
-#endif  // defined(__x86_64__) || defined(__aarch64__)
-
-#if defined(__x86_64__)
-
 // This is the happy case.
 TEST(RestrictedMode, Basic) {
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
-  // Configure the state for x86.
+  // Configure the initial register state.
   ArchRegisterState state;
   state.InitializeRegisters();
+
+  // Set the PC to the bounce routine, as the PC is where zx_restricted_enter
+  // will jump to.
   state.set_ip(reinterpret_cast<uint64_t>(bounce));
 
-  // Set the state.
+  // Write the state to the state VMO.
   ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
   // Enter restricted mode with reasonable args, expect a bounce back.
@@ -530,131 +529,47 @@ TEST(RestrictedMode, EnterBadStateStruct) {
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
-  zx_restricted_state_t state{};
+  ArchRegisterState state;
+  state.InitializeRegisters();
+
   [[maybe_unused]] auto set_state_and_enter = [&]() {
     // Set the state.
-    ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
+    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
     // This should fail with bad state.
     ASSERT_EQ(ZX_ERR_BAD_STATE,
               zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
   };
 
-  state = {};
-  state.ip = -1;  // ip is outside of user space
+  state.set_ip(-1);  // ip is outside of user space
   set_state_and_enter();
 
-  state = {};
-  state.ip = (uint64_t)bounce;
-  state.flags = (1UL << 31);  // set an invalid flag
-  set_state_and_enter();
-
-  state = {};
-  state.ip = (uint64_t)bounce;
-  state.fs_base = (1UL << 63);  // invalid fs (non canonical)
-  set_state_and_enter();
-
-  state = {};
-  state.ip = (uint64_t)bounce;
-  state.gs_base = (1UL << 63);  // invalid gs (non canonical)
-  set_state_and_enter();
-}
-
-#elif defined(__aarch64__)  // defined(__x86_64__)
-
-// This is the happy case.
-TEST(RestrictedMode, Basic) {
-  zx::vmo vmo;
-  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
-
-  ArchRegisterState state;
-
-  // Initialize all standard registers to arbitrary values.
+#ifdef __x86_64__
   state.InitializeRegisters();
+  state.set_ip((uint64_t)bounce);
+  state.restricted_state().flags = (1UL << 31);  // set an invalid flag
+  set_state_and_enter();
 
-  // Set the PC to the bounce routine, as the PC is where zx_restricted_enter
-  // will jump to.
-  state.set_ip(reinterpret_cast<uintptr_t>(bounce));
+  state.InitializeRegisters();
+  state.set_ip((uint64_t)bounce);
+  state.restricted_state().fs_base = (1UL << 63);  // invalid fs (non canonical)
+  set_state_and_enter();
 
-  // Write the state to the state VMO.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  state.InitializeRegisters();
+  state.set_ip((uint64_t)bounce);
+  state.restricted_state().gs_base = (1UL << 63);  // invalid gs (non canonical)
+  set_state_and_enter();
+#endif
 
-  // Enter restricted mode and expect a bounce back.
-  zx_restricted_reason_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
-  ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
-
-  // Read the state out of the thread.
-  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-
-  // Validate that the instruction pointer is right after the syscall instruction.
-  EXPECT_EQ((uintptr_t)&bounce_post_syscall, state.ip());
-
-  state.VerifyTwiddledRestrictedState();
+#ifdef __aarch64__
+  state.InitializeRegisters();
+  state.set_ip((uint64_t)bounce);
+  state.restricted_state().cpsr = 0x1;  // CPSR contains non-user settable flags.
+  set_state_and_enter();
+#endif
 }
 
-// This is a simple benchmark test that prints some rough performance numbers.
-TEST(RestrictedMode, Bench) {
-  // Run the test 5 times to help filter out noise.
-  for (auto i = 0; i < 5; i++) {
-    zx::vmo vmo;
-    ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-    auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
-
-    // Set the state.
-    ArchRegisterState state;
-    state.InitializeRegisters();
-    state.set_ip(reinterpret_cast<uintptr_t>(bounce));
-    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-
-    // Go through a full restricted syscall entry/exit cycle iter times and show the time.
-    constexpr int iter = 1000000;
-    zx_restricted_reason_t reason_code;
-    auto t = zx::ticks::now();
-    for (int i = 0; i < iter; i++) {
-      ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                         &reason_code));
-    }
-    t = zx::ticks::now() - t;
-
-    printf("restricted call %ld ns per round trip (%ld raw ticks)\n",
-           t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
-
-    // For way of comparison, time a null syscall.
-    t = zx::ticks::now();
-    for (int i = 0; i < iter; i++) {
-      ASSERT_OK(zx_syscall_test_0());
-    }
-    t = zx::ticks::now() - t;
-
-    printf("test syscall %ld ns per call (%ld raw ticks)\n",
-           t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get());
-  }
-}
-
-// Verify that restricted_enter fails on invalid zx_restricted_state_t values.
-TEST(RestrictedMode, EnterBadStateStruct) {
-  zx::vmo vmo;
-  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
-
-  zx_restricted_state_t state{};
-  state.pc = -1;  // PC is outside of user space
-  ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
-  ASSERT_EQ(ZX_ERR_BAD_STATE,
-            zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
-
-  state = {};
-  state.pc = (uintptr_t)bounce;
-  state.cpsr = 0x1;  // CPSR contains non-user settable flags.
-  ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
-  ASSERT_EQ(ZX_ERR_BAD_STATE,
-            zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab, 0));
-}
-
-#else  // defined(__x86_64__)
+#else  // defined(__x86_64__) || defined(__aarch64__)
 
 // Restricted mode is only implemented on x86 and arm64.  See that the syscalls fail on other
 // arches.
@@ -666,4 +581,4 @@ TEST(RestrictedMode, NotSupported) {
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, zx_restricted_enter(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, 0, 0));
 }
 
-#endif  // defined(__x86_64__)
+#endif  // defined(__x86_64__) || defined(__aarch64__)
