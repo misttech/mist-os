@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log::OnInterestChanged;
+use diagnostics_log::{OnInterestChanged, TestRecord};
 use fidl_fuchsia_diagnostics::Severity;
 use fidl_fuchsia_validate_logs::{
     LogSinkPuppetRequest, LogSinkPuppetRequestStream, PuppetInfo, RecordSpec,
@@ -10,7 +10,7 @@ use fidl_fuchsia_validate_logs::{
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as rt;
-use fuchsia_zircon::AsHandleRef;
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::prelude::*;
 use tracing::*;
 
@@ -81,12 +81,16 @@ async fn run_puppet(mut requests: LogSinkPuppetRequestStream) {
             }
             LogSinkPuppetRequest::EmitLog {
                 responder,
-                spec: RecordSpec { file, line, record },
+                spec: RecordSpec { file, line, mut record },
             } => {
                 // tracing 0.2 will let us to emit non-'static events directly, no downcasting
                 tracing::dispatcher::get_default(|dispatcher| {
                     let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
-                    publisher.event_for_testing(&file, line, record.clone());
+                    if record.timestamp == 0 {
+                        record.timestamp = zx::Time::get_monotonic().into_nanos();
+                    }
+                    let test_record = TestRecord::from(&file, line, &record);
+                    publisher.event_for_testing(test_record);
                 });
                 responder.send().unwrap();
             }

@@ -1,10 +1,9 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use diagnostics_log_encoding::{Severity, SeverityExt};
+use diagnostics_log_encoding::{encode::TestRecord, Severity, SeverityExt};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics::Interest;
-use fidl_fuchsia_diagnostics_stream::Record;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 use fuchsia_zircon as zx;
 use std::sync::{Mutex, RwLock};
@@ -79,7 +78,7 @@ impl InterestFilter {
         }
     }
 
-    pub fn enabled_for_testing(&self, _file: &str, _line: u32, record: &Record) -> bool {
+    pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
         let min_severity = self.min_severity.read().unwrap();
         record.severity >= *min_severity
     }

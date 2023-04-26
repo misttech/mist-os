@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log_encoding::encode::Encoder;
-use fidl_fuchsia_diagnostics_stream::{Argument, Value};
+use diagnostics_log_encoding::encode::{Argument, Encoder, TracingEvent, Value, WriteEventParams};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
-use std::{collections::HashSet, io::Cursor, mem::MaybeUninit, time::Duration};
+use std::{io::Cursor, mem::MaybeUninit, time::Duration};
 use tracing::{Callsite, Event, Level, Metadata};
 use tracing_core::{field, identify_callsite, subscriber::Interest, Kind};
 
+static PLACEHOLDER_TEXT: Lazy<String> = Lazy::new(|| "x".repeat(32000));
 static PROCESS_ID: Lazy<zx::Koid> =
     Lazy::new(|| fuchsia_runtime::process_self().get_koid().unwrap());
-
 static THREAD_ID: Lazy<zx::Koid> = Lazy::new(|| fuchsia_runtime::thread_self().get_koid().unwrap());
 
 struct NullCallsite;
@@ -85,9 +84,12 @@ fn encoder() -> Encoder<Cursor<[u8; MAX_DATAGRAM_LEN_BYTES as usize]>> {
     Encoder::new(Cursor::new(buffer))
 }
 
-fn bench_argument(value: Value) -> impl FnMut(&mut criterion::Bencher) + 'static {
+fn bench_argument(
+    value: impl Into<Value<'static>>,
+) -> impl FnMut(&mut criterion::Bencher) + 'static {
+    let value = value.into();
     move |b: &mut criterion::Bencher| {
-        let arg = Argument { name: "foo".to_string(), value: value.clone() };
+        let arg = Argument { name: "foo", value: value.clone() };
         b.iter_batched_ref(
             || encoder(),
             |encoder| encoder.write_argument(&arg),
@@ -115,13 +117,14 @@ macro_rules! impl_bench_write_event {
                     b.iter_batched_ref(
                         || encoder(),
                         |encoder| encoder.write_event(
-                            &event,
-                            &["some-tag"],
-                            &HashSet::new(),
-                            *PROCESS_ID,
-                            *THREAD_ID,
-                            1
-                        ),
+                            WriteEventParams {
+                            event: TracingEvent::from(&event),
+                            tags: &["some-tag"],
+                            metatags: std::iter::empty(),
+                            pid: *PROCESS_ID,
+                            tid: *THREAD_ID,
+                            dropped: 1
+                        }),
                         criterion::BatchSize::SmallInput,
                     )
                 }
@@ -188,15 +191,15 @@ fn main() {
     let mut bench = criterion::Benchmark::new("Encoder/Create", move |b| {
         b.iter_with_large_drop(|| encoder());
     })
-    .with_function("Encoder/Argument/Boolean", bench_argument(Value::Boolean(true)))
-    .with_function("Encoder/Argument/Floating", bench_argument(Value::Floating(1234.5678)))
-    .with_function("Encoder/Argument/UnsignedInt", bench_argument(Value::UnsignedInt(12345)))
-    .with_function("Encoder/Argument/SignedInt", bench_argument(Value::SignedInt(-12345)));
+    .with_function("Encoder/Argument/Boolean", bench_argument(true))
+    .with_function("Encoder/Argument/Floating", bench_argument(1234.5678 as f64))
+    .with_function("Encoder/Argument/UnsignedInt", bench_argument(12345 as u64))
+    .with_function("Encoder/Argument/SignedInt", bench_argument(-12345 as i64));
 
     for size in [16, 128, 256, 512, 1024, 32000] {
         bench = bench.with_function(
             &format!("Encoder/Argument/Text/{}", size),
-            bench_argument(Value::Text("x".repeat(size))),
+            bench_argument((*PLACEHOLDER_TEXT).get(..size).unwrap()),
         )
     }
 

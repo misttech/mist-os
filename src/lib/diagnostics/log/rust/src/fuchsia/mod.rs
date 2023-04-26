@@ -3,7 +3,6 @@
 
 use crate::PublishOptions;
 use fidl_fuchsia_diagnostics::{Interest, Severity};
-use fidl_fuchsia_diagnostics_stream::Record;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
@@ -11,7 +10,7 @@ use fuchsia_zircon::{self as zx};
 use std::{any::TypeId, collections::HashSet, fmt::Debug};
 use thiserror::Error;
 use tracing::{
-    span::{Attributes, Id, Record as TracingRecord},
+    span::{Attributes, Id, Record},
     subscriber::Subscriber,
     Event, Metadata,
 };
@@ -23,8 +22,7 @@ mod sink;
 use filter::InterestFilter;
 use sink::Sink;
 
-// Publicly export `Interest` and `Severity` since they are part of the `PublishOptions` API.
-pub use diagnostics_log_encoding::Metatag;
+pub use diagnostics_log_encoding::{encode::TestRecord, Metatag};
 
 /// Callback for interest listeners
 pub trait OnInterestChanged {
@@ -175,11 +173,11 @@ impl Publisher {
 
     // TODO(fxbug.dev/71242) delete this and make Publisher private
     /// Publish the provided event for testing.
-    pub fn event_for_testing(&self, file: &str, line: u32, record: Record) {
+    pub fn event_for_testing(&self, record: TestRecord<'_>) {
         let filter: &InterestFilter = (&self.inner as &dyn Subscriber).downcast_ref().unwrap();
-        if filter.enabled_for_testing(file, line, &record) {
+        if filter.enabled_for_testing(&record) {
             let sink: &Sink = (&self.inner as &dyn Subscriber).downcast_ref().unwrap();
-            sink.event_for_testing(file, line, record);
+            sink.event_for_testing(record);
         }
     }
 
@@ -205,7 +203,7 @@ impl Subscriber for Publisher {
     fn new_span(&self, span: &Attributes<'_>) -> Id {
         self.inner.new_span(span)
     }
-    fn record(&self, span: &Id, values: &TracingRecord<'_>) {
+    fn record(&self, span: &Id, values: &Record<'_>) {
         self.inner.record(span, values)
     }
     fn record_follows_from(&self, span: &Id, follows: &Id) {

@@ -28,7 +28,6 @@ rustc_library("rust") {
 
   if (is_fuchsia) {
     deps += [
-      "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
       "//sdk/lib/syslog:client_includes",
       "//src/lib/diagnostics/log/encoding/rust",
@@ -42,6 +41,7 @@ rustc_library("rust") {
     ]
 
     test_deps = [
+      "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:futures",
     ]

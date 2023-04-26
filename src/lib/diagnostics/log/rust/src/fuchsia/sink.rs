@@ -3,10 +3,9 @@
 
 use crate::PublishError;
 use diagnostics_log_encoding::{
-    encode::{BufMutShared, Encoder, EncodingError, TestRecordArgs},
+    encode::{BufMutShared, Encoder, EncodingError, TestRecord, TracingEvent, WriteEventParams},
     Metatag,
 };
-use fidl_fuchsia_diagnostics_stream::Record;
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -84,16 +83,14 @@ impl Sink {
         }
     }
 
-    pub fn event_for_testing(&self, file: &str, line: u32, record: Record) {
+    pub fn event_for_testing(&self, record: TestRecord<'_>) {
         self.encode_and_send(move |encoder, previously_dropped| {
-            encoder.write_record_for_test(TestRecordArgs {
-                severity: record.severity,
-                record_arguments: record.arguments,
+            encoder.write_event(WriteEventParams {
+                event: record,
                 tags: &self.tags,
+                metatags: std::iter::empty(),
                 pid: *PROCESS_ID,
                 tid: THREAD_ID.with(|t| *t),
-                file,
-                line,
                 dropped: previously_dropped,
             })
         });
@@ -103,14 +100,14 @@ impl Sink {
 impl<S: Subscriber> Layer<S> for Sink {
     fn on_event(&self, event: &Event<'_>, _cx: Context<'_, S>) {
         self.encode_and_send(|encoder, previously_dropped| {
-            encoder.write_event(
-                event,
-                &self.tags,
-                &self.metatags,
-                *PROCESS_ID,
-                THREAD_ID.with(|t| *t),
-                previously_dropped,
-            )
+            encoder.write_event(WriteEventParams {
+                event: TracingEvent::from(event),
+                tags: &self.tags,
+                metatags: self.metatags.iter(),
+                pid: *PROCESS_ID,
+                tid: THREAD_ID.with(|t| *t),
+                dropped: previously_dropped,
+            })
         });
     }
 }
@@ -120,7 +117,7 @@ mod tests {
     use super::*;
     use diagnostics_log_encoding::{parse::parse_record, Severity};
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_diagnostics_stream::{Argument, Value};
+    use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
     use futures::stream::StreamExt;
     use tracing::{debug, error, info, trace, warn};

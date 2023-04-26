@@ -240,7 +240,7 @@ mod tests {
     fn signed_arg_roundtrip() {
         assert_roundtrips(
             Argument { name: String::from("signed"), value: Value::SignedInt(-1999) },
-            Encoder::write_argument,
+            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
             parse_argument,
             None,
         );
@@ -250,7 +250,7 @@ mod tests {
     fn unsigned_arg_roundtrip() {
         assert_roundtrips(
             Argument { name: String::from("unsigned"), value: Value::UnsignedInt(42) },
-            Encoder::write_argument,
+            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
             parse_argument,
             None,
         );
@@ -260,7 +260,7 @@ mod tests {
     fn text_arg_roundtrip() {
         assert_roundtrips(
             Argument { name: String::from("stringarg"), value: Value::Text(String::from("owo")) },
-            Encoder::write_argument,
+            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
             parse_argument,
             None,
         );
@@ -270,7 +270,7 @@ mod tests {
     fn float_arg_roundtrip() {
         assert_roundtrips(
             Argument { name: String::from("float"), value: Value::Floating(3.25) },
-            Encoder::write_argument,
+            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
             parse_argument,
             None,
         );
@@ -280,7 +280,7 @@ mod tests {
     fn bool_arg_roundtrip() {
         assert_roundtrips(
             Argument { name: String::from("bool"), value: Value::Boolean(false) },
-            Encoder::write_argument,
+            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
             parse_argument,
             None,
         );
@@ -346,9 +346,9 @@ mod tests {
         encoder.buf.put_u64_le(header.0).unwrap();
         encoder.buf.put_i64_le(zx::Time::get_monotonic().into_nanos()).unwrap();
         encoder
-            .write_argument(&Argument {
-                name: String::from("msg"),
-                value: Value::Text(String::from("test message one")),
+            .write_argument(crate::encode::Argument {
+                name: "msg",
+                value: crate::encode::Value::Text("test message one"),
             })
             .unwrap();
 
