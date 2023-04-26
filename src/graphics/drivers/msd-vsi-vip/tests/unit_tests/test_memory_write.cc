@@ -266,7 +266,7 @@ void etna_set_state(struct etna_cmd_stream* stream, uint32_t address, uint32_t v
 
 void etna_set_state_from_bo(struct etna_cmd_stream* stream, uint32_t address, struct etna_bo* bo,
                             uint32_t reloc_flags) {
-  DLOG("set state from bo 0x%x gpu_addr 0x%x", address,
+  DLOG("set state from bo 0x%x NPU_addr 0x%x", address,
        static_cast<TestMsdVsiDevice::EtnaBuffer*>(bo)->gpu_addr);
   auto cmd_stream = static_cast<TestMsdVsiDevice::EtnaCommandStream*>(stream);
 
@@ -318,7 +318,7 @@ bool matches_last_wait_link(std::shared_ptr<MsdVsiContext> context, Ringbuffer* 
 
   uint64_t rb_gpu_addr;
   if (!context->exec_address_space()->GetRingbufferGpuAddress(&rb_gpu_addr)) {
-    return DRETF(false, "Failed to get ringbuffer gpu addr");
+    return DRETF(false, "Failed to get ringbuffer NPU addr");
   }
   // The address lies before the start of the ringbuffer.
   if (gpu_addr < rb_gpu_addr) {

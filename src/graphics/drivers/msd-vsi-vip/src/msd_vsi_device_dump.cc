@@ -158,7 +158,7 @@ void MsdVsiDevice::FormatDump(DumpState* dump_state, std::vector<std::string>* d
   dump_out->clear();
 
   const char* build = magma::kDebug ? "DEBUG" : "RELEASE";
-  const char* fmt = "---- GPU dump begin ----";
+  const char* fmt = "---- NPU dump begin ----";
   OutputFormattedString(dump_out, fmt);
   fmt = "%s build";
   OutputFormattedString(dump_out, fmt, build);
@@ -195,7 +195,7 @@ void MsdVsiDevice::FormatDump(DumpState* dump_state, std::vector<std::string>* d
   if (dump_state->fault_present) {
     fmt =
         "MMU EXCEPTION DETECTED\n"
-        "type 0x%x (%s) gpu_address 0x%lx";
+        "type 0x%x (%s) npu_address 0x%lx";
     OutputFormattedString(dump_out, fmt, dump_state->fault_type,
                           FaultTypeToString(dump_state->fault_type), dump_state->fault_gpu_address);
   } else {
@@ -233,13 +233,13 @@ void MsdVsiDevice::FormatDump(DumpState* dump_state, std::vector<std::string>* d
 
       auto cmd_buf = static_cast<CommandBuffer*>(batch);
 
-      fmt = "    Exec Gpu Address 0x%lx";
+      fmt = "    Exec NPU Address 0x%lx";
       OutputFormattedString(dump_out, fmt, cmd_buf->GetGpuAddress());
 
       cmd_buf->GetMappings(&mappings);
       for (const auto& mapping : mappings) {
         fmt =
-            "    Mapping %p, buffer 0x%lx, gpu addr range [0x%lx, 0x%lx), "
+            "    Mapping %p, buffer 0x%lx, NPU addr range [0x%lx, 0x%lx), "
             "offset 0x%lx, mapping length 0x%lx";
         uint64_t mapping_start = mapping->gpu_addr();
         uint64_t mapping_end = mapping->gpu_addr() + mapping->length();
@@ -295,5 +295,5 @@ void MsdVsiDevice::FormatDump(DumpState* dump_state, std::vector<std::string>* d
                       active_head_dword);
   }
 
-  dump_out->push_back("---- GPU dump end ----");
+  dump_out->push_back("---- NPU dump end ----");
 }

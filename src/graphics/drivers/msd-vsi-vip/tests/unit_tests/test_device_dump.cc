@@ -109,7 +109,7 @@ TEST_F(TestDeviceDump, DumpBasic) {
         FormattedString("idle: false"),
         FormattedString("current_execution_address: 0x%x", dump_state.exec_addr),
         FormattedString("MMU EXCEPTION DETECTED\n"
-                        "type 0x2 (page not present) gpu_address 0x1234")};
+                        "type 0x2 (page not present) NPU_address 0x1234")};
 
     ASSERT_TRUE(FindStrings(dump_string, match_strings));
   }
@@ -141,7 +141,7 @@ TEST_F(TestDeviceDump, DumpCommandBuffer) {
   device_->FormatDump(&dump_state, &dump_string);
 
   std::vector<FormattedString> match_strings = {
-      FormattedString("Exec Gpu Address 0x%lx", dump_state.exec_addr),
+      FormattedString("Exec NPU Address 0x%lx", dump_state.exec_addr),
   };
   ASSERT_TRUE(FindStrings(dump_string, match_strings));
 
@@ -195,11 +195,11 @@ TEST_F(TestDeviceDump, DumpCommandBufferWithFault) {
 
   std::vector<FormattedString> match_strings = {
       FormattedString("Batch %lu (Command)", seq_num1),
-      FormattedString("Exec Gpu Address 0x%lx", desc1.gpu_addr + desc1.batch_offset),
+      FormattedString("Exec NPU Address 0x%lx", desc1.gpu_addr + desc1.batch_offset),
       FormattedString("buffer 0x%lx", buf1->platform_buffer()->id()),
       FormattedString("Batch %lu (Command)", seq_num2),
       FormattedString("FAULTING BATCH"),
-      FormattedString("Exec Gpu Address 0x%lx", desc2.gpu_addr + desc2.batch_offset),
+      FormattedString("Exec NPU Address 0x%lx", desc2.gpu_addr + desc2.batch_offset),
       FormattedString("buffer 0x%lx", buf2->platform_buffer()->id()),
   };
 
