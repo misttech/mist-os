@@ -1,0 +1,36 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/connectivity/network/tests/benchmarks/meta/socket-benchmarks.shard.cml",
+        "sys/testing/system-test.shard.cml",
+    ],
+    program: {
+        args: [
+            "-p",
+            "--quiet",
+
+            // Limit the number of runs of each test to prevent the trace file
+            // generated from being too large.
+            "--runs",
+            "50",
+        ],
+    },
+    use: [
+        {
+            protocol: [
+                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#netstack",
+        },
+    ],
+}

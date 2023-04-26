@@ -18,6 +18,12 @@
 #include "src/connectivity/network/tests/os.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
+#if defined(__Fuchsia__)
+#include <lib/trace/event.h>
+
+#include "tracing.h"
+#endif
+
 namespace {
 
 #define CHECK_TRUE_ERRNO(true_condition) FX_CHECK(true_condition) << strerror(errno)
@@ -153,12 +159,24 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   state->SetBytesProcessedPerRun(transfer);
   while (state->KeepRunning()) {
     for (int sent = 0; sent < transfer;) {
-      ssize_t wr = write(client_sock.get(), send_bytes.data() + sent, transfer - sent);
+      ssize_t wr;
+      {
+#ifdef __Fuchsia__
+        TRACE_DURATION(kSocketBenchmarksTracingCategory, "tcp_write");
+#endif
+        wr = write(client_sock.get(), send_bytes.data() + sent, transfer - sent);
+      }
       CHECK_POSITIVE(wr);
       sent += wr;
     }
     for (int recv = 0; recv < transfer;) {
-      ssize_t rd = read(server_sock.get(), recv_bytes.data() + recv, transfer - recv);
+      ssize_t rd;
+      {
+#ifdef __Fuchsia__
+        TRACE_DURATION(kSocketBenchmarksTracingCategory, "tcp_read");
+#endif
+        rd = read(server_sock.get(), recv_bytes.data() + recv, transfer - recv);
+      }
       CHECK_POSITIVE(rd);
       recv += rd;
     }
@@ -228,13 +246,25 @@ bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_co
   state->SetBytesProcessedPerRun(message_size);
   while (state->KeepRunning()) {
     for (int i = 0; i < message_count; i++) {
-      ssize_t wr = write(client_sock.get(), send_bytes.data(), message_size);
+      ssize_t wr;
+      {
+#ifdef __Fuchsia__
+        TRACE_DURATION(kSocketBenchmarksTracingCategory, "udp_write");
+#endif
+        wr = write(client_sock.get(), send_bytes.data(), message_size);
+      }
       CHECK_TRUE_ERRNO(wr >= 0);
       FX_CHECK(wr == static_cast<ssize_t>(message_size))
           << "wrote " << wr << " expected " << message_size;
     }
     for (int i = 0; i < message_count; i++) {
-      ssize_t rd = read(server_sock.get(), recv_bytes.data(), message_size);
+      ssize_t rd;
+      {
+#ifdef __Fuchsia__
+        TRACE_DURATION(kSocketBenchmarksTracingCategory, "udp_read");
+#endif
+        rd = read(server_sock.get(), recv_bytes.data(), message_size);
+      }
       CHECK_TRUE_ERRNO(rd >= 0);
       FX_CHECK(rd == static_cast<ssize_t>(message_size))
           << "read " << rd << " expected " << message_size;
@@ -291,6 +321,9 @@ bool PingLatency(perftest::RepeatState* state) {
 
 constexpr char kFakeNetstackEnvVar[] = "FAKE_NETSTACK";
 constexpr char kNetstack3EnvVar[] = "NETSTACK3";
+#if defined(__Fuchsia__)
+constexpr char kTracingEnvVar[] = "TRACING";
+#endif
 
 void RegisterTests() {
   constexpr const char* kSingleReadTestNameFmt = "WriteRead/%s/%s/%ld%s";
@@ -399,5 +432,31 @@ int main(int argc, char** argv) {
   } else if (std::getenv(kNetstack3EnvVar)) {
     test_suite += ".netstack3";
   }
-  return perftest::PerfTestMain(argc, argv, test_suite.c_str());
+
+#if defined(__Fuchsia__)
+  std::optional<Tracer> tracer;
+  if (std::getenv(kTracingEnvVar)) {
+    fit::result<fit::failed, Tracer> result = StartTracing();
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "failed to start tracing";
+      return 1;
+    } else {
+      tracer = std::move(*result);
+    }
+  }
+#endif
+
+  int return_code = perftest::PerfTestMain(argc, argv, test_suite.c_str());
+
+#if defined(__Fuchsia__)
+  if (std::getenv(kTracingEnvVar) && tracer.has_value()) {
+    fit::result<fit::failed> result = StopTracing(std::move(tracer.value()));
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "failed to stop tracing";
+      return 1;
+    }
+  }
+#endif
+
+  return return_code;
 }

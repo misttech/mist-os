@@ -7,11 +7,13 @@ import("//build/components/fuchsia_test_package.gni")
 import("//build/components/fuchsia_unittest_component.gni")
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/test.gni")
+import("//build/testing/environments.gni")
 
 group("benchmarks") {
   testonly = true
   deps = [
     ":socket-benchmarks-tests",
+    ":socket-benchmarks-with-tracing-pkg",
     ":udp-serde-benchmarks",
   ]
 }
@@ -34,13 +36,28 @@ test("socket_benchmarks") {
     "../os.h",
     "socket_benchmarks.cc",
   ]
+  if (is_fuchsia) {
+    sources += [
+      "tracing.cc",
+      "tracing.h",
+    ]
+  }
 
   deps = [
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/perftest",
+    "//zircon/system/ulib/zx",
   ]
+  if (is_fuchsia) {
+    deps += [
+      "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_cpp",
+      "//sdk/lib/component/incoming/cpp",
+      "//zircon/system/ulib/trace",
+      "//zircon/system/ulib/trace-provider",
+    ]
+  }
 }
 
 fuchsia_unittest_component("socket-benchmarks") {
@@ -81,6 +98,30 @@ fuchsia_test_package("socket-benchmarks-tests") {
     ":socket-benchmarks-with-fake-netstack",
     ":socket-benchmarks-with-fast-udp",
     ":socket-benchmarks-with-netstack3",
+  ]
+}
+
+fuchsia_unittest_component("socket-benchmarks-with-tracing") {
+  manifest = "meta/socket-benchmarks-with-tracing.cml"
+  deps = [
+    ":socket_benchmarks",
+    "//src/connectivity/network/netstack:component-with-tracing",
+  ]
+}
+
+# TODO(https://fxbug.dev/117883): Delete this once Fast UDP is the default.
+fuchsia_unittest_component("socket-benchmarks-with-fast-udp-tracing") {
+  manifest = "meta/socket-benchmarks-with-fast-udp-tracing.cml"
+  deps = [
+    ":socket_benchmarks",
+    "//src/connectivity/network/netstack:component-with-fast-udp-tracing",
+  ]
+}
+
+fuchsia_test_package("socket-benchmarks-with-tracing-pkg") {
+  test_components = [
+    ":socket-benchmarks-with-tracing",
+    ":socket-benchmarks-with-fast-udp-tracing",
   ]
 }
 

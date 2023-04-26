@@ -33,6 +33,15 @@ fuchsia_component("component-with-fast-udp") {
   deps = [ ":bin" ]
 }
 
+# TODO(https://fxbug.dev/117883): delete this once Fast UDP is the default and
+# this is no longer used.
+fuchsia_component("component-with-fast-udp-tracing") {
+  testonly = true
+  component_name = "netstack-with-fast-udp-tracing"
+  manifest = "meta/netstack_with_fast_udp_tracing.cml"
+  deps = [ ":bin_with_tracing" ]
+}
+
 go_binary("bin_with_deadlock_detection") {
   library = "stub"
   output_name = string_replace(target_name, "bin", "netstack")
