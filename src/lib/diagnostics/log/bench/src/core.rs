@@ -3,39 +3,18 @@
 // found in the LICENSE file.
 
 use diagnostics_log::{Publisher, PublisherOptions};
-use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, MAX_DATAGRAM_LEN_BYTES};
+use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
 use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_zircon as zx;
 use futures::StreamExt;
 use std::{
-    cell::RefCell,
-    rc::Rc,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 use tracing::{info, span, Event, Metadata, Subscriber};
 
-struct Setup {
-    buffer: [u8; MAX_DATAGRAM_LEN_BYTES as usize],
-    socket: Option<Rc<RefCell<zx::Socket>>>,
-}
-
-impl Setup {
-    fn new(socket: Option<Rc<RefCell<zx::Socket>>>) -> Self {
-        Self { buffer: [0u8; MAX_DATAGRAM_LEN_BYTES as usize], socket }
-    }
-}
-
-impl Drop for Setup {
-    fn drop(&mut self) {
-        if let Some(socket) = &self.socket {
-            socket.borrow_mut().read(&mut self.buffer).unwrap();
-        }
-    }
-}
-
-async fn setup_publisher() -> (Option<Rc<RefCell<zx::Socket>>>, Publisher) {
+async fn setup_publisher() -> (zx::Socket, Publisher) {
     let (proxy, mut requests) =
         fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
     let task = fasync::Task::spawn(async move {
@@ -51,31 +30,36 @@ async fn setup_publisher() -> (Option<Rc<RefCell<zx::Socket>>>, Publisher) {
         LogSinkRequest::ConnectStructured { socket, .. } => socket,
         _ => panic!("sink ctor sent the wrong message"),
     };
-    let socket = Rc::new(RefCell::new(socket));
     let publisher = task.await;
-    (Some(socket), publisher)
+    (socket, publisher)
 }
 
 fn write_log_benchmark<F, S>(
     bencher: &mut criterion::Bencher,
-    socket: Option<Rc<RefCell<zx::Socket>>>,
+    socket: Option<zx::Socket>,
     subscriber: S,
     logging_fn: F,
 ) where
-    F: FnMut(&mut Setup) -> (),
+    F: FnMut() -> (),
     S: Subscriber + Send + Sync,
 {
-    tracing::subscriber::with_default(subscriber, || {
-        bencher.iter_batched_ref(
-            // The Setup Drop implementation will read from the socket
-            // ensuring that we never exceed the maximum size of the socker buffer.
-            || Setup::new(socket.clone()),
-            logging_fn,
-            // We use PerIterator to ensure that each write to the socket is immediately followed
-            // by a read to ensure we never exceed the maximum size of the buffer and drop the log.
-            criterion::BatchSize::PerIteration,
-        )
+    // This thread constantly reads from the socket to attempt to minimize the number of dropped
+    // logs from the benchmark.
+    let reader_thread = std::thread::spawn(move || {
+        let mut executor = fasync::LocalExecutor::new();
+        let Some(socket) = socket else {
+            return;
+        };
+        executor.run_singlethreaded(async move {
+            let socket = fasync::Socket::from_socket(socket).expect("create async socket");
+            let mut stream = socket.as_datagram_stream();
+            while let Some(result) = stream.next().await {
+                let _ = criterion::black_box(result);
+            }
+        });
     });
+    tracing::subscriber::with_default(subscriber, || bencher.iter(logging_fn));
+    reader_thread.join().expect("join thread");
 }
 
 // The benchmarks below measure the time it takes to write a log message when calling a macro
@@ -88,12 +72,12 @@ fn setup_write_log_benchmarks<F, S>(
     benchmark: Option<criterion::Benchmark>,
 ) -> criterion::Benchmark
 where
-    F: FnMut() -> (Option<Rc<RefCell<zx::Socket>>>, S) + 'static + Copy,
+    F: FnMut() -> (Option<zx::Socket>, S) + 'static + Copy,
     S: Subscriber + Send + Sync,
 {
     let all_args_bench = move |b: &mut criterion::Bencher| {
         let (socket, subscriber) = make_subscriber();
-        write_log_benchmark(b, socket, subscriber, |_setup| {
+        write_log_benchmark(b, socket, subscriber, || {
             info!(
                 tag = "logbench",
                 boolean = true,
@@ -113,13 +97,13 @@ where
     bench
         .with_function(&format!("Publisher/{}/NoArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
-            write_log_benchmark(b, socket, subscriber, |_setup| {
+            write_log_benchmark(b, socket, subscriber, || {
                 info!("this is a log emitted from the benchmark");
             });
         })
         .with_function(&format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
-            write_log_benchmark(b, socket, subscriber, |_setup| {
+            write_log_benchmark(b, socket, subscriber, || {
                 info!(
                     boolean = true,
                     int = -123456,
@@ -130,7 +114,7 @@ where
         })
         .with_function(&format!("Publisher/{}/MessageAsString", name), move |b| {
             let (socket, subscriber) = make_subscriber();
-            write_log_benchmark(b, socket, subscriber, |_setup| {
+            write_log_benchmark(b, socket, subscriber, || {
                 info!(
                     "this is a log emitted from the benchmark boolean={} int={} string={}",
                     true, -123456, "foobarbaz",
@@ -187,7 +171,8 @@ fn main() {
         "Tracing",
         move || {
             let mut executor = fasync::LocalExecutor::new();
-            executor.run_singlethreaded(setup_publisher())
+            let (socket, publisher) = executor.run_singlethreaded(setup_publisher());
+            (Some(socket), publisher)
         },
         None,
     );
