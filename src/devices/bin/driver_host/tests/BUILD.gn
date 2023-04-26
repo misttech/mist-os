@@ -174,10 +174,7 @@ fuchsia_unittest_component("driver_host_unittests") {
 driver_bind_rules("unit-test-fail-bind") {
   rules = "unit-test-fail.bind"
   header_output = "unit-test-fail-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.compat",
-    "//src/devices/bind/fuchsia.test",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("unit-test-fail-driver") {
@@ -200,10 +197,7 @@ fuchsia_driver_component("unit-test-fail") {
 driver_bind_rules("unit-test-pass-bind") {
   rules = "unit-test-pass.bind"
   header_output = "unit-test-pass-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.compat",
-    "//src/devices/bind/fuchsia.test",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("unit-test-pass-driver") {

@@ -11,7 +11,7 @@
         "expected": "match",
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE",
-            "fuchsia.compat.LIBNAME": "\"gpt.cm\""
+            "fuchsia.BIND_AUTOBIND": "0"
         }
     }
 ]

@@ -835,7 +835,6 @@ void Node::Remove(RemoveCompleter::Sync& completer) {
 }
 
 void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) {
-  constexpr char kCompatKey[] = "fuchsia.compat.LIBNAME";
   bool force_rebind = false;
   if (request->has_force_rebind()) {
     force_rebind = request->force_rebind();
@@ -853,7 +852,6 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
   std::string driver_url_suffix;
   if (request->has_driver_url_suffix()) {
     driver_url_suffix = std::string(request->driver_url_suffix().get());
-    properties_.push_back(fdf::MakeProperty(arena_, kCompatKey, driver_url_suffix));
   }
 
   request_bind_completer_ = completer.ToAsync();

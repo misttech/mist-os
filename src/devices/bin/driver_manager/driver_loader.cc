@@ -199,21 +199,11 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
 
   fidl::Arena allocator;
   size_t size = props.size() + str_props.size() + 2;
-  if (!autobind) {
-    size += 1;
-  }
   fidl::VectorView<fdf::wire::NodeProperty> fidl_props(allocator, size);
 
   size_t index = 0;
   fidl_props[index++] = fdf::MakeProperty(allocator, BIND_PROTOCOL, protocol_id);
   fidl_props[index++] = fdf::MakeProperty(allocator, BIND_AUTOBIND, autobind);
-  // If we are looking for a specific driver, we add a property to the device with the
-  // name of the driver we are looking for. Drivers can then bind to this.
-  if (!autobind) {
-    fidl_props[index++] =
-        fdf::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.driver_url_suffix);
-  }
-
   for (size_t i = 0; i < props.size(); i++) {
     fidl_props[index++] = fdf::MakeProperty(allocator, props[i].id, props[i].value);
   }

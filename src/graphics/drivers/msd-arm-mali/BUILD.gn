@@ -61,7 +61,6 @@ driver_bind_rules("msd_arm_test_bind") {
   disable_autobind = true
   deps = [
     "//src/devices/bind/fuchsia.arm.platform",
-    "//src/devices/bind/fuchsia.compat",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

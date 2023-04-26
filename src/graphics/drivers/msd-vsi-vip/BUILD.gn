@@ -82,7 +82,6 @@ driver_bind_rules("msd_vsi_test_bind") {
   header_output = "test_bind.h"
   disable_autobind = true
   deps = [
-    "//src/devices/bind/fuchsia.compat",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.verisilicon.platform",
   ]

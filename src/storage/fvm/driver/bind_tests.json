@@ -9,7 +9,7 @@
     {
         "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE",
-            "fuchsia.compat.LIBNAME": "\"fvm.cm\""
+            "fuchsia.BIND_AUTOBIND": "0"
         },
         "expected": "match",
         "name": "Vendor"
