@@ -5,6 +5,10 @@
 import("//build/rust/rustc_library.gni")
 import("config.gni")  # icu_flavors, icu_fixup_deps
 
+set_defaults("icu_rustc_library") {
+  configs = default_common_binary_configs + default_rust_configs
+}
+
 # An ICU-aware rustc_library.
 #
 # Args:
@@ -20,8 +24,19 @@ import("config.gni")  # icu_flavors, icu_fixup_deps
 # the ideas of which are commonly reused in all icu_* templates.
 template("icu_rustc_library") {
   foreach(icu_flavor, icu_flavors) {
-    rustc_library(
-        "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+    _icu_target_name =
+        "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+    rustc_library(_icu_target_name) {
+      configs = []
+      configs = invoker.configs
+      if (defined(invoker.test_configs)) {
+        test_configs = invoker.test_configs
+      }
+
+      # Since the library names are also crate names, we must place each flavored
+      # library in a separate directory, but with the same base name.
+      output_dir = "${target_out_dir}/out.${_icu_target_name}"
+
       forward_variables_from(invoker,
                              "*",
                              [
@@ -114,6 +129,12 @@ template("icu_rustc_library") {
   }
 
   rustc_library(target_name) {
+    configs = []
+    configs = invoker.configs
+    if (defined(invoker.test_configs)) {
+      test_configs = invoker.test_configs
+    }
+
     forward_variables_from(invoker,
                            "*",
                            [
