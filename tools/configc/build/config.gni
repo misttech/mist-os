@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/config/clang/clang.gni")
 import("//build/host.gni")
+import("//build/python/python_action.gni")
 import("//build/rust/config.gni")
 
 # Compile a configuration value file.
@@ -318,9 +319,10 @@ template("cpp_config_client_lib_source") {
 template("validate_packaged_config") {
   assert(defined(invoker.package_manifest), "must provide an input manifest")
   _package_manifest = invoker.package_manifest
+  _configc_path = "${root_build_dir}/host-tools/configc"
   _meta_far = get_path_info(_package_manifest, "dir") + "/meta.far"
   _stamp = "${target_out_dir}/${target_name}.configc.stamp"
-  compiled_action(target_name) {
+  python_action(target_name) {
     forward_variables_from(invoker,
                            [
                              "deps",
@@ -328,18 +330,24 @@ template("validate_packaged_config") {
                              "testonly",
                              "visibility",
                            ])
-
-    tool = "//tools/configc"
-    tool_output_name = "configc"
+    binary_label = "//tools/configc:validate_config_wrapper"
 
     inputs = [
+      _configc_path,
       _package_manifest,
       _meta_far,
     ]
     outputs = [ _stamp ]
 
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ "//tools/configc:install($host_toolchain)" ]
+
     args = [
-      "validate-package",
+      "--configc-bin",
+      rebase_path(_configc_path, root_build_dir),
+      "--package",
       rebase_path(_package_manifest, root_build_dir),
       "--stamp",
       rebase_path(_stamp, root_build_dir),
