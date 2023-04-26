@@ -341,7 +341,7 @@ zx_status_t Device::CreateFidlProxy(
 
 void Device::set_state(Device::State state) {
   state_ = state;
-  inspect().set_state(StateToString(state));
+  inspect_.set_state(StateToString(state));
 
   if (state == Device::State::kDead) {
     if (std::optional binding = std::exchange(coordinator_binding_, std::nullopt);
@@ -352,20 +352,14 @@ void Device::set_state(Device::State state) {
 }
 
 void Device::InitializeInspectValues() {
-  inspect().set_driver(parent_driver_url().c_str());
-  inspect().set_protocol_id(protocol_id_);
-  inspect().set_flags(flags);
-  inspect().set_properties(props());
-
-  inspect().set_topological_path(MakeTopologicalPath());
-
   std::string type("Device");
   if (flags & DEV_CTX_PROXY) {
     type = std::string("Proxy device");
   } else if (is_composite()) {
     type = std::string("Composite device");
   }
-  inspect().set_type(type);
+  inspect_.SetStaticValues(MakeTopologicalPath(), protocol_id_, type, flags, props(),
+                           parent_driver_url());
 }
 
 void Device::DetachFromParent() {

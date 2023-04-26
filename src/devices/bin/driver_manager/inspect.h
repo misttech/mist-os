@@ -105,32 +105,15 @@ class DeviceInspect {
 
   std::optional<fbl::RefPtr<fs::VmoFile>> file() { return vmo_file_; }
 
+  // Set the values that should not change during the life of the device.
+  // This should only be called once, calling it more than once will create duplicate entries.
+  void SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
+                       const std::string& type, uint32_t flags,
+                       const fbl::Array<const zx_device_prop_t>& properties,
+                       const std::string& driver_url);
+
   void set_state(const std::string& state) { state_.Set(state); }
-
   void set_local_id(uint64_t local_id) { local_id_.Set(local_id); }
-
-  // These methods below are for static values and should be called only once. Calling it more than
-  // once will lead to duplicate entries.
-
-  void set_topological_path(const std::string& path) {
-    device_node_.CreateString("topological_path", path, &static_values_);
-  }
-
-  void set_protocol_id(uint32_t value) {
-    device_node_.CreateUint("protocol_id", value, &static_values_);
-  }
-
-  void set_type(const std::string& type) {
-    device_node_.CreateString("type", type, &static_values_);
-  }
-
-  void set_flags(uint32_t flags) { device_node_.CreateUint("flags", flags, &static_values_); }
-
-  void set_properties(const fbl::Array<const zx_device_prop_t>& props);
-
-  void set_driver(const std::string& url) {
-    device_node_.CreateString("driver", url, &static_values_);
-  }
 
  private:
   inspect::UintProperty& device_count_node_;

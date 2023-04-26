@@ -251,16 +251,25 @@ DeviceInspect::~DeviceInspect() {
   device_count_node_.Subtract(1);
 }
 
-void DeviceInspect::set_properties(const fbl::Array<const zx_device_prop_t>& props) {
+void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_t protocol_id,
+                                    const std::string& type, uint32_t flags,
+                                    const fbl::Array<const zx_device_prop_t>& properties,
+                                    const std::string& driver_url) {
+  device_node_.CreateString("topological_path", topological_path, &static_values_);
+  device_node_.CreateUint("protocol_id", protocol_id, &static_values_);
+  device_node_.CreateString("type", type, &static_values_);
+  device_node_.CreateUint("flags", flags, &static_values_);
+  device_node_.CreateString("driver", driver_url, &static_values_);
+
   inspect::Node properties_array;
 
   // Add a node only if there are any `props`
-  if (!props.empty()) {
+  if (!properties.empty()) {
     properties_array = device_node_.CreateChild("properties");
   }
 
-  for (uint32_t i = 0; i < props.size(); ++i) {
-    const zx_device_prop_t* p = &props[i];
+  for (uint32_t i = 0; i < properties.size(); ++i) {
+    const zx_device_prop_t* p = &properties[i];
     const char* param_name = BindParamName(p->id);
     auto property = properties_array.CreateChild(std::to_string(i));
     property.CreateUint("value", p->value, &static_values_);
@@ -273,7 +282,7 @@ void DeviceInspect::set_properties(const fbl::Array<const zx_device_prop_t>& pro
   }
 
   // Place the node into value list as props will not change in the lifetime of the device.
-  if (!props.empty()) {
+  if (!properties.empty()) {
     static_values_.emplace(std::move(properties_array));
   }
 }

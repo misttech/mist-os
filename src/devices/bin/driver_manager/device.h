@@ -245,7 +245,7 @@ class Device final
 
   void set_local_id(uint64_t local_id) {
     local_id_ = local_id;
-    inspect().set_local_id(local_id);
+    inspect_.set_local_id(local_id);
   }
   uint64_t local_id() const { return local_id_; }
 
