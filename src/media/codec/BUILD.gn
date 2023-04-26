@@ -119,3 +119,9 @@ fuchsia_component("codec_runner_sw_cvsd_comp") {
   deps = [ "//src/media/codec/codecs/sw/cvsd:codec_runner_sw_cvsd" ]
   component_name = "codec_runner_sw_cvsd"
 }
+
+fuchsia_component("codec_runner_sw_lc3_comp") {
+  manifest = "codecs/meta/codec_runner_sw_lc3.cml"
+  deps = [ "//src/media/codec/codecs/sw/lc3:codec_runner_sw_lc3" ]
+  component_name = "codec_runner_sw_lc3"
+}
