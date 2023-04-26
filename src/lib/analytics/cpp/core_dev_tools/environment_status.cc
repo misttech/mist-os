@@ -5,6 +5,7 @@
 #include "environment_status.h"
 
 #include <cstdlib>
+#include <cstring>
 
 namespace analytics::core_dev_tools {
 
@@ -26,6 +27,12 @@ constexpr BotInfo kBotEnvironments[] = {{"TEST_ONLY_ENV", "test-only"},
                                         {"BUILD_ID", "hudson-jenkins"},
                                         {"TEAMCITY_VERSION", "teamcity"},
                                         {"TRAVIS", "travis"}};
+
+// Some bot environment does not set special environment variables but uses "builder" as the user
+// name.
+// TODO(fxr/126204): Remove this when better alternative is available
+constexpr BotInfo kBotBuilder{"USER", "builder"};
+
 }  // namespace
 
 bool IsRunByBot() { return GetBotInfo().IsRunByBot(); }
@@ -36,6 +43,13 @@ BotInfo GetBotInfo() {
       return bot;
     }
   }
+
+  // TODO(fxr/126204): Remove this logic when better alternative is available
+  const char* user = std::getenv(kBotBuilder.environment);
+  if (user && strcmp(user, kBotBuilder.name) == 0) {
+    return kBotBuilder;
+  }
+
   return {};
 }
 
