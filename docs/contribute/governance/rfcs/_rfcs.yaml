@@ -2801,3 +2801,16 @@
   reviewers: ['abarth@google.com', 'keir@google.com', 'shayba@google.com']
   submitted: '2022-12-22'
   reviewed: '2023-04-03'
+
+- name: 'RFC-0215'
+  title: 'Structured Configuration Parent Overrides'
+  short_description: 'Allow parent components to provide configuration at runtime to their children.'
+  authors: ['adamperry@google.com']
+  file: '0215_structured_config_parent_overrides.md'
+  area: ['Component Framework']
+  issue: ['96254']
+  gerrit_change_id: ['823149']
+  status: 'Accepted'
+  reviewers: ['geb@google.com', 'ypomortsev@google.com', 'markdittmer@google.com']
+  submitted: '2023-03-21'
+  reviewed: '2023-04-26'

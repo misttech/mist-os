@@ -444,3 +444,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0213_removing_devfs_fidl_multiplexing.md
   - title: "RFC-0214: Fuchsia churn policy"
     path: /docs/contribute/governance/rfcs/0214_fuchsia_churn_policy.md
+  - title: "RFC-0215: Structured Configuration Parent Overrides"
+    path: /docs/contribute/governance/rfcs/0215_structured_config_parent_overrides.md
