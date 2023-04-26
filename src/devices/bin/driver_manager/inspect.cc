@@ -4,13 +4,11 @@
 
 #include "src/devices/bin/driver_manager/inspect.h"
 
-#include <lib/ddk/binding.h>
 #include <lib/ddk/driver.h>
 #include <lib/inspect/component/cpp/service.h>
 
 #include <utility>
 
-#include "src/devices/bin/driver_manager/device.h"
 #include "src/lib/storage/vfs/cpp/service.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
 #include "src/lib/storage/vfs/cpp/vnode.h"
@@ -74,26 +72,17 @@ const char* BindParamName(uint32_t param_num) {
 }
 }  // namespace
 
-zx::result<> InspectDevfs::Publish(const fbl::RefPtr<Device>& dev) { return AddClassDirEntry(dev); }
-
-// TODO(surajmalhotra): Ideally this would take a RefPtr, but currently this is
-// invoked in the dtor for Device.
-void InspectDevfs::Unpublish(Device* dev) {
+void InspectDevfs::Unpublish(uint32_t protocol_id, fbl::RefPtr<fs::VmoFile> file,
+                             std::string_view link_name) {
   // Remove reference in class directory if it exists
-  auto [dir, seqcount] = GetProtoDir(dev->protocol_id());
+  auto [dir, seqcount] = GetProtoDir(protocol_id);
   if (dir == nullptr) {
     // No class dir for this type, so ignore it
     return;
   }
-  std::optional file_opt = dev->inspect().file();
-  if (!file_opt.has_value()) {
-    // No inspect file for this device.
-    return;
-  }
-  fbl::RefPtr file = file_opt.value();
-  dir->RemoveEntry(dev->link_name(), file.get());
+  dir->RemoveEntry(link_name, file.get());
   // Keep only those protocol directories which are not empty to avoid clutter
-  RemoveEmptyProtoDir(dev->protocol_id());
+  RemoveEmptyProtoDir(protocol_id);
 }
 
 InspectDevfs::InspectDevfs(fbl::RefPtr<fs::PseudoDir> root_dir,
@@ -148,48 +137,40 @@ void InspectDevfs::RemoveEmptyProtoDir(uint32_t id) {
     }
   }
 }
-
-zx::result<> InspectDevfs::AddClassDirEntry(const fbl::RefPtr<Device>& dev) {
+zx::result<std::string> InspectDevfs::Publish(uint32_t protocol_id, const char* name,
+                                              fbl::RefPtr<fs::VmoFile> file) {
   // Create link in /dev/class/... if this id has a published class
-  auto [dir, seqcount] = GetOrCreateProtoDir(dev->protocol_id());
+  auto [dir, seqcount] = GetOrCreateProtoDir(protocol_id);
   if (dir == nullptr) {
     // No class dir for this type, so ignore it
-    return zx::ok();
+    return zx::ok("");
   }
-  std::optional file_opt = dev->inspect().file();
-  if (!file_opt.has_value()) {
-    // No inspect file for this device.
-    return zx::ok();
-  }
-  fbl::RefPtr file = file_opt.value();
 
   char tmp[32];
-  const char* name = nullptr;
+  const char* inspect_name = nullptr;
 
-  if (dev->protocol_id() != ZX_PROTOCOL_CONSOLE) {
+  if (protocol_id != ZX_PROTOCOL_CONSOLE) {
     for (unsigned n = 0; n < 1000; n++) {
       snprintf(tmp, sizeof(tmp), "%03u.inspect", ((*seqcount)++) % 1000);
       fbl::RefPtr<fs::Vnode> node;
       if (dir->Lookup(tmp, &node) == ZX_ERR_NOT_FOUND) {
-        name = tmp;
+        inspect_name = tmp;
         break;
       }
     }
-    if (name == nullptr) {
+    if (inspect_name == nullptr) {
       return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
   } else {
-    snprintf(tmp, sizeof(tmp), "%.*s.inspect", static_cast<int>(dev->name().length()),
-             dev->name().data());
-    name = tmp;
+    snprintf(tmp, sizeof(tmp), "%s.inspect", name);
+    inspect_name = tmp;
   }
 
-  zx::result<> status = zx::make_result(dir->AddEntry(name, file));
+  zx::result<> status = zx::make_result(dir->AddEntry(inspect_name, file));
   if (status.is_error()) {
-    return status;
+    return status.take_error();
   }
-  dev->set_link_name(name);
-  return zx::ok();
+  return zx::ok(std::string(inspect_name));
 }
 
 InspectManager::InspectManager(async_dispatcher_t* dispatcher) {
@@ -218,7 +199,7 @@ InspectManager::InspectManager(async_dispatcher_t* dispatcher) {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InspectManager::Connect() {
-  zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }

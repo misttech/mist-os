@@ -17,8 +17,6 @@
 #include "src/lib/storage/vfs/cpp/synchronous_vfs.h"
 #include "src/lib/storage/vfs/cpp/vmo_file.h"
 
-class Device;
-
 struct ProtocolInfo {
   const char* name;
   fbl::RefPtr<fs::PseudoDir> devnode;
@@ -45,11 +43,14 @@ class InspectDevfs {
   // Delete protocol |id| directory if no files are present.
   void RemoveEmptyProtoDir(uint32_t id);
 
-  zx::result<> AddClassDirEntry(const fbl::RefPtr<Device>& dev);
+  // Publishes a device. Should be called when there's a new devices.
+  // This returns a string, `link_name`, representing the device that was just published.
+  // This string should be passed to `Unpublish` to remove the device when it's being removed.
+  zx::result<std::string> Publish(uint32_t protocol_id, const char* name,
+                                  fbl::RefPtr<fs::VmoFile> file);
 
-  zx::result<> Publish(const fbl::RefPtr<Device>& dev);
-
-  void Unpublish(Device* dev);
+  // Unpublishes a device. Should be called when a device is being removed.
+  void Unpublish(uint32_t protocol_id, fbl::RefPtr<fs::VmoFile> file, std::string_view link_name);
 
  private:
   fbl::RefPtr<fs::PseudoDir> root_dir_;

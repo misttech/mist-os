@@ -186,8 +186,6 @@ class Device final
 
   uint32_t protocol_id() const { return protocol_id_; }
 
-  DeviceInspect& inspect() { return inspect_; }
-
   bool is_bindable() const {
     return !(flags & (DEV_CTX_BOUND | DEV_CTX_INVISIBLE)) && (state_ != Device::State::kDead);
   }
@@ -323,9 +321,6 @@ class Device final
 
   DevfsDevice devfs;
 
-  const fbl::String& link_name() const { return link_name_; }
-  void set_link_name(fbl::String link_name) { link_name_ = std::move(link_name); }
-
   std::shared_ptr<dfv2::Node> GetBoundNode();
   zx::result<std::shared_ptr<dfv2::Node>> CreateDFv2Device();
 
@@ -414,6 +409,13 @@ class Device final
   // const version.
   template <typename DeviceType>
   static std::list<DeviceType*> GetChildren(DeviceType* device);
+
+  // Publish the device to inspect. This should be called when the device is created,
+  // and should only be called once.
+  zx::result<> PublishToInspect();
+  // Unpublish the device from inspect. This should be called when the device is shutting down.
+  // This function is fine to call even if the device has not been published.
+  void UnpublishInspect();
 
   fidl::WireSharedClient<fuchsia_device_manager::DeviceController> device_controller_;
   std::optional<fidl::ServerBindingRef<fuchsia_device_manager::Coordinator>> coordinator_binding_;
