@@ -189,6 +189,14 @@ fuchsia_package("test_manager_pkg") {
     "//src/storage/memfs:memfs_component",
     "//src/sys/early_boot_instrumentation:early-boot-instrumentation",
   ]
+
+  subpackages = [
+    "//src/sys/test_runners/rust:rust-test-runner",
+    "//src/sys/test_runners/gunit:gunit-runner",
+    "//src/sys/test_runners/gtest:gtest-runner",
+    "//src/sys/test_runners/elf:elf-test-runner",
+    "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
+  ]
 }
 
 core_shard("test_manager_core_shard") {
