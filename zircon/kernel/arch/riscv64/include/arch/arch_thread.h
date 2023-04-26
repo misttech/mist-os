@@ -13,7 +13,7 @@
 #include <sys/types.h>
 #include <zircon/tls.h>
 
-#include <arch/riscv64.h>
+#include <arch/riscv64/fpu.h>
 
 struct arch_thread {
   // The compiler knows the position of these two fields relative to tp, which

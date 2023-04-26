@@ -178,16 +178,6 @@ extern void riscv64_software_exception();
 
 void platform_irq(iframe_t* frame);
 
-// Double precision floating point state at context switch time.
-struct riscv64_fpu_state {
-  uint64_t f[32];
-  uint32_t fcsr;
-};
-
-extern "C" void riscv64_fpu_zero();
-extern "C" void riscv64_fpu_save(riscv64_fpu_state* state);
-extern "C" void riscv64_fpu_restore(const riscv64_fpu_state* state);
-
 /*
  * Creates a stack and sets the stack pointer for the specified secondary CPU.
  */

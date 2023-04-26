@@ -18,11 +18,15 @@
 
 #define LOCAL_TRACE 0
 
+namespace {
+
 // mapping of cpu -> hart
 uint64_t cpu_to_hart_map[SMP_MAX_CPUS] = {0};
 
 // list of IPIs queued per cpu
-static ktl::atomic<int> ipi_data[SMP_MAX_CPUS];
+ktl::atomic<int> ipi_data[SMP_MAX_CPUS];
+
+}  // anonymous namespace
 
 // total number of detected cpus
 uint riscv64_num_cpus = 1;
@@ -33,7 +37,7 @@ riscv64_percpu riscv64_percpu_array[SMP_MAX_CPUS];
 void arch_register_hart(uint cpu_num, uint64_t hart_id) { cpu_to_hart_map[cpu_num] = hart_id; }
 
 // software triggered exceptions, used for cross-cpu calls
-void riscv64_software_exception(void) {
+void riscv64_software_exception() {
   uint current_hart = riscv64_curr_hart_id();
 
   sbi_clear_ipi();
@@ -117,7 +121,7 @@ void riscv64_init_percpu_early(uint hart_id, uint cpu_num) {
   wmb();
 }
 
-void arch_mp_init_percpu(void) { interrupt_init_percpu(); }
+void arch_mp_init_percpu() { interrupt_init_percpu(); }
 
 void arch_flush_state_and_halt(Event* flush_done) {
   DEBUG_ASSERT(arch_ints_disabled());

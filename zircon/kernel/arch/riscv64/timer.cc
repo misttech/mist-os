@@ -23,12 +23,25 @@
 
 #define LOCAL_TRACE 0
 
-// TODO-rvbringup: handle early ticks
-
+// Setup by start.S
 arch::EarlyTicks kernel_entry_ticks;
 arch::EarlyTicks kernel_virtual_entry_ticks;
 
+namespace {
+
 uint64_t raw_ticks_to_ticks_offset{0};
+
+template <bool AllowDebugPrint = false>
+inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint32_t cntfrq) {
+  affine::Ratio cntpct_to_nsec = {ZX_SEC(1), cntfrq};
+  if constexpr (AllowDebugPrint) {
+    dprintf(SPEW, "riscv generic timer cntpct_per_nsec: %u/%u\n", cntpct_to_nsec.numerator(),
+            cntpct_to_nsec.denominator());
+  }
+  return cntpct_to_nsec;
+}
+
+}  // anonymous namespace
 
 void riscv64_timer_exception() {
   riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
@@ -73,16 +86,6 @@ void platform_shutdown_timer() {
 }
 
 bool platform_usermode_can_access_tick_registers() { return false; }
-
-template <bool AllowDebugPrint = false>
-static inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint32_t cntfrq) {
-  affine::Ratio cntpct_to_nsec = {ZX_SEC(1), cntfrq};
-  if constexpr (AllowDebugPrint) {
-    dprintf(SPEW, "riscv generic timer cntpct_per_nsec: %u/%u\n", cntpct_to_nsec.numerator(),
-            cntpct_to_nsec.denominator());
-  }
-  return cntpct_to_nsec;
-}
 
 void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t& config) {
   platform_set_ticks_to_time_ratio(

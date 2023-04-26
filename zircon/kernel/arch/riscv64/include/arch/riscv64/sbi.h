@@ -84,9 +84,9 @@ static inline void sbi_send_ipis(const unsigned long *hart_mask) {
   sbi_call(SBI_SEND_IPI, hart_mask);
 }
 
-static inline void sbi_clear_ipi(void) { sbi_call(SBI_CLEAR_IPI); }
+static inline void sbi_clear_ipi() { sbi_call(SBI_CLEAR_IPI); }
 
-static inline uint64_t riscv64_get_time(void) { return riscv64_csr_read(RISCV64_CSR_TIME); }
+static inline uint64_t riscv64_get_time() { return riscv64_csr_read(RISCV64_CSR_TIME); }
 
 static inline sbiret sbi_hart_start(unsigned long hart_id, unsigned long start_addr,
                                     unsigned long priv) {

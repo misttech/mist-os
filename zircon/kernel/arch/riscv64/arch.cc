@@ -35,11 +35,15 @@
 
 // TODO-rvbringup: move secondary cpu stuff to mp.cc
 
+namespace {
+
 // Used to hold up the boot sequence on secondary CPUs until signaled by the primary.
-static ktl::atomic<bool> secondaries_released;
+ktl::atomic<bool> secondaries_released;
 
 // one for each secondary CPU, indexed by (cpu_num - 1).
-static Thread _init_thread[SMP_MAX_CPUS - 1];
+Thread _init_thread[SMP_MAX_CPUS - 1];
+
+}  // anonymous namespace
 
 zx_status_t riscv64_create_secondary_stack(cpu_num_t cpu_num, vaddr_t* sp) {
   DEBUG_ASSERT_MSG(cpu_num > 0 && cpu_num < SMP_MAX_CPUS, "cpu_num: %u", cpu_num);
@@ -116,7 +120,7 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 #endif
 }
 
-void arch_late_init_percpu(void) {
+void arch_late_init_percpu() {
   // enable software interrupts, used for inter-processor-interrupts
   riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_SIE);
 
@@ -130,44 +134,6 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
   for (;;) {
     __asm__ volatile("wfi");
   }
-}
-
-void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uintptr_t arg1,
-                              uintptr_t arg2) {
-  iframe->regs.pc = pc;
-  iframe->regs.sp = sp;
-  iframe->regs.a0 = arg1;
-  iframe->regs.a1 = arg2;
-
-  // Saved interrupt enable (so that interrupts are enabled when returning to user space).
-  // Current interrupt enable state is also disabled, which will matter when the
-  // arch_uspace_entry loads sstatus temporarily before switching to user space.
-  // Set user space bitness to 64bit.
-  // Set the fpu to the initial state, with the implicit assumption that the context switch
-  // routine would have defaulted the FPU state a the time this thread enters user space.
-  // All other bits set to zero, default options.
-  iframe->status =
-      RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_INITIAL;
-}
-
-// Switch to user mode, set the user stack pointer to user_stack_top, save the
-// top of the kernel stack pointer.
-void arch_enter_uspace(iframe_t* iframe) {
-  DEBUG_ASSERT(arch_ints_disabled());
-
-  Thread* ct = Thread::Current::Get();
-
-  LTRACEF("riscv64_uspace_entry(%#" PRIxPTR ", %#" PRIxPTR ", %#" PRIxPTR ", %#" PRIxPTR ")\n",
-          iframe->regs.a0, iframe->regs.a1, ct->stack().top(), iframe->regs.pc);
-
-  ASSERT(arch_is_valid_user_pc(iframe->regs.pc));
-
-#if __has_feature(shadow_call_stack)
-  riscv64_uspace_entry(iframe, ct->stack().top(), ct->stack().shadow_call_base());
-#else
-  riscv64_uspace_entry(iframe, ct->stack().top());
-#endif
-  __UNREACHABLE;
 }
 
 // TODO-rvbringup: move to mp.cc
