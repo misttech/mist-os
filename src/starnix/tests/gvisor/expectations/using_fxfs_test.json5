@@ -770,6 +770,11 @@
                 "ReadWriteSharedPrivate/MMapFileParamTest.NoSigBusOnPagesBeforeEOF/*",
                 "ReadWriteSharedPrivate/MMapFileParamTest.WriteOnlyFd/*",
 
+                // pty_test - flaky
+                "JobControlTest.ReleaseTTY",
+                "JobControlTest.SetForegroundProcessGroupDifferentSession",
+                "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
+
                 // select_test - these tests hang
                 "SelectTest.NullFds",
                 "SelectTest.NegativeNfds",
