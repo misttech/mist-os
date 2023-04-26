@@ -77,10 +77,11 @@ legacy_cache_package_labels += [
   "//src/sys/run_test_suite",
 
   # Used by Chromium tests, such as //src/chromium:tests.
-  # In Chromium infra, these tests run on this image, so they must be in cache.
+  # Although deps in the individual tests ensures these are available in Fuchsia
+  # infrastructure, Chromium infrastructure runs such tests run on this image,
+  # so they must be explicitly included in cached packages.
   # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
-  "//src/testing/fidl/intl_property_manager",
-  "//src/developer/build_info/testing:fake-build-info",
+  "//src/chromium:chromium_test_base_deps",
 
   # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
   # moniker and is unable to ingest Inspect. Used in Chromium tests.

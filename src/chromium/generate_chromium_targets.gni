@@ -309,6 +309,8 @@ if (is_host) {
         max_severity = "ERROR"
       }
       deps = [
+        ":chromium_test_base_deps",
+
         # The targets below have exactly the same contents, so will not be taking
         # extra storage in configurations that use them both.
         ":tzdata_for_base_unittests",
@@ -322,7 +324,10 @@ if (is_host) {
       log_settings = {
         max_severity = "ERROR"
       }
-      deps = [ ":web_engine" ]
+      deps = [
+        ":chromium_test_base_deps",
+        ":web_engine",
+      ]
     }
 
     prebuilt_test_manifest("chromium_cast_runner_tests") {
@@ -331,8 +336,9 @@ if (is_host) {
       log_settings = {
         max_severity = "ERROR"
       }
+      deps = [ ":chromium_test_base_deps" ]
       if (!use_chromium_canary) {
-        deps = [
+        deps += [
           # Although the test package includes cast_runner, the
           # CastRunnerCfv1ShimIntegrationTest tests rely on being able to launch
           # cast_runner by its Component URL.

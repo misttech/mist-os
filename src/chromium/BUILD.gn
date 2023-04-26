@@ -76,3 +76,27 @@ if (is_host) {
     archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
   }
 }
+
+# A set of dependencies required to run most Chromium prebuilt tests.
+# Chromium tests are not currently hermetic. A small number of "system tests"
+# use only services from the actual system. The rest launch a small number of
+# fakes. Depending on this target from a `prebuilt_test_manifest()` instance
+# ensures that they are available.
+group("chromium_test_base_deps") {
+  testonly = true
+  visibility += [
+    # See //products/terminal.gni.
+    "//:legacy_cache_packages",
+
+    # Allow uses not known to this file.
+    "//vendor/*",
+  ]
+
+  # Fake services needed by Chromium tests until subpackages are supported OOT
+  # and fakes are provided with the SDK. See crbug.com/1326674.
+  # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
+  deps = [
+    "//src/developer/build_info/testing:fake-build-info",
+    "//src/testing/fidl/intl_property_manager",
+  ]
+}
