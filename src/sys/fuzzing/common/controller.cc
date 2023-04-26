@@ -84,9 +84,8 @@ void ControllerImpl::Configure(Options options, ConfigureCallback callback) {
         return fpromise::ok();
       })
           .and_then(runner_->Configure())
-          .then([callback = std::move(callback)](const ZxResult<>& result) {
-            callback(result.is_ok() ? ZX_OK : result.error());
-          })
+          .then(
+              [callback = std::move(callback)](ZxResult<>& result) { callback(std::move(result)); })
           .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
 }
@@ -102,8 +101,8 @@ void ControllerImpl::AddToCorpus(CorpusType corpus_type, FidlInput fidl_input,
                   .and_then([this, corpus_type](Input& received) -> ZxResult<> {
                     return AsZxResult(runner_->AddToCorpus(corpus_type, std::move(received)));
                   })
-                  .then([callback = std::move(callback)](const ZxResult<>& result) {
-                    callback(result.is_ok() ? ZX_OK : result.error());
+                  .then([callback = std::move(callback)](ZxResult<>& result) {
+                    callback(std::move(result));
                   })
                   .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
@@ -133,8 +132,8 @@ void ControllerImpl::WriteDictionary(FidlInput dictionary, WriteDictionaryCallba
                   .and_then([this](Input& received) -> ZxResult<> {
                     return AsZxResult(runner_->ParseDictionary(std::move(received)));
                   })
-                  .then([callback = std::move(callback)](const ZxResult<>& result) {
-                    callback(result.is_ok() ? ZX_OK : result.error());
+                  .then([callback = std::move(callback)](ZxResult<>& result) {
+                    callback(std::move(result));
                   })
                   .wrap_with(scope_);
   executor_->schedule_task(std::move(task));
@@ -153,13 +152,13 @@ void ControllerImpl::AddMonitor(fidl::InterfaceHandle<Monitor> monitor,
 
 // Invokes the callback provided for long-running workflows.
 template <typename ResultType, typename WorkflowCallback>
-static ResultType Acknowledge(ResultType result, WorkflowCallback callback) {
-  if (result.is_error()) {
-    callback(result.error());
-    return fpromise::error(ZX_ERR_CANCELED);
+static ResultType Acknowledge(ResultType&& result, WorkflowCallback callback) {
+  if (result.is_ok()) {
+    callback(fpromise::ok());
+  } else {
+    callback(fpromise::error(result.error()));
   }
-  callback(ZX_OK);
-  return result;
+  return std::move(result);
 }
 
 void ControllerImpl::Fuzz(FuzzCallback callback) {

@@ -23,21 +23,21 @@ pub async fn serve_manager(
     let fake = test.controller();
     let writer = test.writer().clone();
     while let Some(request) = stream.next().await {
-        let request = request.context("fuchsia.fuzzer.Manager")?;
+        let request = request.context("fuchsia.fuzzer/Manager")?;
         match request {
             fuzz::ManagerRequest::Connect { fuzzer_url, controller, responder } => {
-                test.record(format!("fuchsia.fuzzer.Manager/Connect({})", fuzzer_url));
+                test.record(format!("fuchsia.fuzzer/Manager.Connect({})", fuzzer_url));
                 let stream = controller.into_stream()?;
                 {
                     let mut url_mut = url.borrow_mut();
                     *url_mut = Some(fuzzer_url);
                 }
-                responder.send(zx::Status::OK.into_raw())?;
+                responder.send(&mut Ok(()))?;
                 task = Some(create_task(serve_controller(stream, test.clone()), &writer));
             }
             fuzz::ManagerRequest::GetOutput { fuzzer_url, output, socket, responder } => {
                 test.record(format!(
-                    "fuchsia.fuzzer.Manager/GetOutput({}, {:?})",
+                    "fuchsia.fuzzer/Manager.GetOutput({}, {:?})",
                     fuzzer_url, output
                 ));
                 let running = {
@@ -45,13 +45,17 @@ pub async fn serve_manager(
                     url.clone().unwrap_or(String::default())
                 };
                 if fuzzer_url == running {
-                    responder.send(fake.set_output(output, socket).into_raw())?;
+                    let mut response = match fake.set_output(output, socket) {
+                        zx::Status::OK => Ok(()),
+                        status => Err(status.into_raw()),
+                    };
+                    responder.send(&mut response)?;
                 } else {
-                    responder.send(zx::Status::NOT_FOUND.into_raw())?;
+                    responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw()))?;
                 }
             }
             fuzz::ManagerRequest::Stop { fuzzer_url, responder } => {
-                test.record(format!("fuchsia.fuzzer.Manager/Stop({})", fuzzer_url));
+                test.record(format!("fuchsia.fuzzer/Manager.Stop({})", fuzzer_url));
                 let running = {
                     let mut url_mut = url.borrow_mut();
                     let running = url_mut.as_ref().map_or(String::default(), |url| url.to_string());
@@ -60,9 +64,9 @@ pub async fn serve_manager(
                 };
                 if fuzzer_url == running {
                     task = None;
-                    responder.send(zx::Status::OK.into_raw())?;
+                    responder.send(&mut Ok(()))?;
                 } else {
-                    responder.send(zx::Status::NOT_FOUND.into_raw())?;
+                    responder.send(&mut Err(zx::Status::NOT_FOUND.into_raw()))?;
                 }
             }
         };

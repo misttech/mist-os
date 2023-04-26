@@ -92,9 +92,9 @@ void EngineIntegrationTest::Crash() {
 
   FUZZING_EXPECT_OK(WatchArtifact(executor(), controller), &actual);
   Input input("FUZZ");
-  Bridge<zx_status_t> bridge1;
-  controller->TryOne(AsyncSocketWrite(executor(), input), bridge1.completer.bind());
-  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error()), ZX_OK);
+  ZxBridge<> bridge1;
+  controller->TryOne(AsyncSocketWrite(executor(), input), ZxBind<>(std::move(bridge1.completer)));
+  FUZZING_EXPECT_OK(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)));
   RunUntilIdle();
   ASSERT_FALSE(actual.is_empty());
   EXPECT_EQ(actual.fuzz_result(), FuzzResult::CRASH);

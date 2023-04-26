@@ -64,18 +64,21 @@ impl FuzzRegistry {
                         timeout,
                         responder,
                     }) => {
-                        let result = match parse_url(fuzzer_url) {
-                            Ok(url) => self.connect(url, controller, timeout).await,
-                            Err(e) => Err(e),
+                        let mut response = match parse_url(fuzzer_url) {
+                            Ok(url) => self
+                                .connect(url, controller, timeout)
+                                .await
+                                .map_err(|e| e.into_raw()),
+                            Err(e) => Err(e.into_raw()),
                         };
-                        responder.send(map_zx_result(result))
+                        responder.send(&mut response)
                     }
                     Ok(fuzz::RegistryRequest::Disconnect { fuzzer_url, responder }) => {
-                        let result = match parse_url(fuzzer_url) {
-                            Ok(url) => self.disconnect(url).await,
-                            Err(e) => Err(e),
+                        let mut response = match parse_url(fuzzer_url) {
+                            Ok(url) => self.disconnect(url).await.map_err(|e| e.into_raw()),
+                            Err(e) => Err(e.into_raw()),
                         };
-                        responder.send(map_zx_result(result))
+                        responder.send(&mut response)
                     }
                     Err(e) => Err(e),
                 };
@@ -147,7 +150,7 @@ impl FuzzRegistry {
                 Err(zx::Status::CANCELED)
             }
             (Err(e), _) => {
-                error!("fuchsia.fuzzer.ControllerProvider:Connect failed: {:?}", e);
+                error!("fuchsia.fuzzer/ControllerProvider.Connect failed: {:?}", e);
                 let _ = stop_provider(&url, provider);
                 Err(zx::Status::INTERNAL)
             }
@@ -227,13 +230,6 @@ fn stop_provider(url: &Url, provider: fuzz::ControllerProviderProxy) -> Result<(
             Err(zx::Status::INTERNAL)
         }
         Ok(_) => Ok(()),
-    }
-}
-
-fn map_zx_result(result: Result<(), zx::Status>) -> i32 {
-    match result {
-        Ok(()) => zx::Status::OK.into_raw(),
-        Err(e) => e.into_raw(),
     }
 }
 
@@ -357,7 +353,7 @@ mod tests {
                 .connect(&FOO_URL, server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             controller.get_status().await.expect("failed to get status");
         };
         join!(serve_test_fut(test_fut), serve_controller_provider(stream));
@@ -377,7 +373,7 @@ mod tests {
             };
             let results = join!(connect_fut, register_fut());
             let result = results.0.expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             results.1.expect("failed to register");
             controller.get_status().await.expect("failed to get status");
         };
@@ -395,7 +391,7 @@ mod tests {
                 .connect(&FOO_URL, server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::TIMED_OUT.into_raw());
+            assert_eq!(result, Err(zx::Status::TIMED_OUT.into_raw()));
             let result = controller.get_status().await;
             assert!(result.is_err());
         };
@@ -418,7 +414,7 @@ mod tests {
                 .connect(&FOO_URL, server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             controller.get_status().await.expect("failed to get status");
         };
         // Verify the second provider is valid by only serving it, and not the first.
@@ -446,9 +442,9 @@ mod tests {
             };
             let results = join!(connect1_fut, connect2_fut(), register_fut());
             let result = results.0.expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             let result = results.1.expect("failed to connect");
-            assert_eq!(result, zx::Status::SHOULD_WAIT.into_raw());
+            assert_eq!(result, Err(zx::Status::SHOULD_WAIT.into_raw()));
             results.2.expect("failed to register");
             controller.get_status().await.expect("failed to get status");
         };
@@ -474,12 +470,12 @@ mod tests {
                 .connect(&FOO_URL, foo_server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             let result = registry
                 .connect(&BAR_URL, bar_server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             foo_controller.get_status().await.expect("failed to get status");
             bar_controller.get_status().await.expect("failed to get status");
         };
@@ -494,7 +490,7 @@ mod tests {
     async fn test_disconnect_without_connect() {
         let test_fut = |registry: fuzz::RegistryProxy, _| async move {
             let result = registry.disconnect(&FOO_URL).await.expect("failed to disconnect");
-            assert_eq!(result, zx::Status::NOT_FOUND.into_raw());
+            assert_eq!(result, Err(zx::Status::NOT_FOUND.into_raw()));
         };
         serve_test_fut(test_fut).await;
     }
@@ -511,12 +507,12 @@ mod tests {
                 .connect(&FOO_URL, server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             controller.get_status().await.expect("failed to get status");
             let result = registry.disconnect(&FOO_URL).await.expect("failed to disconnect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             let result = registry.disconnect(&FOO_URL).await.expect("failed to disconnect");
-            assert_eq!(result, zx::Status::NOT_FOUND.into_raw());
+            assert_eq!(result, Err(zx::Status::NOT_FOUND.into_raw()));
         };
         join!(serve_test_fut(test_fut), serve_controller_provider(stream));
     }
@@ -533,11 +529,11 @@ mod tests {
                 .connect(&FOO_URL, server_end, timeout_ms(100))
                 .await
                 .expect("failed to connect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             controller.get_status().await.expect("failed to get status");
             drop(controller);
             let result = registry.disconnect(&FOO_URL).await.expect("failed to disconnect");
-            assert_eq!(result, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
         };
         join!(serve_test_fut(test_fut), serve_controller_provider(stream));
     }

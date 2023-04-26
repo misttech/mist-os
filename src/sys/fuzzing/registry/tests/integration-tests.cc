@@ -59,19 +59,17 @@ class RegistryIntegrationTest : public AsyncTest {
     if (auto status = context_->Connect(std::move(request)); status != ZX_OK) {
       return fpromise::make_error_promise(status);
     }
-    Bridge<zx_status_t> bridge;
+    ZxBridge<> bridge;
     registry_->Connect(kFuzzerUrl, controller->NewRequest(), timeout.get(),
-                       bridge.completer.bind());
-    return bridge.consumer.promise().then(
-        [](Result<zx_status_t>& result) { return AsZxResult(result); });
+                       ZxBind<>(std::move(bridge.completer)));
+    return bridge.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED));
   }
 
   // Promises to stop a fuzzer if running.
   ZxPromise<> Disconnect() {
-    Bridge<zx_status_t> bridge;
-    registry_->Disconnect(kFuzzerUrl, bridge.completer.bind());
+    ZxBridge<> bridge;
+    registry_->Disconnect(kFuzzerUrl, ZxBind<>(std::move(bridge.completer)));
     return bridge.consumer.promise()
-        .then([](Result<zx_status_t>& result) { return AsZxResult(result); })
         .and_then(process_->Wait())
         .and_then([](const int64_t& ignored) -> ZxResult<> { return fpromise::ok(); });
   }

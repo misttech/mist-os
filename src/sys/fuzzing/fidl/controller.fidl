@@ -135,15 +135,11 @@ protocol Controller {
     /// fuzzer should assume the default values for `Options`.
     ///
     /// + request `options` the execution and error detection parameters.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the options were set.
-    ///     - `ZX_ERR_BAD_STATE` if a long-running call such as `Execute`,
-    ///       `Cleanse`, `Minimize`, `Fuzz`, or `Merge` is in progress.
+    /// * error `ZX_ERR_BAD_STATE` if a long-running call such as `Execute`,
+    /// *     `Cleanse`, `Minimize`, `Fuzz`, or `Merge` is in progress.
     Configure(struct {
         options Options;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Gets the current values for the various execution and error detection
     /// parameters.
@@ -159,16 +155,13 @@ protocol Controller {
     ///
     /// + request `corpus` the type of corpus to add to.
     /// + request `input` the sequence of bytes to add as a test input.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the input was added
-    ///     - `ZX_ERR_INVALID_ARGS` if corpus type is invalid.
-    ///     - A socket error if transferring the input fails.
+    /// * error one of the following:
+    ///     * `ZX_ERR_INVALID_ARGS` if corpus type is invalid.
+    ///     * A socket error if transferring the input fails.
     AddToCorpus(resource struct {
         corpus Corpus;
         input Input;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Connects a `corpus_reader` for either the "seed" or "live" corpus.
     ///
@@ -187,15 +180,12 @@ protocol Controller {
     /// * https://github.com/mirrorer/afl/blob/master/dictionaries/README.dictionaries
     ///
     /// + request `dictionary` the AFL-style dictionary
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the dictionary was parsed and loaded.
-    ///     - A socket error if transferring the input fails.
-    ///     -`ZX_ERR_INVALID_ARGS` if parsing the dictionary fails.
+    /// * error one of the following:
+    ///     * A socket error if transferring the input fails.
+    ///     *`ZX_ERR_INVALID_ARGS` if parsing the dictionary fails.
     WriteDictionary(resource struct {
         dictionary Input;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Returns the current dictionary as an Input, which may be empty.
     ///
@@ -230,13 +220,9 @@ protocol Controller {
     /// See `Result` for more details on long running workflows such as this
     /// one.
     ///
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the workflow was started.
-    ///     - `ZX_ERR_BAD_STATE` if another long-running workflow is in
-    ///       progress.
-    Fuzz() -> (struct {
-        result zx.Status;
-    });
+    /// * error `ZX_ERR_BAD_STATE` if another long-running workflow is in
+    /// *     progress.
+    Fuzz() -> () error zx.Status;
 
     /// Executes the target code with a single `test_input`.
     ///
@@ -244,16 +230,13 @@ protocol Controller {
     /// one.
     ///
     /// + request `input` the sequence of bytes to use with the fuzz target.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the workflow was started.
-    ///     - `ZX_ERR_BAD_STATE` if another long-running workflow is in
+    /// * error one of the following:
+    ///     * `ZX_ERR_BAD_STATE` if another long-running workflow is in
     ///       progress.
-    ///     -  A socket error if transferring the input fails.
+    ///     *  A socket error if transferring the input fails.
     TryOne(resource struct {
         test_input Input;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Attempts to find the smallest input that produces the same error as the
     /// given `test_input`,
@@ -263,18 +246,15 @@ protocol Controller {
     /// one.
     ///
     /// + request `input` the sequence of bytes to minimize.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the workflow was started.
-    ///     - `ZX_ERR_BAD_STATE` if another long-running workflow is in
+    /// * error one of the following:
+    ///     * `ZX_ERR_BAD_STATE` if another long-running workflow is in
     ///       progress.
-    ///     - A socket error if transferring the input fails.
-    ///     - `ZX_ERR_INVALID_ARGS` if the provided `test_input` does not cause
+    ///     * A socket error if transferring the input fails.
+    ///     * `ZX_ERR_INVALID_ARGS` if the provided `test_input` does not cause
     ///       an error.
     Minimize(resource struct {
         test_input Input;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Attempts to replace bytes of the given `test_input` with "filler" bytes,
     /// e.g. \x00, \xFF, without changing the error produced.
@@ -287,16 +267,13 @@ protocol Controller {
     /// returned as-is.
     ///
     /// + request `input` the sequence of bytes to cleanse.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the workflow was started.
-    ///     - `ZX_ERR_BAD_STATE` if another long-running workflow is in
+    /// * error one of the following:
+    ///     * `ZX_ERR_BAD_STATE` if another long-running workflow is in
     ///       progress.
-    ///     - A socket error if transferring the input fails.
+    ///     * A socket error if transferring the input fails.
     Cleanse(resource struct {
         test_input Input;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Attempts to shrink the corpora. Inputs from the seed corpus will be
     /// preserved. All other inputs will be sorted by amount of feedback
@@ -306,15 +283,12 @@ protocol Controller {
     /// See `Result` for more details on long running workflows such as this
     /// one.
     ///
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the workflow was started.
-    ///     - `ZX_ERR_BAD_STATE` if another long-running workflow is in
+    /// * error one of the following:
+    ///     * `ZX_ERR_BAD_STATE` if another long-running workflow is in
     ///       progress.
-    ///     - `ZX_ERR_INVALID_ARGS` if an input in the seed corpus causes an
+    ///     * `ZX_ERR_INVALID_ARGS` if an input in the seed corpus causes an
     ///       error. Inputs in the live corpus that cause errors are skipped.
-    Merge() -> (struct {
-        result zx.Status;
-    });
+    Merge() -> () error zx.Status;
 
     /// Returns various fuzzing metrics, e.g. total coverage, speed, etc.
     ///

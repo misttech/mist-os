@@ -34,13 +34,13 @@ impl Manager {
     pub async fn connect(&self, url: &Url) -> Result<fuzz::ControllerProxy> {
         let (proxy, server_end) = create_proxy::<fuzz::ControllerMarker>()
             .context("failed to create fuchsia.fuzzer.Controller proxy")?;
-        let raw = self
+        let result = self
             .proxy
             .connect(url.as_str(), server_end)
             .await
-            .context("fuchsia.fuzzer.Manager/Connect")?;
-        if raw != zx::Status::OK.into_raw() {
-            bail!("fuchsia.fuzzer.Manager/Connect returned ZX_ERR_{}", zx::Status::from_raw(raw));
+            .context("fuchsia.fuzzer/Manager.Connect")?;
+        if let Err(e) = result {
+            bail!("fuchsia.fuzzer/Manager.Connect returned ZX_ERR_{}", zx::Status::from_raw(e));
         }
         Ok(proxy)
     }
@@ -48,13 +48,13 @@ impl Manager {
     /// Returns a socket that provides the given type of fuzzer output.
     pub async fn get_output(&self, url: &Url, output: fuzz::TestOutput) -> Result<fidl::Socket> {
         let (rx, tx) = fidl::Socket::create_stream();
-        let raw = self
+        let result = self
             .proxy
             .get_output(url.as_str(), output, tx)
             .await
             .context("failed to get output")?;
-        if raw != zx::Status::OK.into_raw() {
-            bail!("fuchsia.fuzzer.Manager/GetOutput returned ZX_ERR_{}", zx::Status::from_raw(raw));
+        if let Err(e) = result {
+            bail!("fuchsia.fuzzer/Manager.GetOutput returned ZX_ERR_{}", zx::Status::from_raw(e));
         }
         Ok(rx)
     }
@@ -65,11 +65,13 @@ impl Manager {
     ///
     /// Returns whether a fuzzer was stopped.
     pub async fn stop(&self, url: &Url) -> Result<bool> {
-        let raw = self.proxy.stop(url.as_str()).await.context(fidl_name("Stop"))?;
-        match zx::Status::from_raw(raw) {
-            zx::Status::OK => Ok(true),
-            zx::Status::NOT_FOUND => Ok(false),
-            status => bail!("fuchsia.fuzzer.Manager/Stop returned ZX_ERR_{}", status),
+        let result = self.proxy.stop(url.as_str()).await.context(fidl_name("Stop"))?;
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if e == zx::Status::NOT_FOUND.into_raw() => Ok(false),
+            Err(e) => {
+                bail!("fuchsia.fuzzer/Manager.Stop returned ZX_ERR_{}", zx::Status::from_raw(e))
+            }
         }
     }
 }

@@ -27,26 +27,23 @@ closed protocol Manager {
     ///
     /// + request `fuzzer_url` the package URL for the fuzzer.
     /// + request `controller` the connection from the client.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the fuzzer was started and connected.
-    ///     - `ZX_ERR_NO_RESOURCES` if `test_manager` needs resources that are
+    /// * error one of the following:
+    ///     * `ZX_ERR_NO_RESOURCES` if `test_manager` needs resources that are
     ///       unavailable.
-    ///     - `ZX_ERR_NOT_FOUND` if the fuzzer URL is not recognized by
+    ///     * `ZX_ERR_NOT_FOUND` if the fuzzer URL is not recognized by
     ///       `test_manager`.
-    ///     - `ZX_ERR_INVALID_ARGS` if `test_manager` reports invalid arguments.
-    ///     - `ZX_ERR_NOT_SUPPORTED` if `test_manager` cannot connect to the
+    ///     * `ZX_ERR_INVALID_ARGS` if `test_manager` reports invalid arguments.
+    ///     * `ZX_ERR_NOT_SUPPORTED` if `test_manager` cannot connect to the
     ///       test suite.
-    ///     - `ZX_ERR_INTERNAL` if `test_manager` encountered some other,
+    ///     * `ZX_ERR_INTERNAL` if `test_manager` encountered some other,
     ///       unspecified failure.
-    ///     - `ZX_ERR_TIMED_OUT` if the fuzzer is not present or added to
+    ///     * `ZX_ERR_TIMED_OUT` if the fuzzer is not present or added to
     ///       fuzz-registry after starting.
-    ///     - `ZX_ERR_SHOULD_WAIT` if another fuzzer is still starting.
+    ///     * `ZX_ERR_SHOULD_WAIT` if another fuzzer is still starting.
     strict Connect(resource struct {
         fuzzer_url fuchsia.url.Url;
         controller server_end:Controller;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Forwards the fuzzer's output of the given type to the provided socket.
     ///
@@ -57,32 +54,25 @@ closed protocol Manager {
     /// + request `fuzzer_url` the package URL for the fuzzer.
     /// + request `output` the type of the output stream to forward.
     /// + request `socket` a socket to forward the output stream to.
-    /// - response `result` one of the following:
-    ///     - `ZX_ERR_INVALID_ARGS` if the URL cannot be parsed.
-    ///     - `ZX_ERR_NOT_FOUND` if the fuzzer URL was not recognized by
+    /// * error one of the following:
+    ///     * `ZX_ERR_INVALID_ARGS` if the URL cannot be parsed.
+    ///     * `ZX_ERR_NOT_FOUND` if the fuzzer URL was not recognized by
     ///       `test_manager`.
-    ///     - `ZX_ERR_BAD_STATE` if the fuzzer is not connected.
+    ///     * `ZX_ERR_BAD_STATE` if the fuzzer is not connected.
     strict GetOutput(resource struct {
         fuzzer_url fuchsia.url.Url;
         output TestOutput;
         socket zx.Handle:SOCKET;
-    }) -> (struct {
-        result zx.Status;
-    });
-
+    }) -> () error zx.Status;
 
     /// Stops the associated fuzzer immediately, ending any workflows in
     /// progress.
     ///
     /// + request `fuzzer_url` the package URL for the fuzzer.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the given fuzzer was active and has been stopped.
-    ///     - `ZX_ERR_NOT_FOUND` if no fuzzer was active with the given URL.
+    /// * error `ZX_ERR_NOT_FOUND` if no fuzzer was active with the given URL.
     strict Stop(struct {
         fuzzer_url fuchsia.url.Url;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 };
 
 /// Represents types of fuzzer output.

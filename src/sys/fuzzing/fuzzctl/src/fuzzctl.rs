@@ -550,8 +550,8 @@ mod tests {
         assert!(!world.exists());
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Stop({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.Stop({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -683,11 +683,11 @@ mod tests {
         test.output_includes("failed to fuzz");
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/Fuzz".to_string(),
-            format!("fuchsia.fuzzer.Manager/Stop({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.Fuzz".to_string(),
+            format!("fuchsia.fuzzer/Manager.Stop({})", TEST_URL),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -714,11 +714,11 @@ mod tests {
         test.output_matches(format!("Input saved to '{}'.", input_path.to_string_lossy()));
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/Fuzz".to_string(),
-            "fuchsia.fuzzer.Controller/ReadCorpus".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.Fuzz".to_string(),
+            "fuchsia.fuzzer/Controller.ReadCorpus".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -745,13 +745,13 @@ mod tests {
         test.output_matches(format!("Input saved to '{}'.", input_path.to_string_lossy()));
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/AddToCorpus(Live)".to_string(),
-            "fuchsia.fuzzer.Controller/AddToCorpus(Live)".to_string(),
-            "fuchsia.fuzzer.Controller/Fuzz".to_string(),
-            "fuchsia.fuzzer.Controller/ReadCorpus".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.AddToCorpus(Live)".to_string(),
+            "fuchsia.fuzzer/Controller.AddToCorpus(Live)".to_string(),
+            "fuchsia.fuzzer/Controller.Fuzz".to_string(),
+            "fuchsia.fuzzer/Controller.ReadCorpus".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -775,11 +775,11 @@ mod tests {
         test.output_matches("Input saved to 'tmp/artifact'.");
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/Fuzz".to_string(),
-            "fuchsia.fuzzer.Controller/ReadCorpus".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.Fuzz".to_string(),
+            "fuchsia.fuzzer/Controller.ReadCorpus".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -801,10 +801,10 @@ mod tests {
         assert_eq!(data, b"hello");
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/TryOne".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.TryOne".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -827,11 +827,11 @@ mod tests {
         assert_eq!(data, b"world");
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/TryOne".to_string(),
-            "fuchsia.fuzzer.Controller/TryOne".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.TryOne".to_string(),
+            "fuchsia.fuzzer/Controller.TryOne".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -889,10 +889,10 @@ mod tests {
         ));
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/Minimize".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.Minimize".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -933,13 +933,13 @@ mod tests {
         run_cmd(&fuzz_ctl, &cmdline, &test).await;
 
         let requests = vec![
-            format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
-            format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
-            "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/AddToCorpus(Live)".to_string(),
-            "fuchsia.fuzzer.Controller/AddToCorpus(Live)".to_string(),
-            "fuchsia.fuzzer.Controller/Merge".to_string(),
-            "fuchsia.fuzzer.Controller/ReadCorpus".to_string(),
+            format!("fuchsia.fuzzer/Manager.Connect({})", TEST_URL),
+            format!("fuchsia.fuzzer/Manager.GetOutput({}, Stderr)", TEST_URL),
+            "fuchsia.fuzzer/Controller.Configure".to_string(),
+            "fuchsia.fuzzer/Controller.AddToCorpus(Live)".to_string(),
+            "fuchsia.fuzzer/Controller.AddToCorpus(Live)".to_string(),
+            "fuchsia.fuzzer/Controller.Merge".to_string(),
+            "fuchsia.fuzzer/Controller.ReadCorpus".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 

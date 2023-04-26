@@ -9,7 +9,7 @@ use {
     crate::duration::deadline_after,
     crate::input::{Input, InputPair},
     crate::writer::{OutputSink, Writer},
-    anyhow::{bail, Context as _, Error, Result},
+    anyhow::{anyhow, bail, Context as _, Error, Result},
     fidl::endpoints::create_request_stream,
     fidl::Error::ClientChannelClosed,
     fidl_fuchsia_fuzzer::{self as fuzz, Artifact as FidlArtifact},
@@ -72,15 +72,11 @@ impl<O: OutputSink> Controller<O> {
     ///
     pub async fn configure(&self, options: fuzz::Options) -> Result<()> {
         self.set_timeout(&options, None);
-        let status = match self.proxy.configure(options).await {
-            Err(e) => bail!("`fuchsia.fuzzer.Controller/Configure` failed: {:?}", e),
-            Ok(raw) => zx::Status::from_raw(raw),
-        };
-        match status {
-            zx::Status::OK => Ok(()),
-            zx::Status::BAD_STATE => bail!("a long-running workflow is in progress"),
-            status => bail!("`fuchsia.fuzzer.Controller/Configure` returned: ZX_ERR_{}", status),
-        }
+        let result =
+            self.proxy.configure(options).await.context("fuchsia.fuzzer/Controller.Configure")?;
+        result.map_err(|status| {
+            anyhow!("fuchsia.fuzzer/Controller.Configure returned: ZX_ERR_{}", status)
+        })
     }
 
     /// Returns a fuzzer's current values for the various execution and error detection parameters.
@@ -169,30 +165,26 @@ impl<O: OutputSink> Controller<O> {
         for input_pair in input_pairs.into_iter() {
             let (mut fidl_input, input) = input_pair.as_tuple();
             let fidl_input_size = fidl_input.size;
-            let (raw, _) = try_join!(
+            let (result, _) = try_join!(
                 async {
                     self.proxy.add_to_corpus(corpus_type, &mut fidl_input).await.map_err(Error::msg)
                 },
                 input.send(),
             )
-            .context("`fuchsia.fuzzer.Controller/AddToCorpus` failed")?;
-            match zx::Status::from_raw(raw) {
-                zx::Status::OK => {
-                    corpus_stats.num_inputs += 1;
-                    corpus_stats.total_size += fidl_input_size;
-                }
-                status => {
-                    bail!(
-                        "`fuchsia.fuzzer.Controller/AddToCorpus` returned: ZX_ERR_{} \
-                           after writing {} of {} files ({} of {} bytes)",
-                        status,
-                        corpus_stats.num_inputs,
-                        expected_num_inputs,
-                        corpus_stats.total_size,
-                        expected_total_size
-                    )
-                }
-            };
+            .context("fuchsia.fuzzer/Controller.AddToCorpus failed")?;
+            if let Err(status) = result {
+                bail!(
+                    "fuchsia.fuzzer/Controller.AddToCorpus returned: ZX_ERR_{} \
+                       after writing {} of {} files ({} of {} bytes)",
+                    status,
+                    corpus_stats.num_inputs,
+                    expected_num_inputs,
+                    corpus_stats.total_size,
+                    expected_total_size
+                )
+            }
+            corpus_stats.num_inputs += 1;
+            corpus_stats.total_size += fidl_input_size;
         }
         Ok(corpus_stats)
     }
@@ -249,26 +241,6 @@ impl<O: OutputSink> Controller<O> {
         check_status("TryOne", status)
     }
 
-    /// Replaces bytes in a error-causing input with PII-safe bytes, e.g. spaces.
-    ///
-    /// The fuzzer will try to reproduce the error caused by the input with each byte replaced by a
-    /// fixed number of "clean" candidates.
-    ///
-    /// Returns an error if:
-    ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
-    ///   * Communicating with the fuzzer fails.
-    ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
-    ///   * The cleansed input fails to be received and saved.
-    ///
-    pub async fn cleanse(&self, input_pair: InputPair) -> Result<()> {
-        let (mut fidl_input, input) = input_pair.as_tuple();
-        let status = self.with_input("Cleanse", self.proxy.cleanse(&mut fidl_input), input).await?;
-        match status {
-            zx::Status::INVALID_ARGS => bail!("the provided input did not cause an error"),
-            status => check_status("Cleanse", status),
-        }
-    }
-
     /// Reduces the length of an error-causing input while preserving the error.
     ///
     /// The fuzzer will bound its attempt to find shorter inputs using the given `runs` or `time`,
@@ -288,6 +260,26 @@ impl<O: OutputSink> Controller<O> {
         match status {
             zx::Status::INVALID_ARGS => bail!("the provided input did not cause an error"),
             status => check_status("Minimize", status),
+        }
+    }
+
+    /// Replaces bytes in a error-causing input with PII-safe bytes, e.g. spaces.
+    ///
+    /// The fuzzer will try to reproduce the error caused by the input with each byte replaced by a
+    /// fixed number of "clean" candidates.
+    ///
+    /// Returns an error if:
+    ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
+    ///   * Communicating with the fuzzer fails.
+    ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
+    ///   * The cleansed input fails to be received and saved.
+    ///
+    pub async fn cleanse(&self, input_pair: InputPair) -> Result<()> {
+        let (mut fidl_input, input) = input_pair.as_tuple();
+        let status = self.with_input("Cleanse", self.proxy.cleanse(&mut fidl_input), input).await?;
+        match status {
+            zx::Status::INVALID_ARGS => bail!("the provided input did not cause an error"),
+            status => check_status("Cleanse", status),
         }
     }
 
@@ -314,7 +306,7 @@ impl<O: OutputSink> Controller<O> {
     // Runs the given `fidl_fut` along with a future to send an `input`.
     async fn with_input<F>(&self, name: &str, fidl_fut: F, input: Input) -> Result<zx::Status>
     where
-        F: Future<Output = Result<i32, fidl::Error>>,
+        F: Future<Output = Result<Result<(), i32>, fidl::Error>>,
     {
         let fidl_fut = fidl_fut.fuse();
         let send_fut = input.send().fuse();
@@ -345,7 +337,6 @@ impl<O: OutputSink> Controller<O> {
         }
         Ok(status)
     }
-
     /// Waits for the results of a long-running workflow.
     ///
     /// The `fuchsia.fuzzer.Controller/WatchArtifact` method uses a
@@ -386,7 +377,7 @@ impl<O: OutputSink> Controller<O> {
                             fidl_artifact
                         }
                         Err(ClientChannelClosed { status, .. }) if status == zx::Status::PEER_CLOSED => FidlArtifact { error: Some(zx::Status::CANCELED.into_raw()), ..FidlArtifact::EMPTY },
-                        Err(e) => bail!("fuchsia.fuzzer.Controller/WatchArtifact: {:?}", e),
+                        Err(e) => bail!("fuchsia.fuzzer/Controller.WatchArtifact: {:?}", e),
                     };
                     remaining -= 1;
                 }
@@ -404,7 +395,10 @@ impl<O: OutputSink> Controller<O> {
 }
 
 // Checks a FIDL response for generic errors.
-fn check_response(name: &str, response: Result<i32, fidl::Error>) -> Result<zx::Status> {
+fn check_response(
+    name: &str,
+    response: Result<Result<(), i32>, fidl::Error>,
+) -> Result<zx::Status> {
     match response {
         Err(fidl::Error::ClientChannelClosed { status, .. })
             if status == zx::Status::PEER_CLOSED =>
@@ -412,7 +406,8 @@ fn check_response(name: &str, response: Result<i32, fidl::Error>) -> Result<zx::
             Ok(zx::Status::OK)
         }
         Err(e) => bail!("`fuchsia.fuzzer.Controller/{}` failed: {:?}", name, e),
-        Ok(raw) => Ok(zx::Status::from_raw(raw)),
+        Ok(Err(raw)) => Ok(zx::Status::from_raw(raw)),
+        Ok(Ok(())) => Ok(zx::Status::OK),
     }
 }
 
@@ -641,32 +636,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_cleanse() -> Result<()> {
-        let test = Test::try_new()?;
-        let (fake, proxy, _task) = perform_test_setup(&test)?;
-        let controller = Controller::new(proxy, test.writer());
-
-        fake.set_input_to_send(b"   bar   ");
-        let input_pair = InputPair::try_from_data(b"foobarbaz".to_vec())?;
-        controller.cleanse(input_pair).await?;
-        let artifact = controller.watch_artifact().await?;
-        assert_eq!(artifact.error, None);
-        assert_eq!(artifact.result, Some(FuzzResult::Cleansed));
-
-        let fidl_input = artifact.input.context("invalid FIDL artifact")?;
-        let input = Input::try_receive(fidl_input).await?;
-        assert_eq!(input.data, b"   bar   ");
-
-        fake.cancel();
-        let input_pair = InputPair::try_from_data(b"foobarbaz".to_vec())?;
-        controller.cleanse(input_pair).await?;
-        let artifact = controller.watch_artifact().await?;
-        assert_eq!(artifact.error, Some(zx::Status::CANCELED.into_raw()));
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn test_minimize() -> Result<()> {
         let test = Test::try_new()?;
         let (fake, proxy, _task) = perform_test_setup(&test)?;
@@ -686,6 +655,32 @@ mod tests {
         fake.cancel();
         let input_pair = InputPair::try_from_data(b"bar".to_vec())?;
         controller.minimize(input_pair).await?;
+        let artifact = controller.watch_artifact().await?;
+        assert_eq!(artifact.error, Some(zx::Status::CANCELED.into_raw()));
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_cleanse() -> Result<()> {
+        let test = Test::try_new()?;
+        let (fake, proxy, _task) = perform_test_setup(&test)?;
+        let controller = Controller::new(proxy, test.writer());
+
+        fake.set_input_to_send(b"   bar   ");
+        let input_pair = InputPair::try_from_data(b"foobarbaz".to_vec())?;
+        controller.cleanse(input_pair).await?;
+        let artifact = controller.watch_artifact().await?;
+        assert_eq!(artifact.error, None);
+        assert_eq!(artifact.result, Some(FuzzResult::Cleansed));
+
+        let fidl_input = artifact.input.context("invalid FIDL artifact")?;
+        let input = Input::try_receive(fidl_input).await?;
+        assert_eq!(input.data, b"   bar   ");
+
+        fake.cancel();
+        let input_pair = InputPair::try_from_data(b"foobarbaz".to_vec())?;
+        controller.cleanse(input_pair).await?;
         let artifact = controller.watch_artifact().await?;
         assert_eq!(artifact.error, Some(zx::Status::CANCELED.into_raw()));
 

@@ -58,26 +58,27 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         while let Some(request) = receiver.next().await {
             let result = match request {
                 fuzz::ManagerRequest::Connect { fuzzer_url, controller, responder } => {
-                    let response = self
+                    let mut response = self
                         .connect(&fuzzer_url, controller)
                         .await
-                        .map_or_else(|e| e, |_| zx::Status::OK);
-                    responder.send(response.into_raw())
+                        .map_err(|status| status.into_raw());
+                    responder.send(&mut response)
                 }
                 fuzz::ManagerRequest::GetOutput { fuzzer_url, output, socket, responder } => {
-                    let response = match self.get_output(&fuzzer_url, output, socket).await {
-                        Ok(_) => zx::Status::OK,
+                    let result = self.get_output(&fuzzer_url, output, socket).await;
+                    let mut response = match result {
+                        Ok(()) => Ok(()),
                         Err(e) => {
                             let _ = self.stop(&fuzzer_url).await;
-                            e
+                            Err(e.into_raw())
                         }
                     };
-                    responder.send(response.into_raw())
+                    responder.send(&mut response)
                 }
                 fuzz::ManagerRequest::Stop { fuzzer_url, responder } => {
-                    let response =
-                        self.stop(&fuzzer_url).await.map_or_else(|e| e, |_| zx::Status::OK);
-                    responder.send(response.into_raw())
+                    let mut response =
+                        self.stop(&fuzzer_url).await.map_err(|status| status.into_raw());
+                    responder.send(&mut response)
                 }
             };
             if let Err(e) = result {
@@ -139,19 +140,16 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         };
         // Now connect the controller via the registry.
         let timeout = zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS).into_nanos();
-        let raw = self
+        let result = self
             .registry
             .connect(url.as_str(), controller, timeout)
             .await
-            .context("fuchsia.fuzzer.Registry/Connect")
+            .context("fuchsia.fuzzer/Registry.Connect")
             .map_err(warn_internal::<i32>)?;
-        match zx::Status::from_raw(raw) {
-            zx::Status::OK => {}
-            status => {
-                warn!("failed to connect {}: fuzz-registry returned: {}", fuzzer_url, status);
-                fuzzer.kill().await?;
-                return Err(status);
-            }
+        if let Err(e) = result {
+            warn!("failed to connect {}: fuzz-registry returned: {}", fuzzer_url, e);
+            fuzzer.kill().await?;
+            return Err(zx::Status::from_raw(e));
         }
         self.put_fuzzer(&url, fuzzer)
     }
@@ -185,19 +183,16 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
     async fn stop(&self, fuzzer_url: &str) -> Result<(), zx::Status> {
         let url = parse_url(fuzzer_url)?;
         let fuzzer = self.take_fuzzer(&url);
-        let status = self
+        let result = self
             .registry
             .disconnect(url.as_str())
             .await
-            .context("fuchsia.fuzzer.Registry/Disconnect")
+            .context("fuchsia.fuzzer/Registry.Disconnect")
             .map_err(warn_internal::<zx::Status>)?;
-        match zx::Status::from_raw(status) {
-            zx::Status::OK => {}
-            status => {
-                warn!("failed to stop {}: fuzz-registry returned: {}", fuzzer_url, status);
-                return Err(status);
-            }
-        };
+        if let Err(e) = result {
+            warn!("failed to stop {}: fuzz-registry returned: {}", fuzzer_url, e);
+            return Err(zx::Status::from_raw(e));
+        }
         if let Some(mut fuzzer) = fuzzer {
             let timeout = zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
             if let Err(e) = fuzzer.stop(Some(timeout)).await {
@@ -259,13 +254,14 @@ mod tests {
         let test_fut = || async move {
             let (client, server) = create_proxy::<fuzz::ControllerMarker>()
                 .context("failed to create Controller endpoints")?;
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
 
-            fuzz_manager.stop(FOO_URL).await.context("failed to stop")?;
+            let result = fuzz_manager.stop(FOO_URL).await.context("failed to stop")?;
+            assert_eq!(result, Ok(()));
             assert!(client.is_closed());
             Ok::<(), Error>(())
         };
@@ -283,11 +279,11 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
 
             test_realm_clone
                 .borrow()
@@ -295,8 +291,8 @@ mod tests {
                 .await
                 .context("failed to write 'stderr' to stderr")?;
             let (stdout, socket) = zx::Socket::create_stream();
-            let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stdout, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            let result = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stdout, socket).await?;
+            assert_eq!(result, Ok(()));
 
             test_realm_clone
                 .borrow()
@@ -304,8 +300,8 @@ mod tests {
                 .await
                 .context("failed to write 'stderr' to stderr")?;
             let (stderr, socket) = zx::Socket::create_stream();
-            let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            let result = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
+            assert_eq!(result, Ok(()));
 
             test_realm_clone
                 .borrow()
@@ -313,8 +309,8 @@ mod tests {
                 .await
                 .context("failed to write 'syslog' to syslog")?;
             let (syslog, socket) = zx::Socket::create_stream();
-            let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Syslog, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            let result = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Syslog, socket).await?;
+            assert_eq!(result, Ok(()));
 
             let msg = read_async(&stdout).await.context("failed to read stdout")?;
             assert_eq!(msg, "stdout");
@@ -322,7 +318,8 @@ mod tests {
             assert_eq!(msg, "stderr");
             let msg = read_async(&syslog).await.context("failed to read syslog")?;
             assert_eq!(msg, "syslog");
-            fuzz_manager.stop(FOO_URL).await.context("failed to stop")?;
+            let result = fuzz_manager.stop(FOO_URL).await.context("failed to stop")?;
+            assert_eq!(result, Ok(()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -339,16 +336,16 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let foo_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager_foo
+            let result = fuzz_manager_foo
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
 
             let (stderr, socket) = zx::Socket::create_stream();
-            let status =
+            let result =
                 fuzz_manager_foo.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             test_realm_foo
                 .borrow()
                 .write_stderr(FOO_URL, "foofoofoo")
@@ -357,7 +354,8 @@ mod tests {
 
             let msg = read_async(&stderr).await.context("failed to read stderr")?;
             assert_eq!(msg, "foofoofoo");
-            fuzz_manager_foo.stop(FOO_URL).await.context("failed to stop")?;
+            let result = fuzz_manager_foo.stop(FOO_URL).await.context("failed to stop")?;
+            assert_eq!(result, Ok(()));
             Ok::<(), Error>(())
         };
         let test_realm_bar = Rc::clone(&test_realm);
@@ -365,16 +363,16 @@ mod tests {
             connect_to_manager(Rc::clone(&test_realm)).context("failed to connect to manager")?;
         let bar_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager_bar
+            let result = fuzz_manager_bar
                 .connect(BAR_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
 
             let (stderr, socket) = zx::Socket::create_stream();
-            let status =
+            let result =
                 fuzz_manager_bar.get_output(BAR_URL, fuzz::TestOutput::Stderr, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            assert_eq!(result, Ok(()));
             test_realm_bar
                 .borrow()
                 .write_stderr(BAR_URL, "barbarbar")
@@ -383,7 +381,8 @@ mod tests {
 
             let msg = read_async(&stderr).await.context("failed to read stderr")?;
             assert_eq!(msg, "barbarbar");
-            fuzz_manager_bar.stop(BAR_URL).await.context("failed to stop")?;
+            let result = fuzz_manager_bar.stop(BAR_URL).await.context("failed to stop")?;
+            assert_eq!(result, Ok(()));
             Ok::<(), Error>(())
         };
         let results = join!(foo_fut(), bar_fut(), serve_test_realm(test_realm));
@@ -403,25 +402,26 @@ mod tests {
         let test_fut = || async move {
             let (client1, server) = create_proxy::<fuzz::ControllerMarker>()
                 .context("failed to create Controller endpoints")?;
-            let status = fuzz_manager1
+            let result = fuzz_manager1
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
             assert!(!client1.is_closed());
 
             // Reconnecting should disconnect previous client.
             let (client2, server) = create_proxy::<fuzz::ControllerMarker>()
                 .context("failed to create Controller endpoints")?;
-            let status = fuzz_manager2
+            let result = fuzz_manager2
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
 
             assert!(client1.is_closed());
             assert!(!client2.is_closed());
-            fuzz_manager2.stop(FOO_URL).await.context("failed to stop")?;
+            let result = fuzz_manager2.stop(FOO_URL).await.context("failed to stop")?;
+            assert_eq!(result, Ok(()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -443,11 +443,11 @@ mod tests {
         }
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::TIMED_OUT.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::TIMED_OUT.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -465,23 +465,23 @@ mod tests {
         let test_fut = || async move {
             let (_, server) = create_proxy::<fuzz::ControllerMarker>()
                 .context("failed to create Controller endpoints")?;
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Ok(()));
 
             let (stdout, socket) = zx::Socket::create_stream();
-            let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stdout, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            let result = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stdout, socket).await?;
+            assert_eq!(result, Ok(()));
 
             let (stderr, socket) = zx::Socket::create_stream();
-            let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            let result = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Stderr, socket).await?;
+            assert_eq!(result, Ok(()));
 
             let (syslog, socket) = zx::Socket::create_stream();
-            let status = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Syslog, socket).await?;
-            assert_eq!(status, zx::Status::OK.into_raw());
+            let result = fuzz_manager.get_output(FOO_URL, fuzz::TestOutput::Syslog, socket).await?;
+            assert_eq!(result, Ok(()));
 
             // Simulate an unexpected suite stop event.
             test_realm_clone
@@ -520,11 +520,11 @@ mod tests {
         test_realm.borrow_mut().launch_error = Some(LaunchError::ResourceUnavailable);
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::NO_RESOURCES.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::NO_RESOURCES.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -541,15 +541,13 @@ mod tests {
         test_realm.borrow_mut().launch_error = Some(LaunchError::InstanceCannotResolve);
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::NOT_FOUND.into_raw());
-            assert_eq!(
-                fuzz_manager.stop(FOO_URL).await.ok(),
-                Some(zx::Status::NOT_FOUND.into_raw())
-            );
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::NOT_FOUND.into_raw()));
+            let result = fuzz_manager.stop(FOO_URL).await.context("fuchsia.fuzzer/Manager.Stop")?;
+            assert_eq!(result, Err(zx::Status::NOT_FOUND.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -566,11 +564,11 @@ mod tests {
         test_realm.borrow_mut().launch_error = Some(LaunchError::InvalidArgs);
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::INVALID_ARGS.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::INVALID_ARGS.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -587,11 +585,11 @@ mod tests {
         test_realm.borrow_mut().launch_error = Some(LaunchError::FailedToConnectToTestSuite);
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::NOT_SUPPORTED.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::NOT_SUPPORTED.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -608,11 +606,11 @@ mod tests {
         test_realm.borrow_mut().launch_error = Some(LaunchError::CaseEnumeration);
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::INTERNAL.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::INTERNAL.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));
@@ -629,11 +627,11 @@ mod tests {
         test_realm.borrow_mut().launch_error = Some(LaunchError::InternalError);
         let test_fut = || async move {
             let (_, server) = create_endpoints::<fuzz::ControllerMarker>();
-            let status = fuzz_manager
+            let result = fuzz_manager
                 .connect(FOO_URL, server)
                 .await
-                .context("fuchsia.fuzzer.Manager/Connect")?;
-            assert_eq!(status, zx::Status::INTERNAL.into_raw());
+                .context("fuchsia.fuzzer/Manager.Connect")?;
+            assert_eq!(result, Err(zx::Status::INTERNAL.into_raw()));
             Ok::<(), Error>(())
         };
         let results = join!(test_fut(), serve_test_realm(test_realm));

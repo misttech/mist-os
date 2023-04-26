@@ -44,31 +44,24 @@ closed protocol Registry {
     ///
     /// + request `fuzzer_url` the package URL for the fuzzer.
     /// + request `provider` the connection to a `Controller` client.
-    /// + request `timeout` maximum duration to wait for a connection.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the fuzzer controller is connected.
-    ///     - `ZX_ERR_TIMED_OUT` if the `timeout` elapses without the provider
+    /// + request `tiemout` maximum duration to wait for a connection.
+    /// * error one of the following:
+    ///     * `ZX_ERR_TIMED_OUT` if the `timeout` elapses without the provider
     ///       becoming available.
-    ///     - `ZX_ERR_SHOULD_WAIT` if already waiting for a fuzzer to start.
+    ///     * `ZX_ERR_SHOULD_WAIT` if already waiting for a fuzzer to start.
     strict Connect(resource struct {
         fuzzer_url fuchsia.url.Url;
         controller server_end:Controller;
         timeout zx.Duration;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 
     /// Removes the provider associated with the given URL from the registry and
     /// closes its channel. The associated fuzzer should exit upon channel
     /// closure.
     ///
     /// + request `fuzzer_url` the package URL for the fuzzer.
-    /// - response `result` one of the following:
-    ///     - `ZX_OK` if the fuzzer controller was disconnected.
-    ///     - `ZX_ERR_NOT_FOUND` if no such provider exists in the registry.
+    /// * error `ZX_ERR_NOT_FOUND` if no such provider exists in the registry.
     strict Disconnect(struct {
         fuzzer_url fuchsia.url.Url;
-    }) -> (struct {
-        result zx.Status;
-    });
+    }) -> () error zx.Status;
 };
