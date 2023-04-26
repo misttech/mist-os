@@ -48,6 +48,10 @@ mod testing;
 
 #[fuchsia::main(logging_tags = ["starnix"])]
 async fn main() -> Result<(), Error> {
+    // Because the starnix kernel state is shared among all of the processes in the same job,
+    // we need to kill those in addition to the process which panicked.
+    kill_job_on_panic::install_hook("\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n");
+
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     trace_instant!(
         trace_category_starnix!(),
