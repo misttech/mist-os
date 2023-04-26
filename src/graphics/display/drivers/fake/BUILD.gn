@@ -94,7 +94,9 @@ test("fake-display-test-bin") {
   deps = [
     ":mock-display-device-tree",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 }
 

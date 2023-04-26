@@ -12,16 +12,17 @@
 
 #include <memory>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/mock-display-device-tree.h"
 #include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fake_display {
 
-class FakeDisplayTest : public zxtest::Test {
+class FakeDisplayTest : public testing::Test {
  public:
   FakeDisplayTest() = default;
 
@@ -57,14 +58,16 @@ class FakeDisplaySysmemTest : public FakeDisplayTest {
   void SetUp() override {
     FakeDisplayTest::SetUp();
 
-    zx::result sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-    ASSERT_OK(sysmem_endpoints);
+    zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
+        fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+    ASSERT_OK(sysmem_endpoints.status_value());
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     EXPECT_TRUE(sysmem_fidl()->ConnectV1(std::move(sysmem_server)).ok());
     sysmem_ = fidl::WireSyncClient(std::move(sysmem_client));
 
-    zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    ASSERT_OK(token_endpoints);
+    zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>> token_endpoints =
+        fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+    ASSERT_OK(token_endpoints.status_value());
     auto& [token_client, token_server] = token_endpoints.value();
     fidl::Status allocate_token_status = sysmem_->AllocateSharedCollection(std::move(token_server));
     ASSERT_TRUE(allocate_token_status.ok());
@@ -87,12 +90,14 @@ class FakeDisplaySysmemTest : public FakeDisplayTest {
     ASSERT_EQ(duplicate_value.tokens.count(), 1u);
 
     // Bind duplicated token to BufferCollection client.
-    zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-    ASSERT_OK(collection_endpoints);
+    zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollection>> collection_endpoints =
+        fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+    ASSERT_OK(collection_endpoints.status_value());
+
     auto& [collection_client, collection_server] = collection_endpoints.value();
     fidl::Status bind_status = sysmem_->BindSharedCollection(std::move(duplicate_value.tokens[0]),
                                                              std::move(collection_server));
-    EXPECT_TRUE(bind_status.ok());
+    EXPECT_OK(bind_status.status());
     buffer_collection_ = fidl::WireSyncClient(std::move(collection_client));
   }
 
@@ -125,9 +130,9 @@ TEST_F(FakeDisplaySysmemTest, ImportBufferCollection) {
       kValidBufferCollectionId, take_token_client().TakeChannel()));
 
   // `collection_id` must be unused.
-  zx::result another_token_endpoints =
+  zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>> another_token_endpoints =
       fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(another_token_endpoints);
+  ASSERT_OK(another_token_endpoints.status_value());
   EXPECT_EQ(display()->DisplayControllerImplImportBufferCollection(
                 kValidBufferCollectionId, another_token_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
