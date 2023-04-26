@@ -78,7 +78,7 @@ class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool>
     ClientProxy* client_ptr = controller()->active_client_;
     EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
     // EnableVsync(false) has not completed here, because we are still holding controller()->mtx()
-    client_ptr->OnDisplayVsync(display_id, 0, INVALID_CONFIG_STAMP_BANJO);
+    client_ptr->OnDisplayVsync(display_id, 0, kInvalidConfigStampBanjo);
   }
 
   bool primary_client_dead() {
@@ -93,7 +93,7 @@ class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool>
 
   void client_proxy_send_vsync() {
     fbl::AutoLock l(controller()->mtx());
-    controller()->active_client_->OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO);
+    controller()->active_client_->OnDisplayVsync(0, 0, kInvalidConfigStampBanjo);
   }
 
   void SendDisplayVsync() { display()->SendVsync(); }
@@ -787,7 +787,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -822,7 +822,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_1);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -847,7 +847,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_2);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -872,7 +872,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_3 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_3);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_3);
   EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -920,7 +920,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -958,7 +958,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_1);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -985,7 +985,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
                         .image_ready_wait_event_id = std::make_optional(image_1_ready_fence.id)},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_2);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -1060,7 +1060,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -1098,7 +1098,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_1);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -1125,7 +1125,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
                         .image_ready_wait_event_id = image_1_ready_fence.id},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_2);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -1151,7 +1151,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_3 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_3);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_3);
   EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
 
   // On Vsync, the configuration stamp client receives on Vsync event message
@@ -1231,7 +1231,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -1260,7 +1260,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
                         .image_ready_wait_event_id = image_1_ready_fence.id},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_1);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
   EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
@@ -1283,7 +1283,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
                         .image_ready_wait_event_id = image_2_ready_fence.id},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(fuchsia_hardware_display::wire::kInvalidConfigStampFidl, apply_config_stamp_2);
+  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
   EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();

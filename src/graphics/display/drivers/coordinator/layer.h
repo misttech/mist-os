@@ -64,8 +64,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   //   layers to determine the current frame state.
   //
   // Returns false if there were any errors.
-  bool ResolvePendingImage(FenceCollection* fence,
-                           config_stamp_t stamp = INVALID_CONFIG_STAMP_BANJO);
+  bool ResolvePendingImage(FenceCollection* fence, config_stamp_t stamp = kInvalidConfigStampBanjo);
 
   // Make the staged config current.
   void ApplyChanges(const display_mode_t& mode);

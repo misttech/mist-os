@@ -193,7 +193,7 @@ class Controller : public DeviceType,
   inspect::UintProperty last_valid_apply_config_timestamp_ns_property_;
   inspect::UintProperty last_valid_apply_config_interval_ns_property_;
 
-  config_stamp_t controller_stamp_ __TA_GUARDED(mtx()) = INVALID_CONFIG_STAMP_BANJO;
+  config_stamp_t controller_stamp_ __TA_GUARDED(mtx()) = kInvalidConfigStampBanjo;
 };
 
 }  // namespace display

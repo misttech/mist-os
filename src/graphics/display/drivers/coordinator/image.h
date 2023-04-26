@@ -160,7 +160,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   const uint32_t client_id_;
 
   // Stamp of the latest Controller display configuration that uses this image.
-  config_stamp_t latest_controller_config_stamp_ = INVALID_CONFIG_STAMP_BANJO;
+  config_stamp_t latest_controller_config_stamp_ = kInvalidConfigStampBanjo;
 
   // Stamp of the latest display configuration in Client (the DisplayController
   // FIDL service) that uses this image.
@@ -169,7 +169,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   // doesn't match the |latest_controller_config_stamp_|. This could happen when
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
-  config_stamp_t latest_client_config_stamp_ = INVALID_CONFIG_STAMP_BANJO;
+  config_stamp_t latest_client_config_stamp_ = kInvalidConfigStampBanjo;
 
   // Indicates that the image contents are ready for display.
   // Only ever accessed on loop thread, so no synchronization

@@ -323,7 +323,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   }
 
   config_stamp_t controller_config_stamp =
-      config_stamp_ptr ? *config_stamp_ptr : INVALID_CONFIG_STAMP_BANJO;
+      config_stamp_ptr ? *config_stamp_ptr : kInvalidConfigStampBanjo;
 
   // See ::ApplyConfig for more explanation of how vsync image tracking works.
   //
@@ -333,7 +333,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
     bool done = controller_config_stamp >= info->pending_layer_change_controller_config_stamp;
     if (done) {
       info->pending_layer_change = false;
-      info->pending_layer_change_controller_config_stamp = INVALID_CONFIG_STAMP_BANJO;
+      info->pending_layer_change_controller_config_stamp = kInvalidConfigStampBanjo;
       info->switching_client = false;
 
       if (active_client_ && info->delayed_apply) {
@@ -413,7 +413,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   // OnVsync() DisplayController FIDL events. In the future we'll remove this
   // logic and only return config seqnos in OnVsync() events instead.
 
-  if (controller_config_stamp != INVALID_CONFIG_STAMP_BANJO) {
+  if (controller_config_stamp != kInvalidConfigStampBanjo) {
     auto& config_image_queue = info->config_image_queue;
 
     // Evict retired configurations from the queue.

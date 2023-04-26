@@ -60,8 +60,7 @@ TEST(DisplayTest, ClientVSyncOk) {
     }
 
     bool vsync_handled_ = false;
-    fuchsia_hardware_display::wire::ConfigStamp expected_config_stamp_ =
-        fuchsia_hardware_display::wire::kInvalidConfigStampFidl;
+    fuchsia_hardware_display::wire::ConfigStamp expected_config_stamp_ = kInvalidConfigStampFidl;
   };
 
   EventHandler event_handler({.value = kClientStampValue});
@@ -80,7 +79,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   client_end.reset();
-  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO));
+  EXPECT_OK(clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStampBanjo));
   clientproxy.CloseTest();
 }
 
@@ -91,7 +90,7 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
-  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO));
+  EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, kInvalidConfigStampBanjo));
   clientproxy.CloseTest();
 }
 

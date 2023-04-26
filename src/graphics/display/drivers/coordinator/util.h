@@ -31,21 +31,15 @@ DECLARE_BINARY_OPERATOR(config_stamp_t, <=)
 
 #undef DECLARE_BINARY_OPERATOR
 
-}  // namespace display
-
-// TODO(fxbug.dev/89828): FIDL and banjo don't support constant structs, for
-// convenience we define the const structs here in their corresponding
-// namespaces.
-namespace fuchsia_hardware_display::wire {
-
-constexpr ConfigStamp kInvalidConfigStampFidl = {
-    .value = kInvalidConfigStampValue,
+// TODO(fxbug.dev/89828): FIDL and banjo don't support constant structs.
+constexpr fuchsia_hardware_display::wire::ConfigStamp kInvalidConfigStampFidl = {
+    .value = fuchsia_hardware_display::wire::kInvalidConfigStampValue,
 };
 
-}  // namespace fuchsia_hardware_display::wire
-
-constexpr config_stamp_t INVALID_CONFIG_STAMP_BANJO = {
+constexpr config_stamp_t kInvalidConfigStampBanjo = {
     .value = INVALID_CONFIG_STAMP_VALUE,
 };
+
+}  // namespace display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_UTIL_H_

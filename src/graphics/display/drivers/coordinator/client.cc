@@ -1553,7 +1553,7 @@ zx_status_t ClientProxy::OnDisplayVsync(uint64_t display_id, zx_time_t timestamp
                    });
 
   if (it == pending_applied_config_stamps_.end() || it->controller_stamp != controller_stamp) {
-    client_stamp = INVALID_CONFIG_STAMP_BANJO;
+    client_stamp = kInvalidConfigStampBanjo;
   } else {
     client_stamp = it->client_stamp;
     pending_applied_config_stamps_.erase(pending_applied_config_stamps_.begin(), it);
