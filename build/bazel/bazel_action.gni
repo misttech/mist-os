@@ -77,26 +77,10 @@ declare_args() {
 #
 #     See technical note below for details about <bazel_path> and <ninja_path>
 #
-#     If this argument is not provided, then `bazel_outputs` and `ninja_outputs`
-#     list arguments *must* be provided instead.
-#
 #     Type: list of scopes (cannot be empty)
 #
-#   bazel_outputs: (optional)
-#   ninja_outputs: (optional)
-#     Deprecated, use `copy_outputs` instead.
-#
-#     These are two parallel lists providing the <bazel_path> and <ninja_path>
-#     values as they should appear in a `copy_outputs` argument.
-#
-#     If provided, both lists must have the same length, and order of items,
-#     It is an error to provide both `copy_outputs` and one of these lists.
-#     It is an error to provide one of these lists and not the other.
-#
-#     Type: list of paths (cannot be empty)
-#
 #   allow_directory_in_outputs (optional):
-#     If true, directories are allowed in `bazel_outputs`, which will allow
+#     If true, directories are allowed in `copy_outputs`, which will allow
 #     users to send directories as a whole from Bazel to GN.
 #
 #     NOTE: Using directories as outputs can usually lead to incremental build
@@ -196,36 +180,6 @@ declare_args() {
 #      {{BAZEL_TARGET_OUT_PATH}}
 #        Expands to {{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}.
 #
-#
-#   Finally, note that for legacy reasons, it is possible to use
-#   `bazel_outputs` and `ninja_outputs` arguments, instead of `copy_outputs`,
-#   to provide the same information, as two parallel lists.
-#
-#   For example, the following definition:
-#
-#     bazel_outputs = [
-#       "{{BAZEL_TARGET_OUT_DIR}}/foo",
-#       "{{BAZEL_TARGET_OUT_DIR}}/bar/data",
-#     ]
-#
-#     ninja_outputs = [
-#        "foo",
-#        "bar.data",
-#     ]
-#
-#   Is strictly equivalent to:
-#
-#     copy_outputs = [
-#       {
-#         bazel = "{{BAZEL_TARGET_OUT_DIR}}/foo"
-#         ninja = "foo"
-#       },
-#       {
-#         bazel = "{{BAZEL_TARGET_OUT_DIR}}/bar/data"
-#         ninja = "bar.data"
-#       },
-#     ]
-#
 template("bazel_action") {
   assert(defined(invoker.command), "command must be defined!")
   assert(defined(invoker.bazel_targets), "bazel_targets must be defined!")
@@ -234,28 +188,18 @@ template("bazel_action") {
   _bazel_output_list = []
   _ninja_output_list = []
 
-  if (defined(invoker.copy_outputs)) {
-    assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty")
-    foreach(entry, invoker.copy_outputs) {
-      assert("$entry" != entry,
-             "`copy_outputs` items must be scopes, string found: \"$entry\"")
+  assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty")
+  foreach(entry, invoker.copy_outputs) {
+    assert("$entry" != entry,
+           "`copy_outputs` items must be scopes, string found: \"$entry\"")
 
-      assert(defined(entry.bazel),
-             "`copy_outputs` scope requires bazel key: $entry")
-      _bazel_output_list += [ entry.bazel ]
+    assert(defined(entry.bazel),
+           "`copy_outputs` scope requires bazel key: $entry")
+    _bazel_output_list += [ entry.bazel ]
 
-      assert(defined(entry.ninja),
-             "`copy_outputs` scope requires ninja key: $entry")
-      _ninja_output_list += [ entry.ninja ]
-    }
-  } else {
-    assert(defined(invoker.bazel_outputs), "bazel_outputs must be defined!")
-    assert(invoker.bazel_outputs != [], "bazel_outputs cannot be empty!")
-    _bazel_output_list = invoker.bazel_outputs
-
-    assert(defined(invoker.ninja_outputs), "ninja_outputs must be defined!")
-    assert(invoker.ninja_outputs != [], "ninja_outputs cannot be empty!")
-    _ninja_output_list = invoker.ninja_outputs
+    assert(defined(entry.ninja),
+           "`copy_outputs` scope requires ninja key: $entry")
+    _ninja_output_list += [ entry.ninja ]
   }
 
   _allow_directory_in_outputs = false
@@ -302,30 +246,13 @@ template("bazel_action") {
     # GN will complain with an error but will not display the problematic
     # so use an assert to provide a user-friendly message.
     assert(string_replace(path, "{{", "") == path,
-           "Unsupported substitution in `bazel_outputs` path: $path")
+           "Unsupported substitution in `copy_outputs` path: $path")
 
     _bazel_outputs += [ path ]
     _num_bazel_outputs += 1
   }
 
   _ninja_outputs = _ninja_output_list
-
-  # If two parallel lists were provided, verify they have the same size.
-  if (!defined(invoker.copy_outputs)) {
-    _num_ninja_outputs = 0
-    foreach(path, _ninja_outputs) {
-      assert(rebase_path(path, "//") != path,
-             "ninja output path must be relative: $path")
-      assert(string_replace("XX$path", "XX-", "") == "XX$path",
-             "ninja output path cannot begin with dash: $path")
-      _num_ninja_outputs += 1
-    }
-    assert(_num_bazel_outputs == _num_ninja_outputs,
-           "The ninja_outputs list, if provided, should have the same length " +
-               "as the bazel_outputs one " +
-               "found ${_num_ninja_outputs}, expected ${_num_bazel_outputs})")
-  }
-
   _outputs = []
   foreach(path, _ninja_outputs) {
     _outputs += [ target_gen_dir + "/" + path ]
