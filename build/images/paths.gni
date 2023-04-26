@@ -85,12 +85,13 @@ supports_fastboot_fvm = fvm_partition != "" && !use_bringup_assembly
 # These are the common assembly-related files.
 files = {
   if (use_bazel_images_only) {
-    images_outdir =
-        get_label_info(labels.images, "target_gen_dir") + "/product_bundle"
+    bazel_target_name = get_label_info(labels.images, "name")
+    images_outdir = get_label_info(labels.images, "target_gen_dir") +
+                    "/${bazel_target_name}/product_bundle"
     assembly_outdir = images_outdir + "/system_a"
     bazel_package_manifests_list =
         get_label_info(labels.images, "target_out_dir") +
-        "/manifests/package_manifests.list"
+        "/${bazel_target_name}/manifests/package_manifests.list"
   } else {
     images_outdir = get_label_info(labels.images, "target_out_dir")
     assembly_outdir = images_outdir + "/${labels.assembly_name}"
