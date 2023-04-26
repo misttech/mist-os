@@ -30,41 +30,60 @@ use {
     std::{marker::PhantomData, sync::Arc},
 };
 
-/// Routes a capability to its source based on a particular routing strategy.
+/// [RoutingStrategy] is a domain specific language for selecting the desired routing
+/// strategy, which are async functions that return [Result<CapabilitySource<C>, RoutingError>],
+/// i.e. finds the capability source by walking the route declarations.
 ///
-/// Callers invoke builder-like methods to construct the routing strategy.
+/// Callers invoke builder-like methods to construct the routing strategy. Thereafter, they may
+/// invoke routing method, which generally begins with `route`.
 ///
 /// # Example
 /// ```
-/// let router = RoutingStrategy::new()
+/// let strategy = RoutingStrategy::new()
 ///     .use_::<UseProtocolDecl>()
 ///     .offer::<OfferProtocolDecl>()
 ///     .expose::<ExposeProtocolDecl>();
+/// // Or `strategy.route_from_offer`, `strategy.route_from_expose`, ...
+/// strategy.route(...);
 /// ```
+///
+/// See "Implementation notes" down this file if you're trying to figure out how this DSL machinery
+/// is structured.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Copy(bound = ""))]
 pub struct RoutingStrategy<Start = (), Offer = (), Expose = ()>(
     PhantomData<(Start, Offer, Expose)>,
 );
 
-impl RoutingStrategy {
-    /// Creates a new `Router` that must be configured with a routing strategy by
+impl RoutingStrategy<(), (), ()> {
+    /// Creates a new `RoutingStrategy` that must be configured with a routing strategy by
     /// calling the various builder-like methods.
     pub const fn new() -> Self {
         RoutingStrategy(PhantomData)
     }
 
-    /// Configure the `Router` to start routing from a `Use` declaration.
+    /// Configure the `RoutingStrategy` to start routing from a `Use` declaration.
     pub const fn use_<U>(self) -> RoutingStrategy<Use<U>, (), ()> {
         RoutingStrategy(PhantomData)
     }
 
-    /// Configure the `Router` to start routing from an environment `Registration`
+    /// Configure the `RoutingStrategy` to start routing from an environment `Registration`
     /// declaration.
     pub const fn registration<R>(self) -> RoutingStrategy<Registration<R>, (), ()> {
         RoutingStrategy(PhantomData)
     }
 }
+
+//
+// # Implementation notes
+//
+// Below you will find many `impl` blocks, for `RoutingStrategy` parameterized by different
+// generic arguments. The builder DSL will produce a parameterized `RoutingStrategy` type,
+// corresponding to one or more `impl` blocks, which contains routing methods available to the
+// user. For example, the `impl<B, O, E> RoutingStrategy<B, O, Expose<E>>` block applies to
+// any routing strategy parameterized with `Expose = Expose<E>`, which is obtained from the
+// `expose` builder method.
+//
 
 // Implement the Use routing strategy. In this strategy, there is neither no
 // Expose nor Offer. This strategy allows components to route capabilities to
@@ -73,7 +92,7 @@ impl<U> RoutingStrategy<Use<U>, (), ()>
 where
     U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
 {
-    /// Configure the `Router` to route from a `Use` declaration to a matching `Offer`
+    /// Configure the `RoutingStrategy` to route from a `Use` declaration to a matching `Offer`
     /// declaration.
     pub fn offer<O>(self) -> RoutingStrategy<Use<U>, Offer<O>, ()> {
         RoutingStrategy(PhantomData)
@@ -116,7 +135,7 @@ where
 }
 
 impl<R> RoutingStrategy<Registration<R>, (), ()> {
-    /// Configure the `Router` to route from an environment `Registration` declaration to a
+    /// Configure the `RoutingStrategy` to route from an environment `Registration` declaration to a
     /// matching `Offer` declaration.
     pub const fn offer<O>(self) -> RoutingStrategy<Registration<R>, Offer<O>, ()> {
         RoutingStrategy(PhantomData)
@@ -124,7 +143,7 @@ impl<R> RoutingStrategy<Registration<R>, (), ()> {
 }
 
 impl<S, O> RoutingStrategy<S, Offer<O>, ()> {
-    /// Configure the `Router` to route from an `Offer` declaration to a matching `Expose`
+    /// Configure the `RoutingStrategy` to route from an `Offer` declaration to a matching `Expose`
     /// declaration.
     pub const fn expose<E>(self) -> RoutingStrategy<S, Offer<O>, Expose<E>> {
         RoutingStrategy(PhantomData)
