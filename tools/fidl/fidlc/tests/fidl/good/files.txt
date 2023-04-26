@@ -181,14 +181,8 @@ fi-0131-b.test.fidl
 fi-0132.test.fidl
 fi-0133.test.fidl
 fi-0135.test.fidl
-fi-0139-a.test.fidl
-fi-0139-b.test.fidl
-fi-0140-a.test.fidl
-fi-0140-b.test.fidl
 fi-0141.test.fidl
 fi-0142.test.fidl
-fi-0143.test.fidl
-fi-0144.test.fidl
 fi-0145.test.fidl
 fi-0146.test.fidl
 fi-0147.test.fidl

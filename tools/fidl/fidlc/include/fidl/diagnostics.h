@@ -324,18 +324,14 @@ constexpr ErrorDef<135, std::string_view> ErrInvalidDiscoverableName(
 constexpr RetiredDef<136> ErrTableCannotBeSimple;
 constexpr RetiredDef<137> ErrUnionCannotBeSimple;
 constexpr RetiredDef<138> ErrElementMustBeSimple;
-constexpr ErrorDef<139, uint32_t, uint32_t> ErrTooManyBytes(
-    "too large: only {} bytes allowed, but {} bytes found");
-constexpr ErrorDef<140, uint32_t, uint32_t> ErrTooManyHandles(
-    "too many handles: only {} allowed, but {} found");
+constexpr RetiredDef<139> ErrTooManyBytes;
+constexpr RetiredDef<140> ErrTooManyHandles;
 constexpr ErrorDef<141> ErrInvalidErrorType(
     "invalid error type: must be int32, uint32 or an enum thereof");
 constexpr ErrorDef<142, std::string_view, std::set<std::string_view>> ErrInvalidTransportType(
     "invalid transport type: got {} expected one of {}");
-constexpr ErrorDef<143, const flat::Attribute *, std::string_view> ErrBoundIsTooBig(
-    "'{}' bound of '{}' is too big");
-constexpr ErrorDef<144, const flat::Attribute *, std::string_view> ErrUnableToParseBound(
-    "unable to parse '{}' bound of '{}'");
+constexpr RetiredDef<143> ErrBoundIsTooBig;
+constexpr RetiredDef<144> ErrUnableToParseBound;
 constexpr WarningDef<145, std::string_view, std::string_view> WarnAttributeTypo(
     "suspect attribute with name '{}'; did you mean '{}'?");
 constexpr ErrorDef<146> ErrInvalidGeneratedName("generated name must be a valid identifier");

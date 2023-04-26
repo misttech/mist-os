@@ -4,7 +4,7 @@
 library fuchsia.examples.docs;
 
 // [START attribute-one]
-@max_bytes("64")
+@doc(" MyType summary\n")
 type MyType = struct {
         // [END attribute-one]
         };

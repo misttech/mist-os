@@ -972,58 +972,6 @@ type Foo = resource struct {
   ASSERT_COMPILED(library);
 }
 
-TEST(ProtocolTests, BadTooManyBytesSimple) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0139.test.fidl");
-  ASSERT_FALSE(library.Compile());
-
-  // Both uses of "MyStruct," use too many bytes.
-  EXPECT_EQ(library.errors().size(), 2);
-  EXPECT_ERR(library.errors()[0], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[1], fidl::ErrTooManyBytes);
-}
-
-TEST(ProtocolTests, BadTooManyHandlesSimple) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0140.test.fidl");
-  ASSERT_FALSE(library.Compile());
-
-  // Both uses of "MyProtocolEnds," use too many handles.
-  EXPECT_EQ(library.errors().size(), 2);
-  EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);
-  EXPECT_ERR(library.errors()[1], fidl::ErrTooManyHandles);
-}
-
-TEST(ProtocolTests, BadMethodStructSizeConstraints) {
-  TestLibrary library(R"FIDL(
-library example;
-
-protocol MyOtherProtocol {};
-
-type MyStruct = resource struct {
-  a client_end:<MyProtocol>;
-};
-
-@max_handles("0") @max_bytes("1")
-protocol MyProtocol {
-  MyMethod(MyStruct) -> (MyStruct) error uint32;
-  -> OnMyEvent(struct { b uint16; });
-};
-)FIDL");
-  ASSERT_FALSE(library.Compile());
-
-  ASSERT_EQ(library.errors().size(), 5);
-
-  // Both uses of "MyStruct" use too many handles.
-  EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);
-  EXPECT_ERR(library.errors()[1], fidl::ErrTooManyHandles);
-
-  // Both uses of "MyStruct," as well as the anonymous layout, use too many bytes.
-  EXPECT_ERR(library.errors()[2], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[3], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[4], fidl::ErrTooManyBytes);
-}
-
 TEST(ProtocolTests, BadMethodStructLayoutDefaultMember) {
   TestLibrary library(R"FIDL(
 library example;
@@ -1286,38 +1234,6 @@ protocol MyProtocol {
   ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrExpectedType, fidl::ErrExpectedType);
 }
 
-TEST(ProtocolTests, BadMethodTableSizeConstraints) {
-  TestLibrary library(R"FIDL(
-library example;
-
-protocol MyOtherProtocol {};
-
-type MyTable = resource table {
-  1: a client_end:<MyProtocol>;
-};
-
-@max_handles("0") @max_bytes("1")
-protocol MyProtocol {
-  MyMethod(MyTable) -> (MyTable) error uint32;
-  -> OnMyEvent(table {
-    1: b bool;
-  });
-};
-)FIDL");
-  ASSERT_FALSE(library.Compile());
-
-  ASSERT_EQ(library.errors().size(), 5);
-
-  // Both uses of "MyTable" use too many handles.
-  EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);
-  EXPECT_ERR(library.errors()[1], fidl::ErrTooManyHandles);
-
-  // Both uses of "MyTable," as well as the anonymous layout, use too many bytes.
-  EXPECT_ERR(library.errors()[2], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[3], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[4], fidl::ErrTooManyBytes);
-}
-
 TEST(ProtocolTests, GoodMethodTableRequest) {
   TestLibrary library(R"FIDL(
 library example;
@@ -1436,36 +1352,6 @@ protocol MyProtocol {
 };
 )FIDL");
   ASSERT_COMPILED(library);
-}
-
-TEST(ProtocolTests, BadMethodUnionSizeConstraints) {
-  TestLibrary library(R"FIDL(
-library example;
-
-protocol MyOtherProtocol {};
-
-type MyUnion = strict resource union {
-  1: a client_end:<MyProtocol>;
-};
-
-@max_handles("0") @max_bytes("1")
-protocol MyProtocol {
-  MyMethod(MyUnion) -> (MyUnion) error uint32;
-  -> OnMyEvent(flexible union { 1: b bool; });
-};
-)FIDL");
-  ASSERT_FALSE(library.Compile());
-
-  ASSERT_EQ(library.errors().size(), 5);
-
-  // Both uses of "MyUnion" use too many handles.
-  EXPECT_ERR(library.errors()[0], fidl::ErrTooManyHandles);
-  EXPECT_ERR(library.errors()[1], fidl::ErrTooManyHandles);
-
-  // Both uses of "MyUnion," as well as the anonymous layout, use too many bytes.
-  EXPECT_ERR(library.errors()[2], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[3], fidl::ErrTooManyBytes);
-  EXPECT_ERR(library.errors()[4], fidl::ErrTooManyBytes);
 }
 
 TEST(ProtocolTests, BadEventErrorSyntax) {

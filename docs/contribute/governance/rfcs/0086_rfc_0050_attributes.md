@@ -22,9 +22,8 @@ FIDL attributes provide a clear way to attach compile-time metadata to FIDL
 declarations, allowing authors to pass extra information to the FIDL compiler
 pertaining to documentation ([Doc][fidl-attributes-doc],
 [NoDoc][fidl-attributes-no-doc]) compile-time validation
-([ForDeprecatedCBindings][fidl-attributes-for-deprecated-c-bindings],
-[MaxBytes][fidl-attributes-max-bytes],
-[MaxHandles][fidl-attributes-max-handles]), code generation
+([ForDeprecatedCBindings][fidl-attributes-for-deprecated-c-bindings]),
+code generation
 ([Transitional][fidl-attributes-transitional],
 [Transport][fidl-attributes-transport]), desired API availability
 ([Discoverable][fidl-attributes-discoverable]), and so on. In addition to these
@@ -71,12 +70,9 @@ containing a comma-separated list of one or more arguments. An argument may be
 any valid FIDL constant. For example:
 
 ```fidl
-const MAX_HANDLES uint64 = 32;
+const DEFAULT_TRANSPORT string = "Channel";
 
-@max_handles(MAX_HANDLES)
-type S = struct {};
-
-@transport("Channel")
+@transport(DEFAULT_TRANSPORT)
 protocol P {};
 ```
 
@@ -514,8 +510,6 @@ the syntax proposed in this document.
 [fidl-attributes-discoverable]: /docs/reference/fidl/language/attributes.md#discoverable
 [fidl-attributes-doc]: /docs/reference/fidl/language/attributes.md#doc
 [fidl-attributes-for-deprecated-c-bindings]: /docs/reference/fidl/language/attributes.md#layout
-[fidl-attributes-max-bytes]: /docs/reference/fidl/language/attributes.md#maxbytes
-[fidl-attributes-max-handles]: /docs/reference/fidl/language/attributes.md#maxhandles
 [fidl-attributes-no-doc]: /docs/reference/fidl/language/attributes.md#nodoc
 [fidl-attributes-transitional]: /docs/reference/fidl/language/attributes.md#transitional
 [fidl-attributes-transport]: /docs/reference/fidl/language/attributes.md#transport

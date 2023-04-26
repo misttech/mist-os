@@ -18,7 +18,6 @@ const MAX_ARG_NAME_LENGTH uint32 = 256;
 const MAX_TEXT_ARG_LENGTH uint32 = 32768;
 
 /// A record in the diagnostic stream.
-@max_handles("0")
 type Record = struct {
     /// The monotonic time at which the record was generated.
     timestamp zx.Time;
@@ -29,7 +28,6 @@ type Record = struct {
 };
 
 /// A named key-value pair in the diagnostic record.
-@max_handles("0")
 type Argument = struct {
     /// The name of the argument.
     name string:MAX_ARG_NAME_LENGTH;
@@ -38,7 +36,6 @@ type Argument = struct {
 };
 
 /// An argument value which can be one of several types.
-@max_handles("0")
 type Value = flexible union {
     /// A signed integral argument.
     1: signed_int int64;

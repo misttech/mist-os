@@ -72,16 +72,14 @@ type Table = table {
     1: foo string;
 };
 
-@max_bytes("1")          // Error: too large
 type Struct = struct {
     foo uint16;
 };
 )FIDL");
   EXPECT_FALSE(library.Compile());
   const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 2);
-  ASSERT_ERR(errors[0], fidl::ErrTooManyBytes);
-  ASSERT_ERR(errors[1], fidl::ErrInvalidAttributePlacement);
+  ASSERT_EQ(errors.size(), 1);
+  ASSERT_ERR(errors[0], fidl::ErrInvalidAttributePlacement);
 }
 
 TEST(RecoverableCompilationTests, BadRecoverInAttributeCompile) {

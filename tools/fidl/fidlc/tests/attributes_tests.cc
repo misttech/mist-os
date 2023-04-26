@@ -708,53 +708,6 @@ protocol MyProtocol {
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "must_have_three_members");
 }
 
-TEST(AttributesTests, BadMaxBytes) {
-  TestLibrary library(R"FIDL(
-library fidl.test;
-
-@max_bytes("27")
-type MyTable = table {
-  1: here bool;
-};
-
-)FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyBytes);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "27");  // 27 allowed
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "40");  // 40 found
-}
-
-TEST(AttributesTests, BadMaxBytesBoundTooBig) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0143.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrBoundIsTooBig);
-}
-
-TEST(AttributesTests, BadMaxBytesUnableToParseBound) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0144.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnableToParseBound);
-}
-
-TEST(AttributesTests, BadMaxHandles) {
-  TestLibrary library(R"FIDL(
-library fidl.test;
-
-using zx;
-
-@max_handles("2")
-type MyUnion = resource union {
-  1: hello uint8;
-  2: world array<uint8,8>;
-  3: foo vector<zx.Handle:VMO>:6;
-};
-
-)FIDL");
-  library.UseLibraryZx();
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyHandles);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "2");  // 2 allowed
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "6");  // 6 found
-}
-
 TEST(AttributesTests, BadAttributeValue) {
   TestLibrary library;
   library.AddFile("bad/fi-0132.test.fidl");

@@ -545,8 +545,6 @@ they often accompany other incompatible changes:
 
 * `@deprecated` (although it may in the future if/when implemented)
 * `@doc`
-* `@max_bytes`
-* `@max_handles`
 * `@unknown`
 
 ### Constraints {#constraints}

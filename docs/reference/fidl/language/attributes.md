@@ -8,8 +8,6 @@ The following FIDL attributes are supported:
 * [`@doc`](#doc)
 * [`@for_deprecated_c_bindings`](#layout)
 * [`@generated_name`](#generated-name)
-* [`@max_bytes`](#maxbytes)
-* [`@max_handles`](#maxhandles)
 * [`@no_doc`](#nodoc)
 * [`@selector`](#selector)
 * [`@transitional`](#transitional)
@@ -180,26 +178,6 @@ table TeardownConfig {
   ...
 };
 ```
-
-## `@max_bytes` {#maxbytes}
-
-<!-- TODO(fxbug.dev/85301): Remove double quotes around numeric arguments. -->
-
-**USAGE**: `@max_bytes("`_number_`")`
-
-**MEANING**:
-This attribute is used to limit the number of bytes that can be transferred
-in a message.
-The compiler will issue an error if the number of bytes exceeds this limit.
-
-## `@max_handles` {#maxhandles}
-
-**USAGE**: `@max_handles("`_number_`")`
-
-**MEANING**:
-This attribute is used to limit the number of handles that can be
-transferred in a message.
-The compiler will issue an error if the number of handles exceeds this limit.
 
 ## `@no_doc` {#nodoc}
 
