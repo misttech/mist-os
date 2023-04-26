@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DRIVERS_VIRTIO_GPU_H_
-#define SRC_GRAPHICS_DRIVERS_VIRTIO_GPU_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
@@ -182,4 +182,4 @@ class GpuDevice : public Device,
 
 }  // namespace virtio
 
-#endif  // SRC_GRAPHICS_DRIVERS_VIRTIO_GPU_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_H_
