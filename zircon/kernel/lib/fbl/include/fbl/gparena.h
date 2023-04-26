@@ -18,7 +18,101 @@
 
 namespace fbl {
 
-// Growable Persistant Arena (GPArena) is an arena that allows for fast allocation and deallocation
+// A simple lock-free list for use by GPArena.
+template <typename Node>
+class LockFreeList {
+ public:
+  // Push |node| onto the list. public:
+  void Push(Node* node) {
+    // Take a local copy/snapshot of the current head node.
+    HeadNode head_node = head_node_.load(ktl::memory_order_relaxed);
+    HeadNode next_head_node;
+    do {
+      // Every time the compare_exchange below fails head_node becomes the current value and so
+      // we need to reset our intended next pointer every iteration.
+      node->next = head_node.head;
+      // Build our candidate next head node.
+      next_head_node = HeadNode(node, head_node.gen + 1);
+      // Use release semantics so that any writes to the Persist area, and our write to
+      // node->next, are visible before the node can be seen in the free list and reused.
+    } while (!head_node_.compare_exchange_strong(
+        head_node, next_head_node, ktl::memory_order_release, ktl::memory_order_relaxed));
+  }
+
+  // Pop a node from the list.  Returns nullptr if empty.
+  Node* Pop() {
+    // Take a local copy/snapshot of the current head node.
+    // Use an acquire to match with the release in Push.
+    HeadNode head_node = head_node_.load(ktl::memory_order_acquire);
+    while (head_node.head) {
+      const HeadNode next_head_node(head_node.head->next, head_node.gen + 1);
+      if (head_node_.compare_exchange_strong(head_node, next_head_node, ktl::memory_order_acquire,
+                                             ktl::memory_order_acquire)) {
+        return head_node.head;
+      }
+      // There is no pause here as we don't need to wait for anyone before trying again,
+      // rather the sooner we retry the *more* likely we are to succeed given that we just
+      // received the most up to date copy of head_node.
+    }
+    return nullptr;
+  }
+
+ private:
+  // Stores the current head pointer and a generation count. The generation count prevents races
+  // where one thread is modifying the list whilst another thread rapidly adds and removes. Every
+  // time a HeadNode is modified the generation count should be incremented to generate a unique
+  // value.
+  //
+  // It is important that the count not wrap past an existing value that is still in use. The
+  // generation is currently 64-bit number and shouldn't ever wrap back to 0 to begin with.
+  // Although even if it should it is incredibly unlikely a thread was stalled for 2^64 operations
+  // to cause a generation collision.
+  struct alignas(16) HeadNode {
+    Node* head = nullptr;
+    uint64_t gen = 0;
+    HeadNode() = default;
+    HeadNode(Node* h, uint64_t g) : head(h), gen(g) {}
+  };
+  ktl::atomic<HeadNode> head_node_{};
+#if defined(__clang__)
+  static_assert(ktl::atomic<HeadNode>::is_always_lock_free, "atomic<HeadNode> not lock free");
+#else
+  // For gcc we have a custom libatomic implementation that *is* lock free, but the compiler doesn't
+  // know that at this point. Instead we ensure HeadNode is 16 bytes and has 16 byte alignment to
+  // make sure our atomics will be used.
+  static_assert(sizeof(HeadNode) == 16, "HeadNode must be 16 bytes");
+  static_assert(alignof(HeadNode) == 16, "HeadNode must have 16 byte alignment");
+#endif
+};
+
+// A spinlock protected list for use by GPArena (when LockFreeList is unavailable).
+template <typename Node>
+class SpinlockList {
+ public:
+  // Push |node| onto the list.
+  void Push(Node* node) {
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    node->next = head_;
+    head_ = node;
+  }
+
+  // Pop a node from the list.  Returns nullptr if empty.
+  Node* Pop() {
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    if (head_ == nullptr) {
+      return nullptr;
+    }
+    Node* result = head_;
+    head_ = head_->next;
+    return result;
+  }
+
+ private:
+  DECLARE_SPINLOCK(SpinlockList) lock_;
+  Node* head_ TA_GUARDED(&lock_){};
+};
+
+// Growable Persistent Arena (GPArena) is an arena that allows for fast allocation and deallocation
 // of a single kind of object. Compared to other arena style allocators it additionally guarantees
 // that a portion of the objects memory will be preserved between calls to Free+Alloc.
 template <size_t PersistSize, size_t ObjectSize>
@@ -108,19 +202,10 @@ class __OWNER(void) GPArena {
   // Returns a raw pointer and not a reference to an object of type T so that the memory can be
   // inspected prior to construction taking place.
   void* Alloc() {
-    // Take a local copy/snapshot of the current head node.
-    // Use an acquire to match with the release in Free.
-    HeadNode head_node = head_node_.load(ktl::memory_order_acquire);
-    while (head_node.head) {
-      const HeadNode next_head_node(head_node.head->next, head_node.gen + 1);
-      if (head_node_.compare_exchange_strong(head_node, next_head_node, ktl::memory_order_acquire,
-                                             ktl::memory_order_acquire)) {
-        count_.fetch_add(1, ktl::memory_order_relaxed);
-        return reinterpret_cast<void*>(head_node.head);
-      }
-      // There is no pause here as we don't need to wait for anyone before trying again,
-      // rather the sooner we retry the *more* likely we are to succeed given that we just
-      // received the most up to date copy of head_node.
+    void* const node = free_list_.Pop();
+    if (node != nullptr) {
+      count_.fetch_add(1, ktl::memory_order_relaxed);
+      return node;
     }
 
     // Nothing in the free list, we need to grow.
@@ -144,20 +229,7 @@ class __OWNER(void) GPArena {
 
   // Takes a raw pointer as the destructor is expected to have already been run.
   void Free(void* node) {
-    FreeNode* free_node = reinterpret_cast<FreeNode*>(node);
-    // Take a local copy/snapshot of the current head node.
-    HeadNode head_node = head_node_.load(ktl::memory_order_relaxed);
-    HeadNode next_head_node;
-    do {
-      // Every time the compare_exchange below fails head_node becomes the current value and so
-      // we need to reset our intended next pointer every iteration.
-      free_node->next = head_node.head;
-      // Build our candidate next head node.
-      next_head_node = HeadNode(free_node, head_node.gen + 1);
-      // Use release semantics so that any writes to the Persist area, and our write to
-      // free_node->next, are visible before the node can be seen in the free list and reused.
-    } while (!head_node_.compare_exchange_strong(
-        head_node, next_head_node, ktl::memory_order_release, ktl::memory_order_relaxed));
+    free_list_.Push(reinterpret_cast<FreeNode*>(node));
     count_.fetch_sub(1, ktl::memory_order_relaxed);
   }
 
@@ -258,17 +330,6 @@ class __OWNER(void) GPArena {
     return true;
   }
 
-  struct FreeNode {
-    char data[PersistSize];
-    // This struct is explicitly not packed to allow for the next field to be naturally aligned.
-    // As a result we *may* preserve more than PersistSize, but that is fine. This is not an atomic
-    // as reads and writes will be serialized with our updates to head_node_, which acts like a
-    // lock.
-    FreeNode* next;
-  };
-  static_assert(sizeof(FreeNode) <= ObjectSize, "Not enough free space in object");
-  static_assert((ObjectSize % alignof(FreeNode)) == 0,
-                "ObjectSize must be common alignment multiple");
   fbl::RefPtr<VmAddressRegion> vmar_;
   fbl::RefPtr<VmMapping> mapping_;
   fbl::RefPtr<VmObject> vmo_;
@@ -286,32 +347,30 @@ class __OWNER(void) GPArena {
 
   ktl::atomic<size_t> count_ = 0;
 
-  // Stores the current head pointer and a generation count. The generation count prevents races
-  // where one thread is modifying the list whilst another thread rapidly adds and removes. Every
-  // time a HeadNode is modified the generation count should be incremented to generate a unique
-  // value.
-  //
-  // It is important that the count not wrap past an existing value that is still in use. The
-  // generation is currently 64-bit number and shouldn't ever wrap back to 0 to begin with. Although
-  // even if it should it is incredibly unlikely a thread was stalled for 2^64 operations to cause a
-  // generation collision.
-  struct alignas(16) HeadNode {
-    FreeNode* head = nullptr;
-    uint64_t gen = 0;
-    HeadNode() = default;
-    HeadNode(FreeNode* h, uint64_t g) : head(h), gen(g) {}
+  struct FreeNode {
+    char data[PersistSize];
+    // This struct is explicitly not packed to allow for the next field to be naturally aligned.
+    // As a result we *may* preserve more than PersistSize, but that is fine. This is not an
+    // atomic as reads and writes will be serialized with our updates to head_node_, which acts
+    // like a lock.
+    FreeNode* next;
   };
-  ktl::atomic<HeadNode> head_node_{};
+  static_assert(sizeof(FreeNode) <= ObjectSize, "Not enough free space in object");
+  static_assert((ObjectSize % alignof(FreeNode)) == 0,
+                "ObjectSize must be common alignment multiple");
+
+// LockFreeList is not supported on RISC-V due to the lack of 16-byte atomics so use a spinlock
+// based list instead.
+//
+// TODO(maniscalco): GPArena shouldn't know anything about RISC-V or its lack of 16-byte atomics.
+// Once ktl/atomic.h exports a "has 16-byte atomics" variable, update this code to use it instead of
+// checking the machine architecture.
 #if defined(__riscv)
-  // TODO(mcgrathr): doesn't actually work on riscv yet
-#elif defined(__clang__)
-  static_assert(ktl::atomic<HeadNode>::is_always_lock_free, "atomic<HeadNode> not lock free");
+  using FreeList = SpinlockList<FreeNode>;
 #else
-  // For gcc we have a custom libatomic implementation that *is* lock free, but the compiler doesn't
-  // know that at this point. Instead we ensure HeadNode is 16bytes so ensure our atomics will be
-  // the ones used.
-  static_assert(sizeof(HeadNode) == 16, "HeadNode must be 16 bytes");
+  using FreeList = LockFreeList<FreeNode>;
 #endif
+  FreeList free_list_;
 };
 
 }  // namespace fbl
