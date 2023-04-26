@@ -8,7 +8,12 @@ use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_zircon as zx;
 use futures::StreamExt;
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 use tracing::{info, span, Event, Metadata, Subscriber};
 
 struct Setup {
@@ -89,7 +94,7 @@ where
     let all_args_bench = move |b: &mut criterion::Bencher| {
         let (socket, subscriber) = make_subscriber();
         write_log_benchmark(b, socket, subscriber, |_setup| {
-            criterion::black_box(info!(
+            info!(
                 tag = "logbench",
                 boolean = true,
                 float = 1234.5678,
@@ -97,7 +102,7 @@ where
                 string = "foobarbaz",
                 uint = 123456,
                 "this is a log emitted from the benchmark"
-            ));
+            );
         });
     };
     let bench = if let Some(benchmark) = benchmark {
@@ -109,32 +114,41 @@ where
         .with_function(&format!("Publisher/{}/NoArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, |_setup| {
-                criterion::black_box(info!("this is a log emitted from the benchmark"));
+                info!("this is a log emitted from the benchmark");
             });
         })
         .with_function(&format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, |_setup| {
-                criterion::black_box(info!(
+                info!(
                     boolean = true,
                     int = -123456,
                     string = "foobarbaz",
                     "this is a log emitted from the benchmark",
-                ));
+                );
             });
         })
         .with_function(&format!("Publisher/{}/MessageAsString", name), move |b| {
             let (socket, subscriber) = make_subscriber();
             write_log_benchmark(b, socket, subscriber, |_setup| {
-                criterion::black_box(info!(
+                info!(
                     "this is a log emitted from the benchmark boolean={} int={} string={}",
                     true, -123456, "foobarbaz",
-                ));
+                );
             });
         })
 }
 
-struct NoOpSubscriber;
+#[derive(Default)]
+struct NoOpSubscriber {
+    counter: AtomicUsize,
+}
+
+impl Drop for NoOpSubscriber {
+    fn drop(&mut self) {
+        assert_ne!(self.counter.swap(0, Ordering::SeqCst), 0);
+    }
+}
 
 impl Subscriber for NoOpSubscriber {
     fn enabled(&self, _metadata: &Metadata<'_>) -> bool {
@@ -149,7 +163,9 @@ impl Subscriber for NoOpSubscriber {
 
     fn record_follows_from(&self, _span: &span::Id, _follows: &span::Id) {}
 
-    fn event(&self, _event: &Event<'_>) {}
+    fn event(&self, _event: &Event<'_>) {
+        let _: usize = self.counter.fetch_add(1, Ordering::Relaxed);
+    }
 
     fn enter(&self, _span: &span::Id) {}
 
@@ -175,7 +191,11 @@ fn main() {
         },
         None,
     );
-    bench = setup_write_log_benchmarks("TracingNoOp", move || (None, NoOpSubscriber), Some(bench));
+    bench = setup_write_log_benchmarks(
+        "TracingNoOp",
+        move || (None, NoOpSubscriber::default()),
+        Some(bench),
+    );
 
     c.bench("fuchsia.diagnostics_log_rust.core", bench);
 }
