@@ -7,12 +7,16 @@ use async_trait::async_trait;
 use fho::{Error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
+pub mod common;
+
 mod adb;
+mod console;
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum StarnixSubCommand {
     Adb(adb::StarnixAdbCommand),
+    Console(console::StarnixConsoleCommand),
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -37,6 +41,11 @@ impl FfxMain for StarnixTool {
         match &self.cmd.subcommand {
             StarnixSubCommand::Adb(command) => {
                 adb::starnix_adb(command, &self.rcs_proxy, writer).await.map_err(|e| Error::User(e))
+            }
+            StarnixSubCommand::Console(command) => {
+                console::starnix_console(command, &self.rcs_proxy, writer)
+                    .await
+                    .map_err(|e| Error::User(e))
             }
         }
     }

@@ -53,6 +53,17 @@ pub async fn serve_component_runner(
     Ok(())
 }
 
+fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::winsize {
+    window_size
+        .map(|window_size| uapi::winsize {
+            ws_row: window_size.rows,
+            ws_col: window_size.cols,
+            ws_xpixel: window_size.x_pixels,
+            ws_ypixel: window_size.y_pixels,
+        })
+        .unwrap_or(uapi::winsize::default())
+}
+
 pub async fn serve_container_controller(
     mut request_stream: fstarcontainer::ControllerRequestStream,
     container: Arc<Container>,
@@ -79,7 +90,13 @@ pub async fn serve_container_controller(
                         .into_iter()
                         .map(CString::new)
                         .collect::<Result<Vec<_>, _>>()?;
-                    match create_task_with_pty(&container.kernel, binary_path, argv, environ) {
+                    match create_task_with_pty(
+                        &container.kernel,
+                        binary_path,
+                        argv,
+                        environ,
+                        to_winsize(payload.window_size),
+                    ) {
                         Ok((current_task, pty)) => {
                             execute_task(current_task, move |result| {
                                 let _ = match result {
@@ -173,11 +190,12 @@ fn create_task_with_pty(
     binary_path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
+    window_size: uapi::winsize,
 ) -> Result<(CurrentTask, FileHandle), Errno> {
     let mut current_task = Task::create_init_child_process(kernel, &binary_path)?;
     let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
     current_task.exec(executable, binary_path, argv, environ)?;
-    let (pty, pts) = create_main_and_replica(&current_task)?;
+    let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
     let fd_flags = FdFlags::empty();
     assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
     assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
@@ -213,6 +231,7 @@ fn forward_to_pty(
         let _result: Result<(), Error> = fasync::LocalExecutor::new().run_singlethreaded(async {
             let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
             loop {
+                buffer.reset();
                 pty_source.read(&current_task, &mut buffer)?;
                 tx.write_all(buffer.data()).await?;
             }

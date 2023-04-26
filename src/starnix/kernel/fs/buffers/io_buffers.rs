@@ -335,6 +335,10 @@ impl VecOutputBuffer {
     pub fn data(&self) -> &[u8] {
         &self.buffer[0..self.bytes_written]
     }
+
+    pub fn reset(&mut self) {
+        self.bytes_written = 0;
+    }
 }
 
 impl From<VecOutputBuffer> for Vec<u8> {

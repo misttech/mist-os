@@ -108,8 +108,29 @@ To terminate the container, use the `ffx component stop` command.
 See [`hello_starnix`](../examples/hello_starnix/README.md) for how to run a
 minimal binary in an empty container.
 
-See [`shell.sh`](../containers/chromiumos/shell.sh) for how to run a shell in
-a conatiner.
+### Getting a shell
+
+Once you have a Starnix container running, you can attach a console to that
+container and run a shell. For example, if you have created a container with
+the moniker `/core/starnix_runner/playground:<container-name>`, you can use the
+following command to attach a shell:
+
+```sh
+ffx starnix console -m /core/starnix_runner/playground:<container-name>
+```
+
+This command assumes the container has a shell binary at `/bin/sh`. If you wish
+to run another binary or if the shell is located at a different path, you can
+specify the command to run in the console:
+
+```sh
+ffx starnix console \
+    -m /core/starnix_runner/playground:<container-name> \
+    /system/bin/sh
+```
+
+If you omit the `-m` argument, `ffx starnix console` will look for a Starnix
+container in the Fuchsia session.
 
 ### Run a Linux test binary
 

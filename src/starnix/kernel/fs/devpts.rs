@@ -42,10 +42,15 @@ pub fn dev_pts_fs(kernel: &Kernel) -> &FileSystemHandle {
 /// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
 pub fn create_main_and_replica(
     current_task: &CurrentTask,
+    window_size: uapi::winsize,
 ) -> Result<(FileHandle, FileHandle), Errno> {
     let pty_file = current_task.open_file(b"/dev/ptmx", OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
-    pty.terminal.write().locked = true;
+    {
+        let mut terminal = pty.terminal.write();
+        terminal.locked = false;
+        terminal.window_size = window_size;
+    }
     let pts_path = format!("/dev/pts/{}", pty.terminal.id);
     let pts_file = current_task.open_file(pts_path.as_bytes(), OpenFlags::RDWR)?;
     Ok((pty_file, pts_file))

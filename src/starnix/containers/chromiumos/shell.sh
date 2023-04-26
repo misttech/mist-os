@@ -9,6 +9,4 @@ ffx component run >/dev/null 2>/dev/null \
 
 set -e
 
-ffx component run --connect-stdio --recreate \
-    /core/starnix_runner/playground:starmium/daemons:sh \
-    fuchsia-pkg://fuchsia.com/starmium#meta/sh.cm
+ffx starnix console -m /core/starnix_runner/playground:starmium

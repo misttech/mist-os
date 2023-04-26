@@ -19,14 +19,9 @@ fuchsia_component("chromiumos_container") {
   manifest = "meta/chromiumos_container.cml"
 }
 
-fuchsia_component("sh") {
-  manifest = "meta/sh.cml"
-}
-
 fuchsia_package("starmium") {
   deps = [
     ":chromiumos_container",
-    ":sh",
     "//src/starnix/containers:default_init",
   ]
 

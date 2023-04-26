@@ -5,6 +5,13 @@ library fuchsia.starnix.container;
 
 using zx;
 
+type ConsoleWindowSize = struct {
+    rows uint16;
+    cols uint16;
+    x_pixels uint16;
+    y_pixels uint16;
+};
+
 @discoverable
 protocol Controller {
     /// Connects `bridge_socket` to a vsocket at `port` in the container.
@@ -18,6 +25,7 @@ protocol Controller {
         2: binary_path string:MAX;
         3: argv vector<string:MAX>:MAX;
         4: environ vector<string:MAX>:MAX;
+        5: window_size ConsoleWindowSize;
     }) -> (struct {
         exit_code uint8;
     }) error zx.Status;
