@@ -94,7 +94,6 @@ if (is_fuchsia) {
   core_realm_network_aib_shards = [
     "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
     "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
-    "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
   ]
   core_realm_eng_aib_pkgs = [
     # Dash launcher should be available in every engineering-mode product.

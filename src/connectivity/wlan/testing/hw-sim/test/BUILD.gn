@@ -178,8 +178,7 @@ fuchsia_test_package("wlan-hw-sim-legacy-privacy-tests") {
     ":scan-legacy-privacy",
   ]
   test_components += hw_sim_test_components_for_all_privacies
-  deps = [ "//src/connectivity/wlan/wlanstack:wlanstack-legacy-privacy-values" ]
-  deps += shared_deps
+  deps = shared_deps
 }
 
 fuchsia_component("rate-selection") {
@@ -197,8 +196,9 @@ fuchsia_test_package("wlan-hw-sim-rate-selection-tests") {
   }
 
   test_components = [ ":rate-selection" ]
-  deps = [ "//src/connectivity/wlan/wlanstack:wlanstack-values" ]
-  deps += shared_deps
+  deps =
+      [ "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-values" ]
+  deps += shared_deps_without_wlandevicemonitor
 }
 
 group("wlan-hw-sim-component-tests") {

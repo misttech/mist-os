@@ -93,7 +93,6 @@ group("tests") {
     "wlancfg:tests",
     "wlancfg/tool:donut-tests",
     "wlandevicemonitor:tests",
-    "wlanstack:wlanstack-tests",
   ]
 }
 
