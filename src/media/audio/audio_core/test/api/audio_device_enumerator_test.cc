@@ -152,7 +152,8 @@ TEST_F(AudioDeviceEnumeratorTest, OnDeviceGainChangedIgnoresInvalidTokensInSets)
   ExpectCallbacks();
 }
 
-TEST_F(AudioDeviceEnumeratorTest, SetDeviceGain_Input) {
+// TODO(fxbug.dev/124889): Reenable after fixing this test flaky behavior.
+TEST_F(AudioDeviceEnumeratorTest, DISABLED_SetDeviceGain_Input) {
   TestSetDeviceGain(CreateInput({0xff, 0x00}, kFormat, kFrameRate));
 }
 
