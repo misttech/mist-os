@@ -4,13 +4,15 @@
 
 use {
     anyhow::{anyhow, Context, Error},
+    fuchsia_async as fasync,
     fuchsia_merkle::{Hash, MerkleTreeBuilder, HASH_SIZE},
+    futures::{StreamExt as _, TryStreamExt as _},
     fxfs::{
         filesystem::{Filesystem, FxFilesystem},
         object_handle::{GetProperties, WriteBytes},
         object_store::{
             directory::Directory, transaction::LockKey, volume::root_volume, DirectWriter,
-            BLOB_MERKLE_ATTRIBUTE_ID,
+            ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::{round_down, round_up},
         serialized_types::BlobMetadata,
@@ -66,8 +68,9 @@ pub async fn make_blob_image(
         BLOCK_SIZE,
         BLOCK_COUNT,
     ));
-    let filesystem = FxFilesystem::new_empty(device).await.context("Faile to format filesystem")?;
-    let blobs_json = install_blobs(filesystem.clone(), "blob", &blobs[..]).await?;
+    let filesystem =
+        FxFilesystem::new_empty(device).await.context("Failed to format filesystem")?;
+    let blobs_json = install_blobs(filesystem.clone(), "blob", blobs).await?;
     filesystem.close().await?;
 
     let mut json_output = BufWriter::new(
@@ -101,89 +104,127 @@ fn parse_manifest(manifest_path: &str) -> Result<Vec<(Hash, PathBuf)>, Error> {
 async fn install_blobs(
     filesystem: Arc<dyn Filesystem>,
     volume_name: &str,
-    blobs: &[(Hash, PathBuf)],
+    mut blobs: Vec<(Hash, PathBuf)>,
 ) -> Result<BlobsJsonOutput, Error> {
     let root_volume = root_volume(filesystem.clone()).await?;
     let vol = root_volume.new_volume(volume_name, None).await.context("Failed to create volume")?;
     let directory = Directory::open(&vol, vol.root_directory_object_id())
         .await
         .context("Unable to open root directory")?;
-    let mut blobs_json = BlobsJsonOutput::new();
-    for (hash, path) in blobs {
-        let mut contents = Vec::new();
-        std::fs::File::open(path)
-            .context(format!("Unable to open `{:?}'", path))?
-            .read_to_end(&mut contents)?;
-        let uncompressed_size = contents.len() as u64;
+    // To avoid blocking the executor, we spawn a background thread to read and compress each blob.
+    // As larger blobs take longer to process, processing the largest ones first will typically be
+    // faster on multicore systems due to more efficient work scheduling.
+    blobs.sort_by_cached_key(|(_, path)| {
+        std::fs::metadata(&path)
+            .context(format!("Failed to query metadata for `{:?}`", &path))
+            .unwrap()
+            .len()
+    });
 
+    let blobs_to_install = blobs.into_iter().rev().map(|(hash, path)| {
+        install_blob(
+            hash,
+            path,
+            filesystem.clone(),
+            Directory::open_unchecked(directory.owner().clone(), directory.object_id()),
+        )
+    });
+
+    Ok(futures::stream::iter(blobs_to_install)
+        .buffer_unordered(std::thread::available_parallelism().unwrap().into())
+        .try_collect()
+        .await?)
+}
+
+async fn install_blob(
+    hash: Hash,
+    path: PathBuf,
+    filesystem: Arc<dyn Filesystem>,
+    directory: Directory<ObjectStore>,
+) -> Result<BlobsJsonOutputEntry, Error> {
+    let source_path = path.to_str().unwrap().to_string();
+    let merkle = hash.to_string();
+
+    let fs_block_size = filesystem.block_size();
+    let (contents, metadata) =
+        fasync::unblock(move || generate_blob(path, hash, fs_block_size)).await;
+
+    let handle;
+    let keys = [LockKey::object(directory.store().store_object_id(), directory.object_id())];
+    let mut transaction = filesystem.clone().new_transaction(&keys, Default::default()).await?;
+    handle = directory.create_child_file(&mut transaction, merkle.as_str()).await?;
+    transaction.commit().await?;
+
+    // TODO(fxbug.dev/122125): Should we inline the data payload too?
+    {
+        let mut writer = DirectWriter::new(&handle, Default::default());
+        writer.write_bytes(&contents).await?;
+        writer.complete().await?;
+    }
+
+    let metadata_len = if !metadata.hashes.is_empty() || !metadata.compressed_offsets.is_empty() {
+        let serialized = bincode::serialize(&metadata).unwrap();
+        handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await?;
+        serialized.len()
+    } else {
+        0
+    };
+
+    let properties = handle.get_properties().await?;
+    Ok(BlobsJsonOutputEntry {
+        source_path,
+        merkle,
+        bytes: metadata.uncompressed_size as usize,
+        size: properties.allocated_size,
+        file_size: metadata.uncompressed_size as usize,
+        compressed_file_size: properties.data_attribute_size,
+        merkle_tree_size: metadata_len,
+        used_space_in_blobfs: properties.allocated_size,
+    })
+}
+
+fn generate_blob(path: PathBuf, hash: Hash, fs_block_size: u64) -> (Vec<u8>, BlobMetadata) {
+    let mut contents = Vec::new();
+    std::fs::File::open(&path)
+        .context(format!("Unable to open `{:?}'", &path))
+        .unwrap()
+        .read_to_end(&mut contents)
+        .unwrap();
+    let hashes = {
+        // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs.
         let mut builder = MerkleTreeBuilder::new();
         builder.write(&contents);
         let tree = builder.finish();
-        assert_eq!(&tree.root(), hash);
-
-        let offsets_and_chunk_size = if let Some((compressed, chunk_size, offsets)) =
-            maybe_compress(&contents, fuchsia_merkle::BLOCK_SIZE, filesystem.block_size() as usize)
-        {
-            contents = compressed;
-            Some((offsets, chunk_size))
-        } else {
-            None
-        };
-
-        let handle;
-        let keys = [LockKey::object(vol.store_object_id(), directory.object_id())];
-        let mut transaction = filesystem.clone().new_transaction(&keys, Default::default()).await?;
-        handle = directory.create_child_file(&mut transaction, &format!("{}", hash)).await?;
-        transaction.commit().await?;
-
-        // TODO(fxbug.dev/122125): Should we inline the data payload too?
-        {
-            let mut writer = DirectWriter::new(&handle, Default::default());
-            writer.write_bytes(&contents).await?;
-            writer.complete().await?;
-        }
-
+        assert_eq!(tree.root(), hash);
+        let mut hashes: Vec<[u8; HASH_SIZE]> = Vec::new();
         let levels = tree.as_ref();
-        // TODO(fxbug.dev/122056: Refactor to share implementation with blob.rs.
-        let metadata_len = if levels.len() > 1 || offsets_and_chunk_size.is_some() {
-            let mut hashes: Vec<[u8; HASH_SIZE]> = Vec::new();
-            if levels.len() > 1 {
-                // We only need to store the leaf hashes.
-                for hash in &levels[0] {
-                    hashes.push(hash.clone().into());
-                }
+        if levels.len() > 1 {
+            // We only need to store the leaf hashes.
+            for hash in &levels[0] {
+                hashes.push(hash.clone().into());
             }
-            let (compressed_offsets, chunk_size) = offsets_and_chunk_size.unwrap_or((vec![], 0));
-            let mut serialized = Vec::new();
-            bincode::serialize_into(
-                &mut serialized,
-                &BlobMetadata { hashes, chunk_size, compressed_offsets, uncompressed_size },
-            )
-            .unwrap();
-            let len = serialized.len();
-            handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await?;
-            len
-        } else {
-            0
+        }
+        hashes
+    };
+
+    let uncompressed_size = contents.len() as u64;
+
+    if let Some((compressed, chunk_size, compressed_offsets)) =
+        maybe_compress(&contents, fuchsia_merkle::BLOCK_SIZE, fs_block_size as usize)
+    {
+        (compressed, BlobMetadata { hashes, chunk_size, compressed_offsets, uncompressed_size })
+    } else {
+        let metadata = BlobMetadata {
+            hashes,
+            chunk_size: 0,
+            compressed_offsets: Vec::new(),
+            uncompressed_size,
         };
-
-        let properties = handle.get_properties().await?;
-        blobs_json.push(BlobsJsonOutputEntry {
-            source_path: path.to_str().unwrap().to_string(),
-            merkle: hash.to_string(),
-            bytes: uncompressed_size as usize,
-            size: properties.allocated_size,
-            file_size: uncompressed_size as usize,
-            compressed_file_size: properties.data_attribute_size,
-            merkle_tree_size: metadata_len,
-            used_space_in_blobfs: properties.allocated_size,
-        })
+        (contents, metadata)
     }
-
-    Ok(blobs_json)
 }
 
-// TODO(fxbug.dev/122125): Support the blob delivery format.
+// TODO(fxbug.dev/124377): Support the blob delivery format.
 fn maybe_compress(
     buf: &[u8],
     block_size: usize,
@@ -279,11 +320,12 @@ mod tests {
             ]
         };
 
-        let blobs_out = install_blobs(filesystem.clone(), "blob", &blobs_in[..])
+        let mut blobs_out = install_blobs(filesystem.clone(), "blob", blobs_in)
             .await
             .expect("Failed to install blobs");
-
         assert_eq!(blobs_out.len(), 3);
+        blobs_out.sort_by_key(|entry| entry.source_path.clone());
+
         assert_eq!(Path::new(blobs_out[0].source_path.as_str()), dir.join("stuff1.txt"));
         assert_matches!(
             &blobs_out[0],
