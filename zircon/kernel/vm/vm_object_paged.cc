@@ -1221,17 +1221,10 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   }
 
   // Now that we have a page aligned range we can try hand over to the cow pages zero method.
-  // Increment the gen count as it's possible for ZeroPagesLocked to fail part way through
-  // and it doesn't unroll its actions.
-  //
-  // Zeroing pages of a contiguous VMO doesn't commit or de-commit any pages currently, but we
-  // increment the generation count anyway in case that changes in future, and to keep the tests
-  // more consistent.
-  IncrementHierarchyGenerationCountLocked();
 
+#if DEBUG_ASSERT_IMPLEMENTED
   // Currently we want ZeroPagesLocked() to not decommit any pages from a contiguous VMO.  In debug
   // we can assert that (not a super fast assert, but seems worthwhile; it's debug only).
-#if DEBUG_ASSERT_IMPLEMENTED
   uint64_t page_count_before = is_contiguous() ? cow_pages_locked()->DebugGetPageCountLocked() : 0;
 #endif
 
@@ -1246,6 +1239,14 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   // We might need a page request if the VMO is backed by a page source.
   __UNINITIALIZED LazyPageRequest page_request;
   while (start < end) {
+    // Increment the gen count as it's possible for ZeroPagesLocked to fail part way through
+    // and it doesn't unroll its actions.
+    //
+    // Zeroing pages of a contiguous VMO doesn't commit or de-commit any pages currently, but we
+    // increment the generation count anyway in case that changes in future, and to keep the tests
+    // more consistent.
+    IncrementHierarchyGenerationCountLocked();
+
     uint64_t zeroed_len = 0;
     zx_status_t status =
         cow_pages_locked()->ZeroPagesLocked(start, end, &page_request, &zeroed_len);
