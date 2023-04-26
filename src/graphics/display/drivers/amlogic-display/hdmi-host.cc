@@ -77,7 +77,7 @@ zx_status_t HdmiHost::Init() {
 
   auto res = hdmi_->PowerUp(1);  // only supports 1 display for now.
   if ((res.status() != ZX_OK) || res->is_error()) {
-    zxlogf(ERROR, "Power Up failed\n");
+    zxlogf(ERROR, "Power Up failed: %s\n", res.FormatDescription().c_str());
     return ZX_ERR_INTERNAL;
   }
   return ZX_OK;

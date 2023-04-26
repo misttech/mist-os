@@ -981,14 +981,14 @@ zx_status_t AmlogicDisplay::Bind() {
         auto hdmi_client =
             DdkConnectFragmentFidlProtocol<fuchsia_hardware_hdmi::Service::Device>("hdmi");
         if (hdmi_client.is_error()) {
-          zxlogf(ERROR, "fuchsia.hardware.hdmi/Device not found");
+          zxlogf(ERROR, "Failed to connect to hdmi FIDL protocol: %s", hdmi_client.status_string());
           return hdmi_client.status_value();
         }
 
         // If configuration is missing, init HDMI.
         if (zx_status_t status = vout_->InitHdmi(parent_, std::move(*hdmi_client));
             status != ZX_OK) {
-          DISP_ERROR("Could not initialize HDMI Vout device! %d\n", status);
+          DISP_ERROR("Could not initialize HDMI Vout device! %s\n", zx_status_get_string(status));
           return status;
         }
         break;
