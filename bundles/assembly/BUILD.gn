@@ -652,8 +652,10 @@ assembly_input_bundle("driver_framework_v1") {
 # build-types: all
 #
 assembly_input_bundle("driver_framework_v2") {
-  bootfs_packages = [ "//src/devices/bin/driver_manager:dfv2_package" ]
-  bootfs_files_labels = [ "//src/devices/bin/driver_host2:bootfs" ]
+  bootfs_packages = [
+    "//src/devices/bin/driver_host2:package",
+    "//src/devices/bin/driver_manager:dfv2_package",
+  ]
 }
 
 # Core starnix support.

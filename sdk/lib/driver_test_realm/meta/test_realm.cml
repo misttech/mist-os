@@ -195,6 +195,13 @@
         {
             name: "driver-host-env",
             extends: "realm",
+            resolvers: [
+                {
+                    resolver: "boot-resolver",
+                    from: "#fake-boot-resolver",
+                    scheme: "fuchsia-boot",
+                },
+            ],
 
             // 20 seconds
             __stop_timeout_ms: 20000,

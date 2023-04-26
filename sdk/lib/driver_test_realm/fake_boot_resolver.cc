@@ -37,6 +37,14 @@ class FakeBootResolver final : public fidl::WireServer<fuchsia_component_resolut
     }
     relative_path.remove_prefix(kPrefix.size() + 1);
 
+    // driver_host2 is supposed to be in a bootfs package, but it's actually in the same package
+    // as the driver test realm for test scenarios.
+    // TODO(http://fxbug.dev/126086): Include driver_host2 as a subpackage to avoid this hack.
+    std::string_view kDriverHostPrefix = "river_host2";
+    if (cpp20::starts_with(relative_path, kDriverHostPrefix)) {
+      relative_path.remove_prefix(kDriverHostPrefix.size() + 1);
+    }
+
     auto file = fidl::CreateEndpoints<fuchsia_io::File>();
     if (file.is_error()) {
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);

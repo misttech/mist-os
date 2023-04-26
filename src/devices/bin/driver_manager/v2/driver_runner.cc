@@ -705,25 +705,25 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
 
 zx::result<> DriverRunner::CreateDriverHostComponent(
     std::string moniker, fidl::ServerEnd<fuchsia_io::Directory> exposed_dir) {
-  std::string url = "#meta/driver_host2.cm";
+  constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   fidl::Arena arena;
-  auto child_decl_builder = fdecl::wire::Child::Builder(arena).name(moniker).url(url).startup(
+  auto child_decl_builder = fdecl::wire::Child::Builder(arena).name(moniker).url(kUrl).startup(
       fdecl::wire::StartupMode::kLazy);
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena);
-  auto open_callback = [moniker,
-                        url](fidl::WireUnownedResult<fcomponent::Realm::OpenExposedDir>& result) {
-    if (!result.ok()) {
-      LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %s", moniker.c_str(),
-           result.FormatDescription().data());
-      return;
-    }
-    if (result->is_error()) {
-      LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %u", moniker.c_str(),
-           result->error_value());
-    }
-  };
+  auto open_callback =
+      [moniker](fidl::WireUnownedResult<fcomponent::Realm::OpenExposedDir>& result) {
+        if (!result.ok()) {
+          LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %s", moniker.c_str(),
+               result.FormatDescription().data());
+          return;
+        }
+        if (result->is_error()) {
+          LOGF(ERROR, "Failed to open exposed directory for driver host: '%s': %u", moniker.c_str(),
+               result->error_value());
+        }
+      };
   auto create_callback =
-      [this, moniker, url, exposed_dir = std::move(exposed_dir),
+      [this, moniker, exposed_dir = std::move(exposed_dir),
        open_callback = std::move(open_callback)](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         if (!result.ok()) {
