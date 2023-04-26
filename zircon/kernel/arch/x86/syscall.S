@@ -409,8 +409,6 @@ syscall_maybe_mds_buff_overwrite:
     // Pass a pointer to the syscall_regs_t struct as first arg.
     movq    %rsp, %rdi
     call    x86_syscall_process_pending_signals
-
-    cli
     JMP_AND_SPECULATION_POSTFENCE(.Lreturn_from_syscall)
 END_FUNCTION(x86_syscall_cleanup_and_return)
 
