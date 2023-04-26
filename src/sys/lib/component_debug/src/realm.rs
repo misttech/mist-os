@@ -184,6 +184,9 @@ pub struct Instance {
     /// URL of the component.
     pub url: String,
 
+    /// Environment of the component from its parent.
+    pub environment: Option<String>,
+
     /// Unique identifier of component.
     pub instance_id: Option<String>,
 
@@ -212,6 +215,7 @@ impl TryFrom<fsys::Instance> for Instance {
         Ok(Self {
             moniker,
             url,
+            environment: instance.environment,
             instance_id: instance.instance_id,
             instance_type: InstanceType::Cml,
             resolved_info,

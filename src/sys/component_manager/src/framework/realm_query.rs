@@ -295,6 +295,7 @@ pub async fn get_instance(
     Ok(fsys::Instance {
         moniker: Some(relative_moniker.to_string()),
         url: Some(instance.component_url.clone()),
+        environment: instance.environment().name().map(|n| n.to_string()),
         instance_id: instance_id.map(|id| id.to_string()),
         resolved_info,
         ..fsys::Instance::EMPTY
@@ -600,6 +601,7 @@ async fn get_fidl_instance_and_children(
         fsys::Instance {
             moniker: Some(relative_moniker.to_string()),
             url: Some(instance.component_url.clone()),
+            environment: instance.environment().name().map(|n| n.to_string()),
             instance_id: instance_id.map(|id| id.to_string()),
             resolved_info,
             ..fsys::Instance::EMPTY

@@ -26,6 +26,7 @@ use serde::Serialize;
 pub struct ShowCmdInstance {
     pub moniker: AbsoluteMoniker,
     pub url: String,
+    pub environment: Option<String>,
     pub instance_id: Option<String>,
     pub is_cmx: bool,
     pub resolved: Option<ShowCmdResolvedInfo>,
@@ -148,6 +149,7 @@ async fn get_instance_by_query(
                 ShowCmdInstance {
                     moniker: instance.moniker,
                     url: instance.url,
+                    environment: instance.environment,
                     instance_id: instance.instance_id,
                     is_cmx: false,
                     resolved: resolved_info,
@@ -161,6 +163,7 @@ async fn get_instance_by_query(
                 ShowCmdInstance {
                     moniker: instance.moniker,
                     url: instance.url.clone(),
+                    environment: instance.environment,
                     instance_id: instance.instance_id,
                     is_cmx: true,
                     resolved: Some(ShowCmdResolvedInfo {
@@ -190,6 +193,9 @@ fn create_table(instance: ShowCmdInstance) -> Table {
 
     table.add_row(row!(r->"Moniker:", instance.moniker));
     table.add_row(row!(r->"URL:", instance.url));
+    table.add_row(
+        row!(r->"Environment:", instance.environment.unwrap_or_else(|| "N/A".to_string())),
+    );
 
     if let Some(instance_id) = instance.instance_id {
         table.add_row(row!(r->"Instance ID:", instance_id));

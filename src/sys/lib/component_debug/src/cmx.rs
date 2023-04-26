@@ -170,6 +170,7 @@ fn parse_cmx_component(
         instances.push(Instance {
             moniker,
             url,
+            environment: None,
             instance_id: None,
             resolved_info: Some(resolved_info),
             instance_type: InstanceType::Cmx(dir.clone()?),

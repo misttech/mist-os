@@ -136,6 +136,9 @@ type Instance = table {
     /// Information about the resolved state of a component instance.
     /// If the component is not resolved, this field is not set.
     4: resolved_info ResolvedInfo;
+
+    /// The component's environment name as defined by its parent.
+    5: environment string:fuchsia.component.MAX_MONIKER_LENGTH;
 };
 
 /// Information about the resolved state of a component instance.
