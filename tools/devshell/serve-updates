@@ -201,14 +201,23 @@ if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || i
     fi
     $verbose && echo >&2 "done"
   fi
-  $verbose && echo -n >&2 "Preparing the package repository..."
-  # only show output of prepare_publish if it fails
-  out="$(fx-command-run build build/images/updates:prepare_publish 2>&1)"
-  if [[ $? -ne 0 ]]; then
-    echo >&2 "${out}"
-    exit $?
+
+  if [[
+      ! -e "${repo_dir}/keys/snapshot.json" ||
+      ! -e "${repo_dir}/keys/targets.json" ||
+      ! -e "${repo_dir}/keys/timestamp.json" ||
+      ! -e "${repo_dir}/repository/1.root.json" ||
+      ! -e "${repo_dir}/repository/root.json"
+  ]]; then
+    echo >&2 "Preparing the package repository..."
+
+    fx-command-run build build/images/updates:prepare_publish
+    if [[ $? -ne 0 ]]; then
+      exit $?
+    fi
+
+    echo >&2 "done"
   fi
-  $verbose && echo >&2 "done"
 else
   if $clean_first; then
     fx-error "Flag '-C' or '--clean' can only be used if the incremental feature is enabled"
