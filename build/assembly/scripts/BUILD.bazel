@@ -4,7 +4,7 @@
 
 load("@rules_python//python:defs.bzl", "py_binary")
 
-package(default_visibility = ["//build/bazel/assembly:__subpackages__"])
+package(default_visibility = ["//build:__subpackages__"])
 
 py_binary(
     name = "assembly_input_bundle_tool",
@@ -13,4 +13,9 @@ py_binary(
         "//build/python/modules:assembly",
         "//build/python/modules:depfile",
     ],
+)
+
+py_binary(
+    name = "convert_size_limits",
+    srcs = ["convert_size_limits.py"],
 )
