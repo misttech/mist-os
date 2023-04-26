@@ -11,6 +11,7 @@
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/memory.h>
 
 #include <cstdint>
 #include <cstdio>

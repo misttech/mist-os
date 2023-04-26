@@ -6,7 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/metadata.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zircon/process.h>

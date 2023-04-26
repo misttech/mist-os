@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_PLATFORM_PC_INCLUDE_PLATFORM_PC_BOOTLOADER_H_
 #define ZIRCON_KERNEL_PLATFORM_PC_INCLUDE_PLATFORM_PC_BOOTLOADER_H_
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/graphics.h>
 #include <stdint.h>
 
 #include <ktl/span.h>

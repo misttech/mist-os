@@ -176,90 +176,11 @@ typedef struct {
   }
 #endif
 
-// The kernel image.  In a bootable ZBI this item must always be first,
-// immediately after the ZBI_TYPE_CONTAINER header.  The contiguous memory
-// image of the kernel is formed from the ZBI_TYPE_CONTAINER header, the
-// ZBI_TYPE_KERNEL_{ARCH} header, and the payload.
-//
-// The boot loader loads the whole image starting with the container header
-// through to the end of the kernel item's payload into contiguous physical
-// memory.  It then constructs a partial ZBI elsewhere in memory, which has
-// a ZBI_TYPE_CONTAINER header of its own followed by all the other items
-// that were in the booted ZBI plus other items synthesized by the boot
-// loader to describe the machine.  This partial ZBI must be placed at an
-// address (where the container header is found) that is aligned to the
-// machine's page size.  The precise protocol for transferring control to
-// the kernel's entry point varies by machine.
-//
-// On all machines, the kernel requires some amount of scratch memory to be
-// available immediately after the kernel image at boot.  It needs this
-// space for early setup work before it has a chance to read any memory-map
-// information from the boot loader.  The `reserve_memory_size` field tells
-// the boot loader how much space after the kernel's load image it must
-// leave available for the kernel's use.  The boot loader must place its
-// constructed ZBI or other reserved areas at least this many bytes after
-// the kernel image.
-//
-// x86-64
-//
-//     The kernel assumes it was loaded at a fixed physical address of
-//     0x100000 (1MB).  zbi_kernel_t.entry is the absolute physical address
-//     of the PC location where the kernel will start.
-//     TODO(fxbug.dev/24762): Perhaps this will change??
-//     The processor is in 64-bit mode with direct virtual to physical
-//     mapping covering the physical memory where the kernel and
-//     bootloader-constructed ZBI were loaded.
-//     The %rsi register holds the physical address of the
-//     bootloader-constructed ZBI.
-//     All other registers are unspecified.
-//
-//  ARM64
-//
-//     zbi_kernel_t.entry is an offset from the beginning of the image
-//     (i.e., the ZBI_TYPE_CONTAINER header before the ZBI_TYPE_KERNEL_ARM64
-//     header) to the PC location in the image where the kernel will
-//     start.  The processor is in physical address mode at EL1 or
-//     above.  The kernel image and the bootloader-constructed ZBI each
-//     can be loaded anywhere in physical memory.  The x0 register
-//     holds the physical address of the bootloader-constructed ZBI.
-//     All other registers are unspecified.
-//
-//  RISCV64
-//
-//     zbi_kernel_t.entry is an offset from the beginning of the image (i.e.,
-//     the ZBI_TYPE_CONTAINER header before the ZBI_TYPE_KERNEL_RISCV64 header)
-//     to the PC location in the image where the kernel will start.  The
-//     processor is in S mode, satp is zero, sstatus.SIE is zero.  The kernel
-//     image and the bootloader-constructed ZBI each can be loaded anywhere in
-//     physical memory, aligned to 4KiB.  The a0 register holds the HART ID,
-//     and the a1 register holds the 4KiB-aligned physical address of the
-//     bootloader-constructed ZBI.  All other registers are unspecified.
-//
 #define ZBI_TYPE_KERNEL_PREFIX (0x004e524b)   // KRN\0
 #define ZBI_TYPE_KERNEL_MASK (0x00FFFFFF)     // Mask to compare to the prefix.
 #define ZBI_TYPE_KERNEL_X64 (0x4c4e524b)      // KRNL
 #define ZBI_TYPE_KERNEL_ARM64 (0x384e524b)    // KRN8
 #define ZBI_TYPE_KERNEL_RISCV64 (0x564e524b)  // KRNV
-#define ZBI_IS_KERNEL_BOOTITEM(x) (((x)&ZBI_TYPE_KERNEL_MASK) == ZBI_TYPE_KERNEL_PREFIX)
-
-#ifndef __ASSEMBLER__
-typedef struct {
-  // Entry-point address.  The interpretation of this differs by machine.
-  uint64_t entry;
-  // Minimum amount (in bytes) of scratch memory that the kernel requires
-  // immediately after its load image.
-  uint64_t reserve_memory_size;
-} zbi_kernel_t;
-
-// The whole contiguous image loaded into memory by the boot loader.
-typedef struct {
-  zbi_header_t hdr_file;
-  zbi_header_t hdr_kernel;
-  zbi_kernel_t data_kernel;
-  uint8_t contents[/*hdr_kernel.length - sizeof(zbi_kernel_t)*/];
-  // data_kernel.reserve_memory_size bytes in memory are free after contents.
-} zircon_kernel_t;
-#endif
 
 // A discarded item that should just be ignored.  This is used for an
 // item that was already processed and should be ignored by whatever
@@ -339,222 +260,25 @@ typedef struct {
 // The crash log from the previous boot, a UTF-8 string.
 #define ZBI_TYPE_CRASHLOG (0x4d4f4f42)  // BOOM
 
-// Physical memory region that will persist across warm boots.
-// zbi_nvram_t gives the physical base address and length in bytes.
+// Physical memory region that will persist across warm boots. See zbi_nvram_t
+// for payload description.
 #define ZBI_TYPE_NVRAM (0x4c4c564e)  // NVLL
-
-#ifndef __ASSEMBLER__
-typedef struct {
-  uint64_t base;
-  uint64_t length;
-} zbi_nvram_t;
-#endif
-
-#define ZBI_BOARD_NAME_LEN 32
 
 // Platform ID Information.
 #define ZBI_TYPE_PLATFORM_ID (0x44494C50)  // PLID
-#ifndef __ASSEMBLER__
-typedef struct {
-  uint32_t vid;
-  uint32_t pid;
-  char board_name[ZBI_BOARD_NAME_LEN];
-} zbi_platform_id_t;
-#endif
 
-#define ZBI_TYPE_DRV_BOARD_INFO (0x4953426D)  // mBSI
 // Board-specific information.
-#ifndef __ASSEMBLER__
-typedef struct {
-  uint32_t revision;
-} zbi_board_info_t;
-#endif
+#define ZBI_TYPE_DRV_BOARD_INFO (0x4953426D)  // mBSI
 
-// CPU configuration, a zbi_cpu_config_t header followed by one or more
-// zbi_cpu_cluster_t entries.  zbi_header_t.length must equal
-// zbi_cpu_config_t.cluster_count * sizeof(zbi_cpu_cluster_t).
+// Legacy CPU configuration. See zbi_cpu_config_t for a description of the payload.
 #define ZBI_TYPE_CPU_CONFIG (0x43555043)  // CPUC
-#ifndef __ASSEMBLER__
-typedef struct {
-  // Number of CPU cores in the cluster.
-  uint32_t cpu_count;
 
-  // Reserved for future use.  Set to 0.
-  uint32_t type;
-  uint32_t flags;
-  uint32_t reserved;
-} zbi_cpu_cluster_t;
-
-typedef struct {
-  // Number of zbi_cpu_cluster_t entries following this header.
-  uint32_t cluster_count;
-
-  // Reserved for future use.  Set to 0.
-  uint32_t reserved[3];
-
-  // cluster_count entries follow.
-  zbi_cpu_cluster_t clusters[];
-} zbi_cpu_config_t;
-#endif
-
+// CPU configuration. See zbi_topology_node_t for a description of the payload.
 #define ZBI_TYPE_CPU_TOPOLOGY (0x544F504F)  // TOPO
 
-#ifndef __ASSEMBLER__
-
-#define ZBI_MAX_SMT 4
-
-// These are Used in the flags field of zbi_topology_processor_t.
-
-// This is the processor that boots the system and the last to be shutdown.
-#define ZBI_TOPOLOGY_PROCESSOR_PRIMARY 0b1
-
-// This is the processor that handles all interrupts, some architectures will
-// not have one.
-#define ZBI_TOPOLOGY_PROCESSOR_INTERRUPT 0b10
-
-#define ZBI_TOPOLOGY_NO_PARENT 0xFFFF
-
-typedef enum {
-  ZBI_TOPOLOGY_ARCH_UNDEFINED = 0,  // Intended primarily for testing.
-  ZBI_TOPOLOGY_ARCH_X86 = 1,
-  ZBI_TOPOLOGY_ARCH_ARM = 2,
-  ZBI_TOPOLOGY_ARCH_RISCV = 3,
-} zbi_topology_architecture_t;
-
-typedef struct {
-  // Cluster ids for each level, one being closest to the cpu.
-  // These map to aff1, aff2, and aff3 values in the ARM registers.
-  uint8_t cluster_1_id;
-  uint8_t cluster_2_id;
-  uint8_t cluster_3_id;
-
-  // Id of the cpu inside of the bottom-most cluster, aff0 value.
-  uint8_t cpu_id;
-
-  // The GIC interface number for this processor.
-  // In GIC v3+ this is not necessary as the processors are addressed by their
-  // affinity routing (all cluster ids followed by cpu_id).
-  uint8_t gic_id;
-} zbi_topology_arm_info_t;
-
-typedef struct {
-  // Indexes here correspond to the logical_ids index for the thread.
-  uint32_t apic_ids[ZBI_MAX_SMT];
-  uint32_t apic_id_count;
-} zbi_topology_x86_info_t;
-
-typedef struct {
-  // ID that represents this CPU in SBI.
-  uint64_t hart_id;
-} zbi_topology_riscv_info_t;
-
-typedef struct {
-  uint16_t logical_ids[ZBI_MAX_SMT];
-  uint8_t logical_id_count;
-
-  uint16_t flags;
-
-  // Should be one of zbi_topology_arm_info_t.
-  // If UNDEFINED then nothing will be set in arch_info.
-  uint8_t architecture;
-  union {
-    zbi_topology_arm_info_t arm;
-    zbi_topology_x86_info_t x86;
-    zbi_topology_riscv_info_t riscv;
-  } architecture_info;
-
-} zbi_topology_processor_t;
-
-typedef struct {
-  // Relative performance level of this processor in the system. The value is
-  // interpreted as the performance of this processor relative to the maximum
-  // performance processor in the system. No specific values are required for
-  // the performance level, only that the following relationship holds:
-  //
-  //   Pmax is the value of performance_class for the maximum performance
-  //   processor in the system, operating at its maximum operating point.
-  //
-  //   P is the value of performance_class for this processor, operating at
-  //   its maximum operating point.
-  //
-  //   R is the performance ratio of this processor to the maximum performance
-  //   processor in the system in the range (0.0, 1.0].
-  //
-  //   R = (P + 1) / (Pmax + 1)
-  //
-  // If accuracy is limited, choose a conservative value that slightly under-
-  // estimates the performance of lower-performance processors.
-  uint8_t performance_class;
-} zbi_topology_cluster_t;
-
-typedef struct {
-  // Unique id of this cache node. No other semantics are assumed.
-  uint32_t cache_id;
-} zbi_topology_cache_t;
-
-typedef struct {
-  // Starting and ending memory addresses of this numa region.
-  uint64_t start_address;
-  uint64_t end_address;
-} zbi_topology_numa_region_t;
-
-typedef enum {
-  ZBI_TOPOLOGY_ENTITY_UNDEFINED = 0,  // Unused default.
-  ZBI_TOPOLOGY_ENTITY_PROCESSOR = 1,
-  ZBI_TOPOLOGY_ENTITY_CLUSTER = 2,
-  ZBI_TOPOLOGY_ENTITY_CACHE = 3,
-  ZBI_TOPOLOGY_ENTITY_DIE = 4,
-  ZBI_TOPOLOGY_ENTITY_SOCKET = 5,
-  ZBI_TOPOLOGY_ENTITY_POWER_PLANE = 6,
-  ZBI_TOPOLOGY_ENTITY_NUMA_REGION = 7,
-} zbi_topology_entity_type_t;
-
-typedef struct {
-  // Should be one of zbi_topology_entity_type_t.
-  uint8_t entity_type;
-  uint16_t parent_index;
-  union {
-    zbi_topology_processor_t processor;
-    zbi_topology_cluster_t cluster;
-    zbi_topology_numa_region_t numa_region;
-    zbi_topology_cache_t cache;
-  } entity;
-} zbi_topology_node_t;
-
-#endif
-
-// Device memory configuration, consisting of one or more `zbi_mem_range_t`
-// entries.
-//
-// The length of the item is `sizeof(zbi_mem_range_t)` times the number of
-// entries. Each entry describes a contiguous range of memory:
-//
-//   * ZBI_MEM_RANGE_RAM ranges are standard RAM.
-//
-//   * ZBI_MEM_RANGE_PERIPHERAL are ranges that cover one or more devices.
-//
-//   * ZBI_MEM_RANGE_RESERVED are reserved ranges that should not be used by
-//     the system. Reserved ranges may overlap previous or later
-//     ZBI_MEM_RANGE_RAM or ZBI_MEM_RANGE_PERIPHERAL regions, in which case the
-//     reserved range takes precedence.
-//
-//   * Any other `type` should be treated as `ZBI_MEM_RANGE_RESERVED` to allow
-//     forwards compatibility.
-//
-// Entries in the table may be in any order, and only a single item of type
-// ZBI_TYPE_MEM_CONFIG should be present in the ZBI.
+// Device memory configuration. See zbi_mem_range_t for a description of the
+// payload.
 #define ZBI_TYPE_MEM_CONFIG (0x434D454D)  // MEMC
-#ifndef __ASSEMBLER__
-typedef struct {
-  uint64_t paddr;
-  uint64_t length;
-  uint32_t type;
-  uint32_t reserved;
-} zbi_mem_range_t;
-#endif
-#define ZBI_MEM_RANGE_RAM (1)
-#define ZBI_MEM_RANGE_PERIPHERAL (2)
-#define ZBI_MEM_RANGE_RESERVED (3)
 
 // Kernel driver configuration.  The zbi_header_t.extra field gives a
 // ZBI_KERNEL_DRIVER_* type that determines the payload format.
@@ -575,16 +299,6 @@ typedef struct {
 // (in particular the "version" field may differ as the format evolves).
 #define ZBI_TYPE_EFI_MEMORY_ATTRIBUTES_TABLE (0x54414d45)  // EMAT
 
-/* EFI Variable for Crash Log */
-#define ZIRCON_VENDOR_GUID                                                         \
-  {                                                                                \
-    0x82305eb2, 0xd39e, 0x4575, { 0xa0, 0xc8, 0x6c, 0x20, 0x72, 0xd0, 0x84, 0x4c } \
-  }
-#define ZIRCON_CRASHLOG_EFIVAR \
-  { 'c', 'r', 'a', 's', 'h', 'l', 'o', 'g', 0 }
-#define ZIRCON_CRASHLOG_EFIATTR \
-  (EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS)
-
 // Framebuffer parameters, a zbi_swfb_t entry.
 #define ZBI_TYPE_FRAMEBUFFER (0x42465753)  // SWFB
 
@@ -597,20 +311,6 @@ typedef struct {
 // A copy of the boot version stored within the sysconfig
 // partition
 #define ZBI_TYPE_BOOT_VERSION (0x53525642)  // BVRS
-
-#ifndef __ASSEMBLER__
-typedef struct {
-  // Physical memory address.
-  uint64_t base;
-
-  // Pixel layout and format.
-  // See [../pixelformat.h](<zircon/pixelformat.h>).
-  uint32_t width;
-  uint32_t height;
-  uint32_t stride;
-  uint32_t format;
-} zbi_swfb_t;
-#endif
 
 // ZBI_TYPE_DRV_* types (LSB is 'm') contain driver metadata.
 #define ZBI_TYPE_DRV_METADATA(type) (((type)&0xFF) == 0x6D)  // 'm'
@@ -625,72 +325,11 @@ typedef struct {
 // followed by one or more zbi_partition_t entries.  zbi_header_t.extra
 // is a board-specific index to specify which device this applies to.
 #define ZBI_TYPE_DRV_PARTITION_MAP (0x5452506D)  // mPRT
-#define ZBI_PARTITION_NAME_LEN (32)
-#define ZBI_PARTITION_GUID_LEN (16)
 
 // Private information for the board driver.
 #define ZBI_TYPE_DRV_BOARD_PRIVATE (0x524F426D)  // mBOR
 
-#ifndef __ASSEMBLER__
-typedef struct {
-  // GUID specifying the format and use of data stored in the partition.
-  uint8_t type_guid[ZBI_PARTITION_GUID_LEN];
-
-  // GUID unique to this partition.
-  uint8_t uniq_guid[ZBI_PARTITION_GUID_LEN];
-
-  // First and last block occupied by this partition.
-  uint64_t first_block;
-  uint64_t last_block;
-
-  // Reserved for future use.  Set to 0.
-  uint64_t flags;
-
-  char name[ZBI_PARTITION_NAME_LEN];
-} zbi_partition_t;
-
-typedef struct {
-  // Total blocks used on the device.
-  uint64_t block_count;
-  // Size of each block in bytes.
-  uint64_t block_size;
-
-  // Number of partitions in the map.
-  uint32_t partition_count;
-
-  // Reserved for future use.
-  uint32_t reserved;
-
-  // Device GUID.
-  uint8_t guid[ZBI_PARTITION_GUID_LEN];
-
-  // partition_count partition entries follow.
-  zbi_partition_t partitions[];
-} zbi_partition_map_t;
-#endif
-
 #define ZBI_TYPE_HW_REBOOT_REASON (0x42525748)  // HWRB
-
-#define ZBI_HW_REBOOT_UNDEFINED ((uint32_t)0)
-#define ZBI_HW_REBOOT_COLD ((uint32_t)1)
-#define ZBI_HW_REBOOT_WARM ((uint32_t)2)
-#define ZBI_HW_REBOOT_BROWNOUT ((uint32_t)3)
-#define ZBI_HW_REBOOT_WATCHDOG ((uint32_t)4)
-
-#ifndef __ASSEMBLER__
-#ifndef __cplusplus
-typedef uint32_t zbi_hw_reboot_reason_t;
-#else
-enum class ZbiHwRebootReason : uint32_t {
-  Undefined = ZBI_HW_REBOOT_UNDEFINED,
-  Cold = ZBI_HW_REBOOT_COLD,
-  Warm = ZBI_HW_REBOOT_WARM,
-  Brownout = ZBI_HW_REBOOT_BROWNOUT,
-  Watchdog = ZBI_HW_REBOOT_WATCHDOG,
-};
-using zbi_hw_reboot_reason_t = ZbiHwRebootReason;
-#endif  // __cplusplus
-#endif  // __ASSEMBLER__
 
 // The serial number, an unterminated ASCII string of printable non-whitespace
 // characters with length zbi_header_t.length.
@@ -719,64 +358,10 @@ using zbi_hw_reboot_reason_t = ZbiHwRebootReason;
 // secure cryptographic pseudo-random number generators.
 #define ZBI_TYPE_SECURE_ENTROPY (0x444e4152)  // RAND
 
-// This type is meant for internal development use and is not part of the
-// long-term stable ZBI protocol contract with boot loaders.
-//
 // This provides a data dump and associated logging from a boot loader,
 // shim, or earlier incarnation that wants its data percolated up by the
-// booting Zircon kernel.  This is usually used for instrumented builds.
-// It's intended to provide the same information and formats that might be
-// published via the FIDL fuchsia.debugdata.Publisher protocol.
-//
-// The payload is described by a trailer rather than a header, with the
-// dump contents themselves first in the payload.  This is so that when the
-// whole payload is transferred to a VMO, the contents can be used there
-// and sent to fuchsia.debugdata.Publisher in place just by adjusting the
-// VMO's ZX_PROP_VMO_CONTENT_SIZE property.
-//
-// The payload is organized into four chunks, followed by the trailer.  The
-// whole payload size is always aligned to ZBI_ALIGNMENT bytes.  The
-// zbi_debugdata_t trailer is read from the final bytes of the payload.
-// Each chunk has an arbitrary size that might not be aligned, and there is
-// no alignment padding between the chunks.  The total size of all the
-// chunks together is padded to ZBI_ALIGNMENT, with the trailer at the end.
-// The sizes in the zbi_debugdata_t trailer must add up, rounded to alignment,
-// to exactly sizeof(zbi_debugdata_t) less than the whole payload size.
-//
-// Layout:
-//  * dump contents
-//    This corresponds to the VMO contents in fuchsia.debugdata.Publisher.
-//    This is arbitrary binary data, its format known by the ultimate consumer.
-//  * sink name
-//    This corresponds to the sink name in the fuchsia.debugdata.Publisher
-//    FIDL protocol.  It's a UTF-8 string with no NUL terminator.  It's a
-//    simple string that identifies what format the dump contents are in.
-//    It can be used to route collected dumps to appropriate
-//    post-processing.  See the FIDL protocol for details.
-//  * VMO name
-//    This corresponds to the ZX_PROP_NAME property set on the VMO published.
-//    It's usually used like a (shortened) file name for the particular dump,
-//    perhaps incorporating a process name and PID or the like.
-//  * log text
-//    This corresponds to logging that was emitted while producing this
-//    data.  It might contain messages relevant to understanding the data,
-//    including symbolizer markup with symbolization context.  It's a UTF-8
-//    string with no NUL terminator, expected to be log lines (with or
-//    without timestamp and other such prefix text) separated by \n characters.
-//
-// The contents and log text can be of any size, but the sink name is
-// presumed to be possibly truncated to a small size such as 255 and the
-// VMO name is presumed to be possibly truncated to a very small size such
-// as ZX_MAX_NAME_LEN (32).
+// booting Zircon kernel. See zbi_debugdata_t for a description of the
+// payload.
 #define ZBI_TYPE_DEBUGDATA (0x44474244)  // DBGD
-
-#ifndef __ASSEMBLER__
-typedef struct {
-  uint32_t content_size;
-  uint32_t sink_name_size;
-  uint32_t vmo_name_size;
-  uint32_t log_size;
-} zbi_debugdata_t;
-#endif
 
 #endif  // LIB_ZBI_FORMAT_ZBI_H_

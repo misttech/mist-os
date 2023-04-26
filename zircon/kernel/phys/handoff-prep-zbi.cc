@@ -6,6 +6,9 @@
 
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/range.h>
+#include <lib/zbi-format/board.h>
+#include <lib/zbi-format/memory.h>
+#include <lib/zbi-format/reboot.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/image.h>

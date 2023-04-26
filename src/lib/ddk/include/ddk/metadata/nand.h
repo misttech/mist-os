@@ -5,7 +5,7 @@
 #ifndef SRC_LIB_DDK_INCLUDE_DDK_METADATA_NAND_H_
 #define SRC_LIB_DDK_INCLUDE_DDK_METADATA_NAND_H_
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <zircon/types.h>
 
 #include <ddk/metadata/bad-block.h>

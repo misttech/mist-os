@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <lib/arch/zbi-boot.h>
 #include <lib/memalloc/range.h>
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
 

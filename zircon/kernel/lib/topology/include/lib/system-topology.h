@@ -8,7 +8,7 @@
 #define ZIRCON_KERNEL_LIB_TOPOLOGY_INCLUDE_LIB_SYSTEM_TOPOLOGY_H_
 
 #include <lib/lazy_init/lazy_init.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/cpu.h>
 #include <zircon/types.h>
 
 #include <fbl/vector.h>

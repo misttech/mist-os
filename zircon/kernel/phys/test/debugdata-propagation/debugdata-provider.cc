@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-shim/debugdata.h>
+#include <lib/zbi-format/internal/debugdata.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/debugdata.h>
 #include <stdio.h>

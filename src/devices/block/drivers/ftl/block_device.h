@@ -14,7 +14,7 @@
 #include <fuchsia/hardware/nand/c/banjo.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/sync/completion.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <threads.h>
 #include <zircon/listnode.h>

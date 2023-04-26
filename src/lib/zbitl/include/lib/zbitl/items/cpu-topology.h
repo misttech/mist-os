@@ -7,7 +7,8 @@
 
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/internal/deprecated-cpu.h>
 
 #include <variant>
 

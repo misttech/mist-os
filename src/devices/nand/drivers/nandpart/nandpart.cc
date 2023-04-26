@@ -12,7 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/operation/nand.h>
 #include <lib/sync/completion.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/hw/gpt.h>

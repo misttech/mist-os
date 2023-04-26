@@ -8,7 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zx/vmo.h>
 #include <threads.h>
 #include <zircon/assert.h>

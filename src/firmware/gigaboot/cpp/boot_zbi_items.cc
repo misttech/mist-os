@@ -5,6 +5,8 @@
 #include "boot_zbi_items.h"
 
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/graphics.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
 #include <stdio.h>

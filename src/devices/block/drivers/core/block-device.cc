@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/operation/block.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <threads.h>

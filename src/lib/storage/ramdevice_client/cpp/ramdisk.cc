@@ -17,7 +17,7 @@
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>

@@ -17,7 +17,7 @@
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/completion.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/board.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/iommu.h>
 #include <lib/zx/resource.h>

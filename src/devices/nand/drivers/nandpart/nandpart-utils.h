@@ -6,7 +6,7 @@
 #define SRC_DEVICES_NAND_DRIVERS_NANDPART_NANDPART_UTILS_H_
 
 #include <fuchsia/hardware/nand/c/banjo.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <zircon/types.h>
 
 zx_status_t SanitizePartitionMap(zbi_partition_map_t* pmap, const nand_info_t& nand_info);

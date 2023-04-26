@@ -9,6 +9,7 @@
 #define ZIRCON_KERNEL_PLATFORM_PC_PLATFORM_P_H_
 
 #include <lib/cbuf.h>
+#include <lib/zbi-format/memory.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>

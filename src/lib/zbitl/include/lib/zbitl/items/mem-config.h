@@ -6,7 +6,7 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_ITEMS_MEM_CONFIG_H_
 
 #include <lib/fit/result.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbitl/view.h>
 
 #include <iterator>

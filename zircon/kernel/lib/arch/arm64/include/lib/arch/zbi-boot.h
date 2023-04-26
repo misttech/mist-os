@@ -8,7 +8,7 @@
 #define ZIRCON_KERNEL_LIB_ARCH_ARM64_INCLUDE_LIB_ARCH_ZBI_BOOT_H_
 
 #include <lib/arch/cache.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/kernel.h>
 
 #include <cstdint>
 

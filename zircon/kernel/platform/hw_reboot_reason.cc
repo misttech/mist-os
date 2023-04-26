@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/reboot.h>
 #include <platform.h>
 
 namespace {

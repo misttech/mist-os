@@ -6,6 +6,7 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/stdcompat/bit.h>
+#include <lib/zbi-format/partition.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/assert.h>

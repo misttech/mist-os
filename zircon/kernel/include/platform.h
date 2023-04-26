@@ -8,7 +8,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_PLATFORM_H_
 #define ZIRCON_KERNEL_INCLUDE_PLATFORM_H_
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/reboot.h>
 #include <sys/types.h>
 #include <zircon/boot/crash-reason.h>
 #include <zircon/compiler.h>

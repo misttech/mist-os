@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_TARGET_ARM64_BOOT_SHIM_BOOT_SHIM_H_
 #define ZIRCON_KERNEL_TARGET_ARM64_BOOT_SHIM_BOOT_SHIM_H_
 
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 
 // This symbol is defined in boot-shim.ld.

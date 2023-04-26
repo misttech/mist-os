@@ -7,6 +7,7 @@
 #include <lib/efi/testing/mock_simple_text_input.h>
 #include <lib/efi/testing/stub_boot_services.h>
 #include <lib/efi/testing/stub_runtime_services.h>
+#include <lib/zbi-format/internal/efi.h>
 #include <lib/zbi-format/zbi.h>
 #include <mcheck.h>
 #include <stdio.h>

@@ -33,6 +33,7 @@
 #include <lib/debuglog.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/system-topology.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 #include <mexec.h>

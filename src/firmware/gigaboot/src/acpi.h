@@ -5,8 +5,8 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_SRC_ACPI_H_
 #define SRC_FIRMWARE_GIGABOOT_SRC_ACPI_H_
 
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/zbi.h>
 #include <stdint.h>
 #include <xefi.h>
 #include <zircon/compiler.h>

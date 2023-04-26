@@ -7,7 +7,7 @@
 
 #include <assert.h>
 #include <debug.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/cpu.h>
 #include <trace.h>
 #include <zircon/errors.h>
 

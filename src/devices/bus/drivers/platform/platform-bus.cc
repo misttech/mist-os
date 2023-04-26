@@ -17,6 +17,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/outgoing/cpp/handlers.h>
 #include <lib/fdf/dispatcher.h>
+#include <lib/zbi-format/board.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdint.h>

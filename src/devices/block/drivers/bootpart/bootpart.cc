@@ -12,6 +12,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 #include <stdlib.h>

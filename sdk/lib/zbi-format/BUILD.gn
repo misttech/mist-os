@@ -4,7 +4,7 @@
 
 import("//build/cpp/sdk_source_set.gni")
 
-config("public_config") {
+config("include") {
   include_dirs = [ "include" ]
 }
 
@@ -14,9 +14,14 @@ sdk_source_set("zbi-format") {
   api = "zbi-format.api"
 
   public = [
-    # TODO(b/271475507): Move each of these files over.
-    # "include/lib/zbi-format/pixel-format.h",
+    "include/lib/zbi-format/board.h",
+    "include/lib/zbi-format/cpu.h",
     "include/lib/zbi-format/driver-config.h",
+    "include/lib/zbi-format/graphics.h",
+    "include/lib/zbi-format/kernel.h",
+    "include/lib/zbi-format/memory.h",
+    "include/lib/zbi-format/partition.h",
+    "include/lib/zbi-format/reboot.h",
     "include/lib/zbi-format/zbi.h",
 
     # TODO(b/271475507): Delete once everyone consumes <lib/zbi-format/zbi.h>
@@ -24,7 +29,16 @@ sdk_source_set("zbi-format") {
     "include/zircon/boot/image.h",
   ]
 
-  public_configs = [ ":public_config" ]
+  # These are headers that are meant for internal development use and are not
+  # part of the long-term stable ZBI protocol contract with bootloaders.
+  sdk_headers_for_internal_use = [
+    # TODO(b/271475507): "include/lib/zbi-format/internal/bootfs.h"
+    "include/lib/zbi-format/internal/deprecated-cpu.h",
+    "include/lib/zbi-format/internal/debugdata.h",
+    "include/lib/zbi-format/internal/efi.h",
+  ]
+
+  public_configs = [ ":include" ]
 
   # Since this doesn't actually compile any code, don't let it contribute any
   # implicit link inputs from default configs.

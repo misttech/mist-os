@@ -9,7 +9,7 @@
 
 #include <lib/arch/ticks.h>
 #include <lib/memalloc/range.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/memory.h>
 #include <zircon/compiler.h>
 
 #include <ktl/byte.h>

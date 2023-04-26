@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
+#include <lib/zbi-format/partition.h>
 
 #include <ddktl/device.h>
 #include <fbl/string_printf.h>

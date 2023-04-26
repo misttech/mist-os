@@ -4,7 +4,7 @@
 
 #include "legacy-mem-config.h"
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zircon-internal/e820.h>
 #include <zircon/assert.h>
 

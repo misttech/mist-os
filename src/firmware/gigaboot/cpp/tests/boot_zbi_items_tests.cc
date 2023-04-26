@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/abr/abr.h>
+#include <lib/zbi-format/graphics.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/limits.h>
 

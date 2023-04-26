@@ -7,6 +7,8 @@
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/boot-shim/debugdata.h>
 #include <lib/boot-shim/test-helper.h>
+#include <lib/zbi-format/internal/debugdata.h>
+#include <lib/zbi-format/reboot.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/debugdata.h>
 

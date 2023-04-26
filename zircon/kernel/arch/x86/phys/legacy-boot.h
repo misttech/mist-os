@@ -9,7 +9,7 @@
 
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/memory.h>
 
 #include <cstdint>
 #include <string_view>

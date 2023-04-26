@@ -12,7 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sync/completion.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zx/vmo.h>
 #include <string.h>
 #include <zircon/status.h>

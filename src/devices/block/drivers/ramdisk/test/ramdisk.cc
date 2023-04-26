@@ -18,6 +18,7 @@
 #include <lib/fzl/fifo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sync/completion.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/fifo.h>

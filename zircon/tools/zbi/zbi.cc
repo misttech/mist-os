@@ -9,6 +9,7 @@
 #include <lib/cksum.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
 #include <lib/zbitl/json.h>

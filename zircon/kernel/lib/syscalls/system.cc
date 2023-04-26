@@ -11,6 +11,7 @@
 #include <lib/fit/defer.h>
 #include <lib/instrumentation/asan.h>
 #include <lib/syscalls/forward.h>
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/macros.h>
 #include <mexec.h>

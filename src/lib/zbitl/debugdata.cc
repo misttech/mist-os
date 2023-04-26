@@ -4,6 +4,7 @@
 
 #include "lib/zbitl/items/debugdata.h"
 
+#include <lib/zbi-format/internal/debugdata.h>
 #include <lib/zbi-format/zbi.h>
 
 #include <string_view>

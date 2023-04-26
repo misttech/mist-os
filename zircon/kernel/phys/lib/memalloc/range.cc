@@ -6,7 +6,7 @@
 
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/memory.h>
 
 #include <string_view>
 #include <type_traits>

@@ -6,6 +6,7 @@
 
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/pool.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
 #include <zircon/assert.h>

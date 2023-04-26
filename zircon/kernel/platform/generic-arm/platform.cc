@@ -17,6 +17,8 @@
 #include <lib/memory_limit.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/system-topology.h>
+#include <lib/zbi-format/kernel.h>
+#include <lib/zbi-format/memory.h>
 #include <mexec.h>
 #include <platform.h>
 #include <reg.h>

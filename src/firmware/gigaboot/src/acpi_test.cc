@@ -4,8 +4,8 @@
 
 #include "acpi.h"
 
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/zbi.h>
 #include <xefi.h>
 
 #include <vector>

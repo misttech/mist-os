@@ -4,7 +4,7 @@
 
 #include "bootbyte.h"
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/internal/efi.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
 

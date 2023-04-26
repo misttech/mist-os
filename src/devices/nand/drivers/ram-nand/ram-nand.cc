@@ -7,6 +7,7 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/zbi-format/partition.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

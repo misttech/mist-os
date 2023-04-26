@@ -5,7 +5,13 @@
 #include <cmdline.h>
 #include <inttypes.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/zbi-format/board.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/graphics.h>
+#include <lib/zbi-format/internal/efi.h>
+#include <lib/zbi-format/kernel.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>

@@ -11,7 +11,7 @@
 #include <lib/fzl/resizeable-vmo-mapper.h>
 #include <lib/operation/block.h>
 #include <lib/sync/completion.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/partition.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/vmo.h>
 #include <threads.h>

@@ -6,6 +6,7 @@
 
 #include <bootbyte.h>
 #include <ctype.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbi/zbi.h>
 #include <stdio.h>
 #include <zircon/hw/gpt.h>

@@ -9,6 +9,8 @@
 
 #include <lib/cksum.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/kernel.h>
+#include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 

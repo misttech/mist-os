@@ -8,6 +8,7 @@
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_ZBI_H_
 
 #include <lib/fit/result.h>
+#include <lib/zbi-format/kernel.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/view.h>
 

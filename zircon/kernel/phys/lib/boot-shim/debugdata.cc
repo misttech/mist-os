@@ -6,7 +6,7 @@
 
 #include "lib/boot-shim/debugdata.h"
 
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/internal/debugdata.h>
 #include <zircon/assert.h>
 
 #include <limits>

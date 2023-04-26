@@ -5,7 +5,7 @@
 #include "src/virtualization/bin/vmm/memory.h"
 
 #include <fuchsia/virtualization/cpp/fidl.h>
-#include <lib/zbi-format/zbi.h>
+#include <lib/zbi-format/memory.h>
 
 std::vector<zbi_mem_range_t> ZbiMemoryRanges(const DevMem& dev_mem,
                                              const std::vector<GuestMemoryRegion>& guest_mem) {

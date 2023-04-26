@@ -10,6 +10,7 @@
 #if WITH_KERNEL_PCIE
 
 #include <inttypes.h>
+#include <lib/zbi-format/memory.h>
 #include <string.h>
 #include <trace.h>
 #include <zircon/syscalls/pci.h>

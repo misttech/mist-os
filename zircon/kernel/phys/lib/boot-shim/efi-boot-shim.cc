@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-shim/efi-boot-shim.h>
+#include <lib/zbi-format/memory.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
