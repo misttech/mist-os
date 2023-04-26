@@ -49,7 +49,6 @@ sysroot_uninstrumented_libc_entries = [
         "zircon/analyzer.h",
         "zircon/assert.h",
         "zircon/availability.h",
-        "zircon/boot/bootfs.h",
         "zircon/boot/crash-reason.h",
         "zircon/compiler.h",
         "zircon/errors.h",

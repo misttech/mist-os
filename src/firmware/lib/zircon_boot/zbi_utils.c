@@ -9,11 +9,11 @@
 #include <string.h>
 #endif
 
+#include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
 #include <lib/zircon_boot/zircon_boot.h>
-#include <zircon/boot/bootfs.h>
 
 #include "utils.h"
 

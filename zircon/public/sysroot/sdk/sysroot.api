@@ -154,7 +154,6 @@
   "include/zircon/analyzer.h": "45a91c07f622ed2c9a578e06cbc5d3c0",
   "include/zircon/assert.h": "fafb92e5a812aa05841147a6b371259c",
   "include/zircon/availability.h": "5283684e12fcdab96d758d50b15d4819",
-  "include/zircon/boot/bootfs.h": "0e759a2716cd0ec8c49a68e98f382cbe",
   "include/zircon/boot/crash-reason.h": "8bc53e5d654937ec3c2f0473640b3963",
   "include/zircon/compiler.h": "0618e9e146eee0f9f8a2f9d6cb139be7",
   "include/zircon/device/audio.h": "17f5fd6a7240b8d11e7791b440237059",

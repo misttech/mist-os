@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
 #include <lib/zx/result.h>
 #include <limits.h>
-#include <zircon/boot/bootfs.h>
 
 #include <map>
 #include <string>

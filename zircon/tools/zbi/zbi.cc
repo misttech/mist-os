@@ -9,6 +9,7 @@
 #include <lib/cksum.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
@@ -17,7 +18,6 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <unistd.h>
-#include <zircon/boot/bootfs.h>
 
 #include <algorithm>
 #include <array>

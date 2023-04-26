@@ -191,7 +191,6 @@ arch/arm64/sysroot/include/wordexp.h
 arch/arm64/sysroot/include/zircon/analyzer.h
 arch/arm64/sysroot/include/zircon/assert.h
 arch/arm64/sysroot/include/zircon/availability.h
-arch/arm64/sysroot/include/zircon/boot/bootfs.h
 arch/arm64/sysroot/include/zircon/boot/crash-reason.h
 arch/arm64/sysroot/include/zircon/compiler.h
 arch/arm64/sysroot/include/zircon/device/audio.h

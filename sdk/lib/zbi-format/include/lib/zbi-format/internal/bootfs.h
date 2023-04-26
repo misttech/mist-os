@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_BOOT_BOOTFS_H_
-#define ZIRCON_BOOT_BOOTFS_H_
+// Note: While this format is intended for internal platform use only, we must
+// contend with existing external use. Accordingly, this format must not change
+// without first consulting //src/firmware/OWNERS. See b/271337470 for detail.
+
+#ifndef LIB_ZBI_FORMAT_INTERNAL_BOOTFS_H_
+#define LIB_ZBI_FORMAT_INTERNAL_BOOTFS_H_
 
 #include <stdint.h>
 
@@ -64,4 +68,4 @@ typedef struct {
 // zbi_bootfs_dirent_t.name_len must be > 1 and <= ZBI_BOOTFS_MAX_NAME_LEN.
 #define ZBI_BOOTFS_MAX_NAME_LEN (256)
 
-#endif  // ZIRCON_BOOT_BOOTFS_H_
+#endif  // LIB_ZBI_FORMAT_INTERNAL_BOOTFS_H_

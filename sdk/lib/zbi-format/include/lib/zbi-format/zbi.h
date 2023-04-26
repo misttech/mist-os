@@ -225,9 +225,9 @@ typedef struct {
 // the storage device, in whatever format that might be.
 #define ZBI_TYPE_STORAGE_RAMDISK (0x4b534452)  // RDSK
 
-// The /boot filesystem in BOOTFS format, specified in <zircon/boot/bootfs.h>.
-// Zircon [userboot](../../../../docs/userboot.md) handles the contents
-// of this filesystem.
+// The /boot filesystem in BOOTFS format, specified in internal/bootfs.h.
+// Zircon [userboot](../../../docs/userboot.md) handles the contents of this
+// filesystem.
 #define ZBI_TYPE_STORAGE_BOOTFS (0x42534642)  // BFSB
 
 // Storage used by the kernel (such as a compressed image containing the actual

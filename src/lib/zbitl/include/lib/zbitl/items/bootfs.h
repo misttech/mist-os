@@ -8,9 +8,9 @@
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/string_view.h>
+#include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbitl/storage-traits.h>
 #include <zircon/assert.h>
-#include <zircon/boot/bootfs.h>
 
 #include <initializer_list>
 #include <string_view>

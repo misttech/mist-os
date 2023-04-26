@@ -7,7 +7,7 @@
 #include "loader-service.h"
 
 #include <lib/fidl/cpp/transaction_header.h>
-#include <zircon/boot/bootfs.h>
+#include <lib/zbi-format/internal/bootfs.h>
 #include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 

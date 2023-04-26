@@ -7,13 +7,13 @@
 #ifndef ZIRCON_KERNEL_LIB_USERABI_USERBOOT_BOOTFS_H_
 #define ZIRCON_KERNEL_LIB_USERABI_USERBOOT_BOOTFS_H_
 
+#include <lib/zbi-format/internal/bootfs.h>
 #include <lib/zbitl/items/bootfs.h>
 #include <lib/zbitl/vmo.h>
 #include <lib/zx/debuglog.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
-#include <zircon/boot/bootfs.h>
 #include <zircon/types.h>
 
 #include <string_view>
