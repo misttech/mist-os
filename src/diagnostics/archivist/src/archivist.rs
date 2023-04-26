@@ -580,7 +580,7 @@ mod tests {
         );
     }
 
-    /// Makes sure that implementaion can handle multiple sockets from same
+    /// Makes sure that implementation can handle multiple sockets from same
     /// log sink.
     #[fuchsia::test]
     async fn log_from_multiple_sock() {
