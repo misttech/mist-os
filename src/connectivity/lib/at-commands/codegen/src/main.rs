@@ -5,9 +5,9 @@
 use {
     anyhow::{Context, Result},
     codegen_lib::{codegen, definition, parser},
-    log::info,
     simplelog::{Config as LogConfig, LevelFilter, SimpleLogger},
     std::{fs::File, io::Read, path::PathBuf},
+    tracing::info,
 };
 
 // This code just confirms we've correctly linked in the parsers.
