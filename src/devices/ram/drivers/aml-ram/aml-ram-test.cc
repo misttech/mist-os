@@ -178,6 +178,8 @@ TEST_F(AmlRamDeviceTest, ValidRequest) {
         ++step;
       });
 
+  mmio_.reg(dmc_offsets_.port_ctrl_offset).SetReadCallback([]() { return DMC_QOS_CLEAR_CTRL; });
+
   mmio_.reg(dmc_offsets_.port_ctrl_offset)
       .SetWriteCallback([this, start = kControlStart, stop = kControlStop, &step](size_t value) {
         if (step == 1) {

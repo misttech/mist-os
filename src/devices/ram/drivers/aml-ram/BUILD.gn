@@ -24,7 +24,10 @@ fuchsia_driver("aml-ram-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-ram.cc" ]
+  sources = [
+    "aml-ram-hardware-test.cc",
+    "aml-ram.cc",
+  ]
   deps = [
     ":aml_ram_bind",
     ":common",
@@ -57,7 +60,6 @@ test("aml-ram-test-bin") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mock-function",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
@@ -70,11 +72,13 @@ group("common") {
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//zircon/system/ulib/driver-unit-test",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
   ]
 }
 

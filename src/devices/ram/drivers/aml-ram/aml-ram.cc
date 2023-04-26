@@ -8,6 +8,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver-unit-test/utils.h>
 #include <lib/zx/clock.h>
 #include <zircon/assert.h>
 
@@ -68,39 +69,58 @@ zx_status_t ValidateRequest(const ram_metrics::wire::BandwidthMeasurementConfig&
 }
 
 zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
+  zx::result device = Create(parent);
+  if (device.is_error()) {
+    return device.error_value();
+  }
+
+  zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("ram")
+                                          .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                          .set_proto_id(ZX_PROTOCOL_AMLOGIC_RAM));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "aml-ram: Failed to add ram device, st = %d", status);
+    return status;
+  }
+
+  // It's now the responsibility of |DdkRelease| to free this object.
+  [[maybe_unused]] auto* unused = device.value().release();
+  return ZX_OK;
+}
+
+zx::result<std::unique_ptr<AmlRam>> AmlRam::Create(zx_device_t* parent) {
   zx_status_t status;
   ddk::PDevFidl pdev(parent);
   std::optional<fdf::MmioBuffer> mmio;
   if ((status = pdev.MapMmio(0, &mmio)) != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to map mmio, st = %d", status);
-    return status;
+    return zx::error(status);
   }
 
   zx::interrupt irq;
   status = pdev.GetInterrupt(0, 0, &irq);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to map interrupt, st = %d", status);
-    return status;
+    return zx::error(status);
   }
 
   zx::port port;
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to create port, st = %d", status);
-    return status;
+    return zx::error(status);
   }
 
   status = irq.bind(port, kPortKeyIrqMsg, 0 /*options*/);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to bind interrupt, st = %d", status);
-    return status;
+    return zx::error(status);
   }
 
   pdev_device_info_t info;
   status = pdev.GetDeviceInfo(&info);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to get device info, st = %d", status);
-    return status;
+    return zx::error(status);
   }
 
   zx::resource smc_monitor = {};
@@ -108,7 +128,7 @@ zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
     status = pdev.GetSmc(0, &smc_monitor);
     if (status != ZX_OK) {
       zxlogf(ERROR, "unable to get sip monitor handle: %s", zx_status_get_string(status));
-      return status;
+      return zx::error(status);
     }
   }
 
@@ -116,7 +136,7 @@ zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
   if (info.pid == PDEV_PID_AMLOGIC_A1) {
     if ((status = pdev.MapMmio(1, &clk_mmio)) != ZX_OK) {
       zxlogf(ERROR, "Failed to map mmio: %s", zx_status_get_string(status));
-      return status;
+      return zx::error(status);
     }
   }
 
@@ -126,20 +146,14 @@ zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
                                                  std::move(port), std::move(smc_monitor), info.pid);
   if (!ac.check()) {
     zxlogf(ERROR, "aml-ram: Failed to allocate device memory");
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  status = device->DdkAdd(ddk::DeviceAddArgs("ram")
-                              .set_flags(DEVICE_ADD_NON_BINDABLE)
-                              .set_proto_id(ZX_PROTOCOL_AMLOGIC_RAM));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-ram: Failed to add ram device, st = %d", status);
-    return status;
-  }
+  return zx::ok(std::move(device));
+}
 
-  // It's now the responsibility of |DdkRelease| to free this object.
-  [[maybe_unused]] auto* dummy = device.release();
-  return ZX_OK;
+bool AmlRam::RunUnitTests(void* context, zx_device_t* parent, zx_handle_t channel) {
+  return driver_unit_test::RunZxTests("AmlRam", parent, channel);
 }
 
 AmlRam::AmlRam(zx_device_t* parent, fdf::MmioBuffer mmio, fdf::MmioBuffer clk_mmio,
@@ -263,7 +277,7 @@ void AmlRam::FinishReadBandwithCounters(ram_metrics::wire::BandwidthInfo* bpi,
   bpi->bytes_per_cycle = (device_pid_ == PDEV_PID_AMLOGIC_A1) ? kBytesPerCycleA1 : kBytesPerCycle;
 
   uint32_t value = mmio_.Read32(dmc_offsets_.port_ctrl_offset);
-  ZX_ASSERT((value & DMC_QOS_ENABLE_CTRL) == 0);
+  ZX_ASSERT(value & DMC_QOS_CLEAR_CTRL);
 
   bpi->channels[0].readwrite_cycles = mmio_.Read32(dmc_offsets_.bw_offset[0]);
   bpi->channels[1].readwrite_cycles = mmio_.Read32(dmc_offsets_.bw_offset[1]);
@@ -444,6 +458,7 @@ static constexpr zx_driver_ops_t aml_ram_driver_ops = []() {
   zx_driver_ops_t result = {};
   result.version = DRIVER_OPS_VERSION;
   result.bind = amlogic_ram::AmlRam::Create;
+  result.run_unit_tests = amlogic_ram::AmlRam::RunUnitTests;
 
   return result;
 }();

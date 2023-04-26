@@ -12,8 +12,10 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/port.h>
+#include <lib/zx/result.h>
 #include <zircon/syscalls/smc.h>
 
+#include <array>
 #include <deque>
 #include <thread>
 
@@ -166,7 +168,9 @@ class AmlRam : public DeviceType {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlRam);
 
+  static zx::result<std::unique_ptr<AmlRam>> Create(zx_device_t* parent);
   static zx_status_t Create(void* context, zx_device_t* parent);
+  static bool RunUnitTests(void* context, zx_device_t* parent, zx_handle_t channel);
 
   AmlRam(zx_device_t* parent, fdf::MmioBuffer mmio, fdf::MmioBuffer clk_mmio, zx::interrupt irq,
          zx::port port, zx::resource smc_monitor, uint32_t device_pid);
@@ -175,6 +179,8 @@ class AmlRam : public DeviceType {
   void DdkSuspend(ddk::SuspendTxn txn);
 
  private:
+  friend class AmlRamHardwareTest;
+
   struct Job {
     ram_metrics::wire::BandwidthMeasurementConfig config;
     MeasureBandwidthCompleter::Async completer;
@@ -201,6 +207,9 @@ class AmlRam : public DeviceType {
   void Shutdown();
   uint32_t DmcSmcRead(uint32_t addr) const;
   uint64_t ReadFrequency() const;
+
+  void MeasureBandwidthTest(const std::array<uint32_t, MEMBW_MAX_CHANNELS>& channels,
+                            uint32_t cycles_to_measure);
 
   fdf::MmioBuffer mmio_;
   fdf::MmioBuffer clk_mmio_;
