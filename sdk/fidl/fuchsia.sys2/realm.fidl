@@ -16,7 +16,9 @@ using fuchsia.url;
 const MAX_INSTANCE_ID_LENGTH uint32 = 64;
 
 /// The maximum length of the human-readable start reason.
-const MAX_START_REASON uint32 = 256;
+/// This accounts for StartReason::AccessCapability which can have a length of
+/// MAX_MONIKER_LENGTH + MAX_NAME_LENGTH + 26 (4222 characters).
+const MAX_START_REASON uint32 = 5000;
 
 /// Errors that can be returned by the GetInstance call.
 type GetInstanceError = flexible enum {
