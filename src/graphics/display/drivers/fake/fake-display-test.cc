@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <lib/image-format/image_format.h>
 #include <zircon/errors.h>
 #include <zircon/pixelformat.h>
 #include <zircon/rights.h>
@@ -135,7 +136,6 @@ TEST_F(FakeDisplaySysmemTest, ImportBufferCollection) {
   const image_t kDefaultConfig = {
       .width = 1024,
       .height = 768,
-      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
@@ -143,24 +143,55 @@ TEST_F(FakeDisplaySysmemTest, ImportBufferCollection) {
       &kDefaultConfig, kValidBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
-  fidl::Status set_constraints_status = buffer_collection()->SetConstraints(
-      /* has_constraints= */ true, fuchsia_sysmem::wire::BufferCollectionConstraints{
-                                       .usage =
-                                           {
-                                               .cpu = fuchsia_sysmem::wire::kCpuUsageRead,
-                                           },
-                                       .min_buffer_count = 1,
-                                       .max_buffer_count = 1,
-                                       .has_buffer_memory_constraints = true,
-                                       .buffer_memory_constraints =
-                                           {
-                                               .min_size_bytes = 4096,
-                                               .max_size_bytes = 0xffffffff,
-                                               .ram_domain_supported = true,
-                                               .cpu_domain_supported = true,
-                                               .inaccessible_domain_supported = true,
-                                           },
-                                   });
+  fidl::Status
+      set_constraints_status =
+          buffer_collection()
+              ->SetConstraints(
+                  /* has_constraints= */ true,
+                  fuchsia_sysmem::wire::BufferCollectionConstraints{
+                      .usage =
+                          {
+                              .cpu = fuchsia_sysmem::wire::kCpuUsageRead,
+                          },
+                      .min_buffer_count = 1,
+                      .max_buffer_count = 1,
+                      .has_buffer_memory_constraints = true,
+                      .buffer_memory_constraints =
+                          {
+                              .min_size_bytes = 4096,
+                              .max_size_bytes = 0xffffffff,
+                              .ram_domain_supported = true,
+                              .cpu_domain_supported = true,
+                              .inaccessible_domain_supported = true,
+                          },
+                      // fake-display driver doesn't add extra image format
+                      // constraints when SetBufferCollectionConstraints() is
+                      // called. To make sure we allocate an image buffer, we
+                      // added a constraints here.
+                      .image_format_constraints_count = 1,
+                      .image_format_constraints =
+                          {
+                              fuchsia_sysmem::wire::ImageFormatConstraints{
+                                  .pixel_format =
+                                      {
+                                          .type = fuchsia_sysmem::PixelFormatType::kR8G8B8A8,
+                                          .has_format_modifier = true,
+                                          .format_modifier =
+                                              {
+                                                  .value =
+                                                      fuchsia_sysmem::wire::kFormatModifierLinear,
+                                              },
+                                      },
+                                  .color_spaces_count = 1,
+                                  .color_space =
+                                      {
+                                          fuchsia_sysmem::wire::ColorSpace{
+                                              .type = fuchsia_sysmem::ColorSpaceType::kSrgb,
+                                          },
+                                      },
+                              },
+                          },
+                  });
   EXPECT_TRUE(set_constraints_status.ok());
 
   // Both the test-side client and the driver have  set the constraints.
@@ -183,34 +214,64 @@ TEST_F(FakeDisplaySysmemTest, ImportImage) {
   const image_t kDefaultConfig = {
       .width = 1024,
       .height = 768,
-      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
+  const auto kPixelFormat = fuchsia_sysmem::wire::PixelFormat{
+      .type = fuchsia_sysmem::PixelFormatType::kBgra32,
+      .has_format_modifier = true,
+      .format_modifier =
+          {
+              .value = fuchsia_sysmem::wire::kFormatModifierLinear,
+          },
+  };
+  const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
+
   EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(&kDefaultConfig,
                                                                            kBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
-  fidl::Status set_constraints_status = buffer_collection()->SetConstraints(
-      /* has_constraints= */ true,
-      fuchsia_sysmem::wire::BufferCollectionConstraints{
-          .usage =
-              {
-                  .cpu = fuchsia_sysmem::wire::kCpuUsageRead,
-              },
-          .min_buffer_count = 1,
-          .max_buffer_count = 1,
-          .has_buffer_memory_constraints = true,
-          .buffer_memory_constraints =
-              {
-                  .min_size_bytes = kDefaultConfig.width * kDefaultConfig.height *
-                                    ZX_PIXEL_FORMAT_BYTES(kDefaultConfig.pixel_format),
-                  .max_size_bytes = 0xffffffff,
-                  .ram_domain_supported = true,
-                  .cpu_domain_supported = true,
-                  .inaccessible_domain_supported = true,
-              },
-      });
+  fidl::Status
+      set_constraints_status =
+          buffer_collection()
+              ->SetConstraints(
+                  /* has_constraints= */ true,
+                  fuchsia_sysmem::wire::BufferCollectionConstraints{
+                      .usage =
+                          {
+                              .cpu = fuchsia_sysmem::wire::kCpuUsageRead,
+                          },
+                      .min_buffer_count = 1,
+                      .max_buffer_count = 1,
+                      .has_buffer_memory_constraints = true,
+                      .buffer_memory_constraints =
+                          {
+                              .min_size_bytes =
+                                  kDefaultConfig.width * kDefaultConfig.height * bytes_per_pixel,
+                              .max_size_bytes = 0xffffffff,
+                              .ram_domain_supported = true,
+                              .cpu_domain_supported = true,
+                              .inaccessible_domain_supported = true,
+                          },
+                      // fake-display driver doesn't add extra image format
+                      // constraints when SetBufferCollectionConstraints() is
+                      // called. To make sure we allocate an image buffer, we
+                      // added a constraints here.
+                      .image_format_constraints_count = 1,
+                      .image_format_constraints =
+                          {
+                              fuchsia_sysmem::wire::ImageFormatConstraints{
+                                  .pixel_format = kPixelFormat,
+                                  .color_spaces_count = 1,
+                                  .color_space =
+                                      {
+                                          fuchsia_sysmem::wire::ColorSpace{
+                                              .type = fuchsia_sysmem::ColorSpaceType::kSrgb,
+                                          },
+                                      },
+                              },
+                          },
+                  });
   EXPECT_TRUE(set_constraints_status.ok());
 
   // Both the test-side client and the driver have set the constraints.

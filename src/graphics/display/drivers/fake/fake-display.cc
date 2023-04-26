@@ -137,8 +137,6 @@ bool IsAcceptableImageType(uint32_t image_type) {
   return image_type == IMAGE_TYPE_PREFERRED_SCANOUT || image_type == IMAGE_TYPE_SIMPLE;
 }
 
-bool IsAcceptablePixelFormat(zx_pixel_format_t pixel_format) { return true; }
-
 }  // namespace
 
 zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
@@ -198,12 +196,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image, uint64
   fbl::AutoLock lock(&image_lock_);
   if (!IsAcceptableImageType(image->type)) {
     zxlogf(INFO, "ImportImage() will fail due to invalid Image type %" PRIu32, image->type);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!IsAcceptablePixelFormat(image->pixel_format)) {
-    zxlogf(INFO, "ImportImage() will fail due to unsupported pixel format %" PRIu32,
-           image->pixel_format);
     return ZX_ERR_INVALID_ARGS;
   }
 
