@@ -1256,8 +1256,6 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
   mb();
 }
 
-void arch_zero_page(void* _ptr) { memset(_ptr, 0, PAGE_SIZE); }
-
 Riscv64ArchVmAspace::Riscv64ArchVmAspace(vaddr_t base, size_t size, Riscv64AspaceType type,
                                          page_alloc_fn_t paf)
     : test_page_alloc_func_(paf), type_(type), base_(base), size_(size) {}
@@ -1318,3 +1316,25 @@ void Riscv64VmICacheConsistencyManager::Finish() {
 }
 
 uint32_t arch_address_tagging_features() { return 0; }
+
+void arch_zero_page(void* _ptr) {
+  const uintptr_t end_address = reinterpret_cast<uintptr_t>(_ptr) + PAGE_SIZE;
+  asm volatile(
+      R"""(
+    .balign 4
+    0:
+      sd    zero,0(%0)
+      sd    zero,8(%0)
+      sd    zero,16(%0)
+      sd    zero,24(%0)
+      sd    zero,32(%0)
+      sd    zero,40(%0)
+      sd    zero,48(%0)
+      sd    zero,56(%0)
+      addi  %0,%0,64
+      bne   %0,%1,0b
+      )"""
+      : "+r"(_ptr)
+      : "r"(end_address)
+      : "memory");
+}
