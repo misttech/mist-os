@@ -1009,11 +1009,20 @@ impl<'a> ValidationContext<'a> {
             if !self.all_children.contains_key(to_target)
                 && !self.all_collections.contains(to_target)
             {
-                return Err(Error::validate(format!(
-                    "\"{}\" is an \"offer\" target but it does not appear in \"children\" \
-                     or \"collections\"",
-                    to
-                )));
+                if let OneOrMany::One(from) = &offer.from {
+                    return Err(Error::validate(format!(
+                        "\"{}\" is an \"offer\" target from \"{}\" but it does not appear in \"children\" \
+                         or \"collections\"",
+                        to,
+                        from
+                    )));
+                } else {
+                    return Err(Error::validate(format!(
+                        "\"{}\" is an \"offer\" target but it does not appear in \"children\" \
+                         or \"collections\"",
+                        to,
+                    )));
+                }
             }
 
             // Ensure that a target is not offered more than once.
@@ -2621,7 +2630,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"parent\" but it does not appear in \"children\" or \"collections\""
         ),
         test_cml_offer_event_stream_capability_requested_no_filter(
             json!({
@@ -2673,7 +2682,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
         ),
         test_cml_offer_event_stream_directory_ready_with_filter(
             json!({
@@ -2686,7 +2695,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
         ),
         test_cml_offer_event_stream_multiple_as(
             json!({
@@ -2727,7 +2736,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#self\" is an \"offer\" target but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#self\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
         ),
         test_cml_expose_event_stream_to_framework(
             json!({
@@ -3943,7 +3952,7 @@ mod tests {
                     "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
                 } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"#missing\" is an \"offer\" target but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"#missing\" is an \"offer\" target from \"#logger\" but it does not appear in \"children\" or \"collections\""
         ),
         test_cml_offer_target_bad_to(
             json!({
