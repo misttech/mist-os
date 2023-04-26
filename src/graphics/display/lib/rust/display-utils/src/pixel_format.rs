@@ -4,6 +4,7 @@
 
 #![allow(non_upper_case_globals)]
 
+use fidl_fuchsia_images2 as images2;
 use thiserror::Error;
 use {fidl_fuchsia_sysmem as sysmem, std::fmt, std::str};
 
@@ -75,20 +76,34 @@ impl Default for PixelFormat {
 
 impl From<u32> for PixelFormat {
     fn from(src: u32) -> Self {
-        match src {
-            ZX_PIXEL_FORMAT_NONE => PixelFormat::Unknown,
-            ZX_PIXEL_FORMAT_RGB_565 => PixelFormat::Rgb565,
-            ZX_PIXEL_FORMAT_RGB_332 => PixelFormat::Rgb332,
-            ZX_PIXEL_FORMAT_RGB_2220 => PixelFormat::Rgb2220,
-            ZX_PIXEL_FORMAT_ARGB_8888 => PixelFormat::Argb8888,
-            ZX_PIXEL_FORMAT_RGB_x888 => PixelFormat::RgbX888,
-            ZX_PIXEL_FORMAT_MONO_8 => PixelFormat::Mono8,
-            // ZX_PIXEL_FORMAT_GRAY_8 is an alias for ZX_PIXEL_FORMAT_MONO_8
-            ZX_PIXEL_FORMAT_NV12 => PixelFormat::Nv12,
-            ZX_PIXEL_FORMAT_RGB_888 => PixelFormat::Rgb888,
-            ZX_PIXEL_FORMAT_ABGR_8888 => PixelFormat::Abgr8888,
-            ZX_PIXEL_FORMAT_BGR_888x => PixelFormat::Bgr888X,
-            _ => PixelFormat::Unknown,
+        if let Some(pixel_format) = images2::PixelFormat::from_primitive(src) {
+            match pixel_format {
+                images2::PixelFormat::R8G8B8A8 => PixelFormat::Abgr8888,
+                images2::PixelFormat::Bgra32 => PixelFormat::Argb8888,
+                images2::PixelFormat::Nv12 => PixelFormat::Nv12,
+                images2::PixelFormat::Bgr24 => PixelFormat::Rgb888,
+                images2::PixelFormat::Rgb565 => PixelFormat::Rgb565,
+                images2::PixelFormat::Rgb332 => PixelFormat::Rgb332,
+                images2::PixelFormat::Rgb2220 => PixelFormat::Rgb2220,
+                images2::PixelFormat::L8 => PixelFormat::Mono8,
+                _ => PixelFormat::Unknown,
+            }
+        } else {
+            match src {
+                ZX_PIXEL_FORMAT_NONE => PixelFormat::Unknown,
+                ZX_PIXEL_FORMAT_RGB_565 => PixelFormat::Rgb565,
+                ZX_PIXEL_FORMAT_RGB_332 => PixelFormat::Rgb332,
+                ZX_PIXEL_FORMAT_RGB_2220 => PixelFormat::Rgb2220,
+                ZX_PIXEL_FORMAT_ARGB_8888 => PixelFormat::Argb8888,
+                ZX_PIXEL_FORMAT_RGB_x888 => PixelFormat::RgbX888,
+                ZX_PIXEL_FORMAT_MONO_8 => PixelFormat::Mono8,
+                // ZX_PIXEL_FORMAT_GRAY_8 is an alias for ZX_PIXEL_FORMAT_MONO_8
+                ZX_PIXEL_FORMAT_NV12 => PixelFormat::Nv12,
+                ZX_PIXEL_FORMAT_RGB_888 => PixelFormat::Rgb888,
+                ZX_PIXEL_FORMAT_ABGR_8888 => PixelFormat::Abgr8888,
+                ZX_PIXEL_FORMAT_BGR_888x => PixelFormat::Bgr888X,
+                _ => PixelFormat::Unknown,
+            }
         }
     }
 }
@@ -125,6 +140,22 @@ impl From<&PixelFormat> for zx_pixel_format_t {
 }
 
 impl From<PixelFormat> for sysmem::PixelFormatType {
+    fn from(src: PixelFormat) -> Self {
+        match src {
+            PixelFormat::Unknown => Self::Invalid,
+            PixelFormat::Mono8 | PixelFormat::Gray8 => Self::L8,
+            PixelFormat::Rgb332 => Self::Rgb332,
+            PixelFormat::Rgb2220 => Self::Rgb2220,
+            PixelFormat::Rgb565 => Self::Rgb565,
+            PixelFormat::Rgb888 => Self::Bgr24,
+            PixelFormat::Abgr8888 | PixelFormat::Bgr888X => Self::R8G8B8A8,
+            PixelFormat::Argb8888 | PixelFormat::RgbX888 => Self::Bgra32,
+            PixelFormat::Nv12 => Self::Nv12,
+        }
+    }
+}
+
+impl From<PixelFormat> for images2::PixelFormat {
     fn from(src: PixelFormat) -> Self {
         match src {
             PixelFormat::Unknown => Self::Invalid,
@@ -301,6 +332,58 @@ mod tests {
         assert_eq!(
             get_bytes_per_pixel(PixelFormat::Unknown),
             Err(GetBytesPerPixelError::UnsupportedFormat(PixelFormat::Unknown))
+        );
+    }
+
+    #[fuchsia::test]
+    fn sysmem2_pixel_format_conversion() {
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::R8G8B8A8.into_primitive()
+            )),
+            images2::PixelFormat::R8G8B8A8
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::Bgra32.into_primitive()
+            )),
+            images2::PixelFormat::Bgra32
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::Nv12.into_primitive()
+            )),
+            images2::PixelFormat::Nv12
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::Bgr24.into_primitive()
+            )),
+            images2::PixelFormat::Bgr24
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::Rgb565.into_primitive()
+            )),
+            images2::PixelFormat::Rgb565
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::Rgb332.into_primitive()
+            )),
+            images2::PixelFormat::Rgb332
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::Rgb2220.into_primitive()
+            )),
+            images2::PixelFormat::Rgb2220
+        );
+        assert_eq!(
+            images2::PixelFormat::from(PixelFormat::from(
+                images2::PixelFormat::L8.into_primitive()
+            )),
+            images2::PixelFormat::L8
         );
     }
 }
