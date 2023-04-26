@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+
 #if defined(FIDL_ALLOW_DEPRECATED_C_BINDINGS)
 #include <fuchsia/sysmem/c/fidl.h>
 #endif
@@ -1320,12 +1321,9 @@ bool ImageFormatMinimumRowBytes(
   return ImageFormatMinimumRowBytes(image_format_constraints_v2, width, minimum_row_bytes_out);
 }
 
-bool ImageFormatConvertSysmemToZx(const PixelFormatAndModifier& pixel_format,
+bool ImageFormatConvertSysmemToZx(fuchsia_images2::wire::PixelFormat pixel_format_type,
                                   zx_pixel_format_t* zx_pixel_format_out) {
-  if (pixel_format.pixel_format_modifier != fuchsia_images2::kFormatModifierLinear) {
-    return false;
-  }
-  switch (pixel_format.pixel_format) {
+  switch (pixel_format_type) {
     case PixelFormat::kR8G8B8A8:
       *zx_pixel_format_out = ZX_PIXEL_FORMAT_ABGR_8888;
       return true;
@@ -1354,6 +1352,10 @@ bool ImageFormatConvertSysmemToZx(const PixelFormatAndModifier& pixel_format,
       *zx_pixel_format_out = ZX_PIXEL_FORMAT_MONO_8;
       return true;
 
+    case PixelFormat::kI420:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_I420;
+      return true;
+
     case PixelFormat::kNv12:
       *zx_pixel_format_out = ZX_PIXEL_FORMAT_NV12;
       return true;
@@ -1371,12 +1373,140 @@ bool ImageFormatConvertSysmemToZx(const PixelFormatAndModifier& pixel_format,
   }
 }
 
+bool ImageFormatConvertSysmemToZx(fuchsia_sysmem::wire::PixelFormatType pixel_format_type,
+                                  zx_pixel_format_t* zx_pixel_format_out) {
+  switch (pixel_format_type) {
+    case fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_ABGR_8888;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kBgra32:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_ARGB_8888;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kBgr24:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_RGB_888;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kRgb565:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_RGB_565;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kRgb332:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_RGB_332;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kRgb2220:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_RGB_2220;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kL8:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_MONO_8;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kI420:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_I420;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kNv12:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_NV12;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kA2B10G10R10:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_ABGR_2_10_10_10;
+      return true;
+
+    case fuchsia_sysmem::wire::PixelFormatType::kA2R10G10B10:
+      *zx_pixel_format_out = ZX_PIXEL_FORMAT_ARGB_2_10_10_10;
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+bool ImageFormatConvertSysmemToZx(const PixelFormatAndModifier& pixel_format,
+                                  zx_pixel_format_t* zx_pixel_format_out) {
+  if (pixel_format.pixel_format_modifier != fuchsia_images2::kFormatModifierLinear) {
+    return false;
+  }
+  return ImageFormatConvertSysmemToZx(pixel_format.pixel_format, zx_pixel_format_out);
+}
+
 bool ImageFormatConvertSysmemToZx(const fuchsia_sysmem::wire::PixelFormat& wire_pixel_format_v1,
                                   zx_pixel_format_t* zx_pixel_format_out) {
   ZX_DEBUG_ASSERT(zx_pixel_format_out);
   auto pixel_format_v1 = fidl::ToNatural(wire_pixel_format_v1);
   auto pixel_format_v2 = sysmem::V2CopyFromV1PixelFormat(pixel_format_v1);
   return ImageFormatConvertSysmemToZx(pixel_format_v2, zx_pixel_format_out);
+}
+
+fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZxToSysmemPixelFormat_v2(
+    zx_pixel_format_t zx_pixel_format) {
+  switch (zx_pixel_format) {
+    case ZX_PIXEL_FORMAT_RGB_565:
+      return fpromise::ok(PixelFormat::kRgb565);
+    case ZX_PIXEL_FORMAT_RGB_332:
+      return fpromise::ok(PixelFormat::kRgb332);
+    case ZX_PIXEL_FORMAT_RGB_2220:
+      return fpromise::ok(PixelFormat::kRgb2220);
+    case ZX_PIXEL_FORMAT_ARGB_8888:
+      // Switching to using alpha.
+    case ZX_PIXEL_FORMAT_RGB_x888:
+      return fpromise::ok(PixelFormat::kBgra32);
+    case ZX_PIXEL_FORMAT_MONO_8:
+      return fpromise::ok(PixelFormat::kL8);
+    case ZX_PIXEL_FORMAT_I420:
+      return fpromise::ok(PixelFormat::kI420);
+    case ZX_PIXEL_FORMAT_NV12:
+      return fpromise::ok(PixelFormat::kNv12);
+    case ZX_PIXEL_FORMAT_RGB_888:
+      return fpromise::ok(PixelFormat::kBgr24);
+    case ZX_PIXEL_FORMAT_ABGR_8888:
+      // Switching to using alpha.
+    case ZX_PIXEL_FORMAT_BGR_888x:
+      return fpromise::ok(PixelFormat::kR8G8B8A8);
+    case ZX_PIXEL_FORMAT_ARGB_2_10_10_10:
+      return fpromise::ok(PixelFormat::kA2R10G10B10);
+    case ZX_PIXEL_FORMAT_ABGR_2_10_10_10:
+      return fpromise::ok(PixelFormat::kA2B10G10R10);
+    default:
+      return fpromise::error();
+  }
+}
+
+fpromise::result<fuchsia_sysmem::wire::PixelFormatType>
+ImageFormatConvertZxToSysmemPixelFormatType_v1(zx_pixel_format_t zx_pixel_format) {
+  switch (zx_pixel_format) {
+    case ZX_PIXEL_FORMAT_RGB_565:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kRgb565);
+    case ZX_PIXEL_FORMAT_RGB_332:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kRgb332);
+    case ZX_PIXEL_FORMAT_RGB_2220:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kRgb2220);
+    case ZX_PIXEL_FORMAT_ARGB_8888:
+      // Switching to using alpha.
+    case ZX_PIXEL_FORMAT_RGB_x888:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kBgra32);
+    case ZX_PIXEL_FORMAT_MONO_8:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kL8);
+    case ZX_PIXEL_FORMAT_I420:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kI420);
+    case ZX_PIXEL_FORMAT_NV12:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kNv12);
+    case ZX_PIXEL_FORMAT_RGB_888:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kBgr24);
+    case ZX_PIXEL_FORMAT_ABGR_8888:
+      // Switching to using alpha.
+    case ZX_PIXEL_FORMAT_BGR_888x:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8);
+    case ZX_PIXEL_FORMAT_ARGB_2_10_10_10:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kA2R10G10B10);
+    case ZX_PIXEL_FORMAT_ABGR_2_10_10_10:
+      return fpromise::ok(fuchsia_sysmem::wire::PixelFormatType::kA2B10G10R10);
+    default:
+      return fpromise::error();
+  }
 }
 
 fpromise::result<PixelFormatAndModifier> ImageFormatConvertZxToSysmem_v2(
@@ -1410,6 +1540,10 @@ fpromise::result<PixelFormatAndModifier> ImageFormatConvertZxToSysmem_v2(
       out = PixelFormat::kL8;
       break;
 
+    case ZX_PIXEL_FORMAT_I420:
+      out = PixelFormat::kI420;
+      break;
+
     case ZX_PIXEL_FORMAT_NV12:
       out = PixelFormat::kNv12;
       break;
@@ -1425,6 +1559,14 @@ fpromise::result<PixelFormatAndModifier> ImageFormatConvertZxToSysmem_v2(
     case ZX_PIXEL_FORMAT_BGR_888x:
       // Switch to using alpha.
       out = PixelFormat::kR8G8B8A8;
+      break;
+
+    case ZX_PIXEL_FORMAT_ARGB_2_10_10_10:
+      out = PixelFormat::kA2R10G10B10;
+      break;
+
+    case ZX_PIXEL_FORMAT_ABGR_2_10_10_10:
+      out = PixelFormat::kA2B10G10R10;
       break;
 
     default:

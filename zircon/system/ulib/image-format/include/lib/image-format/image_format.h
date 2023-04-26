@@ -101,6 +101,15 @@ bool ImageFormatConvertSysmemToZx(const PixelFormatAndModifier& pixel_format,
                                   zx_pixel_format_t* zx_pixel_format_out);
 bool ImageFormatConvertSysmemToZx(const fuchsia_sysmem::wire::PixelFormat& pixel_format,
                                   zx_pixel_format_t* zx_pixel_format_out);
+bool ImageFormatConvertSysmemToZx(fuchsia_images2::wire::PixelFormat pixel_format_type,
+                                  zx_pixel_format_t* zx_pixel_format_out);
+bool ImageFormatConvertSysmemToZx(fuchsia_sysmem::wire::PixelFormatType pixel_format_type,
+                                  zx_pixel_format_t* zx_pixel_format_out);
+
+fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZxToSysmemPixelFormat_v2(
+    zx_pixel_format_t zx_pixel_format);
+fpromise::result<fuchsia_sysmem::wire::PixelFormatType>
+ImageFormatConvertZxToSysmemPixelFormatType_v1(zx_pixel_format_t zx_pixel_format);
 
 fpromise::result<PixelFormatAndModifier> ImageFormatConvertZxToSysmem_v2(
     zx_pixel_format_t zx_pixel_format);
