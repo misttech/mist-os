@@ -152,14 +152,14 @@ bool MsdVsiDevice::Init(void* device_handle) {
   }
 
   if (!IsValidDeviceId()) {
-    MAGMA_LOG(ERROR, "Unsupported NPU model 0x%x\n", device_id_);
+    MAGMA_LOG(ERROR, "Unsupported gpu model 0x%x\n", device_id_);
     return false;
   }
 
   revision_ = registers::Revision::Get().ReadFrom(register_io()).chip_revision();
 
   gpu_features_ = std::make_unique<GpuFeatures>(register_io());
-  DLOG("NPU features: 0x%x minor features 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+  DLOG("gpu features: 0x%x minor features 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
        gpu_features_->features().reg_value(), gpu_features_->minor_features(0),
        gpu_features_->minor_features(1), gpu_features_->minor_features(2),
        gpu_features_->minor_features(3), gpu_features_->minor_features(4),
@@ -178,7 +178,7 @@ bool MsdVsiDevice::Init(void* device_handle) {
 
   if (Has3dPipe()) {
     if (!gpu_features_->features().pipe_3d()) {
-      MAGMA_LOG(ERROR, "NPU has no 3d pipe: features 0x%x\n",
+      MAGMA_LOG(ERROR, "Gpu has no 3d pipe: features 0x%x\n",
                 gpu_features_->features().reg_value());
       return false;
     }
@@ -329,7 +329,7 @@ void MsdVsiDevice::HangCheckTimeout() {
   std::vector<std::string> dump;
   DumpToString(&dump, false /* fault_present */);
 
-  MAGMA_LOG(WARNING, "Suspected NPU hang:");
+  MAGMA_LOG(WARNING, "Suspected GPU hang:");
   MAGMA_LOG(WARNING, "last_interrupt_timestamp %lu", last_interrupt_timestamp_.load());
 
 #if defined(MSD_VSI_VIP_ENABLE_SUSPEND)
@@ -506,7 +506,7 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
 
       if (batch->IsCommandBuffer()) {
         auto* buffer = static_cast<CommandBuffer*>(batch.get())->GetBatchBuffer();
-        TRACE_VTHREAD_DURATION_END("magma", "Command Buffer", "NPU", buffer->id(),
+        TRACE_VTHREAD_DURATION_END("magma", "Command Buffer", "GPU", buffer->id(),
                                    magma::PlatformTrace::GetCurrentTicks(), "id", buffer->id());
       }
 
@@ -948,7 +948,7 @@ bool MsdVsiDevice::StartRingbuffer(std::shared_ptr<MsdVsiContext> context) {
   uint64_t rb_gpu_addr;
   bool res = context->exec_address_space()->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    MAGMA_LOG(ERROR, "Could not get ringbuffer NPU address");
+    MAGMA_LOG(ERROR, "Could not get ringbuffer gpu address");
     return false;
   }
 
@@ -983,7 +983,7 @@ bool MsdVsiDevice::AddRingbufferWaitLink() {
   uint64_t rb_gpu_addr;
   bool res = configured_address_space_->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    MAGMA_LOG(ERROR, "Failed to get ringbuffer NPU address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
     return false;
   }
   uint32_t wait_gpu_addr = magma::to_uint32(rb_gpu_addr) + ringbuffer_->tail();
@@ -1041,7 +1041,7 @@ bool MsdVsiDevice::SubmitFlushTlb(std::shared_ptr<MsdVsiContext> context) {
   uint64_t rb_gpu_addr;
   bool res = configured_address_space_->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    MAGMA_LOG(ERROR, "Failed to get ringbuffer NPU address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
     return false;
   }
 
@@ -1087,7 +1087,7 @@ bool MsdVsiDevice::SubmitFlushTlb(std::shared_ptr<MsdVsiContext> context) {
                  kWaitAddressSpaceChange);
 
   if (!AddRingbufferWaitLink()) {
-    MAGMA_LOG(ERROR, "Failed to get ringbuffer NPU address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
     return false;
   }
 
@@ -1151,7 +1151,7 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
   uint64_t rb_gpu_addr;
   bool res = context->exec_address_space()->GetRingbufferGpuAddress(&rb_gpu_addr);
   if (!res) {
-    MAGMA_LOG(ERROR, "Failed to get ringbuffer NPU address");
+    MAGMA_LOG(ERROR, "Failed to get ringbuffer gpu address");
     return false;
   }
   uint32_t gpu_addr = magma::to_uint32(mapped_batch->GetGpuAddress());
@@ -1176,7 +1176,7 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
     auto* command_buf = static_cast<CommandBuffer*>(mapped_batch.get());
     magma::PlatformBuffer* buf = command_buf->GetBatchBuffer();
 
-    TRACE_VTHREAD_DURATION_BEGIN("magma", "Command Buffer", "NPU", buf->id(),
+    TRACE_VTHREAD_DURATION_BEGIN("magma", "Command Buffer", "GPU", buf->id(),
                                  magma::PlatformTrace::GetCurrentTicks(), "id", buf->id());
 
     uint32_t write_offset = command_buf->GetBatchBufferWriteOffset();
@@ -1249,7 +1249,7 @@ bool MsdVsiDevice::SubmitCommandBuffer(std::shared_ptr<MsdVsiContext> context,
   DASSERT(new_rb_instructions_start ==
           ringbuffer_->SubtractOffset(kRbInstructionsPerBatch * sizeof(uint64_t)));
 
-  DLOG("Submitting buffer at NPU addr 0x%x", gpu_addr);
+  DLOG("Submitting buffer at gpu addr 0x%x", gpu_addr);
 
   LinkRingbuffer(prev_wait_link, gpu_addr, prefetch);
 
