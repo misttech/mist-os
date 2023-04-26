@@ -8,10 +8,10 @@ use alloc::vec::Vec;
 use core::num::NonZeroU16;
 use core::ops::Range;
 
-use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4Addr, Ipv6Addr};
 use packet::{ParsablePacket, ParseBuffer};
+use tracing::debug;
 
 use crate::error::{IpParseResult, ParseError, ParseResult};
 use crate::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
@@ -280,24 +280,6 @@ where
 mod crateonly {
     use std::sync::Once;
 
-    /// log::Log implementation that uses stdout.
-    ///
-    /// Useful when debugging tests.
-    struct Logger;
-
-    impl log::Log for Logger {
-        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
-            true
-        }
-
-        fn log(&self, record: &log::Record<'_>) {
-            println!("{}", record.args())
-        }
-
-        fn flush(&self) {}
-    }
-
-    static LOGGER: Logger = Logger;
     static LOGGER_ONCE: Once = Once::new();
 
     /// Install a logger for tests.
@@ -306,11 +288,13 @@ mod crateonly {
     /// This function sets global program state, so all tests that run after this
     /// function is called will use the logger.
     pub(crate) fn set_logger_for_test() {
-        // log::set_logger will panic if called multiple times; using a Once makes
+        // `init` will panic if called multiple times; using a Once makes
         // set_logger_for_test idempotent
         LOGGER_ONCE.call_once(|| {
-            log::set_logger(&LOGGER).unwrap();
-            log::set_max_level(log::LevelFilter::Trace);
+            tracing_subscriber::fmt()
+                .with_writer(std::io::stdout)
+                .with_max_level(tracing::Level::TRACE)
+                .init();
         })
     }
 

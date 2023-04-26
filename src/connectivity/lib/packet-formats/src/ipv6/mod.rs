@@ -16,7 +16,6 @@ use core::convert::TryFrom;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
-use log::debug;
 use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
@@ -24,6 +23,7 @@ use packet::{
     NestedPacketBuilder, PacketBuilder, PacketConstraints, ParsablePacket, ParseMetadata,
     SerializeBuffer, SerializeError, Serializer, TargetBuffer,
 };
+use tracing::debug;
 use zerocopy::{
     byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, LayoutVerified,
     Unaligned,

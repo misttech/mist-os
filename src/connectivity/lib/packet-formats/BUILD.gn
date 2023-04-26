@@ -14,9 +14,9 @@ _common_deps = [
   "//src/connectivity/network/lib/explicit",
   "//src/lib/network/packet",
   "//third_party/rust_crates:arrayvec",
-  "//third_party/rust_crates:log",
   "//third_party/rust_crates:nonzero_ext",
   "//third_party/rust_crates:thiserror",
+  "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:zerocopy",
 ]
 
@@ -71,6 +71,7 @@ rustc_test("packet-formats_test") {
   deps = _common_deps + [
            "//third_party/rust_crates:assert_matches",
            "//third_party/rust_crates:test-case",
+           "//third_party/rust_crates:tracing-subscriber",
          ]
 
   sources = _common_sources
@@ -100,7 +101,8 @@ rustc_fuzzer("fuzz-parse-packet") {
     "//src/lib/network/netsvc-proto",
     "//src/lib/network/packet",
     "//third_party/rust_crates:arbitrary",
-    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
     "//third_party/rust_crates:zerocopy",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
