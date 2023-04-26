@@ -109,6 +109,10 @@ class AsyncReceiver final {
 
   ~AsyncReceiver() { deque_->Clear(); }
 
+  // Attempts to get an item immediately. If no item is available at the time of the call, it
+  // returns an error.
+  Result<T> TryReceive() { return deque_->TryReceive(); }
+
   // Returns a promise to get an item once it has been sent. If this underlying object is closed, it
   // can still return data that was "in-flight", i.e. sent but not yet `Receive`d. If the object is
   // closed and no more data remains, all outstanding promises returned by `Receive`s will return an
@@ -157,6 +161,21 @@ class AsyncDeque {
     return ZX_OK;
   }
 
+  // See `AsyncReceiver::TryReceive`.
+  Result<T> TryReceive() FXL_LOCKS_EXCLUDED(mutex_) {
+    std::lock_guard lock(mutex_);
+    return TryReceiveLocked();
+  }
+
+  Result<T> TryReceiveLocked() FXL_REQUIRE(mutex_) {
+    if (!completers_.empty() || queue_.empty()) {
+      return fpromise::error();
+    }
+    auto t = std::move(queue_.front());
+    queue_.pop_front();
+    return fpromise::ok(std::move(t));
+  }
+
   // See `AsyncReceiver::Receive`.
   Promise<T> Receive() FXL_LOCKS_EXCLUDED(mutex_) {
     uint64_t generation = 0;
@@ -177,10 +196,8 @@ class AsyncDeque {
                      completers_.clear();
                      return fpromise::error();
                    }
-                   if (completers_.empty() && !queue_.empty()) {
-                     auto t = std::move(queue_.front());
-                     queue_.pop_front();
-                     return fpromise::ok(std::move(t));
+                   if (auto result = TryReceiveLocked(); result.is_ok()) {
+                     return fpromise::ok(result.take_value());
                    }
                    Bridge<T> bridge;
                    completers_.emplace_back(std::move(bridge.completer));

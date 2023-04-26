@@ -21,6 +21,16 @@ class AsyncDequeTest : public AsyncTest {};
 
 // Unit tests.
 
+TEST_F(AsyncDequeTest, TryReceive) {
+  AsyncSender<Input> sender;
+  AsyncReceiver<Input> receiver(&sender);
+  Input hello_world("hello world!");
+  EXPECT_TRUE(receiver.TryReceive().is_error());
+  EXPECT_EQ(sender.Send(hello_world.Duplicate()), ZX_OK);
+  EXPECT_EQ(receiver.TryReceive().value(), hello_world);
+  EXPECT_TRUE(receiver.TryReceive().is_error());
+}
+
 TEST_F(AsyncDequeTest, SendBeforeReceive) {
   AsyncSender<Input> sender;
   AsyncReceiver<Input> receiver(&sender);
