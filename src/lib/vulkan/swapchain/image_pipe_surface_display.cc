@@ -273,25 +273,8 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
       .width = extent.width,
       .height = extent.height,
   };
-  // Zircon and Vulkan format names use different component orders.
-  //
-  // Zircon format specifies the order and sizes of the components in a native type on a
-  // little-endian system, with the leftmost component stored in the most significant bits,
-  // and the rightmost in the least significant bits. For Vulkan, the leftmost component is
-  // stored at the lowest address and the rightmost component at the highest address.
-  switch (format) {
-    case VK_FORMAT_B8G8R8A8_UNORM:
-    case VK_FORMAT_B8G8R8A8_SRGB:
-      image_config.pixel_format = ZX_PIXEL_FORMAT_RGB_x888;
-      break;
-    case VK_FORMAT_R8G8B8A8_UNORM:
-    case VK_FORMAT_R8G8B8A8_SRGB:
-      image_config.pixel_format = ZX_PIXEL_FORMAT_BGR_888x;
-      break;
-    default:
-      // Unsupported format.
-      return false;
-  }
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  image_config.pixel_format = ZX_PIXEL_FORMAT_NONE;
 #if defined(__x86_64__)
   // Must be consistent with intel-gpu-core.h
   const uint32_t kImageTypeXTiled = 1;

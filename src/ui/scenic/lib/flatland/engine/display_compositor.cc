@@ -47,26 +47,6 @@ fuchsia::sysmem::PixelFormatType ConvertZirconFormatToSysmemFormat(const zx_pixe
   return fuchsia::sysmem::PixelFormatType::INVALID;
 }
 
-// Returns a zircon format for buffer with this pixel format.
-// TODO(fxbug.dev/71410): Remove all references to zx_pixel_format_t.
-zx_pixel_format_t BufferCollectionPixelFormatToZirconFormat(
-    const fuchsia::sysmem::PixelFormat& pixel_format) {
-  switch (pixel_format.type) {
-    case fuchsia::sysmem::PixelFormatType::BGRA32:
-      return ZX_PIXEL_FORMAT_ARGB_8888;
-    case fuchsia::sysmem::PixelFormatType::R8G8B8A8:
-      return ZX_PIXEL_FORMAT_ABGR_8888;
-    case fuchsia::sysmem::PixelFormatType::NV12:
-      return ZX_PIXEL_FORMAT_NV12;
-    case fuchsia::sysmem::PixelFormatType::I420:
-      return ZX_PIXEL_FORMAT_I420;
-    default:
-      break;
-  }
-  FX_CHECK(false) << "Unsupported pixel format: " << static_cast<uint32_t>(pixel_format.type);
-  return ZX_PIXEL_FORMAT_NONE;
-}
-
 // Returns an image type that describes the tiling format used for buffer with
 // this pixel format. The values are display driver specific and not documented
 // in display-controller.fidl.
@@ -347,6 +327,7 @@ bool DisplayCompositor::ImportBufferCollection(
   return ImportBufferCollectionToDisplayController(
       collection_id, std::move(display_token),
       // Indicate that no specific size, format, or type is required.
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
       fuchsia::hardware::display::ImageConfig{.pixel_format = ZX_PIXEL_FORMAT_NONE, .type = 0});
 }
 
@@ -381,7 +362,8 @@ fuchsia::hardware::display::ImageConfig DisplayCompositor::CreateImageConfig(
   return fuchsia::hardware::display::ImageConfig{
       .width = metadata.width,
       .height = metadata.height,
-      .pixel_format = BufferCollectionPixelFormatToZirconFormat(pixel_format),
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
       .type = BufferCollectionPixelFormatToImageType(pixel_format)};
 }
 
@@ -1037,7 +1019,8 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
     std::scoped_lock lock(lock_);
     const auto result = ImportBufferCollectionToDisplayController(
         collection_id, std::move(display_token),
-        fuchsia::hardware::display::ImageConfig{.pixel_format = pixel_format});
+        // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+        fuchsia::hardware::display::ImageConfig{.pixel_format = ZX_PIXEL_FORMAT_NONE});
     FX_DCHECK(result);
   }
 

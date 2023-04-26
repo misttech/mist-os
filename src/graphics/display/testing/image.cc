@@ -113,7 +113,8 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
   }
 
   fhd::wire::ImageConfig image_config = {};
-  image_config.pixel_format = format;
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  image_config.pixel_format = ZX_PIXEL_FORMAT_NONE;
   image_config.height = height;
   image_config.width = width;
   image_config.type = 0;  // 0 for any image type.
@@ -446,7 +447,8 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
 void Image::GetConfig(fhd::wire::ImageConfig* config_out) const {
   config_out->height = height_;
   config_out->width = width_;
-  config_out->pixel_format = format_;
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  config_out->pixel_format = ZX_PIXEL_FORMAT_NONE;
   if (modifier_ != fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled) {
     config_out->type = IMAGE_TYPE_SIMPLE;
   } else {

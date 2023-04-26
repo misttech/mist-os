@@ -219,7 +219,8 @@ impl Frame {
         ImageConfig {
             width: config.width,
             height: config.height,
-            pixel_format: config.format.into(),
+            // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+            pixel_format: 0,
             type_: image_type,
         }
     }

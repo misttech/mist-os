@@ -267,7 +267,13 @@ impl Controller {
             proxy
                 .set_buffer_collection_constraints(
                     id.0,
-                    &mut display::ImageConfig { width: 0, height: 0, pixel_format: 0, type_: 0 },
+                    &mut display::ImageConfig {
+                        width: 0,
+                        height: 0,
+                        // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+                        pixel_format: 0,
+                        type_: 0,
+                    },
                 )
                 .await?,
         )?;

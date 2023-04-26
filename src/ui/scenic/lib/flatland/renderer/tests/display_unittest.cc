@@ -86,8 +86,6 @@ class DisplayTest : public gtest::RealLoopFixture {
     return layer_id;
   }
 
-  const zx_pixel_format_t kDefaultImageFormat = ZX_PIXEL_FORMAT_ARGB_8888;
-
   std::unique_ptr<async::Executor> executor_;
   std::unique_ptr<display::DisplayManager> display_manager_;
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
@@ -138,7 +136,8 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
 
   // Set the display constraints on the display controller.
   fuchsia::hardware::display::ImageConfig display_constraints;
-  display_constraints.pixel_format = kDefaultImageFormat;
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  display_constraints.pixel_format = ZX_PIXEL_FORMAT_NONE;
   bool res = scenic_impl::ImportBufferCollection(collection_id, *display_controller.get(),
                                                  std::move(display_token), display_constraints);
   ASSERT_TRUE(res);
@@ -186,7 +185,8 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // display-specific buffer collection id. If it returns OK, then we know that the renderer
   // did fully set the DC constraints.
   fuchsia::hardware::display::ImageConfig image_config;
-  image_config.pixel_format = kDefaultImageFormat;
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  image_config.pixel_format = ZX_PIXEL_FORMAT_NONE;
 
   // Try to import the image into the display controller API and make sure it succeeds.
   uint64_t display_image_id = allocation::GenerateUniqueImageId();
@@ -227,7 +227,8 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   fuchsia::hardware::display::ImageConfig image_config = {
       .width = kWidth,
       .height = kHeight,
-      .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
   };
   auto display_collection_id = allocation::GenerateUniqueBufferCollectionId();
   ASSERT_NE(display_collection_id, 0U);

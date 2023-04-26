@@ -32,7 +32,8 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   monitor_serial_ = fbl::String(info.monitor_serial.data());
   image_config_.height = modes_[0].vertical_resolution;
   image_config_.width = modes_[0].horizontal_resolution;
-  image_config_.pixel_format = pixel_formats_[0];
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  image_config_.pixel_format = ZX_PIXEL_FORMAT_NONE;
   image_config_.type = fhd::wire::kTypeSimple;
 }
 

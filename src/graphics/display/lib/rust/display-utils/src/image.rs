@@ -117,7 +117,8 @@ impl From<&ImageParameters> for fdisplay::ImageConfig {
         Self {
             width: src.width,
             height: src.height,
-            pixel_format: src.pixel_format.into(),
+            // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+            pixel_format: 0,
             type_: fdisplay::TYPE_SIMPLE,
         }
     }

@@ -21,6 +21,7 @@
 #include "src/ui/lib/escher/vk/image_layout_updater.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/display/util.h"
+#include "zircon/pixelformat.h"
 
 #define VK_CHECK_RESULT(XXX) FX_CHECK(XXX.result == vk::Result::eSuccess)
 
@@ -159,7 +160,8 @@ bool BufferPool::CreateBuffers(size_t count, BufferPool::Environment* environmen
 
   image_config_.height = height_in_px;
   image_config_.width = width_in_px;
-  image_config_.pixel_format = pixel_format;
+  // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+  image_config_.pixel_format = ZX_PIXEL_FORMAT_NONE;
   image_config_.type = IMAGE_TYPE_PREFERRED_SCANOUT;
 
   // Create all the tokens.

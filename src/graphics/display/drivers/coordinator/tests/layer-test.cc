@@ -62,10 +62,12 @@ class LayerTest : public TestBase {
 
 TEST_F(LayerTest, PrimaryBasic) {
   Layer layer(1);
-  fhd::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                         .height = kDisplayHeight,
-                                         .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
-                                         .type = fhd::wire::kTypeSimple};
+  fhd::wire::ImageConfig image_config = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
+      .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
   layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
@@ -86,10 +88,12 @@ TEST_F(LayerTest, CursorBasic) {
 
 TEST_F(LayerTest, CleanUpImage) {
   Layer layer(1);
-  fhd::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                         .height = kDisplayHeight,
-                                         .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
-                                         .type = fhd::wire::kTypeSimple};
+  fhd::wire::ImageConfig image_config = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
+      .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
   layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
@@ -161,10 +165,12 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fbl::SinglyLinkedList<LayerNode*> current_layers;
 
   Layer layer(1);
-  fhd::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                         .height = kDisplayHeight,
-                                         .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
-                                         .type = fhd::wire::kTypeSimple};
+  fhd::wire::ImageConfig image_config = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
+      .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
   layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
@@ -210,10 +216,12 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 
 TEST_F(LayerTest, CleanUpAllImages) {
   Layer layer(1);
-  fhd::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                         .height = kDisplayHeight,
-                                         .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
-                                         .type = fhd::wire::kTypeSimple};
+  fhd::wire::ImageConfig image_config = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
+      .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
   layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);
@@ -262,10 +270,12 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fbl::SinglyLinkedList<LayerNode*> current_layers;
 
   Layer layer(1);
-  fhd::wire::ImageConfig image_config = {.width = kDisplayWidth,
-                                         .height = kDisplayHeight,
-                                         .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
-                                         .type = fhd::wire::kTypeSimple};
+  fhd::wire::ImageConfig image_config = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+      .pixel_format = ZX_PIXEL_FORMAT_NONE,
+      .type = fhd::wire::kTypeSimple};
   fhd::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
   layer.SetPrimaryPosition(fhd::wire::Transform::kIdentity, frame, frame);

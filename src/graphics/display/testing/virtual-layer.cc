@@ -388,7 +388,8 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
     fhd::wire::ImageConfig image_config = {};
     image_config.height = info.height;
     image_config.width = info.width;
-    image_config.pixel_format = info.pixel_format;
+    // TODO(fxbug.dev/126113): Delete the unused `pixel_format` field.
+    image_config.pixel_format = ZX_PIXEL_FORMAT_NONE;
     image_config.type = fhd::wire::kTypeSimple;
     auto result = dc->SetLayerCursorConfig(layer->id, image_config);
     if (!result.ok()) {
