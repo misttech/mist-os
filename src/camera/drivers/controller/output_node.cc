@@ -40,6 +40,11 @@ void OutputNode::ProcessFrame(FrameToken token, frame_metadata_t metadata) {
     return;  // ~token
   }
 
+  frame_count_++;
+  if (frame_count_ % kFrameCountHeartbeatInterval == 0) {
+    FX_LOGS(INFO) << "Camera node " << GetLabel() << " has produced " << frame_count_ << " frames";
+  }
+
   // Throttle the rate of binding warning messages.
   // Once a connection is unbound, every frame from the camera can produce multiple
   // of these warnings - one per stream.

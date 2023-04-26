@@ -128,6 +128,9 @@ class ProcessNode {
   void PostTask(fit::closure task,
                 cpp20::source_location location = cpp20::source_location::current());
 
+  // Provide subclasses with the ability to use label_ in log messages.
+  std::string GetLabel() { return label_; }
+
  private:
   // Static methods bound to the c-style callbacks.
   static void StaticHwFrameReady(void* ctx, const frame_available_info_t* info);
