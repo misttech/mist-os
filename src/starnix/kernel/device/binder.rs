@@ -81,6 +81,7 @@ impl DeviceOps for Arc<BinderDriver> {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let binder_proc = self.create_local_process(current_task.get_pid());
+        log_trace!(current_task, "opened new BinderConnection id={}", binder_proc.identifier);
         Ok(Box::new(BinderConnection { identifier: binder_proc.identifier, driver: self.clone() }))
     }
 }
@@ -105,6 +106,7 @@ impl BinderConnection {
     }
 
     pub fn close(&self) {
+        log_trace!("closing BinderConnection id={}", self.identifier);
         if let Some(binder_process) = self.driver.procs.write().remove(&self.identifier) {
             binder_process.close();
         }
@@ -113,6 +115,7 @@ impl BinderConnection {
 
 impl Drop for BinderConnection {
     fn drop(&mut self) {
+        log_trace!("dropping BinderConnection id={}", self.identifier);
         self.close();
     }
 }
@@ -139,6 +142,7 @@ impl FileOps for BinderConnection {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
+        log_trace!(current_task, "binder wait_async");
         match self.proc(current_task) {
             Ok(proc) => {
                 let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
@@ -373,6 +377,7 @@ struct TransactionState {
 
 impl Drop for TransactionState {
     fn drop(&mut self) {
+        log_trace!("Dropping binder TransactionState");
         let Some(proc) = self.proc.upgrade() else { return; };
         let mut proc = proc.lock();
         for handle in &self.handles {
@@ -507,6 +512,7 @@ impl BinderProcess {
         pid: pid_t,
         remote_resource_accessor: Option<RemoteResourceAccessor>,
     ) -> Arc<Self> {
+        log_trace!("new BinderProcess id={}", identifier);
         let result = Arc::new(Self {
             identifier,
             pid,
@@ -529,6 +535,7 @@ impl BinderProcess {
     }
 
     fn close(self: &Arc<Self>) {
+        log_trace!("closing BinderProcess id={}", self.identifier);
         let mut state = self.lock();
         if !state.closed {
             state.closed = true;
@@ -540,6 +547,7 @@ impl BinderProcess {
     /// Make all blocked threads stop waiting and return nothing. This is used by flush to
     /// make userspace recheck whether binder is being shut down.
     fn kick_all_threads(self: &Arc<Self>) {
+        log_trace!("kicking threads for BinderProcess id={}", self.identifier);
         let state = self.lock();
         for thread in state.thread_pool.0.values() {
             thread.lock().request_kick = true;
@@ -558,12 +566,14 @@ impl BinderProcess {
 
     /// Enqueues `command` for the process and wakes up any thread that is waiting for commands.
     pub fn enqueue_command(&self, command: Command) {
+        log_trace!("BinderProcess id={} enqueuing command {:?}", self.identifier, command);
         self.command_queue.lock().push_back(command);
     }
 
     /// A binder thread is done reading a buffer allocated to a transaction. The binder
     /// driver can reclaim this buffer.
     fn handle_free_buffer(self: &Arc<Self>, buffer_ptr: UserAddress) -> Result<(), Errno> {
+        log_trace!("BinderProcess id={} freeing buffer {:?}", self.identifier, buffer_ptr);
         // Drop the state associated with the now completed transaction.
         let active_transaction = self.lock().active_transactions.remove(&buffer_ptr);
 
@@ -790,10 +800,22 @@ impl<'a> BinderProcessGuard<'a> {
         };
 
         match command {
-            binder_driver_command_protocol_BC_ACQUIRE => self.handles.inc_strong(idx),
-            binder_driver_command_protocol_BC_RELEASE => self.handles.dec_strong(idx),
-            binder_driver_command_protocol_BC_INCREFS => self.handles.inc_weak(idx),
-            binder_driver_command_protocol_BC_DECREFS => self.handles.dec_weak(idx),
+            binder_driver_command_protocol_BC_ACQUIRE => {
+                log_trace!(current_task, "Strong increment on handle {}", idx);
+                self.handles.inc_strong(idx)
+            }
+            binder_driver_command_protocol_BC_RELEASE => {
+                log_trace!(current_task, "Strong decrement on handle {}", idx);
+                self.handles.dec_strong(idx)
+            }
+            binder_driver_command_protocol_BC_INCREFS => {
+                log_trace!(current_task, "Weak increment on handle {}", idx);
+                self.handles.inc_weak(idx)
+            }
+            binder_driver_command_protocol_BC_DECREFS => {
+                log_trace!(current_task, "Weak decrement on handle {}", idx);
+                self.handles.dec_weak(idx)
+            }
             _ => unreachable!(),
         }
     }
@@ -810,8 +832,14 @@ impl<'a> BinderProcessGuard<'a> {
     ) -> Result<Vec<RefCountAction>, Errno> {
         let object = self.find_object(&local).ok_or_else(|| errno!(EINVAL))?;
         match command {
-            binder_driver_command_protocol_BC_INCREFS_DONE => object.ack_incref(),
-            binder_driver_command_protocol_BC_ACQUIRE_DONE => object.ack_acquire(),
+            binder_driver_command_protocol_BC_INCREFS_DONE => {
+                log_trace!("Acknowledging increment reference for {:?}", object);
+                object.ack_incref()
+            }
+            binder_driver_command_protocol_BC_ACQUIRE_DONE => {
+                log_trace!("Acknowleding acquire done for {:?}", object);
+                object.ack_acquire()
+            }
             _ => unreachable!(),
         }
     }
@@ -859,6 +887,7 @@ impl<'a> BinderProcessGuard<'a> {
 
 impl Drop for BinderProcess {
     fn drop(&mut self) {
+        log_trace!("Dropping BinderProcess id={}", self.identifier);
         // Notify any subscribers that the objects this process owned are now dead.
         let death_subscribers = std::mem::take(&mut self.state.lock().death_subscribers);
         for (proc, cookie) in death_subscribers {
@@ -940,6 +969,7 @@ impl From<SharedMemoryAllocation<'_>> for TransactionBuffers {
 
 impl Drop for SharedMemory {
     fn drop(&mut self) {
+        log_trace!("Dropping shared memory allocation {:?}", self);
         let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
 
         // SAFETY: This object hands out references to the mapped memory, but the borrow checker
@@ -1511,6 +1541,7 @@ impl BinderThreadState {
             log_trace!("thread {:?} is in a transaction {:?}", self.tid, self.transactions);
             return false;
         }
+        log_trace!("thread {:?} is available", self.tid);
         true
     }
 
@@ -1521,6 +1552,7 @@ impl BinderThreadState {
         binder_process: &mut BinderProcessGuard<'_>,
         registration: RegistrationState,
     ) -> Result<(), Errno> {
+        log_trace!("BinderThreadState id={} looper registration", self.tid);
         if self.is_main_or_registered() {
             // This thread is already registered.
             error!(EINVAL)
@@ -1533,6 +1565,7 @@ impl BinderThreadState {
 
     /// Enqueues `command` for the thread and wakes it up if necessary.
     pub fn enqueue_command(&mut self, command: Command) {
+        log_trace!("BinderThreadState id={} enqueuing command {:?}", self.tid, command);
         self.command_queue.push_back(command);
     }
 
@@ -1543,7 +1576,14 @@ impl BinderThreadState {
     ) -> Result<(Arc<BinderProcess>, Arc<BinderThread>), TransactionError> {
         let transaction = self.transactions.pop().ok_or_else(|| errno!(EINVAL))?;
         match transaction {
-            TransactionRole::Receiver(peer) => peer.upgrade().ok_or(TransactionError::Dead),
+            TransactionRole::Receiver(peer) => {
+                log_trace!(
+                    "binder transaction popped from thread {} for peer {:?}",
+                    self.tid,
+                    peer
+                );
+                peer.upgrade().ok_or(TransactionError::Dead)
+            }
             TransactionRole::Sender(_) => {
                 log_warn!("caller got confused, nothing to reply to!");
                 error!(EINVAL)?
@@ -1554,6 +1594,7 @@ impl BinderThreadState {
 
 impl Drop for BinderThreadState {
     fn drop(&mut self) {
+        log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
         for command in &self.command_queue.commands {
@@ -1950,6 +1991,7 @@ impl BinderObject {
     /// Creates a new BinderObject. It is the responsibility of the caller to sent a `BR_ACQUIRE`
     /// to the owning process.
     fn new(owner: &Arc<BinderProcess>, local: LocalBinderObject, flags: u32) -> Arc<Self> {
+        log_trace!("New binder object {:?} in process {:?} with flags {:?}", local, owner, flags);
         Arc::new(Self {
             owner: Arc::downgrade(owner),
             local,
@@ -2349,12 +2391,15 @@ impl ResourceAccessor for RemoteResourceAccessor {
 /// Implementation of `ResourceAccessor` for a local client represented as a `CurrentTask`.
 impl ResourceAccessor for CurrentTask {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
+        log_trace!(self, "Closing fd {:?}", fd);
         self.files.close(fd)
     }
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+        log_trace!(self, "Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+        log_trace!(self, "Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
     }
 
@@ -2365,12 +2410,15 @@ impl ResourceAccessor for CurrentTask {
 
 impl MemoryAccessor for CurrentTask {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        log_trace!(self, "Reading {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory(addr, bytes)
     }
     fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+        log_trace!(self, "Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory_partial(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        log_trace!(self, "Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
     }
 }
@@ -2378,12 +2426,15 @@ impl MemoryAccessor for CurrentTask {
 /// Implementation of `ResourceAccessor` for a local client represented as a `Task`.
 impl ResourceAccessor for Task {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
+        log_trace!(self, "Closing fd {:?}", fd);
         self.files.close(fd)
     }
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+        log_trace!(self, "Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+        log_trace!(self, "Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
     }
 
@@ -2394,12 +2445,15 @@ impl ResourceAccessor for Task {
 
 impl MemoryAccessor for Task {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        log_trace!(self, "Reading {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory(addr, bytes)
     }
     fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+        log_trace!(self, "Reading up to {} bytes of memory from {:?}", bytes.len(), addr);
         self.mm.read_memory_partial(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        log_trace!(self, "Writing {} bytes to {:?}", bytes.len(), addr);
         self.mm.write_memory(addr, bytes)
     }
 }
@@ -2599,6 +2653,7 @@ impl BinderDriver {
                 }
                 let response =
                     binder_version { protocol_version: BINDER_CURRENT_PROTOCOL_VERSION as i32 };
+                log_trace!(current_task, "binder version is {:?}", response);
                 binder_proc
                     .get_resource_accessor(current_task)
                     .write_object(UserRef::new(user_arg), &response)?;
@@ -2620,6 +2675,8 @@ impl BinderDriver {
                     0
                 };
 
+                log_trace!(current_task, "binder setting context manager with flags {:x}", flags);
+
                 let mut state = self.context_manager_and_queue.lock();
                 state.context_manager =
                     Some(BinderObject::new_context_manager_marker(binder_proc, flags));
@@ -2636,6 +2693,8 @@ impl BinderDriver {
                 let resource_accessor = binder_proc.get_resource_accessor(current_task);
                 let user_ref = UserRef::<binder_write_read>::new(user_arg);
                 let mut input = resource_accessor.read_object(user_ref)?;
+
+                log_trace!(current_task, "binder write/read request start {:?}", input);
 
                 // We will be writing this back to userspace, don't trust what the client gave us.
                 input.write_consumed = 0;
@@ -2683,6 +2742,8 @@ impl BinderDriver {
                     input.read_consumed = read_result? as u64;
                 }
 
+                log_trace!(current_task, "binder write/read request end {:?}", input);
+
                 // Write back to the calling thread how much data was read/written.
                 resource_accessor.write_object(user_ref, &input)?;
                 Ok(SUCCESS)
@@ -2693,8 +2754,10 @@ impl BinderDriver {
                 }
 
                 let user_ref = UserRef::<u32>::new(user_arg);
-                binder_proc.lock().max_thread_count =
+                let new_max_threads =
                     binder_proc.get_resource_accessor(current_task).read_object(user_ref)? as usize;
+                log_trace!(current_task, "setting max binder threads to {}", new_max_threads);
+                binder_proc.lock().max_thread_count = new_max_threads;
                 Ok(SUCCESS)
             }
             uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
@@ -2705,6 +2768,7 @@ impl BinderDriver {
                 Ok(SUCCESS)
             }
             uapi::BINDER_THREAD_EXIT => {
+                log_trace!(current_task, "binder thread {} exiting", binder_thread.tid);
                 binder_proc.lock().unregister_thread(binder_thread.tid);
                 Ok(SUCCESS)
             }
@@ -3692,6 +3756,7 @@ impl TransactionError {
     /// Dispatches the error, by potentially queueing a command to `binder_thread` and/or returning
     /// an error.
     fn dispatch(self, binder_thread: &Arc<BinderThread>) -> Result<(), Errno> {
+        log_trace!("Dispatching transaction error {:?} for thread {}", self, binder_thread.tid);
         binder_thread.lock().enqueue_command(match self {
             TransactionError::Malformed(err) => {
                 log_warn!(
