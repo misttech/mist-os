@@ -1,3 +1,7 @@
+Name: linenoise (for the Zircon userspace)
+License File: LICENSE
+Description:
+
 This is a port of linenoise for the Zircon userspace.
 
 The upstream repository is https://github.com/antirez/linenoise

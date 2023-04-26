@@ -1,3 +1,8 @@
+Name: ngunwind
+License File: LICENSE
+License File: COPYING
+Description:
+
 This unwinder is based on the nongnu libunwind.
 
 http://download.savannah.gnu.org/releases/libunwind/libunwind-1.2-rc1.tar.gz
