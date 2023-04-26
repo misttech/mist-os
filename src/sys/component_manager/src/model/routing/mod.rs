@@ -11,7 +11,11 @@ pub use open::*;
 use {
     crate::{
         capability::CapabilitySource,
-        model::{component::ComponentInstance, error::ModelError, storage},
+        model::{
+            component::ComponentInstance,
+            error::{ModelError, RouteAndOpenCapabilityError},
+            storage,
+        },
     },
     ::routing::{
         self, capability_source::ComponentCapability,
@@ -80,7 +84,7 @@ pub(super) async fn route_and_open_capability(
     route_request: RouteRequest,
     target: &Arc<ComponentInstance>,
     open_options: OpenOptions<'_>,
-) -> Result<(), ModelError> {
+) -> Result<(), RouteAndOpenCapabilityError> {
     match route_request {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
             let storage_source = r.route(target).await?;
@@ -90,10 +94,14 @@ pub(super) async fn route_and_open_capability(
             OpenRequest::new_from_storage_source(backing_dir_info, target, open_options)
                 .open()
                 .await
+                .map_err(|e| RouteAndOpenCapabilityError::OpenError { err: Box::new(e) })
         }
         r => {
             let route_source = r.route(target).await?;
-            OpenRequest::new_from_route_source(route_source, target, open_options).open().await
+            OpenRequest::new_from_route_source(route_source, target, open_options)
+                .open()
+                .await
+                .map_err(|e| RouteAndOpenCapabilityError::OpenError { err: Box::new(e) })
         }
     }
 }
@@ -115,8 +123,9 @@ pub(super) async fn route_and_open_namespace_capability(
     use_decl: UseDecl,
     target: &Arc<ComponentInstance>,
     server_chan: &mut zx::Channel,
-) -> Result<(), ModelError> {
-    let route_request = request_for_namespace_capability_use(use_decl)?;
+) -> Result<(), RouteAndOpenCapabilityError> {
+    let route_request = request_for_namespace_capability_use(use_decl)
+        .ok_or(RouteAndOpenCapabilityError::NotNamespaceCapability)?;
     let open_options = OpenOptions { flags, relative_path, server_chan };
     route_and_open_capability(route_request, target, open_options).await
 }
@@ -138,34 +147,33 @@ pub(super) async fn route_and_open_namespace_capability_from_expose(
     expose_decl: ExposeDecl,
     target: &Arc<ComponentInstance>,
     server_chan: &mut zx::Channel,
-) -> Result<(), ModelError> {
-    let route_request = request_for_namespace_capability_expose(expose_decl)?;
+) -> Result<(), RouteAndOpenCapabilityError> {
+    let route_request = request_for_namespace_capability_expose(expose_decl)
+        .ok_or(RouteAndOpenCapabilityError::NotNamespaceCapability)?;
     let open_options = OpenOptions { flags, relative_path, server_chan };
     route_and_open_capability(route_request, target, open_options).await
 }
 
 /// Create a new `RouteRequest` from a `UseDecl`, checking that the capability type can
 /// be installed in a namespace.
-pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Result<RouteRequest, ModelError> {
+pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Option<RouteRequest> {
     match use_decl {
-        UseDecl::Directory(decl) => Ok(RouteRequest::UseDirectory(decl)),
-        UseDecl::Protocol(decl) => Ok(RouteRequest::UseProtocol(decl)),
-        UseDecl::Service(decl) => Ok(RouteRequest::UseService(decl)),
-        UseDecl::Storage(decl) => Ok(RouteRequest::UseStorage(decl)),
-        _ => Err(ModelError::unsupported("capability cannot be installed in a namespace")),
+        UseDecl::Directory(decl) => Some(RouteRequest::UseDirectory(decl)),
+        UseDecl::Protocol(decl) => Some(RouteRequest::UseProtocol(decl)),
+        UseDecl::Service(decl) => Some(RouteRequest::UseService(decl)),
+        UseDecl::Storage(decl) => Some(RouteRequest::UseStorage(decl)),
+        _ => None,
     }
 }
 
 /// Create a new `RouteRequest` from an `ExposeDecl`, checking that the capability type can
 /// be installed in a namespace.
-pub fn request_for_namespace_capability_expose(
-    expose_decl: ExposeDecl,
-) -> Result<RouteRequest, ModelError> {
+pub fn request_for_namespace_capability_expose(expose_decl: ExposeDecl) -> Option<RouteRequest> {
     match expose_decl {
-        ExposeDecl::Directory(decl) => Ok(RouteRequest::ExposeDirectory(decl)),
-        ExposeDecl::Protocol(decl) => Ok(RouteRequest::ExposeProtocol(decl)),
-        ExposeDecl::Service(decl) => Ok(RouteRequest::ExposeService(decl)),
-        _ => Err(ModelError::unsupported("capability cannot be installed in a namespace")),
+        ExposeDecl::Directory(decl) => Some(RouteRequest::ExposeDirectory(decl)),
+        ExposeDecl::Protocol(decl) => Some(RouteRequest::ExposeProtocol(decl)),
+        ExposeDecl::Service(decl) => Some(RouteRequest::ExposeService(decl)),
+        _ => None,
     }
 }
 
@@ -203,24 +211,27 @@ https://fuchsia.dev/go/components/connect-errors";
 pub async fn report_routing_failure(
     target: &Arc<ComponentInstance>,
     cap: &ComponentCapability,
-    err: &ModelError,
+    err: ModelError,
     server_end: zx::Channel,
 ) {
     server_end
         .close_with_epitaph(err.as_zx_status())
         .unwrap_or_else(|error| debug!(%error, "failed to send epitaph"));
-    let err_str = match err {
+    let err_str = match &err {
         ModelError::RoutingError { err } => err.to_string(),
         _ => err.to_string(),
     };
     target
         .with_logger_as_default(|| {
             match err {
-                ModelError::RoutingError {
+                ModelError::RouteAndOpenCapabilityError {
                     err:
-                        RoutingError::AvailabilityRoutingError(
-                            AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                        ),
+                        RouteAndOpenCapabilityError::RoutingError {
+                            err:
+                                RoutingError::AvailabilityRoutingError(
+                                    AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
+                                ),
+                        },
                 } => {
                     // If the route failed because the capability is
                     // intentionally not provided, then this failure is expected
@@ -235,11 +246,16 @@ pub async fn report_routing_failure(
                         ROUTE_ERROR_HELP
                     );
                 }
-                ModelError::RoutingError {
+                ModelError::RouteAndOpenCapabilityError {
                     err:
-                        RoutingError::AvailabilityRoutingError(
-                            AvailabilityRoutingError::FailedToRouteToOptionalTarget { .. },
-                        ),
+                        RouteAndOpenCapabilityError::RoutingError {
+                            err:
+                                RoutingError::AvailabilityRoutingError(
+                                    AvailabilityRoutingError::FailedToRouteToOptionalTarget {
+                                        ..
+                                    },
+                                ),
+                        },
                 } => {
                     // If the target declared the capability as optional, but
                     // the capability could not be routed (such as if the source

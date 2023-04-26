@@ -79,7 +79,7 @@ async fn do_start(
         // Find the runner to use.
         let runner = component.resolve_runner().await.map_err(|err| {
             warn!(moniker = %component.abs_moniker, %err, "Failed to resolve runner. A runner must be registered in a component's environment before being referenced. https://fuchsia.dev/go/components/runners#register");
-            StartActionError::ResolveRunnerFailed { err: Box::new(err) }
+            err
         })?;
 
         // Generate the Runtime which will be set in the Execution.

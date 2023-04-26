@@ -134,6 +134,11 @@ pub enum ModelError {
         #[from]
         err: OpenOutgoingDirError,
     },
+    #[error("failed to route and open capability: {err}")]
+    RouteAndOpenCapabilityError {
+        #[from]
+        err: RouteAndOpenCapabilityError,
+    },
 }
 
 impl ModelError {
@@ -187,6 +192,7 @@ impl ModelError {
             ModelError::Unsupported { .. } => zx::Status::NOT_SUPPORTED,
             ModelError::Timeout { .. } => zx::Status::TIMED_OUT,
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
+            ModelError::RouteAndOpenCapabilityError { err } => err.as_zx_status(),
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
         }
@@ -499,6 +505,31 @@ impl Into<fsys::StartError> for ResolveActionError {
     }
 }
 
+/// Describes all errors encountered when routing and opening a namespace capability.
+#[derive(Debug, Clone, Error)]
+pub enum RouteAndOpenCapabilityError {
+    #[error("not a namespace capability")]
+    NotNamespaceCapability,
+    #[error(transparent)]
+    RoutingError {
+        #[from]
+        err: RoutingError,
+    },
+    // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+    #[error(transparent)]
+    OpenError { err: Box<ModelError> },
+}
+
+impl RouteAndOpenCapabilityError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::NotNamespaceCapability { .. } => zx::Status::INVALID_ARGS,
+            Self::RoutingError { err } => err.as_zx_status(),
+            Self::OpenError { err } => err.as_zx_status(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum StartActionError {
     #[error("instance {moniker} was shut down")]
@@ -512,9 +543,8 @@ pub enum StartActionError {
     },
     #[error("failed to resolve runner: {}", err)]
     ResolveRunnerFailed {
-        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
-        #[source]
-        err: Box<ModelError>,
+        #[from]
+        err: RouteAndOpenCapabilityError,
     },
     #[error("reboot on terminate forbidden: {}", err)]
     RebootOnTerminateForbidden {

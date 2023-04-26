@@ -342,8 +342,13 @@ async fn route_directory(
         _ => panic!("not a directory or storage capability"),
     };
     if let Err(e) = route_and_open_capability(route_request, &target, open_options).await {
-        routing::report_routing_failure(&target, &ComponentCapability::Use(use_), &e, server_end)
-            .await;
+        routing::report_routing_failure(
+            &target,
+            &ComponentCapability::Use(use_),
+            e.into(),
+            server_end,
+        )
+        .await;
     }
 }
 
@@ -429,7 +434,7 @@ fn add_service_or_protocol_use(
                 routing::report_routing_failure(
                     &target,
                     &ComponentCapability::Use(use_),
-                    &e,
+                    e.into(),
                     server_end,
                 )
                 .await;

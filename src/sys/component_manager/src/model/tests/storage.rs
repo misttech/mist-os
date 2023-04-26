@@ -5,7 +5,9 @@
 use {
     crate::model::{
         component::StartReason,
-        error::{ModelError, NamespacePopulateError, StartActionError},
+        error::{
+            ModelError, NamespacePopulateError, RouteAndOpenCapabilityError, StartActionError,
+        },
         routing::{route_and_open_capability, OpenOptions},
         testing::routing_test_helpers::*,
     },
@@ -713,7 +715,9 @@ async fn use_restricted_storage_open_failure() {
     .await;
     assert!(matches!(
         result,
-        Err(ModelError::RoutingError { err: RoutingError::ComponentNotInIdIndex { moniker: _ } })
+        Err(RouteAndOpenCapabilityError::RoutingError {
+            err: RoutingError::ComponentNotInIdIndex { moniker: _ }
+        })
     ));
 }
 

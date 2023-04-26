@@ -502,55 +502,44 @@ impl ComponentInstance {
         ActionSet::register(self.clone(), UnresolveAction::new()).await
     }
 
-    /// Resolves a runner for this component.
-    //
-    // We use an explicit `BoxFuture` here instead of a standard async
-    // function because we may need to recurse to resolve the runner:
-    //
-    //   resolve_runner -> open_capability_at_source -> bind -> resolve_runner
-    //
-    // Rust 1.40 doesn't support recursive async functions, so we
-    // manually write out the type.
-    pub fn resolve_runner<'a>(
+    /// Resolves the runner that can start this component.
+    pub async fn resolve_runner<'a>(
         self: &'a Arc<Self>,
-    ) -> BoxFuture<'a, Result<Arc<dyn Runner>, ModelError>> {
-        async move {
-            // Fetch component declaration.
-            let runner = {
-                let state = self.lock_state().await;
-                match *state {
-                    InstanceState::Resolved(ref s) => s.decl.get_runner().cloned(),
-                    InstanceState::Destroyed => {
-                        return Err(ModelError::instance_destroyed(self.abs_moniker.clone()));
-                    }
-                    _ => {
-                        panic!("resolve_runner: not resolved")
-                    }
+    ) -> Result<Arc<dyn Runner>, StartActionError> {
+        // Fetch component declaration.
+        let runner = {
+            let state = self.lock_state().await;
+            match *state {
+                InstanceState::Resolved(ref s) => s.decl.get_runner().cloned(),
+                InstanceState::Destroyed => {
+                    return Err(StartActionError::InstanceDestroyed {
+                        moniker: self.abs_moniker.clone(),
+                    });
                 }
-            };
-
-            // Find any explicit "use" runner declaration, resolve that.
-            if let Some(runner) = runner {
-                // Open up a channel to the runner.
-                let (client_channel, server_channel) =
-                    endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>();
-                let mut server_channel = server_channel.into_channel();
-                let options = OpenOptions {
-                    flags: fio::OpenFlags::NOT_DIRECTORY,
-                    relative_path: "".into(),
-                    server_chan: &mut server_channel,
-                };
-                route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
-                    .await?;
-
-                return Ok(Arc::new(RemoteRunner::new(client_channel.into_proxy().unwrap()))
-                    as Arc<dyn Runner>);
+                _ => {
+                    panic!("resolve_runner: not resolved")
+                }
             }
+        };
 
-            // Otherwise, use a null runner.
-            Ok(Arc::new(NullRunner {}) as Arc<dyn Runner>)
+        // Find any explicit "use" runner declaration, resolve that.
+        if let Some(runner) = runner {
+            // Open up a channel to the runner.
+            let (client, server) =
+                endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            let mut server_channel = server.into_channel();
+            let options = OpenOptions {
+                flags: fio::OpenFlags::NOT_DIRECTORY,
+                relative_path: "".into(),
+                server_chan: &mut server_channel,
+            };
+            route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options).await?;
+
+            return Ok(Arc::new(RemoteRunner::new(client)) as Arc<dyn Runner>);
         }
-        .boxed()
+
+        // Otherwise, use a null runner.
+        Ok(Arc::new(NullRunner {}) as Arc<dyn Runner>)
     }
 
     /// Adds the dynamic child defined by `child_decl` to the given `collection_name`. Once

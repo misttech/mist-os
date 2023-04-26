@@ -180,7 +180,7 @@ impl RouteValidator {
                     decl_type: fsys::DeclType::Use,
                 };
                 let request = routing::request_for_namespace_capability_use(use_.clone())
-                    .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
+                    .ok_or(fsys::RouteValidatorError::InvalidArguments)?;
                 Ok((target, request))
             });
             let expose_requests = resolved.decl().exposes.iter().map(|expose| {
@@ -189,7 +189,7 @@ impl RouteValidator {
                     decl_type: fsys::DeclType::Expose,
                 };
                 let request = routing::request_for_namespace_capability_expose(expose.clone())
-                    .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
+                    .ok_or(fsys::RouteValidatorError::InvalidArguments)?;
                 Ok((target, request))
             });
             use_requests.chain(expose_requests).collect()
@@ -225,8 +225,8 @@ impl RouteValidator {
                                     decl_type: target.decl_type,
                                 };
                                 let res = routing::request_for_namespace_capability_use(u.clone())
-                                    .map(|request| (target, request))
-                                    .map_err(|_| fsys::RouteValidatorError::InvalidArguments);
+                                    .ok_or(fsys::RouteValidatorError::InvalidArguments)
+                                    .map(|request| (target, request));
                                 Some(res)
                             })
                             .collect();
@@ -248,8 +248,8 @@ impl RouteValidator {
                                 };
                                 let res =
                                     routing::request_for_namespace_capability_expose(e.clone())
-                                        .map(|request| (target, request))
-                                        .map_err(|_| fsys::RouteValidatorError::InvalidArguments);
+                                        .ok_or(fsys::RouteValidatorError::InvalidArguments)
+                                        .map(|request| (target, request));
                                 Some(res)
                             })
                             .collect();
@@ -438,7 +438,7 @@ async fn validate_uses(
     for use_ in uses {
         let capability = Some(use_.source_name().to_string());
         let decl_type = Some(fsys::DeclType::Use);
-        if let Ok(route_request) = routing::request_for_namespace_capability_use(use_) {
+        if let Some(route_request) = routing::request_for_namespace_capability_use(use_) {
             let error = if let Err(e) = route_request.route(&instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
             } else {
@@ -464,7 +464,7 @@ async fn validate_exposes(
     for expose in exposes {
         let capability = Some(expose.target_name().to_string());
         let decl_type = Some(fsys::DeclType::Expose);
-        if let Ok(route_request) = routing::request_for_namespace_capability_expose(expose) {
+        if let Some(route_request) = routing::request_for_namespace_capability_expose(expose) {
             let error = if let Err(e) = route_request.route(instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
             } else {

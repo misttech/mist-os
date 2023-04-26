@@ -53,7 +53,7 @@ pub fn route_use_fn(component: WeakComponentInstance, use_: UseDecl) -> RoutingF
                     routing::report_routing_failure(
                         &component,
                         &ComponentCapability::Use(use_),
-                        &e,
+                        e.into(),
                         server_end,
                     )
                     .await;
@@ -98,7 +98,7 @@ pub fn route_expose_fn(component: WeakComponentInstance, expose: ExposeDecl) -> 
                     routing::report_routing_failure(
                         &component,
                         &ComponentCapability::Expose(expose),
-                        &e,
+                        e.into(),
                         server_end,
                     )
                     .await;

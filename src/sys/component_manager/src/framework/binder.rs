@@ -167,7 +167,7 @@ async fn report_routing_failure_to_target(
 ) {
     match target.upgrade().map_err(|e| ModelError::from(e)) {
         Ok(target) => {
-            report_routing_failure(&target, &*BINDER_CAPABILITY, &err, server_end).await;
+            report_routing_failure(&target, &*BINDER_CAPABILITY, err, server_end).await;
         }
         Err(err) => {
             warn!(moniker=%target.abs_moniker, error=%err, "failed to upgrade reference");
