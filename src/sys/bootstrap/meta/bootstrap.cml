@@ -868,6 +868,7 @@
             from: "#shutdown_shim",
             to: [
                 "#boot-drivers",
+                "#driver-hosts",
                 "#driver_manager",
                 "#full-pkg-drivers",
                 "#pkg-drivers",

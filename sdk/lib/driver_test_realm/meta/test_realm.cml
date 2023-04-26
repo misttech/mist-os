@@ -123,6 +123,7 @@
             from: "parent",
             to: [
                 "#boot-drivers",
+                "#driver-hosts",
                 "#pkg-drivers",
             ],
         },

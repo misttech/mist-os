@@ -20,7 +20,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            protocol: [
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.device.manager.SystemStateTransition",
+            ],
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
