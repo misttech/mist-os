@@ -682,7 +682,7 @@
                 "ordinal": 52,
                 "name": "magma_poll",
                 "type": "magma_status_t",
-                "description": "Waits for at least one of the given items to meet a condition. Does not reset any semaphores. Results are returned in the items array.",
+                "description": "Waits for at least one of the given items to meet a condition. Does not reset any semaphores. When MAGMA_STATUS_OK is returned, results are returned in the items array. MAGMA_STATUS_TIMED_OUT is returned if no conditions are met before the given timeout expires. If the notification channel handle is included in the item list, and the magma connection is closed, then MAGMA_STATUS_CONNECTION_LOST is returned.",
                 "arguments": [
                     {
                         "name": "items",

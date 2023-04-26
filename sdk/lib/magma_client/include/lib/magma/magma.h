@@ -390,7 +390,10 @@ MAGMA_EXPORT magma_status_t magma_semaphore_export(
 
 ///
 /// \brief Waits for at least one of the given items to meet a condition. Does not reset any
-///        semaphores. Results are returned in the items array.
+///        semaphores. When MAGMA_STATUS_OK is returned, results are returned in the items array.
+///        MAGMA_STATUS_TIMED_OUT is returned if no conditions are met before the given timeout
+///        expires. If the notification channel handle is included in the item list, and the magma
+///        connection is closed, then MAGMA_STATUS_CONNECTION_LOST is returned.
 /// \param items Array of poll items. Type should be either MAGMA_POLL_TYPE_SEMAPHORE or
 ///        MAGMA_POLL_TYPE_HANDLE. Condition may be set to MAGMA_POLL_CONDITION_SIGNALED OR
 ///        MAGMA_POLL_CONDITION_READABLE. If condition is 0 the item is ignored. Item results are

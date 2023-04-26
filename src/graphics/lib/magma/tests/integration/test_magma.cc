@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include <array>
+#include <limits>
 #include <thread>
 #include <unordered_set>
 
@@ -745,19 +746,39 @@ class TestConnection {
     zx::channel local, remote;
     ASSERT_EQ(ZX_OK, zx::channel::create(0 /* flags */, &local, &remote));
 
-    std::vector<magma_poll_item_t> items;
-    items.push_back({
-        .handle = local.get(),
-        .type = MAGMA_POLL_TYPE_HANDLE,
-        .condition = MAGMA_POLL_CONDITION_READABLE,
-    });
+    magma_semaphore_t semaphore;
+    magma_semaphore_id_t id;
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore, &id));
 
-    EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
-              magma_poll(items.data(), static_cast<uint32_t>(items.size()), 0));
+    std::vector<magma_poll_item_t> items({{
+                                              .handle = local.get(),
+                                              .type = MAGMA_POLL_TYPE_HANDLE,
+                                              .condition = MAGMA_POLL_CONDITION_READABLE,
+                                          },
+                                          {
+                                              .semaphore = semaphore,
+                                              .type = MAGMA_POLL_TYPE_SEMAPHORE,
+                                              .condition = MAGMA_POLL_CONDITION_SIGNALED,
+                                          }});
+
+    {
+      constexpr uint64_t kTimeoutMs = 10;
+      EXPECT_EQ(
+          MAGMA_STATUS_TIMED_OUT,
+          magma_poll(items.data(), static_cast<uint32_t>(items.size()), kTimeoutMs * 1000000));
+    }
 
     remote.reset();
-    EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST,
-              magma_poll(items.data(), static_cast<uint32_t>(items.size()), 0));
+
+    {
+      constexpr uint64_t kTimeoutNs = std::numeric_limits<uint64_t>::max();
+
+      EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST,
+                magma_poll(items.data(), static_cast<uint32_t>(items.size()), kTimeoutNs));
+    }
+
+    magma_connection_release_semaphore(connection_, semaphore);
+
 #else
     GTEST_SKIP();
 #endif
