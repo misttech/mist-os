@@ -171,7 +171,6 @@ template("ffx_tool") {
           files = {
             executable = file_base
             executable_metadata = file_base_metadata
-            support = []
           }
         }
       }

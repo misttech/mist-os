@@ -143,7 +143,8 @@ class ElementMeta(object):
         if type == 'cc_prebuilt_library':
             common_files.update(self._meta['headers'])
             if 'ifs' in self._meta:
-                common_files.add(os.path.join(self._meta['root'], self._meta['ifs']))
+                common_files.add(
+                    os.path.join(self._meta['root'], self._meta['ifs']))
             for arch, binaries in self._meta['binaries'].items():
                 contents = set()
                 contents.add(binaries['link'])
@@ -157,9 +158,18 @@ class ElementMeta(object):
             common_files.update(self._meta['sources'])
         elif type == 'dart_library':
             common_files.update(self._meta['sources'])
+        elif type == 'ffx_tool':
+            if 'files' in self._meta:
+                for (name, collection) in self._meta["files"].items():
+                    if name == "executable" or name == "executable_metadata":
+                        common_files.add(collection)
+                    else:
+                        common_files.update(collection)
+            if 'target_files' in self._meta:
+                arch_files.update(self._meta['target_files'])
         elif type == 'fidl_library':
             common_files.update(self._meta['sources'])
-        elif type in ['host_tool', 'companion_host_tool', 'ffx_tool']:
+        elif type in ['host_tool', 'companion_host_tool']:
             if 'files' in self._meta:
                 common_files.update(self._meta['files'])
             if 'target_files' in self._meta:
