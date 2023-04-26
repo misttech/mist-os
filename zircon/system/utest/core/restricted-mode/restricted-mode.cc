@@ -12,6 +12,163 @@
 
 #if defined(__x86_64__) || defined(__aarch64__)
 
+#ifdef __x86_64__
+class ArchRegisterState {
+ public:
+  void InitializeRegisters() {
+    state_.flags = 0;
+    state_.rax = 0x0101010101010101;
+    state_.rbx = 0x0202020202020202;
+    state_.rcx = 0x0303030303030303;
+    state_.rdx = 0x0404040404040404;
+    state_.rsi = 0x0505050505050505;
+    state_.rdi = 0x0606060606060606;
+    state_.rbp = 0x0707070707070707;
+    state_.rsp = 0x0808080808080808;
+    state_.r8 = 0x0909090909090909;
+    state_.r9 = 0x0a0a0a0a0a0a0a0a;
+    state_.r10 = 0x0b0b0b0b0b0b0b0b;
+    state_.r11 = 0x0c0c0c0c0c0c0c0c;
+    state_.r12 = 0x0d0d0d0d0d0d0d0d;
+    state_.r13 = 0x0e0e0e0e0e0e0e0e;
+    state_.r14 = 0x0f0f0f0f0f0f0f0f;
+    state_.r15 = 0x1010101010101010;
+    state_.fs_base = reinterpret_cast<uintptr_t>(&fs_val_);
+    state_.gs_base = reinterpret_cast<uintptr_t>(&gs_val_);
+    fs_val_ = 0;
+    gs_val_ = 0;
+  }
+
+  void VerifyTwiddledRestrictedState() const {
+    // Validate the state of the registers is what was written inside restricted mode.
+    //
+    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
+    EXPECT_EQ(0x0101010101010102, state_.rax);
+    EXPECT_EQ(0x0202020202020203, state_.rbx);
+    EXPECT_EQ(0, state_.rcx);  // RCX is trashed by the syscall and set to zero
+    EXPECT_EQ(0x0404040404040405, state_.rdx);
+    EXPECT_EQ(0x0505050505050506, state_.rsi);
+    EXPECT_EQ(0x0606060606060607, state_.rdi);
+    EXPECT_EQ(0x0707070707070708, state_.rbp);
+    EXPECT_EQ(0x0808080808080809, state_.rsp);
+    EXPECT_EQ(0x090909090909090a, state_.r8);
+    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.r9);
+    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.r10);
+    EXPECT_EQ(0, state_.r11);  // r11 is trashed by the syscall and set to zero
+    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.r12);
+    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.r13);
+    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.r14);
+    EXPECT_EQ(0x1010101010101011, state_.r15);
+
+    // Validate that it was able to write to fs:0 and gs:0 while inside restricted mode the post
+    // incremented values of rcx and r11 were written here.
+    EXPECT_EQ(0x0303030303030304, fs_val_);
+    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, gs_val_);
+  }
+  uintptr_t ip() { return state_.ip; }
+  void set_ip(uintptr_t ip) { state_.ip = ip; }
+  zx_restricted_state_t& restricted_state() { return state_; }
+
+ private:
+  uint64_t fs_val_ = 0;
+  uint64_t gs_val_ = 0;
+  zx_restricted_state_t state_{};
+};
+#endif
+
+#ifdef __aarch64__
+class ArchRegisterState {
+ public:
+  void InitializeRegisters() {
+    // Initialize all standard registers to arbitrary values.
+    state_.x[0] = 0x0101010101010101;
+    state_.x[1] = 0x0202020202020202;
+    state_.x[2] = 0x0303030303030303;
+    state_.x[3] = 0x0404040404040404;
+    state_.x[4] = 0x0505050505050505;
+    state_.x[5] = 0x0606060606060606;
+    state_.x[6] = 0x0707070707070707;
+    state_.x[7] = 0x0808080808080808;
+    state_.x[8] = 0x0909090909090909;
+    state_.x[9] = 0x0a0a0a0a0a0a0a0a;
+    state_.x[10] = 0x0b0b0b0b0b0b0b0b;
+    state_.x[11] = 0x0c0c0c0c0c0c0c0c;
+    state_.x[12] = 0x0d0d0d0d0d0d0d0d;
+    state_.x[13] = 0x0e0e0e0e0e0e0e0e;
+    state_.x[14] = 0x0f0f0f0f0f0f0f0f;
+    state_.x[15] = 0x0101010101010101;
+    state_.x[16] = 0x0202020202020202;
+    state_.x[17] = 0x0303030303030303;
+    state_.x[18] = 0x0404040404040404;
+    state_.x[19] = 0x0505050505050505;
+    state_.x[20] = 0x0606060606060606;
+    state_.x[21] = 0x0707070707070707;
+    state_.x[22] = 0x0808080808080808;
+    state_.x[23] = 0x0909090909090909;
+    state_.x[24] = 0x0a0a0a0a0a0a0a0a;
+    state_.x[25] = 0x0b0b0b0b0b0b0b0b;
+    state_.x[26] = 0x0c0c0c0c0c0c0c0c;
+    state_.x[27] = 0x0d0d0d0d0d0d0d0d;
+    state_.x[28] = 0x0e0e0e0e0e0e0e0e;
+    state_.x[29] = 0x0f0f0f0f0f0f0f0f;
+    state_.x[30] = 0x0101010101010101;
+    state_.sp = 0x0808080808080808;
+    state_.cpsr = 0;
+
+    // Initialize a new thread local storage for the restricted mode routine.
+    state_.tpidr_el0 = reinterpret_cast<uintptr_t>(&tls_val_);
+  }
+
+  void VerifyTwiddledRestrictedState() const {
+    // Validate the state of the registers is what was written inside restricted mode.
+    //
+    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
+    // x0 was used as temp space by bounce, so skip that one.
+    EXPECT_EQ(0x0202020202020203, state_.x[1]);
+    EXPECT_EQ(0x0303030303030304, state_.x[2]);
+    EXPECT_EQ(0x0404040404040405, state_.x[3]);
+    EXPECT_EQ(0x0505050505050506, state_.x[4]);
+    EXPECT_EQ(0x0606060606060607, state_.x[5]);
+    EXPECT_EQ(0x0707070707070708, state_.x[6]);
+    EXPECT_EQ(0x0808080808080809, state_.x[7]);
+    EXPECT_EQ(0x090909090909090a, state_.x[8]);
+    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.x[9]);
+    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.x[10]);
+    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.x[11]);
+    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.x[12]);
+    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.x[13]);
+    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.x[14]);
+    EXPECT_EQ(0x0101010101010102, state_.x[15]);
+    EXPECT_EQ(0x40, state_.x[16]);  // bounce ran syscall 0x40
+    EXPECT_EQ(0x0303030303030304, state_.x[17]);
+    EXPECT_EQ(0x0404040404040405, state_.x[18]);
+    EXPECT_EQ(0x0505050505050506, state_.x[19]);
+    EXPECT_EQ(0x0606060606060607, state_.x[20]);
+    EXPECT_EQ(0x0707070707070708, state_.x[21]);
+    EXPECT_EQ(0x0808080808080809, state_.x[22]);
+    EXPECT_EQ(0x090909090909090a, state_.x[23]);
+    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.x[24]);
+    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.x[25]);
+    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.x[26]);
+    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.x[27]);
+    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.x[28]);
+    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.x[29]);
+    EXPECT_EQ(0x0101010101010102, state_.x[30]);
+    EXPECT_EQ(0x0808080808080809, state_.sp);
+
+    // Check that thread local storage was updated correctly in restricted mode.
+    EXPECT_EQ(0x0202020202020203, tls_val_);
+  }
+  uintptr_t ip() { return state_.pc; }
+  void set_ip(uintptr_t ip) { state_.pc = ip; }
+  zx_restricted_state_t& restricted_state() { return state_; }
+
+ private:
+  uint64_t tls_val_ = 0;
+  zx_restricted_state_t state_{};
+};
+#endif
+
 // Verify that restricted_enter handles invalid args.
 TEST(RestrictedMode, EnterInvalidArgs) {
   // Invalid options.
@@ -194,32 +351,12 @@ TEST(RestrictedMode, Basic) {
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
   // Configure the state for x86.
-  uint64_t fs_val = 0;
-  uint64_t gs_val = 0;
-  zx_restricted_state_t state{};
-  state.ip = (uint64_t)bounce;
-  state.flags = 0;
-  state.rax = 0x0101010101010101;
-  state.rbx = 0x0202020202020202;
-  state.rcx = 0x0303030303030303;
-  state.rdx = 0x0404040404040404;
-  state.rsi = 0x0505050505050505;
-  state.rdi = 0x0606060606060606;
-  state.rbp = 0x0707070707070707;
-  state.rsp = 0x0808080808080808;
-  state.r8 = 0x0909090909090909;
-  state.r9 = 0x0a0a0a0a0a0a0a0a;
-  state.r10 = 0x0b0b0b0b0b0b0b0b;
-  state.r11 = 0x0c0c0c0c0c0c0c0c;
-  state.r12 = 0x0d0d0d0d0d0d0d0d;
-  state.r13 = 0x0e0e0e0e0e0e0e0e;
-  state.r14 = 0x0f0f0f0f0f0f0f0f;
-  state.r15 = 0x1010101010101010;
-  state.fs_base = (uintptr_t)&fs_val;
-  state.gs_base = (uintptr_t)&gs_val;
+  ArchRegisterState state;
+  state.InitializeRegisters();
+  state.set_ip(reinterpret_cast<uint64_t>(bounce));
 
   // Set the state.
-  ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
+  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
   // Enter restricted mode with reasonable args, expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
@@ -228,36 +365,11 @@ TEST(RestrictedMode, Basic) {
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
-  state = {};
-  ASSERT_OK(vmo.read(&state, 0, sizeof(state)));
+  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
   // Validate that the instruction pointer is right after the syscall instruction.
-  EXPECT_EQ((uintptr_t)&bounce_post_syscall, state.ip);
-
-  // Validate the state of the registers is what was written inside restricted mode.
-  //
-  // NOTE: Each of the registers was incremented by one before exiting restricted mode.
-  EXPECT_EQ(0x0101010101010102, state.rax);
-  EXPECT_EQ(0x0202020202020203, state.rbx);
-  EXPECT_EQ(0, state.rcx);  // RCX is trashed by the syscall and set to zero
-  EXPECT_EQ(0x0404040404040405, state.rdx);
-  EXPECT_EQ(0x0505050505050506, state.rsi);
-  EXPECT_EQ(0x0606060606060607, state.rdi);
-  EXPECT_EQ(0x0707070707070708, state.rbp);
-  EXPECT_EQ(0x0808080808080809, state.rsp);
-  EXPECT_EQ(0x090909090909090a, state.r8);
-  EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state.r9);
-  EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state.r10);
-  EXPECT_EQ(0, state.r11);  // r11 is trashed by the syscall and set to zero
-  EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state.r12);
-  EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state.r13);
-  EXPECT_EQ(0x0f0f0f0f0f0f0f10, state.r14);
-  EXPECT_EQ(0x1010101010101011, state.r15);
-
-  // Validate that it was able to write to fs:0 and gs:0 while inside restricted mode the post
-  // incremented values of rcx and r11 were written here.
-  EXPECT_EQ(0x0303030303030304, fs_val);
-  EXPECT_EQ(0x0c0c0c0c0c0c0c0d, gs_val);
+  EXPECT_EQ((uintptr_t)&bounce_post_syscall, state.ip());
+  state.VerifyTwiddledRestrictedState();
 }
 
 // This is a simple benchmark test that prints some rough performance numbers.
@@ -269,14 +381,10 @@ TEST(RestrictedMode, Bench) {
     auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
     // Set the state.
-    uint64_t fs_val = 0;
-    uint64_t gs_val = 0;
-    zx_restricted_state_t state{};
-    state.ip = (uint64_t)bounce;
-    state.flags = 0;
-    state.fs_base = (uintptr_t)&fs_val;
-    state.gs_base = (uintptr_t)&gs_val;
-    ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
+    ArchRegisterState state;
+    state.InitializeRegisters();
+    state.set_ip(reinterpret_cast<uintptr_t>(bounce));
+    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
     constexpr int iter = 1000000;  // about a second worth of iterations on a mid range x86
@@ -464,54 +572,17 @@ TEST(RestrictedMode, Basic) {
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
-  // Configure the state for ARM64.
-  zx_restricted_state_t state{};
+  ArchRegisterState state;
 
   // Initialize all standard registers to arbitrary values.
-  state.x[0] = 0x0101010101010101;
-  state.x[1] = 0x0202020202020202;
-  state.x[2] = 0x0303030303030303;
-  state.x[3] = 0x0404040404040404;
-  state.x[4] = 0x0505050505050505;
-  state.x[5] = 0x0606060606060606;
-  state.x[6] = 0x0707070707070707;
-  state.x[7] = 0x0808080808080808;
-  state.x[8] = 0x0909090909090909;
-  state.x[9] = 0x0a0a0a0a0a0a0a0a;
-  state.x[10] = 0x0b0b0b0b0b0b0b0b;
-  state.x[11] = 0x0c0c0c0c0c0c0c0c;
-  state.x[12] = 0x0d0d0d0d0d0d0d0d;
-  state.x[13] = 0x0e0e0e0e0e0e0e0e;
-  state.x[14] = 0x0f0f0f0f0f0f0f0f;
-  state.x[15] = 0x0101010101010101;
-  state.x[16] = 0x0202020202020202;
-  state.x[17] = 0x0303030303030303;
-  state.x[18] = 0x0404040404040404;
-  state.x[19] = 0x0505050505050505;
-  state.x[20] = 0x0606060606060606;
-  state.x[21] = 0x0707070707070707;
-  state.x[22] = 0x0808080808080808;
-  state.x[23] = 0x0909090909090909;
-  state.x[24] = 0x0a0a0a0a0a0a0a0a;
-  state.x[25] = 0x0b0b0b0b0b0b0b0b;
-  state.x[26] = 0x0c0c0c0c0c0c0c0c;
-  state.x[27] = 0x0d0d0d0d0d0d0d0d;
-  state.x[28] = 0x0e0e0e0e0e0e0e0e;
-  state.x[29] = 0x0f0f0f0f0f0f0f0f;
-  state.x[30] = 0x0101010101010101;
-  state.sp = 0x0808080808080808;
-  state.cpsr = 0;
-
-  // Initialize a new thread local storage for the restricted mode routine.
-  uint64_t tls_val = 0;
-  state.tpidr_el0 = (uintptr_t)&tls_val;
+  state.InitializeRegisters();
 
   // Set the PC to the bounce routine, as the PC is where zx_restricted_enter
   // will jump to.
-  state.pc = (uint64_t)bounce;
+  state.set_ip(reinterpret_cast<uintptr_t>(bounce));
 
   // Write the state to the state VMO.
-  ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
+  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
   // Enter restricted mode and expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
@@ -520,50 +591,12 @@ TEST(RestrictedMode, Basic) {
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
-  state = {};
-  ASSERT_OK(vmo.read(&state, 0, sizeof(state)));
+  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
   // Validate that the instruction pointer is right after the syscall instruction.
-  EXPECT_EQ((uintptr_t)&bounce_post_syscall, state.pc);
+  EXPECT_EQ((uintptr_t)&bounce_post_syscall, state.ip());
 
-  // Validate the state of the registers is what was written inside restricted mode.
-  //
-  // NOTE: Each of the registers was incremented by one before exiting restricted mode.
-  // x0 was used as temp space by bounce, so skip that one.
-  EXPECT_EQ(0x0202020202020203, state.x[1]);
-  EXPECT_EQ(0x0303030303030304, state.x[2]);
-  EXPECT_EQ(0x0404040404040405, state.x[3]);
-  EXPECT_EQ(0x0505050505050506, state.x[4]);
-  EXPECT_EQ(0x0606060606060607, state.x[5]);
-  EXPECT_EQ(0x0707070707070708, state.x[6]);
-  EXPECT_EQ(0x0808080808080809, state.x[7]);
-  EXPECT_EQ(0x090909090909090a, state.x[8]);
-  EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state.x[9]);
-  EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state.x[10]);
-  EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state.x[11]);
-  EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state.x[12]);
-  EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state.x[13]);
-  EXPECT_EQ(0x0f0f0f0f0f0f0f10, state.x[14]);
-  EXPECT_EQ(0x0101010101010102, state.x[15]);
-  EXPECT_EQ(0x40, state.x[16]);  // bounce ran syscall 0x40
-  EXPECT_EQ(0x0303030303030304, state.x[17]);
-  EXPECT_EQ(0x0404040404040405, state.x[18]);
-  EXPECT_EQ(0x0505050505050506, state.x[19]);
-  EXPECT_EQ(0x0606060606060607, state.x[20]);
-  EXPECT_EQ(0x0707070707070708, state.x[21]);
-  EXPECT_EQ(0x0808080808080809, state.x[22]);
-  EXPECT_EQ(0x090909090909090a, state.x[23]);
-  EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state.x[24]);
-  EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state.x[25]);
-  EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state.x[26]);
-  EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state.x[27]);
-  EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state.x[28]);
-  EXPECT_EQ(0x0f0f0f0f0f0f0f10, state.x[29]);
-  EXPECT_EQ(0x0101010101010102, state.x[30]);
-  EXPECT_EQ(0x0808080808080809, state.sp);
-
-  // Check that thread local storage was updated correctly in restricted mode.
-  EXPECT_EQ(0x0202020202020203, tls_val);
+  state.VerifyTwiddledRestrictedState();
 }
 
 // This is a simple benchmark test that prints some rough performance numbers.
@@ -575,12 +608,10 @@ TEST(RestrictedMode, Bench) {
     auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
     // Set the state.
-    uint64_t tls_val = 0;
-    zx_restricted_state_t state{};
-    state.pc = (uint64_t)bounce;
-    state.cpsr = 0;
-    state.tpidr_el0 = (uintptr_t)&tls_val;
-    ASSERT_OK(vmo.write(&state, 0, sizeof(state)));
+    ArchRegisterState state;
+    state.InitializeRegisters();
+    state.set_ip(reinterpret_cast<uintptr_t>(bounce));
+    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
     constexpr int iter = 1000000;
