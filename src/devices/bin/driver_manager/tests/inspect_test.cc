@@ -172,7 +172,7 @@ TEST_F(InspectDevfsTestCase, DevfsEntries) {
   size_t length;
   {
     auto [dir, seqcount] =
-        coordinator().inspect_manager().devfs()->GetProtoDir(test_device_protocol);
+        coordinator().inspect_manager().devfs().GetProtoDir(test_device_protocol);
     ASSERT_NE(dir, nullptr);
     ASSERT_NE(seqcount, nullptr);
     ASSERT_EQ(*seqcount, 1);
@@ -192,7 +192,7 @@ TEST_F(InspectDevfsTestCase, DevfsEntries) {
   // Check that protocol directory is removed and hence the inspect vmo is unlisted
   {
     auto [dir, seqcount] =
-        coordinator().inspect_manager().devfs()->GetProtoDir(test_device_protocol);
+        coordinator().inspect_manager().devfs().GetProtoDir(test_device_protocol);
     ASSERT_EQ(dir, nullptr);
   }
 }
@@ -215,7 +215,7 @@ TEST_F(InspectDevfsTestCase, NoPubProtocolVisibleInClassDirectory) {
   size_t length;
   {
     auto [dir, seqcount] =
-        coordinator().inspect_manager().devfs()->GetProtoDir(test_device_protocol);
+        coordinator().inspect_manager().devfs().GetProtoDir(test_device_protocol);
     ASSERT_NE(dir, nullptr);
     ASSERT_NE(seqcount, nullptr);
     ASSERT_EQ(*seqcount, 1);

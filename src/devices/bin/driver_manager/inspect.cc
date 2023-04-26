@@ -91,7 +91,7 @@ InspectDevfs::InspectDevfs(fbl::RefPtr<fs::PseudoDir> root_dir,
   std::copy(std::begin(kProtoInfos), std::end(kProtoInfos), proto_infos_.begin());
 }
 
-zx::result<InspectDevfs> InspectDevfs::Create(const fbl::RefPtr<fs::PseudoDir>& root_dir) {
+zx::result<InspectDevfs> InspectDevfs::Create(fbl::RefPtr<fs::PseudoDir> root_dir) {
   auto class_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   zx::result<> status = zx::make_result(root_dir->AddEntry("class", class_dir));
   if (status.is_error()) {
@@ -186,15 +186,14 @@ InspectManager::InspectManager(async_dispatcher_t* dispatcher) {
                                std::move(tree_service));
 
   diagnostics_dir_->AddEntry("driver_manager", driver_manager_dir);
-  auto status = InspectDevfs::Create(diagnostics_dir_);
-  ZX_ASSERT(status.is_ok());
-  devfs_ = std::move(status.value());
 
   if (dispatcher) {
     diagnostics_vfs_ = std::make_unique<fs::SynchronousVfs>(dispatcher);
   }
 
-  info_ = fbl::MakeRefCounted<Info>(root_node());
+  zx::result devfs = InspectDevfs::Create(diagnostics_dir_);
+  ZX_ASSERT(devfs.is_ok());
+  info_ = fbl::MakeRefCounted<Info>(root_node(), std::move(devfs.value()));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InspectManager::Connect() {
@@ -207,12 +206,13 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InspectManager::Connect() {
                          std::move(client));
 }
 
-DeviceInspect InspectManager::CreateDevice(std::string name, zx::vmo vmo) {
-  return DeviceInspect(info_, std::move(name), std::move(vmo));
+DeviceInspect InspectManager::CreateDevice(std::string name, zx::vmo vmo, uint32_t protocol_id) {
+  return DeviceInspect(info_, std::move(name), std::move(vmo), protocol_id);
 }
 
-DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, zx::vmo vmo)
-    : info_(std::move(info)) {
+DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string name, zx::vmo vmo,
+                             uint32_t protocol_id)
+    : info_(std::move(info)), protocol_id_(protocol_id), name_(std::move(name)) {
   // Devices are sometimes passed bogus handles. Fun!
   if (vmo.is_valid()) {
     uint64_t size;
@@ -220,7 +220,7 @@ DeviceInspect::DeviceInspect(fbl::RefPtr<InspectManager::Info> info, std::string
     ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
     vmo_file_.emplace(fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), size));
   }
-  device_node_ = info_->devices.CreateChild(name);
+  device_node_ = info_->devices.CreateChild(name_);
   // Increment device count.
   info_->device_count.Add(1);
 
@@ -234,6 +234,21 @@ DeviceInspect::~DeviceInspect() {
     // Decrement device count.
     info_->device_count.Subtract(1);
   }
+  if (vmo_file_.has_value() && !link_name_.empty()) {
+    info_->devfs.Unpublish(protocol_id_, vmo_file_.value(), link_name_);
+  }
+}
+
+zx::result<> DeviceInspect::Publish() {
+  if (!vmo_file_.has_value()) {
+    return zx::ok();
+  }
+  zx::result link_name = info_->devfs.Publish(protocol_id_, name_.c_str(), vmo_file_.value());
+  if (link_name.is_error()) {
+    return link_name.take_error();
+  }
+  link_name_ = link_name.value();
+  return zx::ok();
 }
 
 void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_t protocol_id,

@@ -73,7 +73,8 @@ Device::Device(Coordinator* coord, fbl::String name, fbl::String parent_driver_u
         coordinator->bind_driver_manager().BindDevice(fbl::RefPtr(this));
       }),
       outgoing_dir_(std::move(outgoing_dir)),
-      inspect_(coord->inspect_manager().CreateDevice(name_.c_str(), std::move(inspect))) {
+      inspect_(
+          coord->inspect_manager().CreateDevice(name_.c_str(), std::move(inspect), protocol_id_)) {
   if (device_controller.is_valid()) {
     device_controller_.Bind(std::move(device_controller), coordinator->dispatcher());
   }
@@ -87,8 +88,6 @@ Device::~Device() {
   // holding a reference we shouldn't be able to hit that check, in which case
   // the flag is only used to modify the proxy library loading behavior.
   devfs.unpublish();
-
-  UnpublishInspect();
 
   // Drop our reference to our driver_host if we still have it
   set_host(nullptr);
@@ -167,7 +166,7 @@ zx_status_t Device::Create(
     dev->flags |= DEV_CTX_ALLOW_MULTI_COMPOSITE;
   }
 
-  if (zx::result status = dev->PublishToInspect(); status.is_error()) {
+  if (zx::result status = dev->inspect_.Publish(); status.is_error()) {
     return status.error_value();
   }
 
@@ -250,7 +249,7 @@ zx_status_t Device::CreateComposite(
   }
   dev->composite_ = composite;
 
-  if (zx::result status = dev->PublishToInspect(); status.is_error()) {
+  if (zx::result status = dev->inspect_.Publish(); status.is_error()) {
     return status.error_value();
   }
 
@@ -1082,30 +1081,4 @@ zx::result<std::shared_ptr<dfv2::Node>> Device::CreateDFv2Device() {
   node_devfs.publish();
 
   return zx::ok(dfv2_bound_device_->node());
-}
-
-zx::result<> Device::PublishToInspect() {
-  if (!inspect_.file().has_value()) {
-    return zx::ok();
-  }
-  zx::result link_name = coordinator->inspect_manager().devfs()->Publish(
-      protocol_id(), name().c_str(), inspect_.file().value());
-  if (link_name.is_error()) {
-    return link_name.take_error();
-  }
-  link_name_ = link_name.value();
-  return zx::ok();
-}
-
-void Device::UnpublishInspect() {
-  // If we destruct early enough, devfs might not exist yet.
-  if (!coordinator->inspect_manager().devfs()) {
-    return;
-  }
-  if (!inspect_.file().has_value() || link_name_.empty()) {
-    return;
-  }
-
-  coordinator->inspect_manager().devfs()->Unpublish(protocol_id_, inspect_.file().value(),
-                                                    link_name_);
 }

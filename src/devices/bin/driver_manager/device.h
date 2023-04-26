@@ -410,13 +410,6 @@ class Device final
   template <typename DeviceType>
   static std::list<DeviceType*> GetChildren(DeviceType* device);
 
-  // Publish the device to inspect. This should be called when the device is created,
-  // and should only be called once.
-  zx::result<> PublishToInspect();
-  // Unpublish the device from inspect. This should be called when the device is shutting down.
-  // This function is fine to call even if the device has not been published.
-  void UnpublishInspect();
-
   fidl::WireSharedClient<fuchsia_device_manager::DeviceController> device_controller_;
   std::optional<fidl::ServerBindingRef<fuchsia_device_manager::Coordinator>> coordinator_binding_;
 
@@ -504,9 +497,6 @@ class Device final
   // completed. It will likely mark |active_remove_| as completed and clear
   // it.
   RemoveCompletion remove_completion_;
-
-  // Name of the inspect vmo file as it appears in diagnostics class directory
-  fbl::String link_name_;
 
   // Provides incoming directory for the driver which binds to this device.
   fidl::ClientEnd<fio::Directory> outgoing_dir_;
