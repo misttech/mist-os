@@ -13,13 +13,18 @@ use fidl_fuchsia_net_tun as fnet_tun;
 /// `fuchsia.net.tun/Device` and the underlying network device.
 pub fn create_tun_device(
 ) -> (fnet_tun::DeviceProxy, fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>) {
+    create_tun_device_with(fnet_tun::DeviceConfig::EMPTY)
+}
+
+/// Create a Tun device with the provided config and return its handles.
+pub fn create_tun_device_with(
+    device_config: fnet_tun::DeviceConfig,
+) -> (fnet_tun::DeviceProxy, fidl::endpoints::ClientEnd<fhardware_network::DeviceMarker>) {
     let tun_ctl = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("connect to protocol");
     let (tun_dev, tun_dev_server_end) =
         fidl::endpoints::create_proxy::<fnet_tun::DeviceMarker>().expect("create proxy");
-    tun_ctl
-        .create_device(fnet_tun::DeviceConfig::EMPTY, tun_dev_server_end)
-        .expect("create tun device");
+    tun_ctl.create_device(device_config, tun_dev_server_end).expect("create tun device");
     let (netdevice_client_end, netdevice_server_end) =
         fidl::endpoints::create_endpoints::<fhardware_network::DeviceMarker>();
     tun_dev.get_device(netdevice_server_end).expect("get device");

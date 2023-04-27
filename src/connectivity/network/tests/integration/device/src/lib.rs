@@ -4,19 +4,33 @@
 
 #![cfg(test)]
 
+use std::{convert::TryFrom as _, num::NonZeroU64};
+
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_tun as fnet_tun;
+use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
+
+use fidl_fuchsia_net_ext::IntoExt as _;
+use fuchsia_async::TimeoutExt as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, std_socket_addr_v4};
-use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::{
+    realms::{Netstack, TestSandboxExt as _},
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
 use netstack_testing_macros::netstack_test;
-use packet::ParsablePacket as _;
+use packet::{Buf, ParsablePacket as _, Serializer};
+use packet_formats::error::ParseError;
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+    ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG,
+};
 use packet_formats::icmp::MessageBody as _;
 use packet_formats::ipv4::Ipv4Header as _;
+use sockaddr::{EthernetSockaddr, IntoSockAddr as _};
 use static_assertions::const_assert_eq;
-use std::convert::TryFrom as _;
 use test_case::test_case;
 
 const SOURCE_SUBNET: fnet::Subnet = fidl_subnet!("192.168.255.1/16");
@@ -343,4 +357,116 @@ async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
             ..
         }) if mcast_filters == vec![]
     );
+}
+
+const ETH_HDR: usize = ETHERNET_HDR_LEN_NO_TAG;
+const ETH_BODY: usize = ETHERNET_MIN_BODY_LEN_NO_TAG;
+const MIN_ETH_FRAME: usize = ETHERNET_HDR_LEN_NO_TAG + ETH_BODY;
+const LARGE_BODY: usize = ETH_BODY + 1024;
+const LARGE_FRAME: usize = ETHERNET_HDR_LEN_NO_TAG + LARGE_BODY;
+#[netstack_test]
+#[test_case(fposix_socket_packet::Kind::Network, 0, 0; "network no padding")]
+#[test_case(fposix_socket_packet::Kind::Link, 0, 0; "link no padding")]
+#[test_case(fposix_socket_packet::Kind::Network, ETH_HDR, 0; "network header only")]
+#[test_case(fposix_socket_packet::Kind::Link, ETH_HDR, 0; "link header only")]
+#[test_case(fposix_socket_packet::Kind::Network, MIN_ETH_FRAME, ETH_BODY ; "network min eth")]
+#[test_case(fposix_socket_packet::Kind::Link, MIN_ETH_FRAME, ETH_BODY; "link min eth")]
+#[test_case(fposix_socket_packet::Kind::Network, LARGE_FRAME, LARGE_BODY ; "network large body")]
+#[test_case(fposix_socket_packet::Kind::Link, LARGE_FRAME, LARGE_BODY; "link large body")]
+async fn device_minimum_tx_frame_size<N: Netstack>(
+    name: &str,
+    socket_kind: fposix_socket_packet::Kind,
+    min_tx_len: usize,
+    expected_body_len: usize,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create source realm");
+
+    let (tun, netdevice) =
+        netstack_testing_common::devices::create_tun_device_with(fnet_tun::DeviceConfig {
+            base: Some(fnet_tun::BaseDeviceConfig {
+                min_tx_buffer_length: Some(min_tx_len.try_into().unwrap()),
+                ..fnet_tun::BaseDeviceConfig::EMPTY
+            }),
+            blocking: Some(true),
+            ..fnet_tun::DeviceConfig::EMPTY
+        });
+    let (tun_port, dev_port) =
+        netstack_testing_common::devices::create_eth_tun_port(&tun, 1, SOURCE_MAC_ADDRESS).await;
+
+    let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
+    let mut port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
+    let (control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+            .expect("create proxy");
+    device_control
+        .create_interface(&mut port_id, server_end, fnet_interfaces_admin::Options::EMPTY)
+        .expect("create interface");
+    assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
+    tun_port.set_online(true).await.expect("can set online");
+
+    let id = NonZeroU64::new(control.get_id().await.expect("get ID")).unwrap();
+
+    /// Arbitrary Ethernet frame type that doesn't correspond to any frames
+    /// normally sent by the netstack.
+    const ETHERTYPE: u16 = 1600;
+
+    fn expected_frame(body_len: usize) -> Buf<Vec<u8>> {
+        Buf::new(vec![0; body_len], ..)
+            .encapsulate(EthernetFrameBuilder::new(
+                SOURCE_MAC_ADDRESS.into_ext(),
+                TARGET_MAC_ADDRESS.into_ext(),
+                ETHERTYPE.into(),
+                0,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .into_inner()
+    }
+
+    // Send an ethernet frame with an empty body from a packet socket to see how
+    // much padding is applied.
+    let socket = realm.packet_socket(socket_kind).await.expect("can create socket");
+
+    let message = match socket_kind {
+        fposix_socket_packet::Kind::Link => expected_frame(0),
+        fposix_socket_packet::Kind::Network => Buf::new(vec![], ..),
+    };
+
+    let sent = socket
+        .send_to(
+            message.as_ref(),
+            &libc::sockaddr_ll::from(EthernetSockaddr {
+                interface_id: Some(id),
+                addr: TARGET_MAC_ADDRESS.into_ext(),
+                protocol: ETHERTYPE.into(),
+            })
+            .into_sockaddr(),
+        )
+        .expect("can send");
+    assert_eq!(sent, message.as_ref().len());
+
+    let full_frame: Vec<u8> = async {
+        loop {
+            let frame = tun.read_frame().await.expect("can read").expect("has frame").data.unwrap();
+            let mut body = &frame[..];
+
+            match EthernetFrame::parse(&mut body, EthernetFrameLengthCheck::NoCheck) {
+                Ok(ethernet) => {
+                    if ethernet.ethertype().map_or(false, |e| e == EtherType::from(ETHERTYPE)) {
+                        break frame;
+                    }
+                }
+                Err(e) => {
+                    // We're looking for an Ethernet frame, so ignore anything
+                    // that doesn't parse as one.
+                    let _: ParseError = e;
+                }
+            }
+        }
+    }
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || panic!("failed to find sent frame"))
+    .await;
+
+    assert_eq!(full_frame, expected_frame(expected_body_len).as_ref());
 }

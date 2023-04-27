@@ -10,7 +10,7 @@ use std::fmt::Display;
 use fidl_fuchsia_net as fidl;
 
 use anyhow;
-use net_types::{ip, Witness as _};
+use net_types::{ethernet, ip, Witness as _};
 
 /// Extension trait to provides access to FIDL types.
 pub trait NetTypesIpAddressExt: ip::IpAddress {
@@ -212,6 +212,18 @@ impl FromExt<fidl::Ipv4SocketAddress> for fidl::SocketAddress {
 impl FromExt<fidl::Ipv6SocketAddress> for fidl::SocketAddress {
     fn from_ext(f: fidl::Ipv6SocketAddress) -> fidl::SocketAddress {
         fidl::SocketAddress::Ipv6(f)
+    }
+}
+
+impl FromExt<fidl::MacAddress> for ethernet::Mac {
+    fn from_ext(fidl::MacAddress { octets }: fidl::MacAddress) -> Self {
+        ethernet::Mac::new(octets)
+    }
+}
+
+impl FromExt<ethernet::Mac> for fidl::MacAddress {
+    fn from_ext(mac: ethernet::Mac) -> fidl::MacAddress {
+        fidl::MacAddress { octets: mac.bytes() }
     }
 }
 

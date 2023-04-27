@@ -23,6 +23,7 @@ use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul as fnetemul;
 use fidl_fuchsia_netemul_network as fnetemul_network;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
 use fuchsia_zircon as zx;
 
@@ -472,6 +473,24 @@ impl<'a> TestRealm<'a> {
             .context("failed to connect to socket provider")?;
         let sock = socket_provider
             .socket(domain, &mut association)
+            .await
+            .context("failed to call socket")?
+            .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
+            .context("failed to create socket")?;
+
+        Ok(fdio::create_fd(sock.into()).context("failed to create fd")?)
+    }
+
+    /// Creates a [`socket2::Socket`] backed by the implementation of
+    /// [`fuchsia.posix.socket.packet/Provider`] in this realm.
+    ///
+    /// [`fuchsia.posix.socket.packet/Provider`]: fposix_socket_packet::ProviderMarker
+    pub async fn packet_socket(&self, kind: fposix_socket_packet::Kind) -> Result<socket2::Socket> {
+        let socket_provider = self
+            .connect_to_protocol::<fposix_socket_packet::ProviderMarker>()
+            .context("failed to connect to socket provider")?;
+        let sock = socket_provider
+            .socket(kind)
             .await
             .context("failed to call socket")?
             .map_err(|e| std::io::Error::from_raw_os_error(e.into_primitive()))
