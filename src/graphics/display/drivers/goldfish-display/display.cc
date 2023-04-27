@@ -18,7 +18,6 @@
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
-#include <zircon/pixelformat.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
@@ -51,11 +50,9 @@ const char* kTag = "goldfish-display";
 
 constexpr uint64_t kPrimaryDisplayId = 1;
 
-constexpr zx_pixel_format_t kPixelFormats[] = {
-    ZX_PIXEL_FORMAT_RGB_x888,
-    ZX_PIXEL_FORMAT_ARGB_8888,
-    ZX_PIXEL_FORMAT_BGR_888x,
-    ZX_PIXEL_FORMAT_ABGR_8888,
+constexpr any_pixel_format_t kPixelFormats[] = {
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 
 constexpr uint32_t FB_WIDTH = 1;
