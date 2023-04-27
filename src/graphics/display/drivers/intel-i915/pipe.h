@@ -154,14 +154,18 @@ class Pipe {
   // that is still in the linked list |config_stamps_|.
   // If no configuration has been applied to the device, it stores
   // |std::nullopt|.
-  std::optional<uint64_t> config_stamps_front_seqno_;
+  // TODO(fxbug.dev/126254): Remove once the config stamps are guaranteed to be
+  // in strictly increasing order.
+  std::optional<int64_t> sequence_number_of_config_stamps_front;
 
   // The pipe registers only store the handle (address) of the images that are
   // being displayed. In order to get the config stamp for each layer and for
   // each configuration, we need to keep a mapping from *image handle* to the
   // *seqno of the configuration* so that we can know which layer has the oldest
   // configuration.
-  std::unordered_map<uintptr_t, uint64_t> latest_config_seqno_of_image_;
+  // TODO(fxbug.dev/126254): Remove once the config stamps are guaranteed to be
+  // in strictly increasing order.
+  std::unordered_map<uintptr_t, int64_t> sequence_number_of_latest_config_stamp_with_image_;
 };
 
 class PipeSkylake : public Pipe {
