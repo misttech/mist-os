@@ -1264,6 +1264,9 @@
                 // Fails in updated image, but passes with current. Will be removed after rolling
                 // new images.
                 "RlimitTest.SetRlimitHigher",
+
+                // Require robust pthread mutexes.
+                "RobustFutexTest.*",
             ],
         },
     ],
