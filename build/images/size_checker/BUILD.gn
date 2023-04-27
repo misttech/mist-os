@@ -121,7 +121,7 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
   }
 
   action("convert_size_limits_to_size_budgets") {
-    script = "//build/assembly/scripts/convert_size_limits.py"
+    script = "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py"
     inputs = [
       "$root_build_dir/size_checker.json",
       _image_assembly_config,

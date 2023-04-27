@@ -30,7 +30,7 @@ python_host_test("compare_json_list_test") {
 
 python_host_test("convert_size_limits_test") {
   main_source = "convert_size_limits_test.py"
-  sources = [ "convert_size_limits.py" ]
+  sources = [ "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py" ]
   libraries = [ "//third_party/parameterized" ]
 }
 

@@ -14,8 +14,3 @@ py_binary(
         "//build/python/modules:depfile",
     ],
 )
-
-py_binary(
-    name = "convert_size_limits",
-    srcs = ["convert_size_limits.py"],
-)

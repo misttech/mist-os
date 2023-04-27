@@ -145,3 +145,8 @@ py_binary(
     srcs = ["size_report_merger.py"],
     python_version = "PY3",
 )
+
+py_binary(
+    name = "convert_size_limits",
+    srcs = ["convert_size_limits.py"],
+)
