@@ -179,7 +179,8 @@ template("clang_toolchain") {
     if (enable_rust) {
       # Configure Rust remote builds.
       _rustc_wrapper = ""
-      _rust_concurrent_jobs = ""
+      _rust_concurrent_jobs = {
+      }
       if (rust_rbe_enable) {
         assert(
             rust_rbe_check == "none" || rust_rbe_check == "consistency" ||
@@ -239,10 +240,10 @@ template("clang_toolchain") {
         _rustc_wrapper = string_join(" ",
                                      _rustc_wrapper_tokens + _rewrapper_flags +
                                          [ "--" ]) + " "
+        _rust_concurrent_jobs = concurrent_jobs.remote
+      } else {
+        _rust_concurrent_jobs = concurrent_jobs.local
       }
-      _rust_concurrent_jobs = concurrent_jobs.remote
-    } else {
-      _rust_concurrent_jobs = concurrent_jobs.local
     }
 
     # Set all tools to defaults

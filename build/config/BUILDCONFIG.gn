@@ -587,6 +587,7 @@ set_defaults("rust_proc_macro") {
 set_defaults("loadable_module") {
   configs = default_shared_library_configs
 }
+
 set_defaults("executable") {
   configs = default_executable_configs
 }
@@ -920,6 +921,18 @@ foreach(_target_type,
                                "testonly",
                                "visibility",
                              ])
+
+      # There isn't a defined "remote pool", it's just the full parallelism that
+      # is used by ninja (-j) argument.  If the action doesn't flag that it is
+      # _specifically_ to use the remote pool, make it use the local pool
+      # instead, to reduce contention and thrashing on I/O.
+      _use_remote_pool =
+          defined(invoker.use_remote_pool) && invoker.use_remote_pool
+      if (!_use_remote_pool) {
+        if (!defined(pool)) {
+          pool = "//build/config:local($default_toolchain)"
+        }
+      }
 
       # Accumulate action parameters (inputs, script, args, etc.)
       # over a series of transformations.
