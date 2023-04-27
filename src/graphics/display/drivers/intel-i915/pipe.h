@@ -166,6 +166,14 @@ class Pipe {
   // TODO(fxbug.dev/126254): Remove once the config stamps are guaranteed to be
   // in strictly increasing order.
   std::unordered_map<uintptr_t, int64_t> sequence_number_of_latest_config_stamp_with_image_;
+
+  // If the (there can be at most one) background color layer is enabled on the
+  // pipe, we need to keep the sequence number of the configuration that enables
+  // the color layer, so that we can get the correct config stamp on a Vsync
+  // event of a frame with background color.
+  // TODO(fxbug.dev/126254): Remove once the config stamps are guaranteed to be
+  // in strictly increasing order.
+  std::optional<int64_t> sequence_number_of_config_with_color_layer_;
 };
 
 class PipeSkylake : public Pipe {

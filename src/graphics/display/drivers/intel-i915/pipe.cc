@@ -450,7 +450,11 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
     bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));
     bottom_color.set_g(encode_pipe_color_component(static_cast<uint8_t>(color >> 8)));
     bottom_color.set_b(encode_pipe_color_component(static_cast<uint8_t>(color)));
+    sequence_number_of_config_with_color_layer_ = sequence_number_of_current_config_stamp;
+  } else {
+    sequence_number_of_config_with_color_layer_ = std::nullopt;
   }
+
   regs.pipe_bottom_color = bottom_color.reg_value();
 
   bool scaler_1_claimed = false;
@@ -767,6 +771,12 @@ void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
 std::optional<config_stamp_t> Pipe::GetVsyncConfigStamp(
     const std::vector<uint64_t>& image_handles) {
   int64_t sequence_number_of_oldest_config_on_vsync_frame = std::numeric_limits<int64_t>::max();
+
+  if (sequence_number_of_config_with_color_layer_) {
+    sequence_number_of_oldest_config_on_vsync_frame =
+        std::min(sequence_number_of_oldest_config_on_vsync_frame,
+                 *sequence_number_of_config_with_color_layer_);
+  }
   for (const uint64_t handle : image_handles) {
     auto config_it = sequence_number_of_latest_config_stamp_with_image_.find(handle);
     if (config_it == sequence_number_of_latest_config_stamp_with_image_.end()) {
