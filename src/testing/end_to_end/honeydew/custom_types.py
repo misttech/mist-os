@@ -5,6 +5,7 @@
 """Custom data types."""
 
 import enum
+from typing import NamedTuple
 
 
 class LEVEL(enum.Enum):
@@ -12,3 +13,14 @@ class LEVEL(enum.Enum):
     INFO = enum.auto()
     WARNING = enum.auto()
     ERROR = enum.auto()
+
+
+class TargetSshAddress(NamedTuple):
+    """Tuple that holds target's ssh address information.
+
+    Args:
+        ip: Target's SSH IP Address
+        port: Target's SSH port
+    """
+    ip: str
+    port: int

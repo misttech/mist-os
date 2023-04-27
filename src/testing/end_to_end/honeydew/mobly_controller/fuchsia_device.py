@@ -33,7 +33,6 @@ def create(
             * ssh_key - Absolute path to the SSH private key file needed to SSH
                 into fuchsia device.
             * ssh_user - Username to be used to SSH into fuchsia device.
-            * ip_address - Device IP (V4|V6) address.
 
     Returns:
         A list of FuchsiaDevice objects.
@@ -49,8 +48,7 @@ def create(
             honeydew.create_device(
                 device_name=device_config["name"],
                 ssh_private_key=device_config["ssh_private_key"],
-                ssh_user=device_config["ssh_user"],
-                device_ip_address=device_config.get("ip_address")))
+                ssh_user=device_config["ssh_user"]))
     return fuchsia_devices
 
 
@@ -140,9 +138,8 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         "ssh_private_key":
             "",
         "ssh_user":
-            config.get("ssh_user", fuchsia_device_interface.DEFAULT_SSH_USER),
-        "ip_address":
-            ""
+            config.get(
+                "ssh_user", fuchsia_device_interface.DEFAULTS["SSH_USER"]),
     }
 
     # Sample testbed file format for FuchsiaDevice controller used in infra...
@@ -167,13 +164,6 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         device_config["ssh_private_key"] = config["ssh_key"]
     else:
         raise RuntimeError("Missing SSH private key in the config")
-
-    if config.get("ip_address"):
-        device_config["ip_address"] = config["ip_address"]
-    elif config.get("ipv6"):
-        device_config["ip_address"] = config["ipv6"]
-    elif config.get("ipv4"):
-        device_config["ip_address"] = config["ipv4"]
 
     _LOGGER.debug(
         "Updated FuchsiaDevice controller config after the validation is '%s'",

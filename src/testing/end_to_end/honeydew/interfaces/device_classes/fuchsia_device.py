@@ -5,7 +5,7 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import bluetooth, component
@@ -13,7 +13,9 @@ from honeydew.interfaces.auxiliary_devices import \
     power_switch as power_switch_interface
 from honeydew.utils import ffx_cli, properties
 
-DEFAULT_SSH_USER = "fuchsia"
+DEFAULTS: Dict[str, Any] = {
+    "SSH_USER": "fuchsia",
+}
 
 
 class FuchsiaDevice(abc.ABC):
@@ -31,9 +33,6 @@ class FuchsiaDevice(abc.ABC):
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
 
-        device_ip_address: Device IP (V4|V6) address. If not provided, attempts
-            to resolve automatically.
-
     Raises:
         errors.FuchsiaDeviceError: Failed to instantiate.
     """
@@ -42,13 +41,15 @@ class FuchsiaDevice(abc.ABC):
             self,
             device_name: str,
             ssh_private_key: str,
-            ssh_user: str = DEFAULT_SSH_USER,
-            device_ip_address: Optional[str] = None) -> None:
+            ssh_user: str = DEFAULTS["SSH_USER"]) -> None:
         self.name: str = device_name
+
         self._ssh_private_key: str = ssh_private_key
         self._ssh_user: str = ssh_user
-        self._ip_address: str = device_ip_address or ffx_cli.get_target_address(
-            self.name)
+
+        target_ssh_address = ffx_cli.get_target_ssh_address(self.name)
+        self._ip_address: str = target_ssh_address.ip
+        self._ssh_port: int = target_ssh_address.port
 
     # List all the persistent properties in alphabetical order
     @properties.PersistentProperty

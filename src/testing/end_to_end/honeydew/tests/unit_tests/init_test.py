@@ -10,6 +10,7 @@ from typing import Any, Dict, Set, Type
 from unittest import mock
 
 import honeydew
+from honeydew import custom_types
 from honeydew.device_classes import generic_fuchsia_device, x64
 from honeydew.interfaces.device_classes import fuchsia_device
 from parameterized import parameterized
@@ -36,15 +37,15 @@ class InitTests(unittest.TestCase):
         autospec=True)
     @mock.patch.object(
         honeydew.fuchsia_device.ffx_cli,
-        "get_target_address",
-        return_value="12.34.56.78",
+        "get_target_ssh_address",
+        return_value=custom_types.TargetSshAddress(ip="11.22.33.44", port=22),
         autospec=True)
     @mock.patch(
         "honeydew._get_device_class",
         return_value=generic_fuchsia_device.GenericFuchsiaDevice,
         autospec=True)
     def test_create_device_return_default_device(
-            self, mock_get_device_class, mock_get_target_address,
+            self, mock_get_device_class, mock_get_target_ssh_address,
             mock_start_sl4f_server) -> None:
         """Test case for honeydew.create_device() where it returns default
         fuchsia device object."""
@@ -56,7 +57,7 @@ class InitTests(unittest.TestCase):
             generic_fuchsia_device.GenericFuchsiaDevice)
 
         mock_get_device_class.assert_called_once_with(device_name)
-        mock_get_target_address.assert_called_once_with(device_name)
+        mock_get_target_ssh_address.assert_called_once_with(device_name)
         mock_start_sl4f_server.assert_called_once()
 
     @mock.patch.object(
@@ -65,13 +66,13 @@ class InitTests(unittest.TestCase):
         autospec=True)
     @mock.patch.object(
         honeydew.fuchsia_device.ffx_cli,
-        "get_target_address",
-        return_value="12.34.56.78",
+        "get_target_ssh_address",
+        return_value=custom_types.TargetSshAddress(ip="11.22.33.44", port=22),
         autospec=True)
     @mock.patch(
         "honeydew._get_device_class", return_value=x64.X64, autospec=True)
     def test_create_device_return_specific_device(
-            self, mock_get_device_class, mock_get_target_address,
+            self, mock_get_device_class, mock_get_target_ssh_address,
             mock_start_sl4f_server) -> None:
         """Test case for honeydew.create_device() where it returns a specific
         fuchsia device object."""
@@ -81,7 +82,7 @@ class InitTests(unittest.TestCase):
                 device_name=device_name, ssh_private_key="/tmp/pkey"), x64.X64)
 
         mock_get_device_class.assert_called_once_with(device_name)
-        mock_get_target_address.assert_called_once_with(device_name)
+        mock_get_target_ssh_address.assert_called_once_with(device_name)
         mock_start_sl4f_server.assert_called_once()
 
     @mock.patch(

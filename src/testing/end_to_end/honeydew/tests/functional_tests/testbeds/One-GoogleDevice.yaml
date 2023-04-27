@@ -4,4 +4,3 @@ TestBeds:
       FuchsiaDevice:
         - name: fuchsia-ac67-847a-2e50
           ssh_private_key: ~/.ssh/fuchsia_ed25519
-          ip_address: fe80::5f3f:a069:94e6:aa67%zx

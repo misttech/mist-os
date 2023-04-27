@@ -11,23 +11,26 @@ from http.client import RemoteDisconnected
 from typing import Any, Dict
 from unittest import mock
 
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.device_classes import fuchsia_device_base
 from parameterized import parameterized
 
 # pylint: disable=protected-access
-_INPUT_ARGS: Dict[str, str] = {
+_INPUT_ARGS: Dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
-    "device_ip_address": "11.22.33.44"
 }
 
 _MOCK_ARGS: Dict[str, Any] = {
-    "device_name": "fuchsia-emulator",
-    "device_ip_address": "12.34.56.78",
-    "device_type": "qemu-x64",
-    "sl4f_request": fuchsia_device_base._SL4F_METHODS["GetDeviceName"],
+    "device_name":
+        "fuchsia-emulator",
+    "target_ssh_address":
+        custom_types.TargetSshAddress(ip="11.22.33.44", port=22),
+    "device_type":
+        "qemu-x64",
+    "sl4f_request":
+        fuchsia_device_base._SL4F_METHODS["GetDeviceName"],
     "sl4f_response": {
         "id": "",
         "result": "fuchsia-emulator",
@@ -37,6 +40,8 @@ _MOCK_ARGS: Dict[str, Any] = {
         "id": "",
         "error": "some error",
     },
+    "sl4f_port":
+        fuchsia_device_base._SL4F_PORT["LOCAL"],
 }
 
 _BASE64_ENCODED_STR = "some base64 encoded string=="
@@ -57,13 +62,18 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
+        "_get_device_sl4f_port",
+        return_value=fuchsia_device_base._SL4F_PORT["LOCAL"],
+        autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
         "send_sl4f_command",
         return_value={"result": _INPUT_ARGS["device_name"]},
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.fuchsia_device.ffx_cli,
-        "get_target_address",
-        return_value=_MOCK_ARGS["device_ip_address"],
+        "get_target_ssh_address",
+        return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.subprocess,
@@ -71,21 +81,23 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         return_value=b"some output",
         autospec=True)
     def setUp(
-            self, mock_check_output, mock_get_target_address,
-            mock_send_sl4f_command) -> None:
+            self, mock_check_output, mock_get_target_ssh_address,
+            mock_send_sl4f_command, mock_get_device_sl4f_port) -> None:
         super().setUp()
 
         self.fd_obj = fuchsia_device_base.FuchsiaDeviceBase(
             device_name=_INPUT_ARGS["device_name"],
             ssh_private_key=_INPUT_ARGS["ssh_private_key"])
 
-        mock_get_target_address.assert_called_once()
+        mock_get_target_ssh_address.assert_called_once()
 
         mock_send_sl4f_command.assert_called_once_with(
             self.fd_obj,
             method=fuchsia_device_base._SL4F_METHODS["GetDeviceName"])
 
         mock_check_output.assert_called_once()
+
+        mock_get_device_sl4f_port.assert_called_once()
 
     # List all the tests related to __init__ in alphabetical order
     @parameterized.expand(
@@ -98,39 +110,19 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                             "device_name": _INPUT_ARGS["device_name"],
                             "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
                         },
-                    "optional_params":
-                        {
-                            "ssh_user":
-                                _INPUT_ARGS["ssh_user"],
-                            "device_ip_address":
-                                _INPUT_ARGS["device_ip_address"]
-                        },
-                },),
-            (
-                {
-                    "label": "no_ssh_user",
-                    "mandatory_params":
-                        {
-                            "device_name": _INPUT_ARGS["device_name"],
-                            "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
-                        },
-                    "optional_params":
-                        {
-                            "device_ip_address":
-                                _INPUT_ARGS["device_ip_address"]
-                        },
-                },),
-            (
-                {
-                    "label": "no_device_ip_address",
-                    "mandatory_params":
-                        {
-                            "device_name": _INPUT_ARGS["device_name"],
-                            "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
-                        },
                     "optional_params": {
                         "ssh_user": _INPUT_ARGS["ssh_user"],
                     },
+                },),
+            (
+                {
+                    "label": "no_optional_params",
+                    "mandatory_params":
+                        {
+                            "device_name": _INPUT_ARGS["device_name"],
+                            "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
+                        },
+                    "optional_params": {},
                 },),
         ],
         name_func=_custom_test_name_func)
@@ -140,7 +132,8 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.fuchsia_device.ffx_cli,
-        "get_target_address",
+        "get_target_ssh_address",
+        return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.subprocess,
@@ -149,7 +142,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_fuchsia_device_base_init(
             self, parameterized_dict, mock_check_output,
-            mock_get_target_address, mock_send_sl4f_command) -> None:
+            mock_get_target_ssh_address, mock_send_sl4f_command) -> None:
         """Verify FuchsiaDeviceBase class instantiation."""
         optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
@@ -171,10 +164,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_send_sl4f_command.assert_called_once_with(
             fd_obj, method=fuchsia_device_base._SL4F_METHODS["GetDeviceName"])
 
-        if "device_ip_address" not in optional_params:
-            mock_get_target_address.assert_called_once()
-        else:
-            mock_get_target_address.assert_not_called()
+        mock_get_target_ssh_address.assert_called_once()
 
     # List all the tests related to static properties in alphabetical order
     @mock.patch.object(
@@ -490,38 +480,79 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_run_ssh_command_on_host.assert_called_with(
             self.fd_obj, command=fuchsia_device_base._CMDS["ECHO"])
 
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label":
+                        "ipv4_address",
+                    "device_ip_address":
+                        "12.34.56.78",
+                    "expected_sl4f_port":
+                        fuchsia_device_base._SL4F_PORT["LOCAL"],
+                },),
+            (
+                {
+                    "label":
+                        "ipv6_address",
+                    "device_ip_address":
+                        "fe80::3804:df7d:daa8:ce6c",
+                    "expected_sl4f_port":
+                        fuchsia_device_base._SL4F_PORT["LOCAL"],
+                },),
+            (
+                {
+                    "label":
+                        "ipv6_localhost_address",
+                    "device_ip_address":
+                        "::1",
+                    "expected_sl4f_port":
+                        fuchsia_device_base._SL4F_PORT["REMOTE"],
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    def test_get_device_sl4f_port(self, parameterized_dict):
+        """Testcase for FuchsiaDeviceBase._get_device_sl4f_port()"""
+        self.assertEqual(
+            self.fd_obj._get_device_sl4f_port(
+                device_ip_address=parameterized_dict["device_ip_address"]),
+            parameterized_dict["expected_sl4f_port"])
+
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
         fuchsia_device_base.ffx_cli,
-        "get_target_address",
+        "get_target_ssh_address",
         side_effect=[
-            errors.FuchsiaDeviceError, _MOCK_ARGS["device_ip_address"]
+            errors.FuchsiaDeviceError, _MOCK_ARGS["target_ssh_address"]
         ],
         autospec=True)
-    def test_get_device_ip_address_success(
-            self, mock_get_target_address, mock_sleep) -> None:
-        """Testcase for FuchsiaDeviceBase._get_device_ip_address() success
+    def test_get_device_ssh_address_success(
+            self, mock_get_target_ssh_address, mock_sleep) -> None:
+        """Testcase for FuchsiaDeviceBase._get_device_ssh_address() success
         case"""
-        self.fd_obj._get_device_ip_address(timeout=5)
+        self.assertEqual(
+            self.fd_obj._get_device_ssh_address(timeout=5),
+            _MOCK_ARGS["target_ssh_address"])
 
-        mock_get_target_address.assert_called_with(self.fd_obj.name, timeout=5)
+        self.assertEqual(mock_get_target_ssh_address.call_count, 2)
         mock_sleep.assert_called_with(1)
 
     @mock.patch.object(
         fuchsia_device_base.ffx_cli,
-        "get_target_address",
+        "get_target_ssh_address",
         side_effect=errors.FuchsiaDeviceError,
         autospec=True)
-    def test_get_device_ip_address_fail(self, mock_get_target_address) -> None:
-        """Testcase for FuchsiaDeviceBase._get_device_ip_address() failure
+    def test_get_device_ssh_address_fail(
+            self, mock_get_target_ssh_address) -> None:
+        """Testcase for FuchsiaDeviceBase._get_device_ssh_address() failure
         case"""
 
         with self.assertRaisesRegex(
                 fuchsia_device_base.errors.FuchsiaDeviceError,
                 f"Failed to get the ip address of '{self.fd_obj.name}'."):
-            self.fd_obj._get_device_ip_address(timeout=2)
+            self.fd_obj._get_device_ssh_address(timeout=2)
 
-        mock_get_target_address.assert_called_with(self.fd_obj.name, timeout=2)
+        mock_get_target_ssh_address.assert_called()
 
     @parameterized.expand(
         [
@@ -703,21 +734,29 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_wait_for_online",
+        "_get_device_sl4f_port",
+        return_value=_MOCK_ARGS["sl4f_port"],
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_get_device_ip_address",
+        "_get_device_ssh_address",
+        return_value=_MOCK_ARGS["target_ssh_address"],
+        autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_wait_for_online",
         autospec=True)
     def test_wait_for_bootup_complete(
-            self, mock_get_device_ip_address, mock_wait_for_online,
-            mock_check_ssh_connection_to_device, mock_start_sl4f_server,
-            mock_device_type, mock_bluetooth_sys_init) -> None:
+            self, mock_wait_for_online, mock_get_device_ssh_address,
+            mock_get_device_sl4f_port, mock_check_ssh_connection_to_device,
+            mock_start_sl4f_server, mock_device_type,
+            mock_bluetooth_sys_init) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_bootup_complete()"""
         self.fd_obj._wait_for_bootup_complete(timeout=10)
 
-        mock_get_device_ip_address.assert_called_once()
         mock_wait_for_online.assert_called_once()
+        mock_get_device_ssh_address.assert_called_once()
+        mock_get_device_sl4f_port.assert_called_once()
         mock_check_ssh_connection_to_device.assert_called_once()
         mock_start_sl4f_server.assert_called_once()
         mock_device_type.assert_called_once()

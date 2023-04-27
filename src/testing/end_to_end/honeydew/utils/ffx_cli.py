@@ -9,9 +9,9 @@ import logging
 import subprocess
 import tempfile
 from shutil import rmtree
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from honeydew import errors
+from honeydew import custom_types, errors
 
 _FFX_CMDS: Dict[str, List[str]] = {
     "TARGET_SHOW": ["target", "show", "--json"],
@@ -23,8 +23,8 @@ _TIMEOUTS: Dict[str, float] = {
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_ISOLATE_DIR = None
-_LOGS_DIR = None
+_ISOLATE_DIR: Optional[str] = None
+_LOGS_DIR: Optional[str] = None
 
 
 # List all the public methods in alphabetical order
@@ -130,16 +130,17 @@ def ffx_target_show(
         raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
 
-def get_target_address(
-        target: str, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
-    """Returns the target ip address.
+def get_target_ssh_address(
+        target: str,
+        timeout: float = _TIMEOUTS["FFX_CLI"]) -> custom_types.TargetSshAddress:
+    """Returns the target's ssh ip address and port information.
 
     Args:
         target: Target name.
         timeout: Timeout to wait for the ffx command to return.
 
     Returns:
-        Target IP address.
+        (Target SSH IP Address, Target SSH Port)
 
     Raises:
         errors.FfxCommandError: In case of failure.
@@ -175,7 +176,9 @@ def get_target_address(
             target_entry["child"], label_value="ssh_address")
         # in 'fe80::92bf:167b:19c3:58f0%qemu:22', ":22" is SSH port.
         # Ports can be 1-5 characters, clip off everything after the last ':'.
-        return ssh_address_entry["value"].rsplit(":", 1)[0]
+        ssh_info: List[str] = ssh_address_entry["value"].rsplit(":", 1)
+        return custom_types.TargetSshAddress(
+            ip=ssh_info[0], port=int(ssh_info[1]))
     except Exception as err:  # pylint: disable=broad-except
         raise errors.FfxCommandError(
             f"Failed to get the ip address of {target}") from err

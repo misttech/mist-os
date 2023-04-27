@@ -12,16 +12,4 @@ class GenericFuchsiaDevice(fuchsia_device_base.FuchsiaDeviceBase):
 
     This class will extend from FuchsiaDeviceBase and adds all the capabilities
     supported by Fuchsia platform irrespective of device type.
-
-    Args:
-        device_name: Device name returned by `ffx target list`.
-
-        ssh_private_key: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device.
-
-        ssh_user: Username to be used to SSH into fuchsia device.
-            Default is "fuchsia".
-
-        device_ip_address: Device IP (V4|V6) address. If not provided, attempts
-            to resolve automatically.
     """

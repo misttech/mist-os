@@ -4,4 +4,3 @@ TestBeds:
       FuchsiaDevice:
         - name: fuchsia-emulator
           ssh_private_key: ~/.ssh/fuchsia_ed25519
-          ip_address: fe80::71bb:d31c:2ddc:ef15%qemu

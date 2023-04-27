@@ -189,11 +189,9 @@ follow the below instructions every time HoneyDew code is changed:
     `pip3 show parameterized`
 * Run the below commands sequence
 ```sh
-# For coverage to identify `honeydew` code as it is not pip installer
-$ export PYTHONPATH="${PYTHONPATH}:${FUCHSIA_DIR}/src/testing/end_to_end"
-
-# CD to HoneyDew tests directory
-$ cd ${FUCHSIA_DIR}/src/testing/end_to_end/honeydew/tests
+# For coverage to identify `honeydew` code as it is not pip installed
+# CD to directory where `honeydew` folder exists
+$ cd ${FUCHSIA_DIR}/src/testing/end_to_end
 
 # Run unit tests using coverage tool which will run the tests
 $ coverage run -m unittest discover --top-level-directory ~/fuchsia/src/testing/end_to_end/honeydew --start-directory ~/fuchsia/src/testing/end_to_end/honeydew/tests/unit_tests --pattern "*_test.py"

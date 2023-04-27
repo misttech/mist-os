@@ -85,11 +85,10 @@ TestBeds:
       FuchsiaDevice:
         - name: $FUCHSIA_NODENAME
           ssh_private_key: $PKEY
-          ip_address: $SSH_IP_ADDRESS
 ```
 
-Where `$FUCHSIA_NODENAME`, `$PKEY` and `$SSH_IP_ADDRESS` need to be manually
-substituted to fit your local development environment.
+Where `$FUCHSIA_NODENAME` and `$PKEY` need to be manually substituted to fit
+your local development environment.
 
 #### `name` attribute of FuchsiaDevice
 `name: $FUCHSIA_NODENAME` is the device-under-test that's accessible from the
@@ -128,30 +127,6 @@ path:
 
 ```sh
 $ head -1 $FUCHSIA_DIR/.fx-ssh-path
-```
-
-#### `ip_address` attribute of FuchsiaDevice
-`ip_address: $SSH_IP_ADDRESS` is the SSH IP address assigned to the device.
-This is the same IP address `fx shell` command also uses to communicate with the
-device from host.
-
-You can get this by value running `fx shell -vvv`
-```sh
-$ fx shell -vvv
-OpenSSH_9.2p1, OpenSSL 3.0.7 1 Nov 2022
-debug1: Reading configuration data ~/fuchsia/out/default/ssh-keys/ssh_config
-debug1: ~/fuchsia/out/default/ssh-keys/ssh_config line 7: Applying options for *
-debug2: resolve_canonicalize: hostname fe80::71bb:d31c:2ddc:ef15%qemu is address
-...
-$
-```
-The `$SSH_IP_ADDRESS` in the above example would be
-`fe80::71bb:d31c:2ddc:ef15%qemu`.
-
-A quick way to confirm that this $SSH_IP_ADDRESS value is correct is by
-successfully running the below command:
-```sh
-$ ssh -oPasswordAuthentication=no -oStrictHostKeyChecking=no -oConnectTimeout=3 -i $PKEY fuchsia@$SSH_IP_ADDRESS ls
 ```
 
 ### Lacewing test module

@@ -26,10 +26,9 @@ _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
 # pytype: disable=not-instantiable
 # List all the public methods in alphabetical order
 def create_device(
-        device_name: str,
-        ssh_private_key: str,
-        ssh_user: str = fuchsia_device.DEFAULT_SSH_USER,
-        device_ip_address: Optional[str] = None
+    device_name: str,
+    ssh_private_key: str,
+    ssh_user: str = fuchsia_device.DEFAULTS["SSH_USER"]
 ) -> fuchsia_device.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -46,9 +45,6 @@ def create_device(
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
 
-        device_ip_address: Device IP (V4|V6) address. If not provided, attempts
-            to resolve automatically.
-
     Returns:
         Fuchsia device object
 
@@ -56,8 +52,7 @@ def create_device(
         errors.FuchsiaDeviceError: Failed to create Fuchsia device object.
     """
     device_class = _get_device_class(device_name)
-    device_class_args: Tuple[str, str, str, str | None] = (
-        device_name, ssh_private_key, ssh_user, device_ip_address)
+    device_class_args = (device_name, ssh_private_key, ssh_user)
 
     return device_class(*device_class_args)
 

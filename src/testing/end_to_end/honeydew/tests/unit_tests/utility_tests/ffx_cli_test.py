@@ -9,13 +9,15 @@ import unittest
 from typing import Any, Dict, List
 from unittest import mock
 
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.utils import ffx_cli
 from parameterized import parameterized
 
 _SSH_ADDRESS = "fe80::3804:df7d:daa8:ce6c"
 _SSH_ADDRESS_SCOPE = "qemu"
-_SSH_PORT = "8022"
+_SSH_PORT = 8022
+_TARGET_SSH_ADDRESS = custom_types.TargetSshAddress(
+    ip=f"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}", port=_SSH_PORT)
 
 _FFX_TARGET_SHOW_OUTPUT: bytes = (
     r'[{"title":"Target","label":"target","description":"",'
@@ -202,12 +204,12 @@ class FfxCliTests(unittest.TestCase):
 
         self.mock_check_output.assert_called_once()
 
-    def test_get_target_address(self) -> None:
-        """Verify get_target_address returns ip address of fuchsia device."""
-        result: str = ffx_cli.get_target_address(target="fuchsia-emulator")
-        expected: str = f"{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}"
-
-        self.assertEqual(result, expected)
+    def test_get_target_ssh_address(self) -> None:
+        """Verify get_target_ssh_address returns SSH information of the fuchsia
+        device."""
+        self.assertEqual(
+            ffx_cli.get_target_ssh_address(target="fuchsia-emulator"),
+            _TARGET_SSH_ADDRESS)
 
         self.mock_check_output.assert_called_once()
 
@@ -228,12 +230,12 @@ class FfxCliTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_get_target_address_exception(self, parameterized_dict) -> None:
-        """Verify get_target_address raise exception in failure cases."""
+    def test_get_target_ssh_address_exception(self, parameterized_dict) -> None:
+        """Verify get_target_ssh_address raise exception in failure cases."""
         self.mock_check_output.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(errors.FfxCommandError):
-            ffx_cli.get_target_address(target="fuchsia-emulator")
+            ffx_cli.get_target_ssh_address(target="fuchsia-emulator")
 
         self.mock_check_output.assert_called_once()
 

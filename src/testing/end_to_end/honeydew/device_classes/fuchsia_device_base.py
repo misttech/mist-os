@@ -31,7 +31,13 @@ _CMDS: Dict[str, str] = {
     "START_SL4F": "start_sl4f",
 }
 
-_SL4F_PORT = 80
+_SL4F_PORT: Dict[str, int] = {
+    "LOCAL": 80,
+    # To support common Fuchsia.git in-tree remote workflow where users are
+    # running fx serve-remote
+    "REMOTE": 9080,
+}
+
 _SL4F_METHODS: Dict[str, str] = {
     "GetDeviceName": "device_facade.GetDeviceName",
     "GetDeviceInfo": "hwinfo_facade.HwinfoGetDeviceInfo",
@@ -59,8 +65,8 @@ _SSH_OPTIONS_LIST: List[str] = [
     f"-oConnectTimeout={_TIMEOUTS['SSH_COMMAND_ARG']}",
 ]
 _SSH_OPTIONS: str = " ".join(_SSH_OPTIONS_LIST)
-_SSH_COMMAND = \
-    "ssh {ssh_options} -i {ssh_private_key} {ssh_user}@{ip_address} {command}"
+_SSH_COMMAND = "ssh {ssh_options} -i {ssh_private_key} -p {ssh_port} " \
+               "{ssh_user}@{ip_address} {command}"
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -82,9 +88,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
 
-        device_ip_address: Device IP (V4|V6) address. If not provided, attempts
-            to resolve automatically.
-
     Raises:
         errors.FuchsiaDeviceError: Failed to instantiate.
     """
@@ -93,10 +96,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             self,
             device_name: str,
             ssh_private_key: str,
-            ssh_user: str = fuchsia_device.DEFAULT_SSH_USER,
-            device_ip_address: Optional[str] = None) -> None:
-        super().__init__(
-            device_name, ssh_private_key, ssh_user, device_ip_address)
+            ssh_user: str = fuchsia_device.DEFAULTS["SSH_USER"]) -> None:
+        super().__init__(device_name, ssh_private_key, ssh_user)
+        self._sl4f_port: int = self._get_device_sl4f_port(self._ip_address)
         self.start_sl4f_server()
 
     # List all the persistent properties in alphabetical order
@@ -318,9 +320,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         # pylint: disable=protected-access
         if ipaddress.ip_address(self._normalize_ip_addr(
                 self._ip_address)).version == 6:
-            url: str = f"http://[{self._ip_address}]:{_SL4F_PORT}"
+            url: str = f"http://[{self._ip_address}]:{self._sl4f_port}"
         else:
-            url = f"http://{self._ip_address}:{_SL4F_PORT}"
+            url = f"http://{self._ip_address}:{self._sl4f_port}"
 
         # id is required by the SL4F server to parse test_data but is not
         # currently used.
@@ -443,11 +445,31 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                 f"Failed to connect to '{self.name}' via SSH.")
         _LOGGER.info("%s is available via ssh.", self.name)
 
-    def _get_device_ip_address(self, timeout: float) -> str:
-        """Returns the device IP(V4|V6) address used for SSHing from host.
+    def _get_device_sl4f_port(self, device_ip_address: str) -> int:
+        """Returns the port on which SL4F server running on device is listening.
+
+        Args:
+            device_ip_address: Device IP address.
+
+        Returns:
+            SL4F Port
+        """
+        # Device addr is localhost, assume that means that ports were forwarded
+        # from a remote workstation/laptop with a device attached.
+        if ipaddress.ip_address(
+                self._normalize_ip_addr(device_ip_address)).is_loopback:
+            return _SL4F_PORT["REMOTE"]
+        return _SL4F_PORT["LOCAL"]
+
+    def _get_device_ssh_address(
+            self, timeout: float) -> custom_types.TargetSshAddress:
+        """Returns the device SSH information (ip address and port).
 
         Args:
             timeout: How long in sec to retry for ip address.
+
+        Returns:
+            (Target SSH IP Address, Target SSH Port)
 
         Raises:
             errors.FuchsiaDeviceError: If fails to gets the ip address.
@@ -457,7 +479,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
 
         while time.time() < end_time:
             try:
-                return ffx_cli.get_target_address(self.name, timeout=timeout)
+                return ffx_cli.get_target_ssh_address(
+                    self.name, timeout=timeout)
             except Exception:  # pylint: disable=broad-except
                 time.sleep(1)
         raise errors.FuchsiaDeviceError(
@@ -516,6 +539,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         ssh_command: str = _SSH_COMMAND.format(
             ssh_options=_SSH_OPTIONS,
             ssh_private_key=self._ssh_private_key,
+            ssh_port=self._ssh_port,
             ssh_user=self._ssh_user,
             ip_address=self._ip_address,
             command=command)
@@ -547,7 +571,11 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
 
         # IP address may change on reboot. So get the ip address once again
         remaining_timeout: float = max(0, end_time - time.time())
-        self._ip_address: str = self._get_device_ip_address(remaining_timeout)
+
+        device_ssh_address = self._get_device_ssh_address(remaining_timeout)
+        self._ip_address = device_ssh_address.ip
+        self._ssh_port = device_ssh_address.port
+        self._sl4f_port = self._get_device_sl4f_port(self._ip_address)
 
         # wait until device to allow ssh connection
         remaining_timeout = max(0, end_time - time.time())

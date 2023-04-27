@@ -15,8 +15,8 @@ fuchsia-emulator*   <unknown>    workstation_eng.qemu-x64    Product    [fe80::e
 
 2. Ensure the testbeds used by the test case (will be listed in
 "local_config_source" field in test case's BUILD.gn file) has correct device
-information listed (`name`, `ssh_private_key` and `ip_address` fields. For more
-information about these fields, refer to
+information listed (`name` and `ssh_private_key` fields. For more information
+about these fields, refer to
 [Lacewing Mobly Config YAML file](../../../README.md#Mobly-Config-YAML-File))
 
 
