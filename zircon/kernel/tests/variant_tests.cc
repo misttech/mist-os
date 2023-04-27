@@ -169,7 +169,8 @@ bool copy_move_assign() {
 #pragma clang diagnostic pop
 #endif
 
-  x = ktl::move(x);
+  typename T::variant x1 = ktl::move(x);
+  x = ktl::move(x1);
   EXPECT_EQ(size_t{1}, x.index());
   EXPECT_TRUE(ktl::holds_alternative<b_type>(x));
   EXPECT_FALSE(ktl::holds_alternative<c_type>(x));
