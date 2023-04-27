@@ -66,7 +66,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   }
 
   out->pending_layer_change = false;
-  out->vsync_layer_count = 0;
+  out->layer_count = 0;
   out->id = info.display_id;
   if (info.edid_present) {
     out->edid = DisplayInfo::Edid{};

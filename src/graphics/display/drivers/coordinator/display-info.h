@@ -81,9 +81,8 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   // A list of all images which have been sent to display driver.
   Image::DoublyLinkedList images;
 
-  // The number of layers in the applied configuration which are important for vsync (i.e.
-  // that have images).
-  uint32_t vsync_layer_count;
+  // The number of layers in the applied configuration.
+  uint32_t layer_count;
 
   // Set when a layer change occurs on this display and cleared in vsync
   // when the new layers are all active.

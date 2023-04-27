@@ -1040,7 +1040,6 @@ void Client::ApplyConfig() {
   for (auto& display_config : configs_) {
     display_config.current_.layer_count = 0;
     display_config.current_.layer_list = layers + layer_idx;
-    display_config.vsync_layer_count_ = 0;
 
     // Displays with no current layers are filtered out in Controller::ApplyConfig,
     // after it updates its own image tracking logic.
@@ -1062,7 +1061,6 @@ void Client::ApplyConfig() {
       display_config.current_.layer_count++;
       layers[layer_idx++] = &layer->current_layer_;
       if (layer->current_layer_.type != LAYER_TYPE_COLOR) {
-        display_config.vsync_layer_count_++;
         if (layer->current_image() == nullptr) {
           config_missing_image = true;
         }

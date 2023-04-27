@@ -82,7 +82,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
     return ret;
   }
 
-  uint32_t vsync_layer_count() const { return vsync_layer_count_; }
+  int current_layer_count() const { return static_cast<int>(current_.layer_count); }
   const display_config_t* current_config() const { return &current_; }
   const fbl::SinglyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
 
@@ -101,7 +101,6 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
   fbl::Array<zx_pixel_format_t> pixel_formats_;
   fbl::Array<cursor_info_t> cursor_infos_;
 
-  uint32_t vsync_layer_count_ = 0xffffffff;
   bool display_config_change_ = false;
 
   friend Client;

@@ -557,10 +557,10 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
       if (display->pending_layer_change) {
         display->pending_layer_change_controller_config_stamp = controller_stamp_;
       }
-      display->vsync_layer_count = config->vsync_layer_count();
+      display->layer_count = config->current_layer_count();
       display->delayed_apply = false;
 
-      if (display->vsync_layer_count == 0) {
+      if (display->layer_count == 0) {
         continue;
       }
 
@@ -594,7 +594,6 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
 
         config_image_queue.back().images.push_back({image->id, image->client_id()});
       }
-      ZX_ASSERT(display->vsync_layer_count == 0 || !display->images.is_empty());
     }
 
     vc_applied_ = is_vc;
