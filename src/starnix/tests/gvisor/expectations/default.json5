@@ -354,7 +354,6 @@
                 "MlockTest.MadviseDontneed",
 
                 // mmap_test
-                "MMapTest.MapDevZeroSegfaultAfterUnmap",
                 "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
                 "MMapTest.ExceedLimitDataPrlimitPID",
@@ -1146,6 +1145,7 @@
                 "ElfTest.NoExecute",
                 "ElfTest.ElfInterpreterNoExecute",
                 "EpollTest.DoubleEpollOneShot",
+                "EpollTest.UnblockWithSignal",
                 "ExecveTest.BrkAfterBinary",
                 "Cases/ElfInterpreterBadPathTest.Test/*",
                 "Cases/ElfInterpreterStaticTest.Test/*",
@@ -1157,6 +1157,8 @@
                 "Inotify.BlockingReadOnInotifyFd",
                 "Inotify.EpollNoDeadlock",
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
+                // Passes in debian image, remove.
+                "MMapTest.MapDevZeroSegfaultAfterUnmap",
                 "PingSocket.ICMPPortExhaustion",
                 "Pipes/PipeTest.ZeroSize/*",
                 "PollTest.BlockingEventPOLLRDNORM",
