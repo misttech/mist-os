@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_TYPES_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_TYPES_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <zircon/pixelformat.h>
 
@@ -21,7 +22,7 @@ struct DisplayInfo {
   glm::uvec2 dimensions;
 
   // The pixel formats available on this particular display.
-  std::vector<zx_pixel_format_t> formats;
+  std::vector<fuchsia_images2::PixelFormat> formats;
 };
 
 // The data that gets forwarded either to the display or the software renderer. The lengths

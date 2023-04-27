@@ -4,8 +4,12 @@
 
 #include "src/ui/scenic/lib/flatland/engine/display_compositor.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/fdio/directory.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <zircon/pixelformat.h>
 #include <zircon/status.h>
@@ -13,7 +17,6 @@
 #include <cstdint>
 #include <vector>
 
-#include "fuchsia/hardware/display/cpp/fidl.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
@@ -27,25 +30,6 @@ using fhd_Transform = fuchsia::hardware::display::Transform;
 
 // Debugging color used to highlight images that have gone through the GPU rendering path.
 const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
-
-// TODO(fxbug.dev/71410): Remove all references to zx_pixel_format_t.
-fuchsia::sysmem::PixelFormatType ConvertZirconFormatToSysmemFormat(const zx_pixel_format_t format) {
-  switch (format) {
-    // These two Zircon formats correspond to the Sysmem BGRA32 format.
-    case ZX_PIXEL_FORMAT_RGB_x888:
-    case ZX_PIXEL_FORMAT_ARGB_8888:
-      return fuchsia::sysmem::PixelFormatType::BGRA32;
-    case ZX_PIXEL_FORMAT_BGR_888x:
-    case ZX_PIXEL_FORMAT_ABGR_8888:
-      return fuchsia::sysmem::PixelFormatType::R8G8B8A8;
-    case ZX_PIXEL_FORMAT_NV12:
-      return fuchsia::sysmem::PixelFormatType::NV12;
-    case ZX_PIXEL_FORMAT_I420:
-      return fuchsia::sysmem::PixelFormatType::I420;
-  }
-  FX_CHECK(false) << "Unsupported Zircon pixel format: " << format;
-  return fuchsia::sysmem::PixelFormatType::INVALID;
-}
 
 // Returns an image type that describes the tiling format used for buffer with
 // this pixel format. The values are display driver specific and not documented
@@ -983,7 +967,7 @@ bool DisplayCompositor::SetMinimumRgb(const uint8_t minimum_rgb) {
 
 std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderTargets(
     const bool use_protected_memory, const uint32_t num_render_targets,
-    const fuchsia::math::SizeU& size, const zx_pixel_format_t pixel_format,
+    const fuchsia::math::SizeU& size, const fuchsia_images2::PixelFormat pixel_format,
     fuchsia::sysmem::BufferCollectionInfo_2* out_collection_info) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Create the buffer collection token to be used for frame buffers.
@@ -1034,10 +1018,13 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
   fuchsia::sysmem::BufferCollectionSyncPtr collection_ptr;
   if (make_cpu_accessible && !use_protected_memory) {
     const auto [buffer_usage, memory_constraints] = GetUsageAndMemoryConstraintsForCpuWriteOften();
+    // `pixel_format` is a sysmem v2 wire pixel format type. This needs to be
+    // converted first before it can be used in buffer utils.
+    auto v1_natural_pixel_format_type = sysmem::V1CopyFromV2PixelFormatType(pixel_format);
+    auto v1_hlcpp_pixel_format_type = fidl::NaturalToHLCPP(v1_natural_pixel_format_type);
     collection_ptr = CreateBufferCollectionSyncPtrAndSetConstraints(
         sysmem_allocator_.get(), std::move(compositor_token), num_render_targets, size.width,
-        size.height, buffer_usage, ConvertZirconFormatToSysmemFormat(pixel_format),
-        memory_constraints);
+        size.height, buffer_usage, v1_hlcpp_pixel_format_type, memory_constraints);
   } else {
     fuchsia::sysmem::BufferCollectionConstraints constraints;
     constraints.min_buffer_count_for_camping = num_render_targets;

@@ -16,9 +16,9 @@ TEST_F(DisplayControllerTest, Display2Test) {
   const uint64_t kDisplayId = 2;
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
-  const zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_ARGB_8888;
+  const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
 
-  Display2 display(kDisplayId, /*display_modes=*/{kDisplayMode}, /*pixel_format=*/{kPixelFormat});
+  Display2 display(kDisplayId, /*display_modes=*/{kDisplayMode}, /*pixel_formats=*/{kPixelFormat});
 
   EXPECT_EQ(kDisplayId, display.display_id());
   EXPECT_TRUE(fidl::Equals(kDisplayMode, display.display_modes()[0]));
@@ -44,7 +44,7 @@ TEST_F(DisplayControllerTest, DisplayControllerTest) {
   const uint64_t kDisplayId2 = 2;
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
-  const zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_ARGB_8888;
+  const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
 
   Display2 display1(kDisplayId1, {kDisplayMode}, {kPixelFormat});
   Display2 display2(kDisplayId2, {kDisplayMode}, {kPixelFormat});

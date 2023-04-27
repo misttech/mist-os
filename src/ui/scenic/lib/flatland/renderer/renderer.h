@@ -5,12 +5,13 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_RENDERER_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_RENDERER_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
 #include <lib/zx/event.h>
 #include <zircon/pixelformat.h>
 
 #include <optional>
 
-#include "fuchsia/math/cpp/fidl.h"
 #include "src/ui/lib/escher/geometry/types.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -62,10 +63,9 @@ class Renderer : public allocation::BufferCollectionImporter {
                                         const std::array<float, 3>& postoffsets) = 0;
 
   // Returns the pixel format that the renderer prefers to use for render targets.
-  // TODO(fxbug.dev/71410): Remove all references to zx_pixel_format_t
   // TODO(fxbug.dev/114033): Rename this to reflect that it's for a render target.
-  virtual zx_pixel_format_t ChoosePreferredPixelFormat(
-      const std::vector<zx_pixel_format_t>& available_formats) const = 0;
+  virtual fuchsia_images2::PixelFormat ChoosePreferredPixelFormat(
+      const std::vector<fuchsia_images2::PixelFormat>& available_formats) const = 0;
 
   // Returns true if the renderer is capable of switching to protected mode.
   virtual bool SupportsRenderInProtected() const = 0;

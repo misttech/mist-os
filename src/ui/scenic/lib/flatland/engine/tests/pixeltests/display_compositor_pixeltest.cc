@@ -96,7 +96,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
  protected:
   // TODO(fxbug.dev/125447): This is unnecesarily hardcoded. We should consider
   // making display pixel format a test parameter as well.
-  const zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_ARGB_8888;
+  static constexpr fuchsia_images2::PixelFormat kPixelFormat =
+      fuchsia_images2::PixelFormat::kBgra32;
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;

@@ -5,6 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_NULL_RENDERER_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_NULL_RENDERER_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
+
 #include <mutex>
 #include <unordered_map>
 
@@ -55,8 +57,8 @@ class NullRenderer final : public Renderer {
                                 const std::array<float, 3>& postoffsets) override;
 
   // |Renderer|.
-  zx_pixel_format_t ChoosePreferredPixelFormat(
-      const std::vector<zx_pixel_format_t>& available_formats) const override;
+  fuchsia_images2::PixelFormat ChoosePreferredPixelFormat(
+      const std::vector<fuchsia_images2::PixelFormat>& available_formats) const override;
 
   // |Renderer|.
   bool SupportsRenderInProtected() const override;

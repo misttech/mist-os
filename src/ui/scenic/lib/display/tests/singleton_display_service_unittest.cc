@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/singleton_display_service.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <zircon/pixelformat.h>
 
 #include <gtest/gtest.h>
@@ -13,8 +14,8 @@ namespace display {
 namespace test {
 
 TEST(SingletonDisplayService, Request) {
-  auto display = std::make_shared<Display>(
-      0, 777, 555, 77, 55, std::vector<zx_pixel_format_t>{ZX_PIXEL_FORMAT_ARGB_8888});
+  auto display = std::make_shared<Display>(0, 777, 555, 77, 55,
+                                           std::vector{fuchsia_images2::PixelFormat::kBgra32});
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
   uint32_t width_in_px = 0;
@@ -45,8 +46,8 @@ TEST(SingletonDisplayService, Request) {
 }
 
 TEST(SingletonDisplayService, DevicePixelRatioChange) {
-  auto display = std::make_shared<Display>(
-      0, 777, 555, 77, 55, std::vector<zx_pixel_format_t>{ZX_PIXEL_FORMAT_ARGB_8888});
+  auto display = std::make_shared<Display>(0, 777, 555, 77, 55,
+                                           std::vector{fuchsia_images2::PixelFormat::kBgra32});
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
   const float kDPRx = 1.25f;

@@ -9,6 +9,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "lib/fit/function.h"
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace scenic_impl {
 namespace display {
@@ -68,11 +69,19 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
                          << " doesn't exist for display with id=" << display.id;
         }
       }
+      zx::result pixel_format_convert_result =
+          ::display::AnyPixelFormatToImages2PixelFormatStdVector(display.pixel_format);
+      if (unlikely(!pixel_format_convert_result.is_ok())) {
+        FX_NOTREACHED() << "Cannot convert pixel format to sysmem2 formats: "
+                        << pixel_format_convert_result.error_value();
+        return;
+      }
 
       auto& mode = display.modes[mode_idx];
       default_display_ = std::make_unique<Display>(
           display.id, mode.horizontal_resolution, mode.vertical_resolution,
-          display.horizontal_size_mm, display.vertical_size_mm, std::move(display.pixel_format));
+          display.horizontal_size_mm, display.vertical_size_mm,
+          std::move(pixel_format_convert_result.value()));
       OnClientOwnershipChange(owns_display_controller_);
 
       if (display_available_cb_) {

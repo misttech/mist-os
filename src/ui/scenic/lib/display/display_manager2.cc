@@ -6,10 +6,12 @@
 
 #include <lib/fidl/cpp/clone.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/compiler.h>
 
 #include <iterator>
 #include <string>
 
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/display/display_controller.h"
 
@@ -244,9 +246,17 @@ DisplayManager2::DisplayInfoPrivate DisplayManager2::NewDisplayInfoPrivate(
   display_info.set_manufacturer_name(hardware_display_info.manufacturer_name);
   display_info.set_monitor_name(hardware_display_info.monitor_name);
 
-  return DisplayInfoPrivate{
-      hardware_display_info.id, fsl::GetKoid(display_info.display_ref().reference.get()),
-      hardware_display_info.pixel_format, std::move(controller), std::move(display_info)};
+  zx::result pixel_format_convert_result =
+      ::display::AnyPixelFormatToImages2PixelFormatStdVector(hardware_display_info.pixel_format);
+  if (unlikely(!pixel_format_convert_result.is_ok())) {
+    FX_NOTREACHED() << "This should not happen: cannot convert pixel format to sysmem2 formats: " +
+                           std::string(pixel_format_convert_result.status_string());
+  }
+
+  return DisplayInfoPrivate{hardware_display_info.id,
+                            fsl::GetKoid(display_info.display_ref().reference.get()),
+                            std::move(pixel_format_convert_result.value()), std::move(controller),
+                            std::move(display_info)};
 }
 
 void DisplayManager2::OnDisplaysChanged(
@@ -260,9 +270,18 @@ void DisplayManager2::OnDisplaysChanged(
       FX_LOGS(WARNING) << last_error_;
       continue;
     }
+    zx::result pixel_format_convert_result =
+        ::display::AnyPixelFormatToImages2PixelFormatStdVector(display_info.pixel_format);
+    if (unlikely(!pixel_format_convert_result.is_ok())) {
+      FX_NOTREACHED()
+          << "This should not happen: cannot convert pixel format to sysmem2 formats: " +
+                 std::string(pixel_format_convert_result.status_string());
+      continue;
+    }
+
     if (dc_private->claimed_dc) {
-      dc_private->claimed_dc->AddDisplay(
-          Display2(display_info.id, display_info.modes, display_info.pixel_format));
+      dc_private->claimed_dc->AddDisplay(Display2(display_info.id, display_info.modes,
+                                                  std::move(pixel_format_convert_result.value())));
     }
     dc_private->displays.push_back(NewDisplayInfoPrivate(display_info, dc_private->controller));
     const DisplayInfoPrivate& display_info_private = dc_private->displays.back();

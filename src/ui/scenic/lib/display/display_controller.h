@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_CONTROLLER_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <zircon/pixelformat.h>
@@ -35,7 +36,7 @@ using OnVsyncCallback =
 class Display2 {
  public:
   Display2(uint64_t display_id, std::vector<fuchsia::hardware::display::Mode> display_modes,
-           std::vector<zx_pixel_format_t> pixel_formats);
+           std::vector<fuchsia_images2::PixelFormat> pixel_formats);
 
   // The display's ID in the context of DisplayManager's DisplayController.
   uint64_t display_id() const { return display_id_; }
@@ -43,7 +44,7 @@ class Display2 {
   const std::vector<fuchsia::hardware::display::Mode>& display_modes() const {
     return display_modes_;
   }
-  const std::vector<zx_pixel_format_t>& pixel_formats() const { return pixel_formats_; }
+  const std::vector<fuchsia_images2::PixelFormat>& pixel_formats() const { return pixel_formats_; }
   void set_on_vsync_callback(OnVsyncCallback on_vsync_callback) {
     on_vsync_callback_ = std::move(on_vsync_callback);
   }
@@ -54,7 +55,7 @@ class Display2 {
  private:
   uint64_t display_id_;
   std::vector<fuchsia::hardware::display::Mode> display_modes_;
-  std::vector<zx_pixel_format_t> pixel_formats_;
+  std::vector<fuchsia_images2::PixelFormat> pixel_formats_;
   OnVsyncCallback on_vsync_callback_;
 };
 

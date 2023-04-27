@@ -119,9 +119,6 @@ class DisplaySwapchain : public Swapchain {
 
   void OnVsync(zx::time timestamp, fuchsia::hardware::display::ConfigStamp applied_config_stamp);
 
-  // Sets the config which will be used for all imported images.
-  void SetImageConfig(uint64_t layer_id, int32_t width, int32_t height, zx_pixel_format_t format);
-
   // Import a buffer collection token into the display controller so the constraints will be set on
   // it. Returns an id that can be used to refer to the collection.
   uint64_t ImportBufferCollection(fuchsia::sysmem::BufferCollectionTokenSyncPtr token);

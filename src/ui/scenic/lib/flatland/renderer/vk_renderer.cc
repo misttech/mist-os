@@ -67,22 +67,20 @@ const glm::vec4 kProtectedReplacementColorInRGBA = glm::vec4(0, 0, 0, 1);
 
 // Returns the corresponding Vulkan image format to use given the provided
 // Zircon image format.
-// TODO(fxbug.dev/71410): Remove all references to zx_pixel_format_t.
-vk::Format ConvertToVkFormat(const zx_pixel_format_t pixel_format) {
+vk::Format ConvertToVkFormat(const fuchsia_images2::PixelFormat pixel_format) {
   switch (pixel_format) {
     // These two Zircon formats correspond to the Sysmem BGRA32 format.
-    case ZX_PIXEL_FORMAT_RGB_x888:
-    case ZX_PIXEL_FORMAT_ARGB_8888:
+    case fuchsia_images2::PixelFormat::kBgra32:
       return vk::Format::eB8G8R8A8Srgb;
     // These two Zircon formats correspond to the Sysmem R8G8B8A8 format.
-    case ZX_PIXEL_FORMAT_BGR_888x:
-    case ZX_PIXEL_FORMAT_ABGR_8888:
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
       return vk::Format::eR8G8B8A8Srgb;
-    case ZX_PIXEL_FORMAT_NV12:
+    case fuchsia_images2::PixelFormat::kNv12:
       return vk::Format::eG8B8R82Plane420Unorm;
+    default:
+      FX_CHECK(false) << "Unsupported Zircon pixel format: " << static_cast<uint32_t>(pixel_format);
+      return vk::Format::eUndefined;
   }
-  FX_CHECK(false) << "Unsupported Zircon pixel format: " << pixel_format;
-  return vk::Format::eUndefined;
 }
 
 // Create a default 1x1 texture for solid color renderables which are not associated
@@ -946,12 +944,12 @@ void VkRenderer::SetColorConversionValues(const std::array<float, 9>& coefficien
   compositor_.SetColorConversionParams({glm_matrix, glm_preoffsets, glm_postoffsets});
 }
 
-zx_pixel_format_t VkRenderer::ChoosePreferredPixelFormat(
-    const std::vector<zx_pixel_format_t>& available_formats) const {
+fuchsia_images2::PixelFormat VkRenderer::ChoosePreferredPixelFormat(
+    const std::vector<fuchsia_images2::PixelFormat>& available_formats) const {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
 
   for (auto preferred_format : kSupportedRenderTargetImageFormats) {
-    for (zx_pixel_format_t format : available_formats) {
+    for (fuchsia_images2::PixelFormat format : available_formats) {
       const vk::Format vk_format = ConvertToVkFormat(format);
       if (vk_format == preferred_format) {
         return format;
@@ -959,7 +957,7 @@ zx_pixel_format_t VkRenderer::ChoosePreferredPixelFormat(
     }
   }
   FX_DCHECK(false) << "Preferred format is not available.";
-  return ZX_PIXEL_FORMAT_NONE;
+  return fuchsia_images2::PixelFormat::kInvalid;
 }
 
 bool VkRenderer::SupportsRenderInProtected() const {

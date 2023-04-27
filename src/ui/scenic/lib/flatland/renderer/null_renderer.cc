@@ -7,6 +7,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/pixelformat.h>
 
+#include "fidl/fuchsia.images2/cpp/wire_types.h"
+
 namespace flatland {
 
 bool NullRenderer::ImportBufferCollection(
@@ -154,15 +156,15 @@ void NullRenderer::Render(const allocation::ImageMetadata& render_target,
   }
 }
 
-zx_pixel_format_t NullRenderer::ChoosePreferredPixelFormat(
-    const std::vector<zx_pixel_format_t>& available_formats) const {
+fuchsia_images2::PixelFormat NullRenderer::ChoosePreferredPixelFormat(
+    const std::vector<fuchsia_images2::PixelFormat>& available_formats) const {
   for (const auto& format : available_formats) {
-    if (format == ZX_PIXEL_FORMAT_ARGB_8888) {
+    if (format == fuchsia_images2::PixelFormat::kBgra32) {
       return format;
     }
   }
   FX_DCHECK(false) << "Preferred format is not available.";
-  return ZX_PIXEL_FORMAT_NONE;
+  return fuchsia_images2::PixelFormat::kInvalid;
 }
 
 bool NullRenderer::SupportsRenderInProtected() const { return false; }

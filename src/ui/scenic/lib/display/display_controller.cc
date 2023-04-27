@@ -4,13 +4,14 @@
 
 #include "src/ui/scenic/lib/display/display_controller.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 namespace scenic_impl {
 namespace display {
 
 Display2::Display2(uint64_t display_id, std::vector<fuchsia::hardware::display::Mode> display_modes,
-                   std::vector<zx_pixel_format_t> pixel_formats)
+                   std::vector<fuchsia_images2::PixelFormat> pixel_formats)
     : display_id_(display_id),
       display_modes_(std::move(display_modes)),
       pixel_formats_(std::move(pixel_formats)) {}

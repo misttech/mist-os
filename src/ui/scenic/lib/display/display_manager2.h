@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_MANAGER2_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_MANAGER2_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/ui/display/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_ptr_set.h>
@@ -60,7 +61,7 @@ class DisplayManager2 : public fuchsia::ui::display::DisplayManager {
 
     zx_koid_t display_ref_koid = 0;
 
-    std::vector<zx_pixel_format_t> pixel_formats;
+    std::vector<fuchsia_images2::PixelFormat> pixel_formats;
 
     // Interface for the DisplayController that this display is connected to.
     std::shared_ptr<fuchsia::hardware::display::ControllerSyncPtr> controller;

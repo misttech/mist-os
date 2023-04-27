@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <zircon/syscalls.h>
@@ -12,19 +13,19 @@ namespace scenic_impl {
 namespace display {
 
 Display::Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px, uint32_t width_in_mm,
-                 uint32_t height_in_mm, std::vector<zx_pixel_format_t> pixel_formats)
+                 uint32_t height_in_mm, std::vector<fuchsia_images2::PixelFormat> pixel_formats)
     : vsync_timing_(std::make_shared<scheduling::VsyncTiming>()),
       display_id_(id),
       width_in_px_(width_in_px),
       height_in_px_(height_in_px),
       width_in_mm_(width_in_mm),
       height_in_mm_(height_in_mm),
-      pixel_formats_(pixel_formats) {
+      pixel_formats_(std::move(pixel_formats)) {
   zx::event::create(0, &ownership_event_);
   device_pixel_ratio_.store({1.f, 1.f});
 }
 Display::Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px)
-    : Display(id, width_in_px, height_in_px, 0, 0, {ZX_PIXEL_FORMAT_ARGB_8888}) {}
+    : Display(id, width_in_px, height_in_px, 0, 0, {fuchsia_images2::PixelFormat::kBgra32}) {}
 
 void Display::Claim() {
   FX_DCHECK(!claimed_);

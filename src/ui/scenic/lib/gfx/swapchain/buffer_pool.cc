@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/gfx/swapchain/buffer_pool.h"
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/fit/defer.h>
@@ -87,17 +88,16 @@ static vk::ImageUsageFlags GetFramebufferImageUsage() {
          vk::ImageUsageFlagBits::eTransferDst;
 }
 
-static vk::Format GetDisplayImageFormat(zx_pixel_format_t pixel_format) {
+static vk::Format GetDisplayImageFormat(fuchsia_images2::PixelFormat pixel_format) {
   switch (pixel_format) {
-    case ZX_PIXEL_FORMAT_RGB_x888:
-    case ZX_PIXEL_FORMAT_ARGB_8888:
+    case fuchsia_images2::PixelFormat::kBgra32:
       return vk::Format::eB8G8R8A8Srgb;
-    case ZX_PIXEL_FORMAT_BGR_888x:
-    case ZX_PIXEL_FORMAT_ABGR_8888:
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
       return vk::Format::eR8G8B8A8Srgb;
+    default:
+      FX_CHECK(false) << "Unsupported pixel format: " << static_cast<uint32_t>(pixel_format);
+      return vk::Format::eUndefined;
   }
-  FX_CHECK(false) << "Unsupported pixel format: " << pixel_format;
-  return vk::Format::eUndefined;
 }
 
 // Create a number of synced tokens that can be imported into collections.
@@ -138,9 +138,9 @@ bool BufferPool::CreateBuffers(size_t count, BufferPool::Environment* environmen
   const uint32_t width_in_px = environment->display->width_in_px();
   const uint32_t height_in_px = environment->display->height_in_px();
 
-  zx_pixel_format_t pixel_format = ZX_PIXEL_FORMAT_NONE;
+  auto pixel_format = fuchsia_images2::PixelFormat::kInvalid;
   for (auto preferred_format : kPreferredImageFormats) {
-    for (zx_pixel_format_t format : environment->display->pixel_formats()) {
+    for (fuchsia_images2::PixelFormat format : environment->display->pixel_formats()) {
       vk::Format vk_format = GetDisplayImageFormat(format);
       if (vk_format == preferred_format) {
         pixel_format = format;
@@ -148,12 +148,12 @@ bool BufferPool::CreateBuffers(size_t count, BufferPool::Environment* environmen
         break;
       }
     }
-    if (pixel_format != ZX_PIXEL_FORMAT_NONE) {
+    if (pixel_format != fuchsia_images2::PixelFormat::kInvalid) {
       break;
     }
   }
 
-  if (pixel_format == ZX_PIXEL_FORMAT_NONE) {
+  if (pixel_format == fuchsia_images2::PixelFormat::kInvalid) {
     FX_LOGS(ERROR) << "Unable to find usable pixel format.";
     return false;
   }

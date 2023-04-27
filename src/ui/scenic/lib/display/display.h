@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/event.h>
@@ -29,7 +30,7 @@ namespace display {
 class Display {
  public:
   Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px, uint32_t width_in_mm,
-          uint32_t height_in_mm, std::vector<zx_pixel_format_t> pixel_formats);
+          uint32_t height_in_mm, std::vector<fuchsia_images2::PixelFormat> pixel_formats);
   Display(uint64_t id, uint32_t width_in_px, uint32_t height_in_px);
   virtual ~Display() = default;
 
@@ -64,8 +65,7 @@ class Display {
 
   glm::vec2 device_pixel_ratio() const { return device_pixel_ratio_.load(); }
 
-  // TODO(fxbug.dev/71410): Remove all references to zx_pixel_format_t.
-  const std::vector<zx_pixel_format_t>& pixel_formats() const { return pixel_formats_; }
+  const std::vector<fuchsia_images2::PixelFormat>& pixel_formats() const { return pixel_formats_; }
 
   // Event signaled by DisplayManager when ownership of the display
   // changes. This event backs Scenic's GetDisplayOwnershipEvent API.
@@ -93,7 +93,7 @@ class Display {
   // service running on the main thread.
   std::atomic<glm::vec2> device_pixel_ratio_;
   zx::event ownership_event_;
-  std::vector<zx_pixel_format_t> pixel_formats_;
+  std::vector<fuchsia_images2::PixelFormat> pixel_formats_;
 
   bool claimed_ = false;
 

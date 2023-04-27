@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_VK_RENDERER_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_RENDERER_VK_RENDERER_H_
 
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/images/cpp/fidl.h>
 
 #include <iterator>
@@ -67,8 +68,8 @@ class VkRenderer final : public Renderer {
 
   // |Renderer|.
   // Only called from the main thread.
-  zx_pixel_format_t ChoosePreferredPixelFormat(
-      const std::vector<zx_pixel_format_t>& available_formats) const override;
+  fuchsia_images2::PixelFormat ChoosePreferredPixelFormat(
+      const std::vector<fuchsia_images2::PixelFormat>& available_formats) const override;
 
   // |Renderer|.
   // Only called from the main thread.
