@@ -90,17 +90,8 @@
                 //
                 // These tests try to use `/tmp` and that doesn't exist in
                 // the Android system image (it's actually under `/data/tmp`).
-                "ExecveTest.SymlinkLoop",
-                "ExecveTest.Directory",
-                "InterpreterScriptTest.Execute",
-                "InterpreterScriptTest.InterpreterScriptNoExecute",
                 "InterpreterScriptTest.Whitespace",
-                "InterpreterScriptTest.BinaryNoExecute",
                 "InterpreterScriptTest.MaxRecursion",
-                "InterpreterScriptTest.RelativePath",
-                "InterpreterScriptTest.Symlink",
-                "InterpreterScriptTest.UncleanPath",
-                "InterpreterScriptTest.SymlinkLoop",
 
                 // exit_test
                 "ExitTest.SigkillZombieGroup",
@@ -1156,6 +1147,19 @@
                 "Inotify.ReadWithTooSmallBufferFails",
                 "Inotify.BlockingReadOnInotifyFd",
                 "Inotify.EpollNoDeadlock",
+                // Passes in debian image, remove.
+                "ExecveTest.SymlinkLoop",
+                // Passes in debian image, remove.
+                "ExecveTest.Directory",
+                "InterpreterScriptTest.Execute",
+                // Passes in debian image, remove.
+                "InterpreterScriptTest.InterpreterScriptNoExecute",
+                "InterpreterScriptTest.BinaryNoExecute",
+                "InterpreterScriptTest.RelativePath",
+                "InterpreterScriptTest.Symlink",
+                // Passes in debian image, remove.
+                "InterpreterScriptTest.SymlinkLoop",
+                "InterpreterScriptTest.UncleanPath",
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
                 // Passes in debian image, remove.
                 "MMapTest.MapDevZeroSegfaultAfterUnmap",
