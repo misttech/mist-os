@@ -170,7 +170,7 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
 #endif
 }
 
-void arch_dump_thread(Thread* t) {
+void arch_dump_thread(const Thread* t) {
   if (t->state() != THREAD_RUNNING) {
     dprintf(INFO, "\tarch: ");
     dprintf(INFO, "sp 0x%lx\n", t->arch().sp);

@@ -82,7 +82,7 @@ void arch_thread_construct_first(Thread* t) {
   arch_set_current_thread(t);
 }
 
-void arch_dump_thread(Thread* t) {
+void arch_dump_thread(const Thread* t) {
   if (t->state() != THREAD_RUNNING) {
     dprintf(INFO, "\tarch: ");
     dprintf(INFO, "sp %#" PRIxPTR "\n", t->arch().sp);

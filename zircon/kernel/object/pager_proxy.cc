@@ -326,7 +326,7 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event) {
       printf("ERROR Page source %p has been blocked for %" PRIu64
              " seconds. Page request timed out.\n",
              page_source_.get(), gBootOptions->userpager_overtime_timeout_seconds);
-      dump_thread(Thread::Current::Get(), false);
+      Thread::Current::Dump(false);
       kcounter_add(dispatcher_pager_timed_out_request_count, 1);
       return ZX_ERR_TIMED_OUT;
     }

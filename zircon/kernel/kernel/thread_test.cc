@@ -715,7 +715,7 @@ bool migrate_stress_test() {
       // TODO(fxbug.dev/78695): We are currently seeing some flakes in CI/CQ
       // that cannot be reproduced locally. Once resolved, this additional
       // logging can be removed.
-      dump_thread(thread.thread, /*full=*/true);
+      thread.thread->Dump(/*full=*/true);
       Backtrace bt;
       thread.thread->GetBacktrace(bt);
       bt.Print();
@@ -797,7 +797,7 @@ bool set_migrate_fn_stress_test() {
       // TODO(fxbug.dev/78695): We are currently seeing some flakes in CI/CQ
       // that cannot be reproduced locally. Once resolved, this additional
       // logging can be removed.
-      dump_thread(thread.thread, /*full=*/true);
+      thread.thread->Dump(/*full=*/true);
       Backtrace bt;
       thread.thread->GetBacktrace(bt);
       bt.Print();

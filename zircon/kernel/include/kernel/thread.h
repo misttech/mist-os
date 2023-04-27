@@ -54,6 +54,10 @@ class ThreadDispatcher;
 class VmAspace;
 class WaitQueue;
 struct Thread;
+class ThreadDumper;  // A class which is a friend of the various internal thread
+                     // state classes and structures, allowing it to access
+                     // private variables for debugging purposes during debug
+                     // dumps of thread state.
 
 // These forward declarations are needed so that Thread can friend
 // them before they are defined.
@@ -244,6 +248,9 @@ class WaitQueueCollection {
     friend struct WaitQueueCollection::BlockedThreadTreeTraits;
     friend struct WaitQueueCollection::MinRelativeDeadlineTraits;
 
+    // Dumping routines are allowed to see inside us.
+    friend class ThreadDumper;
+
     // If blocked, a pointer to the WaitQueue the Thread is on.
     WaitQueue* blocking_wait_queue_ TA_GUARDED(thread_lock) = nullptr;
 
@@ -264,9 +271,6 @@ class WaitQueueCollection {
 
     // Return code if woken up abnormally from suspend, sleep, or block.
     zx_status_t blocked_status_ = ZX_OK;
-
-    // Dumping routines are allowed to see inside us.
-    friend void dump_thread_locked(Thread* t, bool full_dump);
 
     // Are we allowed to be interrupted on the current thing we're blocked/sleeping on?
     Interruptible interruptible_ = Interruptible::No;
@@ -490,30 +494,6 @@ typedef void (*thread_trampoline_routine)() __NO_RETURN;
 #else
 #define DEFAULT_STACK_SIZE ARCH_DEFAULT_STACK_SIZE
 #endif
-
-void dump_thread_locked(Thread* t, bool full) TA_REQ(thread_lock);
-void dump_thread(Thread* t, bool full) TA_EXCL(thread_lock);
-void arch_dump_thread(Thread* t);
-void dump_all_threads_locked(bool full) TA_REQ(thread_lock);
-void dump_all_threads(bool full) TA_EXCL(thread_lock);
-void dump_thread_tid(zx_koid_t tid, bool full) TA_EXCL(thread_lock);
-void dump_thread_tid_locked(zx_koid_t tid, bool full) TA_REQ(thread_lock);
-
-static inline void dump_thread_during_panic(Thread* t, bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
-  // Skip grabbing the lock if we are panic'ing
-  dump_thread_locked(t, full);
-}
-
-static inline void dump_all_threads_during_panic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
-  // Skip grabbing the lock if we are panic'ing
-  dump_all_threads_locked(full);
-}
-
-static inline void dump_thread_tid_during_panic(zx_koid_t tid,
-                                                bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
-  // Skip grabbing the lock if we are panic'ing
-  dump_thread_tid_locked(tid, full);
-}
 
 class PreemptionState {
  public:
@@ -991,7 +971,7 @@ class TaskState {
 
  private:
   // Dumping routines are allowed to see inside us.
-  friend void dump_thread_locked(Thread* t, bool full_dump);
+  friend class ThreadDumper;
 
   // The Thread's entry point, and its argument.
   thread_start_routine entry_ = nullptr;
@@ -1065,6 +1045,16 @@ struct Thread {
   static Thread* CreateEtc(Thread* t, const char* name, thread_start_routine entry, void* arg,
                            const SchedulerState::BaseProfile& profile,
                            thread_trampoline_routine alt_trampoline);
+
+  // Public routines used by debugging code to dump thread state.
+  void Dump(bool full) const TA_EXCL(thread_lock);
+  static void DumpAll(bool full) TA_EXCL(thread_lock);
+  static void DumpTid(zx_koid_t tid, bool full) TA_EXCL(thread_lock);
+
+  // Same stuff, but skip the locks when we are panic'ing
+  inline void DumpDuringPanic(bool full) const TA_NO_THREAD_SAFETY_ANALYSIS;
+  static inline void DumpAllDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS;
+  static inline void DumpTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SAFETY_ANALYSIS;
 
   // Internal initialization routines. Eventually, these should be private.
   void SecondaryCpuInitEarly();
@@ -1184,7 +1174,7 @@ struct Thread {
     }
   }
 
-  void OwnerName(char (&out_name)[ZX_MAX_NAME_LEN]);
+  void OwnerName(char (&out_name)[ZX_MAX_NAME_LEN]) const;
   // Return the number of nanoseconds a thread has been running for.
   zx_duration_t Runtime() const;
 
@@ -1282,17 +1272,10 @@ struct Thread {
     // be obtained, it will be left empty.
     static void GetBacktrace(vaddr_t fp, Backtrace& out_bt);
 
-    static void DumpLocked(bool full) TA_REQ(thread_lock);
-    static void Dump(bool full) TA_EXCL(thread_lock);
-    static void DumpAllThreadsLocked(bool full) TA_REQ(thread_lock);
-    static void DumpAllThreads(bool full) TA_EXCL(thread_lock);
-    static void DumpUserTid(zx_koid_t tid, bool full) TA_EXCL(thread_lock);
-    static void DumpUserTidLocked(zx_koid_t tid, bool full) TA_REQ(thread_lock);
-    static void DumpAllDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
-      dump_all_threads_during_panic(full);
-    }
-    static void DumpUserTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
-      dump_thread_tid_during_panic(tid, full);
+    static void Dump(bool full) TA_EXCL(thread_lock) { Thread::Current::Get()->Dump(full); }
+
+    static void DumpDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
+      Thread::Current::Get()->DumpDuringPanic(full);
     }
   };  // struct Current;
 
@@ -1396,10 +1379,6 @@ struct Thread {
   };
 
   void UpdateSchedulerStats(const RuntimeStats::SchedulerStats& stats) TA_REQ(thread_lock);
-
-  void DumpDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
-    dump_thread_during_panic(this, full);
-  }
 
   // Accessors into Thread state. When the conversion to all-private
   // members is complete (bug 54383), we can revisit the overall
@@ -1556,7 +1535,7 @@ struct Thread {
   friend class StackOwnedLoanedPagesInterval;
 
   // Dumping routines are allowed to see inside us.
-  friend void dump_thread_locked(Thread* t, bool full_dump);
+  friend class ThreadDumper;
 
   // The default trampoline used when running the Thread. This can be
   // replaced by the |alt_trampoline| parameter to CreateEtc().
@@ -1582,6 +1561,9 @@ struct Thread {
   bool CheckKillSignal() TA_REQ(thread_lock);
 
   __NO_RETURN void ExitLocked(int retcode) TA_REQ(thread_lock);
+
+  static void DumpAllLocked(bool full) TA_REQ(thread_lock);
+  static void DumpTidLocked(zx_koid_t tid, bool full) TA_REQ(thread_lock);
 
  private:
   struct MigrateListTrait {
@@ -1693,6 +1675,27 @@ struct Thread {
 // that the hardware pointer holds into Thread.
 #include <arch/current_thread.h>
 Thread* Thread::Current::Get() { return arch_get_current_thread(); }
+
+void arch_dump_thread(const Thread* t) TA_REQ(thread_lock);
+
+class ThreadDumper {
+ public:
+  static void DumpLocked(const Thread* t, bool full) TA_REQ(thread_lock);
+};
+
+inline void Thread::DumpDuringPanic(bool full) const TA_NO_THREAD_SAFETY_ANALYSIS {
+  ThreadDumper::DumpLocked(this, full);
+}
+
+inline void Thread::DumpAllDuringPanic(bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
+  // Skip grabbing the lock if we are panic'ing
+  DumpAllLocked(full);
+}
+
+inline void Thread::DumpTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SAFETY_ANALYSIS {
+  // Skip grabbing the lock if we are panic'ing
+  DumpTidLocked(tid, full);
+}
 
 // TODO(johngro): Remove this when we have addressed fxbug.dev/33473.  Right now, this
 // is used in only one place (x86_bringup_aps in arch/x86/smp.cpp) outside of

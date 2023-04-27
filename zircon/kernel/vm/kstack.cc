@@ -172,7 +172,7 @@ zx_status_t KernelStack::Init() {
   return ZX_OK;
 }
 
-void KernelStack::DumpInfo(int debug_level) {
+void KernelStack::DumpInfo(int debug_level) const {
   auto map_dump = [debug_level](const KernelStack::Mapping& map, const char* tag) {
     dprintf(debug_level, "\t%s base %#" PRIxPTR ", size %#zx, vmar %p\n", tag, map.base(),
             map.size(), map.vmar_.get());

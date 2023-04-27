@@ -84,27 +84,27 @@ static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
     Thread* t = NULL;
     if (is_kernel_address(argv[2].u)) {
       t = (Thread*)argv[2].u;
-      dump_thread(t, true);
+      t->Dump(true);
     } else {
       if (flags & CMD_FLAG_PANIC) {
-        dump_thread_tid_during_panic(argv[2].u, true);
+        Thread::DumpTidDuringPanic(argv[2].u, true);
       } else {
-        dump_thread_tid(argv[2].u, true);
+        Thread::DumpTid(argv[2].u, true);
       }
     }
   } else if (!strcmp(argv[1].str, "list")) {
     printf("thread list:\n");
     if (flags & CMD_FLAG_PANIC) {
-      dump_all_threads_during_panic(false);
+      Thread::DumpAllDuringPanic(false);
     } else {
-      dump_all_threads(false);
+      Thread::DumpAll(false);
     }
   } else if (!strcmp(argv[1].str, "list_full")) {
     printf("thread list:\n");
     if (flags & CMD_FLAG_PANIC) {
-      dump_all_threads_during_panic(true);
+      Thread::DumpAllDuringPanic(true);
     } else {
-      dump_all_threads(true);
+      Thread::DumpAll(true);
     }
   } else {
     printf("invalid args\n");

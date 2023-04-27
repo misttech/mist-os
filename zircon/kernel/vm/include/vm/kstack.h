@@ -34,7 +34,7 @@ class KernelStack {
 
   // Logs the relevant stack memory addresses at the given debug level.
   // This is useful during a thread dump.
-  void DumpInfo(int debug_level);
+  void DumpInfo(int debug_level) const;
 
   // Returns the stack to its pre-Init() state.
   zx_status_t Teardown();

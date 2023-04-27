@@ -1516,7 +1516,7 @@ Thread* Thread::CreateIdleThread(cpu_num_t cpu_num) {
  * Returns "kernel" if there is no owner.
  */
 
-void Thread::OwnerName(char (&out_name)[ZX_MAX_NAME_LEN]) {
+void Thread::OwnerName(char (&out_name)[ZX_MAX_NAME_LEN]) const {
   if (user_thread_) {
     user_thread_->process()->get_name(out_name);
     return;
@@ -1549,7 +1549,7 @@ static const char* thread_state_to_str(enum thread_state state) {
 /**
  * @brief  Dump debugging info about the specified thread.
  */
-void dump_thread_locked(Thread* t, bool full_dump) {
+void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
   if (!t->canary().Valid()) {
     dprintf(INFO, "dump_thread WARNING: thread at %p has bad magic\n", t);
   }
@@ -1608,37 +1608,37 @@ void dump_thread_locked(Thread* t, bool full_dump) {
   }
 }
 
-void dump_thread(Thread* t, bool full) {
+void Thread::Dump(bool full) const {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  dump_thread_locked(t, full);
+  ThreadDumper::DumpLocked(this, full);
 }
 
 /**
  * @brief  Dump debugging info about all threads
  */
-void dump_all_threads_locked(bool full) {
-  for (Thread& t : thread_list.Get()) {
+void Thread::DumpAllLocked(bool full) {
+  for (const Thread& t : thread_list.Get()) {
     if (!t.canary().Valid()) {
       dprintf(INFO, "bad magic on thread struct %p, aborting.\n", &t);
       hexdump(&t, sizeof(Thread));
       break;
     }
-    dump_thread_locked(&t, full);
+    ThreadDumper::DumpLocked(&t, full);
   }
 }
 
-void dump_all_threads(bool full) {
+void Thread::DumpAll(bool full) {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  dump_all_threads_locked(full);
+  DumpAllLocked(full);
 }
 
-void dump_thread_tid(zx_koid_t tid, bool full) {
+void Thread::DumpTid(zx_koid_t tid, bool full) {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
-  dump_thread_tid_locked(tid, full);
+  DumpTidLocked(tid, full);
 }
 
-void dump_thread_tid_locked(zx_koid_t tid, bool full) {
-  for (Thread& t : thread_list.Get()) {
+void Thread::DumpTidLocked(zx_koid_t tid, bool full) {
+  for (const Thread& t : thread_list.Get()) {
     if (t.tid() != tid) {
       continue;
     }
@@ -1648,7 +1648,7 @@ void dump_thread_tid_locked(zx_koid_t tid, bool full) {
       hexdump(&t, sizeof(Thread));
       break;
     }
-    dump_thread_locked(&t, full);
+    ThreadDumper::DumpLocked(&t, full);
   }
 }
 

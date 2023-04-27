@@ -247,7 +247,7 @@ __NO_RETURN static void x86_fatal_pfe_handler(iframe_t* frame, ulong cr2) {
 
   uint64_t error_code = frame->err_code;
 
-  dump_thread_during_panic(Thread::Current::Get(), true);
+  Thread::Current::DumpDuringPanic(true);
 
   if (error_code & PFEX_U) {
     // User mode page fault
