@@ -5,6 +5,7 @@
 
 import os
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import relativize_args
@@ -76,45 +77,80 @@ class LexicallyRewriteTokenTest(unittest.TestCase):
 class RelativizePathTest(unittest.TestCase):
 
     def test_abspath(self):
-        self.assertEqual(
-            relativize_args.relativize_path("/a/b/c", "/a/d"), "../b/c")
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_path("/a/b/c", Path("/a/d")),
+                "../b/c")
+        mock_exists.assert_called_with()
 
     def test_relpath(self):
-        self.assertEqual(
-            relativize_args.relativize_path("x/y/z", "/a/d"), "x/y/z")
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_path("x/y/z", Path("/a/d")), "x/y/z")
+        mock_exists.assert_not_called()  # no absolute path in arg
 
     def test_cxx_Iflag(self):
-        self.assertEqual(
-            relativize_args.relativize_path("-I/j/k", "/j/a/d"), "-I../../k")
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_path("-I/j/k", Path("/j/a/d")),
+                "-I../../k")
+        mock_exists.assert_called_with()
 
     def test_cxx_Lflag(self):
-        self.assertEqual(
-            relativize_args.relativize_path("-L/p/q/r", "/p/q/z"), "-L../r")
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_path("-L/p/q/r", Path("/p/q/z")),
+                "-L../r")
+        mock_exists.assert_called_with()
 
     def test_cxx_isystemflag(self):
-        self.assertEqual(
-            relativize_args.relativize_path("-isystem/r/s/t", "/r/v/w"),
-            "-isystem../../s/t")
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_path(
+                    "-isystem/r/s/t", Path("/r/v/w")), "-isystem../../s/t")
+        mock_exists.assert_called_with()
 
+    def test_windows_style_flag(self):
+        with mock.patch.object(Path, 'exists',
+                               return_value=False) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_path("/Foo", Path("/p/q/z")),
+                "/Foo")
+        mock_exists.assert_called_with()
 
 class RelativizeCommandTest(unittest.TestCase):
 
     def test_no_transform(self):
-        self.assertEqual(
-            relativize_args.relativize_command(
-                ["echo", "hello"], "/home/sweet/home"), ["echo", "hello"])
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_command(
+                    ["echo", "hello"], Path("/home/sweet/home")),
+                ["echo", "hello"])
+        mock_exists.assert_not_called()  # nothing looks like an absolute path
 
     def test_with_env(self):
-        self.assertEqual(
-            relativize_args.relativize_command(
-                ["HOME=/home", "echo"], "/home/subdir"),
-            ["/usr/bin/env", "HOME=..", "echo"])
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_command(
+                    ["HOME=/home", "echo"], Path("/home/subdir")),
+                ["/usr/bin/env", "HOME=..", "echo"])
+        mock_exists.assert_called_with()
 
     def test_relativize(self):
-        self.assertEqual(
-            relativize_args.relativize_command(
-                ["cat", "/meow/foo.txt"], "/meow/subdir"),
-            ["cat", "../foo.txt"])
+        with mock.patch.object(Path, 'exists',
+                               return_value=True) as mock_exists:
+            self.assertEqual(
+                relativize_args.relativize_command(
+                    ["cat", "/meow/foo.txt"], Path("/meow/subdir")),
+                ["cat", "../foo.txt"])
+        mock_exists.assert_called_with()
 
 
 class MainArgParserTest(unittest.TestCase):
@@ -144,7 +180,7 @@ class MainArgParserTest(unittest.TestCase):
     def test_cwd(self):
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args(["--cwd", "/home/foo"])
-        self.assertEqual(args.cwd, "/home/foo")
+        self.assertEqual(args.cwd, Path("/home/foo"))
 
     def test_command(self):
         parser = relativize_args.main_arg_parser()

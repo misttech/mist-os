@@ -17,6 +17,7 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import Callable, Sequence
 
 _SCRIPT_BASENAME = os.path.basename(__file__)
@@ -53,29 +54,42 @@ def lexically_rewrite_token(token: str, transform: Callable[[str], str]) -> str:
     return split_transform_join(token, "=", inner_transform)
 
 
-def relativize_path(arg: str, start: str) -> str:
+def greatest_path_parent(p: Path) -> Path:
+    assert p.is_absolute()
+    return Path(*p.parts[:2])  # keep the leading '/' and the first component
+
+
+def relativize_path(arg: str, start: Path) -> str:
     """Convert a path or path substring to relative.
 
     Args:
-      arg: string that is a path or contains a path.
-      start: result paths are relative to this (absolute).
+      arg: string that is a path or may contain a path.
+      start: result paths are relative to this directory (absolute).
 
     Returns:
       possibly transformed arg with relative paths.
     """
-    assert start == '.' or os.path.isabs(start)
+    start_abs = start.absolute()
     # Handle known compiler flags like -I/abs/path, -L/abs/path
     # Such flags are fused to their arguments without a delimiter.
     for flag in ("-I", "-L", "-isystem"):
         if arg.startswith(flag):
-            suffix = arg.lstrip(flag)
-            return flag + relativize_path(suffix, start=start)
+            suffix = arg[len(flag):]
+            return flag + relativize_path(suffix, start=start_abs)
 
-    return os.path.relpath(arg, start=start) if os.path.isabs(arg) else arg
+    try_path = Path(arg)
+    # Windows-style flags look like absolute paths, e.g. /Foo
+    # so we leave those alone by checking for existence.
+    if try_path.is_absolute() and try_path.exists():
+        # Can't use Path.relative_to() because arguments
+        # aren't guaranteed to be subdir of the other.
+        return os.path.relpath(arg, start=start_abs)
+
+    return arg
 
 
 def relativize_command(command: Sequence[str],
-                       working_dir: str) -> Sequence[str]:
+                       working_dir: Path) -> Sequence[str]:
     """Transform a command to use relative paths.
 
     Args:
@@ -119,8 +133,8 @@ def main_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cwd",
-        type=str,
-        default=os.curdir,
+        type=Path,
+        default=Path(os.curdir),
         help="Override the current working dir for relative paths.",
     )
     parser.add_argument(
