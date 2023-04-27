@@ -9,9 +9,10 @@
 #include <memory>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace dsi_dw {
 
