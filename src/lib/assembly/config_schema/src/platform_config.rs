@@ -17,6 +17,7 @@ pub mod session_manager_config;
 pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
+pub mod ui_config;
 pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
@@ -90,6 +91,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for storage support.
     #[serde(default)]
     pub storage: storage_config::StorageConfig,
+
+    /// Platform configuration options for the UI area.
+    #[serde(default)]
+    pub ui: ui_config::PlatformUiConfig,
 
     /// Platform configuration options for the virtualization area.
     #[serde(default)]
