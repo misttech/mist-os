@@ -341,10 +341,13 @@ From //build/images/args.gni:220
 ### bazel_quiet
 
 Suppress Bazel non-error output
+This is now disabled by default since bazel_action()
+uses the //:console pool to print its output directly
+to stdout/stderr during the Ninja build.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:13
+From //build/bazel/bazel_action.gni:16
 
 ### bless_goldens
 
@@ -1142,7 +1145,7 @@ From //build/images/args.gni:94
 
 This variable specifies a fully qualified Chromium build output directory,
 such as `/home/$USER/chrome/src/out/fuchsia`, from which `chrome`,
-`cast_runner`, `web_runner`, and `web_engine` will be obtained.
+`cast_runner`, and `web_engine` will be obtained.
 All of those targets must exist in the output directory.
 If unset, the prebuilt packages from CIPD will be used.
 
@@ -3114,7 +3117,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:106
+From //build/bazel/legacy_ninja_build_outputs.gni:113
 
 ### extra_package_labels
 
@@ -6898,7 +6901,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:51
+From //third_party/pigweed/src/pw_unit_test/test.gni:52
 
 ### pw_unit_test_AUTOMATIC_RUNNER_ARGS
 
@@ -6909,7 +6912,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:57
+From //third_party/pigweed/src/pw_unit_test/test.gni:58
 
 ### pw_unit_test_AUTOMATIC_RUNNER_TIMEOUT
 
@@ -6918,7 +6921,7 @@ Timeout is in seconds. Defaults to empty which means no timeout.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:61
+From //third_party/pigweed/src/pw_unit_test/test.gni:62
 
 ### pw_unit_test_CONFIG
 
@@ -6939,7 +6942,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"pw_executable"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:90
+From //third_party/pigweed/src/pw_unit_test/test.gni:91
 
 ### pw_unit_test_EXECUTABLE_TARGET_TYPE_FILE
 
@@ -6954,7 +6957,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:100
+From //third_party/pigweed/src/pw_unit_test/test.gni:101
 
 ### pw_unit_test_FACADE_TESTS_ENABLED
 
@@ -6985,7 +6988,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test:light"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:29
+From //third_party/pigweed/src/pw_unit_test/test.gni:30
 
 ### pw_unit_test_MAIN
 
@@ -6997,7 +7000,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:36
+From //third_party/pigweed/src/pw_unit_test/test.gni:37
 
 ### pw_unit_test_POOL_DEPTH
 
@@ -7015,7 +7018,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `0`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:74
+From //third_party/pigweed/src/pw_unit_test/test.gni:75
 
 ### pw_unit_test_POOL_TOOLCHAIN
 
@@ -7030,7 +7033,7 @@ Usage: toolchain-controlled only
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_unit_test/test.gni:84
+From //third_party/pigweed/src/pw_unit_test/test.gni:85
 
 ### qr_codes_path
 
@@ -7258,7 +7261,7 @@ Supported modes are:
 
 **Current value (from the default):** `"copy"`
 
-From //src/sys/pkg/bin/package-tool/package-tool.gni:296
+From //src/sys/pkg/bin/package-tool/package-tool.gni:299
 
 ### restat_cc
 
