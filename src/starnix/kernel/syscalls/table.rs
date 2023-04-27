@@ -6,103 +6,37 @@ use paste::paste;
 
 use crate::arch::syscalls::*;
 use crate::fs::FdNumber;
-use crate::logging::log_trace;
 use crate::syscalls::{decls::Syscall, CurrentTask, SyscallResult};
 use crate::types::*;
 
 macro_rules! syscall_match {
     {
-        $current_task:ident; $syscall:expr;
+        $current_task:ident; $syscall_number:expr; $args:ident;
         $($(#[$match:meta])? $call:ident [$num_args:tt],)*
     } => {
         paste! {
-            match $syscall.decl.number as u32 {
+            match $syscall_number as u32 {
                 $(
                     $(#[$match])?
                     crate::types::[<__NR_ $call>] => {
-                        match syscall_match!(
-                            @call $current_task;
-                            $syscall;
-                            [<sys_ $call>][$num_args]
-                        ) {
-                            Ok(x) => {
-                                let return_value = SyscallResult::from(x);
-                                log_trace!($current_task, "-> {:#x}", return_value.value());
-                                Ok(return_value)
-                            },
-                            Err(err) => {
-                                log_trace!($current_task, "!-> {:?}", err);
-                                Err(err)
-                            },
+                        match syscall_match!(@call $current_task; $args; [<sys_ $call>][$num_args]) {
+                            Ok(x) => Ok(SyscallResult::from(x)),
+                            Err(err) => Err(err),
                         }
                     },
                 )*
-                _ => sys_unknown($current_task, $syscall.decl.number),
+                _ => sys_unknown($current_task, $syscall_number),
             }
         }
     };
 
-    (@call $current_task:ident; $syscall:ident; $func:ident [0]) => {{
-        log_trace!($current_task, "{:?}()", $syscall.decl);
-        $func($current_task)
-    }};
-    (@call $current_task:ident; $syscall:ident; $func:ident [1]) => {{
-        let first = $syscall.arg0.into_arg();
-        log_trace!($current_task, "{:?}({:?})", $syscall.decl, first);
-        $func($current_task, first)
-    }};
-    (@call $current_task:ident; $syscall:ident; $func:ident [2]) => {{
-        let first = $syscall.arg0.into_arg();
-        let second = $syscall.arg1.into_arg();
-        log_trace!($current_task, "{:?}({:?}, {:?})", $syscall.decl, first, second);
-        $func($current_task, first, second)
-    }};
-    (@call $current_task:ident; $syscall:ident; $func:ident [3]) => {{
-        let first = $syscall.arg0.into_arg();
-        let second = $syscall.arg1.into_arg();
-        let third = $syscall.arg2.into_arg();
-        log_trace!($current_task, "{:?}({:?}, {:?}, {:?})", $syscall.decl, first, second, third);
-        $func($current_task, first, second, third)
-    }};
-    (@call $current_task:ident; $syscall:ident; $func:ident [4]) => {{
-        let first = $syscall.arg0.into_arg();
-        let second = $syscall.arg1.into_arg();
-        let third = $syscall.arg2.into_arg();
-        let fourth = $syscall.arg3.into_arg();
-        log_trace!(
-            $current_task,
-            "{:?}({:?}, {:?}, {:?}, {:?})",
-            $syscall.decl, first, second, third, fourth
-        );
-        $func($current_task, first, second, third, fourth)
-    }};
-    (@call $current_task:ident; $syscall:ident; $func:ident [5]) => {{
-        let first = $syscall.arg0.into_arg();
-        let second = $syscall.arg1.into_arg();
-        let third = $syscall.arg2.into_arg();
-        let fourth = $syscall.arg3.into_arg();
-        let fifth = $syscall.arg4.into_arg();
-        log_trace!(
-            $current_task,
-            "{:?}({:?}, {:?}, {:?}, {:?}, {:?})",
-            $syscall.decl, first, second, third, fourth, fifth
-        );
-        $func($current_task, first, second, third, fourth, fifth)
-    }};
-    (@call $current_task:ident; $syscall:ident; $func:ident [6]) => {{
-        let first = $syscall.arg0.into_arg();
-        let second = $syscall.arg1.into_arg();
-        let third = $syscall.arg2.into_arg();
-        let fourth = $syscall.arg3.into_arg();
-        let fifth = $syscall.arg4.into_arg();
-        let sixth = $syscall.arg5.into_arg();
-        log_trace!(
-            $current_task,
-            "{:?}({:?}, {:?}, {:?}, {:?}, {:?}, {:?})",
-            $syscall.decl, first, second, third, fourth, fifth, sixth
-        );
-        $func($current_task, first, second, third, fourth, fifth, sixth)
-    }};
+    (@call $current_task:ident; $args:ident; $func:ident [0]) => ($func($current_task));
+    (@call $current_task:ident; $args:ident; $func:ident [1]) => ($func($current_task, $args.0.into_arg()));
+    (@call $current_task:ident; $args:ident; $func:ident [2]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg()));
+    (@call $current_task:ident; $args:ident; $func:ident [3]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg()));
+    (@call $current_task:ident; $args:ident; $func:ident [4]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg(), $args.3.into_arg()));
+    (@call $current_task:ident; $args:ident; $func:ident [5]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg(), $args.3.into_arg(), $args.4.into_arg()));
+    (@call $current_task:ident; $args:ident; $func:ident [6]) => ($func($current_task, $args.0.into_arg(), $args.1.into_arg(), $args.2.into_arg(), $args.3.into_arg(), $args.4.into_arg(), $args.5.into_arg()));
 }
 
 pub fn dispatch_syscall(
@@ -118,8 +52,9 @@ pub fn dispatch_syscall(
     use crate::syscalls::time::*;
     use crate::task::syscalls::*;
 
+    let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
     syscall_match! {
-        current_task; syscall;
+        current_task; syscall.decl.number; args;
         accept4[4],
         accept[3],
         #[cfg(target_arch = "x86_64")] access[2],
