@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/cpp/caller.h>
@@ -23,6 +24,7 @@
 #include <fbl/unique_fd.h>
 #include <vulkan/vk_layer.h>
 
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/vulkan/swapchain/vulkan_utils.h"
 #include "vulkan/vulkan_fuchsia.h"
@@ -190,14 +192,24 @@ void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
   height_ = info[0].modes[0].vertical_resolution;
   display_id_ = info[0].id;
   std::deque<VkSurfaceFormatKHR> formats;
-  auto pixel_format = reinterpret_cast<const int32_t*>(info[0].pixel_format.data());
-  for (unsigned i = 0; i < info[0].pixel_format.size(); i++) {
-    switch (pixel_format[i]) {
-      case ZX_PIXEL_FORMAT_RGB_x888:
+
+  zx::result pixel_format_convert_result =
+      display::AnyPixelFormatToImages2PixelFormatStdVector(info[0].pixel_format);
+  if (!pixel_format_convert_result.is_ok()) {
+    fprintf(stderr,
+            "OnDisplaysChanged: Cannot convert pixel formats to images2. "
+            "This display cannot be used.\n");
+    return;
+  }
+  std::vector<fuchsia_images2::wire::PixelFormat> pixel_formats =
+      std::move(pixel_format_convert_result.value());
+  for (fuchsia_images2::wire::PixelFormat pixel_format : pixel_formats) {
+    switch (pixel_format) {
+      case fuchsia_images2::wire::PixelFormat::kBgra32:
         formats.push_back({VK_FORMAT_B8G8R8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR});
         formats.push_back({VK_FORMAT_B8G8R8A8_SRGB, VK_COLORSPACE_SRGB_NONLINEAR_KHR});
         break;
-      case ZX_PIXEL_FORMAT_BGR_888x:
+      case fuchsia_images2::wire::PixelFormat::kR8G8B8A8:
         // Push front to prefer R8G8B8A8 formats.
         formats.push_front({VK_FORMAT_R8G8B8A8_SRGB, VK_COLORSPACE_SRGB_NONLINEAR_KHR});
         formats.push_front({VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR});
@@ -206,6 +218,10 @@ void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
         // Ignore unknown formats.
         break;
     }
+  }
+  if (formats.empty()) {
+    fprintf(stderr, "OnDisplaysChanged: No pixel format available. Cannot use this display.\n");
+    return;
   }
   supported_image_properties_ =
       SupportedImageProperties{.formats = {formats.begin(), formats.end()}};
