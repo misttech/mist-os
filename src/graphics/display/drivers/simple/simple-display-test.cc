@@ -11,6 +11,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/zx/object.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/pixelformat.h>
 #include <zircon/rights.h>
@@ -19,9 +20,10 @@
 #include <memory>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -79,7 +81,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
  public:
   explicit MockAllocator(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo)
       : dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
-    ASSERT_TRUE(dispatcher_);
+    ZX_ASSERT(dispatcher_);
   }
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
@@ -179,7 +181,7 @@ class FakeMmio {
     mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(sizeof(uint32_t), kRegArrayLength);
   }
 
-  fdf::MmioBuffer MmioBuffer() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
+  fdf::MmioBuffer MmioBuffer() { return mmio_->GetMmioBuffer(); }
 
   ddk_fake::FakeMmioReg& FakeRegister(size_t address) { return (*mmio_)[address]; }
 
@@ -323,7 +325,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   auto& [heap_client, heap_server] = heap_endpoints.value();
   auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);
   fidl::WireSyncClient heap{std::move(heap_client)};
-  EXPECT_OK(heap->CreateResource(std::move(heap_vmo), {}));
+  EXPECT_OK(heap->CreateResource(std::move(heap_vmo), {}).status());
   bind_ref.Unbind();
 
   // Set Buffer collection constraints.

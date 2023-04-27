@@ -44,7 +44,9 @@ test("simple-display-test-bin") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/no_ddk",
     "//src/lib/fsl",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 }
 
