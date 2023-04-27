@@ -36,9 +36,16 @@ verify_images_configuration("verify_zedboot_qemu") {
   bazel_images_config_target = ":zedboot_qemu"
 }
 
+verify_images_configuration("verify_fuchsia_vim3") {
+  testonly = true
+  gn_images_config_target = "//boards/images:vim3"
+  bazel_images_config_target = ":fuchsia_vim3"
+}
+
 group("verifications") {
   testonly = true
   deps = [
+    ":verify_fuchsia_vim3",
     ":verify_zedboot_default",
     ":verify_zedboot_qemu",
   ]

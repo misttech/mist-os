@@ -53,7 +53,7 @@ fuchsia_images_configuration(
     fvm_slice_size = "8388608",
     images = [
         ":fuchsia_zbi",
-        ":fuchsia_vbmeta",
+        ":fuchsia_vbmeta_default",
         # FVM outputs.
         ":standard_fvm",
         ":sparse_fvm",
@@ -62,14 +62,34 @@ fuchsia_images_configuration(
     ],
 )
 
+fuchsia_images_configuration(
+    name = "fuchsia_vim3",
+    fvm_slice_size = "8388608",
+    images = [
+        ":fuchsia_zbi",
+        ":fuchsia_vbmeta_vim3",
+        # FVM outputs.
+        ":standard_fvm",
+        ":sparse_fvm",
+        ":blob_sparse_fvm",
+        ":emmc_fvm_vim3",
+    ],
+)
+
 fuchsia_zbi(
     name = "fuchsia_zbi",
 )
 
 fuchsia_vbmeta(
-    name = "fuchsia_vbmeta",
+    name = "fuchsia_vbmeta_default",
     key = "//:third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem",
     key_metadata = "//:third_party/android/platform/external/avb/test/data/atx_metadata.bin",
+)
+
+fuchsia_vbmeta(
+    name = "fuchsia_vbmeta_vim3",
+    key = "//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_devkey_atx_psk.pem",
+    key_metadata = "//src/firmware/avb_keys:vim3/vim3-dev-key/vim3_dev_atx_metadata.bin",
 )
 
 fuchsia_fvm_standard(
@@ -123,6 +143,19 @@ fuchsia_fvm_standard(
     # This also assumes we are not using raw NAND but that's a safer assumption.
     # In this case "emmc" is a misnomer, it really just means "not raw NAND".
     truncate_to_length = "17179869184",
+)
+
+fuchsia_fvm_standard(
+    name = "emmc_fvm_vim3",
+    compress = True,
+    filesystems = [
+        ":empty_data",
+        ":blobfs",
+        ":internal_reserved",
+    ],
+    fvm_standard_name = "fvm.fastboot",
+    resize_image_file_to_fit = True,
+    truncate_to_length = "3439329280",
 )
 
 fuchsia_filesystem_blobfs(
