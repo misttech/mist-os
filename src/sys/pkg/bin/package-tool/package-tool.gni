@@ -121,7 +121,10 @@ template("package_tool_package_archive_extract") {
       "--blobs-json",
     ]
 
-    hermetic_action_ignored_prefixes = [ "$package_out_dir/blobs" ]
+    hermetic_action_ignored_prefixes = [
+      "$package_out_dir/blobs",
+      "$package_out_dir/manifests",  # Subpackage manifests are written here.
+    ]
   }
 }
 
