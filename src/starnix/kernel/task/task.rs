@@ -1462,7 +1462,7 @@ impl CurrentTask {
                         syscall: syscall.decl.number as i32,
                         arch: arch_val,
                     },
-                    force: false,
+                    force: true,
                 };
 
                 send_signal(self, siginfo);

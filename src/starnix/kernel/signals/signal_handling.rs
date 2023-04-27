@@ -78,7 +78,12 @@ impl DeliveryAction {
 }
 
 fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAction {
-    match sigaction.sa_handler {
+    let handler = if siginfo.force && sigaction.sa_handler == SIG_IGN {
+        SIG_DFL
+    } else {
+        sigaction.sa_handler
+    };
+    match handler {
         SIG_DFL => match siginfo.signal {
             SIGCHLD | SIGURG | SIGWINCH => DeliveryAction::Ignore,
             sig if sig.is_real_time() => DeliveryAction::Ignore,
