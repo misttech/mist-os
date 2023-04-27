@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("config/config.gni")
-import("pm_tool.gni")
+import("package_tool.gni")
 
 # Define a Fuchsia component package target.
 #
@@ -199,7 +199,7 @@ template("fuchsia_package") {
   }
 
   # Creates a Fuchsia metadata package.
-  fuchsia_pm_tool(_metadata_target) {
+  fuchsia_package_tool(_metadata_target) {
     forward_variables_from(invoker, [ "testonly" ])
     package_name = package_name
     command = "build"
@@ -207,7 +207,8 @@ template("fuchsia_package") {
     public_deps = [ ":$_manifest_target" ]
   }
 
-  fuchsia_pm_tool(target_name) {
+  # Creates a Fuchsia metadata package archive.
+  fuchsia_package_tool(target_name) {
     forward_variables_from(invoker, [ "testonly" ])
     package_name = package_name
     command = "archive"
