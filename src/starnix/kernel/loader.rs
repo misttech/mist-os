@@ -341,7 +341,7 @@ fn resolve_elf(
         let mut interp = vec![0; interp_hdr.filesz as usize];
         vmo.read(&mut interp, interp_hdr.offset as u64)
             .map_err(|status| from_status_like_fdio!(status))?;
-        let interp = CStr::from_bytes_with_nul(&interp).map_err(|_| errno!(EINVAL))?;
+        let interp = CStr::from_bytes_until_nul(&interp).map_err(|_| errno!(EINVAL))?;
         let interp_file = current_task.open_file(interp.to_bytes(), OpenFlags::RDONLY)?;
         let interp_vmo = interp_file.get_vmo(
             current_task,
