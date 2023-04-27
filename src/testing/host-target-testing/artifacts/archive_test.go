@@ -101,3 +101,19 @@ func TestDownload(t *testing.T) {
 		})
 	}
 }
+
+func TestDownloadNotExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	// The expected command will be something like `artifacts cp -build <id> -src <src> -dst <dst> -srcs-file <srcs-file>`.
+	// Make a mock script to always say the artifact doesn't exist.
+	mockArtifactsScript := filepath.Join(tmpDir, "artifacts")
+	if err := os.WriteFile(mockArtifactsScript, []byte("#!/bin/bash\necho nothing matched prefix $5 >&2\nexit 1"), os.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+
+	archive := NewArchive("", mockArtifactsScript)
+	err := archive.download(context.Background(), "id", false, "dst", []string{"src"})
+	if !os.IsNotExist(err) {
+		t.Fatal("expected not exist error, got:", err)
+	}
+}

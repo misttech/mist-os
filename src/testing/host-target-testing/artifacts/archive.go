@@ -186,6 +186,10 @@ func (a *Archive) download(ctx context.Context, buildID string, fromRoot bool, d
 		if err != nil {
 			if len(stderr) != 0 {
 				logger.Infof(ctx, "artifacts stderr:\n%s", stderr)
+				// Don't retry if the artifact we want to download does not exist.
+				if bytes.Contains(stderr, []byte("nothing matched prefix")) {
+					return retry.Fatal(os.ErrNotExist)
+				}
 				return fmt.Errorf("artifacts failed: %w: %s", err, string(stderr))
 			}
 			return fmt.Errorf("artifacts failed: %w", err)
