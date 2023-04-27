@@ -46,9 +46,9 @@ fuchsia_test_package("accessibility_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "accessibility_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "accessibility_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("accessibility_tests") {

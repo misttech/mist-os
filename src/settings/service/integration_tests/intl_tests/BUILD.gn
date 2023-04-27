@@ -54,9 +54,9 @@ fuchsia_test_package("intl_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "intl_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "intl_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("intl_tests") {

@@ -47,9 +47,9 @@ fuchsia_test_package("hanging_get_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "hanging_get_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "hanging_get_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("hanging_get_tests") {

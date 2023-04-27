@@ -45,9 +45,9 @@ fuchsia_test_package("privacy_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "privacy_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "privacy_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("privacy_tests") {

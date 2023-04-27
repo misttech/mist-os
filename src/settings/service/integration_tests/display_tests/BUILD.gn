@@ -62,12 +62,12 @@ fuchsia_test_package("display_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "display_integration_test_pkg"
+resource("tests_config") {
   sources = [
     "testdata/interface_configuration.json",
     "testdata/service_flags.json",
   ]
+  outputs = [ "display_integration_test_pkg/{{source_file_part}}" ]
 }
 
 # These tests do not depend on any external dependencies.
@@ -106,12 +106,12 @@ fuchsia_test_package("internal_display_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("internal_tests_config") {
-  for_pkg = "internal_display_integration_test_pkg"
+resource("internal_tests_config") {
   sources = [
     "testdata/display_configuration.json",
     "testdata/interface_configuration.json",
   ]
+  outputs = [ "internal_display_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("display_tests") {

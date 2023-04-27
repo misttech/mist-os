@@ -45,9 +45,9 @@ fuchsia_test_package("night_mode_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "night_mode_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "night_mode_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("night_mode_tests") {

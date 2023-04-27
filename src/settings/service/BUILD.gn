@@ -286,8 +286,7 @@ resource("setui_service_tests_resources") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "setui_service_tests"
+resource("tests_config") {
   sources = [
     "src/tests/testdata/agent_configuration.json",
     "src/tests/testdata/audio_config_data.json",
@@ -301,6 +300,7 @@ config_data("tests_config") {
     "src/tests/testdata/volume-changed.wav",
     "src/tests/testdata/volume-max.wav",
   ]
+  outputs = [ "setui_service_tests_config_data/{{source_file_part}}" ]
 }
 
 icu_rustc_binary("bin") {

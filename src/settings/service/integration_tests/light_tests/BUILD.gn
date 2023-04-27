@@ -135,37 +135,37 @@ fuchsia_test_package("light_multi_config_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("hardware_only_interface_config") {
-  for_pkg = "light_hardware_only_integration_test_pkg"
+resource("hardware_only_interface_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "light_hardware_only_integration_test_pkg/{{source_file_part}}" ]
 }
 
-config_data("single_config_interface_config") {
-  for_pkg = "light_single_config_integration_test_pkg"
+resource("single_config_interface_config") {
   sources = [
     "testdata/agent_configuration.json",
     "testdata/interface_configuration.json",
   ]
+  outputs = [ "light_single_config_integration_test_pkg/{{source_file_part}}" ]
 }
 
-config_data("multi_config_interface_config") {
-  for_pkg = "light_multi_config_integration_test_pkg"
+resource("multi_config_interface_config") {
   sources = [
     "testdata/agent_configuration.json",
     "testdata/interface_configuration.json",
   ]
+  outputs = [ "light_multi_config_integration_test_pkg/{{source_file_part}}" ]
 }
 
-config_data("single_config_light_config") {
-  for_pkg = "light_single_config_integration_test_pkg"
+resource("single_config_light_config") {
   sources = [ "testdata/light_hardware_single_config.json" ]
-  outputs = [ "light_hardware_config.json" ]
+  outputs =
+      [ "light_single_config_integration_test_pkg/light_hardware_config.json" ]
 }
 
-config_data("multi_config_light_config") {
-  for_pkg = "light_multi_config_integration_test_pkg"
+resource("multi_config_light_config") {
   sources = [ "testdata/light_hardware_multi_config.json" ]
-  outputs = [ "light_hardware_config.json" ]
+  outputs =
+      [ "light_multi_config_integration_test_pkg/light_hardware_config.json" ]
 }
 
 group("light_tests") {

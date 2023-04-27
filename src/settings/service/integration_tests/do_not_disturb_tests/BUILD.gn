@@ -42,9 +42,10 @@ fuchsia_test_package("do_not_disturb_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "do_not_disturb_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs =
+      [ "do_not_disturb_integration_test_pkg/interface_configuration.json" ]
 }
 
 group("do_not_disturb_tests") {

@@ -7,9 +7,6 @@
 
         // tmp_storage.shard is included for the isolated-temp feature.
         "//src/sys/test_runners/tmp_storage.shard.cml",
-
-        // Depends on config_data which is a system capability.
-        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -35,21 +32,15 @@
             path: "/dev/class/input-report",
         },
         {
-            directory: "config-data",
+            directory: "pkg",
+            from: "framework",
             rights: [ "r*" ],
             path: "/config/data",
-
-            // Test manager makes all config data available, but we need to choose a meaningful one
-            // for our tests by specifying subdirectory as our package.
-            subdir: "setui_service_tests",
+            subdir: "setui_service_tests_config_data",
         },
         {
             storage: "data",
             path: "/data",
-
-            // Test manager makes all config data available, but we need to choose a meaningful one
-            // for our tests by specifying subdirectory as our package.
-            subdir: "setui_service_tests",
         },
     ],
 }

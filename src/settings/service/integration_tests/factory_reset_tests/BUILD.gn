@@ -50,9 +50,9 @@ fuchsia_test_package("factory_reset_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("tests_config") {
-  for_pkg = "factory_reset_integration_test_pkg"
+resource("tests_config") {
   sources = [ "testdata/interface_configuration.json" ]
+  outputs = [ "factory_reset_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("factory_reset_tests") {

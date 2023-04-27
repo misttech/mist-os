@@ -79,14 +79,15 @@ fuchsia_test_package("volume_change_earcons_integration_test_pkg") {
   }
 }
 
-config_data("tests_config") {
-  for_pkg = "volume_change_earcons_integration_test_pkg"
+resource("tests_config") {
   sources = [
     "testdata/agent_configuration.json",
     "testdata/interface_configuration.json",
     "testdata/volume-changed.wav",
     "testdata/volume-max.wav",
   ]
+  outputs =
+      [ "volume_change_earcons_integration_test_pkg/{{source_file_part}}" ]
 }
 
 # Tests with input device registry.
@@ -126,14 +127,14 @@ fuchsia_test_package("earcons_with_input_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("with_input_tests_config") {
-  for_pkg = "earcons_with_input_integration_test_pkg"
+resource("with_input_tests_config") {
   sources = [
     "testdata/interface_configuration.json",
     "testdata/volume-changed.wav",
     "testdata/volume-max.wav",
     "testdata/with_media_button/agent_configuration.json",
   ]
+  outputs = [ "earcons_with_input_integration_test_pkg/{{source_file_part}}" ]
 }
 
 rustc_test("bluetooth_test_bin") {
@@ -170,8 +171,7 @@ fuchsia_test_package("bluetooth_earcons_integration_test_pkg") {
   subpackages = [ "//src/sys/stash:pkg" ]
 }
 
-config_data("bluetooth_tests_config") {
-  for_pkg = "bluetooth_earcons_integration_test_pkg"
+resource("bluetooth_tests_config") {
   sources = [
     "testdata/agent_configuration.json",
     "testdata/bluetooth-connected.wav",
@@ -180,6 +180,7 @@ config_data("bluetooth_tests_config") {
     "testdata/volume-changed.wav",
     "testdata/volume-max.wav",
   ]
+  outputs = [ "bluetooth_earcons_integration_test_pkg/{{source_file_part}}" ]
 }
 
 group("earcons_tests") {
