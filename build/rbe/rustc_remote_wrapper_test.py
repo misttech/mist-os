@@ -9,6 +9,7 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from pathlib import Path
@@ -26,6 +27,16 @@ from typing import Any, Iterable, Sequence
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
     pass
+
+
+def _write_file_contents(path: Path, contents: str):
+    with open(path, 'w') as f:
+        f.write(contents)
+
+
+def _read_file_contents(path: Path) -> str:
+    with open(path, 'r') as f:
+        return f.read()
 
 
 def _strs(items: Sequence[Any]) -> Sequence[str]:
@@ -733,6 +744,48 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                                    '_rewrite_depfile') as mock_rewrite:
                 run_status = r.run()
             mock_rewrite.assert_called_with()
+
+    def test_rewrite_depfile(self):
+        compiler = Path('../tools/bin/rustc')
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        depfile_path = Path('obj/foo.rlib.d')
+        with tempfile.TemporaryDirectory() as td:
+            exec_root = Path(td)
+            working_dir = exec_root / 'build-here'
+            command = _strs(
+                [
+                    compiler, source, '-o', rlib,
+                    f'--emit=dep-info={depfile_path}'
+                ])
+            r = rustc_remote_wrapper.RustRemoteAction(
+                ['--canonicalize_working_dir=true', '--'] + command,
+                exec_root=exec_root,
+                working_dir=working_dir,
+                auto_reproxy=False,
+            )
+
+            prepare_mocks = self.generate_prepare_mocks()
+            with contextlib.ExitStack() as stack:
+                for m in prepare_mocks:
+                    stack.enter_context(m)
+
+                with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
+                                       '_remote_inputs',
+                                       return_value=iter([])) as mock_inputs:
+                    prepare_status = r.prepare()
+
+            mock_inputs.assert_called_with()
+            self.assertEqual(prepare_status, 0)  # success
+            remote_cwd = r.remote_action.remote_working_dir
+            depfile_abspath = working_dir / depfile_path
+            depfile_abspath.parent.mkdir(parents=True, exist_ok=True)
+            _write_file_contents(
+                depfile_abspath,
+                f'{remote_cwd}/obj/foo.rlib: {remote_cwd}/src/lib.rs\n')
+            r._rewrite_depfile()
+            new_deps = _read_file_contents(depfile_abspath)
+            self.assertEqual(new_deps, 'obj/foo.rlib: src/lib.rs\n')
 
 
 class MainTests(unittest.TestCase):

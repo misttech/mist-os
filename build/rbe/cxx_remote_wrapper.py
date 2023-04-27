@@ -197,7 +197,9 @@ class CxxRemoteAction(object):
 
     def _rewrite_depfile(self):
         remote_action.remove_working_dir_abspaths_from_depfile_in_place(
-            self.depfile, self.remote_action.remote_working_dir)
+            self.working_dir / self.depfile,
+            self.remote_action.remote_working_dir,
+        )
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
@@ -281,6 +283,10 @@ class CxxRemoteAction(object):
         return self._prepare_status
 
     @property
+    def remote_action(self) -> remote_action.RemoteAction:
+        return self._remote_action
+
+    @property
     def working_dir(self) -> Path:
         return self._working_dir
 
@@ -350,10 +356,6 @@ class CxxRemoteAction(object):
         return self._local_preprocess_command
 
     @property
-    def remote_compile_action(self) -> remote_action.RemoteAction:
-        return self._remote_action
-
-    @property
     def remote_compiler(self) -> Path:
         return fuchsia.remote_executable(self.cxx_action.compiler.tool)
 
@@ -378,7 +380,7 @@ class CxxRemoteAction(object):
         return cpp_status
 
     def _run_remote_action(self) -> int:
-        return self._remote_action.run_with_main_args(self._main_args)
+        return self.remote_action.run_with_main_args(self._main_args)
 
     def run(self) -> int:
         if self.local_only:

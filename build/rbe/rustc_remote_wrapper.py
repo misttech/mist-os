@@ -748,7 +748,9 @@ class RustRemoteAction(object):
         separately.
         """
         remote_action.remove_working_dir_abspaths_from_depfile_in_place(
-            self.depfile, self.remote_action.remote_working_dir)
+            self.working_dir / self.depfile,
+            self.remote_action.remote_working_dir,
+        )
 
     def run_remote(self) -> int:
         prepare_status = self.prepare()

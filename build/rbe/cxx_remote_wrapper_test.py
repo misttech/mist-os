@@ -8,6 +8,7 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 
 from pathlib import Path
 import unittest
@@ -26,6 +27,16 @@ from typing import Any, Sequence
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
     pass
+
+
+def _write_file_contents(path: Path, contents: str):
+    with open(path, 'w') as f:
+        f.write(contents)
+
+
+def _read_file_contents(path: Path) -> str:
+    with open(path, 'r') as f:
+        return f.read()
 
 
 def _strs(items: Sequence[Any]) -> Sequence[str]:
@@ -120,7 +131,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                                'check_missing_remote_tools') as mock_check:
             self.assertEqual(c.prepare(), 0)
         self.assertEqual(
-            c.remote_compile_action.inputs_relative_to_project_root,
+            c.remote_action.inputs_relative_to_project_root,
             [fake_builddir / source])
         with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
                                '_run_remote_action',
@@ -195,10 +206,9 @@ class CxxRemoteActionTests(unittest.TestCase):
                         auto_reproxy=False,
                     )
                     self.assertEqual(c.prepare(), 0)
+                    self.assertEqual(c.remote_action.exec_root, fake_root)
                     self.assertEqual(
-                        c.remote_compile_action.exec_root, fake_root)
-                    self.assertEqual(
-                        c.remote_compile_action.build_subdir, fake_builddir)
+                        c.remote_action.build_subdir, fake_builddir)
 
     def test_clang_crash_diagnostics_dir(self):
         fake_root = Path('/usr/project')
@@ -221,15 +231,13 @@ class CxxRemoteActionTests(unittest.TestCase):
                     ['--'] + command, working_dir=fake_cwd, auto_reproxy=False)
                 self.assertEqual(c.prepare(), 0)
                 self.assertTrue(c.cxx_action.compiler_is_clang)
-                self.assertEqual(c.remote_compile_action.exec_root, fake_root)
+                self.assertEqual(c.remote_action.exec_root, fake_root)
+                self.assertEqual(c.remote_action.build_subdir, fake_builddir)
                 self.assertEqual(
-                    c.remote_compile_action.build_subdir, fake_builddir)
-                self.assertEqual(
-                    c.remote_compile_action.output_dirs_relative_to_working_dir,
+                    c.remote_action.output_dirs_relative_to_working_dir,
                     [crash_dir])
                 self.assertEqual(
-                    c.remote_compile_action.
-                    output_dirs_relative_to_project_root,
+                    c.remote_action.output_dirs_relative_to_project_root,
                     [fake_builddir / crash_dir])
 
     def test_remote_flag_back_propagating(self):
@@ -258,7 +266,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                                'check_missing_remote_tools') as mock_check:
             self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
-        remote_action_command = c.remote_compile_action.launch_command
+        remote_action_command = c.remote_action.launch_command
         prefix, sep, wrapped_command = cl_utils.partition_sequence(
             remote_action_command, '--')
         self.assertIn(flag, prefix)
@@ -297,10 +305,10 @@ class CxxRemoteActionTests(unittest.TestCase):
                 self.assertEqual(c.prepare(), 0)
         mock_tools.assert_called_with(c.compiler_path)
         self.assertEqual(
-            c.remote_compile_action.inputs_relative_to_project_root,
+            c.remote_action.inputs_relative_to_project_root,
             [fake_builddir / source])
         self.assertEqual(
-            c.remote_compile_action.output_files_relative_to_project_root,
+            c.remote_action.output_files_relative_to_project_root,
             [fake_builddir / output])
 
         with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
@@ -317,6 +325,43 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_rewrite.assert_called_with()
         mock_exists.assert_called_with()
+
+    def test_rewrite_depfile(self):
+        compiler = Path('g++')
+        source = Path('hello.cc')
+        output = Path('hello.o')
+        depfile = Path('hello.d')
+        with tempfile.TemporaryDirectory() as td:
+            fake_root = Path(td)
+            fake_builddir = Path('make-it-so')
+            fake_cwd = fake_root / fake_builddir
+            command = _strs(
+                [compiler, '-MF', depfile, '-c', source, '-o', output])
+            c = cxx_remote_wrapper.CxxRemoteAction(
+                # For this test, make the remote/local working dirs match
+                ['--canonicalize_working_dir=false', '--'] + command,
+                working_dir=fake_cwd,
+                exec_root=fake_root,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+                auto_reproxy=False,
+            )
+
+            remote_cwd = remote_action._REMOTE_PROJECT_ROOT / fake_builddir
+            fake_cwd.mkdir(parents=True, exist_ok=True)
+            _write_file_contents(
+                fake_cwd / depfile,
+                f'{remote_cwd}/lib/bar.a: {remote_cwd}/obj/foo.o\n')
+
+            with mock.patch.object(cxx_remote_wrapper,
+                                   'check_missing_remote_tools') as mock_check:
+                # create the remote action
+                self.assertEqual(c.prepare(), 0)
+
+            mock_check.asert_called_once()
+            self.assertEqual(c._remote_action.remote_working_dir, remote_cwd)
+            c._rewrite_depfile()
+            new_depfile = _read_file_contents(fake_cwd / depfile)
+            self.assertEqual(new_depfile, 'lib/bar.a: obj/foo.o\n')
 
     def test_remote_cross_compile_clang_with_integrated_preprocessing(self):
         fake_root = remote_action.PROJECT_ROOT
@@ -352,11 +397,11 @@ class CxxRemoteActionTests(unittest.TestCase):
 
             self.assertEqual(c.remote_compiler, remote_compiler_relpath)
             self.assertEqual(
-                set(c.remote_compile_action.inputs_relative_to_project_root), {
+                set(c.remote_action.inputs_relative_to_project_root), {
                     fake_builddir / source,
                     Path('path/to/clang/linux-x64/clang++'), compiler_swapper
                 })
-            remote_compile_command = c.remote_compile_action.launch_command
+            remote_compile_command = c.remote_action.launch_command
             rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
                 remote_compile_command, '--')
             self.assertIn(
@@ -421,12 +466,12 @@ class CxxRemoteActionTests(unittest.TestCase):
 
             self.assertEqual(c.remote_compiler, remote_compiler_relpath)
             self.assertEqual(
-                set(c.remote_compile_action.inputs_relative_to_project_root), {
+                set(c.remote_action.inputs_relative_to_project_root), {
                     fake_builddir / source,
                     Path('path/to/clang/linux-x64/clang++'), compiler_swapper,
                     fake_builddir / c.cxx_action.preprocessed_output
                 })
-            remote_compile_command = c.remote_compile_action.launch_command
+            remote_compile_command = c.remote_action.launch_command
             rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
                 remote_compile_command, '--')
             self.assertIn(
@@ -490,13 +535,11 @@ class CxxRemoteActionTests(unittest.TestCase):
                 mock_tools.assert_called_with(c.compiler_path)
                 self.assertEqual(c.remote_compiler, remote_compiler_relpath)
                 self.assertEqual(
-                    set(
-                        c.remote_compile_action.inputs_relative_to_project_root
-                    ), {
+                    set(c.remote_action.inputs_relative_to_project_root), {
                         source_in_root,
                         Path('path/to/gcc/linux-x64/g++'), compiler_swapper
                     })
-                remote_compile_command = c.remote_compile_action.launch_command
+                remote_compile_command = c.remote_action.launch_command
                 rewrapper_prefix, sep, wrapped_command = cl_utils.partition_sequence(
                     remote_compile_command, '--')
                 self.assertIn(
