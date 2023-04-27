@@ -20,7 +20,6 @@ use crate::logging::*;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{
     DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
-    UserMemoryCursor,
 };
 use crate::mutable_state::Guard;
 use crate::syscalls::{SyscallResult, SUCCESS};
@@ -43,6 +42,36 @@ use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
+
+/// Allows for sequential reading of a task's userspace memory.
+pub struct UserMemoryCursor {
+    buffer: Vec<u8>,
+    consumed: usize,
+}
+
+impl UserMemoryCursor {
+    /// Create a new [`UserMemoryCursor`] starting at userspace address `addr` of length `len`.
+    /// Upon creation, the cursor reads the entire user buffer then caches it.
+    /// Any reads past `addr + len` will fail with `EINVAL`.
+    pub fn new(ma: &dyn MemoryAccessor, addr: UserAddress, len: u64) -> Result<Self, Errno> {
+        let buffer = ma.read_buffer(&UserBuffer { address: addr, length: len as usize })?;
+        Ok(Self { buffer, consumed: 0 })
+    }
+
+    /// Read an object from userspace memory and increment the read position.
+    pub fn read_object<T: FromBytes>(&mut self) -> Result<T, Errno> {
+        let prev_consumed = self.consumed;
+        self.consumed += std::mem::size_of::<T>();
+        let obj = T::read_from(&self.buffer[prev_consumed..self.consumed])
+            .ok_or_else(|| errno!(EINVAL))?;
+        Ok(obj)
+    }
+
+    /// The total number of bytes read.
+    pub fn bytes_read(&self) -> usize {
+        self.consumed
+    }
+}
 
 #[derive(Debug, Default)]
 struct ContextManagerAndQueue {
@@ -2706,7 +2735,7 @@ impl BinderDriver {
                         resource_accessor.as_memory_accessor(),
                         UserAddress::from(input.write_buffer),
                         input.write_size,
-                    );
+                    )?;
 
                     // Handle all the data the calling thread sent, which may include multiple
                     // commands.
@@ -2798,7 +2827,7 @@ impl BinderDriver {
         current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
         binder_thread: &Arc<BinderThread>,
-        cursor: &mut UserMemoryCursor<'_>,
+        cursor: &mut UserMemoryCursor,
     ) -> Result<(), Errno> {
         let command = cursor.read_object::<binder_driver_command_protocol>()?;
         let result = match command {
@@ -5612,7 +5641,8 @@ pub mod tests {
             &*test.receiver_task.mm,
             data_buffer.address,
             data_buffer.length as u64,
-        );
+        )
+        .expect("create memory cursor");
 
         // Skip the first object, it was only there to pad the next one.
         reader.read_object::<binder_buffer_object>().expect("read padding buffer");
