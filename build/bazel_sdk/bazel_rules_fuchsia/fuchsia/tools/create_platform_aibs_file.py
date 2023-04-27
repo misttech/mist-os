@@ -32,7 +32,7 @@ def main():
         dir_path = os.path.join(args.platform_aibs, subdir)
         if not os.path.isdir(dir_path):
             continue
-        paths.append({"name": dir_path})
+        paths.append({"path": dir_path})
 
     with open(args.output, "w") as f:
         json.dump(paths, f, indent=2)

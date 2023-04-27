@@ -15,7 +15,7 @@ def _fuchsia_package_size_check_impl(ctx):
     size_report = ctx.actions.declare_file(ctx.label.name + "_size_report_blobfs.json")
     verbose_output = ctx.actions.declare_file(ctx.label.name + "_verbose_output_blobfs.json")
     budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json")
-    size_checker_file = ctx.attr.size_checker_file
+    size_checker_file = ctx.file.size_checker_file
     platform_aibs = ctx.attr.product_image[FuchsiaProductImageInfo].platform_aibs
     product_assembly_out = ctx.attr.product_image[FuchsiaProductImageInfo].product_assembly_out
 
@@ -34,9 +34,9 @@ def _fuchsia_package_size_check_impl(ctx):
             "--output",
             budgets_file.path,
             "--blobfs-capacity",
-            ctx.attr.blobfs_capacity,
+            str(ctx.attr.blobfs_capacity),
             "--max-blob-contents-size",
-            ctx.attr.max_blob_contents_size,
+            str(ctx.attr.max_blob_contents_size),
         ],
     )
 
@@ -111,7 +111,7 @@ fuchsia_package_size_check = rule(
             mandatory = True,
         ),
         "_convert_size_limits": attr.label(
-            default = "//build/assembly/scripts:convert_size_limits",
+            default = "//fuchsia/tools:convert_size_limits",
             executable = True,
             cfg = "exec",
         ),

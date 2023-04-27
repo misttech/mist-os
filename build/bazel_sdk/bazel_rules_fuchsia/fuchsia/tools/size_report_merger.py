@@ -26,7 +26,7 @@ def parse_args():
         required=True,
     )
     parser.add_argument(
-        '-merged-verbose-outputs',
+        '--merged-verbose-outputs',
         required=True,
     )
     return parser.parse_args()
@@ -41,7 +41,7 @@ def main():
 
     verbose_output_table = {}
     for verbose_output in args.verbose_outputs.split(","):
-        with open(verbose_outputs, 'r') as f:
+        with open(verbose_output, 'r') as f:
             verbose_output_table.update(json.load(f))
 
     with open(args.merged_size_reports, "w") as f:

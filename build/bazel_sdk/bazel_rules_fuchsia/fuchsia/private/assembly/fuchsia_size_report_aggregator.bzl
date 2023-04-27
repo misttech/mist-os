@@ -10,12 +10,12 @@ def _fuchsia_size_report_aggregator_impl(ctx):
     size_reports = ",".join([
         report[FuchsiaSizeCheckerInfo].size_report.path
         for report in ctx.attr.size_reports
-        if report[FuchsiaSizeCheckerInfo].size_report
+        if hasattr(report[FuchsiaSizeCheckerInfo], "size_report")
     ])
     verbose_outputs = ",".join([
         report[FuchsiaSizeCheckerInfo].verbose_output.path
         for report in ctx.attr.size_reports
-        if report[FuchsiaSizeCheckerInfo].verbose_output
+        if hasattr(report[FuchsiaSizeCheckerInfo], "verbose_output")
     ])
 
     size_report_file = ctx.actions.declare_file(ctx.label.name + "_size_report.json")
@@ -24,7 +24,7 @@ def _fuchsia_size_report_aggregator_impl(ctx):
     # Merge size reports and verbose outputs
     ctx.actions.run(
         outputs = [size_report_file, verbose_output_file],
-        inputs = size_reports,
+        inputs = ctx.files.size_reports,
         executable = ctx.executable._size_report_merger,
         arguments = [
             "--size-reports",

@@ -46,7 +46,7 @@ def _fuchsia_product_size_check_impl(ctx):
             "SIZE_FILE": size_file.path,
             "VISUALIZATION_DIR": visualization_dir.path,
             "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,
-            "CREEP_LIMIT": ctx.attr.creep_limit,
+            "CREEP_LIMIT": str(ctx.attr.blobfs_creep_limit),
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
