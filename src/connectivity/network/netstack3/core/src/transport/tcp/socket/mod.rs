@@ -1912,6 +1912,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                     },
                     None => {
                         if let Some(err) = reason {
+                            if *err == ConnectionError::TimedOut {
+                                *err = soft_error.unwrap_or(ConnectionError::TimedOut);
+                            }
                             let MaybeClosedConnectionId(id, marker) = conn_id;
                             ctx.on_connection_status_change(
                                 ConnectionId(id, marker),

@@ -587,6 +587,11 @@ impl<I: Instant> RetransTimer<I> {
         let Self { at, rto, user_timeout_until: _, remaining_retries: _ } = self;
         *at = now.add(*rto);
     }
+
+    fn timed_out(&self, now: I) -> bool {
+        let RetransTimer { user_timeout_until, remaining_retries, at, rto: _ } = self;
+        (remaining_retries.is_none() && now >= *at) || now >= *user_timeout_until
+    }
 }
 
 /// Possible timers for a sender.
@@ -731,16 +736,15 @@ pub(crate) struct Established<I, R, S> {
 
 impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
     /// Returns true if the connection should still be alive per the send state.
-    fn still_alive(&self, now: I, keep_alive: &KeepAlive) -> bool {
+    fn timed_out(&self, now: I, keep_alive: &KeepAlive) -> bool {
         match self.timer {
             Some(SendTimer::KeepAlive(keep_alive_timer)) => {
-                !keep_alive.enabled || keep_alive_timer.already_sent < keep_alive.count.get()
+                keep_alive.enabled && keep_alive_timer.already_sent >= keep_alive.count.get()
             }
             Some(SendTimer::Retrans(timer)) | Some(SendTimer::ZeroWindowProbe(timer)) => {
-                let RetransTimer { user_timeout_until, remaining_retries, at: _, rto: _ } = timer;
-                remaining_retries.is_some() && now < user_timeout_until
+                timer.timed_out(now)
             }
-            None => true,
+            None => false,
         }
     }
 
@@ -1906,6 +1910,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     }
 
     /// Polls the state machine to check if the connection should be closed.
+    ///
+    /// Returns whether the connection has been closed.
     fn poll_close(
         &mut self,
         now: I,
@@ -1917,28 +1923,33 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             fin_wait2_timeout: _,
         }: &SocketOptions,
     ) -> bool {
-        let alive = match self {
-            State::Established(Established { snd, rcv: _ }) => snd.still_alive(now, keep_alive),
+        let timed_out = match self {
+            State::Established(Established { snd, rcv: _ }) => snd.timed_out(now, keep_alive),
             State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
-                snd.still_alive(now, keep_alive)
+                snd.timed_out(now, keep_alive)
             }
             State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ })
             | State::Closing(Closing { snd, last_ack: _, last_wnd: _ }) => {
-                snd.still_alive(now, keep_alive)
+                snd.timed_out(now, keep_alive)
             }
-            State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.still_alive(now, keep_alive),
-            State::TimeWait(TimeWait { last_seq: _, last_ack: _, last_wnd: _, expiry }) => {
-                *expiry > now
-            }
-            State::SynSent(_) | State::SynRcvd(_) | State::Closed(_) | State::Listen(_) => true,
+            State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.timed_out(now, keep_alive),
+            State::SynSent(_)
+            | State::SynRcvd(_)
+            | State::Closed(_)
+            | State::Listen(_)
+            | State::TimeWait(_) => false,
             State::FinWait2(FinWait2 { last_seq: _, rcv: _, timeout_at }) => {
-                timeout_at.map(|at| now < at).unwrap_or(true)
+                timeout_at.map(|at| now >= at).unwrap_or(false)
             }
         };
-        if !alive {
-            *self = State::Closed(Closed { reason: None });
+        if timed_out {
+            *self = State::Closed(Closed { reason: Some(ConnectionError::TimedOut) });
+        } else if let State::TimeWait(tw) = self {
+            if tw.expiry <= now {
+                *self = State::Closed(Closed { reason: None });
+            }
         }
-        !alive
+        matches!(self, State::Closed(_))
     }
 
     /// Returns an instant at which the caller SHOULD make their best effort to
@@ -4413,7 +4424,7 @@ mod test {
             ),
             None,
         );
-        assert_eq!(state, State::Closed(Closed { reason: None }));
+        assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
     }
 
     /// A `SendBuffer` that doesn't allow peeking some number of bytes.
@@ -4787,7 +4798,7 @@ mod test {
         } else {
             assert!(times < DEFAULT_MAX_RETRIES.get());
         }
-        assert_eq!(state, State::Closed(Closed { reason: None }))
+        assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }))
     }
 
     #[test]
@@ -5068,6 +5079,34 @@ mod test {
         assert_eq!(state.poll_send_at(), Some(clock.now().add(DEFAULT_FIN_WAIT2_TIMEOUT)));
         clock.sleep(DEFAULT_FIN_WAIT2_TIMEOUT);
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
-        assert_eq!(state, State::Closed(Closed { reason: None }));
+        assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
+    }
+
+    #[test_case(RetransTimer {
+        user_timeout_until: FakeInstant::from(Duration::from_secs(100)),
+        remaining_retries: None,
+        at: FakeInstant::from(Duration::from_secs(1)),
+        rto: Duration::from_secs(1),
+    }, FakeInstant::from(Duration::from_secs(1)) => true)]
+    #[test_case(RetransTimer {
+        user_timeout_until: FakeInstant::from(Duration::from_secs(100)),
+        remaining_retries: None,
+        at: FakeInstant::from(Duration::from_secs(2)),
+        rto: Duration::from_secs(1),
+    }, FakeInstant::from(Duration::from_secs(1)) => false)]
+    #[test_case(RetransTimer {
+        user_timeout_until: FakeInstant::from(Duration::from_secs(100)),
+        remaining_retries: Some(NonZeroU8::new(1).unwrap()),
+        at: FakeInstant::from(Duration::from_secs(2)),
+        rto: Duration::from_secs(1),
+    }, FakeInstant::from(Duration::from_secs(1)) => false)]
+    #[test_case(RetransTimer {
+        user_timeout_until: FakeInstant::from(Duration::from_secs(1)),
+        remaining_retries: Some(NonZeroU8::new(1).unwrap()),
+        at: FakeInstant::from(Duration::from_secs(1)),
+        rto: Duration::from_secs(1),
+    }, FakeInstant::from(Duration::from_secs(1)) => true)]
+    fn send_timed_out(timer: RetransTimer<FakeInstant>, now: FakeInstant) -> bool {
+        timer.timed_out(now)
     }
 }

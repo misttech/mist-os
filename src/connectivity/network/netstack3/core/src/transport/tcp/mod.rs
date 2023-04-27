@@ -83,6 +83,8 @@ pub enum ConnectionError {
     SourceRouteFailed,
     /// The connection was closed because the source host is isolated.
     SourceHostIsolated,
+    /// The connection was closed because of a time out.
+    TimedOut,
 }
 
 impl From<IcmpErrorCode> for Option<ConnectionError> {
