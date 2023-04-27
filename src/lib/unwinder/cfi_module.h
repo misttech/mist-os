@@ -35,9 +35,6 @@ class CfiModule {
   // Check whether a given PC is in the valid range.
   bool IsValidPC(uint64_t pc) const { return pc >= pc_begin_ && pc < pc_end_; }
 
-  // Memory accessor.
-  Memory* memory() const { return elf_; }
-
  private:
   // DWARF Common Information Entry.
   struct DwarfCie {
