@@ -72,7 +72,6 @@ fuchsia_product_size_check = rule(
         ),
         "blobfs_creep_limit": attr.int(
             doc = "Creep limit for Blobfs, this is how much BlobFS contents can increase in one CL",
-            default = 102400,
         ),
     },
 )

@@ -107,7 +107,7 @@ fuchsia_package_size_check = rule(
             mandatory = True,
         ),
         "max_blob_contents_size": attr.int(
-            doc = "Total size of BlobFS packages",
+            doc = "Total size of BlobFS Contents",
             mandatory = True,
         ),
         "_convert_size_limits": attr.label(
