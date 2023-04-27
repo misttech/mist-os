@@ -34,12 +34,19 @@ impl SysFs {
         // TODO(fxb/119437): Create a dynamic directory that depends on registered devices.
         dir.subdir(b"devices", 0o755, |dir| {
             dir.subdir(b"virtual", 0o755, |dir| {
+                dir.subdir(b"tty", 0o755, |dir| {
+                    dir.entry(
+                        b"tty",
+                        DeviceDirectory::new(kernel.clone(), DeviceType::TTY),
+                        mode!(IFDIR, 0o755),
+                    );
+                });
                 dir.subdir(b"input", 0o755, |dir| {
                     dir.entry(
                         b"input",
                         DeviceDirectory::new(kernel.clone(), DeviceType::new(INPUT_MAJOR, 0)),
                         mode!(IFDIR, 0o755),
-                    )
+                    );
                 });
                 dir.subdir(b"misc", 0o755, |dir| {
                     dir.entry(
@@ -47,7 +54,7 @@ impl SysFs {
                         DeviceDirectory::new(kernel.clone(), DeviceType::DEVICE_MAPPER),
                         mode!(IFDIR, 0o755),
                     );
-                })
+                });
             })
         });
         dir.build_root();

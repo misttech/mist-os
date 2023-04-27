@@ -679,6 +679,17 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                 DEVNAME=input/event{minor}\0\
                 SEQNUM={seqnum}",
             ),
+            (DeviceType::TTY, _, _) => format!(
+                "add@/devices/virtual/tty/tty\0\
+                ACTION=add\0\
+                DEVPATH=/devices/virtual/tty/tty\0\
+                SUBSYSTEM=tty\0\
+                SYNTH_UUID=0\0\
+                MAJOR={}\0\
+                MINOR={}\0\
+                DEVNAME=tty\0\
+                SEQNUM={seqnum}", DeviceType::TTY.major(), DeviceType::TTY.minor()
+            ),
             _ => {
                 crate::logging::not_implemented!(
                     "?",
