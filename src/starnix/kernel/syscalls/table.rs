@@ -251,6 +251,7 @@ pub fn dispatch_syscall(
         statx[5],
         #[cfg(target_arch = "x86_64")] symlink[2],
         symlinkat[3],
+        syncfs[1],
         sysinfo[1],
         tgkill[3],
         #[cfg(target_arch = "x86_64")] time[1],

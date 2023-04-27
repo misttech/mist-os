@@ -1981,6 +1981,12 @@ pub fn sys_flock(current_task: &CurrentTask, fd: FdNumber, operation: u32) -> Re
     file.flock(current_task, operation)
 }
 
+pub fn sys_syncfs(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
+    let _file = current_task.files.get_unless_opath(fd)?;
+    not_implemented!(current_task, "syncfs");
+    Ok(())
+}
+
 pub fn sys_fsync(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
     let _file = current_task.files.get(fd)?;
     not_implemented!(current_task, "fsync");
