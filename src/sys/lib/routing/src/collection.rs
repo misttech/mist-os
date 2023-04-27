@@ -10,10 +10,9 @@ use {
         },
         error::RoutingError,
         mapper::DebugRouteMapper,
-        router::{
-            find_matching_expose, CapabilityVisitor, ErrorNotFoundInChild, Expose, ExposeVisitor,
-            Offer, OfferVisitor, RoutingStrategy, Sources,
-        },
+        router,
+        router::{CapabilityVisitor, ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, Sources},
+        Never, RouteInfo,
     },
     async_trait::async_trait,
     cm_rust::{
@@ -36,11 +35,11 @@ use {
 /// all children within the collection.
 #[derive(Derivative)]
 #[derivative(Clone(bound = "E: Clone, S: Clone, V: Clone, M: Clone"))]
-pub(super) struct CollectionCapabilityProvider<C: ComponentInstanceInterface, U, O, E, S, V, M> {
-    pub router: RoutingStrategy<U, O, Expose<E>>,
-
+pub(super) struct CollectionCapabilityProvider<C: ComponentInstanceInterface, E, S, V, M> {
     /// Component that contains the collection.
     pub collection_component: WeakComponentInstanceInterface<C>,
+
+    pub phantom_expose: std::marker::PhantomData<E>,
 
     /// Name of the collection within `collection_component`.
     pub collection_name: String,
@@ -54,15 +53,12 @@ pub(super) struct CollectionCapabilityProvider<C: ComponentInstanceInterface, U,
 }
 
 #[async_trait]
-impl<C, U, O, E, S, V, M> AggregateCapabilityProvider<C>
-    for CollectionCapabilityProvider<C, U, O, E, S, V, M>
+impl<C, E, S, V, M> AggregateCapabilityProvider<C> for CollectionCapabilityProvider<C, E, S, V, M>
 where
     C: ComponentInstanceInterface + 'static,
-    U: Send + Sync + 'static,
-    O: Send + Sync + 'static,
     E: ExposeDeclCommon
+        + FromEnum<cm_rust::ExposeDecl>
         + ErrorNotFoundInChild
-        + FromEnum<ExposeDecl>
         + Into<ExposeDecl>
         + Clone
         + 'static,
@@ -88,7 +84,9 @@ where
             let child_exposes = child_component.lock_resolved_state().await.map(|c| c.exposes());
             match child_exposes {
                 Ok(child_exposes) => {
-                    if find_matching_expose::<E>(&self.capability_name, &child_exposes).is_some() {
+                    if router::find_matching_expose::<E>(&self.capability_name, &child_exposes)
+                        .is_some()
+                    {
                         instances.push(moniker.name().to_string())
                     }
                 }
@@ -122,25 +120,25 @@ where
 
         let expose_decl: E = {
             let child_exposes = child_component.lock_resolved_state().await?.exposes();
-            find_matching_expose(&self.capability_name, &child_exposes).cloned().ok_or_else(
-                || {
+            router::find_matching_expose(&self.capability_name, &child_exposes)
+                .cloned()
+                .ok_or_else(|| {
                     E::error_not_found_in_child(
                         collection_component.abs_moniker().clone(),
                         child_moniker,
                         self.capability_name.clone(),
                     )
-                },
-            )?
+                })?
         };
-        self.router
-            .route_from_expose(
-                expose_decl,
-                child_component,
-                self.sources.clone(),
-                &mut self.visitor.clone(),
-                &mut self.mapper.clone(),
-            )
-            .await
+        router::route_from_expose(
+            expose_decl,
+            child_component,
+            self.sources.clone(),
+            &mut self.visitor.clone(),
+            &mut self.mapper.clone(),
+            &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
+        )
+        .await
     }
 
     fn clone_boxed(&self) -> Box<dyn AggregateCapabilityProvider<C>> {
@@ -150,9 +148,7 @@ where
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "S: Clone, M: Clone, V: Clone"))]
-pub(super) struct AggregateServiceProvider<C: ComponentInstanceInterface, U, S, M, V> {
-    router: RoutingStrategy<U, Offer<OfferServiceDecl>, Expose<ExposeServiceDecl>>,
-
+pub(super) struct AggregateServiceProvider<C: ComponentInstanceInterface, S, M, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
 
@@ -164,10 +160,9 @@ pub(super) struct AggregateServiceProvider<C: ComponentInstanceInterface, U, S, 
     mapper: M,
 }
 
-impl<C, U, S, M, V> AggregateServiceProvider<C, U, S, M, V>
+impl<C, S, M, V> AggregateServiceProvider<C, S, M, V>
 where
     C: ComponentInstanceInterface + 'static,
-    U: Send + Sync + 'static,
     S: Sources<CapabilityDecl = ServiceDecl> + 'static,
     V: OfferVisitor<OfferDecl = OfferServiceDecl>
         + ExposeVisitor<ExposeDecl = ExposeServiceDecl>
@@ -178,7 +173,6 @@ where
     pub(super) fn new(
         offer_service_decls: Vec<OfferServiceDecl>,
         component: WeakComponentInstanceInterface<C>,
-        router: RoutingStrategy<U, Offer<OfferServiceDecl>, Expose<ExposeServiceDecl>>,
         sources: S,
         visitor: V,
         mapper: M,
@@ -196,15 +190,14 @@ where
             })
             .flatten()
             .collect();
-        Self { router, offer_decls: single_instance_decls, sources, visitor, component, mapper }
+        Self { offer_decls: single_instance_decls, sources, visitor, component, mapper }
     }
 }
 
 #[async_trait]
-impl<C, U, S, M, V> AggregateCapabilityProvider<C> for AggregateServiceProvider<C, U, S, M, V>
+impl<C, S, M, V> AggregateCapabilityProvider<C> for AggregateServiceProvider<C, S, M, V>
 where
     C: ComponentInstanceInterface + 'static,
-    U: Send + Sync + 'static,
     S: Sources<CapabilityDecl = ServiceDecl> + 'static,
     V: OfferVisitor<OfferDecl = OfferServiceDecl>
         + ExposeVisitor<ExposeDecl = ExposeServiceDecl>
@@ -229,21 +222,20 @@ where
                 .map(|allowed_instances| allowed_instances.contains(&instance.to_string()))
                 .unwrap_or(false)
             {
-                return self
-                    .router
-                    .route_from_offer(
-                        offer_decl.clone(),
-                        self.component.upgrade().map_err(|e| {
-                            RoutingError::unsupported_route_source(format!(
-                                "error upgrading aggregation point component {}",
-                                e
-                            ))
-                        })?,
-                        self.sources.clone(),
-                        &mut self.visitor.clone(),
-                        &mut self.mapper.clone(),
-                    )
-                    .await;
+                return router::route_from_offer(
+                    offer_decl.clone(),
+                    self.component.upgrade().map_err(|e| {
+                        RoutingError::unsupported_route_source(format!(
+                            "error upgrading aggregation point component {}",
+                            e
+                        ))
+                    })?,
+                    self.sources.clone(),
+                    &mut self.visitor.clone(),
+                    &mut self.mapper.clone(),
+                    &mut vec![],
+                )
+                .await;
             }
         }
         Err(RoutingError::unsupported_route_source(format!("instance '{}' not found", instance)))

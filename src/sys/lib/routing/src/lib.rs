@@ -37,7 +37,7 @@ use {
         rights::Rights,
         router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
-            ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, RoutingStrategy, Sources,
+            ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, Sources,
         },
         walk_state::WalkState,
     },
@@ -224,6 +224,8 @@ where
     }
 }
 
+pub enum Never {}
+
 /// Route information regarding an offer/expose or collection hop
 /// in the component topology.
 pub struct RouteInfo<C, O, E> {
@@ -254,18 +256,15 @@ where
         .namespace()
         .component()
         .capability();
-    let source = RoutingStrategy::new()
-        .use_::<UseProtocolDecl>()
-        .offer::<OfferProtocolDecl>()
-        .expose::<ExposeProtocolDecl>()
-        .route_from_offer(
-            offer_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-        )
-        .await?;
+    let source = router::route_from_offer(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new(source))
 }
 
@@ -290,12 +289,15 @@ where
         .framework(InternalCapability::Directory)
         .namespace()
         .component();
-    let source = RoutingStrategy::new()
-        .use_::<UseDirectoryDecl>()
-        .offer::<OfferDirectoryDecl>()
-        .expose::<ExposeDirectoryDecl>()
-        .route_from_offer(offer_decl, target.clone(), allowed_sources, &mut state, mapper)
-        .await?;
+    let source = router::route_from_offer(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut state,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
@@ -310,18 +312,15 @@ where
 {
     let mut availability_visitor = AvailabilityServiceVisitor::new_from_offer(&offer_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
-    let source = RoutingStrategy::new()
-        .use_::<UseServiceDecl>()
-        .offer::<OfferServiceDecl>()
-        .expose::<ExposeServiceDecl>()
-        .route_from_offer(
-            offer_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-        )
-        .await?;
+    let source = router::route_from_offer(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new(source))
 }
 
@@ -338,18 +337,15 @@ where
     let allowed_sources = AllowedSourcesBuilder::new().builtin();
 
     let mut availability_visitor = AvailabilityEventStreamVisitor::new_from_offer(&offer_decl);
-    let source = RoutingStrategy::new()
-        .use_::<UseEventStreamDecl>()
-        .offer::<OfferEventStreamDecl>()
-        .expose::<ExposeEventStreamDecl>()
-        .route_from_offer(
-            offer_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-        )
-        .await?;
+    let source = router::route_from_offer(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new(source))
 }
 
@@ -365,20 +361,15 @@ where
     let mut availability_visitor = AvailabilityStorageVisitor::new_from_offer(&offer_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component();
 
-    let mut route = vec![];
-
-    let source = RoutingStrategy::new()
-        .use_::<UseStorageDecl>()
-        .offer::<OfferStorageDecl>()
-        .route_from_offer(
-            offer_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-            &mut route,
-        )
-        .await?;
+    let source = router::route_from_offer_without_expose(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new(source))
 }
 
@@ -393,12 +384,15 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
 
-    let source = RoutingStrategy::new()
-        .registration::<RunnerRegistration>()
-        .offer::<OfferRunnerDecl>()
-        .expose::<ExposeRunnerDecl>()
-        .route_from_offer(offer_decl, target.clone(), allowed_sources, &mut RunnerVisitor, mapper)
-        .await?;
+    let source = router::route_from_offer(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut RunnerVisitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new(source))
 }
 
@@ -413,12 +407,15 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
 
-    let source = RoutingStrategy::new()
-        .registration::<ResolverRegistration>()
-        .offer::<OfferResolverDecl>()
-        .expose::<ExposeResolverDecl>()
-        .route_from_offer(offer_decl, target.clone(), allowed_sources, &mut ResolverVisitor, mapper)
-        .await?;
+    let source = router::route_from_offer(
+        offer_decl,
+        target.clone(),
+        allowed_sources,
+        &mut ResolverVisitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     Ok(RouteSource::new(source))
 }
 
@@ -499,22 +496,19 @@ where
             let env_moniker = env_component_instance.abs_moniker();
 
             let mut availability_visitor = AvailabilityProtocolVisitor::new(&use_decl);
-            let source = RoutingStrategy::new()
-                .registration::<DebugRegistration>()
-                .offer::<OfferProtocolDecl>()
-                .expose::<ExposeProtocolDecl>()
-                .route(
-                    registration_decl,
-                    env_component_instance.clone(),
-                    allowed_sources,
-                    &mut availability_visitor,
-                    mapper,
-                )
-                .await
-                .map_err(|err| {
-                    warn!(?use_decl, %err, "route_protocol error 2");
-                    err
-                })?;
+            let source = router::route_from_registration(
+                registration_decl,
+                env_component_instance.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+                &mut vec![],
+            )
+            .await
+            .map_err(|err| {
+                warn!(?use_decl, %err, "route_protocol error 2");
+                err
+            })?;
 
             target
                 .policy_checker()
@@ -528,20 +522,27 @@ where
         UseSource::Self_ => {
             let mut availability_visitor = AvailabilityProtocolVisitor::new(&use_decl);
             let allowed_sources = AllowedSourcesBuilder::new().component();
-            let source = RoutingStrategy::new()
-                .use_::<UseProtocolDecl>()
-                .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-                .await?;
+            let source = router::route_from_self(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+            )
+            .await?;
             Ok(RouteSource::new(source))
         }
         _ => {
             let mut availability_visitor = AvailabilityProtocolVisitor::new(&use_decl);
-            let source = RoutingStrategy::new()
-                .use_::<UseProtocolDecl>()
-                .offer::<OfferProtocolDecl>()
-                .expose::<ExposeProtocolDecl>()
-                .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-                .await?;
+            let source = router::route_from_use(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+                &mut vec![],
+            )
+            .await?;
 
             target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
             Ok(RouteSource::new(source))
@@ -567,18 +568,15 @@ where
         .namespace()
         .component()
         .capability();
-    let source = RoutingStrategy::new()
-        .use_::<UseProtocolDecl>()
-        .offer::<OfferProtocolDecl>()
-        .expose::<ExposeProtocolDecl>()
-        .route_from_expose(
-            expose_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-        )
-        .await?;
+    let source = router::route_from_expose(
+        expose_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
+    )
+    .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
     Ok(RouteSource::new(source))
@@ -597,21 +595,28 @@ where
         UseSource::Self_ => {
             let mut availability_visitor = AvailabilityServiceVisitor::new(&use_decl);
             let allowed_sources = AllowedSourcesBuilder::new().component();
-            let source = RoutingStrategy::new()
-                .use_::<UseServiceDecl>()
-                .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-                .await?;
+            let source = router::route_from_self(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+            )
+            .await?;
             Ok(RouteSource::new(source))
         }
         _ => {
             let mut availability_visitor = AvailabilityServiceVisitor::new(&use_decl);
             let allowed_sources = AllowedSourcesBuilder::new().component().collection();
-            let source = RoutingStrategy::new()
-                .use_::<UseServiceDecl>()
-                .offer::<OfferServiceDecl>()
-                .expose::<ExposeServiceDecl>()
-                .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-                .await?;
+            let source = router::route_from_use(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+                &mut vec![],
+            )
+            .await?;
 
             target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
             Ok(RouteSource::new(source))
@@ -630,18 +635,15 @@ where
 {
     let mut availability_visitor = AvailabilityServiceVisitor::required();
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
-    let source = RoutingStrategy::new()
-        .use_::<UseServiceDecl>()
-        .offer::<OfferServiceDecl>()
-        .expose::<ExposeServiceDecl>()
-        .route_from_expose(
-            expose_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-        )
-        .await?;
+    let source = router::route_from_expose(
+        expose_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
+    )
+    .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
     Ok(RouteSource::new(source))
@@ -742,10 +744,14 @@ where
         UseSource::Self_ => {
             let mut availability_visitor = AvailabilityDirectoryVisitor::new(&use_decl);
             let allowed_sources = AllowedSourcesBuilder::new().component();
-            let source = RoutingStrategy::new()
-                .use_::<UseDirectoryDecl>()
-                .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-                .await?;
+            let source = router::route_from_self(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+            )
+            .await?;
             Ok(RouteSource::new(source))
         }
         _ => {
@@ -761,12 +767,15 @@ where
                 .framework(InternalCapability::Directory)
                 .namespace()
                 .component();
-            let source = RoutingStrategy::new()
-                .use_::<UseDirectoryDecl>()
-                .offer::<OfferDirectoryDecl>()
-                .expose::<ExposeDirectoryDecl>()
-                .route(use_decl, target.clone(), allowed_sources, &mut state, mapper)
-                .await?;
+            let source = router::route_from_use(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut state,
+                mapper,
+                &mut vec![],
+            )
+            .await?;
 
             target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
             Ok(RouteSource::new_with_relative_path(source, state.subdir))
@@ -795,12 +804,15 @@ where
         .framework(InternalCapability::Directory)
         .namespace()
         .component();
-    let source = RoutingStrategy::new()
-        .use_::<UseDirectoryDecl>()
-        .offer::<OfferDirectoryDecl>()
-        .expose::<ExposeDirectoryDecl>()
-        .route_from_expose(expose_decl, target.clone(), allowed_sources, &mut state, mapper)
-        .await?;
+    let source = router::route_from_expose(
+        expose_decl,
+        target.clone(),
+        allowed_sources,
+        &mut state,
+        mapper,
+        &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
+    )
+    .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
@@ -847,11 +859,14 @@ where
 {
     let mut availability_visitor = AvailabilityStorageVisitor::new(&use_decl);
     let allowed_sources = AllowedSourcesBuilder::new().component();
-    let source = RoutingStrategy::new()
-        .use_::<UseStorageDecl>()
-        .offer::<OfferStorageDecl>()
-        .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-        .await?;
+    let source = router::route_from_use_without_expose(
+        use_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+    )
+    .await?;
     Ok(source)
 }
 
@@ -886,12 +901,15 @@ where
     // Storage rights are always READ+WRITE.
     let mut state = DirectoryState::new(fio::RW_STAR_DIR, None, &Availability::Required);
     let allowed_sources = AllowedSourcesBuilder::new().component().namespace();
-    let source = RoutingStrategy::new()
-        .registration::<StorageDeclAsRegistration>()
-        .offer::<OfferDirectoryDecl>()
-        .expose::<ExposeDirectoryDecl>()
-        .route(storage_decl.clone().into(), target.clone(), allowed_sources, &mut state, mapper)
-        .await?;
+    let source = router::route_from_registration(
+        StorageDeclAsRegistration::from(storage_decl.clone()),
+        target.clone(),
+        allowed_sources,
+        &mut state,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
 
@@ -919,18 +937,15 @@ where
     let source = match target.environment().get_registered_runner(&runner)? {
         // The runner was registered in the environment of some component instance..
         Some((ExtendedInstanceInterface::Component(env_component_instance), registration_decl)) => {
-            RoutingStrategy::new()
-                .registration::<RunnerRegistration>()
-                .offer::<OfferRunnerDecl>()
-                .expose::<ExposeRunnerDecl>()
-                .route(
-                    registration_decl,
-                    env_component_instance,
-                    allowed_sources,
-                    &mut RunnerVisitor,
-                    mapper,
-                )
-                .await
+            router::route_from_registration(
+                registration_decl,
+                env_component_instance,
+                allowed_sources,
+                &mut RunnerVisitor,
+                mapper,
+                &mut vec![],
+            )
+            .await
         }
         // The runner was registered in the root environment.
         Some((ExtendedInstanceInterface::AboveRoot(top_instance), reg)) => {
@@ -977,12 +992,15 @@ where
     M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
-    let source = RoutingStrategy::new()
-        .registration::<ResolverRegistration>()
-        .offer::<OfferResolverDecl>()
-        .expose::<ExposeResolverDecl>()
-        .route(registration, target.clone(), allowed_sources, &mut ResolverVisitor, mapper)
-        .await?;
+    let source = router::route_from_registration(
+        registration,
+        target.clone(),
+        allowed_sources,
+        &mut ResolverVisitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
     Ok(RouteSource::new(source))
@@ -1001,12 +1019,15 @@ where
     let allowed_sources = AllowedSourcesBuilder::new().builtin();
 
     let mut availability_visitor = AvailabilityEventStreamVisitor::new(&use_decl);
-    let source = RoutingStrategy::new()
-        .use_::<UseEventStreamDecl>()
-        .offer::<OfferEventStreamDecl>()
-        .expose::<ExposeEventStreamDecl>()
-        .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
-        .await?;
+    let source = router::route_from_use(
+        use_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        &mut vec![],
+    )
+    .await?;
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
     Ok(RouteSource::new(source))
 }
@@ -1025,19 +1046,15 @@ where
     let allowed_sources =
         AllowedSourcesBuilder::new().framework(InternalCapability::EventStream).builtin();
     let mut availability_visitor = AvailabilityEventStreamVisitor::new(&use_decl);
-    let source = RoutingStrategy::new()
-        .use_::<UseEventStreamDecl>()
-        .offer::<OfferEventStreamDecl>()
-        .expose::<ExposeEventStreamDecl>()
-        .route_extended_strategy(
-            use_decl,
-            target.clone(),
-            allowed_sources,
-            &mut availability_visitor,
-            mapper,
-            route,
-        )
-        .await?;
+    let source = router::route_from_use(
+        use_decl,
+        target.clone(),
+        allowed_sources,
+        &mut availability_visitor,
+        mapper,
+        route,
+    )
+    .await?;
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
     Ok(RouteSource::new(source))
 }
