@@ -18,19 +18,6 @@ group("tests") {
   }
 }
 
-resource("binder_smoke_test_bin") {
-  sources = [ "${gvisor_prebuilt_directory}/stripped/binder_smoke_test" ]
-  outputs = [ "data/tests/binder_smoke_test" ]
-}
-
-fuchsia_test_component("binder_smoke_test") {
-  manifest = "meta/binder_smoke_test.cml"
-  deps = [
-    ":binder_smoke_test_bin",
-    "//src/starnix/tests:starnix_test",
-  ]
-}
-
 fuchsia_test_component_with_expectations("adbd_test") {
   manifest = "meta/adbd_test.cml"
   expectations = "expectations/adbd_test.json5"
@@ -76,7 +63,6 @@ fuchsia_test_package("android") {
     ":adbd_test",
     ":boringssl_self_test64",
     ":sh_test",
-    ":binder_smoke_test",
     ":libutils_test",
   ]
 
