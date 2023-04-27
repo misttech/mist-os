@@ -4,6 +4,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DAI_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DAI_H_
 
+#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.virtualaudio/cpp/wire.h>
 #include <lib/affine/transform.h>
 #include <lib/ddk/platform-defs.h>
@@ -29,7 +30,7 @@ using VirtualAudioDaiDeviceType =
 
 class VirtualAudioDai : public VirtualAudioDaiDeviceType,
                         public ddk::internal::base_protocol,
-                        public fidl::WireServer<fuchsia_hardware_audio::Dai>,
+                        public fidl::Server<fuchsia_hardware_audio::Dai>,
                         public VirtualAudioDriver {
  public:
   VirtualAudioDai(const VirtualAudioDeviceImpl::Config& cfg,
@@ -63,20 +64,20 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
     fidl::BindServer(dispatcher(), std::move(request->dai_protocol), this);
   }
 
-  // FIDL LLCPP methods for fuchsia.hardware.audio.Dai.
+  // FIDL natural C++ methods for fuchsia.hardware.audio.Dai.
   void Reset(ResetCompleter::Sync& completer) override { completer.Reply(); }
   void GetProperties(GetPropertiesCompleter::Sync& completer) override {
     fidl::Arena arena;
-    auto builder = fuchsia_hardware_audio::wire::DaiProperties::Builder(arena);
-    builder.is_input(false);
-    completer.Reply(builder.Build());
+    fuchsia_hardware_audio::DaiProperties properties;
+    properties.is_input(false);
+    completer.Reply(std::move(properties));
   }
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
-  void SignalProcessingConnect(SignalProcessingConnectRequestView request,
+  void SignalProcessingConnect(SignalProcessingConnectRequest& request,
                                SignalProcessingConnectCompleter::Sync& completer) override {
-    request->protocol.Close(ZX_ERR_NOT_SUPPORTED);
+    request.protocol().Close(ZX_ERR_NOT_SUPPORTED);
   }
   void GetRingBufferFormats(GetRingBufferFormatsCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
@@ -85,7 +86,7 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   void GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
-  void CreateRingBuffer(CreateRingBufferRequestView request,
+  void CreateRingBuffer(CreateRingBufferRequest& request,
                         CreateRingBufferCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
