@@ -431,16 +431,6 @@
             to: "#test_manager",
         },
 
-        // Integrate with Remote Control Service
-        {
-            protocol: [
-                "fuchsia.test.manager.Query",
-                "fuchsia.test.manager.RunBuilder",
-            ],
-            from: "#test_manager",
-            to: "#remote-control",
-        },
-
         // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
         // and chromium realm.
         // TODO(fxbug.dev/83038): Remove once e2e is better supported.

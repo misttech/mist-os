@@ -56,12 +56,5 @@
             from: "#fuzz-registry",
             to: "#fuzz-manager",
         },
-
-        // Integrate with Remote Control Service
-        {
-            protocol: [ "fuchsia.fuzzer.Manager" ],
-            from: "#fuzz-manager",
-            to: "#remote-control",
-        },
     ],
 }

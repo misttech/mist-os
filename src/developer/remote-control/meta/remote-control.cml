@@ -22,7 +22,6 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
-                "fuchsia.fuzzer.Manager",
                 "fuchsia.hwinfo.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.interfaces.State",
@@ -33,9 +32,15 @@
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
                 "fuchsia.sys2.RouteValidator.root",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.fuzzer.Manager",
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
             ],
+            availability: "optional",
         },
     ],
     expose: [

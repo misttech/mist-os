@@ -98,10 +98,6 @@
             protocol: "fuchsia.update.CommitStatusProvider",
             from: "#system-update",
         },
-        {
-            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
-            from: "#remote-control",
-        },
 
         // TODO(https://fxbug.dev/97617): If there's no v1 dependencies these should not be routed here.
         {
