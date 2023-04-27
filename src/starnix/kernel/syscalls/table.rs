@@ -211,6 +211,7 @@ pub fn dispatch_syscall(
         inotify_rm_watch[2],
         ioctl[3],
         kill[2],
+        #[cfg(target_arch = "x86_64")] lchown[3],
         lgetxattr[4],
         linkat[5],
         listen[2],

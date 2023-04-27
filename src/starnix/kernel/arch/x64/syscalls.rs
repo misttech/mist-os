@@ -167,6 +167,15 @@ pub fn sys_inotify_init(current_task: &CurrentTask) -> Result<FdNumber, Errno> {
     sys_inotify_init1(current_task, 0)
 }
 
+pub fn sys_lchown(
+    current_task: &CurrentTask,
+    user_path: UserCString,
+    owner: uid_t,
+    group: gid_t,
+) -> Result<(), Errno> {
+    sys_fchownat(current_task, FdNumber::AT_FDCWD, user_path, owner, group, AT_SYMLINK_NOFOLLOW)
+}
+
 pub fn sys_lstat(
     current_task: &CurrentTask,
     user_path: UserCString,
