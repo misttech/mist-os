@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_TESTING_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/fidl/txn_header.h>
 #include <zircon/pixelformat.h>
 
@@ -25,13 +26,13 @@ struct ColorCorrectionArgs {
 
 class Display {
  public:
-  Display(const fuchsia_hardware_display::wire::Info& info);
+  Display(const fuchsia_hardware_display::wire::Info& info,
+          cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats);
 
-  void Init(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc);
   void Init(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc,
             ColorCorrectionArgs color_correction_args = ColorCorrectionArgs());
 
-  zx_pixel_format_t format() const { return pixel_formats_[format_idx_]; }
+  fuchsia_images2::wire::PixelFormat format() const { return pixel_formats_[format_idx_]; }
   fuchsia_hardware_display::wire::Mode mode() const { return modes_[mode_idx_]; }
   fuchsia_hardware_display::wire::CursorInfo cursor() const { return cursors_[0]; }
   uint64_t id() const { return id_; }
@@ -58,7 +59,7 @@ class Display {
   bool grayscale_ = false;
 
   uint64_t id_;
-  fbl::Vector<zx_pixel_format_t> pixel_formats_;
+  fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
   fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
   fbl::Vector<fuchsia_hardware_display::wire::CursorInfo> cursors_;
 

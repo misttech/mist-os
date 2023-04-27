@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_TESTING_VIRTUAL_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
@@ -137,7 +138,9 @@ class PrimaryLayer : public VirtualLayer {
     alpha_val_ = val;
   }
   void SetScaling(bool enable) { scaling_ = enable; }
-  void SetImageFormat(uint32_t image_format) { image_format_ = image_format; }
+  void SetImageFormat(fuchsia_images2::wire::PixelFormat image_format) {
+    image_format_ = image_format;
+  }
   void SetFormatModifier(uint64_t modifier) { modifier_ = modifier; }
 
   bool Init(const fidl::WireSyncClient<Controller>& dc) override;
@@ -165,7 +168,7 @@ class PrimaryLayer : public VirtualLayer {
 
   uint32_t image_width_ = 0;
   uint32_t image_height_ = 0;
-  uint32_t image_format_ = 0;
+  fuchsia_images2::wire::PixelFormat image_format_ = fuchsia_images2::wire::PixelFormat::kInvalid;
   bool override_colors_ = false;
 
   Image::Pattern image_pattern_ = Image::Pattern::kCheckerboard;

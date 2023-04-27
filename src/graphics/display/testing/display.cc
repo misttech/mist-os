@@ -15,12 +15,12 @@ namespace fhd = fuchsia_hardware_display;
 namespace testing {
 namespace display {
 
-Display::Display(const fhd::wire::Info& info) {
+Display::Display(const fhd::wire::Info& info,
+                 cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) {
   id_ = info.id;
 
-  auto pixel_format = reinterpret_cast<const int32_t*>(info.pixel_format.data());
-  for (unsigned i = 0; i < info.pixel_format.count(); i++) {
-    pixel_formats_.push_back(pixel_format[i]);
+  for (const fuchsia_images2::wire::PixelFormat pixel_format : pixel_formats) {
+    pixel_formats_.push_back(pixel_format);
   }
 
   auto mode = reinterpret_cast<const fhd::wire::Mode*>(info.modes.data());
@@ -50,7 +50,7 @@ void Display::Dump() {
 
   printf("\tSupported pixel formats:\n");
   for (unsigned i = 0; i < pixel_formats_.size(); i++) {
-    printf("\t\t%d\t: %08x\n", i, pixel_formats_[i]);
+    printf("\t\t%d\t: %8u\n", i, static_cast<uint32_t>(pixel_formats_[i]));
   }
 
   printf("\n\tSupported display modes:\n");

@@ -5,6 +5,9 @@
 #include "virtual-layer.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire_types.h>
+#include <lib/image-format/image_format.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <math.h>
 #include <stdio.h>
 #include <zircon/pixelformat.h>
@@ -14,6 +17,7 @@
 
 #include <fbl/algorithm.h>
 
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "utils.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -206,8 +210,10 @@ bool PrimaryLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
 
 void* PrimaryLayer::GetCurrentImageBuf() { return images_[alt_image_]->buffer(); }
 size_t PrimaryLayer::GetCurrentImageSize() {
+  PixelFormatAndModifier format_and_modifier(images_[alt_image_]->format(),
+                                             images_[alt_image_]->modifier());
   return images_[alt_image_]->height() * images_[alt_image_]->stride() *
-         ZX_PIXEL_FORMAT_BYTES(images_[alt_image_]->format());
+         ImageFormatStrideBytesPerWidthPixel(format_and_modifier);
 }
 void PrimaryLayer::StepLayout(int32_t frame_num) {
   if (layer_flipping_) {
@@ -366,8 +372,16 @@ CursorLayer::CursorLayer(const fbl::Vector<Display>& displays) : VirtualLayer(di
 bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
   fhd::wire::CursorInfo info = displays_[0]->cursor();
   uint32_t bg_color = 0xffffffff;
-  image_ = Image::Create(dc, info.width, info.height, info.pixel_format, Image::Pattern::kBorder,
-                         get_fg_color(), bg_color, false);
+
+  zx::result convert_result = ::display::AnyPixelFormatToImages2PixelFormat(info.pixel_format);
+  if (!convert_result.is_ok()) {
+    fprintf(stderr, "Cannot convert cursor pixel format %u", info.pixel_format);
+    return false;
+  }
+  fuchsia_images2::wire::PixelFormat cursor_pixel_format = convert_result.value();
+
+  image_ = Image::Create(dc, info.width, info.height, cursor_pixel_format, Image::Pattern::kBorder,
+                         get_fg_color(), bg_color, fuchsia_images2::wire::kFormatModifierLinear);
   if (!image_) {
     return false;
   }

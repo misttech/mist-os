@@ -4,6 +4,7 @@
 
 #include <endian.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -14,7 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <zircon/pixelformat.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
@@ -31,6 +31,7 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/graphics/display/testing/display.h"
 #include "src/graphics/display/testing/utils.h"
 #include "src/graphics/display/testing/virtual-layer.h"
@@ -119,7 +120,16 @@ static bool bind_display(const char* controller, fbl::Vector<Display>* displays)
 
     void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {
       for (size_t i = 0; i < event->added.count(); i++) {
-        displays_->push_back(Display(event->added[i]));
+        const fhd::wire::Info& info = event->added[i];
+
+        zx::result convert_result = display::AnyPixelFormatToImages2PixelFormatStdVector(
+            cpp20::span<const uint32_t>(info.pixel_format.begin(), info.pixel_format.end()));
+        if (!convert_result.is_ok()) {
+          fprintf(stderr, "Cannot add display: Cannot convert pixel formats to images2: %s\n",
+                  zx_status_get_string(convert_result.error_value()));
+          continue;
+        }
+        displays_->push_back(Display(info, /*pixel_formats=*/convert_result.value()));
       }
     }
 
@@ -476,12 +486,10 @@ zx_status_t capture_start() {
 
 bool AmlogicCompareCapturedImage(cpp20::span<const uint8_t> captured_image,
                                  cpp20::span<const uint8_t> input_image,
-                                 zx_pixel_format_t input_image_pixel_format, int height,
-                                 int width) {
-  assert(input_image_pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
-         input_image_pixel_format == ZX_PIXEL_FORMAT_BGR_888x ||
-         input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
-         input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888);
+                                 fuchsia_images2::wire::PixelFormat input_image_pixel_format,
+                                 int height, int width) {
+  assert(input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kBgra32 ||
+         input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8);
 
   auto expected_image = std::vector<uint8_t>(input_image.begin(), input_image.end());
 
@@ -489,22 +497,19 @@ bool AmlogicCompareCapturedImage(cpp20::span<const uint8_t> captured_image,
   // (most-siginificant) format. To avoid out-of-order data access, we convert
   // the endianness of the input image, if they are in (least-significant)
   // R8G8B8A8 (most-significant) order.
-  if (input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
-      input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888) {
+  if (input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kBgra32) {
     for (size_t i = 0; i + 3 < expected_image.size(); i += 4) {
       std::swap(expected_image[i], expected_image[i + 3]);
       std::swap(expected_image[i + 1], expected_image[i + 2]);
     }
   }
 
-  // Actually the pixel format of captured image is not RGB888 but BGR888;
-  // though it is not defined as a zx_pixel_format_t. Since we only need the
-  // bytes-per-pixel here to calculate the stride, in this case it's okay to
-  // use ZX_PIXEL_FORMAT_RGB_888.
-  const int capture_stride =
-      ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888)), 64);
-  const int expected_stride =
-      ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_BGR_888x)), 64);
+  // Capture image are of RGB888 formats; each pixel has 3 bytes.
+  constexpr int kCaptureImageBytesPerPixel = 3;
+  const int capture_stride = ZX_ALIGN(width * kCaptureImageBytesPerPixel, 64);
+  // Input image are of R8G8B8A8 or B8R8G8A8 formats; each pixel has 4 bytes.
+  constexpr int kInputImageByetsPerPixel = 4;
+  const int expected_stride = ZX_ALIGN(width * kInputImageByetsPerPixel, 64);
 
   // Ignore the first row. It sometimes contains junk (hardware bug).
   int start_row = 1;
@@ -539,7 +544,8 @@ bool AmlogicCompareCapturedImage(cpp20::span<const uint8_t> captured_image,
 }
 
 bool CompareCapturedImage(cpp20::span<const uint8_t> input_image,
-                          zx_pixel_format_t input_image_pixel_format, int height, int width) {
+                          fuchsia_images2::wire::PixelFormat input_image_pixel_format, int height,
+                          int width) {
   if (input_image.data() == nullptr) {
     printf("%s: input image is null\n", __func__);
     return false;

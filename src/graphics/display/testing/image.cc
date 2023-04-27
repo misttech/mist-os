@@ -43,9 +43,9 @@ namespace fhd = fuchsia_hardware_display;
 namespace testing {
 namespace display {
 
-Image::Image(uint32_t width, uint32_t height, int32_t stride, zx_pixel_format_t format,
-             uint32_t collection_id, void* buf, Pattern pattern, uint32_t fg_color,
-             uint32_t bg_color, uint64_t modifier)
+Image::Image(uint32_t width, uint32_t height, int32_t stride,
+             fuchsia_images2::wire::PixelFormat format, uint32_t collection_id, void* buf,
+             Pattern pattern, uint32_t fg_color, uint32_t bg_color, uint64_t modifier)
     : width_(width),
       height_(height),
       stride_(stride),
@@ -58,8 +58,8 @@ Image::Image(uint32_t width, uint32_t height, int32_t stride, zx_pixel_format_t 
       modifier_(modifier) {}
 
 Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t width,
-                     uint32_t height, zx_pixel_format_t format, Pattern pattern, uint32_t fg_color,
-                     uint32_t bg_color, uint64_t modifier) {
+                     uint32_t height, fuchsia_images2::wire::PixelFormat format, Pattern pattern,
+                     uint32_t fg_color, uint32_t bg_color, uint64_t modifier) {
   zx::result client_end = component::Connect<fuchsia_sysmem::Allocator>();
   if (client_end.is_error()) {
     fprintf(stderr, "Failed to connect to sysmem: %s\n", client_end.status_string());
@@ -152,24 +152,27 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
   constraints.image_format_constraints_count = 1;
   fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
       constraints.image_format_constraints[0];
-  if (format == ZX_PIXEL_FORMAT_ARGB_8888 || format == ZX_PIXEL_FORMAT_RGB_x888) {
+  if (format == fuchsia_images2::wire::PixelFormat::kBgra32) {
     image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
     image_constraints.color_spaces_count = 1;
     image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
         .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
     };
-  } else if (format == ZX_PIXEL_FORMAT_ABGR_8888 || format == ZX_PIXEL_FORMAT_BGR_888x) {
+  } else if (format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8) {
     image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8;
     image_constraints.color_spaces_count = 1;
     image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
         .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
     };
-  } else {
+  } else if (format == fuchsia_images2::wire::PixelFormat::kNv12) {
     image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kNv12;
     image_constraints.color_spaces_count = 1;
     image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
         .type = fuchsia_sysmem::wire::ColorSpaceType::kRec709,
     };
+  } else {
+    fprintf(stderr, "Unsupported pixel format type: %u\n", static_cast<uint32_t>(format));
+    return nullptr;
   }
   image_constraints.pixel_format.has_format_modifier = true;
   image_constraints.pixel_format.format_modifier.value = modifier;
@@ -217,7 +220,8 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
     minimum_row_bytes = buffer_collection_info.settings.image_format_constraints.min_bytes_per_row;
   }
 
-  uint32_t stride_pixels = minimum_row_bytes / ZX_PIXEL_FORMAT_BYTES(format);
+  uint32_t stride_pixels = minimum_row_bytes / ImageFormatStrideBytesPerWidthPixel(
+                                                   PixelFormatAndModifier(format, modifier));
   uintptr_t addr;
   uint32_t perms = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
   if (zx::vmar::root_self()->map(perms, 0, vmo, 0, buffer_size, &addr) != ZX_OK) {
@@ -255,7 +259,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Controller>& dc, uint32_t w
 #define STRIPE_SIZE 37  // prime to make movement more interesting
 
 void Image::Render(int32_t prev_step, int32_t step_num) {
-  if (format_ == ZX_PIXEL_FORMAT_NV12) {
+  if (format_ == fuchsia_images2::wire::PixelFormat::kNv12) {
     RenderNv12(prev_step, step_num);
   } else {
     uint32_t start, end;
@@ -305,7 +309,8 @@ void Image::Render(int32_t prev_step, int32_t step_num) {
 
 void Image::RenderNv12(int32_t prev_step, int32_t step_num) {
   ZX_DEBUG_ASSERT(pattern_ == Pattern::kCheckerboard);
-  uint32_t byte_stride = stride_ * ZX_PIXEL_FORMAT_BYTES(format_);
+  uint32_t byte_stride =
+      stride_ * ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(format_, modifier_));
   uint32_t real_height = height_;
   for (uint32_t y = 0; y < real_height; y++) {
     uint8_t* buf = static_cast<uint8_t*>(buf_) + y * stride_;
@@ -339,7 +344,8 @@ void Image::RenderLinear(T pixel_generator, uint32_t start_y, uint32_t end_y) {
       *ptr = color;
     }
   }
-  uint32_t byte_stride = stride_ * ZX_PIXEL_FORMAT_BYTES(format_);
+  uint32_t byte_stride =
+      stride_ * ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(format_, modifier_));
   zx_cache_flush(reinterpret_cast<uint8_t*>(buf_) + (byte_stride * start_y),
                  byte_stride * (end_y - start_y), ZX_CACHE_FLUSH_DATA);
 }

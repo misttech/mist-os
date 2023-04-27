@@ -6,9 +6,9 @@
 #define SRC_GRAPHICS_DISPLAY_TESTING_IMAGE_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
 // Indicies into event and event_ids
@@ -32,8 +32,8 @@ class Image {
   };
 
   static Image* Create(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc,
-                       uint32_t width, uint32_t height, zx_pixel_format_t format, Pattern pattern,
-                       uint32_t fg_color, uint32_t bg_color, uint64_t modifier);
+                       uint32_t width, uint32_t height, fuchsia_images2::wire::PixelFormat format,
+                       Pattern pattern, uint32_t fg_color, uint32_t bg_color, uint64_t modifier);
 
   void Render(int32_t prev_step, int32_t step_num);
 
@@ -41,14 +41,15 @@ class Image {
   uint32_t width() { return width_; }
   uint32_t height() { return height_; }
   uint32_t stride() { return stride_; }
-  zx_pixel_format_t format() { return format_; }
+  fuchsia_images2::wire::PixelFormat format() { return format_; }
+  uint64_t modifier() const { return modifier_; }
 
   void GetConfig(fuchsia_hardware_display::wire::ImageConfig* config_out) const;
   bool Import(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc,
               uint64_t image_id, image_import_t* info_out) const;
 
  private:
-  Image(uint32_t width, uint32_t height, int32_t stride, zx_pixel_format_t format,
+  Image(uint32_t width, uint32_t height, int32_t stride, fuchsia_images2::wire::PixelFormat format,
         uint32_t collection_id, void* buf, Pattern pattern, uint32_t fg_color, uint32_t bg_color,
         uint64_t modifier);
 
@@ -63,7 +64,7 @@ class Image {
   uint32_t width_;
   uint32_t height_;
   uint32_t stride_;
-  zx_pixel_format_t format_;
+  fuchsia_images2::wire::PixelFormat format_;
 
   uint32_t collection_id_;
   void* buf_;
