@@ -986,6 +986,10 @@
                 "TuntapTest.TCPBlockingConnectFailsArpResolution",
                 "TuntapTest.RawPacketSocket",
 
+                // semaphore_test
+                "SemaphoreTest.*",
+                "SempahoreTest.*",
+
                 // sync_file_range_test
                 "SyncFileRangeTest.TempFileSucceeds",
                 "SyncFileRangeTest.BadArgs",
