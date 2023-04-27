@@ -46,7 +46,9 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace display {
 
@@ -98,8 +100,8 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
   fbl::SinglyLinkedList<LayerNode*> pending_layers_;
   fbl::SinglyLinkedList<LayerNode*> current_layers_;
 
-  fbl::Array<zx_pixel_format_t> pixel_formats_;
-  fbl::Array<cursor_info_t> cursor_infos_;
+  fbl::Array<CoordinatorPixelFormat> pixel_formats_;
+  fbl::Array<CoordinatorCursorInfo> cursor_infos_;
 
   bool display_config_change_ = false;
 

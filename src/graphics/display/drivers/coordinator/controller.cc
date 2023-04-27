@@ -34,6 +34,7 @@
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/coordinator-bind.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 
 namespace fidl_display = fuchsia_hardware_display;
@@ -696,15 +697,16 @@ bool Controller::GetPanelConfig(uint64_t display_id,
   return false;
 }
 
-zx::result<fbl::Array<cursor_info_t>> Controller::GetCursorInfo(uint64_t display_id) {
+zx::result<fbl::Array<CoordinatorCursorInfo>> Controller::GetCursorInfo(uint64_t display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  fbl::Array<cursor_info_t> cursor_info_out;
+  fbl::Array<CoordinatorCursorInfo> cursor_info_out;
   for (auto& display : displays_) {
     if (display.id == display_id) {
-      fbl::AllocChecker ac;
+      fbl::AllocChecker alloc_checker;
       size_t size = display.cursor_infos.size();
-      cursor_info_out = fbl::Array<cursor_info_t>(new (&ac) cursor_info_t[size], size);
-      if (!ac.check()) {
+      cursor_info_out =
+          fbl::Array<CoordinatorCursorInfo>(new (&alloc_checker) CoordinatorCursorInfo[size], size);
+      if (!alloc_checker.check()) {
         return zx::error(ZX_ERR_NO_MEMORY);
       }
       std::copy(display.cursor_infos.begin(), display.cursor_infos.end(), cursor_info_out.begin());
@@ -714,16 +716,17 @@ zx::result<fbl::Array<cursor_info_t>> Controller::GetCursorInfo(uint64_t display
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-zx::result<fbl::Array<zx_pixel_format_t>> Controller::GetSupportedPixelFormats(
+zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
     uint64_t display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-  fbl::Array<zx_pixel_format_t> formats_out;
+  fbl::Array<CoordinatorPixelFormat> formats_out;
   for (auto& display : displays_) {
     if (display.id == display_id) {
-      fbl::AllocChecker ac;
+      fbl::AllocChecker alloc_checker;
       size_t size = display.pixel_formats.size();
-      formats_out = fbl::Array<zx_pixel_format_t>(new (&ac) zx_pixel_format_t[size], size);
-      if (!ac.check()) {
+      formats_out = fbl::Array<CoordinatorPixelFormat>(
+          new (&alloc_checker) CoordinatorPixelFormat[size], size);
+      if (!alloc_checker.check()) {
         return zx::error(ZX_ERR_NO_MEMORY);
       }
       std::copy(display.pixel_formats.begin(), display.pixel_formats.end(), formats_out.begin());

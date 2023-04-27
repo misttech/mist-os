@@ -23,7 +23,9 @@
 
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/edid/edid.h"
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace display {
 
@@ -72,8 +74,9 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   // This field has no meaning if EDID information is available.
   display_params_t params;
 
-  fbl::Array<zx_pixel_format_t> pixel_formats;
-  fbl::Array<cursor_info_t> cursor_infos;
+  fbl::Vector<CoordinatorPixelFormat> pixel_formats;
+
+  fbl::Vector<CoordinatorCursorInfo> cursor_infos;
 
   // Flag indicating that the display is ready to be published to clients.
   bool init_done = false;

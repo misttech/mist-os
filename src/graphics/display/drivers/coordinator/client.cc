@@ -38,6 +38,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -1116,7 +1117,7 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
         controller_->GetSupportedPixelFormats(config->id);
     if (get_supported_pixel_formats_result.is_error()) {
       zxlogf(WARNING, "Failed to get pixel formats when processing hotplug: %s",
-             zx_status_get_string(get_supported_pixel_formats_result.error_value()));
+             get_supported_pixel_formats_result.status_string());
       continue;
     }
     config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
@@ -1124,7 +1125,7 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
     zx::result get_cursor_infos_result = controller_->GetCursorInfo(config->id);
     if (get_cursor_infos_result.is_error()) {
       zxlogf(WARNING, "Failed to get cursor info when processing hotplug: %s",
-             zx_status_get_string(get_cursor_infos_result.error_value()));
+             get_cursor_infos_result.status_string());
       continue;
     }
     config->cursor_infos_ = std::move(get_cursor_infos_result.value());
@@ -1166,6 +1167,7 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
   // Hang on to modes values until we send the message.
   std::vector<std::vector<fhd::wire::Mode>> modes_vector;
 
+  fidl::Arena arena;
   for (unsigned i = 0; i < added_count; i++) {
     auto config = configs_.find(displays_added[i]);
     if (!config.IsValid()) {
@@ -1199,20 +1201,19 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
     modes_vector.emplace_back(std::move(modes));
     info.modes = fidl::VectorView<fhd::wire::Mode>::FromExternal(modes_vector.back());
 
-    static_assert(sizeof(zx_pixel_format_t) == sizeof(int32_t), "Bad pixel format size");
-    info.pixel_format = fidl::VectorView<zx_pixel_format_t>::FromExternal(
-        config->pixel_formats_.data(), config->pixel_formats_.size());
+    info.pixel_format = fidl::VectorView<uint32_t>(arena, config->pixel_formats_.size());
+    for (size_t pixel_format_index = 0; pixel_format_index < info.pixel_format.count();
+         ++pixel_format_index) {
+      info.pixel_format[pixel_format_index] = config->pixel_formats_[pixel_format_index].ToFidl();
+    }
 
-    static_assert(offsetof(cursor_info_t, width) == offsetof(fhd::wire::CursorInfo, width),
-                  "Bad struct");
-    static_assert(offsetof(cursor_info_t, height) == offsetof(fhd::wire::CursorInfo, height),
-                  "Bad struct");
-    static_assert(offsetof(cursor_info_t, format) == offsetof(fhd::wire::CursorInfo, pixel_format),
-                  "Bad struct");
-    static_assert(sizeof(cursor_info_t) <= sizeof(fhd::wire::CursorInfo), "Bad size");
-    info.cursor_configs = fidl::VectorView<fhd::wire::CursorInfo>::FromExternal(
-        reinterpret_cast<fhd::wire::CursorInfo*>(config->cursor_infos_.data()),
-        config->cursor_infos_.size());
+    info.cursor_configs =
+        fidl::VectorView<fhd::wire::CursorInfo>(arena, config->cursor_infos_.size());
+    for (size_t cursor_config_index = 0; cursor_config_index < info.cursor_configs.count();
+         ++cursor_config_index) {
+      info.cursor_configs[cursor_config_index] =
+          config->cursor_infos_[cursor_config_index].ToFidl();
+    }
 
     const char* manufacturer_name = "";
     const char* monitor_name = "";

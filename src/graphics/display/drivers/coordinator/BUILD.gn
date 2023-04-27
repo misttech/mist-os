@@ -48,6 +48,7 @@ source_set("shared") {
     "fence.cc",
     "image.cc",
     "layer.cc",
+    "migration-util.cc",
     "util.cc",
   ]
   public_deps = [
@@ -62,6 +63,7 @@ source_set("shared") {
     "//src/devices/lib/audio",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/edid",
+    "//src/graphics/display/lib/pixel-format",
     "//src/lib/async-watchdog",
     "//src/lib/ddk",
     "//src/lib/ddktl",

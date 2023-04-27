@@ -32,8 +32,10 @@
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/async-watchdog/watchdog.h"
 
 namespace display {
@@ -93,9 +95,12 @@ class Controller : public DeviceType,
   // |mtx()| must be held for as long as |edid| and |params| are retained.
   bool GetPanelConfig(uint64_t display_id, const fbl::Vector<edid::timing_params_t>** timings,
                       const display_params_t** params) __TA_REQUIRES(mtx());
-  zx::result<fbl::Array<zx_pixel_format_t>> GetSupportedPixelFormats(uint64_t display_id)
+
+  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(uint64_t display_id)
       __TA_REQUIRES(mtx());
-  zx::result<fbl::Array<cursor_info_t>> GetCursorInfo(uint64_t display_id) __TA_REQUIRES(mtx());
+
+  zx::result<fbl::Array<CoordinatorCursorInfo>> GetCursorInfo(uint64_t display_id)
+      __TA_REQUIRES(mtx());
   bool GetDisplayIdentifiers(uint64_t display_id, const char** manufacturer_name,
                              const char** monitor_name, const char** monitor_serial)
       __TA_REQUIRES(mtx());

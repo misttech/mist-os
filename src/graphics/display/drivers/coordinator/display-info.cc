@@ -4,12 +4,15 @@
 
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 
 #include <audio-proto-utils/format-utils.h>
 #include <pretty/hexdump.h>
 
 #include "src/devices/lib/audio/audio.h"
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 
 namespace display {
 
@@ -71,20 +74,27 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   if (info.edid_present) {
     out->edid = DisplayInfo::Edid{};
   }
-  out->pixel_formats = fbl::Array<zx_pixel_format_t>(
-      new (&ac) zx_pixel_format_t[info.pixel_format_count], info.pixel_format_count);
-  if (!ac.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
+
+  zx::result get_display_info_pixel_formats_result =
+      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
+          cpp20::span(info.pixel_format_list, info.pixel_format_count));
+  if (get_display_info_pixel_formats_result.is_error()) {
+    zxlogf(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
+           get_display_info_pixel_formats_result.status_string());
+    return get_display_info_pixel_formats_result.take_error();
   }
-  out->cursor_infos = fbl::Array<cursor_info_t>(new (&ac) cursor_info_t[info.cursor_info_count],
-                                                info.cursor_info_count);
-  if (!ac.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
+  out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
+
+  zx::result get_display_info_cursor_infos_result =
+      CoordinatorCursorInfo::CreateFblVectorFromBanjoVector(
+          cpp20::span(info.cursor_info_list, info.cursor_info_count));
+  if (get_display_info_cursor_infos_result.is_error()) {
+    zxlogf(ERROR, "Cannot convert cursor info to FIDL cursor info value: %s",
+           get_display_info_cursor_infos_result.status_string());
+    return get_display_info_cursor_infos_result.take_error();
   }
-  memcpy(out->pixel_formats.data(), info.pixel_format_list,
-         out->pixel_formats.size() * sizeof(zx_pixel_format_t));
-  memcpy(out->cursor_infos.data(), info.cursor_info_list,
-         out->cursor_infos.size() * sizeof(cursor_info_t));
+  out->cursor_infos = std::move(get_display_info_cursor_infos_result.value());
+
   if (!info.edid_present) {
     out->params = info.panel.params;
     return zx::ok(std::move(out));
