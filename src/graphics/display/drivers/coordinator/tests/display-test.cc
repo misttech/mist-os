@@ -13,11 +13,12 @@
 #include <array>
 
 #include <fbl/auto_lock.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
@@ -27,9 +28,11 @@ TEST(DisplayTest, ClientVSyncOk) {
   constexpr uint64_t kControllerStampValue = 1u;
   constexpr uint64_t kClientStampValue = 2u;
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
-  ASSERT_OK(endpoints);
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
+
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   clientproxy.EnableVsync(true);
@@ -55,9 +58,7 @@ TEST(DisplayTest, ClientVSyncOk) {
       }
     }
 
-    void NotImplemented_(const std::string& name) override {
-      ADD_FAILURE("Unexpected %s", name.c_str());
-    }
+    void NotImplemented_(const std::string& name) override { FAIL() << "Unexpected " << name; }
 
     bool vsync_handled_ = false;
     fuchsia_hardware_display::wire::ConfigStamp expected_config_stamp_ = kInvalidConfigStampFidl;
@@ -71,9 +72,11 @@ TEST(DisplayTest, ClientVSyncOk) {
 }
 
 TEST(DisplayTest, ClientVSynPeerClosed) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
-  ASSERT_OK(endpoints);
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
+
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   clientproxy.EnableVsync(true);
@@ -84,9 +87,11 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
 }
 
 TEST(DisplayTest, ClientVSyncNotSupported) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
-  ASSERT_OK(endpoints);
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
+
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
@@ -99,9 +104,11 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   constexpr std::array<uint64_t, kNumPendingStamps> kControllerStampValues = {1u, 2u, 3u, 4u, 5u};
   constexpr std::array<uint64_t, kNumPendingStamps> kClientStampValues = {2u, 3u, 4u, 5u, 6u};
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
-  ASSERT_OK(endpoints);
+  zx::result<fidl::Endpoints<fuchsia_hardware_display::Controller>> endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_display::Controller>();
+  ASSERT_OK(endpoints.status_value());
   auto& [client_end, server_end] = endpoints.value();
+
   Controller controller(nullptr);
   ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   clientproxy.EnableVsync(false);
@@ -118,7 +125,7 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
 
   // Even if Vsync is disabled, ClientProxy should always drain pending
   // controller stamps.
-  EXPECT_EQ(clientproxy.pending_applied_config_stamps().size(), 1);
+  EXPECT_EQ(clientproxy.pending_applied_config_stamps().size(), 1u);
   EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().controller_stamp.value,
             kControllerStampValues.back());
 

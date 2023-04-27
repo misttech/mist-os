@@ -7,7 +7,8 @@
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/default.h>
 
-#include <zxtest/zxtest.h>
+#include <fbl/vector.h>
+#include <gtest/gtest.h>
 
 namespace display {
 
@@ -20,7 +21,7 @@ class TestCallback : public FenceCallback {
   fbl::Vector<FenceReference*> fired_;
 };
 
-class FenceTest : public zxtest::Test {
+class FenceTest : public testing::Test {
  public:
   void SetUp() override {
     zx::event ev;
@@ -62,7 +63,7 @@ TEST_F(FenceTest, MultipleRefs_MultiplePurposes) {
   three->Signal();
   loop().RunUntilIdle();
 
-  ASSERT_EQ(cb().fired_.size(), 2);
+  ASSERT_EQ(cb().fired_.size(), 2u);
   EXPECT_EQ(cb().fired_[0], two.get());
   EXPECT_EQ(cb().fired_[1], one.get());
 }

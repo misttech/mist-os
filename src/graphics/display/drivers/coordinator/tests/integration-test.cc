@@ -18,7 +18,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
@@ -27,11 +27,13 @@
 #include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/testing/predicates/status.h"
+
 namespace sysmem = fuchsia_sysmem;
-namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display {
-class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool> {
+
+class IntegrationTest : public TestBase, public testing::WithParamInterface<bool> {
  public:
   fbl::RefPtr<display::DisplayInfo> display_info(uint64_t id) __TA_REQUIRES(controller()->mtx()) {
     auto iter = controller()->displays_.find(id);
@@ -101,14 +103,15 @@ class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool>
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
-    zx::result endpoints = fidl::CreateEndpoints<sysmem::Allocator>();
-    ASSERT_OK(endpoints);
+    zx::result<fidl::Endpoints<sysmem::Allocator>> endpoints =
+        fidl::CreateEndpoints<sysmem::Allocator>();
+    ASSERT_OK(endpoints.status_value());
     auto& [client, server] = endpoints.value();
     EXPECT_TRUE(sysmem_fidl()->ConnectV1(std::move(server)).ok());
     sysmem_ = fidl::WireSyncClient(std::move(client));
     const fidl::OneWayStatus status = sysmem_->SetDebugClientInfo(
         fidl::StringView::FromExternal(fsl::GetCurrentProcessName()), fsl::GetCurrentProcessKoid());
-    EXPECT_OK(status);
+    EXPECT_OK(status.status());
   }
 
   // |TestBase|
@@ -120,7 +123,7 @@ class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool>
 
     // Send one last vsync, to make sure any blank configs take effect.
     SendDisplayVsync();
-    EXPECT_EQ(0, controller()->TEST_imported_images_count());
+    EXPECT_EQ(0u, controller()->TEST_imported_images_count());
     TestBase::TearDown();
   }
 
@@ -266,7 +269,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   SendDisplayVsync();
   EXPECT_TRUE(RunLoopWithTimeoutOrUntil(
       [p = primary_client.get()]() { return p->vsync_count() == 2; }, zx::sec(1)));
-  EXPECT_EQ(2, primary_client->vsync_count());
+  EXPECT_EQ(2u, primary_client->vsync_count());
 }
 
 TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
@@ -285,8 +288,8 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
   ASSERT_TRUE(primary_client->Bind(dispatcher()));
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(1)));
-  EXPECT_EQ(0, primary_client->vsync_count());
-  EXPECT_EQ(0, primary_client->get_cookie());
+  EXPECT_EQ(0u, primary_client->vsync_count());
+  EXPECT_EQ(0u, primary_client->get_cookie());
 
   // send vsyncs upto watermark level
   for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
@@ -323,7 +326,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
       [p = primary_client.get()]() { return (p->vsync_count() == ClientProxy::kMaxVsyncMessages); },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(0, primary_client->get_cookie());
+  EXPECT_NE(0u, primary_client->get_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -367,7 +370,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
       [p = primary_client.get()]() { return (p->vsync_count() == ClientProxy::kMaxVsyncMessages); },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(0, primary_client->get_cookie());
+  EXPECT_NE(0u, primary_client->get_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a lot
   constexpr uint32_t kNumVsync = ClientProxy::kVsyncBufferSize * 10;
@@ -413,7 +416,7 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
       [p = primary_client.get()]() { return (p->vsync_count() == ClientProxy::kMaxVsyncMessages); },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(0, primary_client->get_cookie());
+  EXPECT_NE(0u, primary_client->get_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -457,7 +460,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
       [p = primary_client.get()]() { return (p->vsync_count() == ClientProxy::kMaxVsyncMessages); },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
-  EXPECT_NE(0, primary_client->get_cookie());
+  EXPECT_NE(0u, primary_client->get_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
@@ -499,7 +502,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
       },
       zx::sec(3)));
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages * 2, primary_client->vsync_count());
-  EXPECT_NE(0, primary_client->get_cookie());
+  EXPECT_NE(0u, primary_client->get_cookie());
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   for (uint32_t i = 0; i < ClientProxy::kVsyncBufferSize; i++) {
@@ -787,7 +790,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -800,7 +803,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
       zx::sec(2)));
 
   auto present_config_stamp_0 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
+  EXPECT_TRUE(apply_config_stamp_0 == present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value);
 
   auto create_default_layer_result = primary_client->CreateLayer();
@@ -822,8 +825,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 > apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -838,7 +841,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
   }
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 == present_config_stamp_1);
 
   // Present another image layer without wait.
   EXPECT_EQ(ZX_OK, primary_client->PresentLayers({
@@ -847,8 +850,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
-  EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_2);
+  EXPECT_TRUE(apply_config_stamp_2 > apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -863,7 +866,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
   }
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_2, present_config_stamp_2);
+  EXPECT_TRUE(apply_config_stamp_2 == present_config_stamp_2);
 
   // Hide the existing layer.
   {
@@ -872,8 +875,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_3 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_3);
-  EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_3);
+  EXPECT_TRUE(apply_config_stamp_3 > apply_config_stamp_2);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -888,7 +891,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
   }
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_3, present_config_stamp_3);
+  EXPECT_TRUE(apply_config_stamp_3 == present_config_stamp_3);
 }
 
 // This tests the behavior of ApplyConfig() and OnVsync() events when images
@@ -920,7 +923,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -933,7 +936,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
       zx::sec(2)));
 
   auto present_config_stamp_0 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
+  EXPECT_TRUE(apply_config_stamp_0 == present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value);
 
   auto create_default_layer_result = primary_client->CreateLayer();
@@ -958,8 +961,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 > apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -974,7 +977,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   }
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 == present_config_stamp_1);
 
   // Present another image layer; but the image is not ready yet. So the
   // configuration applied to display device will be still the old one. On Vsync
@@ -985,8 +988,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
                         .image_ready_wait_event_id = std::make_optional(image_1_ready_fence.id)},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
-  EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_2);
+  EXPECT_TRUE(apply_config_stamp_2 >= apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -1001,7 +1004,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   }
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
+  EXPECT_TRUE(present_config_stamp_2 == present_config_stamp_1);
 
   // Signal the event. Display Fence callback will be signaled, and new
   // configuration with new config stamp (config_stamp_2) will be used.
@@ -1027,7 +1030,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   }
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
+  EXPECT_TRUE(present_config_stamp_3 == apply_config_stamp_2);
 }
 
 // This tests the behavior of ApplyConfig() and OnVsync() events when images
@@ -1060,7 +1063,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -1073,7 +1076,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
       zx::sec(2)));
 
   auto present_config_stamp_0 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
+  EXPECT_TRUE(apply_config_stamp_0 == present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value);
 
   auto create_default_layer_result = primary_client->CreateLayer();
@@ -1098,8 +1101,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 > apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -1114,7 +1117,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   }
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_1, present_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 == present_config_stamp_1);
 
   // Present another image layer; but the image is not ready yet. Display
   // controller will wait on the fence and Vsync will return the previous
@@ -1125,8 +1128,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
                         .image_ready_wait_event_id = image_1_ready_fence.id},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
-  EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_2);
+  EXPECT_TRUE(apply_config_stamp_2 > apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -1141,7 +1144,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   }
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
+  EXPECT_TRUE(present_config_stamp_2 == present_config_stamp_1);
 
   // Hide the image layer. Display controller will not care about the fence
   // and thus use the latest configuration stamp.
@@ -1151,8 +1154,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
     EXPECT_EQ(ZX_OK, primary_client->dc_->ApplyConfig().status());
   }
   auto apply_config_stamp_3 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_3);
-  EXPECT_GT(apply_config_stamp_3, apply_config_stamp_2);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_3);
+  EXPECT_TRUE(apply_config_stamp_3 >= apply_config_stamp_2);
 
   // On Vsync, the configuration stamp client receives on Vsync event message
   // will be the latest one applied to the display controller, since the pending
@@ -1170,7 +1173,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   }
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_3, apply_config_stamp_3);
+  EXPECT_TRUE(present_config_stamp_3 == apply_config_stamp_3);
 }
 
 // This tests the behavior of ApplyConfig() and OnVsync() events when images
@@ -1231,7 +1234,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
                         .image_ready_wait_event_id = std::nullopt},
                    }));
   auto apply_config_stamp_0 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_0);
   EXPECT_TRUE(
       RunLoopWithTimeoutOrUntil([this]() { return primary_client_connected(); }, zx::sec(2)));
 
@@ -1248,7 +1251,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   }
 
   auto present_config_stamp_0 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(apply_config_stamp_0, present_config_stamp_0);
+  EXPECT_TRUE(apply_config_stamp_0 == present_config_stamp_0);
   EXPECT_NE(0u, present_config_stamp_0.value);
 
   // Present another image layer (image #1, wait_event #0); but the image is not
@@ -1260,8 +1263,8 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
                         .image_ready_wait_event_id = image_1_ready_fence.id},
                    }));
   auto apply_config_stamp_1 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_1);
-  EXPECT_GT(apply_config_stamp_1, apply_config_stamp_0);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_1);
+  EXPECT_TRUE(apply_config_stamp_1 > apply_config_stamp_0);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -1272,7 +1275,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
       zx::sec(2)));
 
   auto present_config_stamp_1 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_1, present_config_stamp_0);
+  EXPECT_TRUE(present_config_stamp_1 == present_config_stamp_0);
 
   // Present another image layer (image #2, wait_event #1); the image is not
   // ready as well. We should still see current |presented_config_stamp| to be
@@ -1283,8 +1286,8 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
                         .image_ready_wait_event_id = image_2_ready_fence.id},
                    }));
   auto apply_config_stamp_2 = primary_client->GetRecentAppliedConfigStamp();
-  EXPECT_NE(kInvalidConfigStampFidl, apply_config_stamp_2);
-  EXPECT_GT(apply_config_stamp_2, apply_config_stamp_1);
+  EXPECT_TRUE(kInvalidConfigStampFidl != apply_config_stamp_2);
+  EXPECT_TRUE(apply_config_stamp_2 > apply_config_stamp_1);
 
   primary_vsync_count = primary_client->vsync_count();
   SendDisplayVsync();
@@ -1295,7 +1298,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
       zx::sec(2)));
 
   auto present_config_stamp_2 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_2, present_config_stamp_1);
+  EXPECT_TRUE(present_config_stamp_2 == present_config_stamp_1);
 
   // Signal the event #1. Display Fence callback will be signaled, and
   // configuration with new config stamp (apply_config_stamp_2) will be used.
@@ -1321,7 +1324,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   }
 
   auto present_config_stamp_3 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_3, apply_config_stamp_2);
+  EXPECT_TRUE(present_config_stamp_3 == apply_config_stamp_2);
 
   // Signal the event #0. Since we have displayed a newer image, signaling the
   // old event associated with the old image shouldn't trigger ReapplyConfig().
@@ -1343,7 +1346,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   }
 
   auto present_config_stamp_4 = primary_client->recent_presented_config_stamp();
-  EXPECT_EQ(present_config_stamp_4, apply_config_stamp_2);
+  EXPECT_TRUE(present_config_stamp_4 == apply_config_stamp_2);
 }
 
 // TODO(fxbug.dev/90423): Currently the fake-display driver only supports one

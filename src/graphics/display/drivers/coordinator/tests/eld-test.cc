@@ -4,8 +4,8 @@
 
 #include "src/graphics/display/drivers/coordinator/eld.h"
 
+#include <gtest/gtest.h>
 #include <src/lib/eld/eld.h>
-#include <zxtest/zxtest.h>
 
 namespace display {
 
@@ -35,7 +35,7 @@ TEST(EldTest, eld1) {
   ASSERT_TRUE(edid.Init(edid1, sizeof(edid1), &err_msg));
   fbl::Array<uint8_t> eld;
   ComputeEld(edid, eld);
-  ASSERT_EQ(eld.size(), 36);
+  ASSERT_EQ(eld.size(), 36u);
   EXPECT_EQ(eld[3], 0x10);  // Version 2.
 
   const char* monitor_name = "LG IPS FULLHD";
@@ -82,7 +82,7 @@ TEST(EldTest, VsyncWithEld2) {
   ASSERT_TRUE(edid.Init(edid2, sizeof(edid2), &err_msg));
   fbl::Array<uint8_t> eld;
   ComputeEld(edid, eld);
-  ASSERT_EQ(eld.size(), 36);
+  ASSERT_EQ(eld.size(), 36u);
   EXPECT_EQ(eld[3], 0x10);  // Version 2.
 
   const char* monitor_name = "VX4380 SERIES";
@@ -129,7 +129,7 @@ TEST(EldTest, VsyncWithEld3) {
   ASSERT_TRUE(edid.Init(edid3, sizeof(edid3), &err_msg));
   fbl::Array<uint8_t> eld;
   ComputeEld(edid, eld);
-  ASSERT_EQ(eld.size(), 36);
+  ASSERT_EQ(eld.size(), 36u);
   EXPECT_EQ(eld[3], 0x10);  // Version 2.
 
   const char* monitor_name = "LG Ultra HD";

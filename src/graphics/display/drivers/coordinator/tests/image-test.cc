@@ -13,12 +13,13 @@
 #include <zircon/pixelformat.h>
 
 #include <fbl/auto_lock.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
@@ -130,7 +131,7 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
     loop.RunUntilIdle();
     EXPECT_TRUE(signal_event_signaled);
   } while (--attempts > 0);
-  EXPECT_EQ(0, failures);
+  EXPECT_EQ(0u, failures);
   EXPECT_EQ(kNumIterations, retire_count);
   {
     fbl::AutoLock l(image->mtx());

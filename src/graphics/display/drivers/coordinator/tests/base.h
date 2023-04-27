@@ -10,22 +10,25 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/bti.h>
+#include <threads.h>
 
 #include <map>
+#include <memory>
 #include <vector>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/fake/mock-display-device-tree.h"
 
 namespace display {
 
-class TestBase : public zxtest::Test {
+class TestBase : public testing::Test {
  public:
   TestBase() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
 

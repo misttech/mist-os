@@ -9,6 +9,7 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/fidl/cpp/message.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <lib/zx/event.h>
 #include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
@@ -17,8 +18,8 @@
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
+#include <fbl/string.h>
 #include <fbl/vector.h>
-#include <zxtest/zxtest.h>
 
 namespace display {
 
@@ -70,19 +71,7 @@ class TestFidlClient {
     std::optional<uint64_t> image_ready_wait_event_id;
   };
 
-  std::vector<PresentLayerInfo> CreateDefaultPresentLayerInfo() {
-    auto layer_result = CreateLayer();
-    EXPECT_TRUE(layer_result.is_ok());
-
-    auto image_result = ImportImageWithSysmem(displays_[0].image_config_);
-    EXPECT_TRUE(image_result.is_ok());
-
-    return {
-        {.layer_id = layer_result.value(),
-         .image_id = image_result.value(),
-         .image_ready_wait_event_id = std::nullopt},
-    };
-  }
+  std::vector<PresentLayerInfo> CreateDefaultPresentLayerInfo();
 
   zx_status_t PresentLayers() { return PresentLayers(CreateDefaultPresentLayerInfo()); }
 

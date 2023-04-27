@@ -9,6 +9,9 @@
 #include <zircon/assert.h>
 
 #include <fbl/auto_lock.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace sysmem = fuchsia_sysmem;
@@ -290,6 +293,20 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmem(
     const fhd::wire::ImageConfig& image_config) {
   fbl::AutoLock lock(mtx());
   return ImportImageWithSysmemLocked(image_config);
+}
+
+std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPresentLayerInfo() {
+  zx::result<uint64_t> layer_result = CreateLayer();
+  EXPECT_OK(layer_result.status_value());
+
+  zx::result<uint64_t> image_result = ImportImageWithSysmem(displays_[0].image_config_);
+  EXPECT_OK(image_result.status_value());
+
+  return {
+      {.layer_id = layer_result.value(),
+       .image_id = image_result.value(),
+       .image_ready_wait_event_id = std::nullopt},
+  };
 }
 
 zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
