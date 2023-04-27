@@ -1353,9 +1353,6 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     }
   });
 
-  // Record the current generation count, we can use this to attempt to avoid re-performing checks
-  // whilst copying.
-  uint64_t gen_count = GetHierarchyGenerationCountLocked();
   // The PageRequest is a non-trivial object so we declare it outside the loop to avoid having to
   // construct and deconstruct it each iteration. It is tolerant of being reused and will
   // reinitialize itself if needed.
@@ -1413,19 +1410,13 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       char* page_ptr = reinterpret_cast<char*>(paddr_to_physmap(pa));
 
       // Call the copy routine. If the copy was successful then ZX_OK is returned, otherwise
-      // ZX_ERR_SHOULD_WAIT may be returned to indicate the copy failed but we can retry it. If we
-      // can retry, but our generation count hasn't changed, then we know that this VMO is unchanged
-      // and we don't need to re-perform checks or lookup the page again.
-      do {
-        status = copyfunc(page_ptr + page_offset, dest_offset, tocopy, guard);
-      } while (unlikely(status == ZX_ERR_SHOULD_WAIT &&
-                        gen_count == GetHierarchyGenerationCountLocked()));
+      // ZX_ERR_SHOULD_WAIT may be returned to indicate the copy failed but we can retry it.
+      status = copyfunc(page_ptr + page_offset, dest_offset, tocopy, guard);
 
       if (status == ZX_ERR_SHOULD_WAIT) {
-        // The generation count changed so we must recheck properties. If all is good we cannot
-        // simply retry the copy. As the underlying page could have changed, so we retry the loop
-        // from the top, stashing the new generation count.
-        gen_count = GetHierarchyGenerationCountLocked();
+        // Although we can retry, as the lock was dropped we must re-check any properties, and then
+        // if all is good go back to the top of the outer loop to attempt to acquire a fresh cursor
+        // and try again.
         status = check();
         if (status == ZX_OK) {
           break;
