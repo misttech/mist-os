@@ -33,8 +33,6 @@
 
 #define LOCAL_TRACE 0
 
-// TODO-rvbringup: move secondary cpu stuff to mp.cc
-
 namespace {
 
 // Used to hold up the boot sequence on secondary CPUs until signaled by the primary.
@@ -42,6 +40,8 @@ ktl::atomic<bool> secondaries_released;
 
 // one for each secondary CPU, indexed by (cpu_num - 1).
 Thread _init_thread[SMP_MAX_CPUS - 1];
+
+uint32_t riscv64_boot_hart;
 
 }  // anonymous namespace
 
@@ -69,28 +69,40 @@ zx_status_t riscv64_free_secondary_stack(cpu_num_t cpu_num) {
 }
 
 // first C level code to initialize each cpu
-void riscv64_cpu_early_init() {
+void riscv64_init_percpu() {
   // set the top level exception handler
   riscv64_csr_write(RISCV64_CSR_STVEC, (uintptr_t)&riscv64_exception_entry);
 
+  // set up the default sstatus for the current cpu
+  riscv64_csr_write(RISCV64_CSR_SSTATUS, 0);
+
   // mask all exceptions, just in case
-  riscv64_csr_clear(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_IE);
   riscv64_csr_clear(RISCV64_CSR_SIE,
                     RISCV64_CSR_SIE_SIE | RISCV64_CSR_SIE_TIE | RISCV64_CSR_SIE_EIE);
+
+  // enable all of the counters
+  riscv64_csr_write(RISCV64_CSR_SCOUNTEREN, RISCV64_CSR_SCOUNTEREN_CY | RISCV64_CSR_SCOUNTEREN_TM |
+                                                RISCV64_CSR_SCOUNTEREN_IR);
 
   // Zero out the fpu state and set to initial
   riscv64_fpu_zero();
 }
 
-void arch_early_init() {
-  riscv64_cpu_early_init();
-  riscv64_mmu_early_init();
+// Called in start.S prior to entering the main kernel.
+// Bootstraps the boot cpu as cpu 0 intrinsically, though it may have a nonzero hart.
+extern "C" void riscv64_boot_cpu_init(uint32_t hart_id) {
+  riscv64_boot_hart = hart_id;
+  riscv64_init_percpu();
+  riscv64_mp_early_init_percpu(hart_id, 0);
 }
+
+void arch_early_init() { riscv64_mmu_early_init(); }
 
 void arch_prevm_init() {}
 
 void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   // print some arch info
+  dprintf(INFO, "RISCV: Boot HART ID %u\n", riscv64_boot_hart);
   dprintf(INFO, "RISCV: Supervisor mode\n");
   dprintf(INFO, "RISCV: mvendorid %#lx marchid %#lx mimpid %#lx\n",
           sbi_call(SBI_GET_MVENDORID).value, sbi_call(SBI_GET_MARCHID).value,
@@ -136,10 +148,9 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
   }
 }
 
-// TODO-rvbringup: move to mp.cc
-extern "C" void riscv64_secondary_entry(uint hart_id, uint cpu_num) {
-  riscv64_init_percpu_early(hart_id, cpu_num);
-  riscv64_cpu_early_init();
+extern "C" void riscv64_secondary_entry(uint32_t hart_id, uint cpu_num) {
+  riscv64_init_percpu();
+  riscv64_mp_early_init_percpu(hart_id, cpu_num);
 
   // Wait until the primary has finished setting things up.
   while (!secondaries_released.load()) {

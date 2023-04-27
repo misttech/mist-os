@@ -24,7 +24,7 @@ struct alignas(MAX_CACHE_LINE) riscv64_percpu {
   cpu_num_t cpu_num;
 
   // The hart id is used by other components (SBI/PLIC etc...)
-  uint hart_id;
+  uint32_t hart_id;
 
   // Whether blocking is disallowed.  See arch_blocking_disallowed().
   uint32_t blocking_disallowed;
@@ -89,28 +89,21 @@ template <typename T, size_t Offset>
 #define WRITE_PERCPU_FIELD32(field, value) \
   (riscv64_write_percpu_field<uint32_t, offsetof(riscv64_percpu, field)>(value))
 
+// Setup the high-level percpu struct pointer for |cpu_num|.
+void arch_setup_percpu(cpu_num_t cpu_num, percpu* percpu);
+
 // Return a pointer to the high-level percpu struct for the calling CPU.
 inline struct percpu* arch_get_curr_percpu() {
   return riscv64_read_percpu_ptr()->high_level_percpu;
 }
-//
+
+extern uint riscv64_num_cpus;
+
 // This needs to be set very early (before arch_init).
-inline void arch_set_num_cpus(uint cpu_count) {
-  extern uint riscv64_num_cpus;
-  riscv64_num_cpus = cpu_count;
-}
+inline void arch_set_num_cpus(uint cpu_count) { riscv64_num_cpus = cpu_count; }
+inline uint arch_max_num_cpus() { return riscv64_num_cpus; }
 
-inline uint arch_max_num_cpus() {
-  extern uint riscv64_num_cpus;
-
-  return riscv64_num_cpus;
-}
-
-void riscv64_init_percpu_early(uint hart_id, uint cpu_num);
-void arch_register_hart(uint cpu_num, uint64_t hart_id);
-
-// Setup the high-level percpu struct pointer for |cpu_num|.
-void arch_setup_percpu(cpu_num_t cpu_num, percpu* percpu);
+void riscv64_mp_early_init_percpu(uint32_t hart_id, uint cpu_num);
 
 inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD32(cpu_num); }
 inline cpu_num_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }

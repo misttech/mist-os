@@ -18,23 +18,22 @@
 
 #define LOCAL_TRACE 0
 
+// total number of detected cpus, accessed via arch_max_num_cpus()
+uint riscv64_num_cpus = 1;
+
 namespace {
 
 // mapping of cpu -> hart
-uint64_t cpu_to_hart_map[SMP_MAX_CPUS] = {0};
-
-// list of IPIs queued per cpu
-ktl::atomic<int> ipi_data[SMP_MAX_CPUS];
-
-}  // anonymous namespace
-
-// total number of detected cpus
-uint riscv64_num_cpus = 1;
+// kept separate from the percpu array for speed purposes
+uint32_t cpu_to_hart_map[SMP_MAX_CPUS] = {0};
 
 // per cpu structures, each cpu will point to theirs using the fixed register
 riscv64_percpu riscv64_percpu_array[SMP_MAX_CPUS];
 
-void arch_register_hart(uint cpu_num, uint64_t hart_id) { cpu_to_hart_map[cpu_num] = hart_id; }
+// list of IPIs queued per cpu
+ktl::atomic<uint32_t> ipi_data[SMP_MAX_CPUS];
+
+}  // anonymous namespace
 
 // software triggered exceptions, used for cross-cpu calls
 void riscv64_software_exception() {
@@ -43,7 +42,7 @@ void riscv64_software_exception() {
   sbi_clear_ipi();
 
   rmb();
-  int reason = ipi_data[current_hart].exchange(0);
+  uint32_t reason = ipi_data[current_hart].exchange(0);
   LTRACEF("current_hart %u reason %#x\n", current_hart, reason);
 
   if (reason & (1u << MP_IPI_RESCHEDULE)) {
@@ -65,8 +64,7 @@ void riscv64_software_exception() {
   }
 
   if (unlikely(reason)) {
-    TRACEF("unhandled ipi cause %#x, hartid %#x\n", reason, current_hart);
-    panic("stopping");
+    panic("RISCV: unhandled ipi cause %#x, hartid %#x\n", reason, current_hart);
   }
 }
 
@@ -112,12 +110,12 @@ void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi) {
   sbi_send_ipis(&hart_mask);
 }
 
-void riscv64_init_percpu_early(uint hart_id, uint cpu_num) {
-  // basic bootstrapping of this cpu
+// Called once per cpu, sets up the percpu structure and tracks cpu number to hart id.
+void riscv64_mp_early_init_percpu(uint32_t hart_id, cpu_num_t cpu_num) {
   riscv64_percpu_array[cpu_num].cpu_num = cpu_num;
   riscv64_percpu_array[cpu_num].hart_id = hart_id;
   riscv64_set_percpu(&riscv64_percpu_array[cpu_num]);
-  arch_register_hart(cpu_num, hart_id);
+  cpu_to_hart_map[cpu_num] = hart_id;
   wmb();
 }
 
