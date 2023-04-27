@@ -363,6 +363,7 @@ impl Task {
         priority: u8,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
+        seccomp_filters: Vec<EbpfProgram>,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -395,7 +396,7 @@ impl Task {
                 uts_ns,
                 restricted_state_addr_and_size: None,
                 no_new_privs,
-                seccomp_filters: vec![],
+                seccomp_filters,
             }),
             ignore_exceptions: std::sync::atomic::AtomicBool::new(false),
         };
@@ -501,6 +502,7 @@ impl Task {
             DEFAULT_TASK_PRIORITY,
             kernel.root_uts_ns.clone(),
             false,
+            vec![],
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -597,7 +599,14 @@ impl Task {
         let creds;
         let priority;
         let uts_ns;
-        let no_new_privs = self.read().no_new_privs;
+        let no_new_privs;
+        let seccomp_filters;
+        {
+            let state = self.read();
+
+            no_new_privs = state.no_new_privs;
+            seccomp_filters = state.seccomp_filters.clone();
+        }
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
             let thread_group_state = self.thread_group.write();
@@ -665,6 +674,7 @@ impl Task {
             priority,
             uts_ns,
             no_new_privs,
+            seccomp_filters,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child
