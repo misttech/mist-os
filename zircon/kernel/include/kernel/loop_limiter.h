@@ -48,7 +48,7 @@ class LoopLimiter {
   // If |duration| is <= 0 |Exceeded| will always return false.
   static LoopLimiter<ItersPerGetTicks> WithDuration(zx_duration_t duration) {
     const zx_ticks_t relative_ticks = platform_get_ticks_to_time_ratio().Inverse().Scale(duration);
-    return ktl::move(LoopLimiter<ItersPerGetTicks>(relative_ticks));
+    return LoopLimiter<ItersPerGetTicks>(relative_ticks);
   }
 
   // Returns true if the timeout has been exceeded.
