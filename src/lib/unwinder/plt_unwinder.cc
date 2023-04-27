@@ -4,6 +4,10 @@
 
 #include "src/lib/unwinder/plt_unwinder.h"
 
+#include <cstdint>
+
+#include "src/lib/unwinder/cfi_module.h"
+
 namespace unwinder {
 
 Error PltUnwinder::Step(Memory* stack, const Registers& current, Registers& next) {
@@ -63,9 +67,25 @@ Error PltUnwinder::StepArm64(Memory* stack, const Registers& current, Registers&
   if (auto err = current.Get(RegisterID::kArm64_lr, lr); err.has_err()) {
     return err;
   }
-  if (!cfi_unwinder_->IsValidPC(lr)) {
+  uint64_t pc;
+  if (auto err = current.GetPC(pc); err.has_err()) {
+    return err;
+  }
+
+  // Check whether the machine instruction is a PLT entry to avoid false positives.
+  // We use "br x17" as a signature, which is d61f0220 represented in little endian.
+  CfiModule* cfi_module;
+  if (auto err = cfi_unwinder_->GetCfiModuleFor(lr, &cfi_module); err.has_err()) {
+    return err;
+  }
+  uint32_t br_instruction;
+  if (auto err = cfi_module->memory()->Read((pc & ~0xf) | 0xc, br_instruction); err.has_err()) {
+    return err;
+  }
+  if (br_instruction != 0xd61f0220) {
     return Error("It doesn't look like a PLT trampoline");
   }
+
   next = current;
   next.SetPC(lr);
   next.Unset(RegisterID::kArm64_lr);

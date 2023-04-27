@@ -23,14 +23,11 @@ class CfiUnwinder {
   // For other unwinders that want to check whether a value looks like a valid PC.
   bool IsValidPC(uint64_t pc);
 
- private:
   Error GetCfiModuleFor(uint64_t pc, CfiModule** out);
 
-  // Inputs.
-  std::map<uint64_t, Module> module_map_;
-
-  // Lazy-initialized CFI of each module.
-  std::map<uint64_t, CfiModule> cfi_map_;
+ private:
+  // Mapping from module load addresses to a pair of (module description, lazily-initialized CFI).
+  std::map<uint64_t, std::pair<Module, std::unique_ptr<CfiModule>>> module_map_;
 };
 
 }  // namespace unwinder
