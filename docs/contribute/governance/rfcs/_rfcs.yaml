@@ -2814,3 +2814,17 @@
   reviewers: ['geb@google.com', 'ypomortsev@google.com', 'markdittmer@google.com']
   submitted: '2023-03-21'
   reviewed: '2023-04-26'
+
+- name: 'RFC-0216'
+  title: 'Fuchsia Hosted Repository Guidelines'
+  short_description: 'Guidelines for developing Fuchsia hosted code outside of fuchsia.git'
+  authors: ['jeremymanson@google.com']
+  file: '0216_hosted_repositories.md'
+  area: ['Developer', 'Governance', 'General']
+  issue: ['126284']
+  gerrit_change_id: ['790738']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'chaselatta@google.com',  'nmulcahey@google.com', 'surajmalhotra@google.com']
+  submitted: '2022-1-17'
+  reviewed: '2023-04-20'
+

@@ -446,3 +446,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0214_fuchsia_churn_policy.md
   - title: "RFC-0215: Structured Configuration Parent Overrides"
     path: /docs/contribute/governance/rfcs/0215_structured_config_parent_overrides.md
+  - title: "RFC-0216: Fuchsia Hosted Repository Guidelines"
+    path: /docs/contribute/governance/rfcs/0216_hosted_repositories.md
