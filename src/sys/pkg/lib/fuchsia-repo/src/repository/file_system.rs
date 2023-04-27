@@ -12,10 +12,11 @@ use {
     async_fs::DirBuilder,
     camino::{Utf8Component, Utf8Path, Utf8PathBuf},
     fidl_fuchsia_developer_ffx_ext::RepositorySpec,
+    fuchsia_async as fasync,
     fuchsia_merkle::Hash,
     futures::{
-        channel::oneshot, future::BoxFuture, io::SeekFrom, stream::BoxStream, AsyncRead,
-        AsyncSeekExt as _, FutureExt as _, Stream, StreamExt as _,
+        future::BoxFuture, io::SeekFrom, stream::BoxStream, AsyncRead, AsyncSeekExt as _,
+        FutureExt as _, Stream, StreamExt as _,
     },
     notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{
@@ -455,9 +456,7 @@ async fn generate_delivery_blob(
         .arg(format!("--type={blob_type}"))
         .spawn()
         .context("spawn blobfs-compression")?;
-    let (sender, receiver) = oneshot::channel();
-    std::thread::spawn(move || sender.send(child.wait()));
-    let status = receiver.await?.context("wait blobfs-compression")?;
+    let status = fasync::unblock(move || child.wait()).await.context("wait blobfs-compression")?;
     if !status.success() {
         anyhow::bail!("blobfs-compression failed: {status}");
     }
