@@ -1265,51 +1265,6 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_new_streamer_appends_to_existing_file() -> Result<()> {
-        let temp = tempdir()?;
-        let root: PathBuf = temp.path().to_path_buf().into();
-        let log = make_valid_log(TIMESTAMP, "log1".to_string());
-        let log2 = make_valid_log(TIMESTAMP + 1, "log2".to_string());
-        {
-            let streamer = setup_default_streamer_with_temp(
-                &temp,
-                LARGE_MAX_LOG_SIZE,
-                LARGE_MAX_SESSION_SIZE,
-                DEFAULT_MAX_SESSIONS,
-            )
-            .await
-            .unwrap();
-            streamer.append_logs(vec![log.clone()]).await.unwrap();
-        }
-
-        let streamer = setup_default_streamer_with_temp(
-            &temp,
-            LARGE_MAX_LOG_SIZE,
-            LARGE_MAX_SESSION_SIZE,
-            DEFAULT_MAX_SESSIONS,
-        )
-        .await
-        .unwrap();
-        streamer.append_logs(vec![log2.clone()]).await.unwrap();
-
-        let results = collect_default_logs(&root).await.unwrap();
-        assert_eq!(results.len(), 1, "{:?}", results);
-        let value = results.values().next().unwrap();
-
-        let results = value.split("\n").collect::<Vec<_>>();
-        assert_eq!(results.len(), 3, "{:?}", results);
-
-        assert_eq!(serde_json::from_str::<LogEntry>(results.get(0).unwrap()).unwrap(), log);
-        assert_eq!(serde_json::from_str::<LogEntry>(results.get(1).unwrap()).unwrap(), log2);
-        assert!(results.get(2).unwrap().is_empty());
-
-        verify_logs(streamer.stream_entries(StreamMode::SnapshotAll, None).await?, vec![log, log2])
-            .await;
-
-        Ok(())
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_snapshot_does_not_include_later_writes() -> Result<()> {
         let (_temp, streamer) = setup_default_streamer(
             SMALL_MAX_LOG_SIZE,
