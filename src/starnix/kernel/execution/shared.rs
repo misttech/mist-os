@@ -72,8 +72,6 @@ pub fn execute_syscall(
 
     current_task.registers.save_registers_for_restart(&syscall);
 
-    log_trace!(current_task, "{:?}", syscall);
-
     // Inlined fast path for seccomp, so that we don't incur the cost
     // of a method call when running the filters.
     if current_task.has_seccomp_filters {
