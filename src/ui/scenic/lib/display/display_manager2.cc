@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display_manager2.h"
 
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/clone.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/compiler.h>
@@ -246,17 +247,11 @@ DisplayManager2::DisplayInfoPrivate DisplayManager2::NewDisplayInfoPrivate(
   display_info.set_manufacturer_name(hardware_display_info.manufacturer_name);
   display_info.set_monitor_name(hardware_display_info.monitor_name);
 
-  zx::result pixel_format_convert_result =
-      ::display::AnyPixelFormatToImages2PixelFormatStdVector(hardware_display_info.pixel_format);
-  if (unlikely(!pixel_format_convert_result.is_ok())) {
-    FX_NOTREACHED() << "This should not happen: cannot convert pixel format to sysmem2 formats: " +
-                           std::string(pixel_format_convert_result.status_string());
-  }
-
-  return DisplayInfoPrivate{hardware_display_info.id,
-                            fsl::GetKoid(display_info.display_ref().reference.get()),
-                            std::move(pixel_format_convert_result.value()), std::move(controller),
-                            std::move(display_info)};
+  std::vector<fuchsia_images2::PixelFormat> pixel_formats =
+      fidl::HLCPPToNatural(hardware_display_info.pixel_format);
+  return DisplayInfoPrivate{
+      hardware_display_info.id, fsl::GetKoid(display_info.display_ref().reference.get()),
+      std::move(pixel_formats), std::move(controller), std::move(display_info)};
 }
 
 void DisplayManager2::OnDisplaysChanged(
@@ -270,18 +265,12 @@ void DisplayManager2::OnDisplaysChanged(
       FX_LOGS(WARNING) << last_error_;
       continue;
     }
-    zx::result pixel_format_convert_result =
-        ::display::AnyPixelFormatToImages2PixelFormatStdVector(display_info.pixel_format);
-    if (unlikely(!pixel_format_convert_result.is_ok())) {
-      FX_NOTREACHED()
-          << "This should not happen: cannot convert pixel format to sysmem2 formats: " +
-                 std::string(pixel_format_convert_result.status_string());
-      continue;
-    }
 
+    std::vector<fuchsia_images2::PixelFormat> pixel_formats =
+        fidl::HLCPPToNatural(display_info.pixel_format);
     if (dc_private->claimed_dc) {
-      dc_private->claimed_dc->AddDisplay(Display2(display_info.id, display_info.modes,
-                                                  std::move(pixel_format_convert_result.value())));
+      dc_private->claimed_dc->AddDisplay(
+          Display2(display_info.id, display_info.modes, std::move(pixel_formats)));
     }
     dc_private->displays.push_back(NewDisplayInfoPrivate(display_info, dc_private->controller));
     const DisplayInfoPrivate& display_info_private = dc_private->displays.back();

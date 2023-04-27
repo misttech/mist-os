@@ -1201,7 +1201,8 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
     modes_vector.emplace_back(std::move(modes));
     info.modes = fidl::VectorView<fhd::wire::Mode>::FromExternal(modes_vector.back());
 
-    info.pixel_format = fidl::VectorView<uint32_t>(arena, config->pixel_formats_.size());
+    info.pixel_format =
+        fidl::VectorView<fuchsia_images2::wire::PixelFormat>(arena, config->pixel_formats_.size());
     for (size_t pixel_format_index = 0; pixel_format_index < info.pixel_format.count();
          ++pixel_format_index) {
       info.pixel_format[pixel_format_index] = config->pixel_formats_[pixel_format_index].ToFidl();

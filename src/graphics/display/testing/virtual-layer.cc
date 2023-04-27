@@ -17,7 +17,6 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "utils.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -373,14 +372,7 @@ bool CursorLayer::Init(const fidl::WireSyncClient<fhd::Controller>& dc) {
   fhd::wire::CursorInfo info = displays_[0]->cursor();
   uint32_t bg_color = 0xffffffff;
 
-  zx::result convert_result = ::display::AnyPixelFormatToImages2PixelFormat(info.pixel_format);
-  if (!convert_result.is_ok()) {
-    fprintf(stderr, "Cannot convert cursor pixel format %u", info.pixel_format);
-    return false;
-  }
-  fuchsia_images2::wire::PixelFormat cursor_pixel_format = convert_result.value();
-
-  image_ = Image::Create(dc, info.width, info.height, cursor_pixel_format, Image::Pattern::kBorder,
+  image_ = Image::Create(dc, info.width, info.height, info.pixel_format, Image::Pattern::kBorder,
                          get_fg_color(), bg_color, fuchsia_images2::wire::kFormatModifierLinear);
   if (!image_) {
     return false;

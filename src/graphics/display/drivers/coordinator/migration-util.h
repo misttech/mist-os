@@ -36,7 +36,7 @@ struct CoordinatorPixelFormat {
   // Converts a CoordinatorPixelFormat to format used in FIDL fuchsia.hardware.
   // display interface. The return type must match return the `pixel_format`
   // fields used in FIDL fuchsia.hardware.display interface.
-  AnyPixelFormat ToFidl() const;
+  fuchsia_images2::wire::PixelFormat ToFidl() const;
 
   // TODO(fxbug.dev/126114): During pixel_format migration, the underlying
   // format may be either `zx_pixel_format_t` or `fuchsia.images2.PixelFormat`.

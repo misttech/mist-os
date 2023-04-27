@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display_controller_listener.h"
 
+#include <fuchsia/images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <zircon/pixelformat.h>
@@ -200,7 +201,7 @@ TEST_F(DisplayControllerListenerTest, OnDisplaysChanged) {
   fuchsia::hardware::display::Info test_display;
   test_display.id = 1;
   test_display.modes = {test_mode};
-  test_display.pixel_format = {ZX_PIXEL_FORMAT_ARGB_8888};
+  test_display.pixel_format = {fuchsia::images2::PixelFormat::BGRA32};
   test_display.cursor_configs = {};
   test_display.manufacturer_name = "fake_manufacturer_name";
   test_display.monitor_name = "fake_monitor_name";

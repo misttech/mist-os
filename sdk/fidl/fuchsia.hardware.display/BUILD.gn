@@ -17,7 +17,10 @@ fidl("fuchsia.hardware.display") {
     "virtcon.fidl",
   ]
 
-  public_deps = [ "//sdk/fidl/fuchsia.sysmem" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.images2",
+    "//sdk/fidl/fuchsia.sysmem",
+  ]
 
   enable_hlcpp = true
 }

@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/display_manager2.h"
 
+#include <fuchsia/images2/cpp/fidl.h>
 #include <fuchsia/ui/display/cpp/fidl.h>
 #include <fuchsia/ui/display/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -79,13 +80,14 @@ class MockDisplayListener : public fuchsia::ui::display::testing::DisplayListene
 static fuchsia::hardware::display::Info CreateFakeDisplayInfo(uint64_t display_id) {
   fuchsia::hardware::display::Mode mode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
-  fuchsia::hardware::display::Info display = {.id = display_id,
-                                              .modes = {mode},
-                                              .pixel_format = {ZX_PIXEL_FORMAT_ARGB_8888},
-                                              .cursor_configs = {},
-                                              .manufacturer_name = "fake_manufacturer_name",
-                                              .monitor_name = "fake_monitor_name",
-                                              .monitor_serial = "fake_monitor_serial"};
+  fuchsia::hardware::display::Info display = {
+      .id = display_id,
+      .modes = {mode},
+      .pixel_format = {fuchsia::images2::PixelFormat::BGRA32},
+      .cursor_configs = {},
+      .manufacturer_name = "fake_manufacturer_name",
+      .monitor_name = "fake_monitor_name",
+      .monitor_serial = "fake_monitor_serial"};
   return display;
 }
 

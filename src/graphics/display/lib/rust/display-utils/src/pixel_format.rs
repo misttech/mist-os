@@ -74,42 +74,24 @@ impl Default for PixelFormat {
     }
 }
 
-impl From<u32> for PixelFormat {
-    fn from(src: u32) -> Self {
-        if let Some(pixel_format) = images2::PixelFormat::from_primitive(src) {
-            match pixel_format {
-                images2::PixelFormat::R8G8B8A8 => PixelFormat::Abgr8888,
-                images2::PixelFormat::Bgra32 => PixelFormat::Argb8888,
-                images2::PixelFormat::Nv12 => PixelFormat::Nv12,
-                images2::PixelFormat::Bgr24 => PixelFormat::Rgb888,
-                images2::PixelFormat::Rgb565 => PixelFormat::Rgb565,
-                images2::PixelFormat::Rgb332 => PixelFormat::Rgb332,
-                images2::PixelFormat::Rgb2220 => PixelFormat::Rgb2220,
-                images2::PixelFormat::L8 => PixelFormat::Mono8,
-                _ => PixelFormat::Unknown,
-            }
-        } else {
-            match src {
-                ZX_PIXEL_FORMAT_NONE => PixelFormat::Unknown,
-                ZX_PIXEL_FORMAT_RGB_565 => PixelFormat::Rgb565,
-                ZX_PIXEL_FORMAT_RGB_332 => PixelFormat::Rgb332,
-                ZX_PIXEL_FORMAT_RGB_2220 => PixelFormat::Rgb2220,
-                ZX_PIXEL_FORMAT_ARGB_8888 => PixelFormat::Argb8888,
-                ZX_PIXEL_FORMAT_RGB_x888 => PixelFormat::RgbX888,
-                ZX_PIXEL_FORMAT_MONO_8 => PixelFormat::Mono8,
-                // ZX_PIXEL_FORMAT_GRAY_8 is an alias for ZX_PIXEL_FORMAT_MONO_8
-                ZX_PIXEL_FORMAT_NV12 => PixelFormat::Nv12,
-                ZX_PIXEL_FORMAT_RGB_888 => PixelFormat::Rgb888,
-                ZX_PIXEL_FORMAT_ABGR_8888 => PixelFormat::Abgr8888,
-                ZX_PIXEL_FORMAT_BGR_888x => PixelFormat::Bgr888X,
-                _ => PixelFormat::Unknown,
-            }
+impl From<images2::PixelFormat> for PixelFormat {
+    fn from(src: images2::PixelFormat) -> Self {
+        match src {
+            images2::PixelFormat::R8G8B8A8 => PixelFormat::Abgr8888,
+            images2::PixelFormat::Bgra32 => PixelFormat::Argb8888,
+            images2::PixelFormat::Nv12 => PixelFormat::Nv12,
+            images2::PixelFormat::Bgr24 => PixelFormat::Rgb888,
+            images2::PixelFormat::Rgb565 => PixelFormat::Rgb565,
+            images2::PixelFormat::Rgb332 => PixelFormat::Rgb332,
+            images2::PixelFormat::Rgb2220 => PixelFormat::Rgb2220,
+            images2::PixelFormat::L8 => PixelFormat::Mono8,
+            _ => PixelFormat::Unknown,
         }
     }
 }
 
-impl From<&zx_pixel_format_t> for PixelFormat {
-    fn from(src: &zx_pixel_format_t) -> Self {
+impl From<&images2::PixelFormat> for PixelFormat {
+    fn from(src: &images2::PixelFormat) -> Self {
         Self::from(*src)
     }
 }
@@ -338,51 +320,35 @@ mod tests {
     #[fuchsia::test]
     fn sysmem2_pixel_format_conversion() {
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::R8G8B8A8.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::R8G8B8A8)),
             images2::PixelFormat::R8G8B8A8
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::Bgra32.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Bgra32)),
             images2::PixelFormat::Bgra32
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::Nv12.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Nv12)),
             images2::PixelFormat::Nv12
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::Bgr24.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Bgr24)),
             images2::PixelFormat::Bgr24
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::Rgb565.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Rgb565)),
             images2::PixelFormat::Rgb565
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::Rgb332.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Rgb332)),
             images2::PixelFormat::Rgb332
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::Rgb2220.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Rgb2220)),
             images2::PixelFormat::Rgb2220
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(
-                images2::PixelFormat::L8.into_primitive()
-            )),
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::L8)),
             images2::PixelFormat::L8
         );
     }

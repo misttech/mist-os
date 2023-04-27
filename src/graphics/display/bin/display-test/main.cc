@@ -31,7 +31,6 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/graphics/display/testing/display.h"
 #include "src/graphics/display/testing/utils.h"
 #include "src/graphics/display/testing/virtual-layer.h"
@@ -120,16 +119,7 @@ static bool bind_display(const char* controller, fbl::Vector<Display>* displays)
 
     void OnDisplaysChanged(fidl::WireEvent<fhd::Controller::OnDisplaysChanged>* event) override {
       for (size_t i = 0; i < event->added.count(); i++) {
-        const fhd::wire::Info& info = event->added[i];
-
-        zx::result convert_result = display::AnyPixelFormatToImages2PixelFormatStdVector(
-            cpp20::span<const uint32_t>(info.pixel_format.begin(), info.pixel_format.end()));
-        if (!convert_result.is_ok()) {
-          fprintf(stderr, "Cannot add display: Cannot convert pixel formats to images2: %s\n",
-                  zx_status_get_string(convert_result.error_value()));
-          continue;
-        }
-        displays_->push_back(Display(info, /*pixel_formats=*/convert_result.value()));
+        displays_->push_back(Display(/*info=*/event->added[i]));
       }
     }
 

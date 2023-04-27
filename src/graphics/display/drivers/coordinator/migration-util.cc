@@ -42,13 +42,12 @@ CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
   return zx::ok(std::move(result));
 }
 
-AnyPixelFormat CoordinatorPixelFormat::ToFidl() const {
+fuchsia_images2::wire::PixelFormat CoordinatorPixelFormat::ToFidl() const {
   zx::result<fuchsia_images2::wire::PixelFormat> convert_result =
       AnyPixelFormatToImages2PixelFormat(format);
   ZX_ASSERT(convert_result.is_ok());
   ZX_ASSERT(!convert_result->IsUnknown());
-  // fuchsia.images2.PixelFormat values can be cast into AnyPixelFormat safely.
-  return static_cast<AnyPixelFormat>(convert_result.value());
+  return convert_result.value();
 }
 
 // static

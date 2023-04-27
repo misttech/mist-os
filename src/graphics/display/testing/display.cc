@@ -15,11 +15,11 @@ namespace fhd = fuchsia_hardware_display;
 namespace testing {
 namespace display {
 
-Display::Display(const fhd::wire::Info& info,
-                 cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) {
+Display::Display(const fhd::wire::Info& info) {
   id_ = info.id;
 
-  for (const fuchsia_images2::wire::PixelFormat pixel_format : pixel_formats) {
+  for (fuchsia_images2::wire::PixelFormat pixel_format : info.pixel_format) {
+    ZX_ASSERT(!pixel_format.IsUnknown());
     pixel_formats_.push_back(pixel_format);
   }
 
@@ -63,7 +63,7 @@ void Display::Dump() {
   printf("\n\tSupported cursor modes:\n");
   for (unsigned i = 0; i < cursors_.size(); i++) {
     printf("\t\t%d\t: %dx%d\t%08x\n", i, cursors_[i].width, cursors_[i].height,
-           cursors_[i].pixel_format);
+           static_cast<uint32_t>(cursors_[i].pixel_format));
   }
 
   printf("\n\t%s Physical dimension in millimeters:\n",

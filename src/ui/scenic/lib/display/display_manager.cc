@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/display/display_manager.h"
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
@@ -69,19 +71,13 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
                          << " doesn't exist for display with id=" << display.id;
         }
       }
-      zx::result pixel_format_convert_result =
-          ::display::AnyPixelFormatToImages2PixelFormatStdVector(display.pixel_format);
-      if (unlikely(!pixel_format_convert_result.is_ok())) {
-        FX_NOTREACHED() << "Cannot convert pixel format to sysmem2 formats: "
-                        << pixel_format_convert_result.error_value();
-        return;
-      }
 
+      std::vector<fuchsia_images2::PixelFormat> pixel_formats =
+          fidl::HLCPPToNatural(display.pixel_format);
       auto& mode = display.modes[mode_idx];
       default_display_ = std::make_unique<Display>(
           display.id, mode.horizontal_resolution, mode.vertical_resolution,
-          display.horizontal_size_mm, display.vertical_size_mm,
-          std::move(pixel_format_convert_result.value()));
+          display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats));
       OnClientOwnershipChange(owns_display_controller_);
 
       if (display_available_cb_) {

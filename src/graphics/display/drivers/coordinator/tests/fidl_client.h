@@ -30,7 +30,7 @@ class TestFidlClient {
     explicit Display(const fuchsia_hardware_display::wire::Info& info);
 
     uint64_t id_;
-    fbl::Vector<zx_pixel_format_t> pixel_formats_;
+    fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
     fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
     fbl::Vector<fuchsia_hardware_display::wire::CursorInfo> cursors_;
 

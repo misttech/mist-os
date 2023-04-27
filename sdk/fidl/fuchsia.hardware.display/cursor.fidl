@@ -3,16 +3,14 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
+using fuchsia.images2;
+
 // Info about valid cursor configurations.
 type CursorInfo = struct {
     // The width and height of the cursor configuration, in pixels.
     width uint32;
     height uint32;
 
-    // Pixel format type of the cursor buffer.
-    //
-    // TODO(fxbug.dev/126114): Currently we use `AnyPixelFormat` to indicate
-    // that the pixel format is being migrated from `zx_pixel_format_t` to
-    // `fuchsia.images2.PixelFormat`.
-    pixel_format AnyPixelFormat;
+    // Pixel format type (fuchsia.images2.PixelFormat) of the cursor buffer.
+    pixel_format fuchsia.images2.PixelFormat;
 };

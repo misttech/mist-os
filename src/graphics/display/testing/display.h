@@ -26,8 +26,7 @@ struct ColorCorrectionArgs {
 
 class Display {
  public:
-  Display(const fuchsia_hardware_display::wire::Info& info,
-          cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats);
+  explicit Display(const fuchsia_hardware_display::wire::Info& info);
 
   void Init(const fidl::WireSyncClient<fuchsia_hardware_display::Controller>& dc,
             ColorCorrectionArgs color_correction_args = ColorCorrectionArgs());
