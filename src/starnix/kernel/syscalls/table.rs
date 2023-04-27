@@ -131,6 +131,7 @@ pub fn dispatch_syscall(
         capset[2],
         chdir[1],
         #[cfg(target_arch = "x86_64")] chmod[2],
+        #[cfg(target_arch = "x86_64")] chown[3],
         chroot[1],
         clock_getres[2],
         clock_gettime[2],
