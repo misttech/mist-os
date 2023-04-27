@@ -41,9 +41,11 @@ legacy_base_package_labels += [
   "//src/fonts:build_type_eng",
 ]
 
-# Add UI packages on terminal.
+# Add UI core shard and packages on terminal.
+core_realm_shards += [ "//src/ui:ui_core_shard" ]
 legacy_cache_package_labels += [
   "//src/fonts/collections:small-open-fonts-collection",
+  "//src/ui:ui_packages",
   "//src/ui/bin/sensor-config:empty-sensor-config-pkg",
   "//src/ui/bin/terminal",
 

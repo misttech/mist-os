@@ -74,13 +74,6 @@ user_platform_aib_names = [
   # Driver Framework
   "driver_framework_v1",
   "driver_framework_v2",
-
-  # UI
-  "ui",
-  "ui_legacy",
-  "ui_user_and_userdebug",
-  "ui_package_user_and_userdebug",
-  "ui_legacy_package_user_and_userdebug",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)
@@ -109,11 +102,6 @@ _eng_aib_names = [
 
   # Kernel args
   "kernel_args_eng",
-
-  # UI
-  "ui_eng",
-  "ui_package_eng",
-  "ui_legacy_package_eng",
 
   # Example AIB
   "example_assembly_bundle",

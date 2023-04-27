@@ -26,10 +26,6 @@ workstation_platform_config = {
     live_usb_enabled = true
     configure_fshost = false
   }
-  ui = {
-    enabled = true
-    legacy = true
-  }
   virtualization = {
     enabled = true
   }

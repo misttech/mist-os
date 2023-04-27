@@ -17,10 +17,6 @@ product_assembly_configuration("terminal") {
         "touchscreen",
       ]
     }
-    ui = {
-      enabled = true
-      legacy = true
-    }
   }
   product = {
   }
