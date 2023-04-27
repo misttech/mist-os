@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+config("sparse-includes") {
+  include_dirs = [
+    "core/libsparse",
+    "core/libsparse/include",
+  ]
+}
+
+sdk_source_set("sparse_format") {
+  sdk_name = "libsparse_sparse_format"
+  category = "experimental"
+  include_base = "core/libsparse"
+  sources = [
+    "core/libsparse/sparse_defs.h",
+    "core/libsparse/sparse_format.h",
+  ]
+
+  public_configs = [ ":sparse-includes" ]
+}

@@ -12,6 +12,7 @@ group("test") {
 test("firmware_storage_test") {
   sources = [
     "gpt_utils.cc",
+    "sparse.cc",
     "storage.cc",
   ]
   deps = [
