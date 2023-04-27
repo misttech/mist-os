@@ -139,3 +139,9 @@ py_binary(
     srcs = ["create_pave_script.py"],
     python_version = "PY3",
 )
+
+py_binary(
+    name = "size_report_merger",
+    srcs = ["size_report_merger.py"],
+    python_version = "PY3",
+)

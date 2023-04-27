@@ -44,6 +44,14 @@ FuchsiaAssemblyConfigInfo = provider(
     },
 )
 
+FuchsiaSizeCheckerInfo = provider(
+    doc = """Size reports created by size checker tool.""",
+    fields = {
+        "size_report": "size_report.json file",
+        "verbose_output": "verbose version of size report file",
+    },
+)
+
 FuchsiaVirtualDeviceInfo = provider(
     doc = "A virtual device spec file which is a single JSON configuration file.",
     fields = {

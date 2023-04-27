@@ -1,10 +1,10 @@
-# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 """Rule for running size checker on given image."""
 
-load(":providers.bzl", "FuchsiaProductImageInfo")
+load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 # Command for running ffx assembly size-check product.
@@ -46,17 +46,23 @@ def _fuchsia_product_size_check_impl(ctx):
             "SIZE_FILE": size_file.path,
             "VISUALIZATION_DIR": visualization_dir.path,
             "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,
-            "CREEP_LIMIT": ctx.attr.creep_limit
+            "CREEP_LIMIT": ctx.attr.creep_limit,
         },
         progress_message = "Size checking for %s" % ctx.label.name,
     )
     deps = [size_file, visualization_dir, size_report_product_file]
 
-    return [DefaultInfo(files = depset(direct = deps))]
+    return [
+        DefaultInfo(files = depset(direct = deps)),
+        FuchsiaSizeCheckerInfo(
+            size_report = size_report_product_file,
+        ),
+    ]
 
 fuchsia_product_size_check = rule(
     doc = """Create a size summary of an image.""",
     implementation = _fuchsia_product_size_check_impl,
+    provides = [FuchsiaSizeCheckerInfo],
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_image": attr.label(
@@ -66,7 +72,7 @@ fuchsia_product_size_check = rule(
         ),
         "blobfs_creep_limit": attr.int(
             doc = "Creep limit for Blobfs, this is how much BlobFS contents can increase in one CL",
-            default = 102400
+            default = 102400,
         ),
     },
 )
