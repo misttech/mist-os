@@ -4,6 +4,8 @@
 
 #![warn(clippy::all)]
 #![warn(clippy::clone_on_ref_ptr)]
+// TODO(https://fxbug.dev/126170): remove after the lint is fixed
+#![allow(unknown_lints, clippy::items_after_test_module)]
 
 mod accessor;
 pub mod archivist;
