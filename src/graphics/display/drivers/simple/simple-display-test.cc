@@ -13,7 +13,6 @@
 #include <lib/zx/object.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/rights.h>
 
 #include <list>

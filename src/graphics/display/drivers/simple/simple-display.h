@@ -8,7 +8,6 @@
 #include <lib/ddk/driver.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 
 #include <fbl/mutex.h>
 
@@ -129,8 +128,6 @@ class SimpleDisplay : public DeviceType,
   const uint32_t height_;
   const uint32_t stride_;
   const fuchsia_images2::wire::PixelFormat format_;
-  // TODO(fxbug.dev/71410): Delete usage of zx_pixel_format_t.
-  zx_pixel_format_t zx_format_;
 
   const uint64_t kFormatModifier = fuchsia_images2::wire::kFormatModifierLinear;
 

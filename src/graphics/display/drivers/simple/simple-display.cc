@@ -92,7 +92,9 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   args.panel.params.height = height_;
   args.panel.params.width = width_;
   args.panel.params.refresh_rate_e2 = kRefreshRateHz * 100;
-  args.pixel_format_list = &zx_format_;
+  // fuchsia.images2.PixelFormat can always cast to AnyPixelFormat safely.
+  any_pixel_format_t pixel_format = static_cast<any_pixel_format_t>(format_);
+  args.pixel_format_list = &pixel_format;
   args.pixel_format_count = 1;
 
   intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
@@ -477,10 +479,6 @@ SimpleDisplay::SimpleDisplay(zx_device_t* parent,
       stride_(stride),
       format_(format),
       next_vsync_time_(zx::clock::get_monotonic()) {
-  ZX_ASSERT_MSG(ImageFormatConvertSysmemToZx(format_, &zx_format_),
-                "Cannot convert sysmem format %u to zx_pixel_format_t",
-                static_cast<uint32_t>(format_));
-
   // Start thread. Heap server must be running on a separate
   // thread as sysmem might be making synchronous allocation requests
   // from the main thread.
