@@ -9,13 +9,12 @@ use ffx_ssh::ssh::get_ssh_key_paths;
 use ffx_target_ssh_args::SshCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::TargetProxy;
+use std::net::IpAddr;
 use std::process::Command;
 use std::time::Duration;
 use timeout::timeout;
 
 static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
-    "-o",
-    "AddressFamily inet6",
     // We do not want multiplexing
     "-o",
     "ControlPath none",
@@ -78,6 +77,16 @@ async fn build_ssh_command(cmd: SshCommand, addr: TargetAddr) -> Result<Command>
             for arg in DEFAULT_SSH_OPTIONS {
                 ssh_cmd.arg(arg);
             }
+            match addr.ip() {
+                IpAddr::V4(_) => {
+                    ssh_cmd.arg("-o");
+                    ssh_cmd.arg("AddressFamily inet");
+                }
+                IpAddr::V6(_) => {
+                    ssh_cmd.arg("-o");
+                    ssh_cmd.arg("AddressFamily inet6");
+                }
+            }
         }
     };
 
@@ -123,7 +132,46 @@ mod test {
             ssh_cmd.get_args().collect::<Vec<_>>(),
             vec![
                 "-o",
+                "ControlPath none",
+                "-o",
+                "ControlMaster no",
+                "-o",
+                "ExitOnForwardFailure yes",
+                "-o",
+                "StreamLocalBindUnlink yes",
+                "-o",
+                "CheckHostIP=no",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+                "-o",
+                "LogLevel=ERROR",
+                "-o",
                 "AddressFamily inet6",
+                "-i",
+                "/foo/bar/baz.pk",
+                "-p",
+                "22",
+                format!("{}", addr).as_str(),
+            ]
+        );
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_address_family() -> Result<()> {
+        let addr = TargetAddr::from_str("127.0.0.1:34522")?;
+        let cmd = SshCommand {
+            private_key: Some("/foo/bar/baz.pk".to_string()),
+            sshconfig: None,
+            command: vec![],
+        };
+        let ssh_cmd = build_ssh_command(cmd, addr).await?;
+        assert_eq!(ssh_cmd.get_program(), "ssh");
+        assert_eq!(
+            ssh_cmd.get_args().collect::<Vec<_>>(),
+            vec![
                 "-o",
                 "ControlPath none",
                 "-o",
@@ -140,10 +188,12 @@ mod test {
                 "UserKnownHostsFile=/dev/null",
                 "-o",
                 "LogLevel=ERROR",
+                "-o",
+                "AddressFamily inet",
                 "-i",
                 "/foo/bar/baz.pk",
                 "-p",
-                "22",
+                "34522",
                 format!("{}", addr).as_str(),
             ]
         );
