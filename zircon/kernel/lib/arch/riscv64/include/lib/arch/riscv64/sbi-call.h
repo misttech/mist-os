@@ -23,131 +23,90 @@ namespace arch {
 
 template <RiscvSbiEid Eid, auto Fid>
 inline RiscvSbiRet SbiCall() {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid)
-      : "memory", "a0", "a1", "a6", "a7");
-  return result;
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a1 __asm__("a1");
+  register uintptr_t a0 __asm__("a0");
+  __asm__ volatile("ecall\n" : "=r"(a0), "=r"(a1) : "r"(a6), "r"(a7) : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 template <RiscvSbiEid Eid, auto Fid>
-inline RiscvSbiRet SbiCall(uintptr_t a0) {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "mv a0, %[a0]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid), [a0] "r"(a0)
-      : "memory", "a0", "a1", "a6", "a7");
-  return result;
+inline RiscvSbiRet SbiCall(uintptr_t _a0) {
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a1 __asm__("a1");
+  register uintptr_t a0 __asm__("a0") = _a0;
+  __asm__ volatile("ecall\n" : "+r"(a0), "=r"(a1) : "r"(a6), "r"(a7) : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 template <RiscvSbiEid Eid, auto Fid>
-inline RiscvSbiRet SbiCall(uintptr_t a0, uintptr_t a1) {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "mv a0, %[a0]\n"
-      "mv a1, %[a1]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid), [a0] "r"(a0), [a1] "r"(a1)
-      : "memory", "a0", "a1", "a6", "a7");
-  return result;
+inline RiscvSbiRet SbiCall(uintptr_t _a0, uintptr_t _a1) {
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a1 __asm__("a1") = _a1;
+  register uintptr_t a0 __asm__("a0") = _a0;
+  __asm__ volatile("ecall\n" : "+r"(a0), "+r"(a1) : "r"(a6), "r"(a7) : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 template <RiscvSbiEid Eid, auto Fid>
-inline RiscvSbiRet SbiCall(uintptr_t a0, uintptr_t a1, uintptr_t a2) {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "mv a0, %[a0]\n"
-      "mv a1, %[a1]\n"
-      "mv a2, %[a2]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid), [a0] "r"(a0), [a1] "r"(a1), [a2] "r"(a2)
-      : "memory", "a0", "a1", "a2", "a6", "a7");
-  return result;
+inline RiscvSbiRet SbiCall(uintptr_t _a0, uintptr_t _a1, uintptr_t _a2) {
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a2 __asm__("a2") = _a2;
+  register uintptr_t a1 __asm__("a1") = _a1;
+  register uintptr_t a0 __asm__("a0") = _a0;
+  __asm__ volatile("ecall\n" : "+r"(a0), "+r"(a1) : "r"(a2), "r"(a6), "r"(a7) : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 template <RiscvSbiEid Eid, auto Fid>
-inline RiscvSbiRet SbiCall(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3) {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "mv a0, %[a0]\n"
-      "mv a1, %[a1]\n"
-      "mv a2, %[a2]\n"
-      "mv a3, %[a3]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid), [a0] "r"(a0), [a1] "r"(a1), [a2] "r"(a2), [a3] "r"(a3)
-      : "memory", "a0", "a1", "a2", "a3", "a6", "a7");
-  return result;
+inline RiscvSbiRet SbiCall(uintptr_t _a0, uintptr_t _a1, uintptr_t _a2, uintptr_t _a3) {
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a3 __asm__("a3") = _a3;
+  register uintptr_t a2 __asm__("a2") = _a2;
+  register uintptr_t a1 __asm__("a1") = _a1;
+  register uintptr_t a0 __asm__("a0") = _a0;
+  __asm__ volatile("ecall\n" : "+r"(a0), "+r"(a1) : "r"(a2), "r"(a3), "r"(a6), "r"(a7) : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 template <RiscvSbiEid Eid, auto Fid>
-inline RiscvSbiRet SbiCall(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4) {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "mv a0, %[a0]\n"
-      "mv a1, %[a1]\n"
-      "mv a2, %[a2]\n"
-      "mv a3, %[a3]\n"
-      "mv a4, %[a4]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid), [a0] "r"(a0), [a1] "r"(a1), [a2] "r"(a2), [a3] "r"(a3),
-        [a4] "r"(a4)
-      : "memory", "a0", "a1", "a2", "a3", "a4", "a6", "a7");
-  return result;
+inline RiscvSbiRet SbiCall(uintptr_t _a0, uintptr_t _a1, uintptr_t _a2, uintptr_t _a3,
+                           uintptr_t _a4) {
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a4 __asm__("a4") = _a4;
+  register uintptr_t a3 __asm__("a3") = _a3;
+  register uintptr_t a2 __asm__("a2") = _a2;
+  register uintptr_t a1 __asm__("a1") = _a1;
+  register uintptr_t a0 __asm__("a0") = _a0;
+  __asm__ volatile("ecall\n"
+                   : "+r"(a0), "+r"(a1)
+                   : "r"(a2), "r"(a3), "r"(a4), "r"(a6), "r"(a7)
+                   : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 template <RiscvSbiEid Eid, auto Fid>
-inline RiscvSbiRet SbiCall(uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
-                           uintptr_t a5) {
-  RiscvSbiRet result;
-  __asm__ volatile(
-      "li a7, %[eid]\n"
-      "li a6, %[fid]\n"
-      "mv a0, %[a0]\n"
-      "mv a1, %[a1]\n"
-      "mv a2, %[a2]\n"
-      "mv a3, %[a3]\n"
-      "mv a4, %[a4]\n"
-      "mv a5, %[a5]\n"
-      "ecall\n"
-      "mv %[error], a0\n"
-      "mv %[value], a1\n"
-      : [error] "=r"(result.error), [value] "=r"(result.value)
-      : [eid] "i"(Eid), [fid] "i"(Fid), [a0] "r"(a0), [a1] "r"(a1), [a2] "r"(a2), [a3] "r"(a3),
-        [a4] "r"(a4), [a5] "r"(a5)
-      : "memory", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7");
-  return result;
+inline RiscvSbiRet SbiCall(uintptr_t _a0, uintptr_t _a1, uintptr_t _a2, uintptr_t _a3,
+                           uintptr_t _a4, uintptr_t _a5) {
+  register uintptr_t a7 __asm__("a7") = static_cast<uintptr_t>(Eid);
+  register uintptr_t a6 __asm__("a6") = static_cast<uintptr_t>(Fid);
+  register uintptr_t a5 __asm__("a5") = _a5;
+  register uintptr_t a4 __asm__("a4") = _a4;
+  register uintptr_t a3 __asm__("a3") = _a3;
+  register uintptr_t a2 __asm__("a2") = _a2;
+  register uintptr_t a1 __asm__("a1") = _a1;
+  register uintptr_t a0 __asm__("a0") = _a0;
+  __asm__ volatile("ecall\n"
+                   : "+r"(a0), "+r"(a1)
+                   : "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7)
+                   : "memory");
+  return RiscvSbiRet{.error = static_cast<RiscvSbiError>(a0), .value = static_cast<intptr_t>(a1)};
 }
 
 namespace RiscvSbi {
