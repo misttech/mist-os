@@ -8,6 +8,7 @@
 
 #include <inttypes.h>
 #include <lib/devicetree/path.h>
+#include <lib/fit/defer.h>
 #include <lib/fit/result.h>
 #include <lib/zircon-internal/align.h>
 #include <zircon/assert.h>
@@ -263,8 +264,18 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
   size_t name_end = unprocessed.find_first_of(uint8_t{0});
   ZX_ASSERT_MSG(name_end != ByteView::npos, "unterminated node name");
   std::string_view name{reinterpret_cast<const char*>(unprocessed.data()), name_end};
+
+  // GCC detects this as a dangling pointer that "escapes", but we know it's
+  // safe because the `path->pop_back();` always runs before `node` dies.
+#pragma GCC diagnostic push
+#if __GNUC__ >= 13
+#pragma GCC diagnostic ignored "-Wdangling-pointer"
+#endif
   Node node{name};
   path->push_back(&node);
+  auto unwind_path = fit::defer([path]() { path->pop_back(); });
+#pragma GCC diagnostic pop
+
   unprocessed.remove_prefix(StructBlockAlign(name_end + 1));
 
   // Seek past all no-op tokens and properties.
@@ -338,7 +349,6 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecod
     call(post_order_visitor);
   }
 
-  path->pop_back();
   return unprocessed;
 }
 
