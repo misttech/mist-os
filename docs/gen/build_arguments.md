@@ -2451,6 +2451,16 @@ library is created at "$dir_pw_third_party/googletest".
 
 From //third_party/pigweed/src/third_party/googletest/googletest.gni:19
 
+### dir_pw_third_party_mbedtls
+
+If compiling backends with mbedtls, this variable is set to the path to the
+mbedtls source code. When set, a pw_source_set for the mbedtls library is
+created at "$dir_pw_third_party/mbedtls".
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/third_party/mbedtls/mbedtls.gni:21
+
 ### dir_pw_third_party_nanopb
 
 If compiling protos for nanopb, this variable is set to the path to the
@@ -6648,6 +6658,12 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
 
+### pw_third_party_mbedtls_CONFIG_HEADER
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/mbedtls/configs/config_default.h"`
+
+From //third_party/pigweed/src/third_party/mbedtls/mbedtls.gni:25
+
 ### pw_third_party_nanopb_CONFIG
 
 The build target that overrides the default configuration options for this
@@ -6820,9 +6836,9 @@ include paths that end with one of these, or match as a regular expression,
 are switched from -I to -isystem, which causes clang-tidy to ignore them.
 Unfortunately, clang-tidy provides no other way to filter header files.
 
-For example, the following ignores header files in "mbedtls/include":
+For example, the following ignores header files in "repo/include":
 
-  pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS = ["mbedtls/include"]
+  pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS = ["repo/include"]
 
 While the following ignores all third-party header files:
 
@@ -6831,7 +6847,7 @@ While the following ignores all third-party header files:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_toolchain/static_analysis_toolchain.gni:44
+From //third_party/pigweed/src/pw_toolchain/static_analysis_toolchain.gni:47
 
 ### pw_toolchain_STATIC_ANALYSIS_SKIP_SOURCES_RES
 
@@ -6846,7 +6862,7 @@ third_party directory:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_toolchain/static_analysis_toolchain.gni:29
+From //third_party/pigweed/src/pw_toolchain/static_analysis_toolchain.gni:32
 
 ### pw_toolchain_USE_RBE
 
