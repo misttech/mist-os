@@ -10,4 +10,14 @@ use serde::{Deserialize, Serialize};
 pub struct PlatformSessionManagerConfig {
     #[serde(default)]
     pub enabled: bool,
+
+    /// If `autolaunch` is true (the default) and the `session_url` is set in
+    /// the `ProductConfig`, the named session will be launched when the device
+    /// boots up.
+    #[serde(default = "autolaunch_default")]
+    pub autolaunch: bool,
+}
+
+fn autolaunch_default() -> bool {
+    true
 }
