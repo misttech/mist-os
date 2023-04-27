@@ -173,11 +173,12 @@ the option of directly accessing the `fuchsia.intl.PropertyProvider` FIDL
 service — in addition to using the OS-agnostic APIs. Cross-platform apps should
 use the properties provided by their runtimes.
 
-#### web_runner
+### Other integrations {#other-integrations}
 
-The list of preferred locales from `Profile` is sent to web serves in the HTTP
-request header [`Accept-Language`][accept-language]. In the future, they may
-also be made available in JavaScript in
+#### Web (e.g., Chrome & WebEngine)
+The list of preferred locales from `Profile` is sent to web servers in the HTTP
+request header [`Accept-Language`][accept-language] and is made available to
+JavaScript via
 [`navigator.languages` and `navigator.language`][navigator-languages].
 
 ## Storing i18n user settings {#store}

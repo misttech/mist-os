@@ -2,6 +2,8 @@
 
 Contains integration tests to ensure that Chromium is compatible with Fuchsia.
 
+These actually test `web_engine` and are named this way for historical reasons.
+
 ## Build the test
 
 ```shell
