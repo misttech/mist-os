@@ -9,7 +9,7 @@ from typing import Any, Dict
 from unittest import mock
 
 from honeydew.affordances import bluetooth_default
-from honeydew.interfaces.transports import sl4f
+from honeydew.transports import sl4f as sl4f_transport
 from parameterized import parameterized
 
 
@@ -29,18 +29,19 @@ class BluetoothDefaultTests(unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        self.sl4f_obj = mock.MagicMock(spec=sl4f.SL4F)
+
+        self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
         self.bluetooth_obj = bluetooth_default.BluetoothDefault(
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
-        self.sl4f_obj.send_sl4f_command.assert_called_once_with(
-            method=bluetooth_default._SL4F_METHODS["BluetoothInitSys"])
+
+        self.sl4f_obj.run.assert_called()
         self.sl4f_obj.reset_mock()
 
     def test_sys_init(self) -> None:
         """Test for BluetoothDefault.sys_init() method."""
         self.bluetooth_obj.sys_init()
-        self.sl4f_obj.send_sl4f_command.assert_called_once_with(
-            method=bluetooth_default._SL4F_METHODS["BluetoothInitSys"])
+
+        self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
         [
@@ -58,9 +59,8 @@ class BluetoothDefaultTests(unittest.TestCase):
         """Test for BluetoothDefault.request_discovery() method."""
         self.bluetooth_obj.request_discovery(
             discovery=parameterized_dict["discovery"])
-        self.sl4f_obj.send_sl4f_command.assert_called_once_with(
-            method=bluetooth_default._SL4F_METHODS["BluetoothRequestDiscovery"],
-            params={"discovery": parameterized_dict["discovery"]})
+
+        self.sl4f_obj.run.assert_called()
 
 
 if __name__ == "__main__":

@@ -5,8 +5,15 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("init_test") {
-    main_source = "init_test.py"
+  python_host_test("ssh_test") {
+    main_source = "ssh_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
+  python_host_test("sl4f_test") {
+    main_source = "sl4f_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//third_party/parameterized",
@@ -19,10 +26,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
-    ":init_test($host_toolchain)",
-    "affordances_tests:tests",
-    "device_class_tests:tests",
-    "transports_tests:tests",
-    "utility_tests:tests",
+    ":sl4f_test($host_toolchain)",
+    ":ssh_test($host_toolchain)",
   ]
 }

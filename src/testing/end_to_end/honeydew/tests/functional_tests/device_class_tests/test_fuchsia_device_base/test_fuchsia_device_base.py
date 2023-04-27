@@ -13,7 +13,6 @@ from honeydew import custom_types
 from honeydew.device_classes import fuchsia_device_base
 from honeydew.interfaces.device_classes import (
     bluetooth_capable_device, component_capable_device, fuchsia_device)
-from honeydew.interfaces.transports import sl4f
 from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -39,10 +38,6 @@ class FuchsiaDeviceBaseTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
         asserts.assert_is_instance(self.device, fuchsia_device.FuchsiaDevice)
-
-    def test_fuchsia_device_supports_sl4f(self) -> None:
-        """Test case to make sure fuchsia device supports SL4F transport"""
-        asserts.assert_is_instance(self.device, sl4f.SL4F)
 
     def test_fuchsia_device_is_bluetooth_capable(self) -> None:
         """Test case to make sure fuchsia device is a bluetooth capable device"""

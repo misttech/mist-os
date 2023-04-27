@@ -7,7 +7,7 @@
 from typing import Any, Dict, List
 
 from honeydew.interfaces.affordances import component
-from honeydew.interfaces.transports import sl4f as sl4f_transport
+from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: Dict[str, str] = {
     "Launch": "component_facade.Launch",
@@ -21,7 +21,7 @@ class ComponentDefault(component.Component):
 
     Args:
         device_name: Device name returned by `ffx target list`.
-        sl4f: Implementation of SL4F transport.
+        sl4f: SL4F transport.
     """
 
     def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
@@ -38,8 +38,7 @@ class ComponentDefault(component.Component):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        self._sl4f.send_sl4f_command(
-            method=_SL4F_METHODS["Launch"], params={"url": url})
+        self._sl4f.run(method=_SL4F_METHODS["Launch"], params={"url": url})
 
     def list(self) -> List[str]:
         """Returns the list of components that are currently running.
@@ -50,7 +49,7 @@ class ComponentDefault(component.Component):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        list_components_resp: Dict[str, Any] = self._sl4f.send_sl4f_command(
+        list_components_resp: Dict[str, Any] = self._sl4f.run(
             method=_SL4F_METHODS["List"])
         return list_components_resp.get("result", [])
 
@@ -66,7 +65,7 @@ class ComponentDefault(component.Component):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        search_component_resp: Dict[str, Any] = self._sl4f.send_sl4f_command(
+        search_component_resp: Dict[str, Any] = self._sl4f.run(
             method=_SL4F_METHODS["Search"], params={"name": name})
 
         return search_component_resp.get("result", "") == "Success"

@@ -48,7 +48,7 @@ def create(
             honeydew.create_device(
                 device_name=device_config["name"],
                 ssh_private_key=device_config["ssh_private_key"],
-                ssh_user=device_config["ssh_user"]))
+                ssh_user=device_config.get("ssh_user")))
     return fuchsia_devices
 
 
@@ -132,14 +132,10 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
         config)
 
-    device_config: Dict[str, str] = {
-        "name":
-            "",
-        "ssh_private_key":
-            "",
-        "ssh_user":
-            config.get(
-                "ssh_user", fuchsia_device_interface.DEFAULTS["SSH_USER"]),
+    device_config: Dict[str, Any] = {
+        "name": "",
+        "ssh_private_key": "",
+        "ssh_user": config.get("ssh_user"),
     }
 
     # Sample testbed file format for FuchsiaDevice controller used in infra...

@@ -7,7 +7,7 @@
 from typing import Dict
 
 from honeydew.interfaces.affordances import bluetooth
-from honeydew.interfaces.transports import sl4f as sl4f_transport
+from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: Dict[str, str] = {
     "BluetoothInitSys": "bt_sys_facade.BluetoothInitSys",
@@ -20,7 +20,7 @@ class BluetoothDefault(bluetooth.Bluetooth):
 
     Args:
         device_name: Device name returned by `ffx target list`.
-        sl4f: Implementation of SL4F transport.
+        sl4f: SL4F transport.
     """
 
     def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
@@ -40,7 +40,7 @@ class BluetoothDefault(bluetooth.Bluetooth):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        self._sl4f.send_sl4f_command(method=_SL4F_METHODS["BluetoothInitSys"])
+        self._sl4f.run(method=_SL4F_METHODS["BluetoothInitSys"])
 
     def request_discovery(self, discovery: bool) -> None:
         """Requests Bluetooth Discovery on Bluetooth capable device.
@@ -51,6 +51,6 @@ class BluetoothDefault(bluetooth.Bluetooth):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        self._sl4f.send_sl4f_command(
+        self._sl4f.run(
             method=_SL4F_METHODS["BluetoothRequestDiscovery"],
             params={"discovery": discovery})

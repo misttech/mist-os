@@ -10,7 +10,7 @@ import logging
 import os
 import pkgutil
 import types
-from typing import Any, List, Optional, Set, Tuple, Type
+from typing import Any, List, Optional, Set, Type
 
 from honeydew import device_classes
 from honeydew.device_classes import generic_fuchsia_device
@@ -26,10 +26,9 @@ _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
 # pytype: disable=not-instantiable
 # List all the public methods in alphabetical order
 def create_device(
-    device_name: str,
-    ssh_private_key: str,
-    ssh_user: str = fuchsia_device.DEFAULTS["SSH_USER"]
-) -> fuchsia_device.FuchsiaDevice:
+        device_name: str,
+        ssh_private_key: str,
+        ssh_user: Optional[str] = None) -> fuchsia_device.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
     This method will look at all the device class implementations available, and
@@ -54,7 +53,7 @@ def create_device(
     device_class = _get_device_class(device_name)
     device_class_args = (device_name, ssh_private_key, ssh_user)
 
-    return device_class(*device_class_args)
+    return device_class(*device_class_args)  # type: ignore[call-arg]
 
 
 def get_all_affordances(device_name: str) -> List[str]:

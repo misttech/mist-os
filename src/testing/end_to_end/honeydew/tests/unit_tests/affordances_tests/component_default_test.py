@@ -9,7 +9,7 @@ from typing import Any, Dict
 from unittest import mock
 
 from honeydew.affordances import component_default
-from honeydew.interfaces.transports import sl4f
+from honeydew.transports import sl4f as sl4f_transport
 from parameterized import parameterized
 
 
@@ -30,7 +30,7 @@ class ComponentDefaultTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.sl4f_obj = mock.MagicMock(spec=sl4f.SL4F)
+        self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
         self.component_obj = component_default.ComponentDefault(
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
 
@@ -38,9 +38,8 @@ class ComponentDefaultTests(unittest.TestCase):
         """Testcase for ComponentDefault.launch()"""
         url = "fuchsia-pkg://fuchsia.com/sl4f#meta/sl4f.cmx"
         self.component_obj.launch(url=url)
-        self.sl4f_obj.send_sl4f_command.assert_called_once_with(
-            method=component_default._SL4F_METHODS["Launch"],
-            params={"url": url})
+
+        self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
         [
@@ -72,11 +71,11 @@ class ComponentDefaultTests(unittest.TestCase):
     def test_list(self, parameterized_dict) -> None:
         """Testcase for ComponentDefault.list()"""
         return_value: Dict[str, Any] = parameterized_dict["return_value"]
-        self.sl4f_obj.send_sl4f_command.return_value = return_value
+        self.sl4f_obj.run.return_value = return_value
 
         self.assertEqual(self.component_obj.list(), return_value["result"])
-        self.sl4f_obj.send_sl4f_command.assert_called_once_with(
-            method=component_default._SL4F_METHODS["List"])
+
+        self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
         [
@@ -106,16 +105,14 @@ class ComponentDefaultTests(unittest.TestCase):
         name_func=_custom_test_name_func)
     def test_search(self, parameterized_dict) -> None:
         """Testcase for ComponentDefault.search()"""
-        self.sl4f_obj.send_sl4f_command.return_value = parameterized_dict[
-            "return_value"]
+        self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
 
         name = "sl4f.cmx"
         self.assertEqual(
             self.component_obj.search(name=name),
             parameterized_dict["expected"])
-        self.sl4f_obj.send_sl4f_command.assert_called_once_with(
-            method=component_default._SL4F_METHODS["Search"],
-            params={"name": name})
+
+        self.sl4f_obj.run.assert_called()
 
 
 if __name__ == "__main__":

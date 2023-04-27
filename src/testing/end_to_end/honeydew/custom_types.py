@@ -24,3 +24,14 @@ class TargetSshAddress(NamedTuple):
     """
     ip: str
     port: int
+
+
+class Sl4fServerAddress(NamedTuple):
+    """Tuple that holds sl4f server address information.
+
+    Args:
+        ip: IP Address of SL4F server
+        port: Port where SL4F server is listening for SL4F requests
+    """
+    ip: str
+    port: int

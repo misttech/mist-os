@@ -8,8 +8,8 @@ import enum
 import logging
 from typing import List
 
+from honeydew.device_classes import fuchsia_device_base
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.transports import sl4f
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
 from honeydew.utils import ffx_cli
@@ -117,6 +117,11 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             "Collecting snapshots of all the FuchsiaDevice objects in '%s'...",
             self.snapshot_on.name)
         for fx_device in self.fuchsia_devices:
+            # type narrowing (https://mypy.readthedocs.io/en/stable/type_narrowing.html)
+            # fx_device object to FuchsiaDeviceBase - needed for code completion
+            # to work in vscode IDE
+            assert isinstance(fx_device, fuchsia_device_base.FuchsiaDeviceBase)
+
             try:
                 fx_device.snapshot(directory=directory)
             except Exception:  # pylint: disable=broad-except
@@ -128,10 +133,11 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             "Performing health checks on all the FuchsiaDevice objects...")
         for fx_device in self.fuchsia_devices:
             # type narrowing (https://mypy.readthedocs.io/en/stable/type_narrowing.html)
-            # fx_device object to SL4F transport - needed for code completion to
-            # work in vscode IDE
-            assert isinstance(fx_device, sl4f.SL4F)
-            fx_device.check_sl4f_connection()
+            # fx_device object to FuchsiaDeviceBase - needed for code completion
+            # to work in vscode IDE
+            assert isinstance(fx_device, fuchsia_device_base.FuchsiaDeviceBase)
+
+            fx_device.sl4f.check_connection()
 
     def _process_user_params(self) -> None:
         """Reads, processes and stores the test params used by this module."""

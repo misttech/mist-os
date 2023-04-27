@@ -40,5 +40,9 @@ class SSHCommandError(HoneyDewError):
     """Exception for errors raised by SSH commands running on host machine."""
 
 
+class Sl4fError(HoneyDewError):
+    """Exception for errors raised by SL4F requests."""
+
+
 class FuchsiaDeviceError(HoneyDewError):
     """Base exception for errors raised by fuchsia device."""
