@@ -12,7 +12,6 @@
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/zx/result.h>
-#include <zircon/pixelformat.h>
 
 #include "clock.h"
 #include "dsi-host.h"

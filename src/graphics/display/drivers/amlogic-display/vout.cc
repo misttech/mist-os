@@ -16,19 +16,19 @@ namespace amlogic_display {
 namespace {
 
 // List of supported pixel formats
-// TODO(fxbug.dev/71410): Remove the zx_pixel_format_t definitions.
-constexpr zx_pixel_format_t kDsiSupportedZxPixelFormats[] = {
-    ZX_PIXEL_FORMAT_ARGB_8888, ZX_PIXEL_FORMAT_RGB_x888, ZX_PIXEL_FORMAT_ABGR_8888,
-    ZX_PIXEL_FORMAT_BGR_888x};
+constexpr any_pixel_format_t kDsiSupporteAnyPixelFormats[] = {
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+};
 constexpr fuchsia_images2::wire::PixelFormat kDsiSupportedPixelFormats[] = {
     fuchsia_images2::wire::PixelFormat::kBgra32,
     fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
 };
 
 // TODO(fxbug.dev/69236): Add more supported formats.
-// TODO(fxbug.dev/71410): Remove the zx_pixel_format_t definitions.
-constexpr zx_pixel_format_t kHdmiSupportedZxPixelFormats[] = {ZX_PIXEL_FORMAT_ARGB_8888,
-                                                              ZX_PIXEL_FORMAT_RGB_x888};
+constexpr any_pixel_format_t kHdmiSupportedAnyPixelFormats[] = {
+    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
+};
 constexpr fuchsia_images2::wire::PixelFormat kHdmiSupportedPixelFormats[] = {
     fuchsia_images2::wire::PixelFormat::kBgra32,
 };
@@ -206,8 +206,8 @@ void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display
       args->panel.params.height = dsi_.height;
       args->panel.params.width = dsi_.width;
       args->panel.params.refresh_rate_e2 = 6000;  // Just guess that it's 60fps
-      args->pixel_format_list = kDsiSupportedZxPixelFormats;
-      args->pixel_format_count = std::size(kDsiSupportedZxPixelFormats);
+      args->pixel_format_list = kDsiSupporteAnyPixelFormats;
+      args->pixel_format_count = std::size(kDsiSupporteAnyPixelFormats);
       args->cursor_info_count = 0;
       break;
     case VoutType::kHdmi:
@@ -215,8 +215,8 @@ void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display
       args->edid_present = true;
       args->panel.i2c.ops = &i2c_impl_protocol_ops_;
       args->panel.i2c.ctx = this;
-      args->pixel_format_list = kHdmiSupportedZxPixelFormats;
-      args->pixel_format_count = std::size(kHdmiSupportedZxPixelFormats);
+      args->pixel_format_list = kHdmiSupportedAnyPixelFormats;
+      args->pixel_format_count = std::size(kHdmiSupportedAnyPixelFormats);
       args->cursor_info_count = 0;
       break;
     default:
@@ -336,7 +336,6 @@ zx_status_t Vout::ApplyConfiguration(const display_mode_t* mode) {
 zx_status_t Vout::OnDisplaysChanged(added_display_info_t& info) {
   switch (type_) {
     case kDsi:
-      // Not used anywhere: ZX_PIXEL_FORMAT_RGB_x888;
       return ZX_OK;
     case kHdmi:
       hdmi_.hdmi_host->UpdateOutputColorFormat(
