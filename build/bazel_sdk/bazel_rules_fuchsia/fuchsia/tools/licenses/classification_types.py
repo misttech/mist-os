@@ -287,8 +287,9 @@ class IdentifiedSnippet:
         dependents_str = "\n".join([f"  {d}" for d in license.dependents])
         license_links = "\n".join([f"  {l}" for l in license.links])
         snippet = self.snippet_text
-        if len(snippet) > 200:
-            snippet = snippet[0:200] + "<trunctated>"
+        max_snippet_length = 1000
+        if len(snippet) > max_snippet_length:
+            snippet = snippet[0:max_snippet_length] + "<TRUNCATED>"
 
         message = f"""
 License '{license.name}' has a snippet identified as '{self.identified_as}'.

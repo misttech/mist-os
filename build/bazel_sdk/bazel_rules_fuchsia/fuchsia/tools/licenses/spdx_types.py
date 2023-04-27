@@ -11,7 +11,8 @@ from fuchsia.tools.licenses.common_types import *
 from typing import Any, Dict, List, Set, Tuple, Type
 
 # Actually 2.2.2, but only SPDX-N.M is used in JSON serialization.
-_supported_spdx_json_version = "SPDX-2.2"
+_default_spdx_json_version = "SPDX-2.2"
+_supported_spdx_json_versions = [_default_spdx_json_version, "SPDX-2.3"]
 _spdx_document_ref = "SPDXRef-DOCUMENT"
 
 
@@ -281,7 +282,7 @@ class SpdxDocument:
     def to_json_dict(self):
         return {
             "spdxVersion":
-                _supported_spdx_json_version,
+                _default_spdx_json_version,
             "SPDXID":
                 self.spdx_id,
             "name":
@@ -313,9 +314,9 @@ class SpdxDocument:
         document_spdx_id = doc_dict.get("SPDXID")
         namespace = doc_dict.get("documentNamespace")
         spdx_version = doc_dict.get("spdxVersion")
-        if spdx_version != _supported_spdx_json_version:
+        if spdx_version not in _supported_spdx_json_versions:
             raise LicenseException(
-                f"Only {_supported_spdx_json_version} is supported but {spdx_version} found",
+                f"Only {_supported_spdx_json_versions} are supported but '{spdx_version}' found",
                 doc_dict.location)
         creators = doc_dict.get_reader("creationInfo").get(
             "creators", expected_type=list)
