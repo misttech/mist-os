@@ -10,7 +10,10 @@ import("//build/config/compiler.gni")
 
 declare_args() {
   # Suppress Bazel non-error output
-  bazel_quiet = true
+  # This is now disabled by default since bazel_action()
+  # uses the //:console pool to print its output directly
+  # to stdout/stderr during the Ninja build.
+  bazel_quiet = false
 }
 
 # Wrap a Bazel command with a GN action.
