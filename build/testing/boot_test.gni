@@ -197,40 +197,14 @@ template("boot_test") {
 
   main_target = target_name
 
-  hw_types = invoker.device_types + _all_emu_types - _all_emu_types
-  emu_types = invoker.device_types - hw_types
-  if (emu_types == [] && hw_types == []) {  # Disabled
-    group(main_target) {
-      testonly = true
-      forward_variables_from(invoker,
-                             [
-                               "efi_disk",
-                               "qemu_kernel",
-                               "vbmeta",
-                               "zbi",
-                             ])
-      deps = []
-      if (defined(efi_disk)) {
-        deps += [ efi_disk ]
-      }
-      if (defined(qemu_kernel)) {
-        deps += [ qemu_kernel ]
-      }
-      if (defined(vbmeta)) {
-        deps += [ vbmeta ]
-      }
-      if (defined(zbi)) {
-        deps += [ zbi ]
-      }
-    }
-    not_needed(invoker, [ "timeout" ])
-  } else if (emu_types == [] || host_cpu == target_cpu) {
-    _boot_test(main_target) {
-      label = ":$main_target"
-      forward_variables_from(invoker, "*")
-      cpu_for_host = host_cpu
-    }
-  } else {
+  # If host_cpu != target_cpu, then we make sure to define a separate boot
+  # test for a target_cpu host in order to take advantage of KVM, HVF, etc.
+  #
+  # TODO(mcgrathr): No riscv64 hosts are available yet.
+  if (host_cpu != target_cpu && target_cpu != "riscv64") {
+    hw_types = invoker.device_types + _all_emu_types - _all_emu_types
+    emu_types = invoker.device_types - hw_types
+
     common_params = {
       forward_variables_from(invoker,
                              "*",
@@ -244,29 +218,18 @@ template("boot_test") {
       label = ":$main_target"
     }
 
-    # If an emulator is specified and $host_cpu != $target_cpu, then we make
-    # sure to define a separate boot test for a $target_cpu host in order to
-    # take advantage of KVM, HVF, etc.
     _boot_test("$main_target.emu") {
-      if (target_cpu == "riscv64") {
-        # TODO(mcgrathr): No riscv64 hosts are available yet.
-        cpu_for_host = host_cpu
-      } else {
-        cpu_for_host = target_cpu
-      }
+      cpu_for_host = target_cpu
       device_types = emu_types
       forward_variables_from(common_params, "*")
     }
-    group_deps = [ ":$main_target.emu" ]
 
-    if (hw_types != []) {
-      _boot_test("$main_target.hw") {
-        cpu_for_host = host_cpu
-        device_types = hw_types
-        forward_variables_from(common_params, "*")
-      }
-      group_deps += [ ":$main_target.hw" ]
+    _boot_test("$main_target.hw") {
+      cpu_for_host = host_cpu
+      device_types = hw_types
+      forward_variables_from(common_params, "*")
     }
+
     group(main_target) {
       forward_variables_from(invoker,
                              [
@@ -274,7 +237,16 @@ template("boot_test") {
                                "visibility",
                              ])
       testonly = true
-      deps = group_deps
+      deps = [
+        ":$main_target.emu",
+        ":$main_target.hw",
+      ]
+    }
+  } else {
+    _boot_test(main_target) {
+      label = ":$main_target"
+      forward_variables_from(invoker, "*")
+      cpu_for_host = host_cpu
     }
   }
 }
