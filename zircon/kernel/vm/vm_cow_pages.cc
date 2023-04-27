@@ -6555,6 +6555,10 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   if (after_page) {
     *after_page = new_page;
   }
+
+  // We've changed a page in the page list. Update the generation count.
+  IncrementHierarchyGenerationCountLocked();
+
   return ZX_OK;
 }
 
