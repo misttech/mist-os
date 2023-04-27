@@ -322,6 +322,50 @@ prefer `use crate::transport::udp` to `use crate::transport::udp::Socket`.
 > codebase may not reflect this until we decide to flip the switch on existing
 > code.
 
+## Lock ordering
+
+When accessing synchronized (locked) state, prefer locking the state that is
+less contended before locking state that is more contended. This allows accesses
+on the more contended state to be deferred for as long as possible, ideally being
+prevented when they are not needed.
+
+Note that "contended" here refers to attempting to acquire a lock that is held
+exclusively. This guidance does not consider a lock to be heavily
+contended as long as the lock is acquired as shared (e.g. read lock), regardless
+how often it is acquired in that mode.
+
+### Coarse vs. Fine-grained locks
+
+Note that this guidance does not prescribe acquiring fine-grained locks before
+coarse-grained locks. It is perfectly fine to acquire coarse-grained locks
+before fine-grained locks as long as the fine-grained locks are more contended.
+
+#### Example
+
+As an example, the IP device configuration lock is considered more coarse-
+grained than the IP device addresses or groups lock because it guards more state.
+However, when modifying addresses or groups, the IP device configuration is
+always acquired before the addresses/groups lock. This is because, the IP
+device configuration lock is not expected to be highly contended since IP device
+configuration changes are expected to happen very infrequently. Addresses
+and groups locks will be more contended as addresses and groups are queried in
+the "fast path" and may be modified at anytime (e.g. receiving RA messages,
+joining/leaving multicast groups on a socket, etc.).
+
+### Case Study: IPv6 Route Discovery
+
+An implementation of IPv6 route discovery may require the ability to add/remove
+routes in response to discovery/invalidation events. If the route table (write)
+lock is acquired before the IPv6 route discovery state lock, this will prevent
+concurrent route lookups during the route discovery operation. In cases where
+route discovery only needs to update timers for a discovered route, without
+needing to update the route table, the route table lock is unnecessarily held.
+
+Alternatively, if the IPv6 route discovery lock is acquired first and route
+discovery specific logic is performed before taking the route table lock, the
+implementation can avoid acquiring the route table lock at all in the above
+situation.
+
 [`fuchsia.net.interfaces/Watcher`]: https://fuchsia.dev/reference/fidl/fuchsia.net.interfaces?hl=en#Watcher
 [DAD implementation]: https://fuchsia-review.googlesource.com/c/fuchsia/+/648202
 [Originally in Netstack3]: https://cs.opensource.google/fuchsia/fuchsia/+/07b825aab40438237b2c47239786aae08c179139:src/connectivity/network/netstack3/
