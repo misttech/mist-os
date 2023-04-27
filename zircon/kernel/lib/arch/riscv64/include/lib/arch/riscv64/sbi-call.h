@@ -135,6 +135,12 @@ inline RiscvSbiRet GetMarchid() { return SbiCall<RiscvSbiEid::kBase, RiscvSbiBas
 
 inline RiscvSbiRet GetMimpid() { return SbiCall<RiscvSbiEid::kBase, RiscvSbiBase::kGetMimpid>(); }
 
+// Timer Extension calls
+
+inline RiscvSbiRet SetTimer(uint64_t time) {
+  return SbiCall<RiscvSbiEid::kTimer, RiscvSbiTimer::kSetTimer>(time);
+}
+
 // IPI Extension calls
 
 inline RiscvSbiRet SendIpi(HartMask hart_mask, HartMaskBase hart_mask_base) {
@@ -146,6 +152,36 @@ inline RiscvSbiRet SendIpi(HartMask hart_mask, HartMaskBase hart_mask_base) {
 inline RiscvSbiRet SystemReset(RiscvSbiResetType reset_type, RiscvSbiResetReason reset_reason) {
   return SbiCall<RiscvSbiEid::kSystemReset, RiscvSbiSystemReset::kSystemReset>(
       static_cast<uint32_t>(reset_type), static_cast<uint32_t>(reset_reason));
+}
+
+// Remote fence Extension calls
+
+inline RiscvSbiRet RemoteSfenceVma(HartMask hart_mask, HartMaskBase hart_mask_base,
+                                   uintptr_t start_addr, uintptr_t size) {
+  return SbiCall<RiscvSbiEid::kRfence, RiscvSbiRfence::kSfenceVma>(hart_mask, hart_mask_base,
+                                                                   start_addr, size);
+}
+
+inline RiscvSbiRet RemoteSfenceVmaAsid(HartMask hart_mask, HartMaskBase hart_mask_base,
+                                       uintptr_t start_addr, uintptr_t size, uint64_t asid) {
+  return SbiCall<RiscvSbiEid::kRfence, RiscvSbiRfence::kSfenceVmaAsid>(hart_mask, hart_mask_base,
+                                                                       start_addr, size, asid);
+}
+
+// Hart State Management Extension calls
+
+inline RiscvSbiRet HartStart(HartId hart_id, uintptr_t start_addr, uint64_t opaque) {
+  return SbiCall<RiscvSbiEid::kHart, RiscvSbiHart::kStart>(hart_id, start_addr, opaque);
+}
+
+inline RiscvSbiRet HartStop() { return SbiCall<RiscvSbiEid::kHart, RiscvSbiHart::kStop>(); }
+
+inline RiscvSbiRet HartGetStatus(HartId hart_id) {
+  return SbiCall<RiscvSbiEid::kHart, RiscvSbiHart::kGetStatus>(hart_id);
+}
+
+inline RiscvSbiRet HartSuspend(HartId hart_id, uintptr_t resume_addr, uint64_t opaque) {
+  return SbiCall<RiscvSbiEid::kHart, RiscvSbiHart::kSuspend>(hart_id, resume_addr, opaque);
 }
 
 }  // namespace RiscvSbi

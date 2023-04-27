@@ -39,10 +39,13 @@ enum class RiscvSbiEid : uint32_t {
   kBase = 0x10,
   kTimer = 0x54494d45,        // 'TIME'
   kIpi = 0x735049,            // 'sPI'
-  KRfence = 0x52464e43,       // 'RFNC'
+  kRfence = 0x52464e43,       // 'RFNC'
   kHart = 0x48534d,           // 'HSM'
   kSystemReset = 0x53525354,  // 'SRST'
   kPmu = 0x504D55,            // 'PMU'
+  kDbcn = 0x4442434e,         // 'DBCN'
+  kSusp = 0x53555350,         // 'SUSP'
+  kCppc = 0x43505043,         // 'CPPC'
 
   kFirstExperimental = 0x08000000,
   kLastExperimental = 0x08ffffff,
@@ -73,6 +76,35 @@ enum class RiscvSbiTimer : uint32_t {
 // IPI Extension (RiscvSbiEid::kIpi) FIDs
 enum class RiscvSbiIpi : uint32_t {
   kSendIpi = 0,
+};
+
+// Remote Fence Extension (RiscvSbiEid::kRfence) FIDs
+enum class RiscvSbiRfence : uint32_t {
+  kFenceI = 0,
+  kSfenceVma = 1,
+  kSfenceVmaAsid = 2,
+  kHfenceGvmaVid = 3,
+  kHfenceGvma = 4,
+  kHfenceVvmaAsid = 5,
+  kHfenceVvma = 6,
+};
+
+// Hart State Management Extension (RiscvSbiEid::kHart) FIDs
+enum class RiscvSbiHart : uint32_t {
+  kStart = 0,
+  kStop = 1,
+  kGetStatus = 2,
+  kSuspend = 3,
+};
+
+enum class RiscvSbiHartState : uint32_t {
+  kStarted = 0,
+  kStopped = 1,
+  kStartPending = 2,
+  kStopPending = 3,
+  kSuspended = 4,
+  kSuspendPending = 5,
+  kResumePending = 6,
 };
 
 // System Reset Extension (RiscvSbiEid::kSystemReset) FIDs
@@ -106,6 +138,7 @@ enum class RiscvSbiResetReason : uint32_t {
   kLastVendor = 0xffffffff,
 };
 
+using HartId = uint64_t;
 using HartMask = uintptr_t;
 using HartMaskBase = uintptr_t;
 
