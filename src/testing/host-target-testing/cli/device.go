@@ -53,7 +53,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.deviceName, "device", os.Getenv(constants.NodenameEnvKey), "device name")
 	fs.StringVar(&c.deviceHostname, "device-hostname", os.Getenv(constants.DeviceAddrEnvKey), "device hostname or IPv4/IPv6 address")
 	fs.StringVar(&c.deviceResolverMode, "device-resolver", FfxResolver, "device resolver (default: ffx)")
-	fs.StringVar(&c.ffxPath, "ffx-path", filepath.Join(testDataPath, "ffx"), "ffx tool path")
+	fs.StringVar(&c.ffxPath, "ffx-path", "host-tools/ffx", "ffx tool path")
 	fs.StringVar(&c.blobfsCompressionPath, "blobfs-compression-path", filepath.Join(testDataPath, "blobfs-compression"), "blobfs-compression tool path")
 	fs.IntVar(&c.deviceSshPort, "device-ssh-port", 22, "device port")
 	fs.StringVar(&c.deviceFinderPath, "device-finder-path", filepath.Join(testDataPath, "device-finder"), "device-finder tool path")

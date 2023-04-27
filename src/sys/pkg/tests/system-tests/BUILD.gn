@@ -10,19 +10,19 @@ import("//src/sys/pkg/tests/system-tests/system-tests.gni")
 if (is_host) {
   host_test_data("test_tools") {
     sources = [
-      "$host_tools_dir/ffx",
       "$root_build_dir/host_x64/blobfs-compression",
       "//prebuilt/tools/artifacts/artifacts",
       "//prebuilt/tools/lkg/lkg",
     ]
     outputs = [ "$root_out_dir/test_data/system-tests/{{source_file_part}}" ]
-    public_deps = [
-      "//src/developer/ffx:host($host_toolchain)",
-      "//src/storage/tools/blobfs-compression",
-    ]
+    public_deps = [ "//src/storage/tools/blobfs-compression" ]
   }
 
-  non_go_deps = [ ":test_tools" ]
+  non_go_deps = [
+    ":test_tools",
+    "//src/developer/ffx:test_data",
+    "//src/developer/ffx/plugins/repository:ffx_repository_tool_test_data",
+  ]
   if (use_vbmeta) {
     host_test_data("test_avb_atx_metadata") {
       sources = [ avb_atx_metadata ]

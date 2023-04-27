@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -154,6 +155,9 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
+	// prepend a config flag for finding subtools that are compiled separately
+	// in the same directory as ffx itself.
+	args = append([]string{"--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path))}, args...)
 	logger.Infof(ctx, "running: %s %q", path, args)
 	cmd := exec.CommandContext(ctx, path, args...)
 	if f.stdout != nil {

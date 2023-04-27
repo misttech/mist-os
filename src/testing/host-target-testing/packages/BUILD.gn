@@ -38,6 +38,7 @@ if (is_host) {
       ":blobfs-compression",
       "//src/developer/ffx:test_data",
       "//src/developer/ffx/lib/pkg:empty-repo-keys",
+      "//src/developer/ffx/plugins/repository:ffx_repository_tool_test_data",
     ]
   }
 
