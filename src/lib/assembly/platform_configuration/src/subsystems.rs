@@ -36,6 +36,7 @@ mod session;
 mod starnix;
 mod storage;
 mod swd;
+mod ui;
 mod virtualization;
 
 /// ffx config flag for enabling configuring the assembly+structured config example.
@@ -223,6 +224,9 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'storage' subsystem")?;
+
+    ui::UiSubsystem::define_configuration(context, &config.platform.ui, builder)
+        .context("Configuring the 'ui' subsystem")?;
 
     virtualization::VirtualizationSubsystem::define_configuration(
         context,

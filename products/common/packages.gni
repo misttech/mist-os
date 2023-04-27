@@ -7,7 +7,6 @@ declare_args() {
     "//src/intl/intl_services:pkg",
     "//src/media/audio/bundles:services",
     "//src/power:battery",
-    "//src/ui:ui_packages",
     "//src/ui/bin/brightness_manager",
     "//src/ui/bin/screensaver",
     "//src/ui/bin/sensor-config:empty-sensor-config-pkg",

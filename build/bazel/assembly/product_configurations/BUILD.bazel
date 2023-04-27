@@ -80,6 +80,10 @@ fuchsia_product_configuration(
                 "configure_fshost": False,
                 "live_usb_enabled": True,
             },
+            "ui": {
+                "enabled": True,
+                "legacy": True,
+            },
             "virtualization": {
                 "enabled": True,
             },
