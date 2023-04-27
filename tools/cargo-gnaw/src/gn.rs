@@ -476,6 +476,8 @@ pub fn write_rule<W: io::Write>(
         "//{}",
         target
             .crate_root
+            .canonicalize_utf8()
+            .unwrap()
             .strip_prefix(project_root)
             .with_context(|| format!(
                 "{} is located outside of the project. Check your vendoring setup",
@@ -550,15 +552,58 @@ mod tests {
     // in the quoted strings.
 
     #[test]
-    fn simple_target() {
+    fn canonicalized_paths() {
         let pkg_id = cargo_metadata::PackageId { repr: String::from("42") };
         let version = Version::new(0, 1, 0);
+
+        let mut project_root = std::env::temp_dir();
+        project_root.push(Path::new("canonicalized_paths"));
+        std::fs::write(&project_root, "").expect("write to temp file");
+
         let target = GnTarget::new(
             &pkg_id,
             "test_target",
             "test_package",
             "2018",
-            Utf8Path::new("somewhere/over/the/rainbow.rs"),
+            &Utf8Path::from_path(project_root.as_path()).unwrap(),
+            &version,
+            GnRustType::Library,
+            &[],
+            None,
+            HashMap::new(),
+        );
+
+        let not_prefix = Path::new("/foo");
+        let prefix = std::env::temp_dir();
+
+        let mut output = vec![];
+        assert_eq!(
+            false,
+            write_rule(&mut output, &target, not_prefix, None, None, None, false, None).is_ok()
+        );
+
+        assert_eq!(
+            true,
+            write_rule(&mut output, &target, prefix.as_path(), None, None, None, false, None)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn simple_target() {
+        let pkg_id = cargo_metadata::PackageId { repr: String::from("42") };
+        let version = Version::new(0, 1, 0);
+
+        let mut project_root = std::env::temp_dir();
+        project_root.push(Path::new("simple_target"));
+        std::fs::write(&project_root, "").expect("write to temp file");
+
+        let target = GnTarget::new(
+            &pkg_id,
+            "test_target",
+            "test_package",
+            "2018",
+            &Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Library,
             &[],
@@ -570,7 +615,7 @@ mod tests {
         write_rule(
             &mut output,
             &target,
-            Path::new("somewhere/over"),
+            std::env::temp_dir().as_path(),
             None,
             None,
             None,
@@ -583,7 +628,7 @@ mod tests {
             output,
             r#"rust_library("test_package-v0_1_0") {
   crate_name = "test_target"
-  crate_root = "//the/rainbow.rs"
+  crate_root = "//simple_target"
   output_name = "test_target-c5bf97c44457465a"
   
   deps = []
@@ -601,16 +646,22 @@ mod tests {
 "#
         );
     }
+
     #[test]
     fn binary_target() {
         let pkg_id = cargo_metadata::PackageId { repr: String::from("42") };
         let version = Version::new(0, 1, 0);
+
+        let mut project_root = std::env::temp_dir();
+        project_root.push(Path::new("binary_target"));
+        std::fs::write(&project_root, "").expect("write to temp file");
+
         let target = GnTarget::new(
             &pkg_id,
             "test_target",
             "test_package",
             "2018",
-            Utf8Path::new("somewhere/over/the/rainbow.rs"),
+            &Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Binary,
             &[],
@@ -623,7 +674,7 @@ mod tests {
         write_rule(
             &mut output,
             &target,
-            Path::new("somewhere/over"),
+            std::env::temp_dir().as_path(),
             None,
             None,
             outname,
@@ -631,12 +682,13 @@ mod tests {
             None,
         )
         .unwrap();
+
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
             r#"executable("test_package-test_target-v0_1_0") {
   crate_name = "test_target"
-  crate_root = "//the/rainbow.rs"
+  crate_root = "//binary_target"
   output_name = "rainbow_binary"
   
   deps = []
@@ -654,16 +706,22 @@ mod tests {
 "#
         );
     }
+
     #[test]
     fn renamed_target() {
         let pkg_id = cargo_metadata::PackageId { repr: String::from("42") };
         let version = Version::new(0, 1, 0);
+
+        let mut project_root = std::env::temp_dir();
+        project_root.push(Path::new("renamed_target"));
+        std::fs::write(&project_root, "").expect("write to temp file");
+
         let target = GnTarget::new(
             &pkg_id,
             "test_target",
             "test_package",
             "2018",
-            Utf8Path::new("somewhere/over/the/rainbow.rs"),
+            &Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Binary,
             &[],
@@ -676,7 +734,7 @@ mod tests {
         write_rule(
             &mut output,
             &target,
-            Path::new("somewhere/over"),
+            std::env::temp_dir().as_path(),
             None,
             None,
             outname,
@@ -689,7 +747,7 @@ mod tests {
             output,
             r#"renamed_rule("test_package-test_target-v0_1_0") {
   crate_name = "test_target"
-  crate_root = "//the/rainbow.rs"
+  crate_root = "//renamed_target"
   output_name = "rainbow_binary"
   
   deps = []

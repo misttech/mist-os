@@ -153,12 +153,13 @@ impl<'a> GnTarget<'a> {
     }
 
     pub fn package_root(&self, project_root: &Path) -> Utf8PathBuf {
-        let mut package_root = self.crate_root;
+        let mut package_root = self.crate_root.canonicalize_utf8().unwrap();
 
         while !package_root.join("Cargo.toml").exists() {
             package_root = package_root
                 .parent()
-                .expect("searching up from the crate root we must find a cargo.toml");
+                .expect("searching up from the crate root we must find a cargo.toml")
+                .to_path_buf();
         }
 
         let package_root = package_root.strip_prefix(project_root).unwrap_or_else(|e| {
