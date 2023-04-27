@@ -9,5 +9,10 @@ type CursorInfo = struct {
     width uint32;
     height uint32;
 
-    pixel_format uint32;
+    // Pixel format type of the cursor buffer.
+    //
+    // TODO(fxbug.dev/126114): Currently we use `AnyPixelFormat` to indicate
+    // that the pixel format is being migrated from `zx_pixel_format_t` to
+    // `fuchsia.images2.PixelFormat`.
+    pixel_format AnyPixelFormat;
 };

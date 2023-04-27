@@ -22,9 +22,14 @@ type Info = struct {
     // Modes supported by the attached display. The first entry is the
     // preferred mode.
     modes vector<Mode>:MAX;
-    // zx_pixel_format_t constants supported by the attached display. The
+
+    // Pixel format type constants supported by the attached display. The
     // first entry is the preferred mode.
-    pixel_format vector<uint32>:MAX;
+    //
+    // TODO(fxbug.dev/126114): Currently we use `AnyPixelFormat` to indicate
+    // that the pixel format is being migrated from `zx_pixel_format_t` to
+    // `fuchsia.images2.PixelFormat`.
+    pixel_format vector<AnyPixelFormat>:MAX;
 
     // A list of cursor configurations most likely to be accepted by the
     // driver. Maybe be empty if there is no hardware support for cursors.

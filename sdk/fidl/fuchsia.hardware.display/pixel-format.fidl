@@ -1,0 +1,16 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.display;
+
+/// Indicates a pixel format type being migrated from `zx_pixel_format_t`
+/// to `fuchsia.images2.PixelFormat`. A pixel format type being migrated
+/// may contain values of either type.
+///
+/// Note that the way `zx_pixel_format_t` values are defined makes the two types
+/// easily separable. It's deterministic to know the underlying type of an
+// `AnyPixelFormat` value; any implicit conversion from `zx_pixel_format_t` or
+// `fuchsia.images2.PixelFormat` enum to `AnyPixelFormat` will be safe.
+//
+// TODO(fxbug.dev/71410): Remove this type once the migration is done.
+alias AnyPixelFormat = uint32;

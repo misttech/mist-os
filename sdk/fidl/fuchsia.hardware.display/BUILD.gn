@@ -12,6 +12,7 @@ fidl("fuchsia.hardware.display") {
     "display.fidl",
     "image-buffer.fidl",
     "layer.fidl",
+    "pixel-format.fidl",
     "provider.fidl",
     "virtcon.fidl",
   ]
