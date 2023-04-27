@@ -131,6 +131,10 @@ Set up the VIM3 to communicate with your host:
    Caution: In general the colors for TX and RX wires are not standardized.
    For example your RX wire may be blue or green.
 
+   Tip: If your host is unable to see the serial logs, power off the VIM3 board
+   and change the TX and RX connections to the board. Some USB to Serial adapters
+   have their wires improperly labeled.
+
    See [Serial Debugging Tool](https://docs.khadas.com/products/sbc/vim3/development/setup-serial-tool)
    for an example image of how your serial wires should be connected to the VIM3.
 
