@@ -121,6 +121,18 @@ async fn apply_command_line_options(
                                     path
                                 );
                             }
+                            std::io::ErrorKind::NotFound => {
+                                tracing::info!(
+                                    "KVM path {} does not exist. Running without acceleration.",
+                                    path
+                                );
+                                eprintln!(
+                                    "KVM path {path} does not exist. \
+                                    Running without acceleration; emulator will be extremely \
+                                    slow and may not establish a connection with ffx in the \
+                                    allotted time.\n"
+                                );
+                            }
                             _ => println!("Unknown error setting up acceleration: {:?}", e),
                         },
                         Ok(_) => emu_config.host.acceleration = AccelerationMode::Hyper,
