@@ -61,7 +61,13 @@ type CursorInfo = struct {
     /// The width and height of the cursor configuration, in pixels.
     width uint32;
     height uint32;
-    format ZxPixelFormat;
+
+    /// Pixel format type of the cursor buffer.
+    // TODO(fxbug.dev/71410): Currently the pixel format is being migrated
+    // from zx_pixel_format_t to FIDL fuchsia.images2.PixelFormat. The
+    // pixel_format value can be of either type. `AnyPixelFormat` is used to
+    // reflect this.
+    format AnyPixelFormat;
 };
 
 type Panel = strict resource union {
@@ -88,7 +94,12 @@ type AddedDisplayArgs = resource struct {
 
     /// A list of pixel formats supported by the display. The first entry is the
     /// preferred pixel format.
-    pixel_format vector<ZxPixelFormat>:MAX;
+    ///
+    // TODO(fxbug.dev/71410): Currently the pixel format is being migrated
+    // from zx_pixel_format_t to FIDL fuchsia.images2.PixelFormat. The
+    // pixel_format value can be of either type. `AnyPixelFormat` is used to
+    // reflect this migration.
+    pixel_format vector<AnyPixelFormat>:MAX;
 
     /// A list of cursor configurations most likely to be accepted by the driver. Can
     /// be null if cursor_count is 0.

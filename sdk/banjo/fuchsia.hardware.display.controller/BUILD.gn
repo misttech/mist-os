@@ -5,7 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display.controller") {
-  sources = [ "display-controller.fidl" ]
+  sources = [
+    "display-controller.fidl",
+    "pixel-format.fidl",
+  ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.audiotypes",
     "//sdk/banjo/fuchsia.hardware.i2cimpl",

@@ -8,7 +8,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
-#include <zircon/pixelformat.h>
 #include <zircon/status.h>
 
 #include <cstdint>
@@ -21,22 +20,22 @@
 namespace display {
 
 // static
-CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(zx_pixel_format_t banjo_pixel_format) {
-  // zx_pixel_format_t can be cast into AnyPixelFormat safely.
+CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(any_pixel_format_t banjo_pixel_format) {
+  // any_pixel_format_t can be cast into AnyPixelFormat safely.
   return {.format = static_cast<AnyPixelFormat>(banjo_pixel_format)};
 }
 
 // static
 zx::result<fbl::Vector<CoordinatorPixelFormat>>
 CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
-    cpp20::span<const zx_pixel_format_t> banjo_pixel_formats) {
+    cpp20::span<const any_pixel_format_t> banjo_pixel_formats) {
   fbl::AllocChecker alloc_checker;
   fbl::Vector<CoordinatorPixelFormat> result;
   result.reserve(banjo_pixel_formats.size(), &alloc_checker);
   if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  for (const zx_pixel_format_t banjo_pixel_format : banjo_pixel_formats) {
+  for (const any_pixel_format_t banjo_pixel_format : banjo_pixel_formats) {
     result.push_back(CoordinatorPixelFormat::FromBanjo(banjo_pixel_format));
   }
   return zx::ok(std::move(result));
