@@ -49,6 +49,7 @@ use {
 };
 
 pub const MIN_BLOCK_SIZE: u64 = 4096;
+pub const MAX_BLOCK_SIZE: u64 = u16::MAX as u64 + 1;
 
 // Whilst Fxfs could support up to u64::MAX, off_t is i64 so allowing files larger than that becomes
 // difficult to deal with via the POSIX APIs. Additionally, PagedObjectHandle only sees data get
@@ -303,6 +304,7 @@ impl FxFilesystem {
         let journal = Arc::new(Journal::new(objects.clone(), JournalOptions::default()));
         let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
         assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
+        assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
         let filesystem = Arc::new(FxFilesystem {
             device: OnceCell::new(),
             block_size,
@@ -366,6 +368,7 @@ impl FxFilesystem {
         let journal = Arc::new(Journal::new(objects.clone(), options.journal_options));
         let block_size = std::cmp::max(device.block_size().into(), MIN_BLOCK_SIZE);
         assert_eq!(block_size % MIN_BLOCK_SIZE, 0);
+        assert!(block_size <= MAX_BLOCK_SIZE, "Max supported block size is 64KiB");
         let read_only = filesystem_options.read_only;
 
         let filesystem = Arc::new(FxFilesystem {

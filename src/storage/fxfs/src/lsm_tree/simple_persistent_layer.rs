@@ -6,6 +6,7 @@ use {
     crate::{
         drop_event::DropEvent,
         errors::FxfsError,
+        filesystem::MAX_BLOCK_SIZE,
         log::*,
         lsm_tree::types::{
             BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, Value,
@@ -18,6 +19,7 @@ use {
     async_trait::async_trait,
     byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt},
     serde::{Deserialize, Serialize},
+    static_assertions::const_assert,
     std::{
         cmp::Ordering,
         io::Read,
@@ -173,6 +175,7 @@ impl SimplePersistentLayer {
 
         // We expect the layer block size to be a multiple of the physical block size.
         ensure!(layer_info.block_size % physical_block_size == 0, FxfsError::Inconsistent);
+        ensure!(layer_info.block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
 
         // Catch obviously bad sizes.
         ensure!(size < u64::MAX - layer_info.block_size, FxfsError::Inconsistent);
@@ -279,6 +282,9 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
     }
 }
 
+// This ensures that item_count can't be overflowed below.
+const_assert!(MAX_BLOCK_SIZE <= u16::MAX as u64 + 1);
+
 // -- Writer support --
 
 pub struct SimplePersistentLayerWriter<W: WriteBytes, K: Key, V: Value> {
@@ -294,6 +300,7 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
     /// Creates a new writer that will serialize items to the object accessible via |object_handle|
     /// (which provdes a write interface to the object).
     pub async fn new(mut writer: W, block_size: u64) -> Result<Self, Error> {
+        ensure!(block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
         let layer_info = LayerInfo { block_size, key_value_version: LATEST_VERSION };
         let mut buf: Vec<u8> = Vec::new();
         let len;
@@ -342,7 +349,7 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
 
         // If writing the item took us over a block, flush the bytes in the buffer prior to this
         // item.
-        if self.buf.len() > self.block_size as usize - 1 || self.item_count == 65535 {
+        if self.buf.len() > self.block_size as usize - 1 {
             self.write_some(len).await?;
         }
 
@@ -369,14 +376,24 @@ mod tests {
     use {
         super::{SimplePersistentLayer, SimplePersistentLayerWriter},
         crate::{
+            filesystem::MAX_BLOCK_SIZE,
             lsm_tree::types::{DefaultOrdUpperBound, Item, ItemRef, Layer, LayerWriter},
             object_handle::Writer,
             testing::fake_object::{FakeObject, FakeObjectHandle},
         },
-        std::{ops::Bound, sync::Arc},
+        std::{fmt::Debug, ops::Bound, sync::Arc},
     };
 
     impl DefaultOrdUpperBound for i32 {}
+
+    impl Debug for SimplePersistentLayerWriter<Writer<'_>, i32, i32> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+            f.debug_struct("SimplerPersistentLayerWriter")
+                .field("block_size", &self.block_size)
+                .field("item_count", &self.item_count)
+                .finish()
+        }
+    }
 
     #[fuchsia::test]
     async fn test_iterate_after_write() {
@@ -496,9 +513,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_large_block_size() {
-        // Large enough such that we hit the 64k item limit.
-        const BLOCK_SIZE: u64 = 2097152;
-        const ITEM_COUNT: i32 = 70000;
+        // At the upper end of the supported size.
+        const BLOCK_SIZE: u64 = MAX_BLOCK_SIZE;
+        // Items will be 16 bytes, so fill up a few pages.
+        const ITEM_COUNT: i32 = ((BLOCK_SIZE as i32) / 16) * 3;
 
         let handle =
             FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
@@ -523,6 +541,18 @@ mod tests {
             iterator.advance().await.expect("failed to advance");
         }
         assert!(iterator.get().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_overlarge_block_size() {
+        // At the upper end of the supported size.
+        const BLOCK_SIZE: u64 = MAX_BLOCK_SIZE * 2;
+
+        let handle =
+            FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
+        SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(Writer::new(&handle), BLOCK_SIZE)
+            .await
+            .expect_err("Creating writer with overlarge block size.");
     }
 
     #[fuchsia::test]
