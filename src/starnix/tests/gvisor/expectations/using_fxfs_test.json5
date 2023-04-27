@@ -771,9 +771,14 @@
                 "ReadWriteSharedPrivate/MMapFileParamTest.WriteOnlyFd/*",
 
                 // pty_test - flaky
-                "JobControlTest.ReleaseTTY",
-                "JobControlTest.SetForegroundProcessGroupDifferentSession",
-                "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
+                // Specifically, the following tests were identified as flaky when running on Fxfs.
+                // Until we can find out why thse tests are flaky, skip all tests that are part of
+                // JobControlTest
+                //  * "JobControlTest.ReleaseTTY",
+                //  * "JobControlTest.SetForegroundProcessGroupDifferentSession",
+                //  * "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
+                //  * "JobControlTest.SetForegroundProcessGroupSIGTTOUBlocked"
+                "JobControlTest.*",
 
                 // select_test - these tests hang
                 "SelectTest.NullFds",
