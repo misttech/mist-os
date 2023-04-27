@@ -15,6 +15,7 @@ ffx_plugin("ffx_sl4f_start") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
+    "//src/lib/fidl/rust/fidl",
     "//src/testing/sl4f_ffx/fidl:fuchsia.sl4f.ffx_rust",
     "//third_party/rust_crates:anyhow",
   ]

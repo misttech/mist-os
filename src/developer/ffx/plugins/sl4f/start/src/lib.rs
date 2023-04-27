@@ -37,7 +37,7 @@ async fn create_remote_component(
         ..fdecl::Child::EMPTY
     };
     let create_result = lifecycle_controller
-        .create_child(
+        .create_instance(
             PARENT_MONIKER,
             &mut collection,
             decl.clone(),
@@ -47,7 +47,7 @@ async fn create_remote_component(
         .map_err(|e| ffx_error!("FIDL error while creating component instance: {:?}", e))?;
 
     match create_result {
-        Err(fcomponent::Error::InstanceAlreadyExists) => {
+        Err(fsys::CreateError::InstanceAlreadyExists) => {
             println!("Component instance already exists: {}", moniker);
             println!("  Restarting component: {}", moniker);
             // This component already exists, but the user has asked it to be recreated.
@@ -57,7 +57,7 @@ async fn create_remote_component(
             };
             println!("  Destroying prior instance of component: {}", moniker);
             let destroy_result =
-                lifecycle_controller.destroy_child(PARENT_MONIKER, &mut child).await.map_err(
+                lifecycle_controller.destroy_instance(PARENT_MONIKER, &mut child).await.map_err(
                     |e| ffx_error!("FIDL error while destroying component instance: {:?}", e),
                 )?;
 
@@ -67,7 +67,7 @@ async fn create_remote_component(
 
             println!("  Recreating component: {}", moniker);
             let create_result = lifecycle_controller
-                .create_child(
+                .create_instance(
                     PARENT_MONIKER,
                     &mut collection,
                     decl.clone(),
@@ -94,16 +94,14 @@ async fn start_remote_component(
 ) -> Result<()> {
     // LifecycleController accepts RelativeMonikers only.
     let moniker = format!(".{}", moniker.to_string());
+    let (_, binder_server) = fidl::endpoints::create_endpoints::<fcomponent::BinderMarker>();
     let start_result = lifecycle_controller
-        .start(&moniker)
+        .start_instance(&moniker, binder_server)
         .await
         .map_err(|e| ffx_error!("FIDL error while starting the component instance: {}", e))?;
 
     match start_result {
-        Ok(fsys::StartResult::Started) => {}
-        Ok(fsys::StartResult::AlreadyStarted) => {
-            println!("The component instance was already started.");
-        }
+        Ok(()) => {}
         Err(e) => {
             ffx_bail!("Lifecycle protocol could not start the component instance: {:?}", e);
         }

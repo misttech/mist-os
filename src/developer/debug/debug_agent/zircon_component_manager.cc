@@ -22,6 +22,8 @@
 #include <string>
 #include <utility>
 
+#include "lib/fidl/cpp/interface_handle.h"
+#include "lib/fidl/cpp/interface_request.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
@@ -85,24 +87,42 @@ void ReadElfJobId(fuchsia::io::DirectoryHandle runtime_dir_handle, const std::st
       });
 }
 
-std::string to_string(fuchsia::component::Error err) {
+std::string to_string(fuchsia::sys2::CreateError err) {
   static const char* const errors[] = {
-      "INTERNAL",                   // 1
-      "INVALID_ARGUMENTS",          // 2
-      "UNSUPPORTED",                // 3
-      "ACCESS_DENIED",              // 4
-      "INSTANCE_NOT_FOUND",         // 5
-      "INSTANCE_ALREADY_EXISTS",    // 6
-      "INSTANCE_CANNOT_START",      // 7
-      "INSTANCE_CANNOT_RESOLVE",    // 8
-      "COLLECTION_NOT_FOUND",       // 9
-      "RESOURCE_UNAVAILABLE",       // 10
-      "INSTANCE_DIED",              // 11
-      "RESOURCE_NOT_FOUND",         // 12
-      "INSTANCE_CANNOT_UNRESOLVE",  // 13
+      "INTERNAL",
+      "INSTANCE_NOT_FOUND",
+      "INSTANCE_ALREADY_EXISTS",
+      "BAD_MONIKER",
+      "BAD_CHILD_DECL",
+      "COLLECTION_NOT_FOUND",
+      "BAD_DYNAMIC_OFFER",
+      "DYNAMIC_OFFERS_FORBIDDEN",
+      "EAGER_STARTUP_FORBIDDEN",
+      "NUMBERED_HANDLES_FORBIDDEN",
   };
   int n = static_cast<int>(err);
-  if (n < 1 || n > 13) {
+  if (n < 1 || n > 10) {
+    return "Invalid error";
+  }
+  return errors[n - 1];
+}
+
+std::string to_string(fuchsia::sys2::DestroyError err) {
+  static const char* const errors[] = {"INTERNAL", "INSTANCE_NOT_FOUND", "BAD_MONIKER",
+                                       "BAD_CHILD_REF"};
+  int n = static_cast<int>(err);
+  if (n < 1 || n > 4) {
+    return "Invalid error";
+  }
+  return errors[n - 1];
+}
+
+std::string to_string(fuchsia::sys2::StartError err) {
+  static const char* const errors[] = {
+      "INTERNAL", "INSTANCE_NOT_FOUND", "BAD_MONIKER", "PACKAGE_NOT_FOUND", "MANIFEST_NOT_FOUND",
+  };
+  int n = static_cast<int>(err);
+  if (n < 1 || n > 5) {
     return "Invalid error";
   }
   return errors[n - 1];
@@ -503,24 +523,24 @@ debug::Status ZirconComponentManager::LaunchComponent(const std::vector<std::str
 
   DEBUG_LOG(Process) << "Launching component url=" << url << " moniker=" << moniker;
 
-  fuchsia::sys2::LifecycleController_CreateChild_Result create_res;
+  fuchsia::sys2::LifecycleController_CreateInstance_Result create_res;
   auto create_child = [&]() {
     fuchsia::component::decl::Child child_decl;
     child_decl.set_name(name);
     child_decl.set_url(url);
     child_decl.set_startup(fuchsia::component::decl::StartupMode::LAZY);
-    return lifecycle_controller->CreateChild(kParentMoniker, {kCollection}, std::move(child_decl),
-                                             {}, &create_res);
+    return lifecycle_controller->CreateInstance(kParentMoniker, {kCollection},
+                                                std::move(child_decl), {}, &create_res);
   };
   status = create_child();
   if (status != ZX_OK)
     return debug::ZxStatus(status);
 
   if (create_res.is_err() &&
-      create_res.err() == fuchsia::component::Error::INSTANCE_ALREADY_EXISTS) {
-    fuchsia::sys2::LifecycleController_DestroyChild_Result destroy_res;
+      create_res.err() == fuchsia::sys2::CreateError::INSTANCE_ALREADY_EXISTS) {
+    fuchsia::sys2::LifecycleController_DestroyInstance_Result destroy_res;
     fuchsia::component::decl::ChildRef child_ref{.name = name, .collection = kCollection};
-    status = lifecycle_controller->DestroyChild(kParentMoniker, child_ref, &destroy_res);
+    status = lifecycle_controller->DestroyInstance(kParentMoniker, child_ref, &destroy_res);
     if (status != ZX_OK)
       return debug::ZxStatus(status);
     if (destroy_res.is_err())
@@ -533,9 +553,10 @@ debug::Status ZirconComponentManager::LaunchComponent(const std::vector<std::str
   if (create_res.is_err())
     return debug::Status("Failed to create the component: " + to_string(create_res.err()));
 
-  fuchsia::sys2::LifecycleController_Start_Result start_res;
+  fuchsia::sys2::LifecycleController_StartInstance_Result start_res;
+  fidl::InterfaceHandle<fuchsia::component::Binder> binder;
   // LifecycleController::Start accepts relative monikers.
-  status = lifecycle_controller->Start("." + moniker, &start_res);
+  status = lifecycle_controller->StartInstance("." + moniker, binder.NewRequest(), &start_res);
   if (status != ZX_OK)
     return debug::ZxStatus(status);
   if (start_res.is_err())

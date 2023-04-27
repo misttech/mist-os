@@ -85,6 +85,7 @@ rustc_library("hub_report_lib") {
   deps = [
     "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:tracing",

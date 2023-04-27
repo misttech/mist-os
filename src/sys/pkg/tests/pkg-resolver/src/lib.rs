@@ -958,18 +958,16 @@ impl<B: Blobfs> TestEnv<B> {
             .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
             .unwrap();
         let () = lifecycle_controller
-            .stop(&format!("./{PKG_RESOLVER_CHILD_NAME}"), false)
+            .stop_instance(&format!("./{PKG_RESOLVER_CHILD_NAME}"))
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(
-            lifecycle_controller
-                .start(&format!("./{PKG_RESOLVER_CHILD_NAME}"))
-                .await
-                .unwrap()
-                .unwrap(),
-            fsys2::StartResult::Started
-        );
+        let (_, binder_server) = fidl::endpoints::create_endpoints();
+        lifecycle_controller
+            .start_instance(&format!("./{PKG_RESOLVER_CHILD_NAME}"), binder_server)
+            .await
+            .unwrap()
+            .unwrap();
         self.proxies = Proxies::from_instance(&self.realm_instance.root);
         self.wait_for_pkg_resolver_to_start().await;
     }

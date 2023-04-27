@@ -54,7 +54,8 @@ async fn run_test(url: &str, expected_result: &str) {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
         .unwrap();
-    lifecycle_controller.start(".").await.unwrap().unwrap();
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
+    lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
     let realm_query = instance
         .root
@@ -214,7 +215,9 @@ async fn route_directories_from_component_manager_namespace() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
         .unwrap();
-    lifecycle_controller.start(".").await.unwrap().unwrap();
+
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
+    lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
     let realm_query = instance
         .root

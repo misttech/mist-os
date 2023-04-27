@@ -54,7 +54,7 @@ impl Stressor {
             ..fdecl::Child::EMPTY
         };
         self.lifecycle_controller
-            .create_child(
+            .create_instance(
                 parent_moniker,
                 &mut collection_ref,
                 decl,
@@ -72,8 +72,9 @@ impl Stressor {
             })?;
 
         let child_moniker = format!("{}/{}:{}", parent_moniker, collection, child_name);
+        let (_, binder_server) = fidl::endpoints::create_endpoints::<fcomponent::BinderMarker>();
         self.lifecycle_controller
-            .start(&child_moniker)
+            .start_instance(&child_moniker, binder_server)
             .await
             .unwrap()
             .map_err(|e| format_err!("Could not start {}: {:?}", child_moniker, e))?;
@@ -88,15 +89,17 @@ impl Stressor {
         child_name: String,
     ) -> Result<()> {
         let mut child = fdecl::ChildRef { name: child_name.clone(), collection: Some(collection) };
-        self.lifecycle_controller.destroy_child(parent_moniker, &mut child).await.unwrap().map_err(
-            |e| {
+        self.lifecycle_controller
+            .destroy_instance(parent_moniker, &mut child)
+            .await
+            .unwrap()
+            .map_err(|e| {
                 format_err!(
                     "Could not destroy child (parent: {})(child: {}): {:?}",
                     parent_moniker,
                     child_name,
                     e
                 )
-            },
-        )
+            })
     }
 }

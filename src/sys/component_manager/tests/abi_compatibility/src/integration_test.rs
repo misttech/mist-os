@@ -1,7 +1,7 @@
 use {
     anyhow::Error,
     assert_matches::assert_matches,
-    cm_rust, fidl, fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    cm_rust, fidl, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::server as fserver,
@@ -247,7 +247,7 @@ async fn resolve_components_against_allow_all_policy() {
         // Attempt to resolve the component. Expect the component resolver to have returned a
         // resolved component with an absent ABI, but resolution passes because of `allow_all`
         // compatibility policy.
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
@@ -258,7 +258,7 @@ async fn resolve_components_against_allow_all_policy() {
     // Test resolution of a component with an unsupported abi revision
     {
         let child_moniker = "./unsupported_abi_component";
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(
@@ -271,7 +271,7 @@ async fn resolve_components_against_allow_all_policy() {
     // Test resolution of a component with a supported abi revision
     {
         let child_moniker = "./supported_abi_component";
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response =
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
@@ -308,8 +308,8 @@ async fn resolve_components_against_enforce_presence_policy() {
         // Attempt to resolve the component. Expect the component resolver to have returned a
         // resolved component with an absent ABI, but resolution fails because of
         // `enforce_presence` compatibility policy.
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Err(fcomponent::Error::InstanceCannotResolve));
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
+        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
@@ -319,7 +319,7 @@ async fn resolve_components_against_enforce_presence_policy() {
     // Test resolution of a component with an unsupported abi revision
     {
         let child_moniker = "./unsupported_abi_component";
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(
@@ -332,7 +332,7 @@ async fn resolve_components_against_enforce_presence_policy() {
     // Test resolution of a component with a supported abi revision
     {
         let child_moniker = "./supported_abi_component";
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response =
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
@@ -369,8 +369,8 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
         // Attempt to resolve the component. Expect the component resolver to have returned a
         // resolved component with an absent ABI, but resolution fails because of
         // `enforce_presence_and_compatibility` compatibility policy.
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Err(fcomponent::Error::InstanceCannotResolve));
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
+        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
@@ -380,8 +380,8 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
     // Test resolution of a component with an unsupported abi revision
     {
         let child_moniker = "./unsupported_abi_component";
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Err(fcomponent::Error::InstanceCannotResolve));
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
+        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(
             resolver_response,
@@ -393,7 +393,7 @@ async fn resolve_components_against_enforce_presence_compatibility_policy() {
     // Test resolution of a component with a supported abi revision
     {
         let child_moniker = "./supported_abi_component";
-        let resolve_res = lifecycle_controller.resolve(child_moniker).await.unwrap();
+        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response =
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");

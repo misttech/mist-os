@@ -82,7 +82,7 @@ pub async fn resolve_component(relative_moniker: &str, expect_success: bool) {
     info!("Attempting to resolve {}", relative_moniker);
     let lifecycle_controller_proxy =
         connect_to_protocol::<fsys::LifecycleControllerMarker>().unwrap();
-    let result = lifecycle_controller_proxy.resolve(relative_moniker).await.unwrap();
+    let result = lifecycle_controller_proxy.resolve_instance(relative_moniker).await.unwrap();
     if expect_success {
         result.unwrap();
     } else {
@@ -94,7 +94,9 @@ pub async fn start_component(relative_moniker: &str, expect_success: bool) {
     info!("Attempting to start {}", relative_moniker);
     let lifecycle_controller_proxy =
         connect_to_protocol::<fsys::LifecycleControllerMarker>().unwrap();
-    let result = lifecycle_controller_proxy.start(relative_moniker).await.unwrap();
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
+    let result =
+        lifecycle_controller_proxy.start_instance(relative_moniker, binder_server).await.unwrap();
     if expect_success {
         result.unwrap();
     } else {
@@ -106,7 +108,7 @@ pub async fn stop_component(relative_moniker: &str, expect_success: bool) {
     info!("Attempting to stop {}", relative_moniker);
     let lifecycle_controller_proxy =
         connect_to_protocol::<fsys::LifecycleControllerMarker>().unwrap();
-    let result = lifecycle_controller_proxy.stop(relative_moniker, false).await.unwrap();
+    let result = lifecycle_controller_proxy.stop_instance(relative_moniker).await.unwrap();
     if expect_success {
         result.unwrap();
     } else {

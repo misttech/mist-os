@@ -127,7 +127,7 @@ zx::result<zx::channel> AdbFileSync::ConnectToComponent(std::string name,
   }
 
   // Resolve component moniker
-  auto resolve_result = lifecycle_->Resolve(component_moniker);
+  auto resolve_result = lifecycle_->ResolveInstance(component_moniker);
   if (resolve_result.is_error()) {
     FX_LOGS(ERROR) << "FIDL call to resolve moniker failed" << resolve_result.error_value();
     return zx::error(resolve_result.error_value().is_domain_error()

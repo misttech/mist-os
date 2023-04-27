@@ -185,11 +185,11 @@ class LocalLifecycleController : public fuchsia::sys2::testing::LifecycleControl
     FX_LOGS(ERROR) << "Not implemented " << name;
   }
 
-  void Resolve(std::string moniker, ResolveCallback callback) override {
+  void ResolveInstance(std::string moniker, ResolveInstanceCallback callback) override {
     moniker_ = moniker;
     EXPECT_EQ(moniker_, "./" + kComponent);
-    callback(fuchsia::sys2::LifecycleController_Resolve_Result::WithResponse(
-        fuchsia::sys2::LifecycleController_Resolve_Response(ZX_OK)));
+    callback(fuchsia::sys2::LifecycleController_ResolveInstance_Result::WithResponse(
+        fuchsia::sys2::LifecycleController_ResolveInstance_Response(ZX_OK)));
   }
 
   // component_testing::LocalComponentImpl methods

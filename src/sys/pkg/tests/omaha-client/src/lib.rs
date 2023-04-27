@@ -2063,13 +2063,10 @@ async fn test_omaha_client_persists_cohort() {
     let lifecycle_controller =
         connect_to_protocol::<fidl_fuchsia_sys2::LifecycleControllerMarker>().unwrap();
     lifecycle_controller
-        .stop(
-            &format!(
-                "./realm_builder:{}/omaha_client_service",
-                env.realm_instance.root.child_name()
-            ),
-            false,
-        )
+        .stop_instance(&format!(
+            "./realm_builder:{}/omaha_client_service",
+            env.realm_instance.root.child_name()
+        ))
         .await
         .unwrap()
         .unwrap();

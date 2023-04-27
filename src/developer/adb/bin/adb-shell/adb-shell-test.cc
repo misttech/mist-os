@@ -73,8 +73,8 @@ class FakeLifecycleController
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Resolve(::fuchsia_sys2::wire::LifecycleControllerResolveRequest* request,
-               ResolveCompleter::Sync& completer) override {
+  void ResolveInstance(::fuchsia_sys2::wire::LifecycleControllerResolveInstanceRequest* request,
+                       ResolveInstanceCompleter::Sync& completer) override {
     moniker_ = request->moniker.get();
     completer.ReplySuccess();
   }

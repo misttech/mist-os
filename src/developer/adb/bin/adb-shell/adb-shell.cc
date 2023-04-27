@@ -71,7 +71,7 @@ zx_status_t AdbShellImpl::ResolveMoniker(std::string moniker) {
 
   fidl::WireSyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller(
       std::move(*client_end));
-  auto result = lifecycle_controller->Resolve(fidl::StringView::FromExternal(moniker));
+  auto result = lifecycle_controller->ResolveInstance(fidl::StringView::FromExternal(moniker));
   if (!result.ok()) {
     FX_LOGS(ERROR) << "FIDL call to resolve moniker failed" << result.status();
     return result.status();
@@ -79,7 +79,7 @@ zx_status_t AdbShellImpl::ResolveMoniker(std::string moniker) {
   if (result->is_error()) {
     FX_LOGS(ERROR) << "Could not resolve moniker "
                    << static_cast<uint32_t>(result.value().error_value());
-    return static_cast<zx_status_t>(result->error_value());
+    return ZX_ERR_INTERNAL;
   }
   return ZX_OK;
 }

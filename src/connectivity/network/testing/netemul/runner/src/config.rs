@@ -14,7 +14,7 @@ use std::{
     convert::TryFrom,
     str::FromStr,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Network {
@@ -505,22 +505,13 @@ impl Config {
 
         // Start all the eager components now that test setup is complete.
         for component in eager_components {
-            match lifecycle_controller
-                .start(&format!("./{}", component))
+            let (_, binder_server) =
+                fidl::endpoints::create_endpoints::<fidl_fuchsia_component::BinderMarker>();
+            lifecycle_controller
+                .start_instance(&format!("./{}", component), binder_server)
                 .await
                 .context("call start")?
                 .map_err(|e| anyhow!("failed to start component '{}': {:?}", component, e))?
-            {
-                fsys2::StartResult::Started => {}
-                fsys2::StartResult::AlreadyStarted => {
-                    warn!(
-                        "component '{}' was already started during test setup: it probably has \
-                        `eager` startup, which is likely incorrect given it is also managed by the \
-                        netemul test runner",
-                        component,
-                    )
-                }
-            }
         }
 
         Ok(NetworkEnvironment {
@@ -1073,11 +1064,11 @@ mod tests {
         };
         let mock_lifecycle_controller = controller_requests
             .map(|request| {
-                let (moniker, responder) = request
+                let (moniker, _, responder) = request
                     .expect("get request")
-                    .into_start()
+                    .into_start_instance()
                     .expect("unexpected lifecycle controller request");
-                responder.send(&mut Ok(fsys2::StartResult::Started)).expect("send response");
+                responder.send(&mut Ok(())).expect("send response");
                 moniker
             })
             .collect::<Vec<String>>();

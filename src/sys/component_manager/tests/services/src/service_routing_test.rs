@@ -195,9 +195,11 @@ async fn start_provider(branch: &ScopedInstance, child_name: &str) -> Result<(),
         child_name,
     );
 
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
+
     // Start the provider child.
     lifecycle_controller_proxy
-        .start(&provider_moniker)
+        .start_instance(&provider_moniker, binder_server)
         .await?
         .map_err(|err| format_err!("failed to start provider component: {:?}", err))?;
 
@@ -237,7 +239,7 @@ async fn destroy_provider(branch: &ScopedInstance, child_name: &str) -> Result<(
 
     // Destroy the provider child.
     lifecycle_controller_proxy
-        .destroy_child(
+        .destroy_instance(
             &parent_moniker,
             &mut fdecl::ChildRef {
                 name: child_name.to_string(),

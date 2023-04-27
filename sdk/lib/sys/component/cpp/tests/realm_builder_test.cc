@@ -904,8 +904,8 @@ TEST_F(RealmBuilderTest, LocalComponentGetsLifecycleControllerStop) {
   for (size_t i = 0; i < components.size(); ++i) {
     size_t orig = destructors_called;
     std::string moniker = "./numbered" + std::to_string(i);
-    lifecycle_controller->Stop(moniker, false,
-                               [](auto result) { ASSERT_TRUE(result.is_response()); });
+    lifecycle_controller->StopInstance(moniker,
+                                       [](auto result) { ASSERT_TRUE(result.is_response()); });
     RunLoopUntil([&]() { return destructors_called == orig + 1; });
   }
 }

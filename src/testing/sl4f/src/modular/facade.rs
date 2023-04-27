@@ -84,7 +84,7 @@ impl ModularFacade {
         // Use a root LifecycleController to kill the session. It will send a shutdown signal to the
         // session so it can terminate gracefully.
         self.lifecycle_controller
-            .destroy_child(
+            .destroy_instance(
                 SESSION_PARENT_MONIKER,
                 &mut fdecl::ChildRef {
                     name: SESSION_CHILD_NAME.to_string(),
@@ -206,7 +206,7 @@ mod tests {
 
         let lifecycle_controller = spawn_stream_handler(|lifecycle_controller_request| async {
             match lifecycle_controller_request {
-                fsys::LifecycleControllerRequest::DestroyChild {
+                fsys::LifecycleControllerRequest::DestroyInstance {
                     parent_moniker,
                     child,
                     responder,

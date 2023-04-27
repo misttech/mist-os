@@ -61,7 +61,11 @@ impl Puppet {
     pub(crate) async fn shutdown(self) {
         let lifecycle_controller =
             fclient::connect_to_protocol::<fidl_fuchsia_sys2::LifecycleControllerMarker>().unwrap();
-        lifecycle_controller.stop(&format!("./{}", PUPPET_MONIKER), false).await.unwrap().unwrap();
+        lifecycle_controller
+            .stop_instance(&format!("./{}", PUPPET_MONIKER))
+            .await
+            .unwrap()
+            .unwrap();
     }
 
     /// Get the printable name associated with this puppet/test

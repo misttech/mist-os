@@ -194,7 +194,7 @@ async fn stop_component(realm_ref: &RealmInstance, child_name: &str) {
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
         .expect("Failed to connect to LifecycleController");
     lifecycle
-        .stop(&format!("./{child_name}"), false)
+        .stop_instance(&format!("./{child_name}"))
         .await
         .expect(&format!("Failed to stop child: {child_name}"))
         .expect(&format!("Failed to unwrap stop child result: {child_name}"));
@@ -206,8 +206,9 @@ async fn start_component(realm_ref: &RealmInstance, child_name: &str) {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
         .expect("Failed to connect to LifecycleController");
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle
-        .start(&format!("./{child_name}"))
+        .start_instance(&format!("./{child_name}"), binder_server)
         .await
         .expect(&format!("Failed to start child: {child_name}"))
         .expect(&format!("Failed to unwrap start child result: {child_name}"));

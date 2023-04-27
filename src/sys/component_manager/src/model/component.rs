@@ -2552,36 +2552,6 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    async fn already_started() {
-        let components = vec![("root", ComponentDeclBuilder::new().build())];
-
-        let instance_id = Some(gen_instance_id(&mut rand::thread_rng()));
-        let component_id_index_path = make_index_file(component_id_index::Index {
-            instances: vec![component_id_index::InstanceIdEntry {
-                instance_id: instance_id.clone(),
-                appmgr_moniker: None,
-                moniker: Some(AbsoluteMoniker::root()),
-            }],
-            ..component_id_index::Index::default()
-        })
-        .unwrap();
-        let test = RoutingTestBuilder::new("root", components)
-            .set_component_id_index_path(
-                component_id_index_path.path().to_str().unwrap().to_string(),
-            )
-            .build()
-            .await;
-
-        let root_realm =
-            test.model.start_instance(&AbsoluteMoniker::root(), &StartReason::Root).await.unwrap();
-
-        assert_eq!(
-            fsys::StartResult::AlreadyStarted,
-            root_realm.start(&StartReason::Root).await.unwrap()
-        );
-    }
-
-    #[fuchsia::test]
     async fn shutdown_component_interface_no_dynamic() {
         let example_offer = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::static_child("a".to_string()),

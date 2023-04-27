@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{Local, TimeZone};
 use errors::{ffx_bail, ffx_error};
-use ffx_component::rcs::connect_to_lifecycle_controller;
+use ffx_component::rcs::connect_to_realm_query;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io as fio;
@@ -115,10 +115,10 @@ async fn choose_and_copy_remote_minidumps(rcs: &RemoteControlProxy) -> Result<Te
 // List all the "minidump.dmp" files in "/reports" directory with the given capability.
 async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Vec<File>> {
     let (client, server) = fidl::handle::Channel::create();
-    connect_to_lifecycle_controller(&rcs)
+    connect_to_realm_query(&rcs)
         .await
-        .context("Error in connect_to_lifecycle_controller")?
-        .get_storage_admin("./core", capability, fidl::endpoints::ServerEnd::new(server))
+        .context("Error in connect_to_realm_query")?
+        .connect_to_storage_admin("./core", capability, fidl::endpoints::ServerEnd::new(server))
         .await
         .context("FDIL error in get_storage_admin")?
         .map_err(|e| anyhow!("Error in get_storage_admin: {:?}", e))?;

@@ -634,7 +634,8 @@ impl RealmInstance {
             .root
             .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
             .map_err(|e| Error::CannotStartRootComponent(e))?;
-        lifecycle_controller.start("./").await?.map_err(|e| {
+        let (_, binder_server) = fidl::endpoints::create_endpoints::<fcomponent::BinderMarker>();
+        lifecycle_controller.start_instance("./", binder_server).await?.map_err(|e| {
             Error::CannotStartRootComponent(format_err!("received error status: {:?}", e))
         })?;
         Ok(())

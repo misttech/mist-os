@@ -95,7 +95,9 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
         .unwrap();
-    lifecycle_controller.start(".").await.unwrap().unwrap();
+
+    let (_, binder_server) = fidl::endpoints::create_endpoints();
+    lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
     // Get to the Trigger protocol exposed by the root component in this nested component manager
     let realm_query =
