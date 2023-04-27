@@ -587,6 +587,11 @@ RUN_ZXTEST(WavlTreeTest, UPDDTE,   MakeIterator)
 RUN_ZXTEST(WavlTreeTest, UPCDTE,   MakeIterator)
 RUN_ZXTEST(WavlTreeTest, RPTE,     MakeIterator)
 
+RUN_ZXTEST(WavlTreeTest, UMTE,     MaterializeIterator)
+RUN_ZXTEST(WavlTreeTest, UPDDTE,   MaterializeIterator)
+RUN_ZXTEST(WavlTreeTest, UPCDTE,   MaterializeIterator)
+RUN_ZXTEST(WavlTreeTest, RPTE,     MaterializeIterator)
+
 RUN_ZXTEST(WavlTreeTest, UMTE,     ReverseIterErase)
 RUN_ZXTEST(WavlTreeTest, UPDDTE,   ReverseIterErase)
 RUN_ZXTEST(WavlTreeTest, UPCDTE,   ReverseIterErase)

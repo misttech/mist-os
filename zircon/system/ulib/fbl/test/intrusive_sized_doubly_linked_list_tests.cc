@@ -128,6 +128,11 @@ RUN_ZXTEST(SizedDoublyLinkedListTest, UPDDTE,  MakeIterator)
 RUN_ZXTEST(SizedDoublyLinkedListTest, UPCDTE,  MakeIterator)
 RUN_ZXTEST(SizedDoublyLinkedListTest, RPTE,    MakeIterator)
 
+RUN_ZXTEST(SizedDoublyLinkedListTest, UMTE,    MaterializeIterator)
+RUN_ZXTEST(SizedDoublyLinkedListTest, UPDDTE,  MaterializeIterator)
+RUN_ZXTEST(SizedDoublyLinkedListTest, UPCDTE,  MaterializeIterator)
+RUN_ZXTEST(SizedDoublyLinkedListTest, RPTE,    MaterializeIterator)
+
 RUN_ZXTEST(SizedDoublyLinkedListTest, UMTE,    ReverseIterErase)
 RUN_ZXTEST(SizedDoublyLinkedListTest, UPDDTE,  ReverseIterErase)
 RUN_ZXTEST(SizedDoublyLinkedListTest, UPCDTE,  ReverseIterErase)

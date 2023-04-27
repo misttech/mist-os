@@ -326,9 +326,29 @@ class __POINTER(PtrType_) DoublyLinkedList : public internal::DoublyLinkedListBa
   const_iterator end() const { return const_iterator(sentinel()); }
   const_iterator cend() const { return const_iterator(sentinel()); }
 
-  // make_iterator : construct an iterator out of a pointer to an object
-  iterator make_iterator(ValueType& obj) { return iterator(&obj); }
+  // make_iterator : Construct an iterator out of a pointer to an object.
+  iterator make_iterator(ValueType& obj) {
+    ZX_DEBUG_ASSERT(NodeTraits::node_state(obj).InContainer());
+    return iterator(&obj);
+  }
   const_iterator make_iterator(const ValueType& obj) const {
+    ZX_DEBUG_ASSERT(NodeTraits::node_state(const_cast<ValueType&>(obj)).InContainer());
+    return const_iterator(&const_cast<ValueType&>(obj));
+  }
+
+  // materialize_iterator : Construct an iterator out of a pointer to an object,
+  // without a reference to the container.
+  //
+  // USE WITH CAUTION: The caller is responsible for ensuring it is safe to
+  // access the container when using this iterator. In particular, static lock
+  // analysis will not detect access without holding the required locks guarding
+  // the container.
+  static iterator materialize_iterator(ValueType& obj) {
+    ZX_DEBUG_ASSERT(NodeTraits::node_state(obj).InContainer());
+    return iterator(&obj);
+  }
+  static const_iterator materialize_iterator(const ValueType& obj) {
+    ZX_DEBUG_ASSERT(NodeTraits::node_state(const_cast<ValueType&>(obj)).InContainer());
     return const_iterator(&const_cast<ValueType&>(obj));
   }
 

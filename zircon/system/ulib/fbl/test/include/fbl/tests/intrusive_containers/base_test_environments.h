@@ -244,13 +244,13 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     EXPECT_EQ(refs_held(), ObjType::live_obj_count());
 
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      EXPECT_NOT_NULL(objects()[i]);
+      EXPECT_NOT_NULL(objects(i));
 
       // If our underlying object it still being kept alive by the test
       // environment, make sure that its internal pointer state has been
       // properly cleared out.
       if (HoldingObject(i)) {
-        auto& ns = ContainerType::NodeTraits::node_state(*objects()[i]);
+        auto& ns = ContainerType::NodeTraits::node_state(*objects(i));
         EXPECT_FALSE(ns.InContainer());
       }
     }
@@ -277,13 +277,13 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     EXPECT_EQ(OBJ_COUNT, ObjType::live_obj_count());
 
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      EXPECT_NOT_NULL(objects()[i]);
+      EXPECT_NOT_NULL(objects(i));
 
       // Make sure that the internal pointer states of all of our objects
       // do not know yet that they have been removed from the container.
       // The clear_unsafe operation should not have updated any of the
       // internal object states.
-      auto& ns = ContainerType::NodeTraits::node_state(*objects()[i]);
+      auto& ns = ContainerType::NodeTraits::node_state(*objects(i));
       EXPECT_TRUE(ns.InContainer());
     }
   }
@@ -328,7 +328,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
       ASSERT_NOT_NULL(tmp);
       if (check_ndx) {
         EXPECT_EQ(tmp->value(), ndx);
-        EXPECT_EQ(objects()[ndx], tmp->raw_ptr());
+        EXPECT_EQ(objects(ndx), tmp->raw_ptr());
       }
       erased_ndx = tmp->value();
 
@@ -429,8 +429,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     // container.
     ASSERT_NO_FAILURES(Populate(container(), RefAction::HoldAll));
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      ASSERT_NOT_NULL(objects()[i]);
-      DoErase<Method>(*objects()[i], i, OBJ_COUNT - i);
+      ASSERT_NOT_NULL(objects(i));
+      DoErase<Method>(*objects(i), i, OBJ_COUNT - i);
     }
 
     EXPECT_EQ(0u, ObjType::live_obj_count());
@@ -442,8 +442,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     ASSERT_NO_FAILURES(Populate(container(), RefAction::HoldAll));
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
       size_t ndx = OBJ_COUNT - i - 1;
-      ASSERT_NOT_NULL(objects()[ndx]);
-      DoErase<Method>(*objects()[ndx], ndx, ndx + 1);
+      ASSERT_NOT_NULL(objects(ndx));
+      DoErase<Method>(*objects(ndx), ndx, ndx + 1);
     }
 
     EXPECT_EQ(0u, ObjType::live_obj_count());
@@ -455,8 +455,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     static_assert(2 < OBJ_COUNT, "OBJ_COUNT too small to run Erase test!");
     ASSERT_NO_FAILURES(Populate(container(), RefAction::HoldAll));
     for (size_t i = 1; i < OBJ_COUNT - 1; ++i) {
-      ASSERT_NOT_NULL(objects()[i]);
-      DoErase<Method>(*objects()[i], i, OBJ_COUNT - i + 1);
+      ASSERT_NOT_NULL(objects(i));
+      DoErase<Method>(*objects(i), i, OBJ_COUNT - i + 1);
     }
   }
 
@@ -503,7 +503,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
         // Remove the object from the container, letting the pointer go out of
         // scope immediately.
         {
-          PtrType tmp = fbl::RemoveFromContainer<Tag>(*objects()[ndx]);
+          PtrType tmp = fbl::RemoveFromContainer<Tag>(*objects(ndx));
           ASSERT_NOT_NULL(tmp);
         }
 
@@ -566,8 +566,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     EXPECT_FALSE(iter.IsValid());
 
     for (i = 0; i < OBJ_COUNT; ++i) {
-      EXPECT_EQ(2u, objects()[i]->visited_count());
-      objects()[i]->ResetVisitedCount();
+      EXPECT_EQ(2u, objects(i)->visited_count());
+      objects(i)->ResetVisitedCount();
     }
 
     // Advancing iter past the end of the container should be a no-op.
@@ -676,8 +676,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     }
 
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      EXPECT_EQ(1u, objects()[i]->visited_count());
-      objects()[i]->ResetVisitedCount();
+      EXPECT_EQ(1u, objects(i)->visited_count());
+      objects(i)->ResetVisitedCount();
     }
 
     // Iterate using the range-based for loop syntax over const references.
@@ -688,8 +688,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     }
 
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      EXPECT_EQ(1u, objects()[i]->visited_count());
-      objects()[i]->ResetVisitedCount();
+      EXPECT_EQ(1u, objects(i)->visited_count());
+      objects(i)->ResetVisitedCount();
     }
 
     // None of the objects should have been destroyed during this test.
@@ -735,7 +735,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     size_t prev_ndx = iter->value();
     while (++iter != end) {
       ASSERT_LT(prev_ndx, OBJ_COUNT);
-      ASSERT_NOT_NULL(objects()[prev_ndx]);
+      ASSERT_NOT_NULL(objects(prev_ndx));
 
       auto prev_iter = iter;
       switch (prev_ndx % 4) {
@@ -754,7 +754,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
       }
       ASSERT_TRUE(prev_iter.IsValid());
       EXPECT_FALSE(prev_iter == iter);
-      EXPECT_TRUE(*prev_iter == *objects()[prev_ndx]);
+      EXPECT_TRUE(*prev_iter == *objects(prev_ndx));
 
       prev_ndx = iter->value();
     }
@@ -828,12 +828,12 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     // internal reference we are holding.  Verify that the iterator is in
     // the position we expect it to be in.
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      ASSERT_NOT_NULL(objects()[i]);
-      auto iter = container().make_iterator(*objects()[i]);
+      ASSERT_NOT_NULL(objects(i));
+      auto iter = container().make_iterator(*objects(i));
 
       ASSERT_TRUE(iter != container().end());
-      EXPECT_EQ(objects()[i]->value(), iter->value());
-      EXPECT_EQ(objects()[i], iter->raw_ptr());
+      EXPECT_EQ(objects(i)->value(), iter->value());
+      EXPECT_EQ(objects(i), iter->raw_ptr());
 
       if (ContainerType::IsSequenced) {
         auto other_iter = container().begin();
@@ -849,12 +849,62 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
 
     // Repeat using a const iterator.
     for (size_t i = 0; i < OBJ_COUNT; ++i) {
-      ASSERT_NOT_NULL(objects()[i]);
-      auto iter = const_container().make_iterator(*objects()[i]);
+      ASSERT_NOT_NULL(objects(i));
+      auto iter = const_container().make_iterator(*objects(i));
 
       ASSERT_TRUE(iter != container().cend());
-      EXPECT_EQ(objects()[i]->value(), iter->value());
-      EXPECT_EQ(objects()[i], iter->raw_ptr());
+      EXPECT_EQ(objects(i)->value(), iter->value());
+      EXPECT_EQ(objects(i), iter->raw_ptr());
+
+      if (ContainerType::IsSequenced) {
+        auto other_iter = container().cbegin();
+
+        for (size_t j = 0; j < i; ++j) {
+          EXPECT_FALSE(other_iter == iter);
+          ++other_iter;
+        }
+
+        EXPECT_TRUE(other_iter == iter);
+      }
+    }
+  }
+
+  void MaterializeIterator() {
+    // Populate the container.  Hold internal refs to everything we add to
+    // the container.
+    ASSERT_NO_FAILURES(Populate(container(), RefAction::HoldAll));
+
+    // For every member of the container, materalize an iterator using the
+    // internal reference we are holding.  Verify that the iterator is in
+    // the position we expect it to be in.
+    for (size_t i = 0; i < OBJ_COUNT; ++i) {
+      ASSERT_NOT_NULL(objects(i));
+      auto iter = ContainerType::materialize_iterator(*objects(i));
+
+      ASSERT_TRUE(iter != container().end());
+      EXPECT_EQ(objects(i)->value(), iter->value());
+      EXPECT_EQ(objects(i), iter->raw_ptr());
+
+      if (ContainerType::IsSequenced) {
+        auto other_iter = container().begin();
+
+        for (size_t j = 0; j < i; ++j) {
+          EXPECT_FALSE(other_iter == iter);
+          ++other_iter;
+        }
+
+        EXPECT_TRUE(other_iter == iter);
+      }
+    }
+
+    // Repeat using a const iterator.
+    for (size_t i = 0; i < OBJ_COUNT; ++i) {
+      ASSERT_NOT_NULL(objects(i));
+      auto iter = ContainerType::materialize_iterator(*const_objects(i));
+
+      ASSERT_TRUE(iter != container().cend());
+      EXPECT_EQ(objects(i)->value(), iter->value());
+      EXPECT_EQ(objects(i), iter->raw_ptr());
 
       if (ContainerType::IsSequenced) {
         auto other_iter = container().cbegin();
@@ -1040,7 +1090,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     for (auto& obj : container()) {
       ASSERT_GT(OBJ_COUNT, obj.value());
       EXPECT_EQ(0u, obj.visited_count());
-      EXPECT_EQ(objects()[obj.value()], &obj);
+      EXPECT_EQ(objects(obj.value()), &obj);
       obj.Visit();
     }
 
@@ -1061,7 +1111,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     for (const auto& obj : other_container) {
       ASSERT_GT(OBJ_COUNT, obj.value());
       EXPECT_EQ(1u, obj.visited_count());
-      EXPECT_EQ(objects()[obj.value()], &obj);
+      EXPECT_EQ(objects(obj.value()), &obj);
       obj.Visit();
     }
 
@@ -1083,7 +1133,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     for (const auto& obj : another_container) {
       ASSERT_GT(OBJ_COUNT, obj.value());
       EXPECT_EQ(2u, obj.visited_count());
-      EXPECT_EQ(objects()[obj.value()], &obj);
+      EXPECT_EQ(objects(obj.value()), &obj);
       obj.Visit();
     }
 
@@ -1136,7 +1186,7 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
     for (const auto& obj : container()) {
       ASSERT_GT(OBJ_COUNT, obj.value());
       EXPECT_EQ(3u, obj.visited_count());
-      EXPECT_EQ(objects()[obj.value()], &obj);
+      EXPECT_EQ(objects(obj.value()), &obj);
     }
 
     ASSERT_NO_FATAL_FAILURE(ContainerChecker::SanityCheck(container()));
@@ -1597,7 +1647,8 @@ class TestEnvironment : public TestEnvironmentSpecialized<TestEnvTraits> {
 
   ContainerType& container() { return this->container_; }
   const ContainerType& const_container() { return this->container_; }
-  ObjType** objects() { return this->objects_; }
+  ObjType* objects(size_t i) { return this->objects_[i]; }
+  const ObjType* const_objects(size_t i) { return this->objects_[i]; }
   size_t& refs_held() { return this->refs_held_; }
 
   void ReleaseObject(size_t ndx) { Sp::ReleaseObject(ndx); }

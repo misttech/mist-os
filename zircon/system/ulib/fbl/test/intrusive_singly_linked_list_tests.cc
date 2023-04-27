@@ -144,6 +144,11 @@ RUN_ZXTEST(SinglyLinkedListTest, UPDDTE,  MakeIterator)
 RUN_ZXTEST(SinglyLinkedListTest, UPCDTE,  MakeIterator)
 RUN_ZXTEST(SinglyLinkedListTest, RPTE,    MakeIterator)
 
+RUN_ZXTEST(SinglyLinkedListTest, UMTE,    MaterializeIterator)
+RUN_ZXTEST(SinglyLinkedListTest, UPDDTE,  MaterializeIterator)
+RUN_ZXTEST(SinglyLinkedListTest, UPCDTE,  MaterializeIterator)
+RUN_ZXTEST(SinglyLinkedListTest, RPTE,    MaterializeIterator)
+
 // SinglyLinkedLists cannot iterate backwards.
 #if TEST_WILL_NOT_COMPILE || 0
 RUN_ZXTEST(SinglyLinkedListTest, UMTE,    ReverseIterErase)

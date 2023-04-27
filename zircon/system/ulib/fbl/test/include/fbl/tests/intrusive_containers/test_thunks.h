@@ -33,6 +33,7 @@ struct TestThunks {
   MAKE_TEST_THUNK(NodeRemoveFromContainer)
   MAKE_TEST_THUNK(GlobalRemoveFromContainer)
   MAKE_TEST_THUNK(MakeIterator)
+  MAKE_TEST_THUNK(MaterializeIterator)
   MAKE_TEST_THUNK(ReverseIterate)
   MAKE_TEST_THUNK(ReverseIterErase)
   MAKE_TEST_THUNK(Swap)
