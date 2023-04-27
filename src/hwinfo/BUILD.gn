@@ -195,29 +195,26 @@ resource("hwinfo_tests_factory_config") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-config_data("hwinfo_tests_config") {
-  for_pkg = "hwinfo_positive_tests"
-
+resource("hwinfo_tests_config") {
   sources = [
     "testdata/board_config.json",
     "testdata/product_config.json",
   ]
+  outputs = [ "hwinfo_positive_tests/{{source_file_part}}" ]
 }
 
-config_data("hwinfo_retail_tests_factory_config") {
-  for_pkg = "fake_factory_store_providers"
-
+resource("hwinfo_retail_tests_factory_config") {
   sources =
       [ "testdata/fuchsia.factory.MiscFactoryStoreProvider_retail.config" ]
+  outputs = [ "fake_factory_store_providers/{{source_file_part}}" ]
 }
 
-config_data("hwinfo_retail_tests_config") {
-  for_pkg = "hwinfo_retail_tests"
-
+resource("hwinfo_retail_tests_config") {
   sources = [
     "testdata/board_config.json",
     "testdata/product_config.json",
   ]
+  outputs = [ "hwinfo_retail_tests/{{source_file_part}}" ]
 }
 
 group("tests") {
