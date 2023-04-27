@@ -84,7 +84,9 @@ test("goldfish-unittests") {
     "//sdk/lib/syslog/cpp:backend",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/no_ddk",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings

@@ -1,7 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include "display.h"
+
+#include "src/graphics/display/drivers/goldfish-display/display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -16,7 +17,9 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/vector.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace goldfish {
 
@@ -34,7 +37,7 @@ class FakeAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
 class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe> {};
 
-class GoldfishDisplayTest : public zxtest::Test {
+class GoldfishDisplayTest : public testing::Test {
  public:
   GoldfishDisplayTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
@@ -125,7 +128,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_USE_PRIMARY, results_[i][0] & CLIENT_USE_PRIMARY);
   }
 }
@@ -141,7 +144,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerCursor) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_USE_PRIMARY, results_[i][0] & CLIENT_USE_PRIMARY);
   }
 }
@@ -174,7 +177,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(0, result_count_[i]);
+    EXPECT_EQ(0u, result_count_[i]);
     if (result_count_[i] != 0) {
       printf("Results: 0x%x\n", results_[i][0]);
     }
@@ -207,7 +210,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_FRAME_SCALE, results_[i][0]);
   }
 }
@@ -238,7 +241,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_SRC_FRAME, results_[i][0]);
   }
 }
@@ -270,7 +273,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_ALPHA, results_[i][0]);
   }
 }
@@ -302,7 +305,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_TRANSFORM, results_[i][0]);
   }
 }
@@ -334,7 +337,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(0, result_count_[i]);
+    EXPECT_EQ(0u, result_count_[i]);
     // TODO(payamm): For now, driver will pretend it supports color conversion
     // EXPECT_EQ(1, result_count_[i]);
     // EXPECT_EQ(CLIENT_COLOR_CONVERSION, results_[i][0]);
@@ -370,7 +373,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    EXPECT_EQ(1, result_count_[i]);
+    EXPECT_EQ(1u, result_count_[i]);
     EXPECT_EQ(CLIENT_FRAME_SCALE, results_[i][0] & CLIENT_FRAME_SCALE);
     EXPECT_EQ(CLIENT_SRC_FRAME, results_[i][0] & CLIENT_SRC_FRAME);
     EXPECT_EQ(CLIENT_ALPHA, results_[i][0] & CLIENT_ALPHA);
