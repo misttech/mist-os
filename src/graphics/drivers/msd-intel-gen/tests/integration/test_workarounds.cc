@@ -43,7 +43,7 @@ class TestConnection : public magma::TestDeviceBase {
     uint32_t context_id;
     ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id));
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     uint64_t size;
     magma_buffer_t batch_buffer;
@@ -93,7 +93,7 @@ class TestConnection : public magma::TestDeviceBase {
     magma_connection_release_buffer(connection_, batch_buffer);
     magma_connection_release_context(connection_, context_id);
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
   }
 
   bool ReadBufferAt(magma_buffer_t buffer, size_t size, uint32_t dword_offset,

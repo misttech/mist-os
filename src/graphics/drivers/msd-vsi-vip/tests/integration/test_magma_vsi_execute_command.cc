@@ -253,7 +253,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     static constexpr uint32_t kTimeoutMs = 1000;
     ExecuteCommand(command_stream, kTimeoutMs);
 
-    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(magma_vsi_.GetConnection()));
+    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_flush(magma_vsi_.GetConnection()));
   }
 
   void TestHang() {
@@ -268,7 +268,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     static constexpr uint32_t kTimeoutMs = 7000;
     ExecuteCommand(command_stream, kTimeoutMs);
 
-    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(magma_vsi_.GetConnection()));
+    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_flush(magma_vsi_.GetConnection()));
   }
 
  private:

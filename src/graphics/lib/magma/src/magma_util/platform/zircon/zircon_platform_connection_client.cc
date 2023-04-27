@@ -456,37 +456,33 @@ void PrimaryWrapper::UpdateFlowControl(uint64_t new_bytes) {
   inflight_bytes_ += new_bytes;
 }
 
-magma_status_t PrimaryWrapper::Flush() {
-  auto result = client_.sync()->Flush();
-  return magma::FromZxStatus(result.status()).get();
-}
-
-magma_status_t PrimaryWrapper::GetError() {
+magma_status_t PrimaryWrapper::GetError(bool flush) {
   std::lock_guard<std::mutex> lock(get_error_lock_);
   if (error_ != MAGMA_STATUS_OK)
     return error_;
 
-  auto result = client_.sync()->Flush();
+  if (flush) {
+    auto status = client_.sync()->Flush();
+    if (!status.ok()) {
+      // Should only happen if the connection is closed; we process the
+      // unbind_info below.
+      DMESSAGE("GetError: Flush returned error %d", status.status());
+    }
+  }
 
-  if (!result.ok()) {
-    // Only run the loop if the channel has been closed - we don't want to process any
-    // incoming flow control events here.
-    DASSERT(result.status() == ZX_ERR_PEER_CLOSED || result.status() == ZX_ERR_CANCELED);
+  // Ensure no other threads are waiting for async events via flow control
+  std::lock_guard<std::mutex> loop_lock(flow_control_mutex_);
 
-    // Ensure no other threads are waiting for async events via flow control
-    std::lock_guard<std::mutex> loop_lock(flow_control_mutex_);
+  // Run the loop to process any unbind
+  loop_.RunUntilIdle();
 
-    // Run the loop to process the unbind
-    loop_.RunUntilIdle();
+  auto unbind_info_optional = unbind_info_;
 
-    auto unbind_info = unbind_info_;
-    DASSERT(unbind_info);
-    if (unbind_info) {
-      DMESSAGE("Primary protocol unbind_info: %s", unbind_info->FormatDescription().c_str());
-      error_ = MAGMA_STATUS_INTERNAL_ERROR;
-      if (unbind_info->is_peer_closed()) {
-        error_ = magma::FromZxStatus(unbind_info->status()).get();
-      }
+  if (unbind_info_optional) {
+    DMESSAGE("Primary protocol unbind_info: %s", unbind_info_optional->FormatDescription().c_str());
+    error_ = MAGMA_STATUS_INTERNAL_ERROR;
+    if (unbind_info_optional->is_peer_closed()) {
+      error_ = magma::FromZxStatus(unbind_info_optional->status()).get();
     }
   }
 
@@ -636,12 +632,14 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
 
   magma_status_t GetError() override {
     DLOG("ZirconPlatformConnectionClient: GetError");
-    return client_.GetError();
+    constexpr bool kFlush = false;
+    return client_.GetError(kFlush);
   }
 
   magma_status_t Flush() override {
     DLOG("ZirconPlatformConnectionClient: Flush");
-    return client_.Flush();
+    constexpr bool kFlush = true;
+    return client_.GetError(kFlush);
   }
 
   magma_status_t MapBuffer(uint64_t buffer_id, uint64_t hw_va, uint64_t offset, uint64_t length,

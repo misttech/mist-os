@@ -168,7 +168,7 @@ class TestPlatformConnection {
     EXPECT_TRUE(buf->duplicate_handle(&handle));
     EXPECT_EQ(client_connection_->ImportObject(handle, magma::PlatformObject::BUFFER, buf->id()),
               MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(1, buf->size());
   }
 
@@ -181,7 +181,7 @@ class TestPlatformConnection {
     EXPECT_TRUE(buf->duplicate_handle(&handle));
     EXPECT_EQ(client_connection_->ImportObject(handle, magma::PlatformObject::BUFFER, buf->id()),
               MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(1, buf->size());
   }
 
@@ -197,7 +197,7 @@ class TestPlatformConnection {
     EXPECT_EQ(client_connection_->ReleaseObject(shared_data_->test_buffer_id,
                                                 magma::PlatformObject::BUFFER),
               MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(2, buf->size());
   }
 
@@ -212,7 +212,7 @@ class TestPlatformConnection {
     EXPECT_EQ(
         client_connection_->ImportObject(handle, magma::PlatformObject::SEMAPHORE, semaphore->id()),
         MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
   }
 
@@ -227,7 +227,7 @@ class TestPlatformConnection {
     EXPECT_EQ(
         client_connection_->ImportObject(handle, magma::PlatformObject::SEMAPHORE, semaphore->id()),
         MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
   }
 
@@ -245,7 +245,7 @@ class TestPlatformConnection {
     EXPECT_EQ(client_connection_->ReleaseObject(shared_data_->test_semaphore_id,
                                                 magma::PlatformObject::SEMAPHORE),
               MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(2, 0);
   }
 
@@ -253,7 +253,7 @@ class TestPlatformConnection {
     FlowControlInit();
     uint32_t context_id;
     client_connection_->CreateContext(&context_id);
-    EXPECT_EQ(client_connection_->GetError(), 0);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
     EXPECT_EQ(shared_data_->test_context_id, context_id);
   }
@@ -261,13 +261,13 @@ class TestPlatformConnection {
   void TestDestroyContext() {
     FlowControlInit();
     client_connection_->DestroyContext(shared_data_->test_context_id);
-    EXPECT_EQ(client_connection_->GetError(), 0);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheckOneMessage();
   }
 
   void TestGetError() {
     FlowControlSkip();
-    EXPECT_EQ(client_connection_->GetError(), 0);
+    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
     shared_data_->test_complete = true;
   }
 
@@ -302,7 +302,7 @@ class TestPlatformConnection {
     EXPECT_EQ(client_connection_->BufferRangeOp(buf->id(), MAGMA_BUFFER_RANGE_OP_DEPOPULATE_TABLES,
                                                 1000, 2000),
               MAGMA_STATUS_OK);
-    EXPECT_EQ(client_connection_->GetError(), 0);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(5, buf->size());
   }
 
@@ -371,17 +371,17 @@ class TestPlatformConnection {
     uint64_t messages_sent = 0;
     client_connection_->ExecuteImmediateCommands(shared_data_->test_context_id,
                                                  kImmediateCommandCount, commands, &messages_sent);
-    EXPECT_EQ(client_connection_->GetError(), 0);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(messages_sent, 0);
   }
 
-  void TestMultipleGetError() {
+  void TestMultipleFlush() {
     FlowControlSkip();
 
     std::vector<std::thread> threads;
     for (uint32_t i = 0; i < 1000; i++) {
       threads.push_back(
-          std::thread([this]() { EXPECT_EQ(MAGMA_STATUS_OK, client_connection_->GetError()); }));
+          std::thread([this]() { EXPECT_EQ(MAGMA_STATUS_OK, client_connection_->Flush()); }));
     }
 
     for (auto& thread : threads) {
@@ -411,7 +411,7 @@ class TestPlatformConnection {
     EXPECT_EQ(MAGMA_STATUS_OK, client_connection_->EnablePerformanceCounterAccess(
                                    magma::PlatformHandle::Create(handle)));
 
-    EXPECT_EQ(client_connection_->GetError(), 0);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     {
       std::unique_lock<std::mutex> lock(shared_data_->mutex);
       zx_info_handle_basic_t handle_info{};
@@ -433,9 +433,9 @@ class TestPlatformConnection {
     std::unique_ptr<magma::PlatformPerfCountPoolClient> pool;
     EXPECT_EQ(MAGMA_STATUS_OK, client_connection_->CreatePerformanceCounterBufferPool(&pool).get());
 
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
 
-    // The GetError() above should wait until the performance counter completion event sent in
+    // The Flush() above should wait until the performance counter completion event sent in
     // CreatePerformanceCounterBufferPool is sent and therefore readable.
     {
       std::lock_guard<std::mutex> lock(shared_data_->mutex);
@@ -459,7 +459,7 @@ class TestPlatformConnection {
               client_connection_->RemovePerformanceCounterBufferFromPool(1, 2).get());
     EXPECT_EQ(MAGMA_STATUS_OK, client_connection_->ClearPerformanceCounters(&counter, 1).get());
     EXPECT_EQ(MAGMA_STATUS_OK, client_connection_->DumpPerformanceCounters(1, 2).get());
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
 
     // The CreatePerformanceCounterBufferPool implementation threw away the server side, so the
     // client should be able to detect that.
@@ -467,7 +467,7 @@ class TestPlatformConnection {
               pool->ReadPerformanceCounterCompletion(&trigger_id, &buffer_id, &buffer_offset, &time,
                                                      &result_flags)
                   .get());
-    EXPECT_EQ(client_connection_->GetError(), MAGMA_STATUS_OK);
+    EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(7, 0);
   }
 
@@ -858,10 +858,10 @@ TEST(PlatformConnection, ExecuteImmediateCommands) {
   Test->TestExecuteImmediateCommands();
 }
 
-TEST(PlatformConnection, MultipleGetError) {
+TEST(PlatformConnection, MultipleFlush) {
   auto Test = TestPlatformConnection::Create();
   ASSERT_NE(Test, nullptr);
-  Test->TestMultipleGetError();
+  Test->TestMultipleFlush();
 }
 
 TEST(PlatformConnection, EnablePerformanceCounters) {

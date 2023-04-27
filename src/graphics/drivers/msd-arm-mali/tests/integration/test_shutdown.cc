@@ -36,7 +36,7 @@ class TestConnection : public magma::TestDeviceBase {
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
-    status = magma_connection_get_error(connection_);
+    status = magma_connection_flush(connection_);
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
@@ -44,7 +44,7 @@ class TestConnection : public magma::TestDeviceBase {
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
-    status = magma_connection_get_error(connection_);
+    status = magma_connection_flush(connection_);
     return DRET(status);
   }
 

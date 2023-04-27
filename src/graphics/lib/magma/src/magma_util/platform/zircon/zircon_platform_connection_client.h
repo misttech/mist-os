@@ -50,10 +50,8 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
   magma_status_t DumpPerformanceCounters(uint64_t pool_id, uint32_t trigger_id);
   magma_status_t ClearPerformanceCounters(fidl::VectorView<uint64_t> counters);
 
-  // Skipped for GetError, Flush, Sync
-  magma_status_t GetError();
-  magma_status_t Flush();
-  magma_status_t Sync();
+  // Skipped for GetError
+  magma_status_t GetError(bool flush);
 
   auto IsPerformanceCounterAccessAllowed() {
     return client_.sync()->IsPerformanceCounterAccessAllowed();

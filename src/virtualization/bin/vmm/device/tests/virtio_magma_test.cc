@@ -527,10 +527,10 @@ TEST_F(VirtioMagmaTest, HandleConnectionMethod) {
   uint64_t connection{};
   ASSERT_NO_FATAL_FAILURE(CreateConnection(device, &connection));
   {  // Try to call a method on the connection
-    virtio_magma_connection_get_error_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_GET_ERROR;
+    virtio_magma_connection_flush_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_FLUSH;
     request.connection = connection;
-    virtio_magma_connection_get_error_resp_t response{};
+    virtio_magma_connection_flush_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -545,7 +545,7 @@ TEST_F(VirtioMagmaTest, HandleConnectionMethod) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_GET_ERROR);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_FLUSH);
     EXPECT_EQ(response.hdr.flags, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
   }

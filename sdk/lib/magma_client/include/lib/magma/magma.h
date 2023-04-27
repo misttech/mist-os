@@ -91,9 +91,9 @@ MAGMA_EXPORT void magma_connection_release(
     magma_connection_t connection);
 
 ///
-/// \brief When a system driver error occurs, the connection will be closed, and interfaces can
-///        return MAGMA_STATUS_CONNECTION_LOST.  In that case, this returns the system driver error.
-///        This may incur a round-trip sync.
+/// \brief If a system driver error occurs, the connection will be closed, and this interface will
+///        eventually return the error. This interface does not flush messages that may be pending
+///        (see magma_connection_flush).
 /// \param connection An open connection.
 ///
 MAGMA_EXPORT magma_status_t magma_connection_get_error(
@@ -260,7 +260,8 @@ MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
 
 ///
 /// \brief Incurs a round-trip to the system driver, used to ensure all previous messages have been
-///        observed, but not necessarily completed.
+///        observed, but not necessarily completed.  If a system driver error occurs, the connection
+///        will be closed, and this interface will return the error.
 /// \param connection An open connection.
 ///
 MAGMA_EXPORT magma_status_t magma_connection_flush(

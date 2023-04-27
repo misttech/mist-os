@@ -50,7 +50,7 @@ class TestConnection : public magma::TestDeviceBase {
     if (!status.ok())
       return DRET(status.get());
 
-    status = magma_connection_get_error(connection_);
+    status = magma_connection_flush(connection_);
     if (!status.ok())
       return DRET(status.get());
 
@@ -99,7 +99,7 @@ class TestConnection : public magma::TestDeviceBase {
     magma_connection_release_context(connection_, context_id);
     magma_connection_release_buffer(connection_, batch_buffer);
 
-    status = magma_connection_get_error(connection_);
+    status = magma_connection_flush(connection_);
     return DRET(status.get());
   }
 

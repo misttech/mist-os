@@ -90,7 +90,7 @@ class TestConnection : public magma::TestDeviceBase {
     switch (how) {
       case NORMAL:
         EXPECT_TRUE(list.WaitForCompletion(connection_, kOneSecondInNs));
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
         EXPECT_EQ(kValue, reinterpret_cast<uint32_t*>(vaddr)[buffer_size / 4 - 1]);
         break;
       case FAULT: {
@@ -99,11 +99,11 @@ class TestConnection : public magma::TestDeviceBase {
         while (std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() -
                                                          start)
                    .count() < 2000) {
-          if (magma_connection_get_error(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
+          if (magma_connection_flush(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
             break;
           }
         }
-        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_flush(connection_));
         EXPECT_TRUE(list.WaitForCompletion(connection_, kOneSecondInNs));
         EXPECT_EQ(0xdeadbeef, reinterpret_cast<uint32_t*>(vaddr)[buffer_size / 4 - 1]);
         break;
@@ -113,11 +113,11 @@ class TestConnection : public magma::TestDeviceBase {
         while (std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() -
                                                          start)
                    .count() < 2000) {
-          if (magma_connection_get_error(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
+          if (magma_connection_flush(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
             break;
           }
         }
-        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_flush(connection_));
         EXPECT_TRUE(list.WaitForCompletion(connection_, kOneSecondInNs));
         EXPECT_EQ(kValue, reinterpret_cast<uint32_t*>(vaddr)[buffer_size / 4 - 1]);
         break;

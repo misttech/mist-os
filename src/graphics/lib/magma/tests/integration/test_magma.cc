@@ -238,20 +238,20 @@ class TestConnection {
 
     uint32_t context_id[2];
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id[0]));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id[1]));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     magma_connection_release_context(connection_, context_id[0]);
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     magma_connection_release_context(connection_, context_id[1]);
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     // Already released
     magma_connection_release_context(connection_, context_id[1]);
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
   }
 
   void NotificationChannelHandle() {
@@ -322,7 +322,7 @@ class TestConnection {
     constexpr uint64_t kGpuAddress = 0x1000;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, kGpuAddress, buffer, 0,
                                                            size, MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     {
       uint64_t vendor_id;
@@ -331,7 +331,7 @@ class TestConnection {
       // Unmap not implemented on Intel
       if (vendor_id != 0x8086) {
         magma_connection_unmap_buffer(connection_, kGpuAddress, buffer);
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
       }
     }
 
@@ -340,7 +340,7 @@ class TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_map_buffer(connection_, 0, buffer, kInvalidPageOffset * page_size(),
                                           size, MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
 
     magma_connection_release_buffer(connection_, buffer);
   }
@@ -370,14 +370,14 @@ class TestConnection {
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, kGpuAddress, buffer[0], 0,
                                                            size, MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_map_buffer(connection_, kGpuAddress + size / 2, buffer[1], 0, size,
                                           MAGMA_MAP_FLAG_READ));
 
     {
-      magma_status_t status = magma_connection_get_error(connection_);
+      magma_status_t status = magma_connection_flush(connection_);
       if (status != MAGMA_STATUS_INVALID_ARGS)
         EXPECT_EQ(MAGMA_STATUS_INTERNAL_ERROR, status);
     }
@@ -431,13 +431,13 @@ class TestConnection {
                                                              size, MAGMA_MAP_FLAG_READ))
           << "i " << i;
 
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_)) << "i " << i;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_)) << "i " << i;
 
       if (!is_intel_or_vsi) {
         ASSERT_EQ(MAGMA_STATUS_OK,
                   magma_connection_perform_buffer_op(
                       connection_, buffer2, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0, size));
-        ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_)) << "i " << i;
+        ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_)) << "i " << i;
       }
 
       imported_buffers.push_back(buffer2);
@@ -450,7 +450,7 @@ class TestConnection {
       if (!is_intel_or_vsi)
         magma_connection_unmap_buffer(connection_, imported_addrs[i], imported_buffers[i]);
 
-      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
       magma_connection_release_buffer(connection_, imported_buffers[i]);
     }
@@ -458,8 +458,14 @@ class TestConnection {
     magma_connection_release_buffer(connection_, buffer);
   }
 
-  void BufferMapInvalid() {
+  void BufferMapInvalid(bool flush) {
     ASSERT_TRUE(connection_);
+
+    if (flush) {
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
+    } else {
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    }
 
     uint64_t size = page_size();
     uint64_t actual_size;
@@ -474,7 +480,23 @@ class TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_map_buffer(connection_, 0, buffer, kInvalidPageOffset * page_size(),
                                           size, MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
+
+    if (flush) {
+      EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
+    } else {
+      std::vector<magma_poll_item_t> items({{
+          .handle = magma_connection_get_notification_channel_handle(connection_),
+          .type = MAGMA_POLL_TYPE_HANDLE,
+          .condition = MAGMA_POLL_CONDITION_READABLE,
+      }});
+
+      constexpr uint64_t kTimeoutNs = std::numeric_limits<uint64_t>::max();
+
+      EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST,
+                magma_poll(items.data(), to_uint32(items.size()), kTimeoutNs));
+
+      EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
+    }
 
     magma_connection_release_buffer(connection_, buffer);
   }
@@ -817,7 +839,7 @@ class TestConnection {
 
     uint32_t context_id;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
     uint64_t some_pattern = 0xabcd12345678beef;
     uint64_t invalid_semaphore_id = 0;
@@ -831,7 +853,7 @@ class TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(
                                    connection_, context_id, 1, &inline_command_buffer));
     // Invalid semaphore ID prevents execution of pattern data
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
 
     magma_connection_release_context(connection_, context_id);
   }
@@ -1264,7 +1286,7 @@ class TestConnection {
 
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_enable_performance_counters(connection_, &counter, 1));
-    EXPECT_EQ(MAGMA_STATUS_ACCESS_DENIED, magma_connection_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_ACCESS_DENIED, magma_connection_flush(connection_));
 
     magma_connection_release_buffer(connection_, buffer);
     magma_connection_release_semaphore(connection_, semaphore);
@@ -1312,7 +1334,7 @@ class TestConnectionWithContext : public TestConnection {
               magma_connection_execute_command(connection(), context_id(), &descriptor));
 
     // Command buffer is mostly zeros, so we expect an error here
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection()));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection()));
   }
 
   void ExecuteCommandNoResources() {
@@ -1324,7 +1346,7 @@ class TestConnectionWithContext : public TestConnection {
               magma_connection_execute_command(connection(), context_id(), &descriptor));
 
     // Empty command buffers may or may not be valid.
-    magma_status_t status = magma_connection_get_error(connection());
+    magma_status_t status = magma_connection_flush(connection());
     EXPECT_TRUE(status == MAGMA_STATUS_OK || status == MAGMA_STATUS_INVALID_ARGS ||
                 status == MAGMA_STATUS_UNIMPLEMENTED)
         << "status: " << status;
@@ -1346,7 +1368,7 @@ class TestConnectionWithContext : public TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection(), context_id(), &descriptor));
 
-    EXPECT_EQ(magma_connection_get_error(connection()), MAGMA_STATUS_UNIMPLEMENTED);
+    EXPECT_EQ(magma_connection_flush(connection()), MAGMA_STATUS_UNIMPLEMENTED);
   }
 
  private:
@@ -1453,9 +1475,14 @@ TEST_F(Magma, BufferMap) {
   test.BufferMap();
 }
 
-TEST_F(Magma, BufferMapInvalid) {
+TEST_F(Magma, BufferMapInvalidFlush) {
   TestConnection test;
-  test.BufferMapInvalid();
+  test.BufferMapInvalid(/*flush=*/true);
+}
+
+TEST_F(Magma, BufferMapInvalidGetError) {
+  TestConnection test;
+  test.BufferMapInvalid(/*flush=*/false);
 }
 
 TEST_F(Magma, BufferMapOverlapError) {

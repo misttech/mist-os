@@ -96,7 +96,7 @@
                 "ordinal": 5,
                 "name": "magma_connection_get_error",
                 "type": "magma_status_t",
-                "description": "When a system driver error occurs, the connection will be closed, and interfaces can return MAGMA_STATUS_CONNECTION_LOST.  In that case, this returns the system driver error.  This may incur a round-trip sync.",
+                "description": "If a system driver error occurs, the connection will be closed, and this interface will eventually return the error. This interface does not flush messages that may be pending (see magma_connection_flush).",
                 "arguments": [
                     {
                         "name": "connection",
@@ -443,7 +443,7 @@
                 "ordinal": 79,
                 "name": "magma_connection_flush",
                 "type": "magma_status_t",
-                "description": "Incurs a round-trip to the system driver, used to ensure all previous messages have been observed, but not necessarily completed.",
+                "description": "Incurs a round-trip to the system driver, used to ensure all previous messages have been observed, but not necessarily completed.  If a system driver error occurs, the connection will be closed, and this interface will return the error.",
                 "arguments": [
                     {
                         "name": "connection",
