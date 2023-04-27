@@ -198,22 +198,41 @@ class RustRemoteAction(object):
         self._cleanup_files: Sequence[Path] = []
         self._prepare_status: int = None  # 0 means success, like an exit code
 
+    @property
+    def _c_sysroot_is_outside_exec_root(self) -> bool:
+        c_sysroot_dir = self.c_sysroot
+        if not c_sysroot_dir:
+            return False  # not applicable
+
+        if not c_sysroot_dir.is_absolute():
+            # C sysroot is relative to the working directory
+            return False
+
+        # Check all absolute path parents.
+        return self.exec_root not in c_sysroot_dir.parents
+
     def _remote_disqualified(self):
         """Detects when the action cannot run remotely for various reasons."""
         # If the C sysroot is outside of exec_root, (e.g. an absolute path
         # like /Library/Developer/... for Mac OS SDKs) then the command
         # will only work locally.
         if self.needs_linker:
-            c_sysroot_dir = self.c_sysroot
-            if c_sysroot_dir:
-                if self.exec_root not in c_sysroot_dir.parents:
-                    return True
+            if self._c_sysroot_is_outside_exec_root:
+                if self.verbose:
+                    msg(
+                        f'Forcing local execution because C sysroot ({self.c_sysroot}) is outside of exec_root ({self.exec_root}).'
+                    )
+                return True
 
         # TODO: procedural macros need to target the host AND the remote
         # platform to be usable both locally and remotely.
         # For now, only build with procedural macros locally.
         if any(path.suffix == '.dylib'
                for path in self._rust_action.externs.values()):
+            if self.verbose:
+                msg(
+                    f'Forcing local execution because one of the externs points to a .dylib, which does not work in the remote environment.'
+                )
             return True
 
         return False
@@ -668,7 +687,7 @@ class RustRemoteAction(object):
         if not c_sysroot_dir:
             return
         # if sysroot points outside of exec_root, stop
-        if self.exec_root not in c_sysroot_dir.parents:
+        if self._c_sysroot_is_outside_exec_root:
             return
         sysroot_triple = fuchsia.rustc_target_to_sysroot_triple(self.target)
         if c_sysroot_dir:

@@ -511,6 +511,62 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             )
             self.assertEqual(r.target_linker_prefix, ld)
 
+    def test_remote_mode_ok_with_relative_c_sysroot(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/host-platform/bin/rustc')
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        c_sysroot = Path('generated/sys/root')  # relative
+        target = 'aarch64-unknown-linux-gnu'
+        command = _strs(
+            [
+                compiler, source, '-o', rlib, '--crate-type=bin',
+                f'--target={target}', f'-Clink-arg=--sysroot={c_sysroot}'
+            ])
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            auto_reproxy=False,
+        )
+        self.assertEqual(r.c_sysroot, c_sysroot)
+        self.assertFalse(r._c_sysroot_is_outside_exec_root)
+        self.assertTrue(r.needs_linker)
+        self.assertFalse(r._remote_disqualified())
+        self.assertFalse(r.local_only)
+        sysroot_files = list(r._c_sysroot_files())
+        self.assertNotEqual(sysroot_files, [])
+
+    def test_forced_local_mode_ok_with_external_absolute_c_sysroot(self):
+        exec_root = Path('/home/project')
+        working_dir = exec_root / 'build-here'
+        compiler = Path('../tools/host-platform/bin/rustc')
+        source = Path('../foo/src/lib.rs')
+        rlib = Path('obj/foo.rlib')
+        c_sysroot = Path('/fancy/pants/local/SDK')  # absolute, external
+        target = 'aarch64-unknown-linux-gnu'
+        command = _strs(
+            [
+                compiler, source, '-o', rlib, '--crate-type=bin',
+                f'--target={target}', f'-Clink-arg=--sysroot={c_sysroot}'
+            ])
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            auto_reproxy=False,
+        )
+        self.assertEqual(r.c_sysroot, c_sysroot)
+        self.assertTrue(r._c_sysroot_is_outside_exec_root)
+        self.assertTrue(r.needs_linker)
+        self.assertTrue(r._remote_disqualified())
+        self.assertTrue(r.local_only)
+        with mock.patch.object(fuchsia, 'c_sysroot_files') as mock_files:
+            sysroot_files = list(r._c_sysroot_files())
+        self.assertEqual(sysroot_files, [])
+        mock_files.assert_not_called()
+
     def test_cdylib_rust_lld(self):
         exec_root = Path('/home/project')
         working_dir = exec_root / 'build-here'
