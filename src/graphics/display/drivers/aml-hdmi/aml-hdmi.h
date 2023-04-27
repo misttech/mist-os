@@ -38,6 +38,13 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
 
   explicit AmlHdmiDevice(zx_device_t* parent);
 
+  // For unit testing
+  //
+  // `mmio` is the region documented as HDMITX in Section 8.1 "Memory Map" of
+  // the AMLogic A311D datasheet.
+  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
+                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw);
+
   AmlHdmiDevice(const AmlHdmiDevice&) = delete;
   AmlHdmiDevice(AmlHdmiDevice&&) = delete;
   AmlHdmiDevice& operator=(const AmlHdmiDevice&) = delete;
@@ -86,17 +93,9 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   void PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) override;
 
  private:
-  friend class FakeAmlHdmiDevice;
   enum {
     MMIO_HDMI,
   };
-
-  // For unit testing
-  //
-  // `mmio` is the region documented as HDMITX in Section 8.1 "Memory Map" of
-  // the AMLogic A311D datasheet.
-  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
-                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw);
 
   void WriteIpReg(uint32_t addr, uint32_t data) override {
     fbl::AutoLock lock(&register_lock_);
@@ -119,7 +118,6 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   std::optional<fdf::MmioBuffer> hdmitx_mmio_ TA_GUARDED(register_lock_);
 
   bool is_powered_up_ = false;
-  bool loop_started_ = false;
 
   std::optional<component::OutgoingDirectory> outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_hdmi::Hdmi> bindings_;
