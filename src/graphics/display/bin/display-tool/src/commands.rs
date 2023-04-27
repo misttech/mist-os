@@ -7,6 +7,7 @@ use {
     display_utils::{Controller, PixelFormat},
 };
 
+mod display_color_layer;
 mod double_buffered_fence_loop;
 mod static_config_vsync_loop;
 
@@ -50,6 +51,30 @@ pub async fn vsync(
         static_config_vsync_loop::Args { display, color, pixel_format },
     )
     .await
+}
+
+pub async fn color(
+    controller: &Controller,
+    id: Option<u64>,
+    color: Rgb888,
+    pixel_format: PixelFormat,
+) -> Result<()> {
+    let displays = controller.displays();
+    if displays.is_empty() {
+        return Err(format_err!("no displays found"));
+    }
+
+    let display = match id {
+        // Pick the first available display if no ID was specified.
+        None => &displays[0],
+        Some(id) => displays
+            .iter()
+            .find(|d| d.id().0 == id)
+            .ok_or_else(|| format_err!("display with id '{}' not found", id))?,
+    };
+
+    display_color_layer::run(controller, display_color_layer::Args { display, color, pixel_format })
+        .await
 }
 
 pub async fn squares(controller: &Controller, id: Option<u64>) -> Result<()> {

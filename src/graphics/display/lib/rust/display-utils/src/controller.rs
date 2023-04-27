@@ -248,6 +248,14 @@ impl Controller {
         proxy.apply_config().map_err(ConfigError::from)
     }
 
+    /// Get the config stamp value of the most recent applied config in
+    /// `apply_config`. Returns an error if the FIDL message cannot be sent.
+    pub async fn get_recent_applied_config_stamp(&self) -> std::result::Result<u64, Error> {
+        let proxy = self.proxy();
+        let response = proxy.get_latest_applied_config_stamp().await?;
+        Ok(response.value)
+    }
+
     /// Import a sysmem buffer collection. The returned `CollectionId` can be used in future API
     /// calls to refer to the imported collection.
     pub(crate) async fn import_buffer_collection(

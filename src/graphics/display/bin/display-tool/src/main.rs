@@ -57,6 +57,24 @@ struct VsyncArgs {
     pixel_format: PixelFormat,
 }
 
+/// Display a color layer on one display
+#[derive(FromArgs)]
+#[argh(subcommand, name = "color")]
+struct ColorArgs {
+    /// ID of the display to show
+    #[argh(positional)]
+    id: Option<u64>,
+
+    /// screen fill color, using CSS hex syntax (rrggbb) without a leading #.
+    /// Default to 0000ff.
+    #[argh(option, default = "Rgb888{r: 0x00, g: 0x00, b: 0xff}")]
+    color: Rgb888,
+
+    /// pixel format. Default to ARGB8888.
+    #[argh(option, default = "PixelFormat::Argb8888")]
+    pixel_format: PixelFormat,
+}
+
 /// Play a double buffered animation using fence synchronization.
 #[derive(FromArgs)]
 #[argh(subcommand, name = "squares")]
@@ -71,6 +89,7 @@ struct SquaresArgs {
 enum SubCommands {
     Info(InfoArgs),
     Vsync(VsyncArgs),
+    Color(ColorArgs),
     Squares(SquaresArgs),
 }
 
@@ -87,6 +106,9 @@ async fn main() -> Result<(), Error> {
             SubCommands::Info(args) => commands::show_display_info(&controller, args.id, args.fidl),
             SubCommands::Vsync(args) => {
                 commands::vsync(&controller, args.id, args.color, args.pixel_format).await
+            }
+            SubCommands::Color(args) => {
+                commands::color(&controller, args.id, args.color, args.pixel_format).await
             }
             SubCommands::Squares(args) => commands::squares(&controller, args.id).await,
         }
