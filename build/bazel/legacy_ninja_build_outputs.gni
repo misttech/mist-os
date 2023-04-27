@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_workspace.gni")
+import("//build/images/size_checker/size_checker_input.gni")
 import("//build/product.gni")
 import("//bundles/assembly/platform_aibs.gni")
 
@@ -41,6 +42,12 @@ gn_labels_for_bazel_inputs =
       "//build/info:build_info_version",
       "//sdk:core",
     ] + eng_platform_aib_labels
+
+if (size_checker_input != {
+    }) {
+  gn_labels_for_bazel_inputs +=
+      [ "//build/images/size_checker:size_checker_json_bazel_input" ]
+}
 
 _assembly_deps = [ "//build/images/zedboot:zedboot.bazel_legacy_aib" ]
 if (use_bringup_assembly) {

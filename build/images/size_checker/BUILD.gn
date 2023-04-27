@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_inputs.gni")
 import("//build/compiled_action.gni")
 import("//build/images/args.gni")
 import("//build/images/filesystem_limits.gni")
@@ -83,6 +84,12 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
     outputs = [ "$root_build_dir/size_checker.json" ]
     contents = size_checker_input
     output_conversion = "json"
+  }
+
+  bazel_input_resource("size_checker_json_bazel_input") {
+    sources = [ "${root_build_dir}/size_checker.json" ]
+    outputs = [ "size_checker.json" ]
+    deps = [ ":size_checker_json" ]
   }
 
   generated_file("update_package_budget_json") {
