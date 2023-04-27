@@ -10,8 +10,9 @@ use crate::arch::uapi::epoll_event;
 use crate::fs::{
     syscalls::{
         poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
-        sys_fchmodat, sys_fchownat, sys_inotify_init1, sys_mkdirat, sys_mknodat, sys_newfstatat,
-        sys_openat, sys_pipe2, sys_readlinkat, sys_renameat, sys_symlinkat, sys_unlinkat,
+        sys_fchmodat, sys_fchownat, sys_inotify_init1, sys_linkat, sys_mkdirat, sys_mknodat,
+        sys_newfstatat, sys_openat, sys_pipe2, sys_readlinkat, sys_renameat, sys_symlinkat,
+        sys_unlinkat,
     },
     DirentSink, DirentSink32, FdNumber,
 };
@@ -174,6 +175,21 @@ pub fn sys_lchown(
     group: gid_t,
 ) -> Result<(), Errno> {
     sys_fchownat(current_task, FdNumber::AT_FDCWD, user_path, owner, group, AT_SYMLINK_NOFOLLOW)
+}
+
+pub fn sys_link(
+    current_task: &CurrentTask,
+    old_user_path: UserCString,
+    new_user_path: UserCString,
+) -> Result<(), Errno> {
+    sys_linkat(
+        current_task,
+        FdNumber::AT_FDCWD,
+        old_user_path,
+        FdNumber::AT_FDCWD,
+        new_user_path,
+        0,
+    )
 }
 
 pub fn sys_lstat(

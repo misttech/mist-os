@@ -148,6 +148,7 @@ pub fn dispatch_syscall(
         kill[2],
         #[cfg(target_arch = "x86_64")] lchown[3],
         lgetxattr[4],
+        #[cfg(target_arch = "x86_64")] link[2],
         linkat[5],
         listen[2],
         listxattr[3],
