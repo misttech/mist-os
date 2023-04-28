@@ -161,6 +161,7 @@ group("tests") {
     "mdns:tests",
     "net-cli:tests",
     "netcfg:tests",
+    "netlink:tests",
 
     # Ensure this target doesn't rot. This dependency can be removed if the
     # target becomes load bearing elsewhere.
