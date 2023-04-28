@@ -20,6 +20,12 @@ namespace gigaboot {
 namespace {
 constexpr uint16_t kFbServerPort = 5554;
 
+// TODO(b/268532862): This needs to be large enough to hold the entire FVM image until we
+// implement sparse flashing support.
+constexpr size_t kPageSize = 4096;
+constexpr size_t kDownloadBufferSize = 4ULL * 1024 * 1024 * 1024;  // 4GB
+constexpr size_t kDownloadBufferPageCount = kDownloadBufferSize / kPageSize;
+
 zx::result<> TcpInitialize(tcp6_socket &fb_tcp_socket) {
   if (fb_tcp_socket.binding_protocol) {
     return zx::ok();
@@ -85,11 +91,20 @@ zx::result<> FastbootTcpMain() {
 
   TcpTransport transport(fb_tcp_socket);
   ZirconBootOps zb_ops = gigaboot::GetZirconBootOps();
-  fbl::Vector<uint8_t> download_buffer;
-  // TODO(b/268532862): This needs to be large enough to hold the entire FVM image until we
-  // implement sparse flashing support.
-  download_buffer.resize(4ULL * 1024 * 1024 * 1024);  // 4GB
-  Fastboot fastboot(download_buffer, zb_ops);
+
+  // Due to the size of this allocation, use AllocatePages directly.
+  // AllocatePool is not designed for allocations this size. Due to internal book keeping in some
+  // implementations it may take upwards of 10 seconds to allocate a huge buffer from the pool.
+  // operator new[] suffers the same issue as it delegates to AllocatePool.
+  efi_physical_addr download_buffer;
+  efi_status status = gEfiSystemTable->BootServices->AllocatePages(
+      AllocateAnyPages, EfiLoaderData, kDownloadBufferPageCount, &download_buffer);
+  if (status != EFI_SUCCESS) {
+    printf("Failed to allocate download buffer\n");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  Fastboot fastboot({reinterpret_cast<uint8_t *>(download_buffer), kDownloadBufferSize}, zb_ops);
 
   constexpr uint32_t namegen = 1;
   mdns_start(namegen, /* fastboot_tcp = */ true);
@@ -121,6 +136,8 @@ zx::result<> FastbootTcpMain() {
       printf("disconnected\n");
     }
   }
+
+  gEfiSystemTable->BootServices->FreePages(download_buffer, kDownloadBufferPageCount);
 
   mdns_stop(/* fastboot_tcp = */ true);
   while (true) {
