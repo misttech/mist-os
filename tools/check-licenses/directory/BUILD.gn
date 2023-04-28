@@ -12,9 +12,11 @@ go_library("directory") {
     "directory_test.go",
     "init.go",
     "metrics.go",
+    "readme.go",
   ]
   deps = [
     "//tools/check-licenses/project",
+    "//tools/check-licenses/project/readme",
     "//tools/lib/logger",
   ]
 }

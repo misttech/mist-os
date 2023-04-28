@@ -14,7 +14,7 @@ import (
 )
 
 // Create an spdx.Package struct that matches the given project struct.
-func (p *Project) setSPDXFields() error {
+func (p *Project) GenerateSPDXPackage() (*spdx.Package, error) {
 	h := fnv.New128a()
 	h.Write([]byte(fmt.Sprintf("%s %s", p.Root, p.Name)))
 	p.SPDXID = fmt.Sprintf("Package-%x", h.Sum([]byte{}))
@@ -55,7 +55,7 @@ func (p *Project) setSPDXFields() error {
 	pkg.PackageLicenseConcluded = ""
 
 	// Multiple files for a given project.
-	for i, l := range p.LicenseFile {
+	for i, l := range p.LicenseFiles {
 		statement := "("
 
 		// Note: We cannot easily find upstream URL links for a single NOTICE file.
@@ -64,7 +64,7 @@ func (p *Project) setSPDXFields() error {
 		} else {
 			ldata, err := l.Data()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			// Multiple license texts in a given license file.
 			for j, data := range ldata {
@@ -79,11 +79,10 @@ func (p *Project) setSPDXFields() error {
 		pkg.PackageLicenseConcluded = fmt.Sprintf("%s%s",
 			pkg.PackageLicenseConcluded, statement)
 
-		if i < len(p.LicenseFile)-1 {
+		if i < len(p.LicenseFiles)-1 {
 			pkg.PackageLicenseConcluded = fmt.Sprintf("%s AND ", pkg.PackageLicenseConcluded)
 		}
 	}
-
 	p.Package = pkg
-	return nil
+	return pkg, nil
 }

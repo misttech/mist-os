@@ -26,10 +26,10 @@ func AnalyzeLicenses() error {
 	for _, p := range filteredProjectsList {
 		plusVal(NumFilteredProjects, p.Root)
 		// Analyze the license files in each project.
-		sort.Sort(file.Order(p.LicenseFile))
-		for _, l := range p.LicenseFile {
+		sort.Sort(file.Order(p.LicenseFiles))
+		for _, l := range p.LicenseFiles {
 			if results, err := license.Search(p.Root, l); err != nil {
-				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmePath, err)
+				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmeFile.ReadmePath, err)
 			} else {
 				p.LicenseFileSearchResults = append(p.LicenseFileSearchResults, results...)
 				for _, r := range results {
@@ -52,14 +52,14 @@ func AnalyzeLicenses() error {
 		}
 
 		// Analyze the copyright headers in the files in each project.
-		sort.Sort(file.Order(p.SearchableFiles))
-		for _, f := range p.SearchableFiles {
+		sort.Sort(file.Order(p.SearchableRegularFiles))
+		for _, f := range p.SearchableRegularFiles {
 			text, _ := f.Text()
 			if len(text) == 0 {
 				continue
 			}
 			if results, err := license.SearchHeaders(p.Root, f); err != nil {
-				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmePath, err)
+				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmeFile.ReadmePath, err)
 			} else {
 				p.RegularFileSearchResults = append(p.RegularFileSearchResults, results...)
 			}

@@ -13,17 +13,14 @@
   "packages": [
     {
       "name": "PackageA",
-      "SPDXID": "SPDXRef-Package-PackageA",
+      "SPDXID": "SPDXRef-Package-e648bebe6e6034074976b5f02ee07c25",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
-      "licenseConcluded": "(LicenseRef-LICENSE-0)",
+      "licenseConcluded": "(LicenseRef-filedata-12345)",
       "licenseInfoFromFiles": [],
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
@@ -32,17 +29,14 @@
     },
     {
       "name": "PackageB",
-      "SPDXID": "SPDXRef-Package-PackageB",
+      "SPDXID": "SPDXRef-Package-95cd5fd83bd09ffc2a188f60bd1bec7e",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
-      "licenseConcluded": "(LicenseRef-LICENSE-0)",
+      "licenseConcluded": "",
       "licenseInfoFromFiles": [],
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
@@ -51,17 +45,14 @@
     },
     {
       "name": "PackageC",
-      "SPDXID": "SPDXRef-Package-PackageC",
+      "SPDXID": "SPDXRef-Package-86796a50f6d892cc59e75bc7e66cbebc",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
-      "licenseConcluded": "(LicenseRef-LICENSE-0)",
+      "licenseConcluded": "",
       "licenseInfoFromFiles": [],
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
@@ -70,32 +61,41 @@
     }
   ],
   "files": [],
-  "hasExtractedLicensingInfos": [],
+  "hasExtractedLicensingInfos": [
+    {
+      "name": "Example License File for PackageA",
+      "licenseId": "LicenseRef-filedata-12345",
+      "extractedText": "Example License Text for PackageA",
+      "seeAlsos": [
+        "www.example.com"
+      ]
+    }
+  ],
   "relationships": [
     {
       "spdxElementId": {
         "ElementRefID": "SPDXRef-DOCUMENT"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-PackageA"
+        "ElementRefID": "SPDXRef-Package-e648bebe6e6034074976b5f02ee07c25"
       },
       "relationshipType": "DESCRIBES"
     },
     {
       "spdxElementId": {
-        "ElementRefID": "SPDXRef-Package-PackageA"
+        "ElementRefID": "SPDXRef-Package-e648bebe6e6034074976b5f02ee07c25"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-PackageB"
+        "ElementRefID": "SPDXRef-Package-95cd5fd83bd09ffc2a188f60bd1bec7e"
       },
       "relationshipType": "CONTAINS"
     },
     {
       "spdxElementId": {
-        "ElementRefID": "SPDXRef-Package-PackageA"
+        "ElementRefID": "SPDXRef-Package-e648bebe6e6034074976b5f02ee07c25"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-PackageC"
+        "ElementRefID": "SPDXRef-Package-86796a50f6d892cc59e75bc7e66cbebc"
       },
       "relationshipType": "CONTAINS"
     }

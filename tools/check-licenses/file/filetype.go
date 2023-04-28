@@ -17,7 +17,7 @@ type FileType string
 
 const (
 	RegularFile          FileType = "Regular File"
-	SingleLicense                 = "Single License"
+	SingleLicense                 = "Single License File"
 	MultiLicenseChromium          = "Multi License Chromium"
 	MultiLicenseFlutter           = "Multi License Flutter"
 	MultiLicenseAndroid           = "Multi License Android"

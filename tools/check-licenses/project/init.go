@@ -12,11 +12,14 @@ import (
 	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
+	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
+	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/util"
 )
 
 var (
 	RootProject      *Project
+	UnknownProject   *Project
 	AllProjects      map[string]*Project
 	FilteredProjects map[string]*Project
 
@@ -32,6 +35,16 @@ func init() {
 	AllProjects = make(map[string]*Project, 0)
 	FilteredProjects = make(map[string]*Project, 0)
 	DedupedLicenseData = make([][]*file.FileData, 0)
+
+	UnknownProject = &Project{
+		Name:                            "unknown",
+		LicenseFiles:                    make([]*file.File, 0),
+		RegularFiles:                    make([]*file.File, 0),
+		SearchableRegularFiles:          make([]*file.File, 0),
+		Children:                        make(map[string]*Project, 0),
+		LicenseFileSearchResults:        make([]*license.SearchResult, 0),
+		LicenseFileSearchResultsDeduped: make(map[string]*license.SearchResult, 0),
+	}
 }
 
 func Initialize(c *ProjectConfig) error {
@@ -51,7 +64,7 @@ func Initialize(c *ProjectConfig) error {
 	}
 
 	Config = c
-	return initializeReadmes()
+	return initializeCustomReadmes()
 }
 
 // Projects are created using README.fuchsia files.
@@ -61,7 +74,7 @@ func Initialize(c *ProjectConfig) error {
 // You can setup custom README.fuchsia files in a special directory,
 // point to them in the config file, and they'll be parsed here
 // before the rest of check-licenses executes.
-func initializeReadmes() error {
+func initializeCustomReadmes() error {
 	for _, readmeCategory := range Config.Readmes {
 		for _, readmePath := range readmeCategory.Paths {
 			readmePath = filepath.Join(Config.FuchsiaDir, readmePath)
@@ -78,15 +91,16 @@ func initializeReadmes() error {
 						return err
 					}
 
-					// The root project for the Fuchsia tree is special, since "currentPath" will be an empty string.
-					if projectRoot == "." {
-						projectRoot = Config.FuchsiaDir
-					}
-
-					if _, err := NewProject(currentPath, projectRoot); err != nil {
+					r, err := readme.NewReadmeFromFileCustomLocation(currentPath, filepath.Join(projectRoot, info.Name()))
+					if err != nil {
 						// Don't error out with these custom README.fuchsia files, so we don't break rollers.
 						log.Printf("Found issue with custom README.fuchsia file: %v: %v\n", currentPath, err)
 
+						return nil
+					}
+
+					if _, err := NewProject(r, projectRoot); err != nil {
+						log.Printf("Found issue with custom README.fuchsia file: %v: %v\n", currentPath, err)
 						return nil
 					}
 				}

@@ -63,7 +63,7 @@ func FilterProjects() error {
 
 	dedupedLicenseDataMap := make(map[string][]*file.FileData)
 	for _, p := range FilteredProjects {
-		for _, lf := range p.LicenseFile {
+		for _, lf := range p.LicenseFiles {
 			data, err := lf.Data()
 			if err != nil {
 				return err
@@ -150,8 +150,8 @@ func getFileMap() (map[string]*Project, error) {
 	fileMap := make(map[string]*Project, 0)
 	for _, p := range AllProjects {
 		allFiles := make([]*file.File, 0)
-		allFiles = append(allFiles, p.Files...)
-		allFiles = append(allFiles, p.LicenseFile...)
+		allFiles = append(allFiles, p.RegularFiles...)
+		allFiles = append(allFiles, p.LicenseFiles...)
 		for _, f := range allFiles {
 			filePath := "//" + f.RelPath()
 			folderPath := "//" + filepath.Dir(f.RelPath())

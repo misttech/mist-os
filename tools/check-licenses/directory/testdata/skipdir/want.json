@@ -2,14 +2,22 @@
     "name": "root",
     "path": "{root}",
     "files": [
-        "{root}/testA.py"
+        {
+            "name": "testA.py",
+            "spdxID": "LicenseRef-file-8d30e2b1fc259b49a4ef73b5f9445eb9",
+            "project": "unknown"
+        }
     ],
     "children": [
         {
             "name": "dontSkip",
             "path": "{root}/dontSkip",
             "files": [
-                "{root}/dontSkip/testF.py"
+                {
+                    "name": "testF.py",
+                    "spdxID": "LicenseRef-file-994504557749103b6d19d2e7788b7e2d",
+                    "project": "unknown"
+                }
             ]
         }
     ]

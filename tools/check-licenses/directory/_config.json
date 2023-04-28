@@ -23,12 +23,194 @@
                     "zircon/system/ulib/bitmap/test",
                     "tools/devshell/tests",
                     "src/tests",
+                    "src/ui/lib/escher/test/gtest_escher.cc",
                     "src/sys/component_manager/tests",
                     "sdk/dart/zircon/test",
-                    "tools/fidl/fidlc/tests/fidl"
+                    "tools/fidl/fidlc/tests",
+                    "tools/auto_owners/tests",
+                    "build/bazel_sdk/tests"
                 ],
                 "notes": [
-                    "Skip test directories"
+                    "Skip test directories for now."
+                ]
+            },
+            {
+                "paths": [
+                    "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/jdk/legal/java.base/ADDITIONAL_LICENSE_INFO"
+                ],
+                "notes": [
+                    "Additional licensing information for the developers.",
+                    "This doesn't contain actual licensing info, and is not for distribution."
+                ]
+            },
+            {
+                "paths": [
+                    "docs"
+                ],
+                "notes": [
+                    "Skip docs directory."
+                ]
+            },
+            {
+                "paths": [
+                    "integration"
+                ],
+                "notes": [
+                    "Skip infra directory."
+                ]
+            },
+            {
+                "paths": [
+                    "third_party/zstd/src/COPYING"
+                ],
+                "notes": [
+                    "zstd provides two optional license files.",
+                    "Fuchsia has chosen the other one, so skip this one.",
+                    "See http://shortn/_uKuAuCIGJ7 for more info."
+                ]
+            },
+            {
+                "paths": [
+                    "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/firmware"
+                ],
+                "notes": [
+                    "Bug: fxbug.dev/126193",
+                    "There are no distributable license files in this directory.",
+                    "Handle it in a better way than simply skipping it."
+                ]
+            },
+            {
+                "paths": [
+                    "zircon/LICENSE",
+                    "third_party/rust_crates/vendor/regex-syntax-0.6.26/src/unicode_tables/LICENSE-UNICODE",
+                    "prebuilt/third_party/bazel/linux-x64/install_base/embedded_tools/jdk/legal/java.base/LICENSE",
+                    "third_party/zlib/contrib/iostream3/LICENSE"
+                ],
+                "notes": [
+                    "Bug: fxbug.dev/126193",
+                    "Temporarily skipping these license files. They will be added back soon."
+                ]
+            },
+            {
+                "paths": [
+                    "third_party/crashpad/src/third_party/lss",
+                    "third_party/crashpad/src/third_party/mini_chromium",
+                    "third_party/crashpad/src/third_party/zlib",
+                    "third_party/antlion/third_party/github.com/jd/tenacity",
+                    "third_party/crashpad/src/third_party/edo",
+                    "third_party/crashpad/src/third_party/googletest",
+                    "third_party/crashpad/src/third_party/gyp",
+                    "third_party/crashpad/src/third_party/ninja",
+                    "third_party/crashpad/src/third_party/fuchsia",
+                    "third_party/crashpad/src/third_party/linux",
+                    "third_party/rust_crates/forks/libm",
+                    "third_party/rust_crates/forks/zstd-sys",
+                    "third_party/vboot_reference/scripts/image_signing",
+                    "third_party/jinja2"
+                ],
+                "notes": [
+                    "Bug: fxbug.dev/126193",
+                    "These projects don't have a LICENSE file currently.",
+                    "Address this issue, and remove these projects from this list."
+                ]
+            },
+            {
+                "paths": [
+                    "build/__init__.py",
+                    "scripts/gn_complete/__init__.py",
+                    "src/fonts/tools/__init__.py",
+                    "src/fonts/tools/tests/__init__.py",
+                    "src/security/tools/csa_helper/__init__.py",
+                    "src/testing/end_to_end/examples/__init__.py",
+                    "src/testing/end_to_end/examples/test_soft_reboot/__init__.py",
+                    "src/testing/end_to_end/fuchsia_base_test/__init__.py",
+                    "src/testing/end_to_end/honeydew/affordances/__init__.py",
+                    "src/testing/end_to_end/honeydew/device_classes/__init__.py",
+                    "src/testing/end_to_end/honeydew/interfaces/__init__.py",
+                    "src/testing/end_to_end/honeydew/interfaces/affordances/__init__.py",
+                    "src/testing/end_to_end/honeydew/interfaces/auxiliary_devices/__init__.py",
+                    "src/testing/end_to_end/honeydew/interfaces/device_classes/__init__.py",
+                    "src/testing/end_to_end/honeydew/interfaces/transports/__init__.py",
+                    "src/testing/end_to_end/honeydew/mobly_controller/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth_default/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component_default/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_fuchsia_device_base/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_generic_fuchsia_device/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_x64/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/unit_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/unit_tests/device_class_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/unit_tests/transports_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/transports/__init__.py",
+                    "src/testing/end_to_end/honeydew/tests/unit_tests/utility_tests/__init__.py",
+                    "src/testing/end_to_end/honeydew/utils/__init__.py",
+                    "src/testing/end_to_end/mobly_driver/tests/functional_tests/test_honeydew_integration/__init__.py",
+                    "src/testing/end_to_end/mobly_driver/tests/unit_tests/drivers/__init__.py"
+                ],
+                "notes": [
+                    "Bug: fxbug.dev/126193",
+                    "'__init__.py' files can hold licensing information, but the ones listed here are empty.",
+                    "Add copyright headers to these files."
+                ]
+            },
+            {
+                "paths": [
+                    "prebuilt/third_party/llvm/linux-x64/include/llvm/Support/LICENSE.TXT",
+                    "prebuilt/third_party/llvm/linux-arm64/include/llvm/Support/LICENSE.TXT",
+                    "prebuilt/third_party/llvm/mac-x64/include/llvm/Support/LICENSE.TXT",
+                    "prebuilt/third_party/vulkansdk/linux/source/DirectXShaderCompiler/LICENSE.TXT",
+                    "third_party/openthread/NOTICE",
+                    "src/starnix/lib/linux_uapi/stub",
+                    "prebuilt/third_party/vulkansdk/linux/source/VulkanCapsViewer/LICENSE",
+                    "prebuilt/third_party/vulkansdk/linux/source/Vulkan-Profiles/LICENSE.md",
+                    "third_party/android/platform/external/aac/NOTICE",
+                    "third_party/lz4/examples/COPYING",
+                    "third_party/network-conformance/orchestrator/dutscripts/tclfmt/LICENSE",
+                    "third_party/lz4/tests/COPYING",
+                    "third_party/lz4/programs/COPYING",
+                    "third_party/libpng/LICENSE",
+                    "src/ui/lib/uitypes/BUILD.gn"
+                ],
+                "notes": [
+                    "Bug: fxbug.dev/126193",
+                    "Temporarily skip these files while proper license detection can be enabled."
+                ]
+            },
+            {
+                "paths": [
+                    "third_party/rust_crates/compat/brotli",
+                    "third_party/rust_crates/compat/ring"
+                ],
+                "notes": [
+                    "3p rust crates with no sources or license files."
+                ]
+            },
+            {
+                "paths": [
+                    "third_party/curl/LICENSES"
+                ],
+                "notes": [
+                    "The curl project includes several optional license files.",
+                    "Skip this directory, and have the README.fuchsia file declare the correct files explicitly."
+                ]
+            },
+            {
+                "paths": [
+                    "src/proc/lib/linux_uapi/stub"
+                ],
+                "notes": [
+                    "Skip stub directories."
+                ]
+            },
+            {
+                "paths": [
+                    "src/proc/lib/linux_uapi/stub"
+                ],
+                "notes": [
+                    "Skip stub directories."
                 ]
             },
             {
@@ -109,7 +291,9 @@
             {
                 "paths": [
                     "tools/check-licenses/project/testdata",
+                    "tools/check-licenses/static",
                     "tools/check-licenses/directory/testdata",
+                    "tools/check-licenses/result/templates",
                     "tools/check-licenses/golden",
                     "tools/check-licenses/license/patterns"
                 ],

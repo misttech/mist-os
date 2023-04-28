@@ -12,18 +12,15 @@
   },
   "packages": [
     {
-      "name": "PackageA",
-      "SPDXID": "SPDXRef-Package-PackageA",
+      "name": "ProjectA",
+      "SPDXID": "SPDXRef-Package-995b475f30603407812c0fd855a467f2",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
-      "licenseConcluded": "(testing123 1) AND (testing123 2) AND (testing123 3)",
+      "licenseConcluded": "(testing123_1 AND testing123_2 AND testing123_3)",
       "licenseInfoFromFiles": [],
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
@@ -31,18 +28,15 @@
       "annotations": []
     },
     {
-      "name": "PackageB",
-      "SPDXID": "SPDXRef-Package-PackageB",
+      "name": "ProjectB",
+      "SPDXID": "SPDXRef-Package-9765cfc69bd09ffc72c760df334220ed",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
-      "licenseConcluded": "(testing123 4)",
+      "licenseConcluded": "(testing123_4)",
       "licenseInfoFromFiles": [],
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION",
@@ -51,14 +45,11 @@
     },
     {
       "name": "PackageC",
-      "SPDXID": "SPDXRef-Package-PackageC",
+      "SPDXID": "SPDXRef-Package-86796a50f6d892cc59e75bc7e66cbebc",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
       "licenseConcluded": "",
@@ -73,34 +64,34 @@
   "hasExtractedLicensingInfos": [
     {
       "name": "Example License File for ProjectA",
-      "licenseId": "testing123 1",
-      "extractedText": "Example license text",
+      "licenseId": "testing123_1",
+      "extractedText": "Testing 123 1",
       "seeAlsos": [
-        "www.google.com"
+        "www.example.com"
       ]
     },
     {
       "name": "2nd Example License File for ProjectA",
-      "licenseId": "testing123 2",
-      "extractedText": "Example license text",
+      "licenseId": "testing123_2",
+      "extractedText": "Testing 123 2",
       "seeAlsos": [
-        "www.google.com"
+        "www.example.com"
       ]
     },
     {
       "name": "3rd Example License File for ProjectA",
-      "licenseId": "testing123 3",
-      "extractedText": "Example license text",
+      "licenseId": "testing123_3",
+      "extractedText": "Testing 123 3",
       "seeAlsos": [
-        "www.google.com"
+        "www.example.com"
       ]
     },
     {
       "name": "Example License File for ProjectB",
-      "licenseId": "testing123 4",
-      "extractedText": "Example license text",
+      "licenseId": "testing123_4",
+      "extractedText": "Testing 123 4",
       "seeAlsos": [
-        "www.google.com"
+        "www.example.com"
       ]
     }
   ],
@@ -110,25 +101,25 @@
         "ElementRefID": "SPDXRef-DOCUMENT"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-PackageA"
+        "ElementRefID": "SPDXRef-Package-995b475f30603407812c0fd855a467f2"
       },
       "relationshipType": "DESCRIBES"
     },
     {
       "spdxElementId": {
-        "ElementRefID": "SPDXRef-Package-PackageA"
+        "ElementRefID": "SPDXRef-Package-995b475f30603407812c0fd855a467f2"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-PackageB"
+        "ElementRefID": "SPDXRef-Package-9765cfc69bd09ffc72c760df334220ed"
       },
       "relationshipType": "CONTAINS"
     },
     {
       "spdxElementId": {
-        "ElementRefID": "SPDXRef-Package-PackageA"
+        "ElementRefID": "SPDXRef-Package-995b475f30603407812c0fd855a467f2"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-PackageC"
+        "ElementRefID": "SPDXRef-Package-86796a50f6d892cc59e75bc7e66cbebc"
       },
       "relationshipType": "CONTAINS"
     }

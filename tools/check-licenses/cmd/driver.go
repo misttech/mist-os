@@ -16,6 +16,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
+	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/result"
 )
 
@@ -37,7 +38,7 @@ func Execute(ctx context.Context) error {
 	r := trace.StartRegion(ctx, "directory.NewDirectory("+Config.FuchsiaDir+")")
 	startDirectory := time.Now()
 	log.Print("Discovering files and folders... ")
-	_, err := directory.NewDirectory(Config.FuchsiaDir, nil)
+	_, err := directory.NewDirectory(".", nil)
 	if err != nil {
 		log.Println("Error!")
 		return err
@@ -108,6 +109,9 @@ func Execute(ctx context.Context) error {
 // Initialize each go package with their updated config files.
 func initialize() error {
 	if err := file.Initialize(Config.File); err != nil {
+		return err
+	}
+	if err := readme.Initialize(); err != nil {
 		return err
 	}
 	if err := license.Initialize(Config.License); err != nil {

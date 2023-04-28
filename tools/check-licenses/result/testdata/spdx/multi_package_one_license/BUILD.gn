@@ -7,7 +7,7 @@ import("//build/testing/host_test_data.gni")
 if (is_host) {
   host_test_data("tests") {
     sources = [
-      "package_list.json",
+      "filtered_projects.json",
       "want.json",
     ]
     outputs = [ "$root_gen_dir/{{source}}" ]

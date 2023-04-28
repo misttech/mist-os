@@ -28,6 +28,12 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 		return "", fmt.Errorf("root project must not be nil")
 	}
 
+	rootPackage, err := root.GenerateSPDXPackage()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate SPDX package for root package %s: %w",
+			root.Name, err)
+	}
+
 	var b strings.Builder
 	b.WriteString("\n")
 
@@ -57,22 +63,26 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 	// Every SPDX doc must have one "DESCRIBES" relationship.
 	r := &spdx.Relationship{
 		RefA:         spdx_common.DocElementID{ElementRefID: doc.SPDXIdentifier},
-		RefB:         spdx_common.DocElementID{ElementRefID: root.Package.PackageSPDXIdentifier},
+		RefB:         spdx_common.DocElementID{ElementRefID: rootPackage.PackageSPDXIdentifier},
 		Relationship: "DESCRIBES"}
 	doc.Relationships = append(doc.Relationships, r)
 
 	for _, p := range projects {
-		doc.Packages = append(doc.Packages, p.Package)
+		pPackage, err := p.GenerateSPDXPackage()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate SPDX package for project %s: %w", p.Name, err)
+		}
+		doc.Packages = append(doc.Packages, pPackage)
 
 		if p != root {
 			r := &spdx.Relationship{
-				RefA:         spdx_common.DocElementID{ElementRefID: root.Package.PackageSPDXIdentifier},
-				RefB:         spdx_common.DocElementID{ElementRefID: p.Package.PackageSPDXIdentifier},
+				RefA:         spdx_common.DocElementID{ElementRefID: rootPackage.PackageSPDXIdentifier},
+				RefB:         spdx_common.DocElementID{ElementRefID: pPackage.PackageSPDXIdentifier},
 				Relationship: "CONTAINS"}
 			doc.Relationships = append(doc.Relationships, r)
 		}
 
-		for _, l := range p.LicenseFile {
+		for _, l := range p.LicenseFiles {
 			// Prebuilts often come with a NOTICE file with several license texts.
 			// For now, let's keep those license texts together in one single
 			// OtherLicense SPDX object.

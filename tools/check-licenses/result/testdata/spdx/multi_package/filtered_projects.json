@@ -1,0 +1,32 @@
+[
+  {
+    "root": "fake/path",
+    "name": "PackageA",
+    "spdxid": "Package-72237883",
+    "licenseFiles": [
+      {
+        "contentLoaded": true,
+        "text": "",
+        "relPath": "fake/multi_package/path",
+        "data": [
+          {
+            "data": "Example License Text for PackageA",
+            "url": "www.example.com",
+            "SPDXName": "Example License File for PackageA",
+            "SPDXID": "LicenseRef-filedata-12345"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "root": "fake/path2",
+    "name": "PackageB",
+    "spdxid": "Package-852005636"
+  },
+  {
+    "root": "fake/path3",
+    "name": "PackageC",
+    "spdxid": "Package-1864736318"
+  }
+]

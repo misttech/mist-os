@@ -5,16 +5,14 @@
 package project
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	spdx "github.com/spdx/tools-golang/spdx/v2_2"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/file"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
-
-	spdx "github.com/spdx/tools-golang/spdx/v2_2"
+	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 )
 
 // Project struct follows the format of README.fuchsia files.
@@ -22,32 +20,18 @@ import (
 //
 //	https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata
 type Project struct {
-	Root                            string `json:"root"`
-	ReadmePath                      string
-	Files                           []*file.File
-	SearchableFiles                 []*file.File
-	LicenseFileType                 file.FileType
-	LicenseFileTypeMap              map[string]file.FileType
-	RegularFileType                 file.FileType
-	CustomFields                    []string
-	SearchResults                   []*license.SearchResult
+	Root                   string `json:"root"`
+	Name                   string `json:"name"`
+	URL                    string
+	LicenseFiles           []*file.File `licenseFiles`
+	RegularFiles           []*file.File
+	SearchableRegularFiles []*file.File
+	ReadmeFile             *readme.Readme
+
 	LicenseFileSearchResults        []*license.SearchResult
 	LicenseFileSearchResultsDeduped map[string]*license.SearchResult
 	RegularFileSearchResults        []*license.SearchResult
-
-	// These fields are taken directly from the README.fuchsia files
-	Name               string
-	URL                string
-	Version            string
-	License            string
-	LicenseFile        []*file.File `json:"licenseFile"`
-	UpstreamGit        string
-	Description        string
-	LocalModifications string
-
-	// For Compliance worksheet
-	ShouldBeDisplayed  bool
-	SourceCodeIncluded bool
+	RegularFileSearchResultsDeduped map[string]*license.SearchResult
 
 	// Projects that this project depends on.
 	// Constructed from the GN dependency tree.
@@ -55,8 +39,7 @@ type Project struct {
 
 	// SPDX fields
 	Package *spdx.Package "json:'package'"
-
-	SPDXID string
+	SPDXID  string        `json:"spdxid"`
 }
 
 // Order implements sort.Interface for []*Project based on the Root field.
@@ -67,11 +50,8 @@ func (a Order) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a Order) Less(i, j int) bool { return a[i].Root < a[j].Root }
 
 // NewProject creates a Project object from a README.fuchsia file.
-func NewProject(readmePath string, projectRootPath string) (*Project, error) {
+func NewProject(r *readme.Readme, projectRootPath string) (*Project, error) {
 	var err error
-	licenseFilePaths := make([]string, 0)
-	licenseFileUrls := make([]string, 0)
-	licenseFileIndex := 0
 
 	// Make all projectRootPath values relative to Config.FuchsiaDir.
 	if strings.Contains(projectRootPath, Config.FuchsiaDir) {
@@ -81,248 +61,70 @@ func NewProject(readmePath string, projectRootPath string) (*Project, error) {
 		}
 	}
 
-	// If a project in the fuchsia tree is missing a README.fuchsia file
-	// (or has a malformed README.fuchsia file), we can create our own
-	// README.fuchsia file in a custom location.
-	//
-	// Those custom readmes are processed during initialization, and
-	// will be included in this AllProjects map.
-	//
-	// If we get here and find that this project already exists, just
-	// return the previously initialized instance.
+	// See if we've already processed this project.
+	// If so, return the previously created instance.
 	if _, ok := AllProjects[projectRootPath]; ok {
 		plusVal(NumPreviousProjectRetrieved, projectRootPath)
-
-		// Now we know a custom-initialized project exists for this directory.
-		//
-		// If a real (non-custom) README.fuchsia file also exists
-		// in this location, we must have wanted to skip it (perhaps it is malformed).
-		//
-		// Keep a record of these situations, so we can resolve them.
-		if _, err := os.Stat(readmePath); err == nil {
-			plusVal(DuplicateReadmeFiles, readmePath)
-		}
-
 		return AllProjects[projectRootPath], nil
-	}
-
-	// There are a ton of rust_crate projects that don't (and will never) have a README.fuchsia file.
-	// Handle those projects separately.
-	if strings.Contains(projectRootPath, "rust_crates") {
-		return NewSpecialProject(projectRootPath)
-	}
-
-	// Same goes for golib projects
-	if strings.Contains(projectRootPath, "golibs") {
-		return NewSpecialProject(projectRootPath)
-	}
-
-	// Same goes for 3p golang.org projects
-	if strings.Contains(projectRootPath, "golang.org") {
-		return NewSpecialProject(projectRootPath)
-	}
-
-	// Same goes for several syzkaller golang projects
-	if strings.Contains(projectRootPath, "syzkaller/vendor") {
-		return NewSpecialProject(projectRootPath)
-	}
-
-	// Same goes for dart-pkg projects
-	if strings.Contains(projectRootPath, "dart-pkg") {
-		return NewSpecialProject(projectRootPath)
-	}
-
-	// Double-check that this README.fuchsia file actually exists.
-	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
-		return nil, err
 	}
 
 	p := &Project{
 		Root:                            projectRootPath,
-		ReadmePath:                      readmePath,
-		LicenseFileType:                 file.SingleLicense,
-		LicenseFileTypeMap:              make(map[string]file.FileType, 0),
-		RegularFileType:                 file.RegularFile,
-		ShouldBeDisplayed:               true,
-		SourceCodeIncluded:              false,
+		Name:                            r.Name,
+		URL:                             r.URL,
+		ReadmeFile:                      r,
+		LicenseFiles:                    make([]*file.File, 0),
+		RegularFiles:                    make([]*file.File, 0),
+		SearchableRegularFiles:          make([]*file.File, 0),
 		Children:                        make(map[string]*Project, 0),
+		LicenseFileSearchResults:        make([]*license.SearchResult, 0),
 		LicenseFileSearchResultsDeduped: make(map[string]*license.SearchResult, 0),
 	}
 
-	if Config.OutputLicenseFile {
-		if url, hash, err := getGitInfo(projectRootPath); err == nil {
-			// This project may not be hosted in a git repo.
-			p.URL = fmt.Sprintf("%v/+/%v", url, hash)
+	for _, l := range r.Licenses {
+		if l.LicenseFilePath == "" {
+			continue
 		}
-	}
-
-	f, err := os.Open(readmePath)
-	if err != nil {
-		return nil, fmt.Errorf("NewProject(%v): %v\n", projectRootPath, err)
-	}
-	defer f.Close()
-
-	s := bufio.NewScanner(f)
-	s.Split(bufio.ScanLines)
-
-	multiline := ""
-	for s.Scan() {
-		var line = s.Text()
-		if strings.HasPrefix(line, "Name:") {
-			p.Name = strings.TrimSpace(strings.TrimPrefix(line, "Name:"))
-			multiline = ""
-		} else if strings.HasPrefix(line, "URL:") {
-			// In practice, most README.fuchsia projects don't use
-			// this URL field correctly, so leave p.URL blank.
-			multiline = ""
-		} else if strings.HasPrefix(line, "Version:") {
-			p.Version = strings.TrimSpace(strings.TrimPrefix(line, "Version:"))
-			multiline = ""
-		} else if strings.HasPrefix(line, "License:") {
-			p.License = strings.TrimSpace(strings.TrimPrefix(line, "License:"))
-			multiline = ""
-		} else if strings.HasPrefix(line, "License File:") {
-			f := strings.TrimSpace(strings.TrimPrefix(line, "License File:"))
-			if len(f) > 0 {
-				licenseFilePaths = append(licenseFilePaths, f)
-				licenseFileUrls = append(licenseFileUrls, "")
-				licenseFileIndex = len(licenseFilePaths) - 1
-			}
-			multiline = ""
-		} else if strings.HasPrefix(line, "License URL:") {
-			url := strings.TrimSpace(strings.TrimPrefix(line, "License URL:"))
-			for len(licenseFileUrls) < licenseFileIndex {
-				licenseFileUrls = append(licenseFileUrls, "")
-			}
-			licenseFileUrls[licenseFileIndex] = url
-			multiline = ""
-		} else if strings.HasPrefix(line, "Upstream Git:") {
-			p.UpstreamGit = strings.TrimSpace(strings.TrimPrefix(line, "Upstream Git:"))
-			multiline = ""
-		} else if strings.HasPrefix(line, "check-licenses:") {
-			p.CustomFields = append(p.CustomFields, (strings.TrimSpace(strings.TrimPrefix(line, "check-licenses:"))))
-		} else if strings.HasPrefix(line, "Description:") {
-			multiline = "Description"
-		} else if strings.HasPrefix(line, "Local Modifications:") {
-			multiline = "Local Modifications"
-		} else if multiline == "Description" {
-			p.Description += strings.TrimSpace(strings.TrimPrefix(line, "Description:")) + "\n"
-		} else if multiline == "Local Modifications" {
-			p.LocalModifications += strings.TrimSpace(strings.TrimPrefix(line, "Local Modifications:")) + "\n"
-		} else if strings.TrimSpace(line) == "" {
-			// Empty lines are OK
-		} else {
-			plusVal(UnknownReadmeLines, readmePath)
-		}
-	}
-
-	// All projects must have a name.
-	if p.Name == "" {
-		plusVal(MissingName, p.ReadmePath)
-	}
-
-	// All projects must point to a license file.
-	if len(licenseFilePaths) == 0 {
-		plusVal(MissingLicenseFile, p.ReadmePath)
-	}
-
-	if err := p.processCustomFields(); err != nil {
-		return nil, err
-	}
-
-	for i, l := range licenseFilePaths {
-		licenseFileType := p.LicenseFileType
-		if _, ok := p.LicenseFileTypeMap[l]; ok {
-			licenseFileType = p.LicenseFileTypeMap[l]
+		if l.LicenseFileFormat == "" {
+			l.LicenseFileFormat = "Single License File"
 		}
 
-		l = filepath.Join(Config.FuchsiaDir, p.Root, l)
-		l = filepath.Clean(l)
-
-		licenseFile, err := file.LoadFile(l, licenseFileType, p.Name)
+		path := filepath.Join(p.Root, l.LicenseFilePath)
+		f, err := file.LoadFile(path, file.FileType(l.LicenseFileFormat), r.Name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load license file %s: %w\n", path, err)
 		}
-
-		licenseDir := filepath.Dir(l)
-		if url, hash, err := getGitInfo(licenseDir); err == nil {
-			licenseFile.SetURL(fmt.Sprintf("%s/+/%s/%s", url, hash, licenseFilePaths[i]))
-		}
-
-		if licenseFileUrls[i] != "" {
-			licenseFile.SetURL(licenseFileUrls[i])
-		}
-
-		p.LicenseFile = append(p.LicenseFile, licenseFile)
+		f.SetURL(l.LicenseFileURL)
+		p.LicenseFiles = append(p.LicenseFiles, f)
 	}
 
-	plusVal(NumProjects, p.Root)
 	AllProjects[p.Root] = p
-	plusVal(ProjectURLs, fmt.Sprintf("%v - %v", p.Root, p.URL))
-
-	if err := p.setSPDXFields(); err != nil {
-		return nil, err
-	}
+	plusVal(NumProjects, p.Root)
 
 	return p, nil
 }
 
-// We can put some information in the README.fuchsia files to help check-licenses
-// do the right thing (e.g. specify the format of the NOTICE file).
-func (p *Project) processCustomFields() error {
-	for _, line := range p.CustomFields {
-		if strings.HasPrefix(line, "license format:") {
-			ft := strings.TrimSpace(strings.TrimPrefix(line, "license format:"))
-
-			if strings.Contains(ft, ":") {
-				filename := strings.TrimSpace(strings.Split(ft, ":")[1])
-				ft = strings.TrimSpace(strings.Split(ft, ":")[0])
-
-				if _, ok := file.FileTypes[ft]; !ok {
-					return fmt.Errorf("Format %v isn't a valid License Format.", ft)
-				}
-
-				p.LicenseFileTypeMap[filename] = file.FileTypes[ft]
-			} else {
-				if _, ok := file.FileTypes[ft]; !ok {
-					return fmt.Errorf("Format %v isn't a valid License Format.", ft)
-				}
-				p.LicenseFileType = file.FileTypes[ft]
-			}
-		} else if strings.HasPrefix(line, "file format:") {
-			ft := strings.TrimSpace(strings.TrimPrefix(line, "file format:"))
-			if val, ok := file.FileTypes[ft]; ok {
-				p.RegularFileType = val
-			} else {
-				return fmt.Errorf("Format %v isn't a valid License Format.", ft)
+func (p *Project) AddFile(f *file.File) error {
+	if f.FileType() != file.RegularFile {
+		// This could be a license file.
+		// Make sure this file isn't already in the list.
+		for _, l := range p.LicenseFiles {
+			if l.RelPath() == f.RelPath() {
+				return nil
 			}
 		}
-	}
-	return nil
-}
 
-func (p *Project) AddFiles(filepaths []string) error {
-	licenseFileMap := make(map[string]bool, 0)
-	for _, lpath := range p.LicenseFile {
-		licenseFileMap[lpath.AbsPath()] = true
+		p.LicenseFiles = append(p.LicenseFiles, f)
+		return nil
 	}
 
-	for _, path := range filepaths {
-		if _, ok := licenseFileMap[path]; ok {
-			continue
-		}
+	p.RegularFiles = append(p.RegularFiles, f)
 
-		f, err := file.LoadFile(path, p.RegularFileType, p.Name)
-		if err != nil {
-			return err
-		}
-		p.Files = append(p.Files, f)
-
-		ext := filepath.Ext(path)
-		if _, ok := file.Config.Extensions[ext]; ok {
-			p.SearchableFiles = append(p.SearchableFiles, f)
-		}
+	ext := filepath.Ext(f.RelPath())
+	if _, ok := file.Config.Extensions[ext]; ok {
+		p.SearchableRegularFiles = append(p.SearchableRegularFiles, f)
 	}
+
 	return nil
 }
 

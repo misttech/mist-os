@@ -21,6 +21,7 @@ go_library("main") {
     "//tools/check-licenses/file",
     "//tools/check-licenses/license",
     "//tools/check-licenses/project",
+    "//tools/check-licenses/project/readme",
     "//tools/check-licenses/result",
     "//tools/check-licenses/util",
     "//tools/lib/logger",

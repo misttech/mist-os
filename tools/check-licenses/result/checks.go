@@ -14,6 +14,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/directory"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
+	"go.fuchsia.dev/fuchsia/tools/check-licenses/project/readme"
 )
 
 type Check struct {
@@ -38,12 +39,10 @@ func RunChecks() error {
 		return err
 	}
 	if err := AllFilesAndFoldersMustBeIncludedInAProject(); err != nil {
-		// TODO: Enable this check after all projects have been addressed.
-		return nil
+		fmt.Printf("========\nWarning: this will soon become an error\n\n%v\n========\n", err)
 	}
 	if err := AllReadmeFuchsiaFilesMustBeFormattedCorrectly(); err != nil {
-		// TODO: Enable this check after all projects have been addressed.
-		return nil
+		fmt.Printf("========\nWarning: this will soon become an error\n\n%v\n========\n", err)
 	}
 	return nil
 }
@@ -57,7 +56,7 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 
 	var fuchsia *project.Project
 	for _, p := range project.FilteredProjects {
-		if p.Root == "." {
+		if p.Root == "." || p.Root == Config.FuchsiaDir {
 			fuchsia = p
 			break
 		}
@@ -67,7 +66,7 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 		return fmt.Errorf("Couldn't find Fuchsia project to verify this check!!\n")
 	}
 	count := 0
-	for _, f := range fuchsia.SearchableFiles {
+	for _, f := range fuchsia.SearchableRegularFiles {
 		fdList, err := f.Data()
 		if err != nil {
 			return fmt.Errorf("Found a file that hasn't been parsed yet?? %v | %v\n", f.AbsPath(), err)
@@ -91,22 +90,61 @@ func AllFuchsiaAuthorSourceFilesMustHaveCopyrightHeaders() error {
 }
 
 func AllLicenseTextsMustBeRecognized() error {
-	if len(license.Unrecognized.Matches) > 0 {
-		var b strings.Builder
-		b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/license/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
-		for _, m := range license.Unrecognized.Matches {
-			b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber(), m.File().RelPath()))
-			b.WriteString(fmt.Sprintf("\n%v\n\n", string(m.Data())))
+	// TODO(fxbug.dev/126193): Remove this allowlist.
+	tempAllowlist := map[string]bool{
+		"third_party/zlib/contrib/iostream3/LICENSE":                                 true,
+		"src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/firmware/License.txt": true,
+		"third_party/rust_crates/vendor/siphasher-0.3.10/COPYING":                    true,
+		"third_party/rust_crates/vendor/siphasher-0.2.3/COPYING":                     true,
+		"third_party/rust_crates/ask2patch/aho-corasick/COPYING":                     true,
+		"third_party/rust_crates/ask2patch/walkdir/COPYING":                          true,
+		"third_party/rust_crates/ask2patch/memchr/COPYING":                           true,
+		"third_party/rust_crates/ask2patch/csv/COPYING":                              true,
+		"third_party/rust_crates/ask2patch/csv-core/COPYING":                         true,
+		"third_party/rust_crates/ask2patch/same-file/COPYING":                        true,
+		"third_party/rust_crates/ask2patch/termcolor/COPYING":                        true,
+		"third_party/rust_crates/ask2patch/byteorder/COPYING":                        true,
+	}
+
+	var foundUnrecognizedMatch bool
+	var b strings.Builder
+
+	b.WriteString("Found unrecognized license texts - please add the relevant license pattern(s) to //tools/check-licenses/license/patterns/* and have it(them) reviewed by the OSRB team:\n\n")
+	for _, m := range license.Unrecognized.Matches {
+		if !tempAllowlist[m.File().RelPath()] {
+			foundUnrecognizedMatch = true
 		}
+
+		b.WriteString(fmt.Sprintf("-> Line %v of %v\n", m.LineNumber(), m.File().RelPath()))
+		b.WriteString(fmt.Sprintf("\n%v\n\n", string(m.Data())))
+	}
+
+	if foundUnrecognizedMatch {
 		return fmt.Errorf(b.String())
 	}
 	return nil
 }
 
 func AllLicensePatternUsagesMustBeApproved() error {
+	// TODO(fxbug.dev/126193): Remove this temporary allowlist.
+	tempAllowlist := map[string]bool{
+		"prebuilt/third_party/vulkansdk/linux/source/DirectXShaderCompiler/external/SPIRV-Headers/LICENSE": true,
+		"prebuilt/third_party/vulkansdk/linux/source/SPIRV-Headers/LICENSE":                                true,
+		"third_party/dart-pkg/pub/dds/tool/dap/external_dap_spec/debugAdapterProtocol.license.txt":         true,
+		"third_party/shaderc/third_party/LICENSE.glslang":                                                  true,
+	}
+
 	var b strings.Builder
 OUTER:
 	for _, sr := range license.AllSearchResults {
+		if tempAllowlist[sr.LicenseData.File().RelPath()] {
+			continue
+		}
+
+		// TODO(fxbug.dev/126193): Remove this clause.
+		if sr.Pattern.Name == "_unrecognized" {
+			continue
+		}
 		if sr.Pattern.Name == "_empty" {
 			continue
 		}
@@ -129,7 +167,8 @@ OUTER:
 				}
 			}
 		}
-		b.WriteString(fmt.Sprintf("File %v was not approved to use license pattern %v\n", filepath, sr.Pattern.RelPath))
+		b.WriteString(fmt.Sprintf("File %v from project %s was not approved to use license pattern %v\n",
+			filepath, sr.ProjectRoot, sr.Pattern.RelPath))
 	}
 
 	result := b.String()
@@ -204,8 +243,8 @@ func AllProjectsMustHaveALicense() error {
 			continue
 		}
 
-		if len(p.LicenseFile) == 0 {
-			badReadmes = append(badReadmes, fmt.Sprintf("-> %v (README.fuchsia file: %v)\n", p.Root, p.ReadmePath))
+		if len(p.LicenseFiles) == 0 {
+			badReadmes = append(badReadmes, fmt.Sprintf("-> %v (README.fuchsia file: %v)\n", p.Root, p.ReadmeFile.ReadmePath))
 		}
 	}
 	sort.Strings(badReadmes)
@@ -232,8 +271,8 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 	b.WriteString("and a README.fuchsia file must exist and specify where the license file lives.\n")
 	b.WriteString("The following directories are not included in a project:\n\n")
 	recurse = func(d *directory.Directory) {
-		if d.Project == nil {
-			b.WriteString(fmt.Sprintf("-> %v\n", d.Path))
+		if d.Project == project.UnknownProject && len(d.Files) > 0 {
+			b.WriteString(fmt.Sprintf("-> %s\n", d.Path))
 			count = count + 1
 			return
 		}
@@ -241,9 +280,9 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 			recurse(child)
 		}
 	}
-	b.WriteString("\nPlease add a LICENSE file to the above projects, and point to them in an associated README.fuchsia file.\n")
-
 	recurse(directory.RootDirectory)
+
+	b.WriteString("\nPlease add a LICENSE file to the above projects, and point to them in an associated README.fuchsia file.\n")
 	if count > 0 {
 		return fmt.Errorf(b.String())
 	}
@@ -251,6 +290,24 @@ func AllFilesAndFoldersMustBeIncludedInAProject() error {
 }
 
 func AllReadmeFuchsiaFilesMustBeFormattedCorrectly() error {
-	//TODO
-	return nil
+	var b strings.Builder
+
+	b.WriteString("All README.fuchsia files must be formatted correctly, using known directives.\n")
+	b.WriteString("https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata\n")
+	b.WriteString("The following README files are malformed:\n\n")
+
+	count := 0
+	for _, r := range readme.AllReadmes {
+		if len(r.MalformedLines) > 0 {
+			b.WriteString(fmt.Sprintf(" -> %s [%s]\n",
+				r.ReadmePath, r.MalformedLines[0]))
+			count = count + 1
+		}
+	}
+	b.WriteString("\nPlease fix the above README files.\n")
+
+	if count == 0 {
+		return nil
+	}
+	return fmt.Errorf(b.String())
 }

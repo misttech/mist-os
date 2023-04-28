@@ -23,7 +23,7 @@ func TestLoadReadmeFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v: expected no error, got %v.", t.Name(), err)
 	}
-	got.GetLicenseURL = nil
+	got.GetLicenseURLForPath = nil
 	got.ReadmePath = ""
 
 	wantPath := filepath.Join(*testDataDir, "readme", "want.json")
@@ -45,7 +45,7 @@ func TestLoadReadmeFile(t *testing.T) {
 }
 
 func runReadmeDiffTest(t *testing.T, wantPath string, got *Readme) {
-	got.GetLicenseURL = nil
+	got.GetLicenseURLForPath = nil
 	got.ReadmePath = ""
 
 	wantJson, err := os.ReadFile(wantPath)

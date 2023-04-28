@@ -12,6 +12,7 @@
     "buildInfoBoard": "{BUILD_INFO_BOARD}",
     "outputs": [
       "compliance.csv",
+      "project_licenses.txt",
       "license_texts_grouped_by_project.txt"
     ],
     "templates": [

@@ -1,4 +1,4 @@
 Name: AEMU
 License File: NOTICE.txt
+check-licenses: license format: multi_license_android
 License File: LICENSE
-check-licenses: license format: multi_license_android: NOTICE.txt

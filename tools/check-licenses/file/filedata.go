@@ -80,6 +80,7 @@ func LoadFileData(f *File, content []byte) ([]*FileData, error) {
 			lineNumber:  0,
 			libraryName: f.projectName,
 			data:        bytes.TrimSpace(content),
+			url:         f.url,
 		})
 
 	// File.LicenseFormat == MultiLicense*
@@ -137,6 +138,9 @@ func LoadFileData(f *File, content []byte) ([]*FileData, error) {
 				data:        bytes.TrimSpace(d.LicenseText),
 			})
 		}
+
+	default:
+		return nil, fmt.Errorf("File type %v is unknown for filedata processing.", f.fileType)
 	}
 
 	for _, d := range data {

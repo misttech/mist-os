@@ -59,7 +59,7 @@ func runTest(folder string, t *testing.T) {
 		FuchsiaDir: dir,
 		OutDir:     dir,
 	}
-	projectsJSONPath := filepath.Join(*testDataDir, "spdx", folder, "package_list.json")
+	projectsJSONPath := filepath.Join(*testDataDir, "spdx", folder, "filtered_projects.json")
 	projects := loadProjectsJSON(projectsJSONPath, t)
 	root := projects[0]
 
@@ -71,6 +71,7 @@ func runTest(folder string, t *testing.T) {
 	wantPath := filepath.Join(*testDataDir, "spdx", folder, "want.json")
 	gotPath := filepath.Join(dir, spdxFilename)
 	want, got := loadWantGot(wantPath, gotPath, t)
+
 	if d := cmp.Diff(want, got); d != "" {
 		t.Errorf("%v: compare docs mismatch: (-want +got):\n%s", t.Name(), d)
 	}

@@ -6,7 +6,6 @@ package directory
 
 import (
 	"encoding/json"
-	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/license"
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
@@ -40,15 +39,6 @@ func Initialize(c *DirectoryConfig) error {
 		patternSkips.Paths = append(patternSkips.Paths, r.Paths...)
 	}
 	c.Skips = append(c.Skips, patternSkips)
-
-	// Skip paths are relative to the root fuchsia directory.
-	for _, skip := range c.Skips {
-		if !skip.SkipAnywhere {
-			for i, path := range skip.Paths {
-				skip.Paths[i] = filepath.Join(c.FuchsiaDir, path)
-			}
-		}
-	}
 
 	// Save the config file to the out directory (if defined).
 	if b, err := json.MarshalIndent(c, "", "  "); err != nil {

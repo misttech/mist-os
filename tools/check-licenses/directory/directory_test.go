@@ -18,70 +18,94 @@ var testDataDir = flag.String("test_data_dir", "", "Path to test data directory"
 // NewDirectory(empty) should produce a directory object that correctly
 // represents an empty directory.
 func TestDirectoryCreateEmpty(t *testing.T) {
-	want, got := setupDirectoryTestDir("empty", t)
-	if got != want {
-		t.Errorf("%v(): got \n%v\n, want \n%v\n", t.Name(), got, want)
-	}
+	runDirectoryTest("empty", t)
 }
 
 // NewDirectory(simple) should produce a directory object that correctly
 // represents the simple testdata directory.
 func TestDirectoryCreateSimple(t *testing.T) {
-	want, got := setupDirectoryTestDir("simple", t)
-	if got != want {
-		t.Errorf("%v(): got \n%v\n, want \n%v\n", t.Name(), got, want)
-	}
+	runDirectoryTest("simple", t)
 }
 
 // NewDirectory(skip) should produce a directory object that correctly
 // skips the configured directories.
 func TestDirectoryWithSkips(t *testing.T) {
-	want, got := setupDirectoryTestDir("skipdir", t)
-	if got != want {
-		t.Errorf("%v(): got \n%v\n, want \n%v\n", t.Name(), got, want)
-	}
+	runDirectoryTest("skipdir", t)
 }
 
-func setupDirectoryTestDir(name string, t *testing.T) (string, string) {
-	// Find the right testdata directory for this test.
+func runDirectoryTest(name string, t *testing.T) {
+	t.Helper()
+
 	testDir := filepath.Join(*testDataDir, name)
 	root := filepath.Join(testDir, "root")
 
 	// Create a Directory object from the want.json file.
-	want, err := os.ReadFile(filepath.Join(testDir, "want.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantString := strings.Replace(string(want), "{root}", root, -1)
-	want = []byte(wantString)
+	wantPath := filepath.Join(testDir, "want.json")
+	want := &Directory{}
+	decodeJSON(wantPath, want, t)
 
-	// Load the accompanying config file for this test type.
-	configJson, err := os.ReadFile(filepath.Join(testDir, "config.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	configString := strings.Replace(string(configJson), "{root}", root, -1)
-	configJson = []byte(configString)
+	configPath := filepath.Join(testDir, "config.json")
+	config := NewConfig()
+	decodeJSON(configPath, config, t)
+	cleanConfig(config, root)
 
-	// Unmarshal the config json data into the Config object, and run
-	// NewDirectory.
-	c := NewConfig()
-	if err = json.Unmarshal(configJson, c); err != nil {
-		t.Fatal(err)
-	}
-	Config = c
-
-	gotTree, err := NewDirectory(root, nil)
+	got, err := newDirectoryWithConfig(root, nil, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Return the results of NewDirectory and the expected json text
-	// for direct comparison.
-	got, err := json.MarshalIndent(gotTree, "", "    ")
+	diffDirectories(want, got, t)
+}
+
+func cleanConfig(c *DirectoryConfig, root string) {
+	for _, s := range c.Skips {
+		for i, p := range s.Paths {
+			s.Paths[i] = strings.ReplaceAll(p, "{root}", root)
+		}
+	}
+}
+
+func decodeJSON(path string, obj interface{}, t *testing.T) {
+	t.Helper()
+
+	contents, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return strings.TrimSpace(string(want)), strings.TrimSpace(string(got))
+	decoder := json.NewDecoder(strings.NewReader(string(contents)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(obj); err != nil {
+		t.Fatalf("%v: failed to decode %s into struct: %v.", t.Name(), path, err)
+	}
+}
+
+func diffDirectories(want, got *Directory, t *testing.T) {
+	t.Helper()
+
+	if want.Name != got.Name {
+		t.Errorf("%s: directory name mismatch: (-want +got):\n-%s\n+%s", t.Name(), want.Name, got.Name)
+	}
+
+	if len(want.Files) != len(got.Files) {
+		t.Errorf("%s: files length mismatch:(-want +got):\n-%d\n+%d", t.Name(), len(want.Files), len(got.Files))
+	}
+	for i := range want.Files {
+		w := want.Files[i]
+		g := got.Files[i]
+
+		if w.Name() != g.Name() {
+			t.Errorf("%s: file names mismatch:(-want +got):\n-%s\n+%s", t.Name(), w.Name(), g.Name())
+		}
+		if w.SPDXID() != g.SPDXID() {
+			t.Errorf("%s: file SPDXID mismatch:(-want +got):\n-%s\n+%s", t.Name(), w.SPDXID(), g.SPDXID())
+		}
+	}
+
+	if len(want.Children) != len(got.Children) {
+		t.Errorf("%s: children length mismatch:(-want +got):\n-%d\n+%d", t.Name(), len(want.Children), len(got.Children))
+	}
+	for i := range want.Children {
+		diffDirectories(want.Children[i], got.Children[i], t)
+	}
 }

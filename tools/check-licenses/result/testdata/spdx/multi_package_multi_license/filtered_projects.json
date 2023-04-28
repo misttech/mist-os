@@ -1,0 +1,73 @@
+[
+  {
+    "root": "fake/path",
+    "name": "PackageA",
+    "spdxid": "Package-72237883",
+    "licenseFiles": [
+      {
+        "contentLoaded": true,
+        "text": "",
+        "relPath": "fake/multi_package_multi_license/path1",
+        "data": [
+          {
+            "SPDXName": "Example License File for ProjectA",
+            "SPDXID": "testing123_1",
+            "data": "package A 1st license file",
+            "url": "www.example.com"
+          }
+        ]
+      },
+      {
+        "contentLoaded": true,
+        "text": "",
+        "relPath": "fake/multi_package_multi_license/path2",
+        "data": [
+          {
+            "SPDXName": "2nd Example License File for ProjectA",
+            "SPDXID": "testing123_2",
+            "data": "package A 2nd license file",
+            "url": "www.example.com"
+          }
+        ]
+      },
+      {
+        "contentLoaded": true,
+        "text": "",
+        "relPath": "fake/multi_package_multi_license/path3",
+        "data": [
+          {
+            "SPDXName": "3rd Example License File for ProjectA",
+            "SPDXID": "testing123_3",
+            "data": "package A 3rd license file",
+            "url": "www.example.com"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "root": "fake/path2",
+    "name": "PackageB",
+    "spdxid": "Package-852005636",
+    "licenseFiles": [
+      {
+        "contentLoaded": true,
+        "text": "",
+        "relPath": "fake/multi_package_multi_license_b/path",
+        "data": [
+          {
+            "SPDXName": "Example License File for ProjectB",
+            "SPDXID": "testing123_4",
+            "data": "package B license file",
+            "url": "www.example.com"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "root": "fake/path3",
+    "name": "PackageC",
+    "spdxid": "Package-1864736318"
+  }
+]

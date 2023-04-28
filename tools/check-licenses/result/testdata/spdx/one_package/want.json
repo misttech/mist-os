@@ -12,15 +12,12 @@
   },
   "packages": [
     {
-      "name": "Fuchsia",
-      "SPDXID": "SPDXRef-Package-Fuchsia",
+      "name": "One Package Test Project",
+      "SPDXID": "SPDXRef-Package-84469cd6d24ab42c926021effe00ad0b",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": true,
       "PackageVerificationCode": {
-        "packageVerificationCodeValue": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-        "packageVerificationCodeExcludedFiles": [
-          ""
-        ]
+        "packageVerificationCodeValue": "0"
       },
       "checksums": [],
       "licenseConcluded": "",
@@ -39,7 +36,7 @@
         "ElementRefID": "SPDXRef-DOCUMENT"
       },
       "relatedSpdxElement": {
-        "ElementRefID": "SPDXRef-Package-Fuchsia"
+        "ElementRefID": "SPDXRef-Package-84469cd6d24ab42c926021effe00ad0b"
       },
       "relationshipType": "DESCRIBES"
     }

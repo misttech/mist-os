@@ -198,6 +198,23 @@ func NewReadme(r io.Reader, path string) (*Readme, error) {
 			getNextLine = false
 			directive, value, readme.LocalModifications = parseReadmeMultiLineDirective(s, value)
 
+		// Deprecated but still in use currently
+		case "check-licenses":
+			// Used to specify license format
+			switch value {
+			case "license format: multi_license_google":
+				readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFileFormat: "Multi License Google"})
+			case "license format: multi_license_chromium":
+				readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFileFormat: "Multi License Chromium"})
+			case "license format: multi_license_flutter":
+				readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFileFormat: "Multi License Flutter"})
+			case "license format: multi_license_android":
+				readme.ProcessReadmeLicense(&ReadmeLicense{LicenseFileFormat: "Multi License Android"})
+			case "file format: copyright_header": //do nothing
+			default:
+				return nil, fmt.Errorf("Unknown deprecated license directive: %s: %s\n", value, path)
+			}
+
 		// Unused multi-line directives still need to be processed here.
 		case "Deprecated":
 			getNextLine = false

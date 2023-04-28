@@ -9,6 +9,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // File is a data struct used to hold the path and text content
@@ -156,6 +157,55 @@ func (f *File) UpdateURLs(projectName string, projectURL string) {
 	for _, d := range f.data {
 		d.UpdateURLs(projectName, projectURL)
 	}
+}
+
+func IsPossibleLicenseFile(path string) bool {
+	lower := strings.ToLower(filepath.Base(path))
+
+	// Skip check-licenses files
+	if strings.Contains(lower, "check-license") {
+		return false
+	}
+
+	// In practice, all license files for project either have "copying"
+	// or "license" in their name.
+	if !(strings.Contains(lower, "licen") ||
+		strings.Contains(lower, "copying") ||
+		strings.Contains(lower, "notice")) {
+		return false
+	}
+
+	// There are some instances of source files and template files
+	// that fit the above criteria. Skip those files.
+	//
+	// TODO: Migrate this list into the config file.
+	switch filepath.Ext(path) {
+	case ".dart",
+		".tmpl",
+		".go",
+		".rs",
+		".c", ".cc", ".cpp", ".h",
+		".py",
+		".cml",
+		".gni",
+		".json",
+		".bzl",
+		".html",
+		".fidl",
+		".cfg",
+		".sh",
+		".csv",
+		".js",
+		".rtf",
+		".lic",
+		".ignore":
+		return false
+	}
+	if strings.Contains(lower, "template") {
+		return false
+	}
+
+	return true
 }
 
 func min(a, b int) int {
