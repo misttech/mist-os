@@ -1072,9 +1072,6 @@
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
 
-                // uidgid_test - https://fxbug.dev/79438
-                "UidGidRootTest.SetgidNotFromThreadGroupLeader",
-
                 // utimes_test
                 "UtimesTest.*",
                 "FutimesatTest.*",
@@ -1283,6 +1280,9 @@
 
                 // Require robust pthread mutexes.
                 "RobustFutexTest.*",
+
+                // uidgid_test - https://fxbug.dev/79438
+                "UidGidRootTest.SetgidNotFromThreadGroupLeader",
             ],
         },
     ],
