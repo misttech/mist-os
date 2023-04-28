@@ -4,7 +4,6 @@
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_deviceid as di;
-use fuchsia_async as fasync;
 use futures::Future;
 use tracing::info;
 
@@ -32,7 +31,7 @@ fn set_device_identification(
     let records = vec![example_di_record()];
     let (client, server) = fidl::endpoints::create_proxy::<di::DeviceIdentificationHandleMarker>()?;
 
-    let request_fut = di_svc.set_device_identification(&mut records.into_iter(), server).check()?;
+    let request_fut = di_svc.set_device_identification(&mut records.into_iter(), server);
 
     let fut = async move {
         let result = request_fut.await;
