@@ -93,7 +93,8 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   args.panel.params.width = width_;
   args.panel.params.refresh_rate_e2 = kRefreshRateHz * 100;
   // fuchsia.images2.PixelFormat can always cast to AnyPixelFormat safely.
-  any_pixel_format_t pixel_format = static_cast<any_pixel_format_t>(format_);
+  fuchsia_images2_pixel_format_enum_value_t pixel_format =
+      static_cast<fuchsia_images2_pixel_format_enum_value_t>(format_);
   args.pixel_format_list = &pixel_format;
   args.pixel_format_count = 1;
 

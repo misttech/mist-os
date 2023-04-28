@@ -50,9 +50,11 @@ const char* kTag = "goldfish-display";
 
 constexpr uint64_t kPrimaryDisplayId = 1;
 
-constexpr any_pixel_format_t kPixelFormats[] = {
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+constexpr fuchsia_images2_pixel_format_enum_value_t kPixelFormats[] = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 
 constexpr uint32_t FB_WIDTH = 1;

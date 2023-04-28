@@ -174,8 +174,9 @@ class GpuDevice : public Device,
   config_stamp_t displayed_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
 
   // TODO(fxbug.dev/122802): Support more formats.
-  static constexpr std::array<any_pixel_format_t, 1> kSupportedFormats = {
-      static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
+  static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
+      static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+          fuchsia_images2::wire::PixelFormat::kBgra32),
   };
 };
 

@@ -25,13 +25,14 @@ struct CoordinatorPixelFormat {
   // Converts a pixel format value used in banjo fuchsia.hardware.display
   // interface to a CoordinatorPixelFormat. The argument type must match
   // the `pixel_format` fields used in banjo fuchsia.hardware.display interface.
-  static CoordinatorPixelFormat FromBanjo(any_pixel_format_t banjo_pixel_format);
+  static CoordinatorPixelFormat FromBanjo(
+      fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format);
 
   // Creates a fbl::Vector containing converted pixel formats from a given
   // banjo-typed Vector got from display engine drivers. Returned values may get
   // de-duplicated.
   static zx::result<fbl::Vector<CoordinatorPixelFormat>> CreateFblVectorFromBanjoVector(
-      cpp20::span<const any_pixel_format_t> banjo_pixel_formats);
+      cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats);
 
   // Converts a CoordinatorPixelFormat to format used in FIDL fuchsia.hardware.
   // display interface. The return type must match return the `pixel_format`

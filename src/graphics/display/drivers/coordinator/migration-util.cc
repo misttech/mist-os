@@ -20,22 +20,23 @@
 namespace display {
 
 // static
-CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(any_pixel_format_t banjo_pixel_format) {
-  // any_pixel_format_t can be cast into AnyPixelFormat safely.
+CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(
+    fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format) {
+  // fuchsia.images2.PixelFormat can be cast into AnyPixelFormat safely.
   return {.format = static_cast<AnyPixelFormat>(banjo_pixel_format)};
 }
 
 // static
 zx::result<fbl::Vector<CoordinatorPixelFormat>>
 CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
-    cpp20::span<const any_pixel_format_t> banjo_pixel_formats) {
+    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats) {
   fbl::AllocChecker alloc_checker;
   fbl::Vector<CoordinatorPixelFormat> result;
   result.reserve(banjo_pixel_formats.size(), &alloc_checker);
   if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  for (const any_pixel_format_t banjo_pixel_format : banjo_pixel_formats) {
+  for (const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format : banjo_pixel_formats) {
     result.push_back(CoordinatorPixelFormat::FromBanjo(banjo_pixel_format));
   }
   return zx::ok(std::move(result));

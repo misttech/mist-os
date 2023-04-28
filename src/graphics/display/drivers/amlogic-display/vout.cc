@@ -16,9 +16,11 @@ namespace amlogic_display {
 namespace {
 
 // List of supported pixel formats
-constexpr any_pixel_format_t kDsiSupporteAnyPixelFormats[] = {
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+constexpr fuchsia_images2_pixel_format_enum_value_t kDsiSupporteAnyPixelFormats[] = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 constexpr fuchsia_images2::wire::PixelFormat kDsiSupportedPixelFormats[] = {
     fuchsia_images2::wire::PixelFormat::kBgra32,
@@ -26,8 +28,9 @@ constexpr fuchsia_images2::wire::PixelFormat kDsiSupportedPixelFormats[] = {
 };
 
 // TODO(fxbug.dev/69236): Add more supported formats.
-constexpr any_pixel_format_t kHdmiSupportedAnyPixelFormats[] = {
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
+constexpr fuchsia_images2_pixel_format_enum_value_t kHdmiSupportedAnyPixelFormats[] = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kBgra32),
 };
 constexpr fuchsia_images2::wire::PixelFormat kHdmiSupportedPixelFormats[] = {
     fuchsia_images2::wire::PixelFormat::kBgra32,

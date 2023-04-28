@@ -39,9 +39,11 @@ namespace fake_display {
 
 namespace {
 // List of supported pixel formats
-constexpr any_pixel_format_t kSupportedPixelFormats[] = {
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
-    static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedPixelFormats[] = {
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kBgra32),
+    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+        fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 // Arbitrary dimensions - the same as sherlock.
 constexpr uint32_t kWidth = 1280;
