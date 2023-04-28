@@ -13,10 +13,7 @@ if (is_host) {
 
     deps = [ "//third_party/rust_crates:notify" ]
 
-    test_deps = [
-      "//third_party/rust_crates:pretty_assertions",
-      "//third_party/rust_crates:tempfile",
-    ]
+    test_deps = [ "//third_party/rust_crates:tempfile" ]
 
     sources = [ "src/lib.rs" ]
   }

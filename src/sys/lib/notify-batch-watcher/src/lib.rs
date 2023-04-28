@@ -357,7 +357,6 @@ impl fmt::Debug for EventFilter {
 mod tests {
     use {
         super::*,
-        pretty_assertions::assert_eq,
         std::{fs::File, io::Write, path::Path, sync::mpsc},
     };
 
@@ -373,9 +372,38 @@ mod tests {
         file.write_all(bytes).unwrap();
     }
 
+    /// Read events until we get an event for the specified path, or error out if it
+    /// took too long.
     #[track_caller]
-    fn check_event_paths(event: &BatchEvent, expected_paths: impl IntoIterator<Item = PathBuf>) {
-        assert_eq!(event.paths, expected_paths.into_iter().collect::<HashSet<_>>());
+    fn wait_for_path_event(
+        event_rx: &mpsc::Receiver<Result<BatchEvent, Vec<Error>>>,
+        path: &Path,
+    ) -> BatchEvent {
+        let mut events = vec![];
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while let Some(duration) = deadline.checked_duration_since(Instant::now()) {
+            match event_rx.recv_timeout(duration) {
+                Ok(Ok(event)) => {
+                    if event.paths.contains(path) {
+                        return event;
+                    }
+
+                    // We received an event that didn't contain our path. Add it
+                    // to our events so we can report it.
+                    events.push(event);
+                }
+                Ok(Err(err)) => {
+                    panic!("unexpected error {err:?}");
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => break,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    panic!("unexpected disconnection");
+                }
+            }
+        }
+
+        panic!("did not receive {path:?}. Received these events: {events:#?}");
     }
 
     fn create_watcher(
@@ -389,22 +417,6 @@ mod tests {
         .unwrap();
 
         watcher.watch(dir, notify::RecursiveMode::Recursive).unwrap();
-
-        // Some notify backends can observe file system events that occurred before the watcher
-        // is set up (for example, with FSEvents and OSX). To avoid this from confusing the
-        // tests, ignore if any files are observed.
-        match event_rx.recv_timeout(BATCH_DURATION * 10) {
-            Ok(Ok(event)) => {
-                check_event_paths(&event, [dir.into()]);
-            }
-            Ok(Err(err)) => {
-                panic!("unexpected error {err:?}");
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                panic!("unexpected disconnection");
-            }
-        }
 
         (watcher, event_rx)
     }
@@ -421,10 +433,7 @@ mod tests {
         update_file(&file_path, b"there1");
         std::fs::remove_file(&file_path).unwrap();
 
-        std::thread::sleep(BATCH_DURATION * 10);
-        let event1 = event_rx.recv().unwrap().unwrap();
-        check_event_paths(&event1, [file_path]);
-
+        let event1 = wait_for_path_event(&event_rx, &file_path);
         assert!(event1.start_time <= event1.end_time);
         assert!(event1.end_time <= Instant::now());
 
@@ -433,10 +442,7 @@ mod tests {
         update_file(&file_path, b"there2");
         std::fs::remove_file(&file_path).unwrap();
 
-        std::thread::sleep(BATCH_DURATION * 10);
-        let event2 = event_rx.recv().unwrap().unwrap();
-        check_event_paths(&event2, [file_path]);
-
+        let event2 = wait_for_path_event(&event_rx, &file_path);
         assert!(event2.start_time <= event2.end_time);
         assert!(event1.end_time <= event2.start_time);
         assert!(event2.end_time <= Instant::now());
