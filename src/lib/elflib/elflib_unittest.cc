@@ -32,7 +32,12 @@ constexpr std::string_view kUnstrippedExampleFileBase = "unstripped_example";
 constexpr std::string_view kUnstrippedExampleFileStrippedBase = "unstripped_example_stripped";
 
 inline std::string GetTestBinaryPath(std::string_view bin) {
+#if defined(__Fuchsia__)
   return std::string("/pkg/data/") + std::string(bin);
+#else
+  // host tests will be invoked from the build directory.
+  return std::string("../../src/lib/elflib/test_data/") + std::string(bin);
+#endif
 }
 
 class TestData {
