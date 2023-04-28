@@ -15,7 +15,7 @@ pub async fn run_command(intl_proxy: IntlProxy, intl: Intl) -> Result<()> {
 }
 
 async fn command(proxy: IntlProxy, settings: IntlSettings) -> WatchOrSetResult {
-    if settings == IntlSettings::EMPTY {
+    if settings == IntlSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {

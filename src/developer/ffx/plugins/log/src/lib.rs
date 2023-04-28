@@ -596,7 +596,7 @@ async fn log_internal(
     if !proactive_enabled {
         if rcs_proxy.is_none() {
             let (client, server) = create_proxy()?;
-            bridge_proxy.open_target(TargetQuery::EMPTY, server).await??;
+            bridge_proxy.open_target(TargetQuery::default(), server).await??;
             let (rcs_client, rcs_server) = create_proxy()?;
             client.open_remote_control(rcs_server).await??;
             rcs_proxy = Some(rcs_client);
@@ -892,7 +892,7 @@ mod test {
                     .send(&mut Ok(IdentifyHostResponse {
                         boot_timestamp_nanos: Some(BOOT_TS),
                         nodename: Some(NODENAME.to_string()),
-                        ..IdentifyHostResponse::EMPTY
+                        ..Default::default()
                     }))
                     .context("sending identify host response")
                     .unwrap();
@@ -926,7 +926,7 @@ mod test {
                     .send(&mut Ok(LogSession {
                         target_identifier: t,
                         session_timestamp_nanos: Some(BOOT_TS),
-                        ..LogSession::EMPTY
+                        ..Default::default()
                     }))
                     .context("error sending response")
                     .expect("should send")
@@ -996,7 +996,7 @@ mod test {
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotAll),
             session: Some(SessionSpec::Relative(0)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let expected_responses = vec![];
 
@@ -1023,7 +1023,7 @@ mod test {
         let cmd = LogCommand::default();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
         let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
@@ -1062,7 +1062,7 @@ mod test {
         let cmd = LogCommand::default();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
         let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
@@ -1108,7 +1108,7 @@ mod test {
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotAll),
             session: Some(SessionSpec::Relative(0)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let log1 = make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -1178,12 +1178,12 @@ mod test {
         let mut formatter = FakeLogFormatter::new();
         let selectors = vec![LogInterestSelector {
             selector: parse_component_selector::<VerboseError>("core/my_component").unwrap(),
-            interest: Interest { min_severity: Some(FidlSeverity::Info), ..Interest::EMPTY },
+            interest: Interest { min_severity: Some(FidlSeverity::Info), ..Default::default() },
         }];
         let cmd = LogCommand { select: selectors.clone(), ..LogCommand::default() };
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
         let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
@@ -1221,12 +1221,12 @@ mod test {
         let mut formatter = FakeLogFormatter::new();
         let selectors = vec![LogInterestSelector {
             selector: parse_component_selector::<VerboseError>("core/my_component").unwrap(),
-            interest: Interest { min_severity: Some(FidlSeverity::Info), ..Interest::EMPTY },
+            interest: Interest { min_severity: Some(FidlSeverity::Info), ..Default::default() },
         }];
         let cmd = LogCommand { select: selectors.clone(), ..LogCommand::default() };
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let mut writer = Vec::new();
@@ -1807,7 +1807,7 @@ mod test {
                 Duration::from_secs(FAKE_START_TIMESTAMP as u64).as_nanos() as u64,
             )),
             session: Some(SessionSpec::Relative(0)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let mut writer = Vec::new();
@@ -1840,7 +1840,7 @@ mod test {
             stream_mode: Some(StreamMode::SnapshotAll),
             min_timestamp_nanos: Some(TimeBound::Monotonic(default_ts().as_nanos() as u64)),
             session: Some(SessionSpec::Relative(0)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let mut writer = Vec::new();
@@ -1872,7 +1872,10 @@ mod test {
 
         let mut writer = Vec::new();
         assert!(log_cmd(
-            setup_fake_daemon_server(DaemonDiagnosticsStreamParameters::EMPTY, Arc::new(vec![])),
+            setup_fake_daemon_server(
+                DaemonDiagnosticsStreamParameters::default(),
+                Arc::new(vec![])
+            ),
             setup_fake_rcs(),
             &setup_fake_log_settings_proxy(vec![]),
             &mut formatter,
@@ -1901,7 +1904,10 @@ mod test {
 
         let mut writer = Vec::new();
         assert!(log_cmd(
-            setup_fake_daemon_server(DaemonDiagnosticsStreamParameters::EMPTY, Arc::new(vec![])),
+            setup_fake_daemon_server(
+                DaemonDiagnosticsStreamParameters::default(),
+                Arc::new(vec![])
+            ),
             setup_fake_rcs(),
             &setup_fake_log_settings_proxy(vec![]),
             &mut formatter,

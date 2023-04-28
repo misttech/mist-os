@@ -687,7 +687,7 @@ mod tests {
                     hwinfo::DeviceRequest::GetInfo { responder } => {
                         let _ = responder.send(hwinfo::DeviceInfo {
                             serial_number: Some(String::from(SERIAL)),
-                            ..hwinfo::DeviceInfo::EMPTY
+                            ..Default::default()
                         });
                     }
                 }
@@ -708,7 +708,7 @@ mod tests {
                         let _ = responder.send(buildinfo::BuildInfo {
                             board_config: Some(String::from(BOARD_CONFIG)),
                             product_config: Some(String::from(PRODUCT_CONFIG)),
-                            ..buildinfo::BuildInfo::EMPTY
+                            ..Default::default()
                         });
                     }
                 }
@@ -782,7 +782,7 @@ mod tests {
                                                     .map(|addr| fnet_interfaces::Address {
                                                         addr,
                                                         valid_until: Some(1),
-                                                        ..fnet_interfaces::Address::EMPTY
+                                                        ..Default::default()
                                                     })
                                                     .collect(),
                                                 ),
@@ -795,7 +795,7 @@ mod tests {
                                                 has_default_ipv4_route: Some(false),
                                                 has_default_ipv6_route: Some(false),
                                                 name: Some(String::from("eth0")),
-                                                ..fnet_interfaces::Properties::EMPTY
+                                                ..Default::default()
                                             },
                                         )
                                     } else {

@@ -119,7 +119,7 @@ mod tests {
         //     abi_revision: None, api_level: None,
         //     exec_path: None, build_id: None,
         //     __non_exhaustive: ()};
-        let version_info = VersionInfo::EMPTY;
+        let version_info = VersionInfo::default();
         init_metrics_svc(version_info, None).await;
         let mut custom_dimensions = BTreeMap::new();
         add_client_id_as_custom_dimension(&mut custom_dimensions).await;

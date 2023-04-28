@@ -55,7 +55,7 @@ pub fn build_info() -> VersionInfo {
 fn build_info_impl(raw_version_info: String, raw_build_version: String) -> VersionInfo {
     let split: Vec<&str> = raw_version_info.split("-").collect();
     if split.len() != 2 {
-        return VersionInfo { build_version: Some(raw_build_version), ..VersionInfo::EMPTY };
+        return VersionInfo { build_version: Some(raw_build_version), ..Default::default() };
     }
 
     let raw_hash = split.get(0).unwrap().to_string();
@@ -71,7 +71,7 @@ fn build_info_impl(raw_version_info: String, raw_build_version: String) -> Versi
         abi_revision: Some(vh.abi_revision.0),
         api_level: Some(vh.api_level),
         exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
-        ..VersionInfo::EMPTY
+        ..Default::default()
     };
 }
 
@@ -99,7 +99,7 @@ mod test {
                 abi_revision: Some(ABI_REVISION),
                 api_level: Some(API_LEVEL),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
-                ..VersionInfo::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -118,7 +118,7 @@ mod test {
                 abi_revision: Some(ABI_REVISION),
                 api_level: Some(API_LEVEL),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
-                ..VersionInfo::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -135,7 +135,7 @@ mod test {
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
                 abi_revision: None,
                 api_level: None,
-                ..VersionInfo::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -152,7 +152,7 @@ mod test {
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
                 abi_revision: None,
                 api_level: None,
-                ..VersionInfo::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -170,7 +170,7 @@ mod test {
                 abi_revision: Some(ABI_REVISION),
                 api_level: Some(API_LEVEL),
                 exec_path: std::env::current_exe().map(|x| x.to_string_lossy().to_string()).ok(),
-                ..VersionInfo::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -187,7 +187,7 @@ mod test {
                 build_version: Some(FAKE_BUILD_VERSION.to_string()),
                 abi_revision: None,
                 api_level: None,
-                ..VersionInfo::EMPTY
+                ..Default::default()
             }
         );
     }

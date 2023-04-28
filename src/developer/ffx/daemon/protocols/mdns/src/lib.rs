@@ -365,7 +365,7 @@ mod tests {
         let _ = wait_for_port_binds(&proxy).await;
         svc_inner
             .handle_target(
-                ffx::TargetInfo { nodename: Some(nodename.clone()), ..ffx::TargetInfo::EMPTY },
+                ffx::TargetInfo { nodename: Some(nodename.clone()), ..Default::default() },
                 5000,
             )
             .await;
@@ -378,7 +378,7 @@ mod tests {
         );
         svc_inner
             .handle_target(
-                ffx::TargetInfo { nodename: Some(nodename.clone()), ..ffx::TargetInfo::EMPTY },
+                ffx::TargetInfo { nodename: Some(nodename.clone()), ..Default::default() },
                 5000,
             )
             .await;
@@ -403,7 +403,7 @@ mod tests {
         let _ = wait_for_port_binds(&proxy).await;
         svc_inner
             .handle_target(
-                ffx::TargetInfo { nodename: Some(nodename.clone()), ..ffx::TargetInfo::EMPTY },
+                ffx::TargetInfo { nodename: Some(nodename.clone()), ..Default::default() },
                 1,
             )
             .await;
@@ -437,7 +437,7 @@ mod tests {
         let _ = wait_for_port_binds(&proxy).await;
         svc_inner
             .handle_target(
-                ffx::TargetInfo { nodename: Some(nodename.clone()), ..ffx::TargetInfo::EMPTY },
+                ffx::TargetInfo { nodename: Some(nodename.clone()), ..Default::default() },
                 50000,
             )
             .await;
@@ -452,7 +452,7 @@ mod tests {
         }
         svc_inner
             .handle_target(
-                ffx::TargetInfo { nodename: Some(nodename.clone()), ..ffx::TargetInfo::EMPTY },
+                ffx::TargetInfo { nodename: Some(nodename.clone()), ..Default::default() },
                 1,
             )
             .await;

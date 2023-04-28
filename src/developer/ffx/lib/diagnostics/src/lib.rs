@@ -43,7 +43,7 @@ pub async fn run_diagnostics_streaming(
                                     data,
                                     truncated_chars: 0,
                                 })),
-                                ..ArchiveIteratorEntry::EMPTY
+                                ..Default::default()
                             }]))?;
                         } else {
                             let (socket, tx_socket) =
@@ -54,7 +54,7 @@ pub async fn run_diagnostics_streaming(
                             // get the data.
                             let response = vec![ArchiveIteratorEntry {
                                 diagnostics_data: Some(DiagnosticsData::Socket(socket)),
-                                ..ArchiveIteratorEntry::EMPTY
+                                ..Default::default()
                             }];
                             responder.send(&mut Ok(response))?;
                             // We write all the data to the other end of the

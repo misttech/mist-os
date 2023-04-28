@@ -1051,12 +1051,12 @@ mod test {
         let mut known_peers: HashSet<PeerSetElement> = Default::default();
 
         let peer1 = Peer {
-            description: PeerDescription { services: None, ..PeerDescription::EMPTY },
+            description: PeerDescription { services: None, ..Default::default() },
             id: NodeId { id: 1 },
             is_self: false,
         };
         let peer2 = Peer {
-            description: PeerDescription { services: None, ..PeerDescription::EMPTY },
+            description: PeerDescription { services: None, ..Default::default() },
             id: NodeId { id: 2 },
             is_self: false,
         };
@@ -1093,7 +1093,7 @@ mod test {
         let peer1 = Peer {
             description: PeerDescription {
                 services: Some(vec![RemoteControlMarker::PROTOCOL_NAME.to_string()]),
-                ..PeerDescription::EMPTY
+                ..Default::default()
             },
             id: NodeId { id: 1 },
             is_self: false,
@@ -1101,7 +1101,7 @@ mod test {
         let peer2 = Peer {
             description: PeerDescription {
                 services: Some(vec![RemoteControlMarker::PROTOCOL_NAME.to_string()]),
-                ..PeerDescription::EMPTY
+                ..Default::default()
             },
             id: NodeId { id: 2 },
             is_self: false,

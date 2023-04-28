@@ -141,9 +141,9 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
         device: Some(DeviceSelector {
             is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
             id: Some(cmd.id.clone()),
-            ..DeviceSelector::EMPTY
+            ..Default::default()
         }),
-        ..AudioDaemonDeviceInfoRequest::EMPTY
+        ..Default::default()
     };
     let info = match audio_proxy.device_info(request).await? {
         Ok(value) => value,
@@ -417,16 +417,16 @@ async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
             fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
                 is_input: Some(false),
                 id: Some(cmd.id),
-                ..fidl_fuchsia_audio_ffxdaemon::DeviceSelector::EMPTY
+                ..Default::default()
             },
         )),
 
         gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
             mute: None, // TODO(fxbug.dev/121211)
             gain: None, // TODO(fxbug.dev/121211)
-            ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+            ..Default::default()
         }),
-        ..AudioDaemonPlayRequest::EMPTY
+        ..Default::default()
     };
 
     ffx_audio_common::play(request, audio_proxy, play_local).await?;
@@ -448,13 +448,13 @@ async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Res
         location: Some(RecordLocation::RingBuffer(fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
             is_input: Some(true),
             id: Some(device_id),
-            ..fidl_fuchsia_audio_ffxdaemon::DeviceSelector::EMPTY
+            ..Default::default()
         })),
 
         stream_type: Some(AudioStreamType::from(&record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
         canceler: Some(cancel_server),
-        ..AudioDaemonRecordRequest::EMPTY
+        ..Default::default()
     };
 
     let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
@@ -495,14 +495,14 @@ async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
     let dev_selector = DeviceSelector {
         is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
         id: Some(request.device_id),
-        ..DeviceSelector::EMPTY
+        ..Default::default()
     };
 
     let gain_state = fidl_fuchsia_hardware_audio::GainState {
         muted: request.muted,
         gain_db: request.gain_db,
         agc_enabled: request.agc_enabled,
-        ..fidl_fuchsia_hardware_audio::GainState::EMPTY
+        ..Default::default()
     };
 
     request
@@ -510,7 +510,7 @@ async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
         .device_set_gain_state(AudioDaemonDeviceSetGainStateRequest {
             device: Some(dev_selector),
             gain_state: Some(gain_state),
-            ..AudioDaemonDeviceSetGainStateRequest::EMPTY
+            ..Default::default()
         })
         .await
         .map(|_| ())

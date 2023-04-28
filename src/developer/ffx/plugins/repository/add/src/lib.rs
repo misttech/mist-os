@@ -144,7 +144,7 @@ mod tests {
                         metadata_repo_path: Some(fuchsia_metadata_dir.to_string()),
                         blob_repo_path: Some(blobs_dir.to_string()),
                         aliases: Some(vec!["fuchsia.com".into()]),
-                        ..FileSystemRepositorySpec::EMPTY
+                        ..Default::default()
                     })
                 ),
                 (
@@ -153,7 +153,7 @@ mod tests {
                         metadata_repo_path: Some(example_metadata_dir.to_string()),
                         blob_repo_path: Some(blobs_dir.to_string()),
                         aliases: Some(vec!["example.com".into()]),
-                        ..FileSystemRepositorySpec::EMPTY
+                        ..Default::default()
                     })
                 ),
             ]

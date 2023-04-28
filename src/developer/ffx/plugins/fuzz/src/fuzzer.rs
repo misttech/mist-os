@@ -115,7 +115,7 @@ impl<O: OutputSink> Fuzzer<O> {
     pub async fn set<S: AsRef<str>>(&self, name: S, value: S) -> Result<()> {
         let name = name.as_ref();
         let value = value.as_ref();
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         // TODO(fxbug.dev/90015): Add flag to read options from a JSON file.
         options::set(&mut fuzz_options, name, value)?;
         self.writer.println("Configuring fuzzer...");
@@ -306,7 +306,7 @@ impl<O: OutputSink> Fuzzer<O> {
     }
 
     async fn set_bounds<S: AsRef<str>>(&self, runs: Option<S>, time: Option<S>) -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         if let Some(runs) = runs {
             options::set(&mut fuzz_options, "runs", runs.as_ref())
                 .context("failed to set 'runs'")?;
@@ -423,7 +423,7 @@ mod tests {
     async fn test_get_one() -> Result<()> {
         let mut test = Test::try_new()?;
         let (fake, fuzzer, _task) = perform_test_setup(&test)?;
-        let options = fuzz::Options { runs: Some(123), ..fuzz::Options::EMPTY };
+        let options = fuzz::Options { runs: Some(123), ..Default::default() };
         fake.set_options(options);
         fuzzer.get(Some("runs".to_string())).await?;
         test.output_matches("runs: 123");
@@ -518,7 +518,7 @@ mod tests {
 
             fuzzer.run(runs.clone(), time.clone()).await?;
             test.output_matches("Configuring fuzzer...");
-            let mut expected = fuzz::Options::EMPTY;
+            let mut expected = fuzz::Options::default();
             add_defaults(&mut expected);
             if let Some(runs) = runs {
                 options::set(&mut expected, "runs", &runs)?;
@@ -646,7 +646,7 @@ mod tests {
 
         test.output_matches("Configuring fuzzer...");
         let actual = fake.get_options();
-        let mut expected = fuzz::Options::EMPTY;
+        let mut expected = fuzz::Options::default();
         options::set(&mut expected, "runs", runs)?;
         options::set(&mut expected, "max_total_time", time)?;
         assert_eq!(actual.runs, expected.runs);

@@ -34,7 +34,7 @@ impl FfxMain for PlayTool {
             Ultrasound => fidl_fuchsia_audio_ffxdaemon::RendererType::UltrasoundRenderer(
                 fidl_fuchsia_audio_ffxdaemon::UltrasoundRenderer {
                     packet_count: self.cmd.packet_count,
-                    ..fidl_fuchsia_audio_ffxdaemon::UltrasoundRenderer::EMPTY
+                    ..Default::default()
                 },
             ),
 
@@ -43,7 +43,7 @@ impl FfxMain for PlayTool {
                 fidl_fuchsia_audio_ffxdaemon::RendererConfig {
                     usage: Some(usage),
                     clock: Some(self.cmd.clock),
-                    ..fidl_fuchsia_audio_ffxdaemon::RendererConfig::EMPTY
+                    ..Default::default()
                 },
             ),
         };
@@ -54,9 +54,9 @@ impl FfxMain for PlayTool {
             gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
                 mute: Some(self.cmd.mute),
                 gain: Some(self.cmd.gain),
-                ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+                ..Default::default()
             }),
-            ..AudioDaemonPlayRequest::EMPTY
+            ..Default::default()
         };
 
         ffx_audio_common::play(request, self.audio_proxy, play_local).await.map_err(Into::into)

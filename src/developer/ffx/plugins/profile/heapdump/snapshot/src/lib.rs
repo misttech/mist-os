@@ -27,7 +27,7 @@ pub async fn snapshot(
     let request = fheapdump_client::CollectorTakeLiveSnapshotRequest {
         process_selector: Some(process_selector),
         with_contents: Some(contents_dir.is_some()),
-        ..fheapdump_client::CollectorTakeLiveSnapshotRequest::EMPTY
+        ..Default::default()
     };
 
     let collector = connect_to_collector(&remote_control, cmd.collector).await?;

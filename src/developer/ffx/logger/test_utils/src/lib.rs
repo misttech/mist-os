@@ -77,7 +77,7 @@ pub fn setup_fake_archive_iterator(
                                             ArchiveIteratorEntry {
                                                 data: Some(s.clone()),
                                                 truncated_chars: Some(0),
-                                                ..ArchiveIteratorEntry::EMPTY
+                                                ..Default::default()
                                             }
                                         } else {
                                             ArchiveIteratorEntry {
@@ -85,7 +85,7 @@ pub fn setup_fake_archive_iterator(
                                                     s.clone(),
                                                     parameters.use_socket,
                                                 )),
-                                                ..ArchiveIteratorEntry::EMPTY
+                                                ..Default::default()
                                             }
                                         }
                                     })

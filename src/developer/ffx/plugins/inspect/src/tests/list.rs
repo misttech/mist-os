@@ -20,7 +20,7 @@ async fn test_list_empty() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let expected_responses = Arc::new(vec![]);
     let test_buffers = TestBuffers::default();
@@ -48,7 +48,7 @@ async fn test_list_fidl_error() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_fidl_error()]);
     let test_buffers = TestBuffers::default();
@@ -76,7 +76,7 @@ async fn test_list_iterator_error() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_iterator_error(
         ArchiveIteratorError::GenericError,
@@ -106,7 +106,7 @@ async fn test_list_with_data() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let lifecycles = make_inspects_for_lifecycle();
     let value = serde_json::to_string(&lifecycles).unwrap();
@@ -139,7 +139,7 @@ async fn test_list_with_data_with_url() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let lifecycles = make_inspects_for_lifecycle();
     let value = serde_json::to_string(&lifecycles).unwrap();
@@ -185,7 +185,7 @@ async fn test_list_with_data_with_manifest_and_archive() {
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         accessor: Some(accessor.clone()),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let lifecycles = make_inspects_for_lifecycle();
     let value = serde_json::to_string(&lifecycles).unwrap();

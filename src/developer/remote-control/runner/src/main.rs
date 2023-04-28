@@ -143,7 +143,7 @@ mod test {
                                 nodename: Some("".to_string()),
                                 addresses: Some(vec![]),
                                 ids: Some(vec![last_id.borrow().clone()]),
-                                ..IdentifyHostResponse::EMPTY
+                                ..Default::default()
                             }))
                             .unwrap();
                     }

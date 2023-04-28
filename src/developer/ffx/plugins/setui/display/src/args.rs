@@ -99,23 +99,25 @@ fn str_to_theme(src: &str) -> Result<fidl_fuchsia_settings::Theme, String> {
     match src {
         "default" => Ok(Theme {
             theme_type: Some(fidl_fuchsia_settings::ThemeType::Default),
-            ..Theme::EMPTY
+            ..Default::default()
         }),
-        "dark" => {
-            Ok(Theme { theme_type: Some(fidl_fuchsia_settings::ThemeType::Dark), ..Theme::EMPTY })
-        }
-        "light" => {
-            Ok(Theme { theme_type: Some(fidl_fuchsia_settings::ThemeType::Light), ..Theme::EMPTY })
-        }
+        "dark" => Ok(Theme {
+            theme_type: Some(fidl_fuchsia_settings::ThemeType::Dark),
+            ..Default::default()
+        }),
+        "light" => Ok(Theme {
+            theme_type: Some(fidl_fuchsia_settings::ThemeType::Light),
+            ..Default::default()
+        }),
         "darkauto" => Ok(Theme {
             theme_type: Some(fidl_fuchsia_settings::ThemeType::Dark),
             theme_mode: Some(fidl_fuchsia_settings::ThemeMode::AUTO),
-            ..Theme::EMPTY
+            ..Default::default()
         }),
         "lightauto" => Ok(Theme {
             theme_type: Some(fidl_fuchsia_settings::ThemeType::Light),
             theme_mode: Some(fidl_fuchsia_settings::ThemeMode::AUTO),
-            ..Theme::EMPTY
+            ..Default::default()
         }),
         _ => Err(String::from("Couldn't parse theme.")),
     }
@@ -130,7 +132,7 @@ impl From<SetArgs> for DisplaySettings {
             screen_enabled: src.screen_enabled,
             theme: src.theme,
             adjusted_auto_brightness: src.auto_brightness_level,
-            ..DisplaySettings::EMPTY
+            ..Default::default()
         }
     }
 }

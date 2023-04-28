@@ -61,7 +61,7 @@ pub fn setup_fake_bridge_provider(
                                     data: value.clone(),
                                     truncated_chars: 0,
                                 })),
-                                ..ArchiveIteratorEntry::EMPTY
+                                ..Default::default()
                             }]))
                             .unwrap()
                     }
@@ -185,7 +185,7 @@ pub fn inspect_bridge_data(
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(client_selector_configuration),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let value = serde_json::to_string(&inspects).unwrap();
     let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);

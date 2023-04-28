@@ -101,7 +101,7 @@ pub mod test {
     }
 
     pub fn setup() -> (Arc<Mutex<FakeServiceCommands>>, FastbootProxy) {
-        let state = Arc::new(Mutex::new(FakeServiceCommands { ..Default::default() }));
+        let state = Arc::new(Mutex::new(FakeServiceCommands::default()));
         (
             state.clone(),
             setup_fake_fastboot_proxy(move |req| match req {

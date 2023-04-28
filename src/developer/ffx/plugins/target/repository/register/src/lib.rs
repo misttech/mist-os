@@ -46,7 +46,7 @@ async fn register(
                 target_identifier: target_str,
                 aliases: Some(cmd.alias),
                 storage_type: cmd.storage_type,
-                ..RepositoryTarget::EMPTY
+                ..Default::default()
             },
             cmd.alias_conflict_mode,
         )
@@ -145,7 +145,7 @@ mod test {
                 target_identifier: Some(TARGET_NAME.to_string()),
                 aliases: Some(aliases),
                 storage_type: None,
-                ..RepositoryTarget::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -183,7 +183,7 @@ mod test {
                 target_identifier: None,
                 aliases: Some(vec![]),
                 storage_type: None,
-                ..RepositoryTarget::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -213,7 +213,7 @@ mod test {
                 target_identifier: Some(TARGET_NAME.to_string()),
                 aliases: Some(aliases),
                 storage_type: Some(RepositoryStorageType::Persistent),
-                ..RepositoryTarget::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -242,7 +242,7 @@ mod test {
                 target_identifier: Some(TARGET_NAME.to_string()),
                 aliases: Some(vec![]),
                 storage_type: None,
-                ..RepositoryTarget::EMPTY
+                ..Default::default()
             }
         );
     }

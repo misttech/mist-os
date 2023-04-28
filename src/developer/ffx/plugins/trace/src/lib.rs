@@ -198,7 +198,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
         }
     }
 
-    let mut trace_config = TraceConfig::EMPTY;
+    let mut trace_config = TraceConfig::default();
     if !categories.is_empty() {
         trace_config.categories = Some(umbrella_categories.clone());
     }
@@ -209,7 +209,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
                 .map(|(name, categories)| ProviderSpec {
                     name: Some(name.to_string()),
                     categories: Some(categories),
-                    ..ProviderSpec::EMPTY
+                    ..Default::default()
                 })
                 .collect(),
         );
@@ -313,7 +313,7 @@ pub async fn trace(
         }
         TraceSubCommand::Start(opts) => {
             let string_matcher: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await.ok();
-            let default = ffx::TargetQuery { string_matcher, ..ffx::TargetQuery::EMPTY };
+            let default = ffx::TargetQuery { string_matcher, ..Default::default() };
             let triggers = if opts.trigger.is_empty() { None } else { Some(opts.trigger) };
             if triggers.is_some() && !opts.background {
                 ffx_bail!(
@@ -340,11 +340,7 @@ pub async fn trace(
                 .start_recording(
                     default,
                     &output,
-                    ffx::TraceOptions {
-                        duration: opts.duration,
-                        triggers,
-                        ..ffx::TraceOptions::EMPTY
-                    },
+                    ffx::TraceOptions { duration: opts.duration, triggers, ..Default::default() },
                     trace_config,
                 )
                 .await?;
@@ -637,13 +633,13 @@ mod tests {
             ffx::TracingRequest::StartRecording { responder, .. } => responder
                 .send(&mut Ok(ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 }))
                 .expect("responder err"),
             ffx::TracingRequest::StopRecording { responder, .. } => responder
                 .send(&mut Ok(ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 }))
                 .expect("responder err"),
             ffx::TracingRequest::Status { responder, iterator } => {
@@ -657,14 +653,14 @@ mod tests {
                                 ffx::TraceInfo {
                                     target: Some(ffx::TargetInfo {
                                         nodename: Some("foo".to_string()),
-                                        ..ffx::TargetInfo::EMPTY
+                                        ..Default::default()
                                     }),
                                     output_file: Some("/foo/bar.fxt".to_string()),
-                                    ..ffx::TraceInfo::EMPTY
+                                    ..Default::default()
                                 },
                                 ffx::TraceInfo {
                                     output_file: Some("/foo/bar/baz.fxt".to_string()),
-                                    ..ffx::TraceInfo::EMPTY
+                                    ..Default::default()
                                 },
                                 ffx::TraceInfo {
                                     output_file: Some("/florp/o/matic.txt".to_string()),
@@ -672,15 +668,15 @@ mod tests {
                                         ffx::Trigger {
                                             alert: Some("foo".to_owned()),
                                             action: Some(ffx::Action::Terminate),
-                                            ..ffx::Trigger::EMPTY
+                                            ..Default::default()
                                         },
                                         ffx::Trigger {
                                             alert: Some("bar".to_owned()),
                                             action: Some(ffx::Action::Terminate),
-                                            ..ffx::Trigger::EMPTY
+                                            ..Default::default()
                                         },
                                     ]),
-                                    ..ffx::TraceInfo::EMPTY
+                                    ..Default::default()
                                 },
                             ]
                             .into_iter(),
@@ -736,18 +732,15 @@ mod tests {
             tracing_controller::ProviderInfo {
                 id: Some(42),
                 name: Some("foo".to_string()),
-                ..tracing_controller::ProviderInfo::EMPTY
+                ..Default::default()
             },
             tracing_controller::ProviderInfo {
                 id: Some(99),
                 pid: Some(1234567),
                 name: Some("bar".to_string()),
-                ..tracing_controller::ProviderInfo::EMPTY
+                ..Default::default()
             },
-            tracing_controller::ProviderInfo {
-                id: Some(2),
-                ..tracing_controller::ProviderInfo::EMPTY
-            },
+            tracing_controller::ProviderInfo { id: Some(2), ..Default::default() },
         ]
     }
 
@@ -1196,7 +1189,7 @@ Current tracing status:
                 ProviderSpec {
                     name: Some("falcon".to_string()),
                     categories: Some(vec!["prairie".to_string(), "peregrine".to_string()]),
-                    ..ProviderSpec::EMPTY
+                    ..Default::default()
                 },
                 ProviderSpec {
                     name: Some("owl".to_string()),
@@ -1205,10 +1198,10 @@ Current tracing status:
                         "elf".to_string(),
                         "snowy".to_string(),
                     ]),
-                    ..ProviderSpec::EMPTY
+                    ..Default::default()
                 },
             ]),
-            ..TraceConfig::EMPTY
+            ..Default::default()
         };
 
         let mut actual_trace_config = map_categories_to_providers(&vec![

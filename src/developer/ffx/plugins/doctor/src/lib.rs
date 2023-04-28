@@ -344,7 +344,7 @@ async fn list_targets(query: Option<&str>, tc: &TargetCollectionProxy) -> Result
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
     tc.list_targets(
-        TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..TargetQuery::EMPTY },
+        TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..Default::default() },
         reader,
     )?;
     let mut res = Vec::new();
@@ -1099,7 +1099,7 @@ async fn doctor_summary<W: Write>(
         match timeout(
             retry_delay,
             tc_proxy.open_target(
-                TargetQuery { string_matcher: target.nodename.clone(), ..TargetQuery::EMPTY },
+                TargetQuery { string_matcher: target.nodename.clone(), ..Default::default() },
                 target_server,
             ),
         )
@@ -1694,7 +1694,7 @@ mod test {
                         .send(&mut Ok(IdentifyHostResponse {
                             addresses: Some(vec![]),
                             nodename: Some(NODENAME.to_string()),
-                            ..IdentifyHostResponse::EMPTY
+                            ..Default::default()
                         }))
                         .unwrap(),
                     _ => panic!("Unexpected request: {:?}", req),
@@ -1737,7 +1737,7 @@ mod test {
                                 rcs_state: Some(RemoteControlState::Unknown),
                                 target_type: Some(TargetType::Unknown),
                                 target_state: Some(TargetState::Fastboot),
-                                ..TargetInfo::EMPTY
+                                ..Default::default()
                             }]
                         },
                         |_query, target_handle| {
@@ -1795,7 +1795,7 @@ mod test {
                                         rcs_state: Some(RemoteControlState::Unknown),
                                         target_type: Some(TargetType::Unknown),
                                         target_state: Some(TargetState::Unknown),
-                                        ..TargetInfo::EMPTY
+                                        ..Default::default()
                                     }]
                                 } else if ssh_error.is_some() {
                                     vec![TargetInfo {
@@ -1805,7 +1805,7 @@ mod test {
                                         rcs_state: Some(RemoteControlState::Unknown),
                                         target_type: Some(TargetType::Unknown),
                                         target_state: Some(TargetState::Unknown),
-                                        ..TargetInfo::EMPTY
+                                        ..Default::default()
                                     }]
                                 } else {
                                     vec![
@@ -1816,7 +1816,7 @@ mod test {
                                             rcs_state: Some(RemoteControlState::Unknown),
                                             target_type: Some(TargetType::Unknown),
                                             target_state: Some(TargetState::Unknown),
-                                            ..TargetInfo::EMPTY
+                                            ..Default::default()
                                         },
                                         TargetInfo {
                                             nodename: Some(UNRESPONSIVE_NODENAME.to_string()),
@@ -1825,7 +1825,7 @@ mod test {
                                             rcs_state: Some(RemoteControlState::Unknown),
                                             target_type: Some(TargetType::Unknown),
                                             target_state: Some(TargetState::Unknown),
-                                            ..TargetInfo::EMPTY
+                                            ..Default::default()
                                         },
                                     ]
                                 }
@@ -1924,7 +1924,7 @@ mod test {
             } else {
                 Some(ANOTHER_FAKE_API_LEVEL)
             },
-            ..VersionInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -1936,7 +1936,7 @@ mod test {
             abi_revision: Some(FAKE_ABI_REVISION),
             api_level: Some(FAKE_API_LEVEL),
             exec_path: Some(ffx_path()),
-            ..VersionInfo::EMPTY
+            ..Default::default()
         }
     }
 

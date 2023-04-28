@@ -61,11 +61,11 @@ pub async fn test_params_from_reader<R: Read>(
                             moniker_segments: Some(vec![StringSelector::StringPattern(
                                 "**".into(),
                             )]),
-                            ..ComponentSelector::EMPTY
+                            ..Default::default()
                         },
                         interest: Interest {
                             min_severity: Some(min_severity.into()),
-                            ..Interest::EMPTY
+                            ..Default::default()
                         },
                     });
                 }

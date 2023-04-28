@@ -18,10 +18,10 @@ async fn command(
     proxy: SetupProxy,
     configuration_interfaces: Option<ConfigurationInterfaces>,
 ) -> WatchOrSetResult {
-    let mut settings = SetupSettings::EMPTY;
+    let mut settings = SetupSettings::default();
     settings.enabled_configuration_interfaces = configuration_interfaces;
 
-    if settings == SetupSettings::EMPTY {
+    if settings == SetupSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         // Default to reboot the device in order for the change to take effect.
@@ -113,7 +113,7 @@ mod test {
             SetupRequest::Watch { responder } => {
                 let _ = responder.send(SetupSettings {
                     enabled_configuration_interfaces: expected_interface,
-                    ..SetupSettings::EMPTY
+                    ..Default::default()
                 });
             }
         });
@@ -125,7 +125,7 @@ mod test {
                 "{:#?}",
                 SetupSettings {
                     enabled_configuration_interfaces: expected_interface,
-                    ..SetupSettings::EMPTY
+                    ..Default::default()
                 }
             )
         );

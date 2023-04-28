@@ -130,7 +130,7 @@ pub async fn dump_annotations<W: Write>(
         collection_timeout_per_annotation: Some(
             i64::try_from(Duration::from_secs(5 * 60).as_nanos()).map_err(|e| anyhow!(e))?,
         ),
-        ..GetAnnotationsParameters::EMPTY
+        ..Default::default()
     };
 
     // Request annotations.
@@ -184,7 +184,7 @@ pub async fn snapshot_impl<W: Write>(
                 i64::try_from(Duration::from_secs(5 * 60).as_nanos()).map_err(|e| anyhow!(e))?,
             ),
             response_channel: Some(file_server_end.into_channel()),
-            ..GetSnapshotParameters::EMPTY
+            ..Default::default()
         };
 
         // Request snapshot & send channel.
@@ -283,7 +283,7 @@ mod test {
 
                 serve_fake_file(server_end);
 
-                let snapshot = Snapshot { ..Snapshot::EMPTY };
+                let snapshot = Snapshot::default();
                 responder.send(snapshot).unwrap();
             }
             DataProviderRequest::GetAnnotations { params, responder } => {
@@ -295,7 +295,7 @@ mod test {
     }
 
     async fn run_snapshot_test(cmd: SnapshotCommand) {
-        let annotations = Annotations { ..Annotations::EMPTY };
+        let annotations = Annotations::default();
         let data_provider_proxy = setup_fake_data_provider_server(annotations);
 
         let mut writer = Vec::new();
@@ -320,7 +320,7 @@ mod test {
             annotation!("hardware.board.name", "default-board"),
             annotation!("build.is_debug", "false"),
         ];
-        let annotations = Annotations { annotations: Some(annotation_vec), ..Annotations::EMPTY };
+        let annotations = Annotations { annotations: Some(annotation_vec), ..Default::default() };
         let data_provider_proxy = setup_fake_data_provider_server(annotations);
 
         let mut writer = Vec::new();

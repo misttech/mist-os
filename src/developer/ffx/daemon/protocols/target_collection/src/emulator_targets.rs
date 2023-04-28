@@ -237,7 +237,7 @@ impl EmulatorWatcher {
                             if kind == Remove(RemoveKind::Folder) {
                                 let target_info = ffx::TargetInfo {
                                     nodename: Some(instance_name),
-                                    ..ffx::TargetInfo::EMPTY
+                                    ..Default::default()
                                 };
                                 return Some(EmulatorTargetAction::Remove(target_info));
                             }
@@ -247,7 +247,7 @@ impl EmulatorWatcher {
                             if kind == Remove(RemoveKind::Folder) {
                                 let target_info = ffx::TargetInfo {
                                     nodename: Some(instance_name),
-                                    ..ffx::TargetInfo::EMPTY
+                                    ..Default::default()
                                 };
                                 return Some(EmulatorTargetAction::Remove(target_info));
                             }
@@ -314,7 +314,7 @@ impl EmulatorWatcher {
             nodename: Some(nodename),
             addresses: Some(vec![loopback]),
             ssh_address,
-            ..ffx::TargetInfo::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -555,7 +555,7 @@ mod tests {
                 EmulatorInstanceEvent::Name(emu_instance_name.clone(), Remove(RemoveKind::Folder)),
                 Some(EmulatorTargetAction::Remove(ffx::TargetInfo {
                     nodename: Some(emu_instance_name.clone()),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 })),
             ),
             (
@@ -564,7 +564,7 @@ mod tests {
                     nodename: Some(instance_data.get_name().to_string()),
                     addresses: Some(vec![loopback]),
                     ssh_address,
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 })),
             ),
             (EmulatorInstanceEvent::Data(tap_instance_data.clone()), None),

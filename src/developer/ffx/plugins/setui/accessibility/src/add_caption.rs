@@ -15,14 +15,14 @@ pub async fn add_caption(accessibility_proxy: AccessibilityProxy, args: CaptionA
 }
 
 async fn command(proxy: AccessibilityProxy, input: CaptionArgs) -> WatchOrSetResult {
-    let mut settings = AccessibilitySettings::EMPTY;
+    let mut settings = AccessibilitySettings::default();
 
     let font_style = CaptionFontStyle {
         family: input.font_family,
         color: input.font_color,
         relative_size: input.relative_size,
         char_edge_style: input.char_edge_style,
-        ..CaptionFontStyle::EMPTY
+        ..Default::default()
     };
 
     let captions_settings = CaptionsSettings {
@@ -30,15 +30,15 @@ async fn command(proxy: AccessibilityProxy, input: CaptionArgs) -> WatchOrSetRes
         for_tts: input.for_tts,
         window_color: input.window_color,
         background_color: input.background_color,
-        font_style: if font_style != CaptionFontStyle::EMPTY { Some(font_style) } else { None },
-        ..CaptionsSettings::EMPTY
+        font_style: if font_style != CaptionFontStyle::default() { Some(font_style) } else { None },
+        ..Default::default()
     };
 
-    if captions_settings != CaptionsSettings::EMPTY {
+    if captions_settings != CaptionsSettings::default() {
         settings.captions_settings = Some(captions_settings);
     }
 
-    if settings == AccessibilitySettings::EMPTY {
+    if settings == AccessibilitySettings::default() {
         return Err(format_err!("At least one option is required. Use --help to see options."));
     }
 

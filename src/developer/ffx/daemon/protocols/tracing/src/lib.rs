@@ -125,7 +125,7 @@ enum TraceTaskStartError {
 
 async fn trace_shutdown(proxy: &trace::ControllerProxy) -> Result<(), ffx::RecordingError> {
     proxy
-        .stop_tracing(trace::StopOptions { write_results: Some(true), ..trace::StopOptions::EMPTY })
+        .stop_tracing(trace::StopOptions { write_results: Some(true), ..Default::default() })
         .await
         .map_err(|e| {
             tracing::warn!("stopping tracing: {:?}", e);
@@ -134,7 +134,7 @@ async fn trace_shutdown(proxy: &trace::ControllerProxy) -> Result<(), ffx::Recor
     proxy
         .terminate_tracing(trace::TerminateOptions {
             write_results: Some(true),
-            ..trace::TerminateOptions::EMPTY
+            ..Default::default()
         })
         .await
         .map_err(|e| {
@@ -159,7 +159,7 @@ impl TraceTask {
         let f = File::create(&output_file).await.context("opening file")?;
         proxy.initialize_tracing(config.clone(), server)?;
         proxy
-            .start_tracing(trace::StartOptions::EMPTY)
+            .start_tracing(trace::StartOptions::default())
             .await?
             .map_err(TraceTaskStartError::TracingStartError)?;
         let output_file_clone = output_file.clone();
@@ -469,7 +469,7 @@ impl FidlProtocol for TracingProtocol {
                         }),
                         config: Some(t.config.clone()),
                         triggers: t.options.triggers.clone(),
-                        ..ffx::TraceInfo::EMPTY
+                        ..Default::default()
                     })
                     .collect::<Vec<_>>();
                 self.iter_tasks.spawn(async move {
@@ -543,7 +543,7 @@ mod tests {
                         FAKE_CONTROLLER_TRACE_OUTPUT.len(),
                         socket.write(FAKE_CONTROLLER_TRACE_OUTPUT.as_bytes()).unwrap()
                     );
-                    responder.send(trace::TerminateResult::EMPTY).map_err(Into::into)
+                    responder.send(trace::TerminateResult::default()).map_err(Into::into)
                 }
                 r => panic!("unexpected request: {:#?}", r),
             }
@@ -555,10 +555,7 @@ mod tests {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeController>()
             .register_fidl_protocol::<TracingProtocol>()
-            .target(ffx::TargetInfo {
-                nodename: Some("foobar".to_string()),
-                ..ffx::TargetInfo::EMPTY
-            })
+            .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })
             .build();
         let proxy = daemon.open_proxy::<ffx::TracingMarker>().await;
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -567,11 +564,11 @@ mod tests {
             .start_recording(
                 ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
-                    ..ffx::TargetQuery::EMPTY
+                    ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions::EMPTY,
-                trace::TraceConfig::EMPTY,
+                ffx::TraceOptions::default(),
+                trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -589,10 +586,7 @@ mod tests {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeController>()
             .register_fidl_protocol::<TracingProtocol>()
-            .target(ffx::TargetInfo {
-                nodename: Some("foobar".to_string()),
-                ..ffx::TargetInfo::EMPTY
-            })
+            .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })
             .build();
         let proxy = daemon.open_proxy::<ffx::TracingMarker>().await;
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -601,11 +595,11 @@ mod tests {
             .start_recording(
                 ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
-                    ..ffx::TargetQuery::EMPTY
+                    ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions::EMPTY,
-                trace::TraceConfig::EMPTY,
+                ffx::TraceOptions::default(),
+                trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -616,10 +610,10 @@ mod tests {
             Err(ffx::RecordingError::DuplicateTraceFile),
             proxy
                 .start_recording(
-                    ffx::TargetQuery::EMPTY,
+                    ffx::TargetQuery::default(),
                     &output,
-                    ffx::TraceOptions::EMPTY,
-                    trace::TraceConfig::EMPTY
+                    ffx::TraceOptions::default(),
+                    trace::TraceConfig::default()
                 )
                 .await
                 .unwrap()
@@ -637,10 +631,7 @@ mod tests {
                     .map_err(Into::into),
                 r => panic!("unexpecte request: {:#?}", r),
             })
-            .target(ffx::TargetInfo {
-                nodename: Some("foobar".to_string()),
-                ..ffx::TargetInfo::EMPTY
-            })
+            .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })
             .build();
         let proxy = daemon.open_proxy::<ffx::TracingMarker>().await;
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -651,11 +642,11 @@ mod tests {
                 .start_recording(
                     ffx::TargetQuery {
                         string_matcher: Some("foobar".to_owned()),
-                        ..ffx::TargetQuery::EMPTY
+                        ..Default::default()
                     },
                     &output,
-                    ffx::TraceOptions::EMPTY,
-                    trace::TraceConfig::EMPTY
+                    ffx::TraceOptions::default(),
+                    trace::TraceConfig::default()
                 )
                 .await
                 .unwrap()
@@ -673,10 +664,7 @@ mod tests {
                     .map_err(Into::into),
                 r => panic!("unexpecte request: {:#?}", r),
             })
-            .target(ffx::TargetInfo {
-                nodename: Some("foobar".to_string()),
-                ..ffx::TargetInfo::EMPTY
-            })
+            .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })
             .build();
         let proxy = daemon.open_proxy::<ffx::TracingMarker>().await;
         let temp_dir = tempfile::TempDir::new().unwrap();
@@ -687,11 +675,11 @@ mod tests {
                 .start_recording(
                     ffx::TargetQuery {
                         string_matcher: Some("foobar".to_owned()),
-                        ..ffx::TargetQuery::EMPTY
+                        ..Default::default()
                     },
                     &output,
-                    ffx::TraceOptions::EMPTY,
-                    trace::TraceConfig::EMPTY
+                    ffx::TraceOptions::default(),
+                    trace::TraceConfig::default()
                 )
                 .await
                 .unwrap()
@@ -714,10 +702,7 @@ mod tests {
     async fn test_trace_duration_shutdown_via_output_file() {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeController>()
-            .target(ffx::TargetInfo {
-                nodename: Some("foobar".to_owned()),
-                ..ffx::TargetInfo::EMPTY
-            })
+            .target(ffx::TargetInfo { nodename: Some("foobar".to_owned()), ..Default::default() })
             .build();
         let protocol = Rc::new(RefCell::new(TracingProtocol::default()));
         let (proxy, _task) = protocols::testing::create_proxy(protocol.clone(), &daemon).await;
@@ -727,11 +712,11 @@ mod tests {
             .start_recording(
                 ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
-                    ..ffx::TargetQuery::EMPTY
+                    ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions { duration: Some(500000.0), ..ffx::TraceOptions::EMPTY },
-                trace::TraceConfig::EMPTY,
+                ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
+                trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -750,10 +735,7 @@ mod tests {
     async fn test_trace_duration_shutdown_via_nodename() {
         let daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeController>()
-            .target(ffx::TargetInfo {
-                nodename: Some("foobar".to_string()),
-                ..ffx::TargetInfo::EMPTY
-            })
+            .target(ffx::TargetInfo { nodename: Some("foobar".to_string()), ..Default::default() })
             .build();
         let protocol = Rc::new(RefCell::new(TracingProtocol::default()));
         let (proxy, _task) = protocols::testing::create_proxy(protocol.clone(), &daemon).await;
@@ -763,11 +745,11 @@ mod tests {
             .start_recording(
                 ffx::TargetQuery {
                     string_matcher: Some("foobar".to_owned()),
-                    ..ffx::TargetQuery::EMPTY
+                    ..Default::default()
                 },
                 &output,
-                ffx::TraceOptions { duration: Some(500000.0), ..ffx::TraceOptions::EMPTY },
-                trace::TraceConfig::EMPTY,
+                ffx::TraceOptions { duration: Some(500000.0), ..Default::default() },
+                trace::TraceConfig::default(),
             )
             .await
             .unwrap()
@@ -803,11 +785,11 @@ mod tests {
     async fn test_triggers_valid() {
         let proxy = spawn_fake_alert_watcher("foober");
         let triggers = Some(vec![
-            ffx::Trigger { alert: Some("foo".to_owned()), action: None, ..ffx::Trigger::EMPTY },
+            ffx::Trigger { alert: Some("foo".to_owned()), action: None, ..Default::default() },
             ffx::Trigger {
                 alert: Some("foober".to_owned()),
                 action: Some(ffx::Action::Terminate),
-                ..ffx::Trigger::EMPTY
+                ..Default::default()
             },
         ]);
         let res = TriggersWatcher::new(&proxy, triggers).await;
@@ -819,11 +801,11 @@ mod tests {
         let (proxy, server) = fidl::endpoints::create_proxy::<trace::ControllerMarker>().unwrap();
         drop(server);
         let triggers = Some(vec![
-            ffx::Trigger { alert: Some("foo".to_owned()), action: None, ..ffx::Trigger::EMPTY },
+            ffx::Trigger { alert: Some("foo".to_owned()), action: None, ..Default::default() },
             ffx::Trigger {
                 alert: Some("foober".to_owned()),
                 action: Some(ffx::Action::Terminate),
-                ..ffx::Trigger::EMPTY
+                ..Default::default()
             },
         ]);
         let res = TriggersWatcher::new(&proxy, triggers).await;

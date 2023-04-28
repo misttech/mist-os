@@ -62,26 +62,26 @@ impl TryFrom<Audio> for AudioSettings {
     type Error = &'static str;
 
     fn try_from(src: Audio) -> Result<Self, Self::Error> {
-        let volume = Volume { level: src.level, muted: src.volume_muted, ..Volume::EMPTY };
+        let volume = Volume { level: src.level, muted: src.volume_muted, ..Default::default() };
         let stream_settings = AudioStreamSettings {
             stream: src.stream,
             source: src.source,
-            user_volume: if volume == Volume::EMPTY { None } else { Some(volume) },
-            ..AudioStreamSettings::EMPTY
+            user_volume: if volume == Volume::default() { None } else { Some(volume) },
+            ..Default::default()
         };
 
         let result = AudioSettings {
-            streams: if stream_settings == AudioStreamSettings::EMPTY {
+            streams: if stream_settings == AudioStreamSettings::default() {
                 None
             } else {
                 Some(vec![stream_settings])
             },
-            ..AudioSettings::EMPTY
+            ..Default::default()
         };
 
         // TODO(https://fxbug.dev/52556): Clean up this logic once we have a detailed error return
         // from the FIDL.
-        if result == AudioSettings::EMPTY {
+        if result == AudioSettings::default() {
             // A Watch call request.
             return Ok(result);
         } else if src.stream.is_none() {

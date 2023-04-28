@@ -16,10 +16,10 @@ pub async fn run_command(privacy_proxy: PrivacyProxy, privacy: Privacy) -> Resul
 }
 
 async fn command(proxy: PrivacyProxy, user_data_sharing_consent: Option<bool>) -> WatchOrSetResult {
-    let mut settings = PrivacySettings::EMPTY;
+    let mut settings = PrivacySettings::default();
     settings.user_data_sharing_consent = user_data_sharing_consent;
 
-    if settings == PrivacySettings::EMPTY {
+    if settings == PrivacySettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
@@ -107,7 +107,7 @@ mod test {
             PrivacyRequest::Watch { responder } => {
                 let _ = responder.send(PrivacySettings {
                     user_data_sharing_consent: expected_user_data_sharing_consent,
-                    ..PrivacySettings::EMPTY
+                    ..Default::default()
                 });
             }
         });
@@ -119,7 +119,7 @@ mod test {
                 "{:#?}",
                 PrivacySettings {
                     user_data_sharing_consent: expected_user_data_sharing_consent,
-                    ..PrivacySettings::EMPTY
+                    ..Default::default()
                 }
             )
         );

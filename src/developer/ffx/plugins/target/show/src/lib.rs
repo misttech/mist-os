@@ -492,7 +492,7 @@ mod tests {
                 })];
                 let nodename = Some("fake_fuchsia_device".to_string());
                 responder
-                    .send(TargetInfo { nodename, addresses: Some(addrs), ..TargetInfo::EMPTY })
+                    .send(TargetInfo { nodename, addresses: Some(addrs), ..Default::default() })
                     .unwrap();
             }
             _ => assert!(false),
@@ -516,7 +516,7 @@ mod tests {
                         product_config: Some("fake_product".to_string()),
                         board_config: Some("fake_board".to_string()),
                         latest_commit_date: Some("fake_commit".to_string()),
-                        ..BuildInfo::EMPTY
+                        ..Default::default()
                     })
                     .unwrap();
             }
@@ -531,7 +531,7 @@ mod tests {
                         name: Some("fake_name".to_string()),
                         revision: Some("fake_revision".to_string()),
                         cpu_architecture: Some(Architecture::X64),
-                        ..BoardInfo::EMPTY
+                        ..Default::default()
                     })
                     .unwrap();
             }
@@ -546,7 +546,7 @@ mod tests {
                         graceful: Some(true),
                         uptime: Some(65000),
                         reason: Some(RebootReason::ZbiSwap),
-                        ..LastReboot::EMPTY
+                        ..Default::default()
                     })
                     .unwrap();
             }
@@ -660,7 +660,7 @@ mod tests {
                         serial_number: Some("fake_serial".to_string()),
                         is_retail_demo: Some(false),
                         retail_sku: Some("fake_sku".to_string()),
-                        ..DeviceInfo::EMPTY
+                        ..Default::default()
                     })
                     .unwrap();
             }
@@ -689,7 +689,7 @@ mod tests {
                         language: Some("fake_language".to_string()),
                         regulatory_domain: Some(RegulatoryDomain {
                             country_code: Some("fake_regulatory_domain".to_string()),
-                            ..RegulatoryDomain::EMPTY
+                            ..Default::default()
                         }),
                         locale_list: Some(vec![]),
                         name: Some("fake_name".to_string()),
@@ -704,7 +704,7 @@ mod tests {
                         microphone: Some("fake_microphone".to_string()),
                         model: Some("fake_model".to_string()),
                         nand_storage: Some("fake_nand_storage".to_string()),
-                        ..ProductInfo::EMPTY
+                        ..Default::default()
                     })
                     .unwrap();
             }

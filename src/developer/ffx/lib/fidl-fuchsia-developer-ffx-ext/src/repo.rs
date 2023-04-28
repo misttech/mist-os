@@ -119,7 +119,7 @@ impl From<RepositorySpec> for fidl::RepositorySpec {
                     } else {
                         Some(aliases.into_iter().collect())
                     },
-                    ..fidl::FileSystemRepositorySpec::EMPTY
+                    ..Default::default()
                 })
             }
             RepositorySpec::Pm { path, aliases } => {
@@ -131,7 +131,7 @@ impl From<RepositorySpec> for fidl::RepositorySpec {
                     } else {
                         Some(aliases.into_iter().collect())
                     },
-                    ..fidl::PmRepositorySpec::EMPTY
+                    ..Default::default()
                 })
             }
             RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
@@ -143,7 +143,7 @@ impl From<RepositorySpec> for fidl::RepositorySpec {
                     } else {
                         Some(aliases.into_iter().collect())
                     },
-                    ..fidl::HttpRepositorySpec::EMPTY
+                    ..Default::default()
                 })
             }
             RepositorySpec::Gcs { metadata_repo_url, blob_repo_url, aliases } => {
@@ -155,7 +155,7 @@ impl From<RepositorySpec> for fidl::RepositorySpec {
                     } else {
                         Some(aliases.into_iter().collect())
                     },
-                    ..fidl::GcsRepositorySpec::EMPTY
+                    ..Default::default()
                 })
             }
         }
@@ -303,7 +303,7 @@ impl From<RepositoryTarget> for fidl::RepositoryTarget {
             target_identifier: repo_target.target_identifier,
             aliases: repo_target.aliases.map(|aliases| aliases.into_iter().collect()),
             storage_type: repo_target.storage_type.map(|storage_type| storage_type.into()),
-            ..fidl::RepositoryTarget::EMPTY
+            ..Default::default()
         }
     }
 }

@@ -355,7 +355,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                                         connection_error_logs: Some(
                                             target.host_pipe_log_buffer().lines(),
                                         ),
-                                        ..ffx::AddTargetError::EMPTY
+                                        ..Default::default()
                                     })
                                     .map_err(Into::into)
                             }
@@ -374,7 +374,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                             .error(ffx::AddTargetError {
                                 connection_error: Some(e),
                                 connection_error_logs: Some(logs),
-                                ..ffx::AddTargetError::EMPTY
+                                ..Default::default()
                             })
                             .map_err(Into::into);
                     }
@@ -625,7 +625,7 @@ mod tests {
 
         handle_discovered_target(
             &tc,
-            ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..ffx::TargetInfo::EMPTY },
+            ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..Default::default() },
         );
         assert!(t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Mdns(t) if t > before_update);
@@ -644,7 +644,7 @@ mod tests {
                 nodename: Some(t.nodename().unwrap()),
                 target_state: Some(ffx::TargetState::Fastboot),
                 fastboot_interface: Some(ffx::FastbootInterface::Tcp),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         );
         assert!(!t.is_host_pipe_running());
@@ -688,10 +688,7 @@ mod tests {
         let (reader, server) =
             fidl::endpoints::create_endpoints::<ffx::TargetCollectionReaderMarker>();
         tc.list_targets(
-            ffx::TargetQuery {
-                string_matcher: query.map(|s| s.to_owned()),
-                ..ffx::TargetQuery::EMPTY
-            },
+            ffx::TargetQuery { string_matcher: query.map(|s| s.to_owned()), ..Default::default() },
             reader,
         )
         .unwrap();
@@ -766,21 +763,21 @@ mod tests {
         target_sender
             .send(ffx::MdnsEventType::TargetFound(ffx::TargetInfo {
                 nodename: Some(NAME.to_owned()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             }))
             .await
             .unwrap();
         target_sender
             .send(ffx::MdnsEventType::TargetFound(ffx::TargetInfo {
                 nodename: Some(NAME2.to_owned()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             }))
             .await
             .unwrap();
         target_sender
             .send(ffx::MdnsEventType::TargetFound(ffx::TargetInfo {
                 nodename: Some(NAME3.to_owned()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             }))
             .await
             .unwrap();
@@ -820,7 +817,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_fastboot_target_no_serial() {
         let tc = Rc::new(TargetCollection::new());
-        handle_fastboot_target(&tc, ffx::FastbootTarget::EMPTY);
+        handle_fastboot_target(&tc, ffx::FastbootTarget::default());
         assert_eq!(tc.targets().len(), 0, "target collection should remain empty");
     }
 
@@ -829,7 +826,7 @@ mod tests {
         let tc = Rc::new(TargetCollection::new());
         handle_fastboot_target(
             &tc,
-            ffx::FastbootTarget { serial: Some("12345".to_string()), ..ffx::FastbootTarget::EMPTY },
+            ffx::FastbootTarget { serial: Some("12345".to_string()), ..Default::default() },
         );
         assert_eq!(tc.targets()[0].serial().as_deref(), Some("12345"));
     }
@@ -923,7 +920,7 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
-        proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::EMPTY, client).unwrap();
+        proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::default(), client).unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
@@ -967,7 +964,7 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<ffx::AddTargetResponder_Marker>();
         let target_add_fut = make_target_add_fut(server);
-        proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::EMPTY, client).unwrap();
+        proxy.add_target(&mut target_addr.into(), ffx::AddTargetConfig::default(), client).unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection.get(target_addr.to_string()).unwrap();
@@ -1020,7 +1017,7 @@ mod tests {
                     port: 8022,
                     scope_id: 1,
                 }),
-                ffx::AddTargetConfig::EMPTY,
+                ffx::AddTargetConfig::default(),
                 client,
             )
             .unwrap();

@@ -141,10 +141,10 @@ mod test {
             enabled: Some(false),
             type_: Some(LightType::Simple),
             lights: Some(vec![
-                LightState { value: Some(LightValue::Brightness(0.2)), ..LightState::EMPTY },
-                LightState { value: Some(LightValue::Brightness(0.42)), ..LightState::EMPTY }
+                LightState { value: Some(LightValue::Brightness(0.2)), ..Default::default() },
+                LightState { value: Some(LightValue::Brightness(0.42)), ..Default::default() }
             ]),
-            ..LightGroupSettings::EMPTY
+            ..Default::default()
         };
         "Test light watch() output."
     )]
@@ -154,11 +154,11 @@ mod test {
             enabled: Some(true),
             type_: Some(LightType::Simple),
             lights: Some(vec![
-                LightState { value: Some(LightValue::Brightness(0.2)), ..LightState::EMPTY },
-                LightState { value: Some(LightValue::Brightness(0.42)), ..LightState::EMPTY },
-                LightState { value: Some(LightValue::Brightness(0.66)), ..LightState::EMPTY }
+                LightState { value: Some(LightValue::Brightness(0.2)), ..Default::default() },
+                LightState { value: Some(LightValue::Brightness(0.42)), ..Default::default() },
+                LightState { value: Some(LightValue::Brightness(0.66)), ..Default::default() }
             ]),
-            ..LightGroupSettings::EMPTY
+            ..Default::default()
         };
         "Test light watch() output with different values."
     )]
@@ -193,10 +193,10 @@ mod test {
             enabled: Some(false),
             type_: Some(LightType::Simple),
             lights: Some(vec![
-                LightState { value: Some(LightValue::Brightness(0.2)), ..LightState::EMPTY },
-                LightState { value: Some(LightValue::Brightness(0.42)), ..LightState::EMPTY }
+                LightState { value: Some(LightValue::Brightness(0.2)), ..Default::default() },
+                LightState { value: Some(LightValue::Brightness(0.42)), ..Default::default() }
             ]),
-            ..LightGroupSettings::EMPTY
+            ..Default::default()
         };
         "Test individual light watch() output."
     )]
@@ -206,9 +206,9 @@ mod test {
             enabled: Some(true),
             type_: Some(LightType::Simple),
             lights: Some(vec![
-                LightState { value: Some(LightValue::Brightness(0.2)), ..LightState::EMPTY }
+                LightState { value: Some(LightValue::Brightness(0.2)), ..Default::default() }
             ]),
-            ..LightGroupSettings::EMPTY
+            ..Default::default()
         };
         "Test individual light watch() output with different values."
     )]

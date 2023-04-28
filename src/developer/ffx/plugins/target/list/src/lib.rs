@@ -38,7 +38,7 @@ pub async fn list_targets(
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
     tc_proxy.list_targets(
-        TargetQuery { string_matcher: cmd.nodename.clone(), ..TargetQuery::EMPTY },
+        TargetQuery { string_matcher: cmd.nodename.clone(), ..Default::default() },
         reader,
     )?;
     let mut res = Vec::new();
@@ -123,7 +123,7 @@ mod test {
             rcs_state: Some(RemoteControlState::Up),
             target_type: Some(TargetType::Unknown),
             target_state: Some(TargetState::Unknown),
-            ..FidlTargetInfo::EMPTY
+            ..Default::default()
         }
     }
 

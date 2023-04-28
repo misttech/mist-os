@@ -19,7 +19,7 @@ pub async fn run_command(input_proxy: InputProxy, input: Input) -> Result<()> {
 }
 
 async fn command(proxy: InputProxy, mut input_state: InputState) -> WatchOrSetResult {
-    if input_state == InputState::EMPTY {
+    if input_state == InputState::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         if input_state.device_type.is_none() {
@@ -66,14 +66,14 @@ mod test {
             source: Some(DeviceStateSource::Hardware),
             state: Some(DeviceState {
                 toggle_flags: ToggleStateFlags::from_bits(1),
-                ..DeviceState::EMPTY
+                ..Default::default()
             }),
-            ..SourceState::EMPTY
+            ..Default::default()
         });
         source_states.push(SourceState {
             source: Some(DeviceStateSource::Software),
             state: Some(u64_to_state(device_state)),
-            ..SourceState::EMPTY
+            ..Default::default()
         });
         let device = InputDevice {
             device_name: Some(device_name.to_string()),
@@ -81,7 +81,7 @@ mod test {
             source_states: Some(source_states),
             mutable_toggle_state: ToggleStateFlags::from_bits(12),
             state: Some(u64_to_state(device_state)),
-            ..InputDevice::EMPTY
+            ..Default::default()
         };
         devices.push(device);
         devices
@@ -89,7 +89,7 @@ mod test {
 
     /// Transforms an u64 into an fuchsia_fidl_settings::DeviceState.
     fn u64_to_state(num: u64) -> DeviceState {
-        DeviceState { toggle_flags: ToggleStateFlags::from_bits(num), ..DeviceState::EMPTY }
+        DeviceState { toggle_flags: ToggleStateFlags::from_bits(num), ..Default::default() }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -108,7 +108,7 @@ mod test {
             device_type: Some(DeviceType::Camera),
             device_state: Some(DeviceState {
                 toggle_flags: Some(ToggleStateFlags::AVAILABLE),
-                ..DeviceState::EMPTY
+                ..Default::default()
             }),
         };
         let response = run_command(proxy, input).await;
@@ -121,7 +121,7 @@ mod test {
             device_type: Some(DeviceType::Microphone),
             device_state: Some(DeviceState {
                 toggle_flags: Some(ToggleStateFlags::MUTED),
-                ..DeviceState::EMPTY
+                ..Default::default()
             }),
         };
         "Test input set() output with non-empty input."
@@ -132,7 +132,7 @@ mod test {
             device_type: Some(DeviceType::Microphone),
             device_state: Some(DeviceState {
                 toggle_flags: Some(ToggleStateFlags::MUTED),
-                ..DeviceState::EMPTY
+                ..Default::default()
             }),
         };
         "Test input set() output with a different input."
@@ -176,7 +176,7 @@ mod test {
             InputRequest::Watch { responder } => {
                 let _ = responder.send(InputSettings {
                     devices: Some(create_input_devices(DeviceType::Camera, "camera", 1)),
-                    ..InputSettings::EMPTY
+                    ..Default::default()
                 });
             }
         });

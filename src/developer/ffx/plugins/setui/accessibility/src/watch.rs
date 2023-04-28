@@ -28,12 +28,12 @@ mod test {
                 panic!("Unexpected call to set");
             }
             AccessibilityRequest::Watch { responder } => {
-                let _ = responder.send(AccessibilitySettings::EMPTY);
+                let _ = responder.send(AccessibilitySettings::default());
             }
         });
 
         let output = utils::assert_watch!(command(proxy));
-        assert_eq!(output, format!("{:#?}", AccessibilitySettings::EMPTY));
+        assert_eq!(output, format!("{:#?}", AccessibilitySettings::default()));
         Ok(())
     }
 }

@@ -77,7 +77,7 @@ impl From<Intl> for IntlSettings {
             temperature_unit: src.temperature_unit,
             time_zone_id: src.time_zone,
             hour_cycle: src.hour_cycle,
-            ..IntlSettings::EMPTY
+            ..Default::default()
         }
     }
 }

@@ -22,7 +22,7 @@ async fn test_selectors_no_parameters() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let expected_responses = Arc::new(vec![]);
     let test_buffers = TestBuffers::default();
@@ -49,7 +49,7 @@ async fn test_selectors_with_unknown_manifest() {
         stream_mode: Some(StreamMode::Snapshot),
         data_type: Some(DataType::Inspect),
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-        ..BridgeStreamParameters::EMPTY
+        ..Default::default()
     };
     let expected_responses = Arc::new(vec![]);
     let test_buffers = TestBuffers::default();

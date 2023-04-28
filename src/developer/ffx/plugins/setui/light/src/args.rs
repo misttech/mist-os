@@ -77,7 +77,7 @@ impl Into<Vec<LightState>> for LightGroup {
                 .simple
                 .clone()
                 .into_iter()
-                .map(|val| LightState { value: Some(LightValue::On(val)), ..LightState::EMPTY })
+                .map(|val| LightState { value: Some(LightValue::On(val)), ..Default::default() })
                 .collect::<Vec<_>>();
         }
 
@@ -88,7 +88,7 @@ impl Into<Vec<LightState>> for LightGroup {
                 .into_iter()
                 .map(|val| LightState {
                     value: Some(LightValue::Brightness(val)),
-                    ..LightState::EMPTY
+                    ..Default::default()
                 })
                 .collect::<Vec<_>>();
         }
@@ -98,7 +98,7 @@ impl Into<Vec<LightState>> for LightGroup {
                 .rgb
                 .clone()
                 .into_iter()
-                .map(|val| LightState { value: Some(LightValue::Color(val)), ..LightState::EMPTY })
+                .map(|val| LightState { value: Some(LightValue::Color(val)), ..Default::default() })
                 .collect::<Vec<_>>();
         }
 

@@ -55,7 +55,7 @@ fn str_to_device_state(src: &str) -> Result<fidl_fuchsia_settings::DeviceState, 
                 })
             },
         )?),
-        ..fidl_fuchsia_settings::DeviceState::EMPTY
+        ..Default::default()
     })
 }
 
@@ -65,7 +65,7 @@ impl From<Input> for InputState {
             device_type: src.device_type,
             name: src.device_name,
             state: src.device_state,
-            ..InputState::EMPTY
+            ..Default::default()
         }
     }
 }

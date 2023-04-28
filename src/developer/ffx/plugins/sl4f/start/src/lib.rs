@@ -34,14 +34,14 @@ async fn create_remote_component(
         url: Some(url.to_string()),
         startup: Some(fdecl::StartupMode::Lazy),
         environment: None,
-        ..fdecl::Child::EMPTY
+        ..Default::default()
     };
     let create_result = lifecycle_controller
         .create_instance(
             PARENT_MONIKER,
             &mut collection,
             decl.clone(),
-            fcomponent::CreateChildArgs::EMPTY,
+            fcomponent::CreateChildArgs::default(),
         )
         .await
         .map_err(|e| ffx_error!("FIDL error while creating component instance: {:?}", e))?;
@@ -71,7 +71,7 @@ async fn create_remote_component(
                     PARENT_MONIKER,
                     &mut collection,
                     decl.clone(),
-                    fcomponent::CreateChildArgs::EMPTY,
+                    fcomponent::CreateChildArgs::default(),
                 )
                 .await
                 .map_err(|e| ffx_error!("FIDL error while creating component instance: {:?}", e))?;

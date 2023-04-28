@@ -399,7 +399,7 @@ mod test {
         let version_info = VersionInfo {
             exec_path: Some(std::env::current_exe().unwrap().to_string_lossy().to_string()),
             build_id: Some(build_id.to_owned()),
-            ..VersionInfo::EMPTY
+            ..Default::default()
         };
         let daemon_hoist = Arc::new(Hoist::new().unwrap());
         let listener = UnixListener::bind(&sockpath).unwrap();

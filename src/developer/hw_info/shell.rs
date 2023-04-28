@@ -151,7 +151,7 @@ mod tests {
             serial_number: Some("526A348SJYW2319".to_string()),
             is_retail_demo: Some(false),
             retail_sku: Some("Number1".to_string()),
-            ..DeviceInfo::EMPTY
+            ..Default::default()
         };
         let mut v = Vec::new();
         write_device_info(&mut v, device_info).expect("Testing write_device_info() failed");
@@ -170,7 +170,7 @@ mod tests {
             serial_number: None,
             is_retail_demo: None,
             retail_sku: None,
-            ..DeviceInfo::EMPTY
+            ..Default::default()
         };
         let mut v_none = Vec::new();
         write_device_info(&mut v_none, device_info_none)
@@ -187,7 +187,7 @@ mod tests {
     fn test_format_product_info() {
         // Tests with the ProductInfo fields set to data.
         let regulatory_domain_info =
-            RegulatoryDomain { country_code: Some("CAN".to_string()), ..RegulatoryDomain::EMPTY };
+            RegulatoryDomain { country_code: Some("CAN".to_string()), ..Default::default() };
         let locale_id_info = LocaleId { id: "10".to_string() };
         let product_info = ProductInfo {
             sku: Some("AB".to_string()),
@@ -206,7 +206,7 @@ mod tests {
             emmc_storage: Some("memory".to_string()),
             microphone: Some("GTK2".to_string()),
             audio_amplifier: Some("Yes".to_string()),
-            ..ProductInfo::EMPTY
+            ..Default::default()
         };
         let mut v = Vec::new();
         write_product_info(&mut v, product_info).expect("Testing write_product_info() failed");
@@ -251,7 +251,7 @@ mod tests {
             emmc_storage: None,
             microphone: None,
             audio_amplifier: None,
-            ..ProductInfo::EMPTY
+            ..Default::default()
         };
         let mut v_none = Vec::new();
         write_product_info(&mut v_none, product_info_none)
@@ -287,7 +287,7 @@ mod tests {
             name: Some("skyrocket".to_string()),
             revision: Some("1000".to_string()),
             cpu_architecture: Some(Architecture::X64),
-            ..BoardInfo::EMPTY
+            ..Default::default()
         };
         let mut v = Vec::new();
         write_board_info(&mut v, board_info).expect("Testing write_board_info() failed");
@@ -300,7 +300,7 @@ mod tests {
 
         // Tests with the BoardInfo fields set to None.
         let board_info_none =
-            BoardInfo { name: None, revision: None, cpu_architecture: None, ..BoardInfo::EMPTY };
+            BoardInfo { name: None, revision: None, cpu_architecture: None, ..Default::default() };
         let mut v_none = Vec::new();
         write_board_info(&mut v_none, board_info_none).expect("Testing write_board_info() failed");
         let write_str_none = String::from_utf8(v_none).expect("Failed to convert to string");

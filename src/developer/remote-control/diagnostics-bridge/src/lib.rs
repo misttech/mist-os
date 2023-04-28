@@ -65,7 +65,7 @@ pub trait ArchiveReaderManager {
                         data,
                         truncated_chars: 0,
                     })),
-                    ..ArchiveIteratorEntry::EMPTY
+                    ..Default::default()
                 }];
                 responder.send(&mut Ok(response))?;
             } else {
@@ -73,7 +73,7 @@ pub trait ArchiveReaderManager {
                 let mut tx_socket = fasync::Socket::from_socket(tx_socket)?;
                 let response = vec![ArchiveIteratorEntry {
                     diagnostics_data: Some(DiagnosticsData::Socket(socket)),
-                    ..ArchiveIteratorEntry::EMPTY
+                    ..Default::default()
                 }];
                 responder.send(&mut Ok(response))?;
                 tx_socket.write_all(data.as_bytes()).await?;
@@ -134,7 +134,7 @@ pub trait ArchiveReaderManager {
                                     data,
                                     truncated_chars: 0,
                                 })),
-                                ..ArchiveIteratorEntry::EMPTY
+                                ..Default::default()
                             }];
                             responder.send(&mut Ok(response))?;
                         } else {
@@ -144,7 +144,7 @@ pub trait ArchiveReaderManager {
                             let mut tx_socket = fasync::Socket::from_socket(tx_socket)?;
                             let response = vec![ArchiveIteratorEntry {
                                 diagnostics_data: Some(DiagnosticsData::Socket(socket)),
-                                ..ArchiveIteratorEntry::EMPTY
+                                ..Default::default()
                             }];
                             responder.send(&mut Ok(response))?;
                             tx_socket.write_all(data.as_bytes()).await?;
@@ -502,7 +502,7 @@ mod test {
         BridgeStreamParameters {
             data_type: Some(DataType::Logs),
             stream_mode: Some(StreamMode::SnapshotThenSubscribe),
-            ..BridgeStreamParameters::EMPTY
+            ..Default::default()
         }
     }
 
@@ -544,7 +544,7 @@ mod test {
                 BridgeStreamParameters {
                     data_type: None,
                     stream_mode: Some(StreamMode::SnapshotThenSubscribe),
-                    ..BridgeStreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server,
             )
@@ -565,7 +565,7 @@ mod test {
                 BridgeStreamParameters {
                     data_type: Some(DataType::Logs),
                     stream_mode: None,
-                    ..BridgeStreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server,
             )
@@ -586,7 +586,7 @@ mod test {
                 BridgeStreamParameters {
                     data_type: Some(DataType::Inspect),
                     stream_mode: Some(StreamMode::SnapshotThenSubscribe),
-                    ..BridgeStreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server,
             )
@@ -607,7 +607,7 @@ mod test {
                 BridgeStreamParameters {
                     data_type: Some(DataType::Logs),
                     stream_mode: Some(StreamMode::Subscribe),
-                    ..BridgeStreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server,
             )
@@ -766,7 +766,7 @@ mod test {
                 BridgeStreamParameters {
                     data_type: Some(DataType::Inspect),
                     stream_mode: Some(StreamMode::Snapshot),
-                    ..BridgeStreamParameters::EMPTY
+                    ..Default::default()
                 },
                 server,
             )

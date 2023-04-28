@@ -131,7 +131,7 @@ async fn propagate_bind_event(sock: &UdpSocket, svc: &Weak<MdnsProtocol>) -> u16
     if let Some(svc) = svc.upgrade() {
         svc.publish_event(ffx::MdnsEventType::SocketBound(ffx::MdnsBindEvent {
             port: Some(port),
-            ..ffx::MdnsBindEvent::EMPTY
+            ..Default::default()
         }))
         .await;
     }
@@ -440,7 +440,7 @@ fn make_target<B: ByteSlice + Copy>(
             target_state: fastboot_interface.map(|_| ffx::TargetState::Fastboot),
             fastboot_interface,
             ssh_address,
-            ..ffx::TargetInfo::EMPTY
+            ..Default::default()
         },
         ttl,
     ))

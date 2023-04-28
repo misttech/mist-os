@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_runs() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "runs", "0").is_ok());
         assert_eq!(fuzz_options.runs, Some(0));
         assert_eq!(get(&fuzz_options, "runs").unwrap(), "0");
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_max_total_time() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "max_total_time", "0").is_ok());
         assert_eq!(fuzz_options.max_total_time, Some(0));
         assert_eq!(get(&fuzz_options, "max_total_time").unwrap(), "0");
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_seed() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "seed", "0").is_ok());
         assert_eq!(fuzz_options.seed, Some(0));
         assert_eq!(get(&fuzz_options, "seed").unwrap(), "0");
@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn test_max_input_size() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "max_input_size", "0").is_ok());
         assert_eq!(fuzz_options.max_input_size, Some(0));
         assert_eq!(get(&fuzz_options, "max_input_size").unwrap(), "0");
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_mutation_depth() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "mutation_depth", "0").is_ok());
         assert_eq!(fuzz_options.mutation_depth, Some(0));
         assert_eq!(get(&fuzz_options, "mutation_depth").unwrap(), "0");
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_dictionary_level() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "dictionary_level", "0").is_ok());
         assert_eq!(fuzz_options.dictionary_level, Some(0));
         assert_eq!(get(&fuzz_options, "dictionary_level").unwrap(), "0");
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn test_detect_exits() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "detect_exits", "false").is_ok());
         assert_eq!(fuzz_options.detect_exits, Some(false));
         assert_eq!(get(&fuzz_options, "detect_exits").unwrap(), "false");
@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn test_detect_leaks() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "detect_leaks", "false").is_ok());
         assert_eq!(fuzz_options.detect_leaks, Some(false));
         assert_eq!(get(&fuzz_options, "detect_leaks").unwrap(), "false");
@@ -517,7 +517,7 @@ mod tests {
 
     #[test]
     fn test_run_limit() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "run_limit", "0").is_ok());
         assert_eq!(fuzz_options.run_limit, Some(0));
         assert_eq!(get(&fuzz_options, "run_limit").unwrap(), "0");
@@ -537,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_malloc_limit() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "malloc_limit", "0").is_ok());
         assert_eq!(fuzz_options.malloc_limit, Some(0));
         assert_eq!(get(&fuzz_options, "malloc_limit").unwrap(), "0");
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_oom_limit() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "oom_limit", "0").is_ok());
         assert_eq!(fuzz_options.oom_limit, Some(0));
         assert_eq!(get(&fuzz_options, "oom_limit").unwrap(), "0");
@@ -577,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_purge_interval() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "purge_interval", "0").is_ok());
         assert_eq!(fuzz_options.purge_interval, Some(0));
         assert_eq!(get(&fuzz_options, "purge_interval").unwrap(), "0");
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_malloc_exitcode() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "malloc_exitcode", "2000").is_ok());
         assert_eq!(fuzz_options.malloc_exitcode, Some(2000));
         assert_eq!(get(&fuzz_options, "malloc_exitcode").unwrap(), "2000");
@@ -612,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_death_exitcode() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "death_exitcode", "2001").is_ok());
         assert_eq!(fuzz_options.death_exitcode, Some(2001));
         assert_eq!(get(&fuzz_options, "death_exitcode").unwrap(), "2001");
@@ -627,7 +627,7 @@ mod tests {
 
     #[test]
     fn test_leak_exitcode() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "leak_exitcode", "2002").is_ok());
         assert_eq!(fuzz_options.leak_exitcode, Some(2002));
         assert_eq!(get(&fuzz_options, "leak_exitcode").unwrap(), "2002");
@@ -642,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_oom_exitcode() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "oom_exitcode", "2003").is_ok());
         assert_eq!(fuzz_options.oom_exitcode, Some(2003));
         assert_eq!(get(&fuzz_options, "oom_exitcode").unwrap(), "2003");
@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn test_pulse_interval() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "pulse_interval", "0").is_ok());
         assert_eq!(fuzz_options.pulse_interval, Some(0));
         assert_eq!(get(&fuzz_options, "pulse_interval").unwrap(), "0");
@@ -677,7 +677,7 @@ mod tests {
 
     #[test]
     fn test_debug() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "debug", "false").is_ok());
         assert_eq!(fuzz_options.debug, Some(false));
         assert_eq!(get(&fuzz_options, "debug").unwrap(), "false");
@@ -701,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_print_final_stats() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "print_final_stats", "false").is_ok());
         assert_eq!(fuzz_options.print_final_stats, Some(false));
         assert_eq!(get(&fuzz_options, "print_final_stats").unwrap(), "false");
@@ -725,7 +725,7 @@ mod tests {
 
     #[test]
     fn test_use_value_profile() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "use_value_profile", "false").is_ok());
         assert_eq!(fuzz_options.use_value_profile, Some(false));
         assert_eq!(get(&fuzz_options, "use_value_profile").unwrap(), "false");
@@ -749,7 +749,7 @@ mod tests {
 
     #[test]
     fn test_asan_options() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "asan_options", "key1=val1").is_ok());
         assert_eq!(get(&fuzz_options, "asan_options").unwrap(), "\"key1=val1\"");
 
@@ -760,7 +760,7 @@ mod tests {
 
     #[test]
     fn test_ubsan_options() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         assert!(set(&mut fuzz_options, "ubsan_options", "key1=val1").is_ok());
         assert_eq!(get(&fuzz_options, "ubsan_options").unwrap(), "\"key1=val1\"");
 
@@ -771,7 +771,7 @@ mod tests {
 
     #[test]
     fn test_get_all() -> Result<()> {
-        let mut fuzz_options = fuzz::Options::EMPTY;
+        let mut fuzz_options = fuzz::Options::default();
         add_defaults(&mut fuzz_options);
         let all = get_all(&fuzz_options);
         let mut all = all.iter();

@@ -1825,7 +1825,7 @@ mod tests {
             mirrors: Some(vec![MirrorConfig {
                 mirror_url: Some(format!("http://{}/{}", repo_host, repo_name)),
                 subscribe: Some(true),
-                ..MirrorConfig::EMPTY
+                ..Default::default()
             }]),
             repo_url: Some(format!("fuchsia-pkg://{}", repo_name)),
             root_keys: Some(vec![RepositoryKeyConfig::Ed25519Key(vec![
@@ -1836,7 +1836,7 @@ mod tests {
             root_threshold: Some(1),
             use_local_mirror: Some(false),
             storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
-            ..RepositoryConfig::EMPTY
+            ..Default::default()
         }
     }
 
@@ -2567,7 +2567,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -2683,7 +2683,7 @@ mod tests {
                                         "example.com".to_string()
                                     ]),
                                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                                    ..ffx::RepositoryTarget::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
@@ -2697,7 +2697,7 @@ mod tests {
                                     repo_name: Some("repo2".to_string()),
                                     target_identifier: Some(TARGET_NODENAME.to_string()),
                                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                                    ..ffx::RepositoryTarget::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
@@ -2712,7 +2712,7 @@ mod tests {
                                     target_identifier: Some(TARGET_NODENAME.to_string()),
                                     aliases: Some(vec!["anothercorp3.com".to_string()]),
                                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                                    ..ffx::RepositoryTarget::EMPTY
+                                    ..Default::default()
                                 }
                             )
                             .await
@@ -2734,7 +2734,7 @@ mod tests {
                     spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
                         path: Some(repo_path.clone()),
                         aliases: None,
-                        ..ffx::PmRepositorySpec::EMPTY
+                        ..Default::default()
                     }),
                 },
                 ffx::RepositoryConfig {
@@ -2742,7 +2742,7 @@ mod tests {
                     spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
                         path: Some(repo_path.clone()),
                         aliases: Some(vec!["corp2.com".into()]),
-                        ..ffx::PmRepositorySpec::EMPTY
+                        ..Default::default()
                     }),
                 },
                 ffx::RepositoryConfig {
@@ -2750,7 +2750,7 @@ mod tests {
                     spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
                         path: Some(repo_path.clone()),
                         aliases: Some(vec!["corp3.com".into()]),
-                        ..ffx::PmRepositorySpec::EMPTY
+                        ..Default::default()
                     }),
                 },
             ]
@@ -2765,21 +2765,21 @@ mod tests {
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 },
                 ffx::RepositoryTarget {
                     repo_name: Some("repo2".to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     aliases: None,
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 },
                 ffx::RepositoryTarget {
                     repo_name: Some("repo3".to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     aliases: Some(vec!["anothercorp3.com".to_string()]),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 },
             ],
         );
@@ -2874,7 +2874,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -2893,7 +2893,7 @@ mod tests {
                 name: REPO_NAME.to_string(),
                 spec: ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
                     path: Some(repo_path.clone()),
-                    ..ffx::PmRepositorySpec::EMPTY
+                    ..Default::default()
                 }),
             }]
         );
@@ -2906,7 +2906,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             }],
         );
 
@@ -2982,7 +2982,7 @@ mod tests {
                                     "fuchsia.com".to_string()
                                 ]),
                                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-                                ..ffx::RepositoryTarget::EMPTY
+                                ..Default::default()
                             }
                         )
                         .await
@@ -3142,7 +3142,7 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
             let spec = ffx::RepositorySpec::Pm(ffx::PmRepositorySpec {
                 path: Some(EMPTY_REPO_PATH.to_owned()),
-                ..ffx::PmRepositorySpec::EMPTY
+                ..Default::default()
             });
 
             // Initially no server should be running.
@@ -3209,7 +3209,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -3234,7 +3234,7 @@ mod tests {
             target_identifier: Some(TARGET_NODENAME.to_string()),
             storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
             aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
-            ..ffx::RepositoryTarget::EMPTY
+            ..Default::default()
         };
 
         register_target(&proxy, target.clone()).await;
@@ -3308,7 +3308,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             },],
         );
 
@@ -3376,7 +3376,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -3400,7 +3400,7 @@ mod tests {
             target_identifier: Some(TARGET_NODENAME.to_string()),
             storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
             aliases: None,
-            ..ffx::RepositoryTarget::EMPTY
+            ..Default::default()
         };
 
         register_target(&proxy, target.clone()).await;
@@ -3481,7 +3481,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: None,
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             }],
         );
 
@@ -3553,7 +3553,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -3577,7 +3577,7 @@ mod tests {
             target_identifier: Some(TARGET_NODENAME.to_string()),
             storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
             aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-            ..ffx::RepositoryTarget::EMPTY
+            ..Default::default()
         };
 
         register_target(&proxy, target.clone()).await;
@@ -3658,7 +3658,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             }],
         );
 
@@ -3723,7 +3723,7 @@ mod tests {
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
                     ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 })
                 .build();
 
@@ -3747,7 +3747,7 @@ mod tests {
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["example.com".to_string(), conflicting_alias.clone()]),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 },
             )
             .await;
@@ -3787,7 +3787,7 @@ mod tests {
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 }],
             );
 
@@ -3802,7 +3802,7 @@ mod tests {
                         storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                         // Conflicting alias will collide with REPO_NAME registration...
                         aliases: Some(vec![conflicting_alias.clone()]),
-                        ..ffx::RepositoryTarget::EMPTY
+                        ..Default::default()
                     }, fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut)
                     .await
                     .expect("communicated with proxy")
@@ -3824,7 +3824,7 @@ mod tests {
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["example.com".to_string(), conflicting_alias.clone()]),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 }],
             );
         })
@@ -3868,7 +3868,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: ssh_host_addr.clone() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -3894,7 +3894,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: None,
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             },
         )
         .await;
@@ -4090,7 +4090,7 @@ mod tests {
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
                     ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 })
                 .build();
 
@@ -4104,7 +4104,7 @@ mod tests {
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["example.com".to_string(), "fuchsia.com".to_string()]),
-                    ..ffx::RepositoryTarget::EMPTY
+                    ..Default::default()
                 },
             )
             .await;
@@ -4153,7 +4153,7 @@ mod tests {
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
                     ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 })
                 .build();
 
@@ -4206,7 +4206,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -4217,7 +4217,7 @@ mod tests {
             repo_name: Some(REPO_NAME.to_string()),
             target_identifier: None,
             storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
-            ..ffx::RepositoryTarget::EMPTY
+            ..Default::default()
         };
 
         register_target(&proxy, target.clone()).await;
@@ -4326,7 +4326,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -4348,7 +4348,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: Some(vec![]),
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             },
         )
         .await;
@@ -4390,7 +4390,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: Some(vec![]),
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             }],
         );
     }
@@ -4436,7 +4436,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -4448,7 +4448,7 @@ mod tests {
             target_identifier: Some(TARGET_NODENAME.to_string()),
             storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
             aliases: None,
-            ..ffx::RepositoryTarget::EMPTY
+            ..Default::default()
         };
 
         register_target(&proxy, target.clone()).await;
@@ -4521,7 +4521,7 @@ mod tests {
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: None,
-                ..ffx::RepositoryTarget::EMPTY
+                ..Default::default()
             }],
         );
     }
@@ -4569,7 +4569,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -4593,7 +4593,7 @@ mod tests {
                         target_identifier: Some(TARGET_NODENAME.to_string()),
                         storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                         aliases: None,
-                        ..ffx::RepositoryTarget::EMPTY
+                        ..Default::default()
                     },
                     fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace
                 )
@@ -4680,7 +4680,7 @@ mod tests {
                 ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
                 addresses: Some(vec![device_address.clone()]),
                 ssh_address: Some(device_address.clone()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             })
             .build();
 
@@ -4693,7 +4693,7 @@ mod tests {
                         target_identifier: Some(TARGET_NODENAME.to_string()),
                         storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                         aliases: None,
-                        ..ffx::RepositoryTarget::EMPTY
+                        ..Default::default()
                     },
                     fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace
                 )
@@ -4743,7 +4743,7 @@ mod tests {
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
                     ssh_host_address: Some(ffx::SshHostAddrInfo { address: HOST_ADDR.to_string() }),
-                    ..ffx::TargetInfo::EMPTY
+                    ..Default::default()
                 })
                 .build();
 

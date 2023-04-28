@@ -190,7 +190,7 @@ mod tests {
             DataProviderRequest::GetSnapshot { params, responder } => {
                 let _channel = params.response_channel.unwrap();
 
-                let snapshot = Snapshot { ..Snapshot::EMPTY };
+                let snapshot = Snapshot::default();
                 responder.send(snapshot).unwrap();
             }
             _ => unreachable!(),

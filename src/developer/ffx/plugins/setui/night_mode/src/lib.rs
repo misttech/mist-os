@@ -16,10 +16,10 @@ pub async fn run_command(night_mode_proxy: NightModeProxy, night_mode: NightMode
 }
 
 async fn command(proxy: NightModeProxy, night_mode_enabled: Option<bool>) -> WatchOrSetResult {
-    let mut settings = NightModeSettings::EMPTY;
+    let mut settings = NightModeSettings::default();
     settings.night_mode_enabled = night_mode_enabled;
 
-    if settings == NightModeSettings::EMPTY {
+    if settings == NightModeSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
@@ -107,7 +107,7 @@ mod test {
             NightModeRequest::Watch { responder } => {
                 let _ = responder.send(NightModeSettings {
                     night_mode_enabled: expected_night_mode_enabled,
-                    ..NightModeSettings::EMPTY
+                    ..Default::default()
                 });
             }
         });
@@ -119,7 +119,7 @@ mod test {
                 "{:#?}",
                 NightModeSettings {
                     night_mode_enabled: expected_night_mode_enabled,
-                    ..NightModeSettings::EMPTY
+                    ..Default::default()
                 }
             )
         );

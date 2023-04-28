@@ -1168,7 +1168,7 @@ impl From<&Target> for ffx::TargetInfo {
             // TODO(awdavies): Gather more information here when possible.
             target_type: Some(ffx::TargetType::Unknown),
             ssh_host_address: target.ssh_host_address_info(),
-            ..ffx::TargetInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -1286,7 +1286,7 @@ mod test {
                                     addresses: Some(result),
                                     product_config: Some(DEFAULT_PRODUCT_CONFIG.to_owned()),
                                     board_config: Some(DEFAULT_BOARD_CONFIG.to_owned()),
-                                    ..rcs::IdentifyHostResponse::EMPTY
+                                    ..Default::default()
                                 }))
                                 .context("sending testing response")
                                 .unwrap();

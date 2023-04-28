@@ -102,7 +102,7 @@ pub async fn screenshot_impl<W: Write>(
     let screenshot_response = screenshot_proxy
         .take_file(ScreenshotTakeFileRequest {
             format: Some(ScreenshotFormat::BgraRaw),
-            ..ScreenshotTakeFileRequest::EMPTY
+            ..Default::default()
         })
         .await
         .map_err(|e| anyhow!("Error: Could not get the screenshot from the target: {:?}", e))?;
@@ -252,8 +252,7 @@ mod test {
     fn setup_fake_screenshot_server() -> ScreenshotProxy {
         setup_fake_screenshot_proxy(move |req| match req {
             ScreenshotRequest::TakeFile { payload: _, responder } => {
-                let mut screenshot =
-                    ScreenshotTakeFileResponse { ..ScreenshotTakeFileResponse::EMPTY };
+                let mut screenshot = ScreenshotTakeFileResponse::default();
 
                 let (file_client_end, file_server_end) =
                     fidl::endpoints::create_endpoints::<fio::FileMarker>();

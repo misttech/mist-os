@@ -335,7 +335,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
                     data: serde_json::to_string(&value).unwrap(),
                     truncated_chars: 0,
                 })),
-                ..ArchiveIteratorEntry::EMPTY
+                ..Default::default()
             };
             responder.send(&mut Ok(vec![translated]))?;
             return Ok(None);
@@ -348,7 +348,7 @@ impl RemoteDiagnosticsBridgeProxyWrapper {
         state
             .target_collection_proxy
             .open_target(
-                TargetQuery { string_matcher: Some(self.node_name.clone()), ..TargetQuery::EMPTY },
+                TargetQuery { string_matcher: Some(self.node_name.clone()), ..Default::default() },
                 server,
             )
             .await??;
@@ -445,7 +445,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
                 client_selector_configuration: Some(
                     fidl_fuchsia_diagnostics::ClientSelectorConfiguration::SelectAll(true),
                 ),
-                ..BridgeStreamParameters::EMPTY
+                ..Default::default()
             },
             server,
         );
@@ -474,7 +474,7 @@ impl StreamDiagnostics for Arc<RemoteDiagnosticsBridgeProxyWrapper> {
         }
         Ok(Ok(LogSession {
             session_timestamp_nanos: Some(state.boot_timestamp),
-            ..LogSession::EMPTY
+            ..Default::default()
         }))
     }
 }
@@ -491,7 +491,7 @@ async fn setup_diagnostics_stream(
         stream_mode: Some(stream_mode),
         min_timestamp_nanos: from_bound,
         session,
-        ..DaemonDiagnosticsStreamParameters::EMPTY
+        ..Default::default()
     };
     diagnostics_proxy
         .stream_diagnostics(Some(&target_str), params, server)
@@ -812,7 +812,7 @@ mod test {
                             .send(&mut Ok(LogSession {
                                 target_identifier: target,
                                 session_timestamp_nanos: Some(BOOT_TS),
-                                ..LogSession::EMPTY
+                                ..Default::default()
                             }))
                             .context("error sending response")
                             .expect("should send")
@@ -901,7 +901,7 @@ mod test {
                 .send(&mut Ok(IdentifyHostResponse {
                     nodename: Some(TARGET_NAME.to_string()),
                     boot_timestamp_nanos: Some(BOOT_TS),
-                    ..IdentifyHostResponse::EMPTY
+                    ..Default::default()
                 }))
                 .unwrap();
         }
@@ -1030,10 +1030,8 @@ mod test {
 
         for mode in stream_modes {
             let (sender, mut receiver) = unbounded();
-            let params = DaemonDiagnosticsStreamParameters {
-                stream_mode: Some(mode),
-                ..DaemonDiagnosticsStreamParameters::EMPTY
-            };
+            let params =
+                DaemonDiagnosticsStreamParameters { stream_mode: Some(mode), ..Default::default() };
 
             let log = LogsDataBuilder::new(BuilderArgs {
                 component_url: None,
@@ -1084,7 +1082,7 @@ mod test {
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::Subscribe),
             min_timestamp_nanos: Some(TimeBound::Monotonic(BOOT_TS)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let log_0 = LogsDataBuilder::new(BuilderArgs {
@@ -1143,7 +1141,7 @@ mod test {
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::Subscribe),
             min_timestamp_nanos: Some(TimeBound::Absolute(BOOT_TS)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let log_0 = LogsDataBuilder::new(BuilderArgs {
@@ -1201,7 +1199,7 @@ mod test {
         let (sender, mut receiver) = unbounded();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::Subscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let log = LogsDataBuilder::new(BuilderArgs {
@@ -1278,7 +1276,7 @@ mod test {
         let mut formatter = FakeLogFormatter::new();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotAll),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let expected_responses = vec![];
 
@@ -1303,7 +1301,7 @@ mod test {
         let mut formatter = FakeLogFormatter::new();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
         let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
@@ -1339,7 +1337,7 @@ mod test {
         let mut formatter = FakeLogFormatter::new();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::Subscribe),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
         let log1 = make_log_entry(LogData::FfxEvent(EventType::LoggingStarted));
         let log2 = make_log_entry(LogData::MalformedTargetLog("text".to_string()));
@@ -1382,7 +1380,7 @@ mod test {
             stream_mode: Some(StreamMode::SnapshotAll),
             min_timestamp_nanos: Some(TimeBound::Absolute(START_TIMESTAMP_FOR_DAEMON)),
             session: Some(SessionSpec::Relative(0)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let mut writer = Vec::new();
@@ -1406,7 +1404,7 @@ mod test {
             stream_mode: Some(StreamMode::SnapshotAll),
             min_timestamp_nanos: Some(TimeBound::Monotonic(default_ts().as_nanos() as u64)),
             session: Some(SessionSpec::Relative(0)),
-            ..DaemonDiagnosticsStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let mut writer = Vec::new();

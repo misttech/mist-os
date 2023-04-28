@@ -59,7 +59,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                             .events_out
                             .send(ffx::FastbootTarget {
                                 serial: Some(dev.serial),
-                                ..ffx::FastbootTarget::EMPTY
+                                ..Default::default()
                             })
                             .await;
                     }

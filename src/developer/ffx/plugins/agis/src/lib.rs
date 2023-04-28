@@ -146,7 +146,7 @@ async fn listener_listen(
     op: ListenOp,
 ) -> Result<AgisResult, anyhow::Error> {
     let target_name = ffx_config::get(TARGET_DEFAULT_KEY).await?;
-    let target_query = TargetQuery { string_matcher: target_name, ..TargetQuery::EMPTY };
+    let target_query = TargetQuery { string_matcher: target_name, ..Default::default() };
     listener
         .listen(target_query, op.global_id)
         .await?
@@ -217,7 +217,7 @@ mod test {
                         global_id: Some(GLOBAL_ID),
                         process_koid: Some(PROCESS_KOID),
                         process_name: Some(PROCESS_NAME.to_string()),
-                        ..fidl_fuchsia_gpu_agis::Vtc::EMPTY
+                        ..Default::default()
                     });
                     let mut result = Ok(vtcs);
                     responder.send(&mut result).unwrap();

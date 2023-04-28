@@ -58,7 +58,7 @@ impl From<Keyboard> for KeyboardSettings {
                     period: src.autorepeat_period.unwrap_or(0),
                 })
             },
-            ..KeyboardSettings::EMPTY
+            ..Default::default()
         }
     }
 }

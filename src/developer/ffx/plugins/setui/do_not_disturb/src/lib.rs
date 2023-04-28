@@ -23,7 +23,7 @@ pub async fn run_command(
 async fn command(proxy: DoNotDisturbProxy, do_not_disturb: DoNotDisturb) -> WatchOrSetResult {
     let settings = DoNotDisturbSettings::from(do_not_disturb);
 
-    if settings == DoNotDisturbSettings::EMPTY {
+    if settings == DoNotDisturbSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {

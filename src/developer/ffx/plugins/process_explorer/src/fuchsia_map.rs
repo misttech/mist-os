@@ -171,7 +171,7 @@ mod tests {
             board_config: Some("bazingaBoard".to_string()),
             version: Some("bazingaVersion".to_string()),
             latest_commit_date: Some("bazingaDate".to_string()),
-            ..BuildInfo::EMPTY
+            ..Default::default()
         };
         let json_map = json::make_fuchsia_map_json(processed, build_info);
 

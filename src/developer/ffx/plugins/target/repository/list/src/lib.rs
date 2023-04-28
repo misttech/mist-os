@@ -107,7 +107,7 @@ mod test {
                                                             "target1_alias1".to_owned(),
                                                             "target1_alias2".to_owned(),
                                                         ]),
-                                                        ..RepositoryTarget::EMPTY
+                                                        ..Default::default()
                                                     },
                                                     RepositoryTarget {
                                                         repo_name: Some("smith".to_owned()),
@@ -117,14 +117,14 @@ mod test {
                                                         storage_type: Some(
                                                             RepositoryStorageType::Ephemeral,
                                                         ),
-                                                        ..RepositoryTarget::EMPTY
+                                                        ..Default::default()
                                                     },
                                                     RepositoryTarget {
                                                         repo_name: Some("bob".to_owned()),
                                                         target_identifier: Some(
                                                             "target3".to_owned(),
                                                         ),
-                                                        ..RepositoryTarget::EMPTY
+                                                        ..Default::default()
                                                     },
                                                 ]
                                                 .into_iter(),

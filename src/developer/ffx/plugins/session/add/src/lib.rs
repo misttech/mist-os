@@ -34,7 +34,7 @@ pub async fn add_impl<W: std::io::Write>(
 
     manager_proxy
         .propose_element(
-            Spec { component_url: Some(cmd.url.to_string()), ..Spec::EMPTY },
+            Spec { component_url: Some(cmd.url.to_string()), ..Default::default() },
             controller_server,
         )
         .await?

@@ -63,7 +63,7 @@ impl DiagnosticsBridgeProvider {
             data_type: Some(D::DATA_TYPE),
             accessor: accessor_selector,
             client_selector_configuration: Some(selectors),
-            ..BridgeStreamParameters::EMPTY
+            ..Default::default()
         };
 
         let (client, server) = create_proxy::<ArchiveIteratorMarker>()

@@ -160,7 +160,7 @@ impl FidlProtocol for Diagnostics {
                             .session_timestamp_nanos()
                             .await
                             .map(|t| t as u64),
-                        ..ffx::LogSession::EMPTY
+                        ..Default::default()
                     }))?;
                     run_diagnostics_streaming(log_iterator, iterator).await.map_err(|e| {
                         tracing::error!("Failure running diagnostics streaming: {:?}", e);
@@ -179,7 +179,7 @@ impl FidlProtocol for Diagnostics {
                         .open_target(
                             ffx::TargetQuery {
                                 string_matcher: target_str.clone(),
-                                ..ffx::TargetQuery::EMPTY
+                                ..Default::default()
                             },
                             th_server_end,
                         )
@@ -224,7 +224,7 @@ mod test {
             diagnostics_proxy
                 .stream_diagnostics(
                     Some("narbacular"),
-                    ffx::DaemonDiagnosticsStreamParameters::EMPTY,
+                    ffx::DaemonDiagnosticsStreamParameters::default(),
                     server
                 )
                 .await
@@ -244,7 +244,7 @@ mod test {
                     None,
                     ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::SnapshotAll),
-                        ..ffx::DaemonDiagnosticsStreamParameters::EMPTY
+                        ..Default::default()
                     },
                     server
                 )
@@ -265,7 +265,7 @@ mod test {
                     Some("flippity-flap"),
                     ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::SnapshotAll),
-                        ..ffx::DaemonDiagnosticsStreamParameters::EMPTY
+                        ..Default::default()
                     },
                     server
                 )
@@ -296,7 +296,7 @@ mod test {
                     Some("flippity-flap"),
                     ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::Subscribe),
-                        ..ffx::DaemonDiagnosticsStreamParameters::EMPTY
+                        ..Default::default()
                     },
                     server
                 )
@@ -322,7 +322,7 @@ mod test {
                                     ffx::TargetRequest::StreamActiveDiagnostics {
                                         responder,
                                         ..
-                                    } => responder.send(&mut Ok(ffx::LogSession::EMPTY)).unwrap(),
+                                    } => responder.send(&mut Ok(ffx::LogSession::default())).unwrap(),
                                     e => panic!("unsupported request for this target handle related test: {:?}", e),
                                 }
                             }
@@ -342,13 +342,13 @@ mod test {
                     Some("flippity-flap"),
                     ffx::DaemonDiagnosticsStreamParameters {
                         stream_mode: Some(ffx::StreamMode::Subscribe),
-                        ..ffx::DaemonDiagnosticsStreamParameters::EMPTY
+                        ..Default::default()
                     },
                     server
                 )
                 .await
                 .unwrap(),
-            Ok(ffx::LogSession::EMPTY)
+            Ok(ffx::LogSession::default())
         );
     }
 }

@@ -114,7 +114,7 @@ impl HostIdentifier {
             boot_timestamp_nanos,
             product_config,
             board_config,
-            ..rcs::IdentifyHostResponse::EMPTY
+            ..Default::default()
         })
     }
 }

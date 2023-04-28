@@ -21,7 +21,7 @@ async fn command(proxy: KeyboardProxy, keyboard: Keyboard) -> WatchOrSetResult {
     }
     let settings = KeyboardSettings::from(keyboard);
 
-    if settings == KeyboardSettings::EMPTY {
+    if settings == KeyboardSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings).await? {

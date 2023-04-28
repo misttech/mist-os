@@ -28,10 +28,10 @@ async fn command(
     proxy: FactoryResetProxy,
     is_local_reset_allowed: Option<bool>,
 ) -> WatchOrSetResult {
-    let mut settings = FactoryResetSettings::EMPTY;
+    let mut settings = FactoryResetSettings::default();
     settings.is_local_reset_allowed = is_local_reset_allowed;
 
-    if settings == FactoryResetSettings::EMPTY {
+    if settings == FactoryResetSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
@@ -94,7 +94,7 @@ mod test {
                 "Successfully set factory_reset to {:?}",
                 FactoryResetSettings {
                     is_local_reset_allowed: Some(expected_is_local_reset_allowed),
-                    ..FactoryResetSettings::EMPTY
+                    ..Default::default()
                 }
             )
         );
@@ -124,7 +124,7 @@ mod test {
             FactoryResetRequest::Watch { responder } => {
                 let _ = responder.send(FactoryResetSettings {
                     is_local_reset_allowed: expected_is_local_reset_allowed,
-                    ..FactoryResetSettings::EMPTY
+                    ..Default::default()
                 });
             }
         });
@@ -136,7 +136,7 @@ mod test {
                 "{:#?}",
                 FactoryResetSettings {
                     is_local_reset_allowed: expected_is_local_reset_allowed,
-                    ..FactoryResetSettings::EMPTY
+                    ..Default::default()
                 }
             )
         );

@@ -73,7 +73,7 @@ pub async fn route_request<B: Bridge>(
             let bytes = hyper::body::to_bytes(request.into_body()).await.unwrap();
             let req = str::from_utf8(&bytes).expect("response was not valid utf-8");
             let target_query =
-                ffx::TargetQuery { string_matcher: bridge.target(), ..ffx::TargetQuery::EMPTY };
+                ffx::TargetQuery { string_matcher: bridge.target(), ..Default::default() };
             tracing::info!("  route_request() to {:?}", &target_query.string_matcher);
             let resp = bridge.execute(target_query, req).await;
             Response::new(Body::from(resp))

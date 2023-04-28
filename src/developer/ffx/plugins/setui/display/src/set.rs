@@ -12,7 +12,7 @@ pub async fn set(proxy: DisplayProxy, args: SetArgs) -> Result<()> {
 }
 
 async fn command(proxy: DisplayProxy, settings: DisplaySettings) -> WatchOrSetResult {
-    if settings == DisplaySettings::EMPTY {
+    if settings == DisplaySettings::default() {
         return Err(format_err!("At least one option is required. Use --help to see options."));
     }
 
@@ -73,7 +73,7 @@ mod test {
             theme: Some(Theme {
                 theme_type: Some(ThemeType::Dark),
                 theme_mode: Some(ThemeMode::AUTO),
-                ..Theme::EMPTY
+                ..Default::default()
             }),
             screen_enabled: Some(true),
         };

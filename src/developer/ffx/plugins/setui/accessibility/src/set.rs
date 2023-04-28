@@ -13,14 +13,14 @@ pub async fn set(accessibility_proxy: AccessibilityProxy, args: SetArgs) -> Resu
 }
 
 async fn command(proxy: AccessibilityProxy, options: SetArgs) -> WatchOrSetResult {
-    let mut settings = AccessibilitySettings::EMPTY;
+    let mut settings = AccessibilitySettings::default();
     settings.audio_description = options.audio_description;
     settings.screen_reader = options.screen_reader;
     settings.color_inversion = options.color_inversion;
     settings.enable_magnification = options.enable_magnification;
     settings.color_correction = options.color_correction;
 
-    if settings == AccessibilitySettings::EMPTY {
+    if settings == AccessibilitySettings::default() {
         return Err(format_err!("At least one option is required. Use --help to see options."));
     }
 

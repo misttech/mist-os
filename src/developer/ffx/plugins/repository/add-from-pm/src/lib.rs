@@ -80,7 +80,7 @@ mod test {
                 "my-repo".to_owned(),
                 RepositorySpec::Pm(PmRepositorySpec {
                     path: Some(tmp.path().canonicalize().unwrap().to_str().unwrap().to_string()),
-                    ..PmRepositorySpec::EMPTY
+                    ..Default::default()
                 })
             )
         );

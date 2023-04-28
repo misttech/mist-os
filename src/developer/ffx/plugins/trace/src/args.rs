@@ -139,7 +139,7 @@ fn trigger_from_str(val: &str) -> Result<Trigger, String> {
         .ok_or("triggers must be delimited by ':'. Example: '-trigger \"my_alert:terminate\"")?;
     let action = Some(try_string_to_action(action)?);
     let alert = Some(alert.to_owned());
-    Ok(Trigger { alert, action, ..Trigger::EMPTY })
+    Ok(Trigger { alert, action, ..Default::default() })
 }
 
 fn buffering_mode_from_str(val: &str) -> Result<BufferingMode, String> {
@@ -229,7 +229,7 @@ mod tests {
             Trigger {
                 alert: Some("foobar".to_owned()),
                 action: Some(Action::Terminate),
-                ..Trigger::EMPTY
+                ..Default::default()
             },
         );
     }

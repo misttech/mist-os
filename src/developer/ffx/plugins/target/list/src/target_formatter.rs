@@ -648,7 +648,7 @@ mod test {
             rcs_state: Some(ffx::RemoteControlState::Unknown),
             target_type: Some(ffx::TargetType::Unknown),
             target_state: Some(ffx::TargetState::Unknown),
-            ..ffx::TargetInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -662,7 +662,7 @@ mod test {
             rcs_state: Some(ffx::RemoteControlState::Unknown),
             target_type: Some(ffx::TargetType::Unknown),
             target_state: Some(ffx::TargetState::Unknown),
-            ..ffx::TargetInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -690,7 +690,7 @@ mod test {
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         ])
         .unwrap();
@@ -719,7 +719,7 @@ mod test {
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 serial_number: Some("cereal".to_owned()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         ])
         .unwrap();
@@ -748,7 +748,7 @@ mod test {
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 serial_number: Some("cereal".to_owned()),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
             ffx::TargetInfo {
                 nodename: None,
@@ -761,7 +761,7 @@ mod test {
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         ])
         .unwrap();
@@ -788,7 +788,7 @@ mod test {
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         ])
         .unwrap();
@@ -837,7 +837,7 @@ mod test {
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         ])
         .unwrap();
@@ -865,7 +865,7 @@ mod test {
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
             ffx::TargetInfo {
                 nodename: None,
@@ -878,7 +878,7 @@ mod test {
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
                 target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
-                ..ffx::TargetInfo::EMPTY
+                ..Default::default()
             },
         ])
         .unwrap();

@@ -1283,7 +1283,7 @@ mod tests {
             covered_features: Some(4),
             corpus_num_inputs: Some(5),
             corpus_total_size: Some(6),
-            ..fuzz::Status::EMPTY
+            ..Default::default()
         };
         fuzzer.set_status(status);
         script.add(&mut test, "status");

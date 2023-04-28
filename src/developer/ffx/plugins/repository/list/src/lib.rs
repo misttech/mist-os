@@ -174,7 +174,7 @@ mod test {
                                                                 blob_repo_path: Some(
                                                                     "a/b/blobs".to_owned(),
                                                                 ),
-                                                                ..FileSystemRepositorySpec::EMPTY
+                                                                ..Default::default()
                                                             },
                                                         ),
                                                     },
@@ -187,7 +187,7 @@ mod test {
                                                                     "example.com".into(),
                                                                     "fuchsia.com".into(),
                                                                 ]),
-                                                                ..PmRepositorySpec::EMPTY
+                                                                ..Default::default()
                                                             },
                                                         ),
                                                     },

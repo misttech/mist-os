@@ -168,7 +168,7 @@ impl TargetHandleInner {
                             .session_timestamp_nanos()
                             .await
                             .map(|t| t as u64),
-                        ..ffx::LogSession::EMPTY
+                        ..Default::default()
                     }))
                     .map_err(Into::into)
             }
@@ -352,7 +352,7 @@ mod tests {
                                             .send(&mut Ok(fidl_rcs::IdentifyHostResponse {
                                                 nodename,
                                                 addresses: Some(addrs),
-                                                ..fidl_rcs::IdentifyHostResponse::EMPTY
+                                                ..Default::default()
                                             }))
                                             .unwrap();
                                     }

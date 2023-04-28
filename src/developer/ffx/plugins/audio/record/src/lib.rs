@@ -49,12 +49,12 @@ impl FfxMain for RecordTool {
             _ => (
                 RecordLocation::Capturer(CapturerType::StandardCapturer(CapturerInfo {
                     usage: capturer_usage,
-                    ..CapturerInfo::EMPTY
+                    ..Default::default()
                 })),
                 Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
                     mute: Some(self.cmd.mute),
                     gain: Some(self.cmd.gain),
-                    ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+                    ..Default::default()
                 }),
             ),
         };
@@ -70,7 +70,7 @@ impl FfxMain for RecordTool {
             canceler: Some(cancel_server),
             gain_settings,
             buffer_size: self.cmd.buffer_size,
-            ..AudioDaemonRecordRequest::EMPTY
+            ..Default::default()
         };
 
         let (stdout_sock, stderr_sock) = {

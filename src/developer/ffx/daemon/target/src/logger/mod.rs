@@ -447,7 +447,7 @@ impl<'a> Logger<'a> {
             stream_mode: Some(fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe),
             data_type: Some(fidl_fuchsia_diagnostics::DataType::Logs),
             client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
-            ..BridgeStreamParameters::EMPTY
+            ..Default::default()
         };
         let _ = log_proxy
             .stream_diagnostics(params, listener_client)
@@ -683,7 +683,7 @@ mod test {
                                 nodename: Some(NODENAME.to_string()),
                                 addresses: None,
                                 boot_timestamp_nanos: Some(BOOT_TIME.try_into().unwrap()),
-                                ..IdentifyHostResponse::EMPTY
+                                ..Default::default()
                             }))
                             .context("sending testing response")
                             .unwrap();

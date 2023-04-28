@@ -284,7 +284,7 @@ mod test {
     fn component(names: Vec<&str>) -> Vec<PackageEntry> {
         names
             .iter()
-            .map(|n| PackageEntry { path: Some(n.to_string()), ..PackageEntry::EMPTY })
+            .map(|n| PackageEntry { path: Some(n.to_string()), ..Default::default() })
             .collect()
     }
     async fn setup_repo_proxy(expected_include_fields: ListFields) -> RepositoryRegistryProxy {
@@ -330,7 +330,7 @@ mod test {
                                                     ),
                                                     modified: Some(60 * 60 * 24),
                                                     entries: pkg1_components,
-                                                    ..RepositoryPackage::EMPTY
+                                                    ..Default::default()
                                                 },
                                                 RepositoryPackage {
                                                     name: Some("package2".to_string()),
@@ -340,7 +340,7 @@ mod test {
                                                             .to_string(),
                                                     ),
                                                     entries: pkg2_components,
-                                                    ..RepositoryPackage::EMPTY
+                                                    ..Default::default()
                                                 },
                                             ]
                                             .into_iter(),
@@ -384,7 +384,7 @@ mod test {
                                                             .to_string(),
                                                     ),
                                                     modified: Some(60 * 60 * 24),
-                                                    ..PackageEntry::EMPTY
+                                                    ..Default::default()
                                                 },
                                                 PackageEntry {
                                                     path: Some("blob2".to_string()),
@@ -393,7 +393,7 @@ mod test {
                                                         "secondhashsecondhashsecondhash"
                                                             .to_string(),
                                                     ),
-                                                    ..PackageEntry::EMPTY
+                                                    ..Default::default()
                                                 },
                                             ]
                                             .into_iter(),

@@ -25,7 +25,7 @@ impl From<DoNotDisturb> for DoNotDisturbSettings {
         DoNotDisturbSettings {
             user_initiated_do_not_disturb: src.user_dnd,
             night_mode_initiated_do_not_disturb: src.night_mode_dnd,
-            ..DoNotDisturbSettings::EMPTY
+            ..Default::default()
         }
     }
 }

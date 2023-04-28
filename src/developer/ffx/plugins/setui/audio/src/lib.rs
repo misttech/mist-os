@@ -17,7 +17,7 @@ pub async fn run_command(audio_proxy: AudioProxy, audio: Audio) -> Result<()> {
 async fn command(proxy: AudioProxy, audio: Audio) -> WatchOrSetResult {
     let settings = AudioSettings::try_from(audio).expect("Iuput arguments have errors");
 
-    if settings == AudioSettings::EMPTY {
+    if settings == AudioSettings::default() {
         Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
     } else {
         Ok(Either::Set(if let Err(err) = proxy.set(settings.clone()).await? {
