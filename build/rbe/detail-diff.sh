@@ -38,14 +38,28 @@ function diff_with() {
     shift
   done
 
-  # The rest of "$@" are input files.
+  # The rest of "$@" are input files.  $1 is from local, $2 is from remote.
   test "$#" = 2 || {
     echo "diff_with: Expected two inputs, but got $#."
     exit 1
   }
 
+  # Some tools' output include the full name of the file
+  # being examined, and behavior may depend on the file extension.
+  # So use $1 as the canonical name for tool operation on both files.
+  suffix="$(basename "${tool[0]}")"
+
+  "${tool[@]}" "$1" > "$1.$suffix.local"
+  # Use the same name for the remote file with a temporary move.
+  mv "$1"{,.bkp}
+  mv "$2" "$1"
+  "${tool[@]}" "$1" > "$1.$suffix.remote"
+  # Restore the original names.
+  mv "$1" "$2"
+  mv "$1"{.bkp,}
+
   echo "diff -u <(${tool[@]} $1) <(${tool[@]} $2)"
-  diff -u <("${tool[@]}" "$1") <("${tool[@]}" "$2")
+  diff -u "$1.$suffix.local" "$1.$suffix.remote"
 }
 
 function binary_diff() {
