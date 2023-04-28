@@ -70,7 +70,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1852
+From //build/config/BUILDCONFIG.gn:1865
 
 ### allow_legacy_data_partition_names
 
@@ -3132,7 +3132,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1599
+From //build/config/BUILDCONFIG.gn:1612
 
 ### extra_vbmeta_descriptors
 
@@ -4552,7 +4552,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1403
+From //build/config/BUILDCONFIG.gn:1416
 
 ### legacy_base_driver_package_labels
 
@@ -5898,7 +5898,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:304
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:303
 
 ### pw_arduino_build_BOARD
 
@@ -7638,7 +7638,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1842
+From //build/config/BUILDCONFIG.gn:1855
 
 ### select_variant_canonical
 
@@ -7648,7 +7648,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1847
+From //build/config/BUILDCONFIG.gn:1860
 
 ### select_variant_shortcuts
 
@@ -7700,7 +7700,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1645
+From //build/config/BUILDCONFIG.gn:1658
 
 ### size_checker_input
 
@@ -8136,7 +8136,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1629
+From //build/config/BUILDCONFIG.gn:1642
 
 ### universe_package_labels
 
