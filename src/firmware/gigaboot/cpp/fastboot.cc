@@ -689,11 +689,16 @@ zx::result<> Fastboot::OemAddStagedBootloaderFile(std::string_view cmd,
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 
+using FastbootState = fastboot::FastbootBase::State;
+
 // The transport implementation for a TCP fastboot packet.
 class PacketTransport : public fastboot::Transport {
  public:
-  PacketTransport(TcpTransportInterface &interface, size_t packet_size)
-      : interface_(&interface), packet_size_(packet_size) {}
+  PacketTransport(TcpTransportInterface &interface, size_t packet_size, Fastboot &fastboot)
+      : interface_(&interface),
+        packet_size_(packet_size),
+        fastboot_(&fastboot),
+        last_state_(fastboot.state()) {}
 
   zx::result<size_t> ReceivePacket(void *dst, size_t capacity) override {
     if (packet_size_ > capacity) {
@@ -704,6 +709,10 @@ class PacketTransport : public fastboot::Transport {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
+    if (last_state_ == FastbootState::kCommand) {
+      printf("[fb] %.*s ... ", static_cast<int>(packet_size_), static_cast<char *>(dst));
+    }
+
     return zx::ok(packet_size_);
   }
 
@@ -711,6 +720,15 @@ class PacketTransport : public fastboot::Transport {
   size_t PeekPacketSize() override { return packet_size_; }
 
   zx::result<> Send(std::string_view packet) override {
+    // The first packet within the data phase is logged so the DATA response is
+    // shown. Subsequent packets are not logged until it reenters the command
+    // phase.
+    auto state = fastboot_->state();
+    if (state == FastbootState::kCommand || last_state_ == FastbootState::kCommand) {
+      printf("%.*s\n", static_cast<int>(packet.size()), packet.data());
+      last_state_ = state;
+    }
+
     // Prepend a length prefix.
     size_t size = packet.size();
     uint64_t be_size = ToBigEndian(size);
@@ -728,6 +746,8 @@ class PacketTransport : public fastboot::Transport {
  private:
   TcpTransportInterface *interface_ = nullptr;
   size_t packet_size_ = 0;
+  Fastboot *fastboot_ = nullptr;
+  FastbootState last_state_ = FastbootState::kCommand;
 };
 
 void FastbootTcpSession(TcpTransportInterface &interface, Fastboot &fastboot) {
@@ -764,7 +784,7 @@ void FastbootTcpSession(TcpTransportInterface &interface, Fastboot &fastboot) {
     packet_length = BigToHostEndian(packet_length);
 
     // Construct and pass a packet transport to fastboot.
-    PacketTransport packet(interface, packet_length);
+    PacketTransport packet(interface, packet_length, fastboot);
     zx::result<> ret = fastboot.ProcessPacket(&packet);
     if (ret.is_error()) {
       printf("Failed to process fastboot packet\n");

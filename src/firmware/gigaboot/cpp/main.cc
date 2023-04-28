@@ -17,6 +17,10 @@
 #include "xefi.h"
 #include "zircon_boot_ops.h"
 
+#if defined(__x86_64__)
+#include <cpuid.h>
+#endif
+
 // This is necessary because the Fastboot class inherits from FastbootBase,
 // which is an abstract class with pure virtual functions.
 // The _purecall definition is not provided in efi compilation, which leads to an
@@ -24,6 +28,19 @@
 extern "C" int _purecall(void) { return 0; }
 
 namespace {
+// Check for KVM or non-KVM QEMU using Hypervisor Vendor ID.
+bool IsQemu() {
+#if defined(__x86_64__)
+  uint32_t eax;
+  uint32_t name[3];
+  __cpuid(0x40000000, eax, name[0], name[1], name[2]);
+  std::string_view name_str(reinterpret_cast<const char*>(name), sizeof(name));
+  return name_str == "TCGTCGTCGTCG"sv || name_str == "KVMKVMKVM\0\0\0"sv;
+#else
+  return false;
+#endif
+}
+
 // Always enable serial output if not already. Infra relies on serial to get device feedback.
 // Without it, some CI/CQs fail.
 void SetSerial() {
@@ -32,13 +49,18 @@ void SetSerial() {
     return;
   }
 
+  // QEMU routes serial output to the console. To avoid double printing, avoid using serial
+  // output when running in QEMU.
+  if (IsQemu()) {
+    return;
+  }
+
   // Temporarily set `gEfiSystemTable->ConOut` to NULL to force serial console setup.
-  // This won't affect the graphic set up done earlier. There's a known issue that this may cause
-  // double print on QEMU. Since Gigaboot++ is not intended run on QEMU (the intended emulator is
-  // GCE), this is fine for now.
+  // This won't affect the graphic set up done earlier.
   //
   // This function can be removed once SetEfiStdout() can correctly set up both graphics and serial
   // output.
+
   auto conn_out = gEfiSystemTable->ConOut;
   gEfiSystemTable->ConOut = nullptr;
   SetEfiStdout(gEfiSystemTable);
