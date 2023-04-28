@@ -618,3 +618,13 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/iovisor/ubpf
 	name = third_party/ubpf
 	ignore = all
+[submodule "third_party/colorama/colorama"]
+	path = third_party/colorama/colorama
+	url = https://fuchsia.googlesource.com/third_party/github.com/tartley/colorama
+	name = third_party/colorama
+	ignore = all
+[submodule "third_party/jellyfish/jellyfish"]
+	path = third_party/jellyfish/jellyfish
+	url = https://fuchsia.googlesource.com/third_party/github.com/jamesturk/jellyfish
+	name = third_party/jellyfish
+	ignore = all
