@@ -10,6 +10,16 @@ use fuchsia_zircon::{
 };
 use std::ffi::c_void;
 
+#[cfg(target_arch = "aarch64")]
+fn untag_ptr(ptr: u64) -> u64 {
+    ptr & !(0xFFu64 << 56)
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+fn untag_ptr(ptr: u64) -> u64 {
+    ptr
+}
+
 /// Reads the contents of the given process' memory range.
 pub fn read_process_memory(
     process: &zx::Process,
@@ -17,7 +27,7 @@ pub fn read_process_memory(
     num_bytes: u64,
 ) -> Result<Vec<u8>, zx::Status> {
     let mut buf = vec![0; num_bytes.try_into().or(Err(zx::Status::FILE_BIG))?];
-    process.read_memory(address as zx_vaddr_t, &mut buf)?;
+    process.read_memory(untag_ptr(address) as zx_vaddr_t, &mut buf)?;
     Ok(buf)
 }
 
