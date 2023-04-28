@@ -4,6 +4,9 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/icu/icu_executable.gni")
+import("//build/icu/icu_fuchsia_component.gni")
+import("//build/icu/icu_fuchsia_package.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("time_zone_info_service") {
@@ -22,31 +25,30 @@ group("tests") {
   ]
 }
 
-executable("bin") {
+icu_executable("bin") {
   output_name = "time-zone-info-service"
   sources = [ "main.cc" ]
+  icu_deps = [ "//src/lib/intl/time_zone_info:time-zone-info-service-lib" ]
   deps = [
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
-    "//src/lib/icu:lib",
-    "//src/lib/intl/time_zone_info:time-zone-info-service-lib",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
-fuchsia_component("component") {
+icu_fuchsia_component("component") {
   component_name = "time-zone-info-service"
   manifest = "meta/time-zone-info-service.cml"
-  deps = [ ":bin" ]
+  icu_deps = [ ":bin" ]
 }
 
-fuchsia_package("pkg") {
+icu_fuchsia_package("pkg") {
   package_name = "time-zone-info-service"
-  deps = [
+  icu_deps = [
     ":component",
-    "//src/intl:icudtl",
+    "//src/lib/icu:icudtl",
   ]
 }
 

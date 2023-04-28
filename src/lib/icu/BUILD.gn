@@ -58,10 +58,7 @@ group("tools") {
 # Depend on this library instead of //third_party/icu directly.
 # DO NOT USE in icu_* target types, simply omit the dep.
 group("lib") {
-  public_deps = [
-    "${icu_root}:icu",
-    "${icu_root}:icuuc_public",
-  ]
+  public_deps = [ "${icu_root}:icu" ]
 }
 
 # Depend on this library instead of //third_party/icu:icudata directly.

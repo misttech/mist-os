@@ -89,11 +89,8 @@ template("third_party_icu_headers") {
         # reason.
         check_includes = false
         sources = [ _header_name ]
-        public_deps = [
-          "//third_party/icu/${icu_flavor.name}:icu",
-          "//third_party/icu/${icu_flavor.name}:icuuc_public",
-        ]
-        configs += [
+        public_deps = [ "//third_party/icu/${icu_flavor.name}:icu" ]
+        public_configs = [
           # defines FUCHSIA_ICU_VARIANT
           "//src/lib/icu:${icu_flavor.name}",
         ]
@@ -179,7 +176,7 @@ template("third_party_icu_headers") {
       "//src/lib/icu:data",
       "//src/lib/icu:lib",
     ]
-    configs += [
+    public_configs = [
       "${icu_root}:icu_config",
 
       # defines FUCHSIA_ICU_VARIANT

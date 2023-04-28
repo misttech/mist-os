@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 group("icu_data") {
+  testonly = true
   deps = [
     "cpp",
     "rust",

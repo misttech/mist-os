@@ -23,6 +23,7 @@ third_party_icu_headers("icu_headers") {
     "third_party/icu/source/common/unicode/errorcode.h",
     "third_party/icu/source/common/unicode/locid.h",
     "third_party/icu/source/common/unicode/unistr.h",
+    "third_party/icu/source/common/unicode/utypes.h",
     "third_party/icu/source/i18n/unicode/calendar.h",
     "third_party/icu/source/i18n/unicode/timezone.h",
   ]
@@ -34,7 +35,7 @@ icu_source_set("time-zone-info-service-lib") {
     "time_zone_info_service.h",
   ]
 
-  icu_deps = [
+  icu_public_deps = [
     ":icu_headers",
     "//src/lib/icu_data/cpp",
   ]
