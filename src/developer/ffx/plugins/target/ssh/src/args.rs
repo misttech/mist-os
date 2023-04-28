@@ -25,14 +25,6 @@ pub struct SshCommand {
     #[argh(option, description = "path to the custom ssh config file to use.")]
     pub sshconfig: Option<String>,
 
-    // Custom private key
-    #[argh(
-        option,
-        description = "path to the private key file - will default to the value configured for \
-           `ssh.pub` key in ffx config."
-    )]
-    pub private_key: Option<String>,
-
     #[argh(positional, description = "command to run on the target. If blank drops into a shell")]
     pub command: Vec<String>,
 }

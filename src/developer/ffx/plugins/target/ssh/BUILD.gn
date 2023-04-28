@@ -21,6 +21,7 @@ ffx_plugin("ffx_target_ssh") {
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:pretty_assertions",
