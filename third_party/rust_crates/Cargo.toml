@@ -368,6 +368,14 @@ serde_json5 = { path = "mirrors/serde_json5" } # TODO(fxbug.dev/75491) remove
 ### and examples.                                                             ###
 #################################################################################
 
+# IMPORTANT: The expression ${gn_source_root} must be used to reference
+# a path to the root source directory relative to the current directory
+# (which would be the Ninja build directory in the case of Fuchsia).
+#
+# Apart from that, it is ok to use relative paths with any number of ../ in them
+# as long as these are relative to source locations instead.
+
+#
 # Global GN configs that will be added or removed from all generated targets
 
 [gn.config]
@@ -460,7 +468,7 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 rustflags = [ "--cfg=relaxed_coherence" ]
 
 [gn.package.getrandom."0.2.2"]
-env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.2", "CARGO_MANIFEST_DIR=../../third_party/rust_crates/vendor/getrandom-0.2.2" ]
+env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.2", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.2.2" ]
 rustflags = []
 
 [gn.package.httparse."1.7.1"]
@@ -470,7 +478,7 @@ rustflags = ["--cfg=httparse_simd"]
 rustflags = ["--cfg=has_std"]
 
 [gn.package.js-sys."0.3.40"]
-env_vars = [ "CARGO_PKG_NAME=js-sys", "CARGO_PKG_VERSION=0.3.40", "CARGO_MANIFEST_DIR=../../third_party/rust_crates/vendor/js-sys-0.3.40" ]
+env_vars = [ "CARGO_PKG_NAME=js-sys", "CARGO_PKG_VERSION=0.3.40", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/js-sys-0.3.40" ]
 
 [gn.package.libc."0.2.138"]
 rustflags = [
@@ -684,7 +692,7 @@ rustflags = []
 
 [gn.package.handlebars."4.3.5"]
 # pest relies on this being set to find the grammar file
-env_vars = [ "CARGO_MANIFEST_DIR=../../third_party/rust_crates/vendor/handlebars-4.3.5" ]
+env_vars = [ "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/handlebars-4.3.5" ]
 
 # Refer to //build/icu/README.md for the details of the approach.
 [gn.package.rust_icu_uchar."3.0.0"]
