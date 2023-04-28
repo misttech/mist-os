@@ -7,8 +7,9 @@
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
-#include <zircon/pixelformat.h>
 #include <zircon/types.h>
+
+#include <fbl/algorithm.h>
 
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/display/get_hardware_display_controller.h"
@@ -211,7 +212,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 #ifdef FAKE_DISPLAY
       image_constraints.pixel_format.type = pixel_type;
 #else
-      // Compatible with ZX_PIXEL_FORMAT_RGB_888. This format required for AMLOGIC capture.
+      // This format required for AMLOGIC capture.
       image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGR24;
 #endif  // FAKE_DISPLAY
 
@@ -390,19 +391,31 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
       }
     }
 
-    // Actually the pixel format of captured image is not RGB888 but BGR888;
-    // though it is not defined as a zx_pixel_format_t. Since we only need the
-    // bytes-per-pixel here to calculate the stride, in this case it's okay to
-    // use ZX_PIXEL_FORMAT_RGB_888.
-    const int capture_stride =
-        ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888)), 64);
+    // The AMLogic display engine always use formats with 3 bytes per pixel for
+    // captured images.
+    // TODO(fxbug.dev/125394): This should not be hardcoded, instead sysmem
+    // should calculate it from sysmem BufferCollectionInfo of allocated capture
+    // buffer.
+    constexpr uint32_t kCaptureImageBytesPerPixel = 3;
+    // TODO(fxbug.dev/125394): This should not be hardcoded, instead sysmem
+    // should read it from the sysmem BufferCollectionInfo of allocated capture
+    // buffer.
+    constexpr uint32_t kCaptureImageRowByteAlignment = 64;
+    const int capture_stride = static_cast<int>(
+        fbl::round_up(width * kCaptureImageBytesPerPixel, kCaptureImageRowByteAlignment));
+
     fuchsia_sysmem::wire::PixelFormat pixel_format = {
         .type = static_cast<fuchsia_sysmem::wire::PixelFormatType>(input_image_pixel_format_type),
         .format_modifier = {
             .value = 0,
         }};
-    const int expected_stride =
-        ZX_ALIGN(width * static_cast<int>(ImageFormatStrideBytesPerWidthPixel(pixel_format)), 64);
+    const uint32_t input_image_bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(pixel_format);
+    // TODO(fxbug.dev/125394): This should not be hardcoded, instead sysmem
+    // should read it from the sysmem BufferCollectionInfo of allocated input
+    // image buffer.
+    constexpr uint32_t kInputImageRowByteAlignment = 64;
+    const int expected_stride = static_cast<int>(
+        fbl::round_up(width * input_image_bytes_per_pixel, kInputImageRowByteAlignment));
 
     // Ignore the first row. It sometimes contains junk (hardware bug).
     const int start_row = 1;
