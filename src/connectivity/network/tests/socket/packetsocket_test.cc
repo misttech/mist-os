@@ -307,6 +307,27 @@ TEST_P(GenericPacketSocketTest, SockOptSoType) {
   EXPECT_EQ(opt, type);
 }
 
+TEST_P(GenericPacketSocketTest, TwoSockets) {
+  // Test that two packet sockets can be used simultaneously. This is a
+  // regression test for a netstack bug that caused the netstack to crash when
+  // closing a packet socket.  Other test cases in this file didn't observe the
+  // failure since the crash occurred after the test had finished and running
+  // another test case would cause the netstack to be restarted.
+  const auto& [type, protocol] = GetParam();
+
+  {
+    // Open and then close another packet socket.
+    fbl::unique_fd fd;
+    ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_PACKET, type, htons(protocol)))) << strerror(errno);
+  }
+
+  // Do something with the original socket to make sure it's still alive.
+  sockaddr_ll addr;
+  socklen_t addrlen = sizeof(addr);
+  ASSERT_EQ(getsockname(fd().get(), reinterpret_cast<sockaddr*>(&addr), &addrlen), 0)
+      << strerror(errno);
+}
+
 INSTANTIATE_TEST_SUITE_P(AllPacketSocketTests, GenericPacketSocketTest,
                          Combine(Values(SOCK_DGRAM, SOCK_RAW),
                                  Values(0, ETH_P_ALL, ETH_P_IP, ETH_P_IPV6, ETH_P_ARP,
