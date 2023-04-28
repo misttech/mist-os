@@ -16,7 +16,6 @@
 #include <sys/param.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/time.h>
 
 #include <memory>

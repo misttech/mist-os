@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 
 #include <memory>
 
@@ -175,8 +174,8 @@ class GpuDevice : public Device,
   config_stamp_t displayed_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
 
   // TODO(fxbug.dev/122802): Support more formats.
-  static constexpr std::array<zx_pixel_format_t, 1> kSupportedFormats = {
-      ZX_PIXEL_FORMAT_ARGB_8888,
+  static constexpr std::array<any_pixel_format_t, 1> kSupportedFormats = {
+      static_cast<any_pixel_format_t>(fuchsia_images2::wire::PixelFormat::kBgra32),
   };
 };
 
