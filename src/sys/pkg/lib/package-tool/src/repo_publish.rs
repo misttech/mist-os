@@ -318,8 +318,23 @@ async fn get_trusted_root(
         return Ok(Some(RawSignedMetadata::new(buf)));
     }
 
-    // Otherwise, try to read the latest version.
+    // If one wasn't passed in, try to use the `root.json`, that's typically the
+    // most recent trusted version.
     match repo.fetch_metadata(&MetadataPath::root(), MetadataVersion::None).await {
+        Ok(mut file) => {
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf).await?;
+
+            return Ok(Some(RawSignedMetadata::new(buf)));
+        }
+        Err(TufError::MetadataNotFound { .. }) => {}
+        Err(err) => {
+            return Err(err.into());
+        }
+    }
+
+    // If `root.json` doesn't exist, try `1.root.json`.
+    match repo.fetch_metadata(&MetadataPath::root(), MetadataVersion::Number(1)).await {
         Ok(mut file) => {
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).await?;
@@ -977,6 +992,75 @@ mod tests {
 
         assert_matches!(repo_client.update().await, Ok(true));
         assert_eq!(repo_client.database().trusted_root().version(), 1);
+    }
+
+    #[fuchsia::test]
+    async fn test_without_trusted_root_tries_root_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Create a simple repository.
+        let repo = test_utils::make_pm_repository(root).await;
+        let repo_keys = RepoKeys::from_dir(root.join("keys").as_std_path()).unwrap();
+
+        // Publish a new `root.json and `2.root.json`.
+        let mut repo_client = RepoClient::from_trusted_remote(&repo).await.unwrap();
+        RepoBuilder::from_database(&repo, &repo_keys, repo_client.database())
+            .refresh_metadata(true)
+            .commit()
+            .await
+            .unwrap();
+
+        assert_matches!(repo_client.update().await, Ok(true));
+
+        // Make sure the metadata is correct. Note that the timestamp version is
+        // reset back to 1 when the root metadata is rotated.
+        assert_eq!(repo_client.database().trusted_root().version(), 2);
+        assert_eq!(repo_client.database().trusted_timestamp().unwrap().version(), 1);
+
+        // Remove `1.root.json` so we can't initialize with it.
+        std::fs::remove_file(root.join("repository").join("1.root.json")).unwrap();
+
+        // Refresh the metadata.
+        let cmd =
+            RepoPublishCommand { repo_path: root.to_path_buf(), ..default_command_for_test() };
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+
+        // Make sure we can update a client with `2.root.json` metadata.
+        let buf = async_fs::read(root.join("repository").join("2.root.json")).await.unwrap();
+        let trusted_root = RawSignedMetadata::new(buf);
+        let mut repo_client = RepoClient::from_trusted_root(&trusted_root, &repo).await.unwrap();
+
+        assert_matches!(repo_client.update().await, Ok(true));
+        assert_eq!(repo_client.database().trusted_root().version(), 2);
+        assert_eq!(repo_client.database().trusted_timestamp().unwrap().version(), 2);
+    }
+
+    #[fuchsia::test]
+    async fn test_without_trusted_root_tries_1_root_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+
+        // Create a simple repository.
+        let repo = test_utils::make_pm_repository(root).await;
+
+        std::fs::remove_file(root.join("repository").join("root.json")).unwrap();
+
+        // Refresh all the metadata using 1.root.json.
+        let cmd = RepoPublishCommand {
+            clean: true,
+            repo_path: root.to_path_buf(),
+            ..default_command_for_test()
+        };
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+
+        // Make sure we can update a client with 1.root.json metadata.
+        let buf = async_fs::read(root.join("repository").join("1.root.json")).await.unwrap();
+        let trusted_root = RawSignedMetadata::new(buf);
+        let mut repo_client = RepoClient::from_trusted_root(&trusted_root, &repo).await.unwrap();
+
+        assert_matches!(repo_client.update().await, Ok(true));
+        assert_eq!(repo_client.database().trusted_timestamp().unwrap().version(), 2);
     }
 
     #[fuchsia::test]
