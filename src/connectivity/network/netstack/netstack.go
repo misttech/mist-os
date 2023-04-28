@@ -1300,6 +1300,10 @@ func (ns *Netstack) addEndpoint(
 		nicOpts.QDisc = fifo.New(ep, qdisc.numQueues, qdisc.queueLen)
 	}
 	if err := ns.stack.CreateNICWithOptions(ifs.nicid, ep, nicOpts); err != nil {
+		// Clean up memory held by qdisc.
+		if nicOpts.QDisc != nil {
+			nicOpts.QDisc.Close()
+		}
 		return nil, fmt.Errorf("NIC %s: could not create NIC: %w", name, WrapTcpIpError(err))
 	}
 
