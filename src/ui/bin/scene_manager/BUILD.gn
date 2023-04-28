@@ -4,12 +4,20 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/rust/rustc_binary.gni")
+import("//build/icu/icu_fuchsia_component.gni")
+import("//build/icu/icu_fuchsia_package.gni")
+import("//build/icu/icu_rustc_binary.gni")
 
-rustc_binary("scene_manager_bin") {
-  name = "scene_manager"
+icu_rustc_binary("scene_manager_bin") {
+  output_name = "scene_manager"
   with_unit_tests = true
   edition = "2021"
+
+  icu_deps = [
+    "//src/lib/icu:icudtl",
+    "//src/lib/icu_data/rust/icu_data:icu_data",
+    "//src/ui/lib/input_pipeline:input_pipeline",
+  ]
 
   deps = [
     ":input_config_lib",
@@ -37,18 +45,15 @@ rustc_binary("scene_manager_bin") {
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
-    "//src/intl:icudtl",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/icu_data/rust",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/ui/lib/focus_chain_provider:lib_with_includes",
-    "//src/ui/lib/input_pipeline",
     "//src/ui/lib/scene_management",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -81,9 +86,9 @@ fuchsia_component_manifest("manifest") {
   manifest = "meta/scene_manager.cml"
 }
 
-fuchsia_component("scene_manager_component") {
+icu_fuchsia_component("scene_manager_component") {
   cm_label = ":manifest"
-  deps = [ ":scene_manager_bin" ]
+  icu_deps = [ ":scene_manager_bin" ]
 }
 
 # TODO(fxbug.dev/106573): Remove test-only target when
@@ -95,8 +100,8 @@ group("scene_manager_component_for_test") {
   ]
 }
 
-fuchsia_package("scene_manager") {
-  deps = [ ":scene_manager_component" ]
+icu_fuchsia_package("scene_manager") {
+  icu_deps = [ ":scene_manager_component" ]
 }
 
 fuchsia_unittest_package("scene_manager_tests") {
