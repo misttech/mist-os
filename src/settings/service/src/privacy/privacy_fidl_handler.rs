@@ -68,7 +68,7 @@ impl From<SettingInfo> for PrivacySettings {
         if let SettingInfo::Privacy(info) = response {
             return PrivacySettings {
                 user_data_sharing_consent: info.user_data_sharing_consent,
-                ..PrivacySettings::EMPTY
+                ..Default::default()
             };
         }
 
@@ -90,7 +90,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_request_from_settings_empty() {
-        let request = to_request(PrivacySettings::EMPTY);
+        let request = to_request(PrivacySettings::default());
 
         assert_eq!(request, Request::SetUserDataSharingConsent(None));
     }
@@ -99,10 +99,10 @@ mod tests {
     fn test_request_from_settings() {
         const USER_DATA_SHARING_CONSENT: bool = true;
 
-        let mut privacy_settings = PrivacySettings::EMPTY;
-        privacy_settings.user_data_sharing_consent = Some(USER_DATA_SHARING_CONSENT);
-
-        let request = to_request(privacy_settings);
+        let request = to_request(PrivacySettings {
+            user_data_sharing_consent: Some(USER_DATA_SHARING_CONSENT),
+            ..Default::default()
+        });
 
         assert_eq!(request, Request::SetUserDataSharingConsent(Some(USER_DATA_SHARING_CONSENT)));
     }
@@ -111,10 +111,8 @@ mod tests {
     async fn try_from_set_converts_supplied_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<PrivacyMarker>()
             .expect("should be able to create proxy");
-        let _fut = proxy.set(PrivacySettings {
-            user_data_sharing_consent: Some(true),
-            ..PrivacySettings::EMPTY
-        });
+        let _fut = proxy
+            .set(PrivacySettings { user_data_sharing_consent: Some(true), ..Default::default() });
         let mut request_stream: PrivacyRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream

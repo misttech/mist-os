@@ -48,7 +48,7 @@ impl MediaButtonsEventBuilder {
             mic_mute: Some(self.mic_mute),
             pause: Some(self.pause),
             camera_disable: Some(self.camera_disable),
-            ..MediaButtonsEvent::EMPTY
+            ..Default::default()
         }
     }
 

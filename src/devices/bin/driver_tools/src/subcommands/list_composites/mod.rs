@@ -180,7 +180,7 @@ mod tests {
                 name: Some("sysmem".to_string()),
                 bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
                 device: Some("sysmem_dev".to_string()),
-                ..fdd::LegacyCompositeFragmentInfo::EMPTY
+                ..Default::default()
             },
             fdd::LegacyCompositeFragmentInfo {
                 name: Some("acpi".to_string()),
@@ -189,14 +189,14 @@ mod tests {
                     BindInstruction { op: 1, arg: 30, debug: 0 },
                 ]),
                 device: Some("acpi_dev".to_string()),
-                ..fdd::LegacyCompositeFragmentInfo::EMPTY
+                ..Default::default()
             },
         ];
 
         let legacy_info = fdd::LegacyCompositeNodeInfo {
             fragments: Some(test_fragments),
             properties: Some(gen_composite_property_data()),
-            ..fdd::LegacyCompositeNodeInfo::EMPTY
+            ..Default::default()
         };
 
         fdd::CompositeInfo {
@@ -205,7 +205,7 @@ mod tests {
             topological_path: Some("dev/sys/composite_dev".to_string()),
             primary_index: Some(1),
             node_info: Some(fdd::CompositeNodeInfo::Legacy(legacy_info)),
-            ..fdd::CompositeInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -215,12 +215,12 @@ mod tests {
             fdd::CompositeParentNodeInfo {
                 name: Some("sysmem".to_string()),
                 device: Some("path/sysmem_dev".to_string()),
-                ..fdd::CompositeParentNodeInfo::EMPTY
+                ..Default::default()
             },
             fdd::CompositeParentNodeInfo {
                 name: Some("acpi".to_string()),
                 device: Some("path/acpi_dev".to_string()),
-                ..fdd::CompositeParentNodeInfo::EMPTY
+                ..Default::default()
             },
         ];
 
@@ -230,7 +230,7 @@ mod tests {
             topological_path: Some("dev/sys/composite_dev".to_string()),
             primary_index: Some(1),
             node_info: Some(fdd::CompositeNodeInfo::Parents(test_parents)),
-            ..fdd::CompositeInfo::EMPTY
+            ..Default::default()
         };
 
         let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
@@ -244,14 +244,8 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_verbose_empty_fields() {
         let test_parents = vec![
-            fdd::CompositeParentNodeInfo {
-                name: Some("sysmem".to_string()),
-                ..fdd::CompositeParentNodeInfo::EMPTY
-            },
-            fdd::CompositeParentNodeInfo {
-                name: Some("acpi".to_string()),
-                ..fdd::CompositeParentNodeInfo::EMPTY
-            },
+            fdd::CompositeParentNodeInfo { name: Some("sysmem".to_string()), ..Default::default() },
+            fdd::CompositeParentNodeInfo { name: Some("acpi".to_string()), ..Default::default() },
         ];
 
         let test_composite = fdd::CompositeInfo {
@@ -260,7 +254,7 @@ mod tests {
             topological_path: Some("dev/sys/composite_dev".to_string()),
             primary_index: Some(1),
             node_info: Some(fdd::CompositeNodeInfo::Parents(test_parents)),
-            ..fdd::CompositeInfo::EMPTY
+            ..Default::default()
         };
 
         let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
@@ -299,7 +293,7 @@ mod tests {
                 name: Some("sysmem".to_string()),
                 bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
                 device: None,
-                ..fdd::LegacyCompositeFragmentInfo::EMPTY
+                ..Default::default()
             },
             fdd::LegacyCompositeFragmentInfo {
                 name: Some("acpi".to_string()),
@@ -308,14 +302,14 @@ mod tests {
                     BindInstruction { op: 1, arg: 30, debug: 0 },
                 ]),
                 device: None,
-                ..fdd::LegacyCompositeFragmentInfo::EMPTY
+                ..Default::default()
             },
         ];
 
         let legacy_info = fdd::LegacyCompositeNodeInfo {
             fragments: Some(test_fragments),
             properties: Some(gen_composite_property_data()),
-            ..fdd::LegacyCompositeNodeInfo::EMPTY
+            ..Default::default()
         };
 
         let test_composite = fdd::CompositeInfo {
@@ -323,7 +317,7 @@ mod tests {
             driver: None,
             primary_index: Some(1),
             node_info: Some(fdd::CompositeNodeInfo::Legacy(legacy_info)),
-            ..fdd::CompositeInfo::EMPTY
+            ..Default::default()
         };
 
         let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };

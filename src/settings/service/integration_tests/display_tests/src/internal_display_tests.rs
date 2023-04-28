@@ -23,7 +23,7 @@ async fn test_manual_brightness() {
 
     assert_eq!(settings.brightness_value, Some(STARTING_BRIGHTNESS));
 
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.brightness_value = Some(CHANGED_BRIGHTNESS);
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -41,7 +41,7 @@ async fn test_auto_brightness() {
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.auto_brightness = Some(true);
     display_settings.adjusted_auto_brightness = Some(AUTO_BRIGHTNESS_LEVEL);
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
@@ -62,7 +62,7 @@ async fn test_light_mode() {
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
     // Test that if display is enabled, it is reflected.
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.low_light_mode = Some(FidlLowLightMode::Enable);
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -71,7 +71,7 @@ async fn test_light_mode() {
     assert_eq!(settings.low_light_mode, Some(FidlLowLightMode::Enable));
 
     // Test that if display is disabled, it is reflected.
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.low_light_mode = Some(FidlLowLightMode::Disable);
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -80,7 +80,7 @@ async fn test_light_mode() {
     assert_eq!(settings.low_light_mode, Some(FidlLowLightMode::Disable));
 
     // Test that if display is disabled immediately, it is reflected.
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.low_light_mode = Some(FidlLowLightMode::DisableImmediately);
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -95,13 +95,13 @@ async fn test_light_mode() {
 #[fuchsia::test]
 async fn test_theme_type_light() {
     let incoming_theme =
-        Some(FidlTheme { theme_type: Some(FidlThemeType::Light), ..FidlTheme::EMPTY });
+        Some(FidlTheme { theme_type: Some(FidlThemeType::Light), ..Default::default() });
     let expected_theme = incoming_theme.clone();
 
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -116,16 +116,16 @@ async fn test_theme_type_light_theme_mode_empty() {
     let incoming_theme = Some(FidlTheme {
         theme_type: Some(FidlThemeType::Light),
         theme_mode: Some(FidlThemeMode::empty()),
-        ..FidlTheme::EMPTY
+        ..Default::default()
     });
     // theme_mode of 0x00 should be replaced with theme_mode absent.
     let expected_theme =
-        Some(FidlTheme { theme_type: Some(FidlThemeType::Light), ..FidlTheme::EMPTY });
+        Some(FidlTheme { theme_type: Some(FidlThemeType::Light), ..Default::default() });
 
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -140,7 +140,7 @@ async fn test_no_theme_set() {
     let expected_theme = Some(FidlTheme {
         theme_type: Some(FidlThemeType::Light),
         theme_mode: Some(FidlThemeMode::AUTO),
-        ..FidlTheme::EMPTY
+        ..Default::default()
     });
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
@@ -154,7 +154,7 @@ async fn test_no_theme_set() {
 #[fuchsia::test]
 async fn test_theme_mode_auto() {
     let incoming_theme =
-        Some(FidlTheme { theme_mode: Some(FidlThemeMode::AUTO), ..FidlTheme::EMPTY });
+        Some(FidlTheme { theme_mode: Some(FidlThemeMode::AUTO), ..Default::default() });
     let expected_theme = Some(FidlTheme {
         theme_type: Some(FidlThemeType::Light),
         ..incoming_theme.clone().unwrap()
@@ -163,7 +163,7 @@ async fn test_theme_mode_auto() {
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -178,14 +178,14 @@ async fn test_theme_mode_auto_and_type_light() {
     let incoming_theme = Some(FidlTheme {
         theme_mode: Some(FidlThemeMode::AUTO),
         theme_type: Some(FidlThemeType::Light),
-        ..FidlTheme::EMPTY
+        ..Default::default()
     });
     let expected_theme = incoming_theme.clone();
 
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
-    let mut display_settings = DisplaySettings::EMPTY;
+    let mut display_settings = DisplaySettings::default();
     display_settings.theme = incoming_theme;
     proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -198,23 +198,23 @@ async fn test_theme_mode_auto_and_type_light() {
 #[fuchsia::test]
 async fn test_theme_mode_auto_preserves_previous_type() {
     let first_incoming_theme =
-        Some(FidlTheme { theme_type: Some(FidlThemeType::Light), ..FidlTheme::EMPTY });
+        Some(FidlTheme { theme_type: Some(FidlThemeType::Light), ..Default::default() });
     let second_incoming_theme =
-        Some(FidlTheme { theme_mode: Some(FidlThemeMode::AUTO), ..FidlTheme::EMPTY });
+        Some(FidlTheme { theme_mode: Some(FidlThemeMode::AUTO), ..Default::default() });
     let expected_theme = Some(FidlTheme {
         theme_mode: Some(FidlThemeMode::AUTO),
         theme_type: Some(FidlThemeType::Light),
-        ..FidlTheme::EMPTY
+        ..Default::default()
     });
 
     let instance = DisplayTest::create_realm().await.expect("setting up test realm");
     let proxy = DisplayTest::connect_to_displaymarker(&instance);
 
-    let mut first_display_settings = DisplaySettings::EMPTY;
+    let mut first_display_settings = DisplaySettings::default();
     first_display_settings.theme = first_incoming_theme;
     proxy.set(first_display_settings).await.expect("set completed").expect("set successful");
 
-    let mut second_display_settings = DisplaySettings::EMPTY;
+    let mut second_display_settings = DisplaySettings::default();
     second_display_settings.theme = second_incoming_theme;
     proxy.set(second_display_settings).await.expect("set completed").expect("set successful");
 
@@ -249,9 +249,9 @@ async fn test_set_multiple_fields_success() {
         theme: Some(FidlTheme {
             theme_type: Some(FidlThemeType::Dark),
             theme_mode: None,
-            ..FidlTheme::EMPTY
+            ..Default::default()
         }),
-        ..DisplaySettings::EMPTY
+        ..Default::default()
     };
     proxy.set(settings.clone()).await.expect("set completed").expect("set successful");
 
@@ -285,7 +285,7 @@ async fn test_set_multiple_fields_brightness(
         brightness_value,
         screen_enabled,
         adjusted_auto_brightness,
-        ..DisplaySettings::EMPTY
+        ..Default::default()
     };
     let result = proxy.set(settings).await.expect("set completed");
     if expect_success {
@@ -315,9 +315,9 @@ async fn test_set_multiple_fields_brightness(
                 theme: Some(FidlTheme {
                     theme_type: Some(FidlThemeType::Light),
                     theme_mode: Some(FidlThemeMode::AUTO),
-                    ..FidlTheme::EMPTY
+                    ..Default::default()
                 }),
-                ..DisplaySettings::EMPTY
+                ..Default::default()
             }
         );
     } else {

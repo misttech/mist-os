@@ -20,9 +20,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -35,9 +35,9 @@ fn changed_media_background_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -55,9 +55,9 @@ fn changed_media_stream_settings_max() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -70,9 +70,9 @@ fn changed_media_background_stream_settings_max() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -83,9 +83,9 @@ fn changed_media_stream_settings_system() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -96,9 +96,9 @@ fn changed_media_stream_settings_system_with_feedback() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -109,9 +109,9 @@ fn changed_interruption_stream_settings_max() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -124,9 +124,9 @@ fn changed_interruption_background_stream_settings_max() -> AudioStreamSettings 
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -137,9 +137,9 @@ fn changed_interruption_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -152,9 +152,9 @@ fn changed_interruption_background_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -165,9 +165,9 @@ fn changed_communication_stream_settings_max() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -178,9 +178,9 @@ fn changed_system_agent_stream_settings_max() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 

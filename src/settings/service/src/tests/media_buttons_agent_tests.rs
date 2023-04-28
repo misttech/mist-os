@@ -85,7 +85,7 @@ async fn test_media_buttons_proxied() {
             mic_mute: Some(true),
             pause: None,
             camera_disable: None,
-            ..MediaButtonsEvent::EMPTY
+            ..Default::default()
         })
         .await;
 

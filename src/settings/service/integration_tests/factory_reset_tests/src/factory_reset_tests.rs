@@ -77,7 +77,7 @@ async fn test_set() {
     proxy
         .set(fidl_fuchsia_settings::FactoryResetSettings {
             is_local_reset_allowed: Some(false),
-            ..fidl_fuchsia_settings::FactoryResetSettings::EMPTY
+            ..Default::default()
         })
         .await
         .expect("set completed")

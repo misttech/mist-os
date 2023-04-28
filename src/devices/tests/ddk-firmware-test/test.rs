@@ -189,7 +189,7 @@ async fn create_realm(
         )
         .await?;
     let realm = builder.build().await?;
-    realm.driver_test_realm_start(fdt::RealmArgs::EMPTY).await?;
+    realm.driver_test_realm_start(fdt::RealmArgs::default()).await?;
     Ok(realm)
 }
 
@@ -281,7 +281,7 @@ async fn load_package_firmware_test_dfv2() -> Result<(), Error> {
     let args = fdt::RealmArgs {
         use_driver_framework_v2: Some(true),
         root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;
 

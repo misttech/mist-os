@@ -202,7 +202,7 @@ mod tests {
                                         ),
                                     }],
                                 }]),
-                                ..fdd::CompositeNodeSpecInfo::EMPTY
+                                ..Default::default()
                             },
                             fdd::CompositeNodeSpecInfo {
                                 name: Some("test_spec_with_driver".to_string()),
@@ -280,7 +280,7 @@ mod tests {
                                         ],
                                     },
                                 ]),
-                                ..fdd::CompositeNodeSpecInfo::EMPTY
+                                ..Default::default()
                             },
                         ],
                         iterator,

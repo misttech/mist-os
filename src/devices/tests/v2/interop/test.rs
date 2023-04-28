@@ -63,7 +63,7 @@ async fn test_interop() -> Result<()> {
         root_driver: Some("#meta/root.cm".to_string()),
         use_driver_framework_v2: Some(true),
         offers: Some(offers),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;
 

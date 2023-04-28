@@ -25,9 +25,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(DEFAULT_VOLUME_LEVEL + 0.2),
             muted: Some(DEFAULT_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -38,9 +38,9 @@ fn changed_interruption_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(DEFAULT_VOLUME_LEVEL + 0.25),
             muted: Some(DEFAULT_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -168,7 +168,7 @@ async fn test_earcons_play_at_media_volume_level() {
         stream: Some(AudioRenderUsage::Background),
         source: Some(AudioStreamSettingSource::System),
         user_volume: changed_media_stream_settings().user_volume,
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     };
     test_instance.verify_volume(AudioRenderUsage::Background, expected_background_stream).await;
 

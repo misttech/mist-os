@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::common::{
-    AudioCoreRequest, AudioTest, DEFAULT_MEDIA_STREAM_SETTINGS, DEFAULT_VOLUME_LEVEL,
+    default_media_stream_settings, AudioCoreRequest, AudioTest, DEFAULT_VOLUME_LEVEL,
     DEFAULT_VOLUME_MUTED,
 };
 use fidl_fuchsia_media::AudioRenderUsage;
@@ -31,9 +31,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -44,14 +44,14 @@ fn changed_media_stream_settings_2() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
 async fn set_volume(proxy: &AudioProxy, streams: Vec<AudioStreamSettings>) {
-    let mut audio_settings = AudioSettings::EMPTY;
+    let mut audio_settings = AudioSettings::default();
     audio_settings.streams = Some(streams);
     proxy.set(audio_settings).await.expect("set completed").expect("set successful");
 }
@@ -80,7 +80,7 @@ async fn test_audio() {
 
     // Verify that the settings matches the default on start.
     let settings = watch_client.watch().await.expect("watch completed");
-    verify_audio_stream(&settings, DEFAULT_MEDIA_STREAM_SETTINGS);
+    verify_audio_stream(&settings, default_media_stream_settings());
 
     // Verify that a Set call changes the audio settings.
     set_volume(audio_test.proxy(), vec![changed_media_stream_settings()]).await;
@@ -163,7 +163,7 @@ async fn test_deduped_volume_changes() {
         let fut = set_client.watch();
 
         // Make a second identical request. This should do nothing.
-        set_volume(&set_client, vec![DEFAULT_MEDIA_STREAM_SETTINGS]).await;
+        set_volume(&set_client, vec![default_media_stream_settings()]).await;
 
         // Make a third, different request. This should show up in the watch.
         set_volume(&set_client, vec![changed_media_stream_settings_2()]).await;
@@ -200,8 +200,8 @@ async fn test_volume_not_overwritten() {
     let changed_background_stream_settings = AudioStreamSettings {
         stream: Some(AudioRenderUsage::Background),
         source: Some(AudioStreamSettingSource::User),
-        user_volume: Some(Volume { level: Some(0.3), muted: Some(true), ..Volume::EMPTY }),
-        ..AudioStreamSettings::EMPTY
+        user_volume: Some(Volume { level: Some(0.3), muted: Some(true), ..Default::default() }),
+        ..Default::default()
     };
 
     set_volume(audio_test.proxy(), vec![changed_background_stream_settings.clone()]).await;
@@ -231,9 +231,9 @@ async fn test_volume_rounding() {
             user_volume: Some(Volume {
                 level: Some(CHANGED_VOLUME_LEVEL + 0.0015),
                 muted: Some(CHANGED_VOLUME_MUTED),
-                ..Volume::EMPTY
+                ..Default::default()
             }),
-            ..AudioStreamSettings::EMPTY
+            ..Default::default()
         }],
     )
     .await;
@@ -257,7 +257,7 @@ async fn test_volume_rounding() {
     stream: Some(AudioRenderUsage::Media),
     source: Some(AudioStreamSettingSource::User),
     user_volume: None,
-    ..AudioStreamSettings::EMPTY
+    ..Default::default()
 } ; "missing user volume")]
 #[test_case(AudioStreamSettings {
     stream: Some(AudioRenderUsage::Media),
@@ -265,9 +265,9 @@ async fn test_volume_rounding() {
     user_volume: Some(Volume {
         level: None,
         muted: None,
-        ..Volume::EMPTY
+        ..Default::default()
     }),
-..AudioStreamSettings::EMPTY
+..Default::default()
 } ; "missing user volume and muted")]
 #[test_case(AudioStreamSettings {
     stream: None,
@@ -275,9 +275,9 @@ async fn test_volume_rounding() {
     user_volume: Some(Volume {
         level: Some(CHANGED_VOLUME_LEVEL),
         muted: Some(CHANGED_VOLUME_MUTED),
-        ..Volume::EMPTY
+        ..Default::default()
     }),
-    ..AudioStreamSettings::EMPTY
+    ..Default::default()
 } ; "missing stream")]
 #[test_case(AudioStreamSettings {
     stream: Some(AudioRenderUsage::Media),
@@ -285,9 +285,9 @@ async fn test_volume_rounding() {
     user_volume: Some(Volume {
         level: Some(CHANGED_VOLUME_LEVEL),
         muted: Some(CHANGED_VOLUME_MUTED),
-        ..Volume::EMPTY
+        ..Default::default()
     }),
-    ..AudioStreamSettings::EMPTY
+    ..Default::default()
 } ; "missing source")]
 #[fuchsia::test]
 async fn invalid_missing_input_tests(setting: AudioStreamSettings) {
@@ -297,7 +297,7 @@ async fn invalid_missing_input_tests(setting: AudioStreamSettings) {
 
     let result = audio_test
         .proxy()
-        .set(AudioSettings { streams: Some(vec![setting]), ..AudioSettings::EMPTY })
+        .set(AudioSettings { streams: Some(vec![setting]), ..Default::default() })
         .await
         .expect("set completed");
     assert_eq!(result, Err(Error::Failed));
@@ -325,9 +325,9 @@ async fn invalid_missing_input_tests(setting: AudioStreamSettings) {
     user_volume: Some(Volume {
         level: None,
         muted: Some(CHANGED_VOLUME_MUTED),
-        ..Volume::EMPTY
+        ..Default::default()
     }),
-    ..AudioStreamSettings::EMPTY
+    ..Default::default()
 },  AudioCoreRequest::SetMute(AudioRenderUsage::Media, CHANGED_VOLUME_MUTED)
 ; "missing user volume")]
 #[test_case(AudioStreamSettings {
@@ -336,9 +336,9 @@ async fn invalid_missing_input_tests(setting: AudioStreamSettings) {
     user_volume: Some(Volume {
         level: Some(CHANGED_VOLUME_LEVEL),
         muted: None,
-        ..Volume::EMPTY
+        ..Default::default()
     }),
-    ..AudioStreamSettings::EMPTY
+    ..Default::default()
 }, AudioCoreRequest::SetVolume(AudioRenderUsage::Media, CHANGED_VOLUME_LEVEL)
 ; "missing muted")]
 #[fuchsia::test]
@@ -352,7 +352,7 @@ async fn valid_missing_input_tests(
 
     let result = audio_test
         .proxy()
-        .set(AudioSettings { streams: Some(vec![setting]), ..AudioSettings::EMPTY })
+        .set(AudioSettings { streams: Some(vec![setting]), ..Default::default() })
         .await
         .expect("set completed");
 

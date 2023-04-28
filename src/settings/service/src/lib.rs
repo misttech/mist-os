@@ -767,7 +767,7 @@ async fn get_metric_event_logger_proxy(
             ProjectSpec {
                 customer_id: Some(CUSTOMER_ID),
                 project_id: Some(PROJECT_ID),
-                ..ProjectSpec::EMPTY
+                ..Default::default()
             },
             ServerEnd::new(server_end.into_channel()),
         )

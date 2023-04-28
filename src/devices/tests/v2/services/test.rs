@@ -32,7 +32,7 @@ async fn test_services() -> Result<()> {
         root_driver: Some("#meta/root.cm".to_string()),
         use_driver_framework_v2: Some(true),
         exposes: Some(exposes),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     realm.driver_test_realm_start(args).await?;
 

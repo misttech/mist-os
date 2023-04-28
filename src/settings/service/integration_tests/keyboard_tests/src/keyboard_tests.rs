@@ -15,7 +15,7 @@ async fn test_keyboard() {
     let initial_value = KeyboardSettings {
         keymap: Some(KeymapId::UsQwerty),
         autorepeat: None,
-        ..KeyboardSettings::EMPTY
+        ..Default::default()
     };
 
     // Ensure retrieved value matches the expected default value.
@@ -26,7 +26,7 @@ async fn test_keyboard() {
     let changed_value = KeyboardSettings {
         keymap: Some(KeymapId::UsDvorak),
         autorepeat: Some(Autorepeat { delay: 2, period: 1 }),
-        ..KeyboardSettings::EMPTY
+        ..Default::default()
     };
 
     // Ensure setting interface propagates correctly.
@@ -48,7 +48,7 @@ async fn test_keyboard_clean_autorepeat_and_unset_keymap() {
     let initial_value = KeyboardSettings {
         keymap: Some(KeymapId::UsQwerty),
         autorepeat: Some(Autorepeat { delay: 1, period: 2 }),
-        ..KeyboardSettings::EMPTY
+        ..Default::default()
     };
 
     // Setup initial values.
@@ -60,7 +60,7 @@ async fn test_keyboard_clean_autorepeat_and_unset_keymap() {
     assert_eq!(settings.autorepeat, initial_value.autorepeat);
 
     // Ensure setting interface propagates correctly.
-    let mut keyboard_settings = fidl_fuchsia_settings::KeyboardSettings::EMPTY;
+    let mut keyboard_settings = fidl_fuchsia_settings::KeyboardSettings::default();
     keyboard_settings.keymap = None;
     keyboard_settings.autorepeat = Some(fidl_fuchsia_settings::Autorepeat { delay: 0, period: 0 });
     proxy.set(keyboard_settings).await.expect("set completed").expect("set successful");
@@ -68,7 +68,7 @@ async fn test_keyboard_clean_autorepeat_and_unset_keymap() {
     let changed_value = KeyboardSettings {
         keymap: Some(KeymapId::UsQwerty),
         autorepeat: None,
-        ..KeyboardSettings::EMPTY
+        ..Default::default()
     };
 
     // Ensure retrieved value matches set value.

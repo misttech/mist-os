@@ -23,7 +23,7 @@ use std::fmt;
 impl From<SettingInfo> for FidlInputSettings {
     fn from(response: SettingInfo) -> Self {
         if let SettingInfo::Input(info) = response {
-            let mut input_settings = FidlInputSettings::EMPTY;
+            let mut input_settings = FidlInputSettings::default();
             let mut input_devices: Vec<FidlInputDevice> = Vec::new();
 
             info.input_device_state.input_categories.iter().for_each(|(_, category)| {
@@ -291,21 +291,20 @@ impl InputDevice {
 
 impl From<InputDevice> for FidlInputDevice {
     fn from(device: InputDevice) -> Self {
-        let mut result = FidlInputDevice::EMPTY;
+        let mut result = FidlInputDevice::default();
 
         // Convert source states.
         let source_states = Some(
             device
                 .source_states
                 .keys()
-                .map(|source| {
-                    let mut source_state = FidlSourceState::EMPTY;
-                    source_state.source = Some((*source).into());
-                    source_state.state = Some(
+                .map(|source| FidlSourceState {
+                    source: Some((*source).into()),
+                    state: Some(
                         (*device.source_states.get(source).expect("Source state map key missing"))
                             .into(),
-                    );
-                    source_state
+                    ),
+                    ..Default::default()
                 })
                 .collect(),
         );
@@ -449,9 +448,10 @@ impl From<FidlDeviceState> for DeviceState {
 
 impl From<DeviceState> for FidlDeviceState {
     fn from(device_state: DeviceState) -> Self {
-        let mut state = FidlDeviceState::EMPTY;
-        state.toggle_flags = FidlToggleFlags::from_bits(device_state.bits);
-        state
+        FidlDeviceState {
+            toggle_flags: FidlToggleFlags::from_bits(device_state.bits),
+            ..Default::default()
+        }
     }
 }
 
@@ -484,25 +484,25 @@ mod tests {
                     source: Some(FidlDeviceStateSource::Hardware),
                     state: Some(FidlDeviceState {
                         toggle_flags: FidlToggleFlags::from_bits(hw_bits),
-                        ..FidlDeviceState::EMPTY
+                        ..Default::default()
                     }),
-                    ..FidlSourceState::EMPTY
+                    ..Default::default()
                 },
                 FidlSourceState {
                     source: Some(FidlDeviceStateSource::Software),
                     state: Some(FidlDeviceState {
                         toggle_flags: FidlToggleFlags::from_bits(sw_bits),
-                        ..FidlDeviceState::EMPTY
+                        ..Default::default()
                     }),
-                    ..FidlSourceState::EMPTY
+                    ..Default::default()
                 },
             ]),
             mutable_toggle_state: FidlToggleFlags::from_bits(MUTED_DISABLED_BITS),
             state: Some(FidlDeviceState {
                 toggle_flags: FidlToggleFlags::from_bits(overall_bits),
-                ..FidlDeviceState::EMPTY
+                ..Default::default()
             }),
-            ..FidlInputDevice::EMPTY
+            ..Default::default()
         }
     }
 
@@ -909,7 +909,7 @@ mod tests {
     fn test_fidl_device_state_to_device_state() {
         let device_state: DeviceState = FidlDeviceState {
             toggle_flags: FidlToggleFlags::from_bits(MUTED_BITS),
-            ..FidlDeviceState::EMPTY
+            ..Default::default()
         }
         .into();
         assert_eq!(device_state, DeviceState::from_bits(MUTED_BITS).unwrap(),);
@@ -922,7 +922,7 @@ mod tests {
             fidl_device_state,
             FidlDeviceState {
                 toggle_flags: FidlToggleFlags::from_bits(MUTED_BITS),
-                ..FidlDeviceState::EMPTY
+                ..Default::default()
             }
         );
     }

@@ -145,7 +145,7 @@ impl ResolvedDriver {
             device_categories: Some(self.device_categories.clone()),
             package_type: fdi::DriverPackageType::from_primitive(self.package_type as u8),
             is_fallback: Some(self.fallback),
-            ..fdi::MatchedDriverInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -157,7 +157,7 @@ impl ResolvedDriver {
             package_type: fdi::DriverPackageType::from_primitive(self.package_type as u8),
             package_hash: self.package_hash,
             device_categories: Some(self.device_categories.clone()),
-            ..fdd::DriverInfo::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -259,7 +259,7 @@ fn get_rules_device_categories_vec(
     let default_val = Some(vec![fdi::DeviceCategory {
         category: Some(DEFAULT_DEVICE_CATEGORY.to_string()),
         subcategory: None,
-        ..fdi::DeviceCategory::EMPTY
+        ..Default::default()
     }]);
 
     for entry in component.program.as_ref()?.info.entries.as_ref()? {
@@ -286,11 +286,7 @@ pub fn get_device_categories_from_component_data(
         if let Some(entries) = &dictionary.entries {
             let category = get_dictionary_string_value(entries, "category");
             let subcategory = get_dictionary_string_value(entries, "subcategory");
-            categories.push(fdi::DeviceCategory {
-                category,
-                subcategory,
-                ..fdi::DeviceCategory::EMPTY
-            });
+            categories.push(fdi::DeviceCategory { category, subcategory, ..Default::default() });
         }
     }
     categories

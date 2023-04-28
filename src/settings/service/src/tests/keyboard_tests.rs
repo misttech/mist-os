@@ -59,9 +59,11 @@ async fn test_keyboard_storage() {
     let (keyboard_service, store) = create_test_keyboard_env(Arc::new(factory)).await;
 
     // Set a new value.
-    let mut keyboard_settings = fidl_fuchsia_settings::KeyboardSettings::EMPTY;
-    keyboard_settings.keymap = Some(fidl_fuchsia_input::KeymapId::UsDvorak);
-    keyboard_settings.autorepeat = Some(fidl_fuchsia_settings::Autorepeat { delay: 2, period: 1 });
+    let keyboard_settings = fidl_fuchsia_settings::KeyboardSettings {
+        keymap: Some(fidl_fuchsia_input::KeymapId::UsDvorak),
+        autorepeat: Some(fidl_fuchsia_settings::Autorepeat { delay: 2, period: 1 }),
+        ..Default::default()
+    };
     keyboard_service.set(keyboard_settings).await.expect("set completed").expect("set successful");
 
     // Verify the value we set is persisted in DeviceStorage.

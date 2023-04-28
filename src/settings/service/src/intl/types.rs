@@ -66,16 +66,13 @@ impl From<fidl_fuchsia_settings::IntlSettings> for IntlInfo {
 
 impl From<IntlInfo> for fidl_fuchsia_settings::IntlSettings {
     fn from(info: IntlInfo) -> IntlSettings {
-        let mut intl_settings = IntlSettings::EMPTY;
-
-        intl_settings.locales =
-            info.locales.map(|locales| locales.into_iter().map(LocaleId::into).collect());
-        intl_settings.temperature_unit = info.temperature_unit.map(TemperatureUnit::into);
-        intl_settings.time_zone_id =
-            info.time_zone_id.map(|tz| fidl_fuchsia_intl::TimeZoneId { id: tz });
-        intl_settings.hour_cycle = info.hour_cycle.map(HourCycle::into);
-
-        intl_settings
+        IntlSettings {
+            locales: info.locales.map(|locales| locales.into_iter().map(LocaleId::into).collect()),
+            temperature_unit: info.temperature_unit.map(TemperatureUnit::into),
+            time_zone_id: info.time_zone_id.map(|tz| fidl_fuchsia_intl::TimeZoneId { id: tz }),
+            hour_cycle: info.hour_cycle.map(HourCycle::into),
+            ..Default::default()
+        }
     }
 }
 
@@ -164,7 +161,7 @@ mod tests {
 
     #[fuchsia::test]
     fn fidl_storage_convertible_from_storable_empty() {
-        let info = IntlInfo::from_storable(IntlSettings::EMPTY);
+        let info = IntlInfo::from_storable(IntlSettings::default());
 
         assert_eq!(
             info,
@@ -184,7 +181,7 @@ mod tests {
             temperature_unit: Some(fidl_fuchsia_intl::TemperatureUnit::Celsius),
             time_zone_id: Some(fidl_fuchsia_intl::TimeZoneId { id: TIME_ZONE_ID.to_string() }),
             hour_cycle: Some(fidl_fuchsia_settings::HourCycle::H12),
-            ..IntlSettings::EMPTY
+            ..Default::default()
         };
 
         let info = IntlInfo::from_storable(intl_settings);
@@ -210,7 +207,7 @@ mod tests {
         };
         let storable = info.to_storable();
 
-        assert_eq!(storable, IntlSettings::EMPTY,);
+        assert_eq!(storable, IntlSettings::default(),);
     }
 
     #[fuchsia::test]
@@ -231,7 +228,7 @@ mod tests {
                 temperature_unit: Some(fidl_fuchsia_intl::TemperatureUnit::Celsius),
                 time_zone_id: Some(fidl_fuchsia_intl::TimeZoneId { id: TIME_ZONE_ID.to_string() }),
                 hour_cycle: Some(fidl_fuchsia_settings::HourCycle::H12),
-                ..IntlSettings::EMPTY
+                ..Default::default()
             }
         );
     }

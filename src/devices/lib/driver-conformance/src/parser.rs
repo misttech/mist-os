@@ -399,12 +399,12 @@ pub mod test {
     fn test_tests_by_driver() {
         let meta = init_metadata();
 
-        let test0 = meta.tests_by_driver(&fdd::DriverInfo { ..fdd::DriverInfo::EMPTY });
+        let test0 = meta.tests_by_driver(&fdd::DriverInfo::default());
         assert!(test0.is_err());
 
         let test1 = meta.tests_by_driver(&fdd::DriverInfo {
-            device_categories: Some(vec![fdi::DeviceCategory::EMPTY]),
-            ..fdd::DriverInfo::EMPTY
+            device_categories: Some(vec![fdi::DeviceCategory::default()]),
+            ..Default::default()
         });
         assert!(test1.is_err());
 
@@ -412,9 +412,9 @@ pub mod test {
             device_categories: Some(vec![fdi::DeviceCategory {
                 category: Some("misc".to_string()),
                 subcategory: None,
-                ..fdi::DeviceCategory::EMPTY
+                ..Default::default()
             }]),
-            ..fdd::DriverInfo::EMPTY
+            ..Default::default()
         });
         assert!(test2.is_ok());
         assert_eq!(test2.unwrap().len(), 1);
@@ -424,15 +424,15 @@ pub mod test {
                 fdi::DeviceCategory {
                     category: Some("input".to_string()),
                     subcategory: Some("touchpad".to_string()),
-                    ..fdi::DeviceCategory::EMPTY
+                    ..Default::default()
                 },
                 fdi::DeviceCategory {
                     category: Some("imaging".to_string()),
                     subcategory: Some("camera".to_string()),
-                    ..fdi::DeviceCategory::EMPTY
+                    ..Default::default()
                 },
             ]),
-            ..fdd::DriverInfo::EMPTY
+            ..Default::default()
         });
         assert!(test3.is_ok());
         assert_eq!(test3.unwrap().len(), 2);
@@ -441,9 +441,9 @@ pub mod test {
             device_categories: Some(vec![fdi::DeviceCategory {
                 category: Some("bike".to_string()),
                 subcategory: None,
-                ..fdi::DeviceCategory::EMPTY
+                ..Default::default()
             }]),
-            ..fdd::DriverInfo::EMPTY
+            ..Default::default()
         });
         assert!(test4.is_err());
 
@@ -451,9 +451,9 @@ pub mod test {
             device_categories: Some(vec![fdi::DeviceCategory {
                 category: Some("input".to_string()),
                 subcategory: Some("pogo".to_string()),
-                ..fdi::DeviceCategory::EMPTY
+                ..Default::default()
             }]),
-            ..fdd::DriverInfo::EMPTY
+            ..Default::default()
         });
         assert!(test5.is_err());
     }

@@ -302,7 +302,7 @@ mod tests {
                                 bound_driver_url: Some(String::from(
                                     "fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm",
                                 )),
-                                ..fdd::DeviceInfo::EMPTY
+                                ..Default::default()
                             },
                             fdd::DeviceInfo {
                                 id: Some(child_id),
@@ -314,7 +314,7 @@ mod tests {
                                 bound_driver_url: Some(String::from(
                                     "fuchsia-pkg://fuchsia.com/bar-package#meta/bar.cm",
                                 )),
-                                ..fdd::DeviceInfo::EMPTY
+                                ..Default::default()
                             },
                         ],
                         iterator,
@@ -414,7 +414,7 @@ mod tests {
                 bound_driver_url: Some(String::from(
                     "fuchsia-pkg://fuchsia.com/root-package#meta/root.cm",
                 )),
-                ..fdd::DeviceInfo::EMPTY
+                ..Default::default()
             },
             // Composite parent
             fdd::DeviceInfo {
@@ -427,7 +427,7 @@ mod tests {
                 bound_driver_url: Some(String::from(
                     "fuchsia-pkg://fuchsia.com/parent-package#meta/parent.cm",
                 )),
-                ..fdd::DeviceInfo::EMPTY
+                ..Default::default()
             },
             // Composite child
             fdd::DeviceInfo {
@@ -440,7 +440,7 @@ mod tests {
                 bound_driver_url: Some(String::from(
                     "fuchsia-pkg://fuchsia.com/child-package#meta/child.cm",
                 )),
-                ..fdd::DeviceInfo::EMPTY
+                ..Default::default()
             },
         ]
     }

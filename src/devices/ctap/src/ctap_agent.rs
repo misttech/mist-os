@@ -263,7 +263,7 @@ mod tests {
                 command_id: Some(fidl_fuchsia_fido_report::CtapHidCommand::Init),
                 payload_len: Some(response_payload.len() as u16),
                 data: Some(response_payload.to_vec()),
-                ..fidl_fuchsia_fido_report::Message::EMPTY
+                ..Default::default()
             });
         }
 
@@ -286,7 +286,7 @@ mod tests {
                                 command_id: payload.command_id,
                                 payload_len: Some(payload.data.as_ref().unwrap().len() as u16),
                                 data: payload.data,
-                                ..fidl_fuchsia_fido_report::Message::EMPTY
+                                ..Default::default()
                             });
                         }
                     }

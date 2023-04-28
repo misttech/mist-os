@@ -52,7 +52,7 @@ pub async fn run_tool(
         standard_in: Some(sin.into()),
         standard_out: Some(sout.into()),
         standard_err: Some(serr.into()),
-        ..fdp::StdioParams::EMPTY
+        ..Default::default()
     };
 
     let run_result = tool_runner_proxy

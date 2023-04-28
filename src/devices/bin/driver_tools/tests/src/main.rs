@@ -17,7 +17,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
     let instance = builder.build().await?;
-    instance.driver_test_realm_start(fdt::RealmArgs::EMPTY).await?;
+    instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
     info!("Started Driver Test Realm. Now looping forever.");
     loop {}

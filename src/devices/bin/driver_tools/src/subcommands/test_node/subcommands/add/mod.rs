@@ -29,7 +29,7 @@ pub async fn add_test_node(
         .add_test_node(fdd::TestNodeAddArgs {
             name: Some(cmd.name.clone()),
             properties: Some(vec![string_to_property(&cmd.property)?]),
-            ..fdd::TestNodeAddArgs::EMPTY
+            ..Default::default()
         })
         .await?
         .map_err(|e| anyhow!("Calling AddTestNode failed with {:#?}", e))?;

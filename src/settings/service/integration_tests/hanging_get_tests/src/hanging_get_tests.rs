@@ -20,7 +20,7 @@ async fn test_multiple_watches() {
     let updated_setting = DoNotDisturbSettings {
         user_initiated_do_not_disturb: Some(true),
         night_mode_initiated_do_not_disturb: Some(true),
-        ..DoNotDisturbSettings::EMPTY
+        ..Default::default()
     };
     assert_ne!(initial_setting, updated_setting);
 

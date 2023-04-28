@@ -80,7 +80,7 @@ impl TryInto<fidl_fuchsia_fido_report::Message> for Message {
             command_id: Some(self.command),
             data: Some(self.payload.to_vec()),
             payload_len: Some(self.payload_length),
-            ..fidl_fuchsia_fido_report::Message::EMPTY
+            ..Default::default()
         });
     }
 }

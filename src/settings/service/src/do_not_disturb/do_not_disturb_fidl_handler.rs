@@ -18,10 +18,11 @@ use std::convert::TryFrom;
 impl From<SettingInfo> for DoNotDisturbSettings {
     fn from(response: SettingInfo) -> Self {
         if let SettingInfo::DoNotDisturb(info) = response {
-            let mut dnd_settings = fidl_fuchsia_settings::DoNotDisturbSettings::EMPTY;
-            dnd_settings.user_initiated_do_not_disturb = info.user_dnd;
-            dnd_settings.night_mode_initiated_do_not_disturb = info.night_mode_dnd;
-            dnd_settings
+            fidl_fuchsia_settings::DoNotDisturbSettings {
+                user_initiated_do_not_disturb: info.user_dnd,
+                night_mode_initiated_do_not_disturb: info.night_mode_dnd,
+                ..Default::default()
+            }
         } else {
             panic!("incorrect value sent to do_not_disturb");
         }

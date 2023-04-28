@@ -20,7 +20,7 @@ pub async fn write(
         .context("Failed to connect to I2C device")?;
     let transactions = vec![fi2c::Transaction {
         data_transfer: Some(fi2c::DataTransfer::WriteData(cmd.data.clone())),
-        ..fi2c::Transaction::EMPTY
+        ..Default::default()
     }];
     device
         .transfer(&mut transactions.into_iter())

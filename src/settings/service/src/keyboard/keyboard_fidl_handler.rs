@@ -80,7 +80,7 @@ impl From<SettingInfo> for KeyboardSettings {
             return KeyboardSettings {
                 keymap: info.keymap.map(KeymapId::into),
                 autorepeat: info.autorepeat.map(Autorepeat::into),
-                ..KeyboardSettings::EMPTY
+                ..Default::default()
             };
         }
 
@@ -104,7 +104,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_request_from_settings_empty() {
-        let request = to_request(KeyboardSettings::EMPTY).unwrap();
+        let request = to_request(KeyboardSettings::default()).unwrap();
 
         assert_eq!(
             request,
@@ -114,8 +114,10 @@ mod tests {
 
     #[fuchsia::test]
     fn test_request_from_settings_error() {
-        let mut keyboard_settings = KeyboardSettings::EMPTY;
-        keyboard_settings.keymap = Some(fidl_fuchsia_input::KeymapId::unknown());
+        let keyboard_settings = KeyboardSettings {
+            keymap: Some(fidl_fuchsia_input::KeymapId::unknown()),
+            ..Default::default()
+        };
 
         assert!(format!("{:?}", to_request(keyboard_settings).unwrap_err())
             .contains("Received an invalid keymap id:"));
@@ -131,9 +133,11 @@ mod tests {
         const AUTOREPEAT: fidl_fuchsia_settings::Autorepeat =
             fidl_fuchsia_settings::Autorepeat { delay: DELAY, period: PERIOD };
 
-        let mut keyboard_settings = KeyboardSettings::EMPTY;
-        keyboard_settings.keymap = Some(KEYMAP_ID);
-        keyboard_settings.autorepeat = Some(AUTOREPEAT);
+        let keyboard_settings = KeyboardSettings {
+            keymap: Some(KEYMAP_ID),
+            autorepeat: Some(AUTOREPEAT),
+            ..Default::default()
+        };
 
         let request = to_request(keyboard_settings).unwrap();
 
@@ -152,7 +156,7 @@ mod tests {
             .expect("should be able to create proxy");
         let _fut = proxy.set(KeyboardSettings {
             keymap: Some(fidl_fuchsia_input::KeymapId::FrAzerty),
-            ..KeyboardSettings::EMPTY
+            ..Default::default()
         });
         let mut request_stream: KeyboardRequestStream =
             server.into_stream().expect("should be able to convert to stream");

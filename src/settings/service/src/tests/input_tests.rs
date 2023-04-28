@@ -192,14 +192,14 @@ async fn set_device_muted(
     device_name: &str,
     device_type: DeviceType,
 ) {
-    let mut input_state = FidlInputState::EMPTY;
+    let mut input_state = FidlInputState::default();
     let mut states = Vec::new();
 
     input_state.name = Some(device_name.to_string());
     input_state.device_type = Some(device_type);
     input_state.state = Some(FidlDeviceState {
         toggle_flags: ToggleStateFlags::from_bits(if muted { MUTED_BITS } else { AVAILABLE_BITS }),
-        ..FidlDeviceState::EMPTY
+        ..Default::default()
     });
 
     states.push(input_state);
@@ -291,12 +291,12 @@ fn verify_muted_state(
         if expected_muted_state {
             Some(FidlDeviceState {
                 toggle_flags: ToggleStateFlags::from_bits(MUTED_BITS),
-                ..FidlDeviceState::EMPTY
+                ..Default::default()
             })
         } else {
             Some(FidlDeviceState {
                 toggle_flags: ToggleStateFlags::from_bits(AVAILABLE_BITS),
-                ..FidlDeviceState::EMPTY
+                ..Default::default()
             })
         },
     );

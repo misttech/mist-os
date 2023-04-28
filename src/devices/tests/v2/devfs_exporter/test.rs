@@ -20,7 +20,7 @@ async fn test_devfs_exporter() -> Result<()> {
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/root.cm".to_string()),
         use_driver_framework_v2: Some(true),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;
     // Connect to our driver.

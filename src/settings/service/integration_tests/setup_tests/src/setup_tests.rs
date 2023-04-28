@@ -78,7 +78,7 @@ async fn test_setup(should_reboot: bool, test_actions: &[Action]) {
 
     // Ensure setting interface propagates change correctly.
     let expected_interfaces = fidl_fuchsia_settings::ConfigurationInterfaces::ETHERNET;
-    let mut setup_settings = fidl_fuchsia_settings::SetupSettings::EMPTY;
+    let mut setup_settings = fidl_fuchsia_settings::SetupSettings::default();
     setup_settings.enabled_configuration_interfaces = Some(expected_interfaces);
     setup_service
         .set(setup_settings, should_reboot)

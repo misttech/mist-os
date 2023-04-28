@@ -135,7 +135,7 @@ async fn set_up_test_driver_realm(
     builder.driver_test_realm_setup().await?;
     let instance = builder.build().await?;
 
-    let mut realm_args = fdt::RealmArgs::EMPTY;
+    let mut realm_args = fdt::RealmArgs::default();
     realm_args.use_driver_framework_v2 = Some(use_dfv2);
     if use_dfv2 {
         // DriverTestRealm attempts to bind the .cm of test-parent-sys if not explicitly requested otherwise.
@@ -646,7 +646,7 @@ async fn test_add_test_node_dfv2() -> Result<()> {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(bind_fuchsia_test::BIND_PROTOCOL_PARENT),
             }]),
-            ..fdd::TestNodeAddArgs::EMPTY
+            ..Default::default()
         })
         .await?
         .unwrap();

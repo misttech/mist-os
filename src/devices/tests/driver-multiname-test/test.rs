@@ -15,7 +15,7 @@ async fn test_sample_driver() {
     let builder = RealmBuilder::new().await.unwrap();
     let _: &RealmBuilder = builder.driver_test_realm_setup().await.unwrap();
     let instance = builder.build().await.unwrap();
-    let () = instance.driver_test_realm_start(fdt::RealmArgs::EMPTY).await.unwrap();
+    let () = instance.driver_test_realm_start(fdt::RealmArgs::default()).await.unwrap();
 
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev().unwrap();

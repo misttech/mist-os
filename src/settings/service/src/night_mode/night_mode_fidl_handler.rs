@@ -47,9 +47,10 @@ impl watch::Responder<NightModeSettings, fuchsia_zircon::Status> for NightModeWa
 impl From<SettingInfo> for NightModeSettings {
     fn from(response: SettingInfo) -> Self {
         if let SettingInfo::NightMode(info) = response {
-            let mut night_mode_settings = NightModeSettings::EMPTY;
-            night_mode_settings.night_mode_enabled = info.night_mode_enabled;
-            return night_mode_settings;
+            return NightModeSettings {
+                night_mode_enabled: info.night_mode_enabled,
+                ..Default::default()
+            };
         }
 
         panic!("incorrect value sent to night_mode");
@@ -99,7 +100,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_request_from_settings_empty() {
-        let request = to_request(NightModeSettings::EMPTY);
+        let request = to_request(NightModeSettings::default());
         let night_mode_info = NightModeInfo::empty();
         assert_eq!(request, Request::SetNightModeInfo(night_mode_info));
     }
@@ -108,9 +109,10 @@ mod tests {
     fn test_request_from_settings() {
         const NIGHT_MODE_ENABLED: bool = true;
 
-        let mut night_mode_settings = NightModeSettings::EMPTY;
-        night_mode_settings.night_mode_enabled = Some(NIGHT_MODE_ENABLED);
-        let request = to_request(night_mode_settings);
+        let request = to_request(NightModeSettings {
+            night_mode_enabled: Some(NIGHT_MODE_ENABLED),
+            ..Default::default()
+        });
 
         let mut night_mode_info = NightModeInfo::empty();
         night_mode_info.night_mode_enabled = Some(NIGHT_MODE_ENABLED);
@@ -122,8 +124,8 @@ mod tests {
     async fn try_from_set_converts_supplied_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<NightModeMarker>()
             .expect("should be able to create proxy");
-        let _fut = proxy
-            .set(NightModeSettings { night_mode_enabled: Some(true), ..NightModeSettings::EMPTY });
+        let _fut =
+            proxy.set(NightModeSettings { night_mode_enabled: Some(true), ..Default::default() });
         let mut request_stream: NightModeRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream

@@ -137,9 +137,7 @@ impl From<SettingInfo> for AudioSettings {
                 streams.push(AudioStreamSettings::from(*stream));
             }
 
-            let mut audio_settings = AudioSettings::EMPTY;
-            audio_settings.streams = Some(streams);
-            audio_settings
+            AudioSettings { streams: Some(streams), ..Default::default() }
         } else {
             panic!("incorrect value sent to audio");
         }
@@ -154,9 +152,9 @@ impl From<AudioStream> for AudioStreamSettings {
             user_volume: Some(Volume {
                 level: Some(stream.user_volume_level),
                 muted: Some(stream.user_volume_muted),
-                ..Volume::EMPTY
+                ..Default::default()
             }),
-            ..AudioStreamSettings::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -261,8 +259,12 @@ mod tests {
         AudioStreamSettings {
             stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
             source: Some(AudioStreamSettingSource::User),
-            user_volume: Some(Volume { level: Some(0.6), muted: Some(false), ..Volume::EMPTY }),
-            ..AudioStreamSettings::EMPTY
+            user_volume: Some(Volume {
+                level: Some(0.6),
+                muted: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
         }
     }
 
@@ -270,7 +272,7 @@ mod tests {
     #[fuchsia::test]
     fn test_request_from_settings_empty() {
         let id = ftrace::Id::new();
-        let request = to_request(AudioSettings::EMPTY, id);
+        let request = to_request(AudioSettings::default(), id);
 
         assert_eq!(request, Err(Error::NoStreams));
     }
@@ -281,7 +283,7 @@ mod tests {
         let mut stream = test_stream();
         stream.user_volume = None;
 
-        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..AudioSettings::EMPTY };
+        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..Default::default() };
 
         let id = ftrace::Id::new();
         let request = to_request(audio_settings, id);
@@ -295,7 +297,7 @@ mod tests {
         let mut stream = test_stream();
         stream.stream = None;
 
-        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..AudioSettings::EMPTY };
+        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..Default::default() };
 
         let id = ftrace::Id::new();
         let request = to_request(audio_settings, id);
@@ -309,7 +311,7 @@ mod tests {
         let mut stream = test_stream();
         stream.source = None;
 
-        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..AudioSettings::EMPTY };
+        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..Default::default() };
 
         let id = ftrace::Id::new();
         let request = to_request(audio_settings, id);
@@ -322,9 +324,9 @@ mod tests {
     #[fuchsia::test]
     fn test_request_missing_user_volume_level_and_muted() {
         let mut stream = test_stream();
-        stream.user_volume = Some(Volume { level: None, muted: None, ..Volume::EMPTY });
+        stream.user_volume = Some(Volume { level: None, muted: None, ..Default::default() });
 
-        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..AudioSettings::EMPTY };
+        let audio_settings = AudioSettings { streams: Some(vec![stream]), ..Default::default() };
 
         let id = ftrace::Id::new();
         let request = to_request(audio_settings, id);

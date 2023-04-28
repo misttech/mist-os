@@ -21,27 +21,30 @@ use utils;
 pub(crate) const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 pub(crate) const DEFAULT_VOLUME_MUTED: bool = false;
 
-pub(crate) const DEFAULT_MEDIA_STREAM_SETTINGS: AudioStreamSettings =
-    create_default_audio_stream(AudioRenderUsage::Media);
+pub(crate) fn default_media_stream_settings() -> AudioStreamSettings {
+    create_default_audio_stream(AudioRenderUsage::Media)
+}
 
-const DEFAULT_STREAMS: [AudioStreamSettings; 5] = [
-    create_default_audio_stream(AudioRenderUsage::Background),
-    create_default_audio_stream(AudioRenderUsage::Media),
-    create_default_audio_stream(AudioRenderUsage::Interruption),
-    create_default_audio_stream(AudioRenderUsage::SystemAgent),
-    create_default_audio_stream(AudioRenderUsage::Communication),
-];
+fn default_streams() -> [AudioStreamSettings; 5] {
+    [
+        create_default_audio_stream(AudioRenderUsage::Background),
+        create_default_audio_stream(AudioRenderUsage::Media),
+        create_default_audio_stream(AudioRenderUsage::Interruption),
+        create_default_audio_stream(AudioRenderUsage::SystemAgent),
+        create_default_audio_stream(AudioRenderUsage::Communication),
+    ]
+}
 
-const fn create_default_audio_stream(usage: AudioRenderUsage) -> AudioStreamSettings {
+fn create_default_audio_stream(usage: AudioRenderUsage) -> AudioStreamSettings {
     AudioStreamSettings {
         stream: Some(usage),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(DEFAULT_VOLUME_LEVEL),
             muted: Some(DEFAULT_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -126,7 +129,7 @@ impl AudioTest {
 
         // Add mock audio core service.
         let mut streams = HashMap::<AudioRenderUsage, (f32, bool)>::new();
-        for stream in DEFAULT_STREAMS {
+        for stream in default_streams() {
             let _ = streams.insert(
                 stream.stream.expect("stream usage specified"),
                 (

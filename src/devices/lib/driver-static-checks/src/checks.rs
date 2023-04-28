@@ -319,7 +319,7 @@ mod tests {
                         ))),
                     },
                 ]),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             })
             .collect();
 
@@ -339,7 +339,7 @@ mod tests {
                             value: Some(Box::new(fdata::DictionaryValue::ObjVec(objs))),
                         },
                     ]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 },
             }),
             uses: vec![],

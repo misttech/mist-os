@@ -288,9 +288,9 @@ mod tests {
             type_: Some(LightType::Brightness),
             lights: Some(vec![LightState {
                 value: Some(LightValue::Brightness(0.5)),
-                ..LightState::EMPTY
+                ..Default::default()
             }]),
-            ..LightGroup::EMPTY
+            ..Default::default()
         }));
         assert!(groups.contains(&LightGroup {
             name: Some("def".to_owned()),
@@ -298,9 +298,9 @@ mod tests {
             type_: Some(LightType::Rgb),
             lights: Some(vec![LightState {
                 value: Some(LightValue::Color(ColorRgb { red: 1.0, green: 0.5, blue: 0.0 })),
-                ..LightState::EMPTY
+                ..Default::default()
             }]),
-            ..LightGroup::EMPTY
+            ..Default::default()
         }));
         assert!(groups.contains(&LightGroup {
             name: Some("ghi".to_owned()),
@@ -308,16 +308,16 @@ mod tests {
             type_: Some(LightType::Simple),
             lights: Some(vec![LightState {
                 value: Some(LightValue::On(true)),
-                ..LightState::EMPTY
+                ..Default::default()
             }]),
-            ..LightGroup::EMPTY
+            ..Default::default()
         }));
         assert!(groups.contains(&LightGroup {
             name: Some("jkl".to_owned()),
             enabled: Some(false),
             type_: Some(LightType::Simple),
-            lights: Some(vec![LightState { value: None, ..LightState::EMPTY }]),
-            ..LightGroup::EMPTY
+            lights: Some(vec![LightState { value: None, ..Default::default() }]),
+            ..Default::default()
         }));
 
         drop(migration);

@@ -209,11 +209,11 @@ impl DisplayTest {
     // This is for tests that testing screen enabled fields. It is used for both test packages.
     pub async fn test_screen_enabled(display_proxy: DisplayProxy) {
         // Test that if screen is turned off, it is reflected.
-        let mut display_settings = DisplaySettings::EMPTY;
+        let mut display_settings = DisplaySettings::default();
         display_settings.auto_brightness = Some(false);
         display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
-        let mut display_settings = DisplaySettings::EMPTY;
+        let mut display_settings = DisplaySettings::default();
         display_settings.screen_enabled = Some(false);
         display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -222,7 +222,7 @@ impl DisplayTest {
         assert_eq!(settings.screen_enabled, Some(false));
 
         // Test that if display is turned back on, the display and manual brightness are on.
-        let mut display_settings = DisplaySettings::EMPTY;
+        let mut display_settings = DisplaySettings::default();
         display_settings.screen_enabled = Some(true);
         display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
 
@@ -232,7 +232,7 @@ impl DisplayTest {
         assert_eq!(settings.auto_brightness, Some(false));
 
         // Test that if auto brightness is turned on, the display and auto brightness are on.
-        let mut display_settings = DisplaySettings::EMPTY;
+        let mut display_settings = DisplaySettings::default();
         display_settings.auto_brightness = Some(true);
         display_proxy.set(display_settings).await.expect("set completed").expect("set successful");
 

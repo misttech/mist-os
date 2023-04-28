@@ -69,18 +69,15 @@ impl TryFrom<AccessibilityRequest> for Job {
 impl From<SettingInfo> for AccessibilitySettings {
     fn from(response: SettingInfo) -> Self {
         if let SettingInfo::Accessibility(info) = response {
-            let mut accessibility_settings = AccessibilitySettings::EMPTY;
-
-            accessibility_settings.audio_description = info.audio_description;
-            accessibility_settings.screen_reader = info.screen_reader;
-            accessibility_settings.color_inversion = info.color_inversion;
-            accessibility_settings.enable_magnification = info.enable_magnification;
-            accessibility_settings.color_correction =
-                info.color_correction.map(ColorBlindnessType::into);
-            accessibility_settings.captions_settings =
-                info.captions_settings.map(CaptionsSettings::into);
-
-            return accessibility_settings;
+            return AccessibilitySettings {
+                audio_description: info.audio_description,
+                screen_reader: info.screen_reader,
+                color_inversion: info.color_inversion,
+                enable_magnification: info.enable_magnification,
+                color_correction: info.color_correction.map(ColorBlindnessType::into),
+                captions_settings: info.captions_settings.map(CaptionsSettings::into),
+                ..Default::default()
+            };
         }
 
         panic!("incorrect value sent to accessibility");
@@ -111,7 +108,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_request_try_from_settings_request_empty() {
-        let request = to_request(AccessibilitySettings::EMPTY);
+        let request = to_request(AccessibilitySettings::default());
 
         const EXPECTED_ACCESSIBILITY_INFO: AccessibilityInfo = AccessibilityInfo {
             audio_description: None,
@@ -151,13 +148,15 @@ mod tests {
             captions_settings: Some(EXPECTED_CAPTION_SETTINGS),
         };
 
-        let mut accessibility_settings = AccessibilitySettings::EMPTY;
-        accessibility_settings.audio_description = Some(true);
-        accessibility_settings.screen_reader = Some(true);
-        accessibility_settings.color_inversion = Some(true);
-        accessibility_settings.enable_magnification = Some(true);
-        accessibility_settings.color_correction = Some(ColorBlindnessType::Protanomaly);
-        accessibility_settings.captions_settings = Some(EXPECTED_CAPTION_SETTINGS.into());
+        let accessibility_settings = AccessibilitySettings {
+            audio_description: Some(true),
+            screen_reader: Some(true),
+            color_inversion: Some(true),
+            enable_magnification: Some(true),
+            color_correction: Some(ColorBlindnessType::Protanomaly),
+            captions_settings: Some(EXPECTED_CAPTION_SETTINGS.into()),
+            ..Default::default()
+        };
 
         let request = to_request(accessibility_settings);
 

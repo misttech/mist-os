@@ -62,38 +62,36 @@ impl From<FidlTheme> for Theme {
 impl From<SettingInfo> for DisplaySettings {
     fn from(response: SettingInfo) -> Self {
         if let SettingInfo::Brightness(info) = response {
-            let mut display_settings = fidl_fuchsia_settings::DisplaySettings::EMPTY;
-
-            display_settings.auto_brightness = Some(info.auto_brightness);
-            display_settings.adjusted_auto_brightness = Some(info.auto_brightness_value);
-            display_settings.brightness_value = Some(info.manual_brightness_value);
-            display_settings.screen_enabled = Some(info.screen_enabled);
-            display_settings.low_light_mode = Some(match info.low_light_mode {
-                LowLightMode::Enable => FidlLowLightMode::Enable,
-                LowLightMode::Disable => FidlLowLightMode::Disable,
-                LowLightMode::DisableImmediately => FidlLowLightMode::DisableImmediately,
-            });
-
-            display_settings.theme = Some(FidlTheme {
-                theme_type: match info.theme {
-                    Some(Theme { theme_type: Some(theme_type), .. }) => match theme_type {
-                        ThemeType::Unknown => None,
-                        ThemeType::Default => Some(FidlThemeType::Default),
-                        ThemeType::Light => Some(FidlThemeType::Light),
-                        ThemeType::Dark => Some(FidlThemeType::Dark),
+            fidl_fuchsia_settings::DisplaySettings {
+                auto_brightness: Some(info.auto_brightness),
+                adjusted_auto_brightness: Some(info.auto_brightness_value),
+                brightness_value: Some(info.manual_brightness_value),
+                screen_enabled: Some(info.screen_enabled),
+                low_light_mode: Some(match info.low_light_mode {
+                    LowLightMode::Enable => FidlLowLightMode::Enable,
+                    LowLightMode::Disable => FidlLowLightMode::Disable,
+                    LowLightMode::DisableImmediately => FidlLowLightMode::DisableImmediately,
+                }),
+                theme: Some(FidlTheme {
+                    theme_type: match info.theme {
+                        Some(Theme { theme_type: Some(theme_type), .. }) => match theme_type {
+                            ThemeType::Unknown => None,
+                            ThemeType::Default => Some(FidlThemeType::Default),
+                            ThemeType::Light => Some(FidlThemeType::Light),
+                            ThemeType::Dark => Some(FidlThemeType::Dark),
+                        },
+                        _ => None,
                     },
-                    _ => None,
-                },
-                theme_mode: match info.theme {
-                    Some(Theme { theme_mode, .. }) if !theme_mode.is_empty() => {
-                        Some(FidlThemeMode::from(theme_mode))
-                    }
-                    _ => None,
-                },
-                ..FidlTheme::EMPTY
-            });
-
-            display_settings
+                    theme_mode: match info.theme {
+                        Some(Theme { theme_mode, .. }) if !theme_mode.is_empty() => {
+                            Some(FidlThemeMode::from(theme_mode))
+                        }
+                        _ => None,
+                    },
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }
         } else {
             panic!("incorrect value sent to display");
         }

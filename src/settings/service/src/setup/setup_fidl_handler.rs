@@ -69,7 +69,7 @@ impl From<ConfigurationInterfaceFlags> for fidl_fuchsia_settings::ConfigurationI
 
 impl From<SetupInfo> for SetupSettings {
     fn from(info: SetupInfo) -> Self {
-        let mut settings = SetupSettings::EMPTY;
+        let mut settings = SetupSettings::default();
         let interfaces =
             fidl_fuchsia_settings::ConfigurationInterfaces::from(info.configuration_interfaces);
 
@@ -151,8 +151,10 @@ mod tests {
             ConfigurationInterfaceFlags::ETHERNET;
         const SHOULD_REBOOT: bool = true;
 
-        let mut setup_settings = SetupSettings::EMPTY;
-        setup_settings.enabled_configuration_interfaces = CONFIGURATION_INTERFACES;
+        let setup_settings = SetupSettings {
+            enabled_configuration_interfaces: CONFIGURATION_INTERFACES,
+            ..Default::default()
+        };
 
         let request = to_request(setup_settings, SHOULD_REBOOT);
 
@@ -176,7 +178,7 @@ mod tests {
         let _fut = proxy.set(
             SetupSettings {
                 enabled_configuration_interfaces: CONFIGURATION_INTERFACES,
-                ..SetupSettings::EMPTY
+                ..Default::default()
             },
             SHOULD_REBOOT,
         );

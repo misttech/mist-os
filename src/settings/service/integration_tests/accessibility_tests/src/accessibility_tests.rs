@@ -19,7 +19,7 @@ async fn test_accessibility_set_all() {
         color: Some(TEST_COLOR),
         relative_size: Some(1.0),
         char_edge_style: Some(EdgeStyle::Raised),
-        ..CaptionFontStyle::EMPTY
+        ..Default::default()
     };
     let changed_caption_settings = CaptionsSettings {
         for_media: Some(true),
@@ -27,12 +27,12 @@ async fn test_accessibility_set_all() {
         font_style: Some(changed_font_style),
         window_color: Some(TEST_COLOR),
         background_color: Some(TEST_COLOR),
-        ..CaptionsSettings::EMPTY
+        ..Default::default()
     };
 
-    let initial_settings = AccessibilitySettings::EMPTY;
+    let initial_settings = AccessibilitySettings::default();
 
-    let mut expected_settings = AccessibilitySettings::EMPTY;
+    let mut expected_settings = AccessibilitySettings::default();
     expected_settings.audio_description = Some(true);
     expected_settings.screen_reader = Some(true);
     expected_settings.color_inversion = Some(true);
@@ -70,7 +70,7 @@ async fn test_accessibility_set_captions() {
         color: None,
         relative_size: Some(1.0),
         char_edge_style: None,
-        ..CaptionFontStyle::EMPTY
+        ..Default::default()
     };
     let expected_captions_settings = CaptionsSettings {
         for_media: Some(true),
@@ -78,10 +78,10 @@ async fn test_accessibility_set_captions() {
         font_style: Some(changed_font_style),
         window_color: Some(ColorRgba { red: 238.0, green: 23.0, blue: 128.0, alpha: 255.0 }),
         background_color: None,
-        ..CaptionsSettings::EMPTY
+        ..Default::default()
     };
 
-    let mut expected_settings = AccessibilitySettings::EMPTY;
+    let mut expected_settings = AccessibilitySettings::default();
     expected_settings.captions_settings = Some(expected_captions_settings.clone());
 
     let instance = AccessibilityTest::create_realm().await.expect("setting up test realm");
@@ -90,26 +90,26 @@ async fn test_accessibility_set_captions() {
         let proxy = AccessibilityTest::connect_to_accessibilitymarker(&instance);
 
         // Set for_media and window_color in the top-level CaptionsSettings.
-        let mut first_set = AccessibilitySettings::EMPTY;
+        let mut first_set = AccessibilitySettings::default();
         first_set.captions_settings = Some(CaptionsSettings {
             for_media: Some(false),
             for_tts: None,
             font_style: None,
             window_color: expected_captions_settings.clone().window_color,
             background_color: None,
-            ..CaptionsSettings::EMPTY
+            ..Default::default()
         });
         proxy.set(first_set.clone()).await.expect("set completed").expect("set successful");
 
         // Set FontStyle and overwrite for_media.
-        let mut second_set = AccessibilitySettings::EMPTY;
+        let mut second_set = AccessibilitySettings::default();
         second_set.captions_settings = Some(CaptionsSettings {
             for_media: expected_captions_settings.clone().for_media,
             for_tts: None,
             font_style: expected_captions_settings.clone().font_style,
             window_color: None,
             background_color: None,
-            ..CaptionsSettings::EMPTY
+            ..Default::default()
         });
         proxy.set(second_set.clone()).await.expect("set completed").expect("set successful");
     }

@@ -95,7 +95,7 @@ impl CompositeNodeSpecManager {
                 name: Some(name.clone()),
                 node_index: Some(idx as u32),
                 num_nodes: Some(parents.len() as u32),
-                ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             };
 
             parent_specs.push((properties, composite_node_spec_info));
@@ -168,7 +168,7 @@ impl CompositeNodeSpecManager {
 
         Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
             specs: Some(specs_result),
-            ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+            ..Default::default()
         }))
     }
 
@@ -247,13 +247,13 @@ fn to_composite_node_spec_info(
                 primary_index: Some(matched_driver.primary_index),
                 parent_names: Some(matched_driver.names.clone()),
                 parents: Some(composite_node_spec_info.nodes.clone()),
-                ..fdd::CompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             }
         }
         None => fdd::CompositeNodeSpecInfo {
             name: Some(name.to_string()),
             parents: Some(composite_node_spec_info.nodes.clone()),
-            ..fdd::CompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         },
     }
 }
@@ -488,7 +488,7 @@ fn match_composite_properties<'a>(
     let info = fdi::MatchedCompositeInfo {
         composite_name: Some(composite.symbol_table[&composite.device_name_id].clone()),
         driver_info: Some(composite_driver.create_matched_driver_info()),
-        ..fdi::MatchedCompositeInfo::EMPTY
+        ..Default::default()
     };
     return Ok(Some(MatchedComposite { info, names, primary_index }));
 }
@@ -661,7 +661,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
                     parents: nodes.clone(),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -675,7 +675,7 @@ mod tests {
         let expected_composite_node_spec = fdd::CompositeNodeSpecInfo {
             name: Some("test_spec".to_string()),
             parents: nodes,
-            ..fdd::CompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
 
         assert_eq!(&expected_composite_node_spec, composite_node_spec);
@@ -697,12 +697,12 @@ mod tests {
             name: Some("test_spec".to_string()),
             node_index: Some(0),
             num_nodes: Some(2),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -724,12 +724,12 @@ mod tests {
             name: Some("test_spec".to_string()),
             node_index: Some(1),
             num_nodes: Some(2),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec_2]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_2)
         );
@@ -760,7 +760,7 @@ mod tests {
                         bind_rules: bind_rules,
                         properties: properties,
                     }]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -774,12 +774,12 @@ mod tests {
             name: Some("test_spec".to_string()),
             node_index: Some(0),
             num_nodes: Some(1),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties)
         );
@@ -813,7 +813,7 @@ mod tests {
                         bind_rules: bind_rules,
                         properties: properties,
                     }]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -834,12 +834,12 @@ mod tests {
             name: Some("test_spec".to_string()),
             node_index: Some(0),
             num_nodes: Some(1),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties)
         );
@@ -884,7 +884,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
                     parents: Some(vec![create_test_parent_spec_1(), create_test_parent_spec_2(),]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -902,7 +902,7 @@ mod tests {
                         },
                         fdf::ParentSpec { bind_rules: bind_rules_3, properties: properties_3 },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -931,14 +931,14 @@ mod tests {
                 name: Some("test_spec".to_string()),
                 node_index: Some(1),
                 num_nodes: Some(2),
-                ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             }));
 
             assert!(matched_specs.contains(&fdi::MatchedCompositeNodeSpecInfo {
                 name: Some("test_spec2".to_string()),
                 node_index: Some(0),
                 num_nodes: Some(2),
-                ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             }));
 
             true
@@ -1003,7 +1003,7 @@ mod tests {
                         },
                         create_test_parent_spec_2(),
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1021,7 +1021,7 @@ mod tests {
                             properties: properties_1,
                         },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1036,7 +1036,7 @@ mod tests {
                         bind_rules: bind_rules_4,
                         properties: properties_4,
                     }]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1060,21 +1060,21 @@ mod tests {
                 name: Some("test_spec".to_string()),
                 node_index: Some(0),
                 num_nodes: Some(2),
-                ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             }));
 
             assert!(matched_specs.contains(&fdi::MatchedCompositeNodeSpecInfo {
                 name: Some("test_spec2".to_string()),
                 node_index: Some(1),
                 num_nodes: Some(2),
-                ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             }));
 
             assert!(matched_specs.contains(&fdi::MatchedCompositeNodeSpecInfo {
                 name: Some("test_spec3".to_string()),
                 node_index: Some(0),
                 num_nodes: Some(1),
-                ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                ..Default::default()
             }));
 
             true
@@ -1111,7 +1111,7 @@ mod tests {
                         create_test_parent_spec_1(),
                         fdf::ParentSpec { bind_rules: bind_rules_2, properties: properties_2 },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1180,7 +1180,7 @@ mod tests {
                         fdf::ParentSpec { bind_rules: bind_rules_1, properties: properties_1 },
                         fdf::ParentSpec { bind_rules: bind_rules_2, properties: properties_2 },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1198,12 +1198,12 @@ mod tests {
             name: Some("test_spec".to_string()),
             node_index: Some(0),
             num_nodes: Some(2),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec_1]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -1218,12 +1218,12 @@ mod tests {
             name: Some("test_spec".to_string()),
             node_index: Some(1),
             num_nodes: Some(2),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec_2]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_2)
         );
@@ -1273,7 +1273,7 @@ mod tests {
                         fdf::ParentSpec { bind_rules: bind_rules_1, properties: properties_1 },
                         fdf::ParentSpec { bind_rules: bind_rules_2, properties: properties_2 },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1318,7 +1318,7 @@ mod tests {
                         bind_rules: bind_rules,
                         properties: properties,
                     }]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1353,7 +1353,7 @@ mod tests {
                         bind_rules: bind_rules,
                         properties: properties,
                     },]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1393,7 +1393,7 @@ mod tests {
                         fdf::ParentSpec { bind_rules: bind_rules, properties: properties_1 },
                         fdf::ParentSpec { bind_rules: vec![], properties: properties_2 },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1433,7 +1433,7 @@ mod tests {
                         fdf::ParentSpec { bind_rules: bind_rules, properties: properties_1 },
                         fdf::ParentSpec { bind_rules: vec![], properties: properties_2 },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1447,7 +1447,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
                     parents: None,
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -1558,7 +1558,7 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..fdi::MatchedCompositeInfo::EMPTY
+                    ..Default::default()
                 },
                 vec![
                     TEST_PRIMARY_NAME.to_string(),
@@ -1570,7 +1570,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
                     parents: nodes.clone(),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![&composite_driver]
             )
@@ -1591,7 +1591,7 @@ mod tests {
                 TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             parents: nodes,
-            ..fdd::CompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
 
         assert_eq!(&expected_composite_node_spec, composite_node_spec);
@@ -1613,14 +1613,14 @@ mod tests {
             composite: Some(fdi::MatchedCompositeInfo {
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                ..fdi::MatchedCompositeInfo::EMPTY
+                ..Default::default()
             }),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -1727,7 +1727,7 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..fdi::MatchedCompositeInfo::EMPTY
+                    ..Default::default()
                 },
                 vec![
                     TEST_ADDITIONAL_B_NAME.to_string(),
@@ -1739,7 +1739,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
                     parents: nodes.clone(),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![&composite_driver]
             )
@@ -1760,7 +1760,7 @@ mod tests {
                 TEST_PRIMARY_NAME.to_string(),
             ]),
             parents: nodes,
-            ..fdd::CompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
 
         assert_eq!(&expected_composite_node_spec, composite_node_spec);
@@ -1782,14 +1782,14 @@ mod tests {
             composite: Some(fdi::MatchedCompositeInfo {
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                ..fdi::MatchedCompositeInfo::EMPTY
+                ..Default::default()
             }),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -1913,7 +1913,7 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..fdi::MatchedCompositeInfo::EMPTY
+                    ..Default::default()
                 },
                 vec![
                     TEST_PRIMARY_NAME.to_string(),
@@ -1929,7 +1929,7 @@ mod tests {
                         additional_parent_spec_b,
                         additional_parent_spec_a,
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![&composite_driver]
             )
@@ -1952,14 +1952,14 @@ mod tests {
             composite: Some(fdi::MatchedCompositeInfo {
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                ..fdi::MatchedCompositeInfo::EMPTY
+                ..Default::default()
             }),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -2096,7 +2096,7 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..fdi::MatchedCompositeInfo::EMPTY
+                    ..Default::default()
                 },
                 vec![
                     TEST_PRIMARY_NAME.to_string(),
@@ -2114,7 +2114,7 @@ mod tests {
                         optional_node_parent_a,
                         additional_parent_spec_a,
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![&composite_driver]
             )
@@ -2138,14 +2138,14 @@ mod tests {
             composite: Some(fdi::MatchedCompositeInfo {
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                ..fdi::MatchedCompositeInfo::EMPTY
+                ..Default::default()
             }),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -2168,14 +2168,14 @@ mod tests {
             composite: Some(fdi::MatchedCompositeInfo {
                 composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                ..fdi::MatchedCompositeInfo::EMPTY
+                ..Default::default()
             }),
-            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             Some(fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
                 specs: Some(vec![expected_composite_node_spec]),
-                ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                ..Default::default()
             })),
             composite_node_spec_manager.match_parent_specs(&device_properties_1)
         );
@@ -2285,7 +2285,7 @@ mod tests {
                         additional_parent_spec_a,
                         additional_parent_spec_b
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![&composite_driver]
             )
@@ -2312,7 +2312,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test-spec".to_string()),
                     parents: Some(vec![node.clone()]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -2324,7 +2324,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
                     parents: Some(vec![node]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -2350,7 +2350,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test/spec".to_string()),
                     parents: Some(vec![node.clone()]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )
@@ -2362,7 +2362,7 @@ mod tests {
                 fdf::CompositeNodeSpec {
                     name: Some("test:spec".to_string()),
                     parents: Some(vec![node]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 },
                 vec![]
             )

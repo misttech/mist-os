@@ -77,9 +77,10 @@ impl TryFrom<FactoryResetRequest> for Job {
 impl From<SettingInfo> for FactoryResetSettings {
     fn from(response: SettingInfo) -> Self {
         if let SettingInfo::FactoryReset(info) = response {
-            let mut factory_reset_settings = FactoryResetSettings::EMPTY;
-            factory_reset_settings.is_local_reset_allowed = Some(info.is_local_reset_allowed);
-            factory_reset_settings
+            FactoryResetSettings {
+                is_local_reset_allowed: Some(info.is_local_reset_allowed),
+                ..Default::default()
+            }
         } else {
             panic!("incorrect value sent to factory_reset");
         }
@@ -101,7 +102,7 @@ mod tests {
     fn to_request_maps_correctly() {
         let result = to_request(FactoryResetSettings {
             is_local_reset_allowed: Some(true),
-            ..FactoryResetSettings::EMPTY
+            ..Default::default()
         });
         assert_matches!(result, Some(Request::SetLocalResetAllowed(true)));
     }
@@ -110,7 +111,7 @@ mod tests {
     async fn try_from_set_handles_missing_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>()
             .expect("should be able to create proxy");
-        let _fut = proxy.set(FactoryResetSettings::EMPTY);
+        let _fut = proxy.set(FactoryResetSettings::default());
         let mut request_stream: FactoryResetRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream
@@ -126,10 +127,8 @@ mod tests {
     async fn try_from_set_converts_supplied_params() {
         let (proxy, server) = fidl::endpoints::create_proxy::<FactoryResetMarker>()
             .expect("should be able to create proxy");
-        let _fut = proxy.set(FactoryResetSettings {
-            is_local_reset_allowed: Some(true),
-            ..FactoryResetSettings::EMPTY
-        });
+        let _fut = proxy
+            .set(FactoryResetSettings { is_local_reset_allowed: Some(true), ..Default::default() });
         let mut request_stream: FactoryResetRequestStream =
             server.into_stream().expect("should be able to convert to stream");
         let request = request_stream

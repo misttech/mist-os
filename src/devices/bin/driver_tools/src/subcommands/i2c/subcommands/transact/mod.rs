@@ -28,7 +28,7 @@ fn parse_transactions<T: AsRef<str> + Display>(
                 };
                 transactions.push(fi2c::Transaction {
                     data_transfer: Some(fi2c::DataTransfer::ReadSize(length)),
-                    ..fi2c::Transaction::EMPTY
+                    ..Default::default()
                 });
             }
             "w" => {
@@ -46,7 +46,7 @@ fn parse_transactions<T: AsRef<str> + Display>(
                 }
                 transactions.push(fi2c::Transaction {
                     data_transfer: Some(fi2c::DataTransfer::WriteData(data)),
-                    ..fi2c::Transaction::EMPTY
+                    ..Default::default()
                 });
             }
             ty => {
@@ -107,14 +107,14 @@ mod tests {
     fn i2c_read(length: u32) -> fi2c::Transaction {
         fi2c::Transaction {
             data_transfer: Some(fi2c::DataTransfer::ReadSize(length)),
-            ..fi2c::Transaction::EMPTY
+            ..Default::default()
         }
     }
 
     fn i2c_write(data: &[u8]) -> fi2c::Transaction {
         fi2c::Transaction {
             data_transfer: Some(fi2c::DataTransfer::WriteData(data.into())),
-            ..fi2c::Transaction::EMPTY
+            ..Default::default()
         }
     }
 

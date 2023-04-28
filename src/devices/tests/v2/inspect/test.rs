@@ -34,7 +34,7 @@ async fn test_driver_inspect() -> Result<()> {
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
         use_driver_framework_v2: Some(true),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;
 

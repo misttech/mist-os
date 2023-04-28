@@ -252,15 +252,15 @@ mod tests {
                             fdi::DeviceCategory {
                                 category: Some("connectivity".to_string()),
                                 subcategory: Some("ethernet".to_string()),
-                                ..fdi::DeviceCategory::EMPTY
+                                ..Default::default()
                             },
                             fdi::DeviceCategory {
                                 category: Some("usb".to_string()),
                                 subcategory: None,
-                                ..fdi::DeviceCategory::EMPTY
+                                ..Default::default()
                             },
                         ]),
-                        ..fdd::DriverInfo::EMPTY
+                        ..Default::default()
                     }],
                     iterator,
                 )

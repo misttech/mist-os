@@ -29,9 +29,9 @@ fn get_test_light_groups() -> HashMap<String, LightGroup> {
                 type_: Some(LightType::Brightness),
                 lights: Some(vec![LightState {
                     value: Some(LightValue::Brightness(LIGHT_VAL)),
-                    ..LightState::EMPTY
+                    ..Default::default()
                 }]),
-                ..LightGroup::EMPTY
+                ..Default::default()
             },
         ),
         (
@@ -42,9 +42,9 @@ fn get_test_light_groups() -> HashMap<String, LightGroup> {
                 type_: Some(LightType::Simple),
                 lights: Some(vec![LightState {
                     value: Some(LightValue::On(true)),
-                    ..LightState::EMPTY
+                    ..Default::default()
                 }]),
-                ..LightGroup::EMPTY
+                ..Default::default()
             },
         ),
     ])
@@ -70,7 +70,7 @@ async fn test_light_set_and_watch() {
     let mut expected_light_info = get_test_light_groups();
     let mut changed_light_group = expected_light_info[LIGHT_NAME_1].clone();
     let changed_light_state =
-        LightState { value: Some(LightValue::Brightness(0.128)), ..LightState::EMPTY };
+        LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() };
     changed_light_group.lights = Some(vec![changed_light_state.clone()]);
     let _ = expected_light_info.insert(LIGHT_NAME_1.to_string(), changed_light_group);
 
@@ -103,7 +103,7 @@ async fn test_light_set_no_lights() {
             LIGHT_NAME_1,
             &mut vec![LightState {
                 value: Some(LightValue::Brightness(0.128)),
-                ..LightState::EMPTY
+                ..Default::default()
             }]
             .into_iter()
             .map(LightState::into),
@@ -127,8 +127,8 @@ async fn test_light_set_wrong_size() {
         .set_light_group_values(
             LIGHT_NAME_1,
             &mut vec![
-                LightState { value: Some(LightValue::Brightness(0.128)), ..LightState::EMPTY },
-                LightState { value: Some(LightValue::Brightness(0.11)), ..LightState::EMPTY },
+                LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() },
+                LightState { value: Some(LightValue::Brightness(0.11)), ..Default::default() },
             ]
             .into_iter()
             .map(LightState::into),
@@ -146,12 +146,12 @@ async fn test_individual_light_group() {
     let light_group_1 = light_groups.get(LIGHT_NAME_1).unwrap().clone();
     let mut light_group_1_updated = light_group_1.clone();
     light_group_1_updated.lights =
-        Some(vec![LightState { value: Some(LightValue::Brightness(0.128)), ..LightState::EMPTY }]);
+        Some(vec![LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() }]);
 
     let light_group_2 = light_groups.get(LIGHT_NAME_2).unwrap().clone();
     let mut light_group_2_updated = light_group_2.clone();
     light_group_2_updated.lights =
-        Some(vec![LightState { value: Some(LightValue::On(false)), ..LightState::EMPTY }]);
+        Some(vec![LightState { value: Some(LightValue::On(false)), ..Default::default() }]);
 
     let realm = LightRealm::create_realm(get_test_hardware_lights())
         .await
@@ -247,14 +247,8 @@ async fn test_set_wrong_state_length() {
 
     // Set with an extra light state should fail.
     let extra_state = vec![
-        fidl_fuchsia_settings::LightState {
-            value: None,
-            ..fidl_fuchsia_settings::LightState::EMPTY
-        },
-        fidl_fuchsia_settings::LightState {
-            value: None,
-            ..fidl_fuchsia_settings::LightState::EMPTY
-        },
+        fidl_fuchsia_settings::LightState { value: None, ..Default::default() },
+        fidl_fuchsia_settings::LightState { value: None, ..Default::default() },
     ];
     let result = light_proxy
         .set_light_group_values(LIGHT_NAME_1, &mut extra_state.into_iter())
@@ -273,7 +267,7 @@ async fn test_set_wrong_value_type() {
     let light_proxy = LightRealm::connect_to_light_marker(&realm);
 
     // One of the light values is On instead of brightness, the set should fail.
-    let new_state = vec![LightState { value: Some(LightValue::On(true)), ..LightState::EMPTY }];
+    let new_state = vec![LightState { value: Some(LightValue::On(true)), ..Default::default() }];
     let result = light_proxy
         .set_light_group_values(LIGHT_NAME_1, &mut new_state.into_iter())
         .await
@@ -312,7 +306,7 @@ async fn test_set_invalid_rgb_values() {
                     green: LIGHT_START_VAL,
                     blue: INVALID_VAL_1,
                 })),
-                ..fidl_fuchsia_settings::LightState::EMPTY
+                ..Default::default()
             }]
             .into_iter(),
         )
@@ -330,7 +324,7 @@ async fn test_set_invalid_rgb_values() {
                     green: INVALID_VAL_2,
                     blue: LIGHT_START_VAL,
                 })),
-                ..fidl_fuchsia_settings::LightState::EMPTY
+                ..Default::default()
             }]
             .into_iter(),
         )

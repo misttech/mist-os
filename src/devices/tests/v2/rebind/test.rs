@@ -18,7 +18,7 @@ async fn start_driver_test_realm() -> Result<RealmInstance> {
     builder.driver_test_realm_setup().await.context("Failed to setup driver test realm")?;
     let instance = builder.build().await.context("Failed to build realm instance")?;
 
-    let mut realm_args = fdt::RealmArgs::EMPTY;
+    let mut realm_args = fdt::RealmArgs::default();
     realm_args.use_driver_framework_v2 = Some(true);
     realm_args.root_driver = Some(ROOT_DRIVER_DFV2_URL.to_owned());
     instance

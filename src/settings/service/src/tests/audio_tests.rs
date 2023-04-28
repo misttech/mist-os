@@ -35,9 +35,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_MUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 
@@ -289,8 +289,10 @@ async fn test_invalid_stream_fails() {
     let _ = audio_proxy.watch().await.expect("watch completed");
 
     // Make a set call with the media stream, which isn't present and should fail.
-    let mut audio_settings = AudioSettings::EMPTY;
-    audio_settings.streams = Some(vec![changed_media_stream_settings()]);
+    let audio_settings = AudioSettings {
+        streams: Some(vec![changed_media_stream_settings()]),
+        ..Default::default()
+    };
     let _ =
         audio_proxy.set(audio_settings).await.expect("set completed").expect_err("set should fail");
 }

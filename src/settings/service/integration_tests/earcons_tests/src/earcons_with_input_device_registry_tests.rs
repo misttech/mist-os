@@ -21,9 +21,9 @@ fn changed_media_stream_settings_max() -> AudioStreamSettings {
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
             muted: Some(CHANGED_VOLUME_UNMUTED),
-            ..Volume::EMPTY
+            ..Default::default()
         }),
-        ..AudioStreamSettings::EMPTY
+        ..Default::default()
     }
 }
 

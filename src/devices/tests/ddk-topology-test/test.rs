@@ -22,7 +22,7 @@ async fn do_test(dfv2: bool) -> Result<(), Error> {
         .driver_test_realm_start(fdt::RealmArgs {
             use_driver_framework_v2: Some(dfv2),
             root_driver: Some(root_driver.to_string()),
-            ..fdt::RealmArgs::EMPTY
+            ..Default::default()
         })
         .await?;
 

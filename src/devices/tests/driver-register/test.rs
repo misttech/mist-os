@@ -37,7 +37,7 @@ async fn set_up_test_driver_realm(
     builder.driver_test_realm_setup().await?;
     let instance = builder.build().await?;
 
-    let mut realm_args = fdt::RealmArgs::EMPTY;
+    let mut realm_args = fdt::RealmArgs::default();
     realm_args.use_driver_framework_v2 = Some(use_dfv2);
     if use_dfv2 {
         // DriverTestRealm attempts to bind the .so of test-parent-sys if not explicitly requested otherwise.

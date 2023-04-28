@@ -797,7 +797,7 @@ mod tests {
             device_categories: Some(device_categories),
             package_type: fdi::DriverPackageType::from_primitive(package_type as u8),
             is_fallback: Some(fallback),
-            ..fdi::MatchedDriverInfo::EMPTY
+            ..Default::default()
         }
     }
 
@@ -805,7 +805,7 @@ mod tests {
         fdi::DeviceCategory {
             category: Some(resolved_driver::DEFAULT_DEVICE_CATEGORY.to_string()),
             subcategory: None,
-            ..fdi::DeviceCategory::EMPTY
+            ..Default::default()
         }
     }
 
@@ -957,10 +957,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(1),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
             let expected_url =
@@ -985,10 +983,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
             let expected_url =
@@ -1012,10 +1008,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(3),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         }
@@ -1075,10 +1069,8 @@ mod tests {
                 key: fdf::NodePropertyKey::StringValue("my-key".to_string()),
                 value: fdf::NodePropertyValue::StringValue("test-value".to_string()),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_drivers_v1(args).await.unwrap().unwrap();
 
@@ -1088,7 +1080,7 @@ mod tests {
                 device_categories: Some(vec![]),
                 package_type: Some(fdi::DriverPackageType::Base),
                 is_fallback: Some(false),
-                ..fdi::MatchedDriverInfo::EMPTY
+                ..Default::default()
             })];
 
             assert_eq!(expected_result, result);
@@ -1149,10 +1141,8 @@ mod tests {
                 key: fdf::NodePropertyKey::StringValue("my-key".to_string()),
                 value: fdf::NodePropertyValue::EnumValue("test-value".to_string()),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_drivers_v1(args).await.unwrap().unwrap();
 
@@ -1162,7 +1152,7 @@ mod tests {
                 package_type: Some(fdi::DriverPackageType::Base),
                 is_fallback: Some(false),
                 device_categories: Some(vec![]),
-                ..fdi::MatchedDriverInfo::EMPTY
+                ..Default::default()
             })];
 
             assert_eq!(expected_result, result);
@@ -1235,10 +1225,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_drivers_v1(args).await.unwrap().unwrap();
 
@@ -1333,10 +1321,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_driver(args).await.unwrap();
 
@@ -1406,7 +1392,7 @@ mod tests {
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property.clone()]),
                 driver_url_suffix: Some("driver-1.cm".to_string()),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             let result = proxy.match_driver(args).await.unwrap().unwrap();
@@ -1423,7 +1409,7 @@ mod tests {
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property.clone()]),
                 driver_url_suffix: Some("driver-2.cm".to_string()),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
             let result = proxy.match_driver(args).await.unwrap().unwrap();
             match result {
@@ -1439,7 +1425,7 @@ mod tests {
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
                 driver_url_suffix: Some("bad_driver.cm".to_string()),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             let result = proxy.match_driver(args).await.unwrap();
@@ -1513,10 +1499,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
@@ -1619,10 +1603,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
@@ -1710,10 +1692,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_drivers_v1(args).await.unwrap().unwrap();
 
@@ -1822,10 +1802,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             let result = proxy.match_drivers_v1(args).await.unwrap().unwrap();
 
@@ -2049,10 +2027,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap();
 
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
@@ -2086,10 +2062,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
             let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
@@ -2128,10 +2102,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_drivers_v1(args).await.unwrap();
 
             assert_eq!(result, Ok(vec![]));
@@ -2165,10 +2137,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_drivers_v1(args).await.unwrap().unwrap();
 
             let expected_result = vec![fdi::MatchedDriver::Driver(create_matched_driver_info(
@@ -2204,10 +2174,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(1),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
             let expected_url = "fuchsia-boot:///#meta/test-bind-component.cm".to_string();
@@ -2227,10 +2195,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(2),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap().unwrap();
 
             let expected_url = "fuchsia-boot:///#meta/test-bind2-component.cm".to_string();
@@ -2250,10 +2216,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(3),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(args).await.unwrap();
             assert_eq!(result, Err(Status::NOT_FOUND.into_raw()));
         }
@@ -2308,7 +2272,7 @@ mod tests {
                             bind_rules: bind_rules,
                             properties: properties,
                         }]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -2326,7 +2290,7 @@ mod tests {
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             let result = proxy.match_driver(match_args).await.unwrap().unwrap();
@@ -2336,9 +2300,9 @@ mod tests {
                         name: Some("test_group".to_string()),
                         node_index: Some(0),
                         num_nodes: Some(1),
-                        ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                        ..Default::default()
                     }]),
-                    ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                    ..Default::default()
                 }),
                 result
             );
@@ -2355,7 +2319,7 @@ mod tests {
             ];
             let mismatch_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_mismatch),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             let result = proxy.match_driver(mismatch_args).await.unwrap();
@@ -2434,7 +2398,7 @@ mod tests {
                             bind_rules: bind_rules,
                             properties: properties,
                         }]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -2452,7 +2416,7 @@ mod tests {
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             let result = proxy.match_drivers_v1(match_args).await.unwrap().unwrap();
@@ -2465,9 +2429,9 @@ mod tests {
                             name: Some("test_group".to_string()),
                             node_index: Some(0),
                             num_nodes: Some(1),
-                            ..fdi::MatchedCompositeNodeSpecInfo::EMPTY
+                            ..Default::default()
                         }]),
-                        ..fdi::MatchedCompositeNodeParentInfo::EMPTY
+                        ..Default::default()
                     }),
                     fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
                         url: Some(
@@ -2477,7 +2441,7 @@ mod tests {
                         device_categories: Some(vec![]),
                         package_type: Some(fdi::DriverPackageType::Base),
                         is_fallback: Some(false),
-                        ..fdi::MatchedDriverInfo::EMPTY
+                        ..Default::default()
                     })
                 ],
                 result
@@ -2495,7 +2459,7 @@ mod tests {
             ];
             let mismatch_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_mismatch),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             let result = proxy.match_drivers_v1(mismatch_args).await.unwrap().unwrap();
@@ -2507,7 +2471,7 @@ mod tests {
                     device_categories: Some(vec![]),
                     package_type: Some(fdi::DriverPackageType::Base),
                     is_fallback: Some(false),
-                    ..fdi::MatchedDriverInfo::EMPTY
+                    ..Default::default()
                 }),],
                 result
             );
@@ -2643,7 +2607,7 @@ mod tests {
                             properties: node_2_props_match.clone(),
                         },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap()
@@ -2670,7 +2634,7 @@ mod tests {
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -2696,7 +2660,7 @@ mod tests {
                                 properties: node_2_props_nonmatch,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -2844,7 +2808,7 @@ mod tests {
                             properties: node_2_props_match.clone(),
                         },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap()
@@ -2871,7 +2835,7 @@ mod tests {
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -2897,7 +2861,7 @@ mod tests {
                                 properties: node_2_props_nonmatch,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -3060,7 +3024,7 @@ mod tests {
                             properties: node_2_props_match.clone(),
                         },
                     ]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap()
@@ -3191,7 +3155,7 @@ mod tests {
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -3209,7 +3173,7 @@ mod tests {
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             // We can see the spec comes back without a matched composite.
@@ -3389,7 +3353,7 @@ mod tests {
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -3407,7 +3371,7 @@ mod tests {
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             // We can see the spec comes back without a matched composite.
@@ -3602,7 +3566,7 @@ mod tests {
                                 properties: optional_1_props_match,
                             },
                         ]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -3614,7 +3578,7 @@ mod tests {
             }];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
-                ..fdi::MatchDriverArgs::EMPTY
+                ..Default::default()
             };
 
             // We can see the spec comes back without a matched composite.
@@ -3730,7 +3694,7 @@ mod tests {
                                 value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
                             }]
                         }]),
-                        ..fdf::CompositeNodeSpec::EMPTY
+                        ..Default::default()
                     })
                     .await
                     .unwrap()
@@ -3754,7 +3718,7 @@ mod tests {
                         bind_rules: duplicate_bind_rules,
                         properties: node_transform,
                     }]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap();
@@ -3831,7 +3795,7 @@ mod tests {
                         bind_rules: bind_rules,
                         properties: node_transform,
                     }]),
-                    ..fdf::CompositeNodeSpec::EMPTY
+                    ..Default::default()
                 })
                 .await
                 .unwrap();
@@ -3884,10 +3848,8 @@ mod tests {
                 key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
                 value: fdf::NodePropertyValue::IntValue(1),
             };
-            let args = fdi::MatchDriverArgs {
-                properties: Some(vec![property]),
-                ..fdi::MatchDriverArgs::EMPTY
-            };
+            let args =
+                fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
             // First attempt should fail since we haven't registered it.
             let result = proxy.match_driver(args.clone()).await.unwrap();
@@ -4141,7 +4103,7 @@ mod tests {
                         key: "category".to_string(),
                         value: Some(Box::new(fdata::DictionaryValue::Str("usb".to_string())))
                     }]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 },
                 fdata::Dictionary {
                     entries: Some(vec![
@@ -4158,19 +4120,19 @@ mod tests {
                             ))),
                         }
                     ]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 }
             ]),
             vec![
                 fdi::DeviceCategory {
                     category: Some("usb".to_string()),
                     subcategory: None,
-                    ..fdi::DeviceCategory::EMPTY
+                    ..Default::default()
                 },
                 fdi::DeviceCategory {
                     category: Some("connectivity".to_string()),
                     subcategory: Some("ethernet".to_string()),
-                    ..fdi::DeviceCategory::EMPTY
+                    ..Default::default()
                 }
             ]
         );

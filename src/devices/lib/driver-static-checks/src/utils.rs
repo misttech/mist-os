@@ -106,7 +106,7 @@ mod tests {
                     ))),
                 },
             ]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         };
         assert_eq!(
             get_dictionary_value(&dict, "runner"),

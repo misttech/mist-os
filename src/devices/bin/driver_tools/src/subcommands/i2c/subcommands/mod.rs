@@ -33,12 +33,12 @@ async fn read_byte_from_i2c_device(device: &fi2c::DeviceProxy, address: &[u8]) -
     let transactions = vec![
         fi2c::Transaction {
             data_transfer: Some(fi2c::DataTransfer::WriteData(address.to_owned())),
-            ..fi2c::Transaction::EMPTY
+            ..Default::default()
         },
         fi2c::Transaction {
             data_transfer: Some(fi2c::DataTransfer::ReadSize(1)),
             stop: Some(true),
-            ..fi2c::Transaction::EMPTY
+            ..Default::default()
         },
     ];
     let data = device

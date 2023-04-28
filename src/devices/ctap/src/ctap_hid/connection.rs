@@ -152,7 +152,7 @@ pub mod fidl {
                             command_id: Some(CtapHidCommand::Init),
                             data: Some(TEST_PAYLOAD.to_vec()),
                             payload_len: Some(TEST_PAYLOAD.len() as u16),
-                            ..fidl_fuchsia_fido_report::Message::EMPTY
+                            ..Default::default()
                         });
 
                     responder.send(&mut test_message).expect("failed to send response");

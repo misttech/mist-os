@@ -155,18 +155,18 @@ mod tests {
                                 threshold_high: Some(vec![91, 144, 1]),
                                 threshold_low: Some(vec![3, 8, 240]),
                                 sampling_rate: Some(1111),
-                                ..fir::SensorFeatureReport::EMPTY
+                                ..Default::default()
                             }),
                             touch: Some(fir::TouchFeatureReport {
                                 input_mode: Some(fir::TouchConfigurationInputMode::WindowsPrecisionTouchpadCollection),
                                 selective_reporting: Some(fir::SelectiveReportingFeatureReport {
                                     surface_switch: Some(false),
                                     button_switch: Some(true),
-                                    ..fir::SelectiveReportingFeatureReport::EMPTY
+                                    ..Default::default()
                                 }),
-                                ..fir::TouchFeatureReport::EMPTY
+                                ..Default::default()
                             }),
-                            ..fir::FeatureReport::EMPTY
+                            ..Default::default()
                         });
                         responder
                             .send(&mut feature_report)
@@ -258,9 +258,9 @@ mod tests {
                                         exponent: 999,
                                     },
                                 }),
-                                ..fir::MouseInputDescriptor::EMPTY
+                                ..Default::default()
                             }),
-                            ..fir::MouseDescriptor::EMPTY
+                            ..Default::default()
                         }),
                         sensor: Some(fir::SensorDescriptor {
                             input: Some(vec![
@@ -288,9 +288,9 @@ mod tests {
                                         },
                                     ]),
                                     report_id: Some(2),
-                                    ..fir::SensorInputDescriptor::EMPTY
+                                    ..Default::default()
                                 },
-                                fir::SensorInputDescriptor { ..fir::SensorInputDescriptor::EMPTY },
+                                fir::SensorInputDescriptor::default(),
                             ]),
                             feature: Some(vec![
                                 fir::SensorFeatureDescriptor {
@@ -376,13 +376,11 @@ mod tests {
                                         },
                                     }),
                                     report_id: Some(255),
-                                    ..fir::SensorFeatureDescriptor::EMPTY
+                                    ..Default::default()
                                 },
-                                fir::SensorFeatureDescriptor {
-                                    ..fir::SensorFeatureDescriptor::EMPTY
-                                },
+                                fir::SensorFeatureDescriptor::default(),
                             ]),
-                            ..fir::SensorDescriptor::EMPTY
+                            ..Default::default()
                         }),
                         touch: Some(fir::TouchDescriptor {
                             input: Some(fir::TouchInputDescriptor {
@@ -423,34 +421,32 @@ mod tests {
                                                 exponent: 100,
                                             },
                                         }),
-                                        ..fir::ContactInputDescriptor::EMPTY
+                                        ..Default::default()
                                     },
-                                    fir::ContactInputDescriptor {
-                                        ..fir::ContactInputDescriptor::EMPTY
-                                    },
+                                    fir::ContactInputDescriptor::default(),
                                 ]),
                                 max_contacts: Some(444444),
                                 touch_type: Some(fir::TouchType::Touchscreen),
                                 buttons: Some(vec![1, 2, 3]),
-                                ..fir::TouchInputDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             feature: Some(fir::TouchFeatureDescriptor {
                                 supports_input_mode: Some(false),
                                 supports_selective_reporting: Some(true),
-                                ..fir::TouchFeatureDescriptor::EMPTY
+                                ..Default::default()
                             }),
-                            ..fir::TouchDescriptor::EMPTY
+                            ..Default::default()
                         }),
                         keyboard: Some(fir::KeyboardDescriptor {
                             input: Some(fir::KeyboardInputDescriptor {
                                 keys3: Some(vec![finput::Key::L, finput::Key::CapsLock]),
-                                ..fir::KeyboardInputDescriptor::EMPTY
+                                ..Default::default()
                             }),
                             output: Some(fir::KeyboardOutputDescriptor {
                                 leds: Some(vec![fir::LedType::NumLock, fir::LedType::Kana]),
-                                ..fir::KeyboardOutputDescriptor::EMPTY
+                                ..Default::default()
                             }),
-                            ..fir::KeyboardDescriptor::EMPTY
+                            ..Default::default()
                         }),
                         consumer_control: Some(fir::ConsumerControlDescriptor {
                             input: Some(fir::ConsumerControlInputDescriptor {
@@ -458,11 +454,11 @@ mod tests {
                                     fir::ConsumerControlButton::VolumeUp,
                                     fir::ConsumerControlButton::Reboot,
                                 ]),
-                                ..fir::ConsumerControlInputDescriptor::EMPTY
+                                ..Default::default()
                             }),
-                            ..fir::ConsumerControlDescriptor::EMPTY
+                            ..Default::default()
                         }),
-                        ..fir::DeviceDescriptor::EMPTY
+                        ..Default::default()
                     };
                     responder
                         .send(descriptor)
@@ -814,21 +810,13 @@ mod tests {
                                 event_time: Some(123),
                                 mouse: Some(fir::MouseInputReport {
                                     pressed_buttons: Some(vec![]),
-                                    ..fir::MouseInputReport::EMPTY
+                                    ..Default::default()
                                 }),
-                                sensor: Some(fir::SensorInputReport {
-                                    ..fir::SensorInputReport::EMPTY
-                                }),
-                                touch: Some(fir::TouchInputReport {
-                                    ..fir::TouchInputReport::EMPTY
-                                }),
-                                keyboard: Some(fir::KeyboardInputReport {
-                                    ..fir::KeyboardInputReport::EMPTY
-                                }),
-                                consumer_control: Some(fir::ConsumerControlInputReport {
-                                    ..fir::ConsumerControlInputReport::EMPTY
-                                }),
-                                ..fir::InputReport::EMPTY
+                                sensor: Some(fir::SensorInputReport::default()),
+                                touch: Some(fir::TouchInputReport::default()),
+                                keyboard: Some(fir::KeyboardInputReport::default()),
+                                consumer_control: Some(fir::ConsumerControlInputReport::default()),
+                                ..Default::default()
                             });
                             responder
                                 .send(&mut input_report)
@@ -902,7 +890,7 @@ Report from file: "class/input-device/A"
                                     pressed_buttons: Some(vec![5, 28]),
                                     position_x: Some(-9999),
                                     position_y: Some(1111),
-                                    ..fir::MouseInputReport::EMPTY
+                                    ..Default::default()
                                 }),
                                 touch: Some(fir::TouchInputReport {
                                     contacts: Some(vec![
@@ -913,7 +901,7 @@ Report from file: "class/input-device/A"
                                             pressure: Some(2),
                                             contact_width: Some(888),
                                             contact_height: Some(166),
-                                            ..fir::ContactInputReport::EMPTY
+                                            ..Default::default()
                                         },
                                         fir::ContactInputReport {
                                             contact_id: Some(452),
@@ -922,21 +910,21 @@ Report from file: "class/input-device/A"
                                             pressure: Some(200),
                                             contact_width: Some(24),
                                             contact_height: Some(3333),
-                                            ..fir::ContactInputReport::EMPTY
+                                            ..Default::default()
                                         },
                                     ]),
                                     pressed_buttons: Some(vec![8, 24]),
-                                    ..fir::TouchInputReport::EMPTY
+                                    ..Default::default()
                                 }),
                                 trace_id: Some(523234),
                                 report_id: Some(108),
-                                ..fir::InputReport::EMPTY
+                                ..Default::default()
                             },
                             fir::InputReport {
                                 event_time: Some(456),
                                 sensor: Some(fir::SensorInputReport {
                                     values: Some(vec![-149, 921399, 0]),
-                                    ..fir::SensorInputReport::EMPTY
+                                    ..Default::default()
                                 }),
                                 keyboard: Some(fir::KeyboardInputReport {
                                     pressed_keys3: Some(vec![
@@ -944,18 +932,18 @@ Report from file: "class/input-device/A"
                                         finput::Key::Semicolon,
                                         finput::Key::KeypadPlus,
                                     ]),
-                                    ..fir::KeyboardInputReport::EMPTY
+                                    ..Default::default()
                                 }),
                                 consumer_control: Some(fir::ConsumerControlInputReport {
                                     pressed_buttons: Some(vec![
                                         fir::ConsumerControlButton::VolumeUp,
                                         fir::ConsumerControlButton::Reboot,
                                     ]),
-                                    ..fir::ConsumerControlInputReport::EMPTY
+                                    ..Default::default()
                                 }),
                                 trace_id: Some(9327),
                                 report_id: Some(2),
-                                ..fir::InputReport::EMPTY
+                                ..Default::default()
                             },
                         ],
                         reader,

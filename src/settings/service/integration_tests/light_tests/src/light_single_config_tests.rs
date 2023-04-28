@@ -25,9 +25,9 @@ fn get_test_light_groups() -> HashMap<String, LightGroup> {
             type_: Some(LightType::Brightness),
             lights: Some(vec![LightState {
                 value: Some(LightValue::Brightness(LIGHT_VAL)),
-                ..LightState::EMPTY
+                ..Default::default()
             }]),
-            ..LightGroup::EMPTY
+            ..Default::default()
         },
     )])
 }
@@ -70,7 +70,7 @@ async fn test_light_disabled_by_mic_mute_off() {
 
     // Send mic unmuted, which should disable the light.
     listener_proxy
-        .on_event(MediaButtonsEvent { mic_mute: Some(false), ..MediaButtonsEvent::EMPTY })
+        .on_event(MediaButtonsEvent { mic_mute: Some(false), ..Default::default() })
         .await
         .expect("on event called");
 
@@ -96,7 +96,7 @@ async fn test_light_set_and_watch() {
     let mut expected_light_info = get_test_light_groups();
     let mut changed_light_group = expected_light_info[LIGHT_NAME_1].clone();
     let changed_light_state =
-        LightState { value: Some(LightValue::Brightness(0.128)), ..LightState::EMPTY };
+        LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() };
     changed_light_group.lights = Some(vec![changed_light_state.clone()]);
     let _ = expected_light_info.insert(LIGHT_NAME_1.to_string(), changed_light_group);
 
@@ -130,8 +130,8 @@ async fn test_light_set_wrong_size() {
         .set_light_group_values(
             LIGHT_NAME_1,
             &mut vec![
-                LightState { value: Some(LightValue::Brightness(0.128)), ..LightState::EMPTY },
-                LightState { value: Some(LightValue::Brightness(0.11)), ..LightState::EMPTY },
+                LightState { value: Some(LightValue::Brightness(0.128)), ..Default::default() },
+                LightState { value: Some(LightValue::Brightness(0.11)), ..Default::default() },
             ]
             .into_iter()
             .map(LightState::into),
@@ -204,14 +204,8 @@ async fn test_set_wrong_state_length() {
 
     // Set with an extra light state should fail.
     let extra_state = vec![
-        fidl_fuchsia_settings::LightState {
-            value: None,
-            ..fidl_fuchsia_settings::LightState::EMPTY
-        },
-        fidl_fuchsia_settings::LightState {
-            value: None,
-            ..fidl_fuchsia_settings::LightState::EMPTY
-        },
+        fidl_fuchsia_settings::LightState { value: None, ..Default::default() },
+        fidl_fuchsia_settings::LightState { value: None, ..Default::default() },
     ];
     let result = light_proxy
         .set_light_group_values(LIGHT_NAME_1, &mut extra_state.into_iter())
@@ -234,7 +228,7 @@ async fn test_set_wrong_value_type() {
     let _ = rx.next().await.unwrap();
 
     // One of the light values is On instead of brightness, the set should fail.
-    let new_state = vec![LightState { value: Some(LightValue::On(true)), ..LightState::EMPTY }];
+    let new_state = vec![LightState { value: Some(LightValue::On(true)), ..Default::default() }];
     let result = light_proxy
         .set_light_group_values(LIGHT_NAME_1, &mut new_state.into_iter())
         .await

@@ -48,7 +48,7 @@ async fn driver_runner_test() -> Result<(), anyhow::Error> {
             "fuchsia-pkg://fuchsia.com/driver_runner_integration_test#meta/packaged_driver.cm"
                 .to_string(),
         ),
-        ..fdt::RealmArgs::EMPTY
+        ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;
 

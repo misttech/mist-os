@@ -18,7 +18,7 @@ async fn test_intl_e2e() {
         temperature_unit: Some(fidl_fuchsia_intl::TemperatureUnit::Celsius),
         time_zone_id: Some(fidl_fuchsia_intl::TimeZoneId { id: "GMT".to_string() }),
         hour_cycle: Some(HourCycle::H24),
-        ..IntlSettings::EMPTY
+        ..Default::default()
     };
 
     let instance = IntlTest::create_realm().await.expect("setting up test realm");
@@ -81,14 +81,14 @@ async fn test_intl_e2e_set_twice() {
         assert_eq!(settings.hour_cycle, Some(HourCycle::H12));
 
         // Set new values.
-        let mut intl_settings = IntlSettings::EMPTY;
+        let mut intl_settings = IntlSettings::default();
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_settings.hour_cycle = Some(HourCycle::H24);
         intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
 
         // Try to set to a new value: this second set should succeed too.
-        let mut intl_settings = IntlSettings::EMPTY;
+        let mut intl_settings = IntlSettings::default();
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_service
@@ -130,14 +130,14 @@ async fn test_intl_e2e_idempotent_set() {
         assert_eq!(settings.hour_cycle, Some(HourCycle::H12));
 
         // Set new values.
-        let mut intl_settings = IntlSettings::EMPTY;
+        let mut intl_settings = IntlSettings::default();
         let updated_timezone = "GMT";
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
 
         // Try to set again to the same value: this second set should succeed.
-        let mut intl_settings = IntlSettings::EMPTY;
+        let mut intl_settings = IntlSettings::default();
         intl_settings.time_zone_id =
             Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
         intl_service
@@ -165,13 +165,13 @@ async fn test_intl_invalid_timezone() {
     let intl_service = IntlTest::connect_to_intl_marker(&instance);
 
     // Set a real value.
-    let mut intl_settings = IntlSettings::EMPTY;
+    let mut intl_settings = IntlSettings::default();
     intl_settings.time_zone_id =
         Some(fidl_fuchsia_intl::TimeZoneId { id: INITIAL_TIME_ZONE.to_string() });
     intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
 
     // Set with an invalid timezone value.
-    let mut intl_settings = IntlSettings::EMPTY;
+    let mut intl_settings = IntlSettings::default();
     let updated_timezone = "not_a_real_time_zone";
     intl_settings.time_zone_id =
         Some(fidl_fuchsia_intl::TimeZoneId { id: updated_timezone.to_string() });
@@ -195,13 +195,13 @@ async fn test_intl_invalid_locale() {
     let intl_service = IntlTest::connect_to_intl_marker(&instance);
 
     // Set a real value.
-    let mut intl_settings = IntlSettings::EMPTY;
+    let mut intl_settings = IntlSettings::default();
     intl_settings.locales =
         Some(vec![fidl_fuchsia_intl::LocaleId { id: INITIAL_LOCALE.to_string() }]);
     intl_service.set(intl_settings).await.expect("set completed").expect("set successful");
 
     // Set with an invalid locale.
-    let mut intl_settings = IntlSettings::EMPTY;
+    let mut intl_settings = IntlSettings::default();
     let updated_locale = "nope nope nope";
     intl_settings.locales =
         Some(vec![fidl_fuchsia_intl::LocaleId { id: updated_locale.to_string() }]);
