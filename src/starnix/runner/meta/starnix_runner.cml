@@ -42,6 +42,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",
                 "fuchsia.posix.socket.Provider",

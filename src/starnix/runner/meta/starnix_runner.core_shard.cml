@@ -26,5 +26,10 @@
             to: "#starnix_runner",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.kernel.Stats",
+            from: "parent",
+            to: "#starnix_runner",
+        },
     ],
 }

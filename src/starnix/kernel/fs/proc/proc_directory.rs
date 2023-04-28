@@ -9,10 +9,12 @@ use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::logging::not_implemented;
+use crate::logging::{log_error, not_implemented};
 use crate::task::*;
 use crate::types::*;
+use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
+use once_cell::sync::OnceCell;
 
 use maplit::btreemap;
 use std::collections::BTreeMap;
@@ -46,7 +48,8 @@ impl ProcDirectory {
             &b"thread-self"[..] => ThreadSelfSymlink::new_node(fs),
             // TODO(tbodt): Put actual data in /proc/meminfo. Android is currently satistified by
             // an empty file though.
-            &b"meminfo"[..] => fs.create_node(BytesFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
+            &b"meminfo"[..] =>
+                fs.create_node(MeminfoFile::new_node(), mode!(IFREG, 0o444), FsCred::root()),
             // Fake kmsg as being empty.
             &b"kmsg"[..] =>
                 fs.create_node(SimpleFileNode::new(|| Ok(ProcKmsgFile)), mode!(IFREG, 0o100), FsCred::root()),
@@ -301,5 +304,67 @@ impl FileOps for PressureFile {
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::empty()
+    }
+}
+
+#[derive(Default)]
+struct MeminfoFile {
+    seq: Mutex<SeqFileState<()>>,
+
+    kernel_stats: OnceCell<fidl_fuchsia_kernel::StatsSynchronousProxy>,
+}
+
+impl MeminfoFile {
+    pub fn new_node() -> impl FsNodeOps {
+        SimpleFileNode::new(move || {
+            Ok(MeminfoFile { seq: Default::default(), kernel_stats: OnceCell::new() })
+        })
+    }
+}
+
+impl FileOps for MeminfoFile {
+    fileops_impl_seekable!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let stats_proxy = self.kernel_stats.get_or_init(|| {
+            let (client_end, server_end) = zx::Channel::create();
+            connect_channel_to_protocol::<fidl_fuchsia_kernel::StatsMarker>(server_end)
+                .expect("Failed to connect to fuchsia.kernel.Stats.");
+            fidl_fuchsia_kernel::StatsSynchronousProxy::new(client_end)
+        });
+        let memstats = stats_proxy.get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
+            log_error!("FIDL error getting memory stats: {e}");
+            errno!(EIO)
+        })?;
+        let mut seq = self.seq.lock();
+        let iter = move |_cursor, sink: &mut SeqFileBuf| {
+            writeln!(sink, "MemTotal:\t {} kB", memstats.total_bytes.unwrap_or_default() / 1024)?;
+            writeln!(sink, "MemFree:\t {} kB", memstats.free_bytes.unwrap_or_default() / 1024)?;
+            writeln!(
+                sink,
+                "MemAvailable:\t {} kB",
+                (memstats.free_bytes.unwrap_or_default()
+                    + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
+                    / 1024
+            )?;
+            Ok(None)
+        };
+        seq.read_at(current_task, iter, offset, data)
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOSYS)
     }
 }

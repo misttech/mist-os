@@ -41,6 +41,7 @@
         },
         {
             protocol: [
+                "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",

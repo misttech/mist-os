@@ -40,6 +40,7 @@
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
