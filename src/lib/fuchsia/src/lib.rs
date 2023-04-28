@@ -112,13 +112,12 @@ fn init_logging_with_threads(
     let (send, recv) = std::sync::mpsc::channel();
     let bg_thread = std::thread::spawn(move || {
         let mut exec = fuchsia_async::LocalExecutor::new();
-        let mut options = diagnostics_log::PublisherOptions::default().tags(tags.as_slice());
+        let mut options = diagnostics_log::PublishOptions::default().tags(&tags);
         if let Some(severity) = interest.min_severity {
             options = options.minimum_severity(severity);
         }
-        let mut publisher = diagnostics_log::Publisher::new(options).expect("create publisher");
-        let interest_listening_task = publisher.take_interest_listening_task();
-        tracing::subscriber::set_global_default(publisher).expect("initlaize subscriber");
+        let interest_listening_task = diagnostics_log::initialize_returning_listening_task(options)
+            .expect("initialize logging");
         if let Some(on_interest_changes) = interest_listening_task {
             let (on_interest_changes, cancel_interest) =
                 futures::future::abortable(on_interest_changes);

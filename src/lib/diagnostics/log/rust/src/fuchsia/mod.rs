@@ -114,12 +114,7 @@ macro_rules! publisher_options {
 
 publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher));
 
-/// Initializes logging with the given options.
-///
-/// IMPORTANT: this should be called at most once in a program, otherwise it'll return errors or
-/// panic. Therefore it's recommended to never call this from libraries and only do it from
-/// binaries.
-pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
+fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
 
     if opts.ingest_log_events {
@@ -130,8 +125,35 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
         crate::install_panic_hook();
     }
 
+    Ok(publisher)
+}
+
+/// Initializes logging with the given options.
+///
+/// IMPORTANT: this should be called at most once in a program, and must be
+/// called only after an async executor has been set for the current thread,
+/// otherwise it'll return errors or panic. Therefore it's recommended to never
+/// call this from libraries and only do it from binaries.
+pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
+    let publisher = initialize_publishing(opts)?;
     tracing::subscriber::set_global_default(publisher)?;
     Ok(())
+}
+
+/// Initializes logging with the given options, returning the async task that
+/// listens for changes in log interest.
+///
+/// IMPORTANT: this should be called at most once in a program, and must be
+/// called only after an async executor has been set for the current thread,
+/// otherwise it'll return errors or panic. Therefore it's recommended to never
+/// call this from libraries and only do it from binaries.
+pub fn initialize_returning_listening_task(
+    opts: PublishOptions<'_>,
+) -> Result<Option<fasync::Task<()>>, PublishError> {
+    let mut publisher = initialize_publishing(opts)?;
+    let interest_listening_task = publisher.take_interest_listening_task();
+    tracing::subscriber::set_global_default(publisher)?;
+    Ok(interest_listening_task)
 }
 
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic

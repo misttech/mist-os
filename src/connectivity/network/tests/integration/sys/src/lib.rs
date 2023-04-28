@@ -14,7 +14,7 @@ use fuchsia_zircon as zx;
 
 use futures::{StreamExt as _, TryStreamExt as _};
 use netemul::{TestRealm, TestSandbox};
-use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt as _};
+use netstack_testing_common::realms::{constants, Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 
 const MOCK_SERVICES_NAME: &str = "mock";
@@ -263,4 +263,29 @@ async fn serves_update_verify<N: Netstack>(name: &str) {
         .await
         .expect("call succeeded");
     assert_eq!(response, Ok(()));
+}
+
+#[netstack_test]
+async fn emits_logs<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    // Start the netstack.
+    let _ = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+
+    let netstack_moniker =
+        netstack_testing_common::get_component_moniker(&realm, constants::netstack::COMPONENT_NAME)
+            .await
+            .expect("get netstack moniker");
+    let mut stream = diagnostics_reader::ArchiveReader::new()
+        .select_all_for_moniker(&netstack_moniker)
+        .snapshot_then_subscribe()
+        .expect("subscribe to netstack logs");
+    let payload = stream
+        .next()
+        .await
+        .expect("netstack should emit logs on startup")
+        .expect("extract syslogs from archivist payload");
+    assert!(payload.msg().is_some(), "syslog should contain message");
 }
