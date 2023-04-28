@@ -7,24 +7,13 @@
 
 #include <stdint.h>
 
-#define ZBI_HW_REBOOT_UNDEFINED ((uint32_t)0)
-#define ZBI_HW_REBOOT_COLD ((uint32_t)1)
-#define ZBI_HW_REBOOT_WARM ((uint32_t)2)
-#define ZBI_HW_REBOOT_BROWNOUT ((uint32_t)3)
-#define ZBI_HW_REBOOT_WATCHDOG ((uint32_t)4)
-
 // ZBI_TYPE_HW_REBOOT_REASON payload.
-#ifndef __cplusplus
 typedef uint32_t zbi_hw_reboot_reason_t;
-#else
-enum class ZbiHwRebootReason : uint32_t {
-  Undefined = ZBI_HW_REBOOT_UNDEFINED,
-  Cold = ZBI_HW_REBOOT_COLD,
-  Warm = ZBI_HW_REBOOT_WARM,
-  Brownout = ZBI_HW_REBOOT_BROWNOUT,
-  Watchdog = ZBI_HW_REBOOT_WATCHDOG,
-};
-using zbi_hw_reboot_reason_t = ZbiHwRebootReason;
-#endif  // __cplusplus
+
+#define ZBI_HW_REBOOT_REASON_UNDEFINED ((zbi_hw_reboot_reason_t)0)
+#define ZBI_HW_REBOOT_REASON_COLD ((zbi_hw_reboot_reason_t)1)
+#define ZBI_HW_REBOOT_REASON_WARM ((zbi_hw_reboot_reason_t)2)
+#define ZBI_HW_REBOOT_REASON_BROWNOUT ((zbi_hw_reboot_reason_t)3)
+#define ZBI_HW_REBOOT_REASON_WATCHDOG ((zbi_hw_reboot_reason_t)4)
 
 #endif  // LIB_ZBI_FORMAT_REBOOT_H_

@@ -64,23 +64,23 @@ size_t RamMappableCrashlog::Recover(FILE* tgt) {
   }
 
   // Create a string representation of the HW reboot reason.
-  ZbiHwRebootReason hw_reason = platform_hw_reboot_reason();
+  zbi_hw_reboot_reason_t hw_reason = platform_hw_reboot_reason();
   const char* str_hw_reason;
   char str_hw_reason_buf[16];
   switch (hw_reason) {
-    case ZbiHwRebootReason::Undefined:
+    case ZBI_HW_REBOOT_REASON_UNDEFINED:
       str_hw_reason = "UNKNOWN";
       break;
-    case ZbiHwRebootReason::Cold:
+    case ZBI_HW_REBOOT_REASON_COLD:
       str_hw_reason = "COLD BOOT";
       break;
-    case ZbiHwRebootReason::Warm:
+    case ZBI_HW_REBOOT_REASON_WARM:
       str_hw_reason = "WARM BOOT";
       break;
-    case ZbiHwRebootReason::Brownout:
+    case ZBI_HW_REBOOT_REASON_BROWNOUT:
       str_hw_reason = "BROWNOUT";
       break;
-    case ZbiHwRebootReason::Watchdog:
+    case ZBI_HW_REBOOT_REASON_WATCHDOG:
       str_hw_reason = "HW WATCHDOG";
       break;
     default:
@@ -99,8 +99,8 @@ size_t RamMappableCrashlog::Recover(FILE* tgt) {
     // just tell us "unknown".
     if (ShouldPrintCrashlogStatus()) {
       if (!((log_recovery_result_ == ZX_ERR_IO_DATA_INTEGRITY) &&
-            ((hw_reason == ZbiHwRebootReason::Undefined) ||
-             (hw_reason == ZbiHwRebootReason::Cold)))) {
+            ((hw_reason == ZBI_HW_REBOOT_REASON_UNDEFINED) ||
+             (hw_reason == ZBI_HW_REBOOT_REASON_COLD)))) {
         printf("Crashlog: Failed to recover crashlog.  Result %d, HW Reboot Reason %s\n",
                log_recovery_result_, str_hw_reason);
       }
@@ -130,8 +130,8 @@ size_t RamMappableCrashlog::Recover(FILE* tgt) {
       // If we rebooted spontaneously, check to see if we have some more details
       // provided by way of the bootloader and the HW reboot reason register.
       switch (hw_reason) {
-        case ZbiHwRebootReason::Brownout:
-        case ZbiHwRebootReason::Watchdog:
+        case ZBI_HW_REBOOT_REASON_BROWNOUT:
+        case ZBI_HW_REBOOT_REASON_WATCHDOG:
           str_reason = str_hw_reason;
           break;
         default:

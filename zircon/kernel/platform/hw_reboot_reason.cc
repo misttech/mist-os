@@ -8,7 +8,7 @@
 #include <platform.h>
 
 namespace {
-zbi_hw_reboot_reason_t g_platform_hw_reboot_reason = ZbiHwRebootReason::Undefined;
+zbi_hw_reboot_reason_t g_platform_hw_reboot_reason = ZBI_HW_REBOOT_REASON_UNDEFINED;
 }
 
 void platform_set_hw_reboot_reason(zbi_hw_reboot_reason_t reason) {
