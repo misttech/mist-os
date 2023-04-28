@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/image-format/image_format.h>
 #include <zircon/errors.h>
-#include <zircon/pixelformat.h>
 #include <zircon/rights.h>
 
 #include <memory>
