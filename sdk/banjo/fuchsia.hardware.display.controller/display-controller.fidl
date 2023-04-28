@@ -250,9 +250,11 @@ type CursorLayer = struct {
 };
 
 type ColorLayer = struct {
-    format ZxPixelFormat;
+    /// The format of `color` bytes.
+    format FuchsiaImages2PixelFormatEnumValue;
+
     /// The color to use for the layer. The color is little-endian, and is
-    /// guaranteed to be of the appropriate size.
+    /// guaranteed to be of the exact size of one pixel in `format`.
     color vector<uint8>:MAX;
 };
 

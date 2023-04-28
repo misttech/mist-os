@@ -41,6 +41,7 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/util.h"
 #include "src/graphics/display/lib/edid/edid.h"
+#include "src/graphics/display/lib/pixel-format/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -495,7 +496,18 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
     return;
   }
 
-  layer->SetColorConfig(request->pixel_format, request->color_bytes);
+  zx::result<fuchsia_images2::wire::PixelFormat> format_conversion_result =
+      ::display::AnyPixelFormatToImages2PixelFormat(request->pixel_format);
+  if (format_conversion_result.is_error()) {
+    zxlogf(ERROR,
+           "SetLayerColorConfig cannot convert pixel format %u to "
+           "fuchsia.images2.PixelFormat: %s",
+           request->pixel_format, format_conversion_result.status_string());
+    TearDown();
+    return;
+  }
+  fuchsia_images2::wire::PixelFormat pixel_format = format_conversion_result.value();
+  layer->SetColorConfig(pixel_format, request->color_bytes);
   pending_config_valid_ = false;
   // no Reply defined
 }

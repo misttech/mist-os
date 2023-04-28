@@ -444,8 +444,8 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
   bool has_color_layer = config->layer_count && config->layer_list[0]->type == LAYER_TYPE_COLOR;
   if (has_color_layer) {
     color_layer_t* layer = &config->layer_list[0]->cfg.color;
-    ZX_DEBUG_ASSERT(layer->format == ZX_PIXEL_FORMAT_RGB_x888 ||
-                    layer->format == ZX_PIXEL_FORMAT_ARGB_8888);
+    const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(layer->format);
+    ZX_DEBUG_ASSERT(format == fuchsia_images2::wire::PixelFormat::kBgra32);
     uint32_t color = *reinterpret_cast<const uint32_t*>(layer->color_list);
 
     bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));

@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -100,7 +101,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   void SetPrimaryAlpha(fuchsia_hardware_display::wire::AlphaMode mode, float val);
   void SetCursorConfig(fuchsia_hardware_display::wire::ImageConfig image_config);
   void SetCursorPosition(int32_t x, int32_t y);
-  void SetColorConfig(uint32_t pixel_format, ::fidl::VectorView<uint8_t> color_bytes);
+  void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
+                      ::fidl::VectorView<uint8_t> color_bytes);
   void SetImage(fbl::RefPtr<Image> image_id, uint64_t wait_event_id, uint64_t signal_event_id);
 
  private:

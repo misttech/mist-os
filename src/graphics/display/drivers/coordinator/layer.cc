@@ -12,6 +12,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 
+#include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 
 namespace fhd = fuchsia_hardware_display;
@@ -304,14 +305,16 @@ void Layer::SetCursorPosition(int32_t x, int32_t y) {
   config_change_ = true;
 }
 
-void Layer::SetColorConfig(uint32_t pixel_format, ::fidl::VectorView<uint8_t> color_bytes) {
+void Layer::SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
+                           ::fidl::VectorView<uint8_t> color_bytes) {
   // Increase the size of the static array when large color formats are introduced
   ZX_ASSERT(color_bytes.count() <= sizeof(pending_color_bytes_));
 
   pending_layer_.type = LAYER_TYPE_COLOR;
   color_layer_t* color_layer = &pending_layer_.cfg.color;
 
-  color_layer->format = pixel_format;
+  ZX_DEBUG_ASSERT(!pixel_format.IsUnknown());
+  color_layer->format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(pixel_format);
   memcpy(pending_color_bytes_, color_bytes.data(), sizeof(pending_color_bytes_));
 
   pending_image_ = nullptr;

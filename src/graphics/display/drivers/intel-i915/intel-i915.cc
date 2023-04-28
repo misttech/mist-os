@@ -1707,8 +1707,9 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           if (j != 0) {
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
           }
-          zx_pixel_format_t format = config->layer_list[j]->cfg.color.format;
-          if (format != ZX_PIXEL_FORMAT_RGB_x888 && format != ZX_PIXEL_FORMAT_ARGB_8888) {
+          const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(
+              config->layer_list[j]->cfg.color.format);
+          if (format != fuchsia_images2::wire::PixelFormat::kBgra32) {
             layer_cfg_result[i][j] |= CLIENT_USE_PRIMARY;
           }
           break;
