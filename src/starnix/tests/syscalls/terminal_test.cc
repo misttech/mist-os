@@ -209,7 +209,9 @@ TEST(Pty, ioctl_TCSETSF) {
   });
 }
 
-void FullWrite(int fd, char* buffer, ssize_t size) { ASSERT_EQ(write(fd, buffer, size), size); }
+void FullWrite(int fd, const char* buffer, ssize_t size) {
+  ASSERT_EQ(write(fd, buffer, size), size);
+}
 
 TEST(Pty, EndOfFile) {
   ForkHelper helper;
@@ -254,6 +256,52 @@ TEST(Pty, EndOfFile) {
     FullWrite(main_terminal, source_buffer, 2);
     ASSERT_EQ(1, SAFE_SYSCALL(read(replica_terminal, target_buffer, 2)));
     ASSERT_EQ(' ', target_buffer[0]);
+  });
+}
+
+TEST(Pty, EchoModes) {
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    // Create a new session here.
+    SAFE_SYSCALL(setsid());
+    int main_terminal = OpenMainTerminal();
+    int replica_terminal = SAFE_SYSCALL(open(ptsname(main_terminal), O_RDWR | O_NONBLOCK));
+
+    unsigned default_lflags = ISIG | ICANON | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
+
+    struct termios termios = {};
+    ASSERT_EQ(0, SAFE_SYSCALL(tcgetattr(main_terminal, &termios)));
+    ASSERT_EQ(default_lflags, termios.c_lflag);
+    memset(&termios, 0, sizeof(termios));
+    ASSERT_EQ(0, SAFE_SYSCALL(tcgetattr(replica_terminal, &termios)));
+    ASSERT_EQ(default_lflags, termios.c_lflag);
+
+    auto check_input = [main_terminal, replica_terminal](const char* input, const char* main_str,
+                                                         const char* replicate_str) {
+      char target_buffer[64] = {};
+
+      FullWrite(main_terminal, input, strlen(input));
+      ASSERT_EQ((ssize_t)strlen(main_str),
+                SAFE_SYSCALL(read(main_terminal, target_buffer, sizeof(target_buffer) - 1)));
+      ASSERT_STREQ(main_str, target_buffer);
+      memset(target_buffer, 0, sizeof(target_buffer));
+      ASSERT_EQ((ssize_t)strlen(replicate_str),
+                SAFE_SYSCALL(read(replica_terminal, target_buffer, sizeof(target_buffer) - 1)));
+      ASSERT_STREQ(replicate_str, target_buffer);
+    };
+
+    // clang-format off
+    check_input("ab\x7F" "cd\n", "ab\b \bcd\r\n", "acd\n");
+    check_input("ab\x01" "cd\n", "ab^Acd\r\n", "ab\x01" "cd\n");
+    check_input("ab\x06" "cd\n", "ab^Fcd\r\n", "ab\x06" "cd\n");
+    check_input("ab\x07" "cd\n", "ab^Gcd\r\n", "ab\x07" "cd\n");
+    check_input("ab\x08" "cd\n", "ab^Hcd\r\n", "ab\x08" "cd\n");
+    check_input("ab\x09" "cd\n", "ab\tcd\r\n", "ab\tcd\n");
+    check_input("ab\x0E" "cd\n", "ab^Ncd\r\n", "ab\x0E" "cd\n");
+    check_input("ab\x0F" "cd\n", "ab^Ocd\r\n", "ab\x0F" "cd\n");
+    check_input("ab\x1B" "cd\n", "ab^[cd\r\n", "ab\x1B" "cd\n");
+    // clang-format on
   });
 }
 

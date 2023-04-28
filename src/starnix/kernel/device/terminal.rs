@@ -32,6 +32,13 @@ const SPACES_PER_TAB: usize = 8;
 // DISABLED_CHAR is used to indicate that a control character is disabled.
 const DISABLED_CHAR: u8 = 0;
 
+const BACKSPACE_CHAR: u8 = 8; // \b
+
+/// The offset in ASCII between a control character and it's character name.
+/// For example, typing CTRL-C on a keyboard generates the value
+/// b'C' - CONTROL_OFFSET
+const CONTROL_OFFSET: u8 = 0x40;
+
 /// Global state of the devpts filesystem.
 pub struct TTYState {
     /// The terminal objects indexed by their identifier.
@@ -619,8 +626,7 @@ impl TerminalMutableState<Base = Terminal> {
                     }
                     self.column += spaces;
                 }
-                8 => {
-                    // \b
+                BACKSPACE_CHAR => {
                     if self.column > 0 {
                         self.column -= 1;
                     }
@@ -702,19 +708,58 @@ impl TerminalMutableState<Base = Terminal> {
             buffer = &buffer[size..];
             return_value += size;
 
+            let first_byte = character_bytes[0];
+
             // If we get EOF, make the buffer available for reading.
-            if self.termios.has_local_flags(ICANON) && self.termios.is_eof(character_bytes[0]) {
+            if self.termios.has_local_flags(ICANON) && self.termios.is_eof(first_byte) {
                 queue.readable = true;
                 break;
             }
 
-            queue.read_buffer.extend_from_slice(&character_bytes);
+            if self.termios.has_local_flags(ICANON) && self.termios.is_erase(first_byte) {
+                let erase_count =
+                    compute_last_character_size(&queue.read_buffer[..], &self.termios);
+                if erase_count == 0 {
+                    continue;
+                }
+                queue.read_buffer.truncate(queue.read_buffer.len() - erase_count);
+            } else {
+                queue.read_buffer.extend_from_slice(&character_bytes);
+            }
+
+            // TODO: Implement remaining echo flags:
+            // * ECHOE
+            // * ECHOPRT
+            // * ECHOK
+            // * ECHOKE
 
             // Anything written to the read buffer will have to be echoed.
+            let mut echo_bytes = vec![];
             if self.termios.has_local_flags(ECHO) {
-                signals.append(with_queue!(self
-                    .output_queue
-                    .write_bytes(self.as_mut(), &character_bytes)));
+                if self.termios.is_erase(first_byte) {
+                    echo_bytes = vec![BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
+                } else if self.termios.has_local_flags(ECHOCTL)
+                    && matches!(first_byte, 0..=0x8 | 0xB..=0xC | 0xE..=0x1F)
+                {
+                    // If this bit is set and the ECHO bit is also set, echo
+                    // control characters with ‘^’ followed by the corresponding
+                    // text character. Thus, control-A echoes as ‘^A’. This is
+                    // usually the preferred mode for interactive input, because
+                    // echoing a control character back to the terminal could have
+                    // some undesired effect on the terminal.
+                    echo_bytes = vec![b'^', first_byte + CONTROL_OFFSET];
+                } else {
+                    echo_bytes = character_bytes.clone();
+                }
+            } else if self.termios.has_local_flags(ECHONL) && first_byte == b'\n' {
+                // If this bit is set and the ICANON bit is also set, then the
+                // newline ('\n') character is echoed even if the ECHO bit is not set.
+                echo_bytes = character_bytes.clone();
+            }
+
+            if !echo_bytes.is_empty() {
+                signals
+                    .append(with_queue!(self.output_queue.write_bytes(self.as_mut(), &echo_bytes)));
             }
 
             // If we finish a line, make it available for reading.
@@ -773,6 +818,7 @@ trait TermIOS {
     fn has_output_flags(&self, flags: tcflag_t) -> bool;
     fn has_local_flags(&self, flags: tcflag_t) -> bool;
     fn is_eof(&self, c: RawByte) -> bool;
+    fn is_erase(&self, c: RawByte) -> bool;
     fn is_terminating(&self, character_bytes: &[RawByte]) -> bool;
     fn signal(&self, c: RawByte) -> Option<Signal>;
 }
@@ -789,6 +835,9 @@ impl TermIOS for uapi::termios {
     }
     fn is_eof(&self, c: RawByte) -> bool {
         c == self.c_cc[VEOF as usize] && self.c_cc[VEOF as usize] != DISABLED_CHAR
+    }
+    fn is_erase(&self, c: RawByte) -> bool {
+        c == self.c_cc[VERASE as usize] && self.c_cc[VERASE as usize] != DISABLED_CHAR
     }
     fn is_terminating(&self, character_bytes: &[RawByte]) -> bool {
         // All terminating characters are 1 byte.
@@ -867,6 +916,54 @@ fn compute_next_character_size(buffer: &[RawByte], termios: &uapi::termios) -> u
     } else {
         1
     }
+}
+
+/// Returns the number of bytes of the next character in `buffer`.
+///
+/// Depending on `termios`, this might consider ASCII or UTF8 encoding.
+///
+/// This will return 1 if the encoding is UTF8 and the first bytes of buffer are not a valid utf8
+/// sequence.
+fn compute_last_character_size(buffer: &[RawByte], termios: &uapi::termios) -> usize {
+    if buffer.is_empty() {
+        return 0;
+    }
+    if !termios.has_input_flags(IUTF8) {
+        return 1;
+    }
+
+    #[derive(Default)]
+    struct Receiver {
+        /// Whether the byte most recently processed was either a complete code
+        /// point or an invalid sequence.
+        ///
+        /// This approach matches compute_next_character_size, which treats
+        /// invalid sequences as individual bytes.
+        is_boundary: bool,
+    }
+
+    impl utf8parse::Receiver for Receiver {
+        fn codepoint(&mut self, _c: char) {
+            self.is_boundary = true;
+        }
+        fn invalid_sequence(&mut self) {
+            self.is_boundary = true;
+        }
+    }
+
+    let mut byte_count = 0;
+    let mut last_boundary = 0;
+    let mut receiver = Receiver::default();
+    let mut parser = utf8parse::Parser::new();
+    while byte_count < buffer.len() {
+        parser.advance(&mut receiver, buffer[byte_count]);
+        if receiver.is_boundary {
+            last_boundary = byte_count;
+            receiver.is_boundary = false;
+        }
+        byte_count += 1;
+    }
+    buffer.len() - last_boundary
 }
 
 /// Alias used to mark bytes in the queues that have not yet been processed and pushed into the
