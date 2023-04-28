@@ -714,7 +714,6 @@ impl Inspect for &mut ValidScoConnectionParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::encoding::Decodable;
     use fuchsia_inspect::assert_data_tree;
 
     #[test]
@@ -1064,13 +1063,13 @@ mod tests {
 
     #[test]
     fn test_invalid_service_definition_fails_gracefully() {
-        let no_uuids_fidl = fidl_bredr::ServiceDefinition::new_empty();
+        let no_uuids_fidl = fidl_bredr::ServiceDefinition::default();
         let fidl_to_local = ServiceDefinition::try_from(&no_uuids_fidl);
         assert!(fidl_to_local.is_err());
 
         let empty_uuids_fidl = fidl_bredr::ServiceDefinition {
             service_class_uuids: Some(vec![]),
-            ..fidl_bredr::ServiceDefinition::new_empty()
+            ..Default::default()
         };
         let fidl_to_local = ServiceDefinition::try_from(&empty_uuids_fidl);
         assert!(fidl_to_local.is_err());
@@ -1097,7 +1096,7 @@ mod tests {
         assert_eq!(fidl_to_local, local);
 
         // Empty FIDL parameters is OK.
-        let fidl = fidl_bredr::ChannelParameters::new_empty();
+        let fidl = fidl_bredr::ChannelParameters::default();
         let expected = ChannelParameters {
             channel_mode: None,
             max_rx_sdu_size: None,

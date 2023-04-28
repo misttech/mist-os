@@ -5,7 +5,7 @@
 //! Mock implementation of blobfs for blobfs::Client.
 
 use {
-    fidl::{encoding::Decodable as _, endpoints::RequestStream as _},
+    fidl::endpoints::RequestStream as _,
     fidl_fuchsia_io as fio,
     fuchsia_hash::Hash,
     fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
@@ -395,7 +395,15 @@ impl Blob {
                     responder.send(&mut Ok(data[pos..pos + count].to_vec())).unwrap();
                 }
                 Some(Ok(fio::FileRequest::GetAttr { responder })) => {
-                    let mut attr = fio::NodeAttributes::new_empty();
+                    let mut attr = fio::NodeAttributes {
+                        mode: 0,
+                        id: 0,
+                        content_size: 0,
+                        storage_size: 0,
+                        link_count: 0,
+                        creation_time: 0,
+                        modification_time: 0,
+                    };
                     attr.content_size = data.len().try_into().unwrap();
                     responder.send(Status::OK.into_raw(), &mut attr).unwrap();
                 }

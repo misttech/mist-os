@@ -6,7 +6,6 @@ use crate::{Result, SessionId};
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
-use fidl::encoding::Decodable;
 use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream};
 use fidl_fuchsia_diagnostics::*;
 use fidl_fuchsia_logger::LogSinkMarker;
@@ -296,7 +295,7 @@ impl TestPlayer {
             .publisher
             .publish(
                 player_client,
-                PlayerRegistration { domain: Some(test_domain()), ..Decodable::new_empty() },
+                PlayerRegistration { domain: Some(test_domain()), ..Default::default() },
             )
             .await
             .context("Registering new player")?;
@@ -335,9 +334,9 @@ fn delta_with_state(state: PlayerState) -> PlayerInfoDelta {
             repeat_mode: Some(RepeatMode::Off),
             shuffle_on: Some(false),
             content_type: Some(ContentType::Audio),
-            ..Decodable::new_empty()
+            ..Default::default()
         }),
-        ..Decodable::new_empty()
+        ..Default::default()
     }
 }
 
@@ -367,7 +366,7 @@ async fn can_publish_players() -> Result<()> {
     let service = TestService::new().await?;
 
     let mut player = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let mut sessions = watcher.wait_for_n_updates(1).await?;
@@ -384,7 +383,7 @@ async fn can_receive_deltas() -> Result<()> {
 
     let mut player1 = TestPlayer::new(&service).await?;
     let mut player2 = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     player2.emit_delta(delta_with_state(PlayerState::Playing)).await?;
@@ -396,7 +395,7 @@ async fn can_receive_deltas() -> Result<()> {
                 flags: Some(PlayerCapabilityFlags::PLAY),
                 ..Default::default()
             }),
-            ..Decodable::new_empty()
+            ..Default::default()
         })
         .await?;
     let mut updates = watcher.wait_for_n_updates(1).await?;
@@ -412,7 +411,7 @@ async fn can_receive_deltas() -> Result<()> {
                 flags: Some(PlayerCapabilityFlags::PAUSE),
                 ..Default::default()
             }),
-            ..Decodable::new_empty()
+            ..Default::default()
         })
         .await?;
     let mut updates = watcher.wait_for_n_updates(1).await?;
@@ -433,7 +432,7 @@ async fn active_status() -> Result<()> {
     let service = TestService::new().await?;
 
     let mut player = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     player.emit_delta(delta_with_state(PlayerState::Idle)).await?;
     let _ = watcher.wait_for_n_updates(1).await?;
@@ -491,7 +490,7 @@ async fn player_controls_are_proxied() -> Result<()> {
     let service = TestService::new().await?;
 
     let mut player = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let mut updates = watcher.wait_for_n_updates(1).await?;
@@ -528,7 +527,7 @@ async fn player_disconnection_propagates() -> Result<()> {
     let service = TestService::new().await?;
 
     let mut player = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let mut updates = watcher.wait_for_n_updates(1).await?;
@@ -554,7 +553,7 @@ async fn watch_filter_active() -> Result<()> {
     let mut player2 = TestPlayer::new(&service).await?;
     let _player3 = TestPlayer::new(&service).await?;
     let mut active_watcher =
-        service.new_watcher(WatchOptions { only_active: Some(true), ..Decodable::new_empty() })?;
+        service.new_watcher(WatchOptions { only_active: Some(true), ..Default::default() })?;
 
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let updates = active_watcher.wait_for_n_updates(1).await?;
@@ -578,7 +577,7 @@ async fn disconnected_player_results_in_removal_event() -> Result<()> {
     let service = TestService::new().await?;
 
     let mut player1 = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     player1.emit_delta(delta_with_state(PlayerState::Playing)).await?;
     let _updates = watcher.wait_for_n_updates(1).await?;
@@ -611,13 +610,13 @@ async fn player_status() -> Result<()> {
         shuffle_on: Some(true),
         content_type: Some(ContentType::Movie),
         error: Some(Error::Other),
-        ..Decodable::new_empty()
+        ..Default::default()
     };
 
     player
         .emit_delta(PlayerInfoDelta {
             player_status: Some(expected_player_status()),
-            ..Decodable::new_empty()
+            ..Default::default()
         })
         .await?;
 
@@ -645,7 +644,7 @@ async fn player_capabilities() -> Result<()> {
     player
         .emit_delta(PlayerInfoDelta {
             player_capabilities: Some(expected_player_capabilities()),
-            ..Decodable::new_empty()
+            ..Default::default()
         })
         .await?;
 
@@ -692,7 +691,7 @@ async fn media_images() -> Result<()> {
     player
         .emit_delta(PlayerInfoDelta {
             media_images: Some(expected_media_images()),
-            ..Decodable::new_empty()
+            ..Default::default()
         })
         .await?;
 
@@ -721,7 +720,7 @@ async fn players_get_ids() -> Result<()> {
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
 async fn session_controllers_can_watch_session_status() -> Result<()> {
     let service = TestService::new().await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
 
     let mut player1 = TestPlayer::new(&service).await?;
     let mut player2 = TestPlayer::new(&service).await?;
@@ -752,7 +751,7 @@ async fn session_controllers_can_watch_session_status() -> Result<()> {
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
 async fn session_observers_can_watch_session_status() -> Result<()> {
     let service = TestService::new().await?;
-    let mut watcher = service.new_observer_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_observer_watcher(Default::default())?;
 
     let mut player1 = TestPlayer::new(&service).await?;
     let mut player2 = TestPlayer::new(&service).await?;
@@ -783,7 +782,7 @@ async fn session_observers_can_watch_session_status() -> Result<()> {
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
 async fn player_disconnection_disconects_observers() -> Result<()> {
     let service = TestService::new().await?;
-    let mut watcher = service.new_observer_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_observer_watcher(Default::default())?;
 
     let mut player = TestPlayer::new(&service).await?;
 
@@ -805,7 +804,7 @@ async fn player_disconnection_disconects_observers() -> Result<()> {
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
 async fn observers_caught_up_with_state_of_session() -> Result<()> {
     let service = TestService::new().await?;
-    let mut watcher = service.new_observer_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_observer_watcher(Default::default())?;
 
     let mut player = TestPlayer::new(&service).await?;
 
@@ -987,7 +986,7 @@ async fn active_session_initializes_clients_without_player() -> Result<()> {
 async fn active_session_initializes_clients_with_idle_player() -> Result<()> {
     let service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
     let active_session_discovery = service
         .realm
         .root
@@ -1010,7 +1009,7 @@ async fn active_session_initializes_clients_with_idle_player() -> Result<()> {
 async fn active_session_initializes_clients_with_active_player() -> Result<()> {
     let service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
     let active_session_discovery = service
         .realm
         .root
@@ -1043,7 +1042,7 @@ async fn active_session_initializes_clients_with_active_player() -> Result<()> {
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
 async fn active_session_falls_back_when_session_removed() -> Result<()> {
     let service = TestService::new().await?;
-    let mut watcher = service.new_watcher(Decodable::new_empty())?;
+    let mut watcher = service.new_watcher(Default::default())?;
     let active_session_discovery = service
         .realm
         .root

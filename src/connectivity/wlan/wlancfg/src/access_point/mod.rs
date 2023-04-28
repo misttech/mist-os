@@ -808,21 +808,18 @@ mod tests {
         let (controller2, _) = request_controller(&test_values.provider);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        let channel = controller2.into_channel().expect("error turning proxy into channel");
-        let mut buffer = zx::MessageBuf::new();
-        let epitaph_fut = channel.recv_msg(&mut buffer);
-        pin_mut!(epitaph_fut);
-        assert_variant!(exec.run_until_stalled(&mut epitaph_fut), Poll::Ready(Ok(_)));
-
         // Verify Epitaph was received.
-        use fidl::encoding::{decode_transaction_header, Decodable, Decoder, EpitaphBody};
-        let (header, tail) =
-            decode_transaction_header(buffer.bytes()).expect("failed decoding header");
-        let mut msg = Decodable::new_empty();
-        Decoder::decode_into::<EpitaphBody>(&header, tail, &mut [], &mut msg)
-            .expect("failed decoding body");
-        assert_eq!(msg.error, zx::Status::ALREADY_BOUND);
-        assert!(channel.is_closed());
+        let mut controller2_event_stream = controller2.take_event_stream();
+        let controller2_event_fut = controller2_event_stream.next();
+        pin_mut!(controller2_event_fut);
+        assert_variant!(
+            exec.run_until_stalled(&mut controller2_event_fut),
+            Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
+                status: zx::Status::ALREADY_BOUND,
+                ..
+            })))
+        );
+        assert!(controller2.is_closed());
     }
 
     #[fuchsia::test]
@@ -850,21 +847,18 @@ mod tests {
         let (controller2, _) = request_controller(&provider);
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
 
-        let channel = controller2.into_channel().expect("error turning proxy into channel");
-        let mut buffer = zx::MessageBuf::new();
-        let epitaph_fut = channel.recv_msg(&mut buffer);
-        pin_mut!(epitaph_fut);
-        assert_variant!(exec.run_until_stalled(&mut epitaph_fut), Poll::Ready(Ok(_)));
-
         // Verify Epitaph was received.
-        use fidl::encoding::{decode_transaction_header, Decodable, Decoder, EpitaphBody};
-        let (header, tail) =
-            decode_transaction_header(buffer.bytes()).expect("failed decoding header");
-        let mut msg = Decodable::new_empty();
-        Decoder::decode_into::<EpitaphBody>(&header, tail, &mut [], &mut msg)
-            .expect("failed decoding body");
-        assert_eq!(msg.error, zx::Status::ALREADY_BOUND);
-        assert!(channel.is_closed());
+        let mut controller2_event_stream = controller2.take_event_stream();
+        let controller2_event_fut = controller2_event_stream.next();
+        pin_mut!(controller2_event_fut);
+        assert_variant!(
+            exec.run_until_stalled(&mut controller2_event_fut),
+            Poll::Ready(Some(Err(fidl::Error::ClientChannelClosed {
+                status: zx::Status::ALREADY_BOUND,
+                ..
+            })))
+        );
+        assert!(controller2.is_closed());
 
         // Drop the initial client controller and make sure the second service instance can get a
         // client controller and make a request.

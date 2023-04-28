@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context, Error};
-use fidl::{encoding::Decodable, endpoints};
+use fidl::endpoints;
 use fidl_fuchsia_bluetooth;
 use fidl_fuchsia_bluetooth_gatt2::{
     Characteristic as FidlCharacteristic, CharacteristicNotifierMarker,
@@ -171,10 +171,7 @@ async fn write_characteristic(
 
 async fn read_descriptor(svc: &RemoteServiceProxy, id: u64) -> Result<(), Error> {
     let value: ReadValue = svc
-        .read_descriptor(
-            &mut Handle { value: id },
-            &mut ReadOptions::ShortRead(ShortReadOptions::new_empty()),
-        )
+        .read_descriptor(&mut Handle { value: id }, &mut ReadOptions::ShortRead(ShortReadOptions))
         .await
         .context("Failed to read descriptor")?
         .map_err(|e| format_err!("Failed to read descriptor: {:?}", e))?;

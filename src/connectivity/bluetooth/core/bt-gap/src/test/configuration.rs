@@ -4,7 +4,6 @@
 
 use {
     assert_matches::assert_matches,
-    fidl::encoding::Decodable,
     fidl_fuchsia_bluetooth_host::{HostRequest, HostRequestStream, HostSetConnectableResponder},
     fidl_fuchsia_bluetooth_sys::{
         self as sys, ConfigurationMarker, ConfigurationProxy, ConfigurationRequestStream,
@@ -60,7 +59,7 @@ async fn disable_le_privacy() {
     let run_configuration = configuration::run(dispatcher, server);
     let make_request = async move {
         let response = config_client
-            .update(sys::Settings { le_privacy: Some(false), ..sys::Settings::new_empty() })
+            .update(sys::Settings { le_privacy: Some(false), ..Default::default() })
             .await;
         assert_matches!(response, Ok(sys::Settings { le_privacy: Some(false), .. }));
         // The configuration client is dropped when this terminates, which causes the configuration
@@ -86,7 +85,7 @@ async fn disable_le_background_scan() {
     let run_configuration = configuration::run(dispatcher, server);
     let make_request = async move {
         let response = config_client
-            .update(sys::Settings { le_background_scan: Some(false), ..sys::Settings::new_empty() })
+            .update(sys::Settings { le_background_scan: Some(false), ..Default::default() })
             .await;
         assert_matches!(response, Ok(sys::Settings { le_background_scan: Some(false), .. }));
         Ok(())
@@ -109,10 +108,7 @@ async fn disable_connectable_mode() {
     let run_configuration = configuration::run(dispatcher, server);
     let make_request = async move {
         let response = config_client
-            .update(sys::Settings {
-                bredr_connectable_mode: Some(false),
-                ..sys::Settings::new_empty()
-            })
+            .update(sys::Settings { bredr_connectable_mode: Some(false), ..Default::default() })
             .await;
         assert_matches!(response, Ok(sys::Settings { bredr_connectable_mode: Some(false), .. }));
         Ok(())
@@ -141,7 +137,7 @@ async fn set_secure_connections_only() {
         let response = config_client
             .update(sys::Settings {
                 le_security_mode: Some(LeSecurityMode::SecureConnectionsOnly),
-                ..sys::Settings::new_empty()
+                ..Default::default()
             })
             .await;
         assert_matches!(
@@ -174,7 +170,7 @@ async fn configure_applies_to_multiple_devices() {
     let run_configuration = configuration::run(dispatcher, server);
     let make_request = async move {
         let response = config_client
-            .update(sys::Settings { le_privacy: Some(false), ..sys::Settings::new_empty() })
+            .update(sys::Settings { le_privacy: Some(false), ..Default::default() })
             .await;
         assert_matches!(response, Ok(sys::Settings { le_privacy: Some(false), .. }));
         // The configuration client is dropped when this terminates, which causes the configuration

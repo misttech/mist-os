@@ -5,7 +5,6 @@
 #![recursion_limit = "256"]
 
 use anyhow::{Context as _, Error};
-use fidl::encoding::Decodable;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media::{Metadata, Property, TimelineFunction, METADATA_LABEL_ARTIST};
 use fidl_fuchsia_media_sessions2::*;
@@ -54,7 +53,7 @@ impl Player {
             shuffle_on: Some(false),
             error: None,
             content_type: Some(ContentType::Other),
-            ..Decodable::new_empty()
+            ..Default::default()
         }
     }
 
@@ -69,7 +68,7 @@ impl Player {
                 } else {
                     Self::player_status(PlayerState::Paused)
                 }),
-                ..Decodable::new_empty()
+                ..Default::default()
             })
         }
     }
@@ -85,7 +84,7 @@ async fn main() -> Result<()> {
             player_client_end,
             PlayerRegistration {
                 domain: Some("domain://example".to_string()),
-                ..Decodable::new_empty()
+                ..Default::default()
             },
         )
         .await
@@ -101,7 +100,7 @@ async fn main() -> Result<()> {
         player_status: None,
         player_capabilities: Some(PlayerCapabilities {
             flags: Some(PlayerCapabilityFlags::PLAY | PlayerCapabilityFlags::PAUSE),
-            ..Decodable::new_empty()
+            ..Default::default()
         }),
         metadata: Some(Metadata {
             properties: vec![Property {
@@ -109,7 +108,7 @@ async fn main() -> Result<()> {
                 value: String::from("Sine"),
             }],
         }),
-        ..Decodable::new_empty()
+        ..Default::default()
     });
     let mut hanging_get = None;
 

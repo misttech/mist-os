@@ -268,16 +268,17 @@ impl Future for SysmemAllocation {
 mod tests {
     use super::*;
 
-    use fidl::encoding::Decodable;
     use fidl_fuchsia_sysmem::{
         AllocatorMarker, AllocatorRequest, BufferCollectionRequest, BufferCollectionTokenProxy,
         BufferCollectionTokenRequest, BufferCollectionTokenRequestStream, CoherencyDomain,
-        HeapType, ImageFormatConstraints, SingleBufferSettings, VmoBuffer,
+        HeapType, SingleBufferSettings, VmoBuffer,
     };
     use fuchsia_async::{self as fasync, pin_mut};
     use futures::StreamExt;
 
-    use crate::buffer_collection_constraints::BUFFER_COLLECTION_CONSTRAINTS_DEFAULT;
+    use crate::buffer_collection_constraints::{
+        BUFFER_COLLECTION_CONSTRAINTS_DEFAULT, IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
+    };
 
     fn assert_tokens_connected(
         exec: &mut fasync::TestExecutor,
@@ -407,12 +408,13 @@ mod tests {
                 let single_buffer_settings = SingleBufferSettings {
                     buffer_settings,
                     has_image_format_constraints: false,
-                    image_format_constraints: ImageFormatConstraints::new_empty(),
+                    image_format_constraints: IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
                 };
+                const ABSENT_BUFFER: VmoBuffer = VmoBuffer { vmo: None, vmo_usable_start: 0 };
                 let mut buffer_collection_info = BufferCollectionInfo2 {
                     buffer_count: 1,
                     settings: single_buffer_settings,
-                    ..BufferCollectionInfo2::new_empty()
+                    buffers: [ABSENT_BUFFER; 64],
                 };
 
                 buffer_collection_info.buffers[0] = VmoBuffer {

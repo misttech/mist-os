@@ -4,7 +4,6 @@
 
 use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use anyhow::{Context, Error};
-use fidl::encoding::Decodable;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_bluetooth_bredr::{
     Attribute, Channel, ChannelMode, ChannelParameters, ConnectParameters,
@@ -583,7 +582,7 @@ impl ProfileServerFacade {
             Some(server) => {
                 let _ = server.advertise(
                     &mut service_defs.into_iter(),
-                    ChannelParameters::new_empty(),
+                    ChannelParameters::default(),
                     connect_client,
                 );
             }
@@ -720,9 +719,9 @@ impl ProfileServerFacade {
                     psm: Some(psm),
                     parameters: Some(ChannelParameters {
                         channel_mode: Some(mode),
-                        ..ChannelParameters::new_empty()
+                        ..Default::default()
                     }),
-                    ..L2capParameters::new_empty()
+                    ..Default::default()
                 };
                 server
                     .connect(&mut peer_id.into(), &mut ConnectParameters::L2cap(l2cap_params))

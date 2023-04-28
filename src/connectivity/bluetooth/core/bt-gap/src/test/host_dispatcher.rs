@@ -5,7 +5,6 @@
 use anyhow::{format_err, Error};
 use assert_matches::assert_matches;
 use async_helpers::hanging_get::asynchronous as hanging_get;
-use fidl::encoding::Decodable;
 use fidl_fuchsia_bluetooth::Appearance;
 use fidl_fuchsia_bluetooth_host::HostRequest;
 use fidl_fuchsia_bluetooth_sys::{self as sys, TechnologyType};
@@ -141,7 +140,7 @@ async fn apply_settings_fails_host_removed() {
         let updated_config = dispatcher
             .apply_sys_settings(sys::Settings {
                 bredr_connectable_mode: Some(false),
-                ..sys::Settings::new_empty()
+                ..Default::default()
             })
             .await;
         assert_matches!(

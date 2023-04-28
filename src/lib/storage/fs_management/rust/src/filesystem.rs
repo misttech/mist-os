@@ -12,10 +12,7 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     cstr::cstr,
     fdio::SpawnAction,
-    fidl::{
-        encoding::Decodable,
-        endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd},
-    },
+    fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd},
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_fs::AdminMarker,
@@ -231,7 +228,7 @@ impl Filesystem {
             Mode::Component { .. } => {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-                let mut options = CheckOptions::new_empty();
+                let mut options = CheckOptions;
                 proxy.check(channel, &mut options).await?.map_err(Status::from_raw)?;
             }
             Mode::Legacy(mut config) => {

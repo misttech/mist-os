@@ -4,7 +4,6 @@
 
 //! Utilities for filtering events.
 
-use fidl::encoding::Decodable;
 use fidl_fuchsia_media_sessions2::*;
 
 /// A filter accepts or rejects filter applicants.
@@ -16,7 +15,7 @@ pub struct Filter {
 
 impl Default for Filter {
     fn default() -> Self {
-        Self { options: Decodable::new_empty() }
+        Self { options: Default::default() }
     }
 }
 
@@ -84,21 +83,18 @@ mod test {
 
     #[fuchsia::test]
     fn active_filter() {
-        let loose_filter = Filter::new(Decodable::new_empty());
+        let loose_filter = Filter::new(Default::default());
         assert_eq!(loose_filter, Filter::default());
 
-        assert_eq!(loose_filter.filter(&FilterApplicant::new(Decodable::new_empty(), 1u32)), true);
+        assert_eq!(loose_filter.filter(&FilterApplicant::new(Default::default(), 1u32)), true);
 
         let active_filter =
-            Filter::new(WatchOptions { only_active: Some(true), ..Decodable::new_empty() });
+            Filter::new(WatchOptions { only_active: Some(true), ..Default::default() });
 
-        assert_eq!(
-            active_filter.filter(&FilterApplicant::new(Decodable::new_empty(), 1u32)),
-            false
-        );
+        assert_eq!(active_filter.filter(&FilterApplicant::new(Default::default(), 1u32)), false);
         assert_eq!(
             active_filter.filter(&FilterApplicant::new(
-                WatchOptions { only_active: Some(true), ..Decodable::new_empty() },
+                WatchOptions { only_active: Some(true), ..Default::default() },
                 2u32
             )),
             true
@@ -107,24 +103,21 @@ mod test {
 
     #[fuchsia::test]
     fn allowlist_filter() {
-        let loose_filter = Filter::new(Decodable::new_empty());
+        let loose_filter = Filter::new(Default::default());
         assert_eq!(loose_filter, Filter::default());
 
-        assert_eq!(loose_filter.filter(&FilterApplicant::new(Decodable::new_empty(), 1u32)), true);
+        assert_eq!(loose_filter.filter(&FilterApplicant::new(Default::default(), 1u32)), true);
 
         let active_filter = Filter::new(WatchOptions {
             allowed_sessions: Some(vec![0u64, 5u64]),
-            ..Decodable::new_empty()
+            ..Default::default()
         });
 
-        assert_eq!(
-            active_filter.filter(&FilterApplicant::new(Decodable::new_empty(), 1u32)),
-            false
-        );
+        assert_eq!(active_filter.filter(&FilterApplicant::new(Default::default(), 1u32)), false);
 
         assert_eq!(
             active_filter.filter(&FilterApplicant::new(
-                WatchOptions { allowed_sessions: Some(vec![0u64]), ..Decodable::new_empty() },
+                WatchOptions { allowed_sessions: Some(vec![0u64]), ..Default::default() },
                 2u32
             )),
             true
@@ -132,7 +125,7 @@ mod test {
 
         assert_eq!(
             active_filter.filter(&FilterApplicant::new(
-                WatchOptions { allowed_sessions: Some(vec![5u64]), ..Decodable::new_empty() },
+                WatchOptions { allowed_sessions: Some(vec![5u64]), ..Default::default() },
                 2u32
             )),
             true
@@ -140,7 +133,7 @@ mod test {
 
         assert_eq!(
             active_filter.filter(&FilterApplicant::new(
-                WatchOptions { allowed_sessions: Some(vec![7u64]), ..Decodable::new_empty() },
+                WatchOptions { allowed_sessions: Some(vec![7u64]), ..Default::default() },
                 2u32
             )),
             false
@@ -149,10 +142,10 @@ mod test {
 
     #[fuchsia::test]
     fn filter_is_intersection() {
-        let loose_filter = Filter::new(Decodable::new_empty());
+        let loose_filter = Filter::new(Default::default());
         assert_eq!(loose_filter, Filter::default());
 
-        assert_eq!(loose_filter.filter(&FilterApplicant::new(Decodable::new_empty(), 1u32)), true);
+        assert_eq!(loose_filter.filter(&FilterApplicant::new(Default::default(), 1u32)), true);
 
         let active_filter = Filter::new(WatchOptions {
             only_active: Some(true),
@@ -160,10 +153,7 @@ mod test {
             ..Default::default()
         });
 
-        assert_eq!(
-            active_filter.filter(&FilterApplicant::new(Decodable::new_empty(), 1u32)),
-            false
-        );
+        assert_eq!(active_filter.filter(&FilterApplicant::new(Default::default(), 1u32)), false);
 
         assert_eq!(
             active_filter.filter(&FilterApplicant::new(

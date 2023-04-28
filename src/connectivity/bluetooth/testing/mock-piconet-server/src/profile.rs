@@ -77,7 +77,7 @@ pub fn parse_service_definitions(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use {bt_rfcomm::ServerChannel, fidl::encoding::Decodable, fuchsia_bluetooth::types::Uuid};
+    use {bt_rfcomm::ServerChannel, fuchsia_bluetooth::types::Uuid};
 
     const SDP_SUPPORTED_FEATURES: u16 = 0x0311;
 
@@ -188,7 +188,7 @@ pub(crate) mod tests {
             ]]),
             profile_descriptors: Some(prof_descs.clone()),
             additional_attributes: Some(vec![(&avrcp_attribute).into()]),
-            ..bredr::ServiceDefinition::new_empty()
+            ..Default::default()
         };
         let primary_protocol = protocol_descriptor_list.iter().map(Into::into).collect();
         let record = ServiceRecord::new(

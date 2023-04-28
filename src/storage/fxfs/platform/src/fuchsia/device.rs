@@ -4,7 +4,7 @@
 use {
     crate::fuchsia::{errors::map_to_status, file::FxFile, node::OpenedNode},
     anyhow::Error,
-    fidl::{encoding::Decodable as _, endpoints::ServerEnd},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_hardware_block as block,
     fidl_fuchsia_hardware_block_volume::{
         self as volume, VolumeAndNodeMarker, VolumeAndNodeRequest,
@@ -64,9 +64,11 @@ impl FifoMessageGroup {
     fn into_response(self) -> BlockFifoResponse {
         return BlockFifoResponse {
             status: self.status,
+            reqid: 0,
             group: self.group_id,
+            padding_to_satisfy_zerocopy: 0,
             count: self.count,
-            ..BlockFifoResponse::new_empty()
+            padding_to_match_request_size_and_alignment: [0; 3],
         };
     }
 
@@ -259,9 +261,12 @@ impl BlockServer {
                 }
             } else {
                 Some(BlockFifoResponse {
+                    status: 0,
                     reqid: request.reqid,
+                    group: 0,
+                    padding_to_satisfy_zerocopy: 0,
                     count: 1,
-                    ..BlockFifoResponse::new_empty()
+                    padding_to_match_request_size_and_alignment: [0; 3],
                 })
             }
         };

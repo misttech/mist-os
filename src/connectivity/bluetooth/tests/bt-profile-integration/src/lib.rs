@@ -8,7 +8,6 @@ use {
         access::{expectation, AccessHarness},
         profile::ProfileHarness,
     },
-    fidl::encoding::Decodable,
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_bluetooth::{DeviceClass, ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
     fidl_fuchsia_bluetooth_bredr::{
@@ -37,7 +36,7 @@ fn service_definition_for_testing() -> ServiceDefinition {
             protocol: ProtocolIdentifier::L2Cap,
             params: vec![DataElement::Uint16(0x100f)], // In the "dynamically-assigned" range
         }]),
-        ..ServiceDefinition::new_empty()
+        ..Default::default()
     }
 }
 
@@ -59,7 +58,7 @@ pub fn a2dp_sink_service_definition() -> ServiceDefinition {
             major_version: 1,
             minor_version: 2,
         }]),
-        ..ServiceDefinition::new_empty()
+        ..Default::default()
     }
 }
 
@@ -70,7 +69,7 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
 
     let _ = profile.aux().profile.advertise(
         &mut service_defs.into_iter(),
-        ChannelParameters::new_empty(),
+        ChannelParameters::default(),
         connect_client,
     );
     Ok(connect_requests)
@@ -162,7 +161,7 @@ async fn test_connect_unknown_peer(profile: ProfileHarness) {
         &mut PeerId(0xDEAD).into(),
         &mut ConnectParameters::L2cap(L2capParameters {
             psm: Some(PSM_AVDTP),
-            ..L2capParameters::new_empty()
+            ..Default::default()
         }),
     );
     match fut.await {

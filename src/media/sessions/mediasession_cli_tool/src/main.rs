@@ -4,7 +4,6 @@
 
 use anyhow;
 use argh::FromArgs;
-use fidl::encoding::Decodable;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media_sessions2::*;
 use fuchsia_async as fasync;
@@ -83,7 +82,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     match invocation.command {
         Command::Ls(_) => {
-            discovery.watch_sessions(WatchOptions::new_empty(), watcher_client)?;
+            discovery.watch_sessions(WatchOptions::default(), watcher_client)?;
             while let Some((id, delta, responder)) = watcher_requests
                 .try_next()
                 .await?
@@ -98,7 +97,7 @@ async fn main() -> Result<(), anyhow::Error> {
             }
         }
         Command::Info(info) => {
-            discovery.watch_sessions(WatchOptions::new_empty(), watcher_client)?;
+            discovery.watch_sessions(WatchOptions::default(), watcher_client)?;
             while let Some((id, delta, responder)) = watcher_requests
                 .try_next()
                 .await?

@@ -2549,10 +2549,7 @@ mod tests {
     use super::*;
 
     use anyhow::Error;
-    use fidl::{
-        encoding::Decodable,
-        endpoints::{Proxy, ServerEnd},
-    };
+    use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::StreamExt;
@@ -3698,14 +3695,13 @@ mod tests {
                 proxy.add_ip_membership(&mut fposix_socket::IpMulticastMembership {
                     mcast_addr: mcast_addr.into_fidl(),
                     iface: id.get(),
-                    ..Decodable::new_empty()
+                    local_addr: fnet::Ipv4Address { addr: [0; 4] },
                 })
             }
             IpAddr::V6(mcast_addr) => {
                 proxy.add_ipv6_membership(&mut fposix_socket::Ipv6MulticastMembership {
                     mcast_addr: mcast_addr.into_fidl(),
                     iface: id.get(),
-                    ..Decodable::new_empty()
                 })
             }
         }

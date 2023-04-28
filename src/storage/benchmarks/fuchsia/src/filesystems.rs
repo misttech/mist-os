@@ -5,9 +5,10 @@
 use {
     async_trait::async_trait,
     either::Either,
-    fidl::encoding::Decodable,
     fidl_fuchsia_fs::AdminMarker,
-    fidl_fuchsia_fs_startup::{StartOptions, StartupMarker},
+    fidl_fuchsia_fs_startup::{
+        CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
+    },
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio,
@@ -251,7 +252,14 @@ impl MemfsInstance {
         let startup = connect_to_childs_protocol::<StartupMarker>("memfs".to_string(), None)
             .await
             .expect("Failed to connect to memfs");
-        let mut options = StartOptions::new_empty();
+        let mut options = StartOptions {
+            read_only: false,
+            verbose: false,
+            fsck_after_every_transaction: false,
+            write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+            write_compression_level: 0,
+            cache_eviction_policy_override: EvictionPolicyOverride::None,
+        };
         // Memfs doesn't need a block device but FIDL prevents passing an invalid handle.
         let (device_client_end, _) = fidl::endpoints::create_endpoints::<BlockMarker>();
         startup

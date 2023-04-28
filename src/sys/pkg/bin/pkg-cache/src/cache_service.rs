@@ -2756,7 +2756,6 @@ mod serve_write_blob_tests {
         }
 
         fn make_stub_request(self, proxy: &fio::FileProxy) -> impl Future<Output = ()> {
-            use fidl::encoding::Decodable;
             match self {
                 StubRequestor::Clone => {
                     let (_, server_end) =
@@ -2770,7 +2769,15 @@ mod serve_write_blob_tests {
                 StubRequestor::SetAttr => proxy
                     .set_attr(
                         fio::NodeAttributeFlags::empty(),
-                        &mut fio::NodeAttributes::new_empty(),
+                        &mut fio::NodeAttributes {
+                            mode: 0,
+                            id: 0,
+                            content_size: 0,
+                            storage_size: 0,
+                            link_count: 0,
+                            creation_time: 0,
+                            modification_time: 0,
+                        },
                     )
                     .map(|_| ())
                     .boxed(),

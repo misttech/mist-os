@@ -459,7 +459,6 @@ mod tests {
         },
         anyhow::{anyhow, Error},
         async_trait::async_trait,
-        fidl::encoding::Decodable as _,
         fidl_fuchsia_device::ControllerProxy,
         fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag},
         fidl_fuchsia_hardware_block_volume::VolumeProxy,
@@ -519,7 +518,12 @@ mod tests {
             if self.is_nand {
                 Err(anyhow!("not supported by nand device"))
             } else {
-                Ok(BlockInfo { flags: self.block_flags, ..BlockInfo::new_empty() })
+                Ok(BlockInfo {
+                    block_count: 0,
+                    block_size: 0,
+                    max_transfer_size: 0,
+                    flags: self.block_flags,
+                })
             }
         }
         fn is_nand(&self) -> bool {

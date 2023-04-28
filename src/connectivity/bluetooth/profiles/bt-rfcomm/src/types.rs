@@ -187,7 +187,7 @@ impl Drop for ServiceGroup {
 pub(crate) mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::{encoding::Decodable, endpoints::create_proxy_and_stream};
+    use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_bredr::{
         Channel, ProfileDescriptor, ProtocolIdentifier, ServiceClassProfileIdentifier,
     };
@@ -354,7 +354,7 @@ pub(crate) mod tests {
         service_group.set_service_defs(defs);
 
         let id = PeerId(123);
-        let channel = Channel::new_empty();
+        let channel = Channel::default();
         let protocol = vec![];
         let res = service_group.relay_connected(id.into(), channel, protocol);
         assert_matches!(res, Ok(()));

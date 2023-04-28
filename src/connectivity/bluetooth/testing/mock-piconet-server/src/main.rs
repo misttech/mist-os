@@ -498,7 +498,6 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_utils::PollExt;
-    use fidl::encoding::Decodable;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
     use fidl_fuchsia_bluetooth_bredr::*;
     use futures::{pin_mut, task::Poll};
@@ -637,7 +636,7 @@ mod tests {
         let (target, receiver) = create_request_stream::<ConnectionReceiverMarker>().unwrap();
         let services = vec![];
         let mut adv_fut =
-            c.advertise(&mut services.into_iter(), ChannelParameters::new_empty(), target);
+            c.advertise(&mut services.into_iter(), ChannelParameters::default(), target);
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
         exec.run_until_stalled(&mut mps_fut).expect_pending("server should still be running");
 

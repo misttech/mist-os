@@ -131,7 +131,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl::encoding::Decodable;
 
     struct FakeStream {
         data: Vec<u8>,
@@ -139,7 +138,7 @@ mod test {
 
     impl ElementaryStream for FakeStream {
         fn format_details(&self, _version_ordinal: u64) -> FormatDetails {
-            Decodable::new_empty()
+            Default::default()
         }
 
         fn is_access_units(&self) -> bool {

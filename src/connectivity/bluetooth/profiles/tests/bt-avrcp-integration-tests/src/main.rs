@@ -5,7 +5,6 @@
 use {
     anyhow::{format_err, Context},
     bt_avctp::{AvcPeer, AvcResponseType},
-    fidl::encoding::Decodable,
     fidl::endpoints::{create_endpoints, create_proxy, create_request_stream},
     fidl_fuchsia_bluetooth_avrcp::{
         AbsoluteVolumeHandlerMarker, AbsoluteVolumeHandlerRequest,
@@ -88,7 +87,7 @@ fn avrcp_controller_service_definition() -> bredr::ServiceDefinition {
             id: SDP_SUPPORTED_FEATURES, // SDP Attribute "SUPPORTED FEATURES"
             element: bredr::DataElement::Uint16(0x0003), // CATEGORY 1 and 2.
         }]),
-        ..bredr::ServiceDefinition::new_empty()
+        ..Default::default()
     }
 }
 
@@ -200,10 +199,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
     fasync::Timer::new(fasync::Time::after(MAX_AVRCP_CONNECTION_ESTABLISHMENT)).await;
 
     // Mock peer attempts to connect to AVRCP.
-    let l2cap = bredr::L2capParameters {
-        psm: Some(bredr::PSM_AVCTP),
-        ..bredr::L2capParameters::new_empty()
-    };
+    let l2cap = bredr::L2capParameters { psm: Some(bredr::PSM_AVCTP), ..Default::default() };
     let params = bredr::ConnectParameters::L2cap(l2cap);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();
@@ -267,10 +263,7 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
         }
     };
     // Mock peer tries to initiate a browse channel connection.
-    let l2cap = bredr::L2capParameters {
-        psm: Some(bredr::PSM_AVCTP_BROWSE),
-        ..bredr::L2capParameters::new_empty()
-    };
+    let l2cap = bredr::L2capParameters { psm: Some(bredr::PSM_AVCTP_BROWSE), ..Default::default() };
     let params = bredr::ConnectParameters::L2cap(l2cap);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();

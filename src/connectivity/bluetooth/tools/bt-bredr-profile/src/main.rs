@@ -7,7 +7,7 @@
 use {
     anyhow::{anyhow, Context, Error},
     bt_rfcomm::ServerChannel,
-    fidl::{encoding::Decodable, endpoints::create_request_stream},
+    fidl::endpoints::create_request_stream,
     fidl_fuchsia_bluetooth_bredr::*,
     fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestMarker,
     fuchsia_async as fasync,
@@ -150,7 +150,7 @@ async fn advertise(
             protocol: ProtocolIdentifier::L2Cap,
             params: vec![DataElement::Uint16(psm)],
         }]),
-        ..ServiceDefinition::new_empty()
+        ..Default::default()
     }];
 
     let (connect_client, connect_requests) =
@@ -233,7 +233,7 @@ async fn connect_l2cap(
             &mut ConnectParameters::L2cap(L2capParameters {
                 psm: Some(psm),
                 parameters: Some(params),
-                ..L2capParameters::new_empty()
+                ..Default::default()
             }),
         )
         .await?

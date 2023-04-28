@@ -5,7 +5,6 @@
 use {
     anyhow::{ensure, Error},
     async_trait::async_trait,
-    fidl::encoding::Decodable as _,
     fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver,
     fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
     fuchsia_trace as trace,
@@ -354,6 +353,17 @@ impl Common {
     }
 }
 
+const EMPTY_BLOCK_FIFO_REQUEST: BlockFifoRequest = BlockFifoRequest {
+    opcode: 0,
+    reqid: 0,
+    group: 0,
+    vmoid: 0,
+    length: 0,
+    vmo_offset: 0,
+    dev_offset: 0,
+    trace_flow_id: 0,
+};
+
 impl Common {
     fn new(
         fifo: fasync::Fifo<BlockFifoResponse, BlockFifoRequest>,
@@ -376,7 +386,7 @@ impl Common {
         self.send(BlockFifoRequest {
             opcode: BLOCK_OP_CLOSE_VMO,
             vmoid: vmo_id.into_id(),
-            ..BlockFifoRequest::new_empty()
+            ..EMPTY_BLOCK_FIFO_REQUEST
         })
         .await
     }
@@ -394,7 +404,7 @@ impl Common {
                     length: self.to_blocks(length)?.try_into()?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
-                    ..BlockFifoRequest::new_empty()
+                    ..EMPTY_BLOCK_FIFO_REQUEST
                 })
                 .await?
             }
@@ -410,7 +420,7 @@ impl Common {
                         length: block_count,
                         vmo_offset: 0,
                         dev_offset: device_block,
-                        ..BlockFifoRequest::new_empty()
+                        ..EMPTY_BLOCK_FIFO_REQUEST
                     })
                     .await?;
                     temp_vmo.read(&mut slice[..to_do], 0)?;
@@ -438,7 +448,7 @@ impl Common {
                     length: self.to_blocks(length)?.try_into()?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
-                    ..BlockFifoRequest::new_empty()
+                    ..EMPTY_BLOCK_FIFO_REQUEST
                 })
                 .await?;
             }
@@ -455,7 +465,7 @@ impl Common {
                         length: block_count,
                         vmo_offset: 0,
                         dev_offset: device_block,
-                        ..BlockFifoRequest::new_empty()
+                        ..EMPTY_BLOCK_FIFO_REQUEST
                     })
                     .await?;
                     if to_do == slice.len() {
@@ -473,7 +483,7 @@ impl Common {
         self.send(BlockFifoRequest {
             opcode: BLOCK_OP_FLUSH,
             vmoid: BLOCK_VMOID_INVALID,
-            ..BlockFifoRequest::new_empty()
+            ..EMPTY_BLOCK_FIFO_REQUEST
         })
         .await
     }
@@ -715,7 +725,6 @@ mod tests {
             BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
             RemoteBlockClient, RemoteBlockClientSync,
         },
-        fidl::encoding::Decodable as _,
         fidl_fuchsia_hardware_block as block,
         fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
         fuchsia_zircon as zx,
@@ -729,6 +738,15 @@ mod tests {
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1024;
+
+    const EMPTY_BLOCK_FIFO_RESPONSE: BlockFifoResponse = BlockFifoResponse {
+        status: 0,
+        reqid: 0,
+        group: 0,
+        padding_to_satisfy_zerocopy: 0,
+        count: 0,
+        padding_to_match_request_size_and_alignment: [0; 3],
+    };
 
     pub async fn make_ramdisk() -> (RamdiskClient, block::BlockProxy, RemoteBlockClient) {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
@@ -1144,7 +1162,7 @@ mod tests {
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
                         reqid: request.reqid,
-                        ..BlockFifoResponse::new_empty()
+                        ..EMPTY_BLOCK_FIFO_RESPONSE
                     }
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;
@@ -1172,7 +1190,7 @@ mod tests {
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
                         reqid: request.reqid,
-                        ..BlockFifoResponse::new_empty()
+                        ..EMPTY_BLOCK_FIFO_RESPONSE
                     }
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;

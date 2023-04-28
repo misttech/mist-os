@@ -547,7 +547,6 @@ mod tests {
     use crate::types::tests::{other_service_definition, rfcomm_service_definition};
 
     use async_utils::PollExt;
-    use fidl::encoding::Decodable;
     use fidl::endpoints::create_proxy_and_stream;
     use futures::pin_mut;
     use futures::task::{Context, Poll};
@@ -599,7 +598,7 @@ mod tests {
             .connect_sco(
                 &mut PeerId(1).into(),
                 /*initiator=*/ true,
-                &mut vec![bredr::ScoConnectionParameters::new_empty()].into_iter(),
+                &mut vec![bredr::ScoConnectionParameters::default()].into_iter(),
                 receiver_client
             )
             .is_ok());
@@ -623,7 +622,7 @@ mod tests {
             create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
         let adv_fut = client.advertise(
             &mut services.into_iter(),
-            bredr::ChannelParameters::new_empty(),
+            bredr::ChannelParameters::default(),
             connection,
         );
         (connection_stream, adv_fut)
@@ -1188,7 +1187,7 @@ mod tests {
         let id = PeerId(123);
         let mut protocol = vec![];
         assert!(connect_client
-            .connected(&mut id.into(), bredr::Channel::new_empty(), &mut protocol.iter_mut())
+            .connected(&mut id.into(), bredr::Channel::default(), &mut protocol.iter_mut())
             .is_ok());
 
         // Run the relay fut - should still be running.

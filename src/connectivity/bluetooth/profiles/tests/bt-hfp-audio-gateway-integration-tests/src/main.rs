@@ -6,7 +6,6 @@ use {
     anyhow::format_err,
     at_commands::{self as at, SerDe},
     bitflags::bitflags,
-    fidl::encoding::Decodable,
     fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_bluetooth_hfp::HfpMarker,
     fidl_fuchsia_bluetooth_internal_a2dp::ControllerMarker,
@@ -104,7 +103,7 @@ fn hfp_hf_service_definition() -> bredr::ServiceDefinition {
             id: ATTR_ID_HFP_SUPPORTED_FEATURES,
             element: bredr::DataElement::Uint16(supported_features),
         }]),
-        ..bredr::ServiceDefinition::new_empty()
+        ..Default::default()
     }
 }
 

@@ -569,7 +569,6 @@ impl VolumesDirectory {
 mod tests {
     use {
         crate::fuchsia::{testing::open_file_checked, volumes_directory::VolumesDirectory},
-        fidl::encoding::Decodable,
         fidl::endpoints::{create_request_stream, ServerEnd},
         fidl_fuchsia_fs::AdminMarker,
         fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy},
@@ -943,7 +942,7 @@ mod tests {
                 volume_proxy
                     .mount(
                         dir_server_end,
-                        &mut MountOptions { crypt: Some(client1), ..MountOptions::new_empty() },
+                        &mut MountOptions { crypt: Some(client1), as_blob: false },
                     )
                     .await
                     .expect("mount (fidl) failed")
@@ -968,10 +967,7 @@ mod tests {
                         volume_proxy
                             .mount(
                                 dir_server_end,
-                                &mut MountOptions {
-                                    crypt: Some(client2),
-                                    ..MountOptions::new_empty()
-                                },
+                                &mut MountOptions { crypt: Some(client2), as_blob: false },
                             )
                             .await
                             .expect("mount (fidl) failed")

@@ -12,10 +12,7 @@ use crate::{
     Result, SessionId, CHANNEL_BUFFER_SIZE,
 };
 use async_utils::stream::StreamMap;
-use fidl::{
-    encoding::Decodable,
-    endpoints::{ClientEnd, ServerEnd},
-};
+use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_media::UsageReporterProxy;
 use fidl_fuchsia_media_sessions2::*;
 use futures::{
@@ -106,7 +103,7 @@ impl Discovery {
     ) -> impl Stream<Item = SessionInfoDelta> + Unpin + Send + 'static {
         self.sessions_info_stream(Filter::new(WatchOptions {
             allowed_sessions: Some(vec![session_id]),
-            ..Decodable::new_empty()
+            ..Default::default()
         }))
         .filter_map(move |(id, event)| {
             if id != session_id {
@@ -374,10 +371,7 @@ mod test {
     use super::*;
     use crate::{id::Id, spawn_log_error};
     use assert_matches::assert_matches;
-    use fidl::{
-        encoding::Decodable,
-        endpoints::{create_endpoints, create_proxy},
-    };
+    use fidl::endpoints::{create_endpoints, create_proxy};
     use fidl_fuchsia_media::UsageReporterMarker;
     use fuchsia_inspect::Inspector;
     use futures::channel::oneshot;
@@ -400,7 +394,7 @@ mod test {
         let mut watcher1 = watcher1_server.into_stream()?;
         discovery_request_sink
             .send(DiscoveryRequest::WatchSessions {
-                watch_options: Decodable::new_empty(),
+                watch_options: Default::default(),
                 session_watcher: watcher1_client,
                 control_handle: dummy_control_handle.clone(),
             })
@@ -414,7 +408,7 @@ mod test {
             player_client,
             PlayerRegistration {
                 domain: Some(String::from("test_domain://")),
-                ..Decodable::new_empty()
+                ..Default::default()
             },
             inspector.root().create_child("test_player"),
             player_published_sink,
@@ -427,7 +421,7 @@ mod test {
             .expect("Receiving a request")
             .into_watch_info_change()
             .expect("Receiving info change responder");
-        info_change_responder.send(Decodable::new_empty())?;
+        info_change_responder.send(Default::default())?;
 
         // Synchronize with the first watcher. After receiving this, we know that the service knows
         // about the player.
@@ -438,7 +432,7 @@ mod test {
         let (watcher2_client, watcher2_server) = create_endpoints::<SessionsWatcherMarker>();
         discovery_request_sink
             .send(DiscoveryRequest::WatchSessions {
-                watch_options: Decodable::new_empty(),
+                watch_options: Default::default(),
                 session_watcher: watcher2_client,
                 control_handle: dummy_control_handle.clone(),
             })

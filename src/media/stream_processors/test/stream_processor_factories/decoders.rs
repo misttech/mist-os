@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::encoding::Decodable;
 use fidl::endpoints::*;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_mediacodec::*;
@@ -32,7 +31,7 @@ impl StreamProcessorFactory for DecoderFactory {
                     input_details: Some(stream.format_details(format_details_version_ordinal)),
                     promise_separate_access_units_on_input: Some(stream.is_access_units()),
                     permit_lack_of_split_header_handling: Some(true),
-                    ..CreateDecoderParams::new_empty()
+                    ..Default::default()
                 },
                 decoder_request,
             )?;

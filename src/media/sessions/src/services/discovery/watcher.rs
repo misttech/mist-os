@@ -110,7 +110,7 @@ pub fn watcher_filter(
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::{encoding::Decodable, endpoints::create_endpoints};
+    use fidl::endpoints::create_endpoints;
     use futures::{stream, Future, SinkExt, StreamExt};
     use futures_test::task::*;
     use std::sync::Arc;
@@ -151,21 +151,21 @@ mod test {
     async fn player_filter() -> Result<()> {
         let make_event = |player_id: SessionId, is_active| {
             FilterApplicant::new(
-                WatchOptions { only_active: Some(is_active), ..Decodable::new_empty() },
-                (player_id, PlayerProxyEvent::Updated(Arc::new(|| Decodable::new_empty()))),
+                WatchOptions { only_active: Some(is_active), ..Default::default() },
+                (player_id, PlayerProxyEvent::Updated(Arc::new(|| Default::default()))),
             )
         };
 
         let mut dummy_stream =
             stream::iter((0u64..4u64).map(|i| make_event(i, false))).filter_map(watcher_filter(
-                Filter::new(WatchOptions { only_active: Some(true), ..Decodable::new_empty() }),
+                Filter::new(WatchOptions { only_active: Some(true), ..Default::default() }),
             ));
 
         assert_matches!(dummy_stream.next().await, None);
 
         let mut dummy_stream =
             stream::iter((0u64..4u64).map(|i| make_event(i, true))).filter_map(watcher_filter(
-                Filter::new(WatchOptions { only_active: Some(true), ..Decodable::new_empty() }),
+                Filter::new(WatchOptions { only_active: Some(true), ..Default::default() }),
             ));
 
         assert_matches!(dummy_stream.next().await, Some(_));

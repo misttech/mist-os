@@ -479,7 +479,7 @@ mod test {
         })
         .is_ok());
 
-        assert!(validate_test_flags(&TestCommand { ..Default::default() }).is_err());
+        assert!(validate_test_flags(&TestCommand::default()).is_err());
 
         assert!(validate_test_flags(&TestCommand {
             driver: Some("val".to_string()),
@@ -639,14 +639,14 @@ mod test {
         });
         assert_eq!(test3, "S".to_string());
 
-        let test4 = get_name(&TestCommand { ..Default::default() });
+        let test4 = get_name(&TestCommand::default());
         assert_eq!(test4, "Default Name".to_string());
     }
 
     #[test]
     fn test_parse_metadata() {
         // No path.
-        assert!(parse_metadata(&TestCommand { ..Default::default() }).is_err());
+        assert!(parse_metadata(&TestCommand::default()).is_err());
 
         // Bad path.
         assert!(parse_metadata(&TestCommand {
@@ -748,18 +748,15 @@ mod test {
                 ..Default::default()
             },
         ]);
-        let test0 = filter_tests(
-            &TestCommand { ..Default::default() },
-            &parser::TestMetadata { ..Default::default() },
-            tests.clone(),
-        );
+        let test0 =
+            filter_tests(&TestCommand::default(), &parser::TestMetadata::default(), tests.clone());
         assert!(test0.is_ok());
         let test0_val = test0.unwrap();
         assert_eq!(test0_val.len(), 2);
 
         let test1 = filter_tests(
             &TestCommand { automated_only: true, ..Default::default() },
-            &parser::TestMetadata { ..Default::default() },
+            &parser::TestMetadata::default(),
             tests.clone(),
         );
         assert!(test1.is_ok());
@@ -776,7 +773,7 @@ mod test {
 
         let test2 = filter_tests(
             &TestCommand { manual_only: true, ..Default::default() },
-            &parser::TestMetadata { ..Default::default() },
+            &parser::TestMetadata::default(),
             tests.clone(),
         );
         assert!(test2.is_ok());
@@ -803,7 +800,7 @@ mod test {
                 "fuchsia-pkg://a/b#meta/c.cm".to_string(),
             ])
             .unwrap();
-        let test0 = filter_tests(&TestCommand { ..Default::default() }, &metadata, tests0.clone());
+        let test0 = filter_tests(&TestCommand::default(), &metadata, tests0.clone());
         assert!(test0.is_ok());
         let test0_val = test0.unwrap();
         assert_eq!(test0_val.len(), 3);

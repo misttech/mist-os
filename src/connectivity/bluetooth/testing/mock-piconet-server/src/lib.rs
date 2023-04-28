@@ -4,7 +4,6 @@
 
 use anyhow::{format_err, Context, Error};
 use cm_rust::{ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget};
-use fidl::encoding::Decodable;
 use fidl::endpoints::{self as f_end, DiscoverableProtocolMarker};
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_component_test as ftest;
@@ -189,7 +188,7 @@ impl PiconetMember {
             f_end::create_request_stream().context("ConnectionReceiver creation")?;
         let _ = self.profile_svc.advertise(
             &mut service_defs.into_iter(),
-            bredr::ChannelParameters::new_empty(),
+            bredr::ChannelParameters::default(),
             connect_client,
         );
 

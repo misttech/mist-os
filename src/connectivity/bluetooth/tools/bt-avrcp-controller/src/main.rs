@@ -5,7 +5,6 @@
 use {
     anyhow::{format_err, Context as _, Error},
     argh::FromArgs,
-    fidl::encoding::Decodable as FidlDecodable,
     fidl::endpoints::create_endpoints,
     fidl_fuchsia_bluetooth_avrcp::{
         self as fidl_avrcp, AttributeRequestOption, BrowseControllerMarker, BrowseControllerProxy,
@@ -201,7 +200,7 @@ async fn set_player_application_settings<'a>(
     controller: &'a ControllerProxy,
 ) -> Result<String, Error> {
     // Send canned response to AVRCP with Equalizer off.
-    let mut settings = fidl_avrcp::PlayerApplicationSettings::new_empty();
+    let mut settings = fidl_avrcp::PlayerApplicationSettings::default();
     settings.equalizer = Some(fidl_avrcp::Equalizer::Off);
 
     match controller.set_player_application_settings(settings).await? {

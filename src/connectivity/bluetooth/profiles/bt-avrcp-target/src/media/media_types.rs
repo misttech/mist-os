@@ -546,7 +546,6 @@ impl From<Notification> for fidl_avrcp::Notification {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::encoding::Decodable as FidlDecodable;
 
     #[fuchsia::test]
     /// Tests correctness of updating and getting the playback rate from the PlaybackRate.
@@ -555,17 +554,19 @@ mod tests {
         assert_eq!(0.0, pbr.rate());
 
         let timeline_fn = TimelineFunction {
+            subject_time: 0,
+            reference_time: 0,
             subject_delta: 10,
             reference_delta: 5,
-            ..TimelineFunction::new_empty()
         };
         pbr = timeline_fn.into();
         assert_eq!(2.0, pbr.rate());
 
         let timeline_fn = TimelineFunction {
+            subject_time: 0,
+            reference_time: 0,
             subject_delta: 4,
             reference_delta: 10,
-            ..TimelineFunction::new_empty()
         };
         pbr = timeline_fn.into();
         assert_eq!(0.4, pbr.rate());
@@ -634,21 +635,26 @@ mod tests {
     fn test_media_info_update_metadata() {
         let mut info: MediaInfo = Default::default();
 
-        let mut metadata = fidl_media_types::Metadata::new_empty();
-        let mut property1 = fidl_media_types::Property::new_empty();
-        property1.label = fidl_media_types::METADATA_LABEL_TITLE.to_string();
         let sample_title = "This is a sample title".to_string();
-        property1.value = sample_title.clone();
-        let mut property2 = fidl_media_types::Property::new_empty();
-        property2.label = fidl_media_types::METADATA_LABEL_GENRE.to_string();
         let sample_genre = "Pop".to_string();
-        property2.value = sample_genre.clone();
-        // Unsupported piece of metadata, should be ignored.
-        let mut property3 = fidl_media_types::Property::new_empty();
-        property3.label = fidl_media_types::METADATA_LABEL_COMPOSER.to_string();
-        property3.value = "Bach".to_string();
+        let metadata = fidl_media_types::Metadata {
+            properties: vec![
+                fidl_media_types::Property {
+                    label: fidl_media_types::METADATA_LABEL_TITLE.to_string(),
+                    value: sample_title.clone(),
+                },
+                fidl_media_types::Property {
+                    label: fidl_media_types::METADATA_LABEL_GENRE.to_string(),
+                    value: sample_genre.clone(),
+                },
+                // Unsupported piece of metadata, should be ignored.
+                fidl_media_types::Property {
+                    label: fidl_media_types::METADATA_LABEL_COMPOSER.to_string(),
+                    value: "Bach".to_string(),
+                },
+            ],
+        };
 
-        metadata.properties = vec![property1, property2, property3];
         info.update_metadata(metadata);
         assert_eq!(Some(sample_title), info.title);
         assert_eq!(Some(sample_genre), info.genre);
@@ -660,12 +666,13 @@ mod tests {
     fn test_media_info_update_metadata_no_duration() {
         let mut info: MediaInfo = Default::default();
 
-        let mut metadata = fidl_media_types::Metadata::new_empty();
-        let mut property1 = fidl_media_types::Property::new_empty();
-        property1.label = fidl_media_types::METADATA_LABEL_TITLE.to_string();
         let sample_title = "Foobar".to_string();
-        property1.value = sample_title.clone();
-        metadata.properties = vec![property1];
+        let metadata = fidl_media_types::Metadata {
+            properties: vec![fidl_media_types::Property {
+                label: fidl_media_types::METADATA_LABEL_TITLE.to_string(),
+                value: sample_title.clone(),
+            }],
+        };
 
         info.update_media_info(None, Some(metadata));
         assert_eq!(None, info.playing_time);
@@ -682,12 +689,13 @@ mod tests {
         let duration = Some(22345678);
 
         // Create original state (metadata and random duration).
-        let mut metadata = fidl_media_types::Metadata::new_empty();
-        let mut property1 = fidl_media_types::Property::new_empty();
-        property1.label = fidl_media_types::METADATA_LABEL_TITLE.to_string();
         let sample_title = "Foobar".to_string();
-        property1.value = sample_title.clone();
-        metadata.properties = vec![property1];
+        let metadata = fidl_media_types::Metadata {
+            properties: vec![fidl_media_types::Property {
+                label: fidl_media_types::METADATA_LABEL_TITLE.to_string(),
+                value: sample_title.clone(),
+            }],
+        };
         info.update_media_info(None, Some(metadata));
         info.update_playing_time(duration);
 

@@ -96,7 +96,6 @@ mod tests {
     use crate::host_device::HostDevice;
     use {
         assert_matches::assert_matches,
-        fidl::encoding::Decodable,
         fidl_fuchsia_bluetooth_host::{HostMarker, HostRequest},
         fuchsia_bluetooth::types::{Address, HostId},
         futures::{future, join, stream::TryStreamExt},
@@ -204,7 +203,7 @@ mod tests {
         let partial_settings = sys::Settings {
             le_privacy: Some(false),
             bredr_connectable_mode: Some(false),
-            ..sys::Settings::new_empty()
+            ..Default::default()
         };
         let expected_config = Config {
             le: LeConfig { privacy_enabled: false, ..BASIC_CONFIG.le },

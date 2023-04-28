@@ -6,7 +6,6 @@
 
 use crate::{buffer_collection_constraints::*, Result};
 use anyhow::Context as _;
-use fidl::encoding::Decodable;
 use fidl::endpoints::{create_endpoints, ClientEnd, Proxy};
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem::*;
@@ -190,7 +189,7 @@ impl BufferSetFactory {
                     constraints.buffer_constraints_version_ordinal,
                 ),
                 sysmem_token: Some(codec_token),
-                ..StreamBufferPartialSettings::new_empty()
+                ..Default::default()
             },
         ))
     }

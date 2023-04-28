@@ -152,7 +152,7 @@ mod test {
     use super::*;
     use crate::CHANNEL_BUFFER_SIZE;
     use assert_matches::assert_matches;
-    use fidl::{encoding::Decodable, endpoints::create_proxy};
+    use fidl::endpoints::create_proxy;
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, future, sink::SinkExt, task::noop_waker, FutureExt};
 
@@ -175,7 +175,7 @@ mod test {
         let poll_result = Pin::new(&mut status_fut).poll(&mut ctx);
         assert_matches!(poll_result, Poll::Pending);
 
-        status_sink.send(SessionInfoDelta::new_empty()).await?;
+        status_sink.send(SessionInfoDelta::default()).await?;
         let result = status_fut.await;
         assert_matches!(result, Ok(_));
 
@@ -195,7 +195,7 @@ mod test {
         let observer = Observer::new(status_stream, responders);
         fasync::Task::spawn(observer.map(drop)).detach();
 
-        status_sink.send(SessionInfoDelta::new_empty()).await?;
+        status_sink.send(SessionInfoDelta::default()).await?;
         assert_matches!(session_control_proxy.watch_status().await, Ok(_));
 
         Ok(())

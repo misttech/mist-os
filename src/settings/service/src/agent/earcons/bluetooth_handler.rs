@@ -18,7 +18,6 @@ use crate::service;
 use crate::trace;
 
 use anyhow::{format_err, Context, Error};
-use fidl::encoding::Decodable;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_media_sessions2::{
     DiscoveryMarker, SessionsWatcherRequest, SessionsWatcherRequestStream, WatchOptions,
@@ -95,7 +94,7 @@ impl BluetoothHandler {
             .map_err(|e| format_err!("Error creating watcher request stream: {:?}", e))?;
 
         call!(discovery_proxy =>
-            watch_sessions(WatchOptions::new_empty(), watcher_client))
+            watch_sessions(WatchOptions::default(), watcher_client))
         .map_err(|e| format_err!("Unable to start discovery of MediaSessions: {:?}", e))?;
 
         self.handle_bluetooth_connections(watcher_requests);

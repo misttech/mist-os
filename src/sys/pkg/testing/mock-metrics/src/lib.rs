@@ -107,11 +107,7 @@ impl MockMetricEventLoggerFactory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        ::fidl::{encoding::Decodable as _, endpoints::create_proxy_and_stream},
-        fidl_fuchsia_metrics::ProjectSpec,
-    };
+    use {super::*, ::fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_metrics::ProjectSpec};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_metrics() {
@@ -136,7 +132,11 @@ mod tests {
         drop(factory);
         task.await;
 
-        let mut event = MetricEvent { metric_id: 42, ..MetricEvent::new_empty() };
+        let mut event = MetricEvent {
+            metric_id: 42,
+            event_codes: vec![],
+            payload: fidl::MetricEventPayload::Count(0),
+        };
         logger.log_metric_events(&mut std::iter::once(&mut event)).await.unwrap().unwrap();
         let events = mock.wait_for_at_least_n_events_with_metric_id(1, 42).await;
         assert_eq!(events, vec![event]);

@@ -342,7 +342,6 @@ pub(crate) mod tests {
     use super::*;
 
     use anyhow::{format_err, Error};
-    use fidl::encoding::Decodable as FidlDecodable;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_media_sessions2::{self as fidl_media, *};
     use fuchsia_async as fasync;
@@ -353,25 +352,26 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn create_metadata_title(title: String) -> fidl_media_types::Metadata {
-        let mut metadata = fidl_media_types::Metadata::new_empty();
-        let mut property1 = fidl_media_types::Property::new_empty();
-        property1.label = fidl_media_types::METADATA_LABEL_TITLE.to_string();
-        property1.value = title;
-        metadata.properties = vec![property1];
-        metadata
+        fidl_media_types::Metadata {
+            properties: vec![fidl_media_types::Property {
+                label: fidl_media_types::METADATA_LABEL_TITLE.to_string(),
+                value: title,
+            }],
+        }
     }
 
     pub(crate) fn create_player_status() -> fidl_media::PlayerStatus {
         let mut player_status = fidl_media::PlayerStatus::EMPTY;
 
-        let mut timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        // Playback started at beginning of media.
-        timeline_fn.subject_time = 0;
-        // Monotonic clock time at beginning of media (nanos).
-        timeline_fn.reference_time = 500000000;
-        // Playback rate = 1, normal playback.
-        timeline_fn.subject_delta = 1;
-        timeline_fn.reference_delta = 1;
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            // Playback started at beginning of media.
+            subject_time: 0,
+            // Monotonic clock time at beginning of media (nanos).
+            reference_time: 500000000,
+            // Playback rate = 1, normal playback.
+            subject_delta: 1,
+            reference_delta: 1,
+        };
 
         player_status.player_state = Some(fidl_media::PlayerState::Playing);
         player_status.duration = Some(123456789);

@@ -294,7 +294,6 @@ mod tests {
     use assert_matches::assert_matches;
     use async_utils::PollExt;
     use bt_rfcomm::{frame::mux_commands::*, frame::*, Role, DLCI};
-    use fidl::encoding::Decodable;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_bluetooth_bredr::ConnectionReceiverMarker;
     use fuchsia_async as fasync;
@@ -507,8 +506,10 @@ mod tests {
         let (profile, mut profile_server) =
             create_proxy_and_stream::<bredr::ProfileMarker>().unwrap();
         let mut profile_stream = Box::pin(profile_server.next());
-        let connect_request =
-            profile.connect(&mut id.into(), &mut bredr::ConnectParameters::new_empty());
+        let connect_request = profile.connect(
+            &mut id.into(),
+            &mut bredr::ConnectParameters::L2cap(bredr::L2capParameters::default()),
+        );
         let responder = match exec.run_until_stalled(&mut profile_stream) {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Connect { responder, .. }))) => responder,
             x => panic!("Expected ready connect request but got: {:?}", x),

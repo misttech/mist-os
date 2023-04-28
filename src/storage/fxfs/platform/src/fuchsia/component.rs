@@ -455,12 +455,11 @@ impl Component {
 mod tests {
     use {
         super::{new_block_client, Component},
-        fidl::{
-            encoding::Decodable,
-            endpoints::{Proxy, ServerEnd},
-        },
+        fidl::endpoints::{Proxy, ServerEnd},
         fidl_fuchsia_fs::AdminMarker,
-        fidl_fuchsia_fs_startup::{StartOptions, StartupMarker},
+        fidl_fuchsia_fs_startup::{
+            CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
+        },
         fidl_fuchsia_fxfs::VolumesMarker,
         fidl_fuchsia_io as fio,
         fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy},
@@ -527,7 +526,14 @@ mod tests {
             startup_proxy
                 .start(
                     ramdisk.open().await.expect("Unable to open ramdisk").into(),
-                    &mut StartOptions::new_empty(),
+                    &mut StartOptions {
+                        read_only: false,
+                        verbose: false,
+                        fsck_after_every_transaction: false,
+                        write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                        write_compression_level: 0,
+                        cache_eviction_policy_override: EvictionPolicyOverride::None,
+                    },
                 )
                 .await
                 .expect("Start failed (FIDL)")
