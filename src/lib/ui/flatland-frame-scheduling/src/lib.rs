@@ -56,7 +56,7 @@ impl From<PresentParameters> for flatland::PresentArgs {
         flatland::PresentArgs {
             requested_presentation_time: Some(item.requested_presentation_time.into_nanos()),
             unsquashable: Some(item.unsquashable),
-            ..flatland::PresentArgs::EMPTY
+            ..Default::default()
         }
     }
 }

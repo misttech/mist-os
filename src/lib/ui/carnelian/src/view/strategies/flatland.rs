@@ -127,7 +127,7 @@ impl Plumber {
         let args = flatland::RegisterBufferCollectionArgs {
             export_token: Some(buffer_tokens.export_token),
             buffer_collection_token: Some(sysmem_buffer_collection_token),
-            ..flatland::RegisterBufferCollectionArgs::EMPTY
+            ..Default::default()
         };
 
         allocator
@@ -152,7 +152,7 @@ impl Plumber {
             image_indexes.insert(image_id as u64, uindex);
             let image_props = flatland::ImageProperties {
                 size: Some(fidl_fuchsia_math::SizeU { width: size.width, height: size.height }),
-                ..flatland::ImageProperties::EMPTY
+                ..Default::default()
             };
             let mut flatland_image_id = flatland::ContentId { value: image_id as u64 };
             let mut import_token = duplicate_import_token(&buffer_tokens.import_token)?;
@@ -302,7 +302,7 @@ impl FlatlandViewStrategy {
         if input {
             let mut view_identity =
                 fidl_fuchsia_ui_views::ViewIdentityOnCreation::from(viewref_pair);
-            let mut view_bound_protocols = flatland::ViewBoundProtocols::EMPTY;
+            let mut view_bound_protocols = flatland::ViewBoundProtocols::default();
 
             let (touch_client, touch_server) = create_endpoints();
             let (mouse_client, mouse_server) = create_endpoints();
@@ -338,7 +338,7 @@ impl FlatlandViewStrategy {
                                     response_type: event.pointer_sample.as_ref().and_then(|_| {
                                         Some(fidl_fuchsia_ui_pointer::TouchResponseType::Yes)
                                     }),
-                                    ..fidl_fuchsia_ui_pointer::TouchResponse::EMPTY
+                                    ..Default::default()
                                 })
                                 .collect();
                             touch_sender
@@ -481,7 +481,7 @@ impl FlatlandViewStrategy {
                 acquire_fences: None,
                 release_fences: release_event.and_then(|release_event| Some(vec![release_event])),
                 unsquashable: Some(true),
-                ..flatland::PresentArgs::EMPTY
+                ..Default::default()
             })
             .expect("present error");
     }

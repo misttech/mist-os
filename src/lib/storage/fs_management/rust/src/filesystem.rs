@@ -149,14 +149,14 @@ impl Filesystem {
                     name: Some(name.clone()),
                     url: Some(format!("#meta/{}.cm", component_name)),
                     startup: Some(fdecl::StartupMode::Lazy),
-                    ..fdecl::Child::EMPTY
+                    ..Default::default()
                 };
                 // Launch a new component in our collection.
                 realm_proxy
                     .create_child(
                         &mut collection_ref,
                         child_decl,
-                        fcomponent::CreateChildArgs::EMPTY,
+                        fcomponent::CreateChildArgs::default(),
                     )
                     .await?
                     .map_err(|e| anyhow!("create_child failed: {:?}", e))?;

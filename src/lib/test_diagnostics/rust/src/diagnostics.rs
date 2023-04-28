@@ -384,7 +384,7 @@ mod tests {
                                         data: json_data,
                                         truncated_chars: 0,
                                     })),
-                                    ..ArchiveIteratorEntry::EMPTY
+                                    ..Default::default()
                                 };
                                 responder.send(&mut Ok(vec![result])).expect("send response");
                             }
@@ -394,7 +394,7 @@ mod tests {
                                     .expect("create async socket");
                                 let response = ArchiveIteratorEntry {
                                     diagnostics_data: Some(DiagnosticsData::Socket(socket)),
-                                    ..ArchiveIteratorEntry::EMPTY
+                                    ..Default::default()
                                 };
                                 responder.send(&mut Ok(vec![response])).expect("send response");
                                 tx_socket
@@ -476,7 +476,7 @@ mod tests {
                         data: "data".to_string(),
                         truncated_chars: 0,
                     })),
-                    ..ArchiveIteratorEntry::EMPTY
+                    ..Default::default()
                 }]))
                 .unwrap();
             // Send an empty response, which shuts down the pending task.

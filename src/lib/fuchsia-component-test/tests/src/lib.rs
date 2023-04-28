@@ -605,9 +605,9 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
                                 startup: Some(fcdecl::StartupMode::Lazy),
                                 environment: None,
                                 on_terminate: None,
-                                ..fcdecl::Child::EMPTY
+                                ..Default::default()
                             },
-                            fcomponent::CreateChildArgs::EMPTY,
+                            fcomponent::CreateChildArgs::default(),
                         )
                         .await?
                         .expect("failed to create child");

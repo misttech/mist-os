@@ -148,7 +148,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn default_filter_is_info_when_unspecified() {
         let (proxy, _requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let (filter, _on_changes) = InterestFilter::new(proxy, Interest::EMPTY, false);
+        let (filter, _on_changes) = InterestFilter::new(proxy, Interest::default(), false);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
         tracing::subscriber::set_global_default(
             Registry::default().with(SeverityTracker { counts: observed.clone() }).with(filter),
@@ -179,7 +179,7 @@ mod tests {
         match stream.try_next().await {
             Ok(Some(LogSinkRequest::WaitForInterestChange { responder })) => {
                 responder
-                    .send(&mut Ok(Interest { min_severity: severity, ..Interest::EMPTY }))
+                    .send(&mut Ok(Interest { min_severity: severity, ..Default::default() }))
                     .expect("send response");
             }
             other => panic!("Expected WaitForInterestChange but got {:?}", other),
@@ -191,7 +191,7 @@ mod tests {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
         let (filter, on_changes) = InterestFilter::new(
             proxy,
-            Interest { min_severity: Some(Severity::Warn), ..Interest::EMPTY },
+            Interest { min_severity: Some(Severity::Warn), ..Default::default() },
             false,
         );
         let (send, mut recv) = mpsc::unbounded();
@@ -255,7 +255,7 @@ mod tests {
         let t = std::thread::spawn(move || {
             // Unused, but its existence is needed by AsyncChannel.
             let _executor = fuchsia_async::LocalExecutor::new();
-            let (filter, _on_changes) = InterestFilter::new(proxy, Interest::EMPTY, true);
+            let (filter, _on_changes) = InterestFilter::new(proxy, Interest::default(), true);
             filter
         });
         if let Some(Ok(request)) = requests.next().await {
@@ -264,7 +264,7 @@ mod tests {
                     responder
                         .send(&mut Ok(Interest {
                             min_severity: Some(Severity::Trace),
-                            ..Interest::EMPTY
+                            ..Default::default()
                         }))
                         .expect("sent initial interest");
                 }

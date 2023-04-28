@@ -745,7 +745,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 responder.send(fio::FileInfo {
                     stream,
                     observer: self.file.event()?,
-                    ..fio::FileInfo::EMPTY
+                    ..Default::default()
                 })?;
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
@@ -755,10 +755,8 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 if !self.flags.contains(fio::OpenFlags::NODE_REFERENCE) {
                     rights |= io2_conversions::io1_to_io2(self.flags);
                 }
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(rights),
-                    ..fio::ConnectionInfo::EMPTY
-                })?;
+                responder
+                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
             }
             fio::FileRequest::Sync { responder } => {
                 fuchsia_trace::duration!("storage", "File::Sync");
@@ -1444,7 +1442,7 @@ mod tests {
                 );
             }
             Some(fio::FileEvent::OnRepresentation { payload }) => {
-                assert_eq!(payload, fio::Representation::File(fio::FileInfo::EMPTY));
+                assert_eq!(payload, fio::Representation::File(fio::FileInfo::default()));
             }
             e => panic!("Expected OnOpen event with fio::NodeInfoDeprecated::File, got {:?}", e),
         }

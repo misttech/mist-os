@@ -57,7 +57,7 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
                                 range: Range { min: 0, max: i64::from(height) },
                                 unit: Unit { type_: UnitType::Other, exponent: 0 },
                             }),
-                            ..ContactInputDescriptor::EMPTY
+                            ..Default::default()
                         })
                         .take(
                             usize::try_from(TOUCH_MAX_CONTACTS)
@@ -68,11 +68,11 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
                     max_contacts: Some(TOUCH_MAX_CONTACTS),
                     touch_type: Some(TouchType::Touchscreen),
                     buttons: Some(vec![]),
-                    ..TouchInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..TouchDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 
@@ -93,11 +93,11 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
             keyboard: Some(KeyboardDescriptor {
                 input: Some(KeyboardInputDescriptor {
                     keys3: Some(all_keys.clone()),
-                    ..KeyboardInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..KeyboardDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 
@@ -116,11 +116,11 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
                         ConsumerControlButton::Reboot,
                         ConsumerControlButton::CameraDisable,
                     ]),
-                    ..ConsumerControlInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..ConsumerControlDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 
@@ -156,11 +156,11 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
                     buttons: Some(vec![0, 1, 2]),
                     position_x: None,
                     position_y: None,
-                    ..MouseInputDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..MouseDescriptor::EMPTY
+                ..Default::default()
             }),
-            ..DeviceDescriptor::EMPTY
+            ..Default::default()
         })
     }
 }

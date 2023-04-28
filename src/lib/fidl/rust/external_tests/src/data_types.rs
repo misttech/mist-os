@@ -169,9 +169,9 @@ fn flexible_resource_union() {
 
 #[test]
 fn value_table() {
-    assert_matches!(ValueRecord::EMPTY, ValueRecord { name: None, age: None, .. });
+    assert_matches!(ValueRecord::default(), ValueRecord { name: None, age: None, .. });
 
-    let table = ValueRecord { age: Some(30), ..ValueRecord::EMPTY };
+    let table = ValueRecord { age: Some(30), ..Default::default() };
     assert_eq!(table.name, None);
     assert_eq!(table.age, Some(30));
 
@@ -183,9 +183,9 @@ fn value_table() {
 
 #[test]
 fn resource_table() {
-    assert_matches!(ResourceRecord::EMPTY, ResourceRecord { name: None, age: None, .. });
+    assert_matches!(ResourceRecord::default(), ResourceRecord { name: None, age: None, .. });
 
-    let table = ResourceRecord { age: Some(30), ..ResourceRecord::EMPTY };
+    let table = ResourceRecord { age: Some(30), ..Default::default() };
     assert_eq!(table.name, None);
     assert_eq!(table.age, Some(30));
 

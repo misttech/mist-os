@@ -36,7 +36,7 @@ fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
                         let () = responder
                             .send(fposix_socket::StreamSocketDescribeResponse {
                                 socket: Some(s0),
-                                ..fposix_socket::StreamSocketDescribeResponse::EMPTY
+                                ..Default::default()
                             })
                             .expect("send Describe response");
                     }

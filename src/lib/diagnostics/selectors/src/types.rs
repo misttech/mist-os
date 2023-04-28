@@ -187,7 +187,7 @@ impl Into<fdiagnostics::Selector> for Selector<'_> {
         fdiagnostics::Selector {
             component_selector: Some(self.component.into()),
             tree_selector: Some(self.tree.into()),
-            ..fdiagnostics::Selector::EMPTY // TODO(fxbug.dev/55118): add metadata.
+            ..Default::default() // TODO(fxbug.dev/55118): add metadata.
         }
     }
 }
@@ -198,7 +198,7 @@ impl Into<fdiagnostics::ComponentSelector> for ComponentSelector<'_> {
             moniker_segments: Some(
                 self.segments.into_iter().map(|segment| segment.into()).collect(),
             ),
-            ..fdiagnostics::ComponentSelector::EMPTY
+            ..Default::default()
         }
     }
 }

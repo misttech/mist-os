@@ -273,7 +273,7 @@ mod tests {
                     value: Some(Box::new(fdata::DictionaryValue::Str(local_component_id))),
                 },
             ]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         };
 
         let (_controller_client_end, controller_server_end) =
@@ -290,7 +290,7 @@ mod tests {
                     ns: Some(vec![]),
                     outgoing_dir: Some(outgoing_dir_server_end),
                     runtime_dir: Some(runtime_dir_server_end),
-                    ..fcrunner::ComponentStartInfo::EMPTY
+                    ..Default::default()
                 },
                 controller_server_end,
             )
@@ -312,7 +312,7 @@ mod tests {
                             value: Some(Box::new(fdata::DictionaryValue::Str("rule!".to_string()))),
                         },
                     ]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 })
         );
     }
@@ -348,7 +348,7 @@ mod tests {
                 key: LOCAL_COMPONENT_ID_KEY.to_string(),
                 value: Some(Box::new(fdata::DictionaryValue::Str(local_component_id))),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         };
 
         let (_controller_client_end, controller_server_end) =
@@ -365,7 +365,7 @@ mod tests {
                     ns: Some(vec![]),
                     outgoing_dir: Some(outgoing_dir_server_end),
                     runtime_dir: Some(runtime_dir_server_end),
-                    ..fcrunner::ComponentStartInfo::EMPTY
+                    ..Default::default()
                 },
                 controller_server_end,
             )

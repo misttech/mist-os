@@ -43,7 +43,7 @@ pub struct PublisherOptions<'t> {
 impl<'t> Default for PublisherOptions<'t> {
     fn default() -> Self {
         Self {
-            interest: Interest::EMPTY,
+            interest: Interest::default(),
             listen_for_interest_updates: true,
             log_sink_proxy: None,
             metatags: HashSet::new(),
@@ -62,7 +62,7 @@ impl PublisherOptions<'_> {
     /// configuration that is desired in most scenarios.
     pub fn empty() -> Self {
         Self {
-            interest: Interest::EMPTY,
+            interest: Interest::default(),
             metatags: HashSet::new(),
             tags: &[],
             wait_for_initial_interest: false,

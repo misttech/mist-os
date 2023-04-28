@@ -42,7 +42,7 @@ pub struct PublisherOptions<'t> {
 impl<'t> Default for PublisherOptions<'t> {
     fn default() -> Self {
         Self {
-            interest: Interest::EMPTY,
+            interest: Interest::default(),
             metatags: HashSet::new(),
             tags: &[],
             _lifetime: PhantomData,

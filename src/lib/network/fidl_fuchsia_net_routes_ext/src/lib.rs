@@ -81,10 +81,7 @@ impl From<SpecifiedRouteProperties> for fnet_routes::SpecifiedRouteProperties {
         specified_properties: SpecifiedRouteProperties,
     ) -> fnet_routes::SpecifiedRouteProperties {
         let SpecifiedRouteProperties { metric } = specified_properties;
-        fnet_routes::SpecifiedRouteProperties {
-            metric: Some(metric),
-            ..fnet_routes::SpecifiedRouteProperties::EMPTY
-        }
+        fnet_routes::SpecifiedRouteProperties { metric: Some(metric), ..Default::default() }
     }
 }
 
@@ -114,10 +111,7 @@ impl From<EffectiveRouteProperties> for fnet_routes::EffectiveRouteProperties {
         effective_properties: EffectiveRouteProperties,
     ) -> fnet_routes::EffectiveRouteProperties {
         let EffectiveRouteProperties { metric } = effective_properties;
-        fnet_routes::EffectiveRouteProperties {
-            metric: Some(metric),
-            ..fnet_routes::EffectiveRouteProperties::EMPTY
-        }
+        fnet_routes::EffectiveRouteProperties { metric: Some(metric), ..Default::default() }
     }
 }
 
@@ -162,7 +156,7 @@ impl From<RouteProperties> for fnet_routes::RoutePropertiesV4 {
         let RouteProperties { specified_properties } = properties;
         fnet_routes::RoutePropertiesV4 {
             specified_properties: Some(specified_properties.into()),
-            ..fnet_routes::RoutePropertiesV4::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -172,7 +166,7 @@ impl From<RouteProperties> for fnet_routes::RoutePropertiesV6 {
         let RouteProperties { specified_properties } = properties;
         fnet_routes::RoutePropertiesV6 {
             specified_properties: Some(specified_properties.into()),
-            ..fnet_routes::RoutePropertiesV6::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -433,7 +427,7 @@ impl TryFrom<InstalledRoute<Ipv4>> for fnet_routes::InstalledRouteV4 {
         Ok(fnet_routes::InstalledRouteV4 {
             route: Some(route.try_into()?),
             effective_properties: Some(effective_properties.into()),
-            ..fnet_routes::InstalledRouteV4::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -445,7 +439,7 @@ impl TryFrom<InstalledRoute<Ipv6>> for fnet_routes::InstalledRouteV6 {
         Ok(fnet_routes::InstalledRouteV6 {
             route: Some(route.try_into()?),
             effective_properties: Some(effective_properties.into()),
-            ..fnet_routes::InstalledRouteV6::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -594,13 +588,13 @@ pub fn get_watcher<I: FidlRouteIpExt>(
         |GetWatcherInputs { watcher_server_end, state_proxy }| {
             IpInvariant(
                 state_proxy
-                    .get_watcher_v4(watcher_server_end, fnet_routes::WatcherOptionsV4::EMPTY),
+                    .get_watcher_v4(watcher_server_end, fnet_routes::WatcherOptionsV4::default()),
             )
         },
         |GetWatcherInputs { watcher_server_end, state_proxy }| {
             IpInvariant(
                 state_proxy
-                    .get_watcher_v6(watcher_server_end, fnet_routes::WatcherOptionsV6::EMPTY),
+                    .get_watcher_v6(watcher_server_end, fnet_routes::WatcherOptionsV6::default()),
             )
         },
     );
@@ -808,17 +802,14 @@ mod tests {
         fn arbitrary_test_value() -> Self {
             fnet_routes::SpecifiedRouteProperties {
                 metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(0)),
-                ..fnet_routes::SpecifiedRouteProperties::EMPTY
+                ..Default::default()
             }
         }
     }
 
     impl ArbitraryTestValue for fnet_routes::EffectiveRouteProperties {
         fn arbitrary_test_value() -> Self {
-            fnet_routes::EffectiveRouteProperties {
-                metric: Some(0),
-                ..fnet_routes::EffectiveRouteProperties::EMPTY
-            }
+            fnet_routes::EffectiveRouteProperties { metric: Some(0), ..Default::default() }
         }
     }
 
@@ -828,7 +819,7 @@ mod tests {
                 specified_properties: Some(
                     fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
                 ),
-                ..fnet_routes::RoutePropertiesV4::EMPTY
+                ..Default::default()
             }
         }
     }
@@ -839,7 +830,7 @@ mod tests {
                 specified_properties: Some(
                     fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
                 ),
-                ..fnet_routes::RoutePropertiesV6::EMPTY
+                ..Default::default()
             }
         }
     }
@@ -895,7 +886,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                ..fnet_routes::InstalledRouteV4::EMPTY
+                ..Default::default()
             }
         }
     }
@@ -907,7 +898,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                ..fnet_routes::InstalledRouteV6::EMPTY
+                ..Default::default()
             }
         }
     }
@@ -915,7 +906,7 @@ mod tests {
     #[test]
     fn specified_route_properties_try_from_unset_metric() {
         assert_eq!(
-            SpecifiedRouteProperties::try_from(fnet_routes::SpecifiedRouteProperties::EMPTY),
+            SpecifiedRouteProperties::try_from(fnet_routes::SpecifiedRouteProperties::default()),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/SpecifiedRouteProperties.metric",
             ))
@@ -926,7 +917,7 @@ mod tests {
     fn specified_route_properties_try_from() {
         let fidl_type = fnet_routes::SpecifiedRouteProperties {
             metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(1)),
-            ..fnet_routes::SpecifiedRouteProperties::EMPTY
+            ..Default::default()
         };
         let local_type =
             SpecifiedRouteProperties { metric: fnet_routes::SpecifiedMetric::ExplicitMetric(1) };
@@ -942,7 +933,7 @@ mod tests {
     #[test]
     fn effective_route_properties_try_from_unset_metric() {
         assert_eq!(
-            EffectiveRouteProperties::try_from(fnet_routes::EffectiveRouteProperties::EMPTY),
+            EffectiveRouteProperties::try_from(fnet_routes::EffectiveRouteProperties::default()),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/EffectiveRouteProperties.metric",
             ))
@@ -951,10 +942,8 @@ mod tests {
 
     #[test]
     fn effective_route_properties_try_from() {
-        let fidl_type = fnet_routes::EffectiveRouteProperties {
-            metric: Some(1),
-            ..fnet_routes::EffectiveRouteProperties::EMPTY
-        };
+        let fidl_type =
+            fnet_routes::EffectiveRouteProperties { metric: Some(1), ..Default::default() };
         let local_type = EffectiveRouteProperties { metric: 1 };
         assert_eq!(fidl_type.clone().try_into(), Ok(EffectiveRouteProperties { metric: 1 }));
         assert_eq!(
@@ -968,7 +957,7 @@ mod tests {
     #[test]
     fn route_properties_try_from_unset_specified_properties_v4() {
         assert_eq!(
-            RouteProperties::try_from(fnet_routes::RoutePropertiesV4::EMPTY),
+            RouteProperties::try_from(fnet_routes::RoutePropertiesV4::default()),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/RoutePropertiesV4.specified_properties"
             ))
@@ -978,7 +967,7 @@ mod tests {
     #[test]
     fn route_properties_try_from_unset_specified_properties_v6() {
         assert_eq!(
-            RouteProperties::try_from(fnet_routes::RoutePropertiesV6::EMPTY),
+            RouteProperties::try_from(fnet_routes::RoutePropertiesV6::default()),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/RoutePropertiesV6.specified_properties"
             ))
@@ -991,7 +980,7 @@ mod tests {
             specified_properties: Some(
                 fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
             ),
-            ..fnet_routes::RoutePropertiesV4::EMPTY
+            ..Default::default()
         };
         let local_type = RouteProperties {
             specified_properties: fnet_routes::SpecifiedRouteProperties::arbitrary_test_value()
@@ -1013,7 +1002,7 @@ mod tests {
             specified_properties: Some(
                 fnet_routes::SpecifiedRouteProperties::arbitrary_test_value(),
             ),
-            ..fnet_routes::RoutePropertiesV6::EMPTY
+            ..Default::default()
         };
         let local_type = RouteProperties {
             specified_properties: fnet_routes::SpecifiedRouteProperties::arbitrary_test_value()
@@ -1210,7 +1199,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                ..fnet_routes::InstalledRouteV4::EMPTY
+                ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/InstalledRouteV4.route"
@@ -1226,7 +1215,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                ..fnet_routes::InstalledRouteV6::EMPTY
+                ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/InstalledRouteV6.route"
@@ -1240,7 +1229,7 @@ mod tests {
             InstalledRoute::try_from(fnet_routes::InstalledRouteV4 {
                 route: Some(fnet_routes::RouteV4::arbitrary_test_value()),
                 effective_properties: None,
-                ..fnet_routes::InstalledRouteV4::EMPTY
+                ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/InstalledRouteV4.effective_properties"
@@ -1254,7 +1243,7 @@ mod tests {
             InstalledRoute::try_from(fnet_routes::InstalledRouteV6 {
                 route: Some(fnet_routes::RouteV6::arbitrary_test_value()),
                 effective_properties: None,
-                ..fnet_routes::InstalledRouteV6::EMPTY
+                ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(
                 "fuchsia.net.routes/InstalledRouteV6.effective_properties"
@@ -1269,7 +1258,7 @@ mod tests {
             effective_properties: Some(
                 fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
             ),
-            ..fnet_routes::InstalledRouteV4::EMPTY
+            ..Default::default()
         };
         let local_type = InstalledRoute {
             route: fnet_routes::RouteV4::arbitrary_test_value().try_into().unwrap(),
@@ -1288,7 +1277,7 @@ mod tests {
             effective_properties: Some(
                 fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
             ),
-            ..fnet_routes::InstalledRouteV6::EMPTY
+            ..Default::default()
         };
         let local_type = InstalledRoute {
             route: fnet_routes::RouteV6::arbitrary_test_value().try_into().unwrap(),

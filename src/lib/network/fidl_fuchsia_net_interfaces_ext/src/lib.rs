@@ -499,7 +499,7 @@ pub fn event_stream_from_state(
                     fnet_interfaces::AddressPropertiesInterest::VALID_UNTIL
                         | fnet_interfaces::AddressPropertiesInterest::PREFERRED_LIFETIME_INFO,
                 ),
-                ..fnet_interfaces::WatcherOptions::EMPTY
+                ..Default::default()
             },
             server,
         )
@@ -528,7 +528,7 @@ mod tests {
             has_default_ipv4_route: Some(false),
             has_default_ipv6_route: Some(false),
             addresses: Some(vec![fidl_address(ADDR, zx::ZX_TIME_INFINITE)]),
-            ..fnet_interfaces::Properties::EMPTY
+            ..Default::default()
         }
     }
 
@@ -545,7 +545,7 @@ mod tests {
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
             addresses: Some(vec![fidl_address(ADDR2, zx::ZX_TIME_INFINITE)]),
-            ..fnet_interfaces::Properties::EMPTY
+            ..Default::default()
         }
     }
 
@@ -558,7 +558,7 @@ mod tests {
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
             addresses: Some(vec![fidl_address(ADDR2, zx::ZX_TIME_INFINITE)]),
-            ..fnet_interfaces::Properties::EMPTY
+            ..Default::default()
         }
     }
 
@@ -570,7 +570,7 @@ mod tests {
         fnet_interfaces::Address {
             addr: Some(addr),
             valid_until: Some(valid_until),
-            ..fnet_interfaces::Address::EMPTY
+            ..Default::default()
         }
     }
 
@@ -599,11 +599,8 @@ mod tests {
     #[test_case(&mut HashMap::new(); "hashmap")]
     #[test_case(&mut InterfaceState::Unknown(ID); "interface_state_unknown")]
     fn test_unknown_error(state: &mut impl Update) {
-        let unknown = fnet_interfaces::Properties {
-            id: Some(ID),
-            online: Some(true),
-            ..fnet_interfaces::Properties::EMPTY
-        };
+        let unknown =
+            fnet_interfaces::Properties { id: Some(ID), online: Some(true), ..Default::default() };
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Changed(unknown.clone())),
             Err(UpdateError::UnknownChanged(changed)) if changed == unknown
@@ -628,10 +625,7 @@ mod tests {
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
     fn test_missing_id_error(state: &mut impl Update) {
-        let missing_id = fnet_interfaces::Properties {
-            online: Some(true),
-            ..fnet_interfaces::Properties::EMPTY
-        };
+        let missing_id = fnet_interfaces::Properties { online: Some(true), ..Default::default() };
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Changed(missing_id.clone())),
             Err(UpdateError::MissingId(properties)) if properties == missing_id
@@ -645,8 +639,7 @@ mod tests {
     #[test_case(&mut InterfaceState::Known(validated_properties(ID)); "interface_state_known")]
     #[test_case(&mut validated_properties(ID); "properties")]
     fn test_empty_change_error(state: &mut impl Update) {
-        let empty_change =
-            fnet_interfaces::Properties { id: Some(ID), ..fnet_interfaces::Properties::EMPTY };
+        let empty_change = fnet_interfaces::Properties { id: Some(ID), ..Default::default() };
         let net_zero_change =
             fnet_interfaces::Properties { name: None, device_class: None, ..fidl_properties(ID) };
         assert_matches::assert_matches!(
@@ -671,7 +664,7 @@ mod tests {
             has_default_ipv4_route: Some(false),
             has_default_ipv6_route: Some(false),
             addresses: Some(vec![fidl_address(ADDR, zx::ZX_TIME_INFINITE)]),
-            ..fnet_interfaces::Properties::EMPTY
+            ..Default::default()
         };
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Changed(properties_delta(ID).clone())),

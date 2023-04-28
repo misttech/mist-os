@@ -136,10 +136,7 @@ impl ExpectationsComparer {
         }
 
         case_listener_proxy
-            .finished(fidl_fuchsia_test::Result_ {
-                status: Some(status),
-                ..fidl_fuchsia_test::Result_::EMPTY
-            })
+            .finished(fidl_fuchsia_test::Result_ { status: Some(status), ..Default::default() })
             .context("case listener proxy fidl error")?;
 
         Ok(expectation_error.map(|err| (invocation, err)))
@@ -169,14 +166,14 @@ impl ExpectationsComparer {
             listener_proxy
                 .on_test_case_started(
                     invocation,
-                    fidl_fuchsia_test::StdHandles::EMPTY,
+                    fidl_fuchsia_test::StdHandles::default(),
                     case_listener_server_end,
                 )
                 .context("error while telling run listener that a skipped test case had started")?;
             case_listener_proxy
                 .finished(fidl_fuchsia_test::Result_ {
                     status: Some(fidl_fuchsia_test::Status::Skipped),
-                    ..fidl_fuchsia_test::Result_::EMPTY
+                    ..Default::default()
                 })
                 .context(
                     "error while telling run listener that a skipped test case had finished",

@@ -160,27 +160,27 @@ mod tests {
                 fnet_interfaces::Address {
                     addr: Some(IPV4_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
-                    ..fnet_interfaces::Address::EMPTY
+                    ..Default::default()
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV4_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
-                    ..fnet_interfaces::Address::EMPTY
+                    ..Default::default()
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
-                    ..fnet_interfaces::Address::EMPTY
+                    ..Default::default()
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
-                    ..fnet_interfaces::Address::EMPTY
+                    ..Default::default()
                 },
             ]),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
-            ..fnet_interfaces::Properties::EMPTY
+            ..Default::default()
         }
     }
 
@@ -270,7 +270,7 @@ mod tests {
                 fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
                     id: Some(2),
                     online: Some(false),
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 Some(false),
             ),
@@ -278,7 +278,7 @@ mod tests {
                 fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
                     id: Some(1),
                     online: Some(true),
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 Some(true),
             ),
@@ -286,7 +286,7 @@ mod tests {
                 fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
                     id: Some(3),
                     online: Some(true),
-                    ..fnet_interfaces::Properties::EMPTY
+                    ..Default::default()
                 }),
                 None,
             ),

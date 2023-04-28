@@ -454,13 +454,13 @@ mod tests {
                             key: ftest::LOCAL_COMPONENT_NAME_KEY.to_string(),
                             value: Some(Box::new(fdata::DictionaryValue::Str(component_to_start))),
                         }]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     }),
                     ns: Some(vec![]),
                     outgoing_dir: Some(outgoing_dir_server_end),
                     runtime_dir: Some(runtime_dir_server_end),
                     numbered_handles: Some(vec![]),
-                    ..fcrunner::ComponentStartInfo::EMPTY
+                    ..Default::default()
                 },
                 controller_server_end,
             )

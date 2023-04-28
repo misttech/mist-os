@@ -791,7 +791,7 @@ mod tests {
             'a' as u32,
             US_DVORAK.hid_usage_to_code_point(
                 HID_USAGE_KEY_A,
-                &ModifierState { ..Default::default() },
+                &ModifierState::default(),
                 &LockStateKeys::new(),
             )?
         );

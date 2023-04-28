@@ -168,7 +168,7 @@ pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector
     };
     Ok(LogInterestSelector {
         selector,
-        interest: Interest { min_severity: Some(min_severity), ..Interest::EMPTY },
+        interest: Interest { min_severity: Some(min_severity), ..Default::default() },
     })
 }
 
@@ -181,9 +181,9 @@ pub fn parse_log_interest_selector_or_severity(
         return Ok(LogInterestSelector {
             selector: ComponentSelector {
                 moniker_segments: Some(vec![StringSelector::StringPattern("**".into())]),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             },
-            interest: Interest { min_severity: Some(min_severity), ..Interest::EMPTY },
+            interest: Interest { min_severity: Some(min_severity), ..Default::default() },
         });
     }
     parse_log_interest_selector(selector)
@@ -809,12 +809,12 @@ a:b:c
         let selector = Selector {
             component_selector: Some(ComponentSelector {
                 moniker_segments: Some(vec![StringSelector::ExactMatch("a".to_string())]),
-                ..ComponentSelector::EMPTY
+                ..Default::default()
             }),
             tree_selector: Some(TreeSelector::SubtreeSelector(SubtreeSelector {
                 node_path: vec![StringSelector::ExactMatch("a*:".to_string())],
             })),
-            ..Selector::EMPTY
+            ..Default::default()
         };
 
         // Check we generate the expected string with escaping.
@@ -853,7 +853,7 @@ a:b:c
             Selector {
                 component_selector: Some(ComponentSelector {
                     moniker_segments: Some(vec![StringSelector::ExactMatch("foo".into()),]),
-                    ..ComponentSelector::EMPTY
+                    ..Default::default()
                 }),
                 tree_selector: Some(TreeSelector::PropertySelector(PropertySelector {
                     node_path: vec![
@@ -862,7 +862,7 @@ a:b:c
                     ],
                     target_properties: StringSelector::ExactMatch("quux".into())
                 })),
-                ..Selector::EMPTY
+                ..Default::default()
             }
         );
     }
@@ -904,14 +904,14 @@ a:b:c
             parse_log_interest_selector("core/network#FATAL").unwrap(),
             LogInterestSelector {
                 selector: parse_component_selector::<VerboseError>("core/network").unwrap(),
-                interest: Interest { min_severity: Some(Severity::Fatal), ..Interest::EMPTY }
+                interest: Interest { min_severity: Some(Severity::Fatal), ..Default::default() }
             }
         );
         assert_eq!(
             parse_log_interest_selector("any/component#INFO").unwrap(),
             LogInterestSelector {
                 selector: parse_component_selector::<VerboseError>("any/component").unwrap(),
-                interest: Interest { min_severity: Some(Severity::Info), ..Interest::EMPTY }
+                interest: Interest { min_severity: Some(Severity::Info), ..Default::default() }
             }
         );
     }
@@ -936,7 +936,7 @@ a:b:c
                 parse_log_interest_selector_or_severity(severity_str).unwrap(),
                 LogInterestSelector {
                     selector: parse_component_selector::<VerboseError>("**").unwrap(),
-                    interest: Interest { min_severity: Some(severity), ..Interest::EMPTY }
+                    interest: Interest { min_severity: Some(severity), ..Default::default() }
                 }
             );
         }
@@ -945,7 +945,7 @@ a:b:c
             parse_log_interest_selector_or_severity("foo/bar#DEBUG").unwrap(),
             LogInterestSelector {
                 selector: parse_component_selector::<VerboseError>("foo/bar").unwrap(),
-                interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY }
+                interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() }
             }
         );
 

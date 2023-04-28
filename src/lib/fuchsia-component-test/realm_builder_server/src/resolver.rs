@@ -160,12 +160,12 @@ impl Registry {
                 .expect("schema must have fields TODO real error handling")
                 .len();
             let blank_values = (0..num_expected_values)
-                .map(|_| fconfig::ValueSpec { value: None, ..fconfig::ValueSpec::EMPTY })
+                .map(|_| fconfig::ValueSpec { value: None, ..Default::default() })
                 .collect::<Vec<_>>();
             fconfig::ValuesData {
                 checksum: schema.checksum.clone(),
                 values: Some(blank_values),
-                ..fconfig::ValuesData::EMPTY
+                ..Default::default()
             }
         };
 
@@ -251,7 +251,7 @@ impl Registry {
         let package = Some(fresolution::Package {
             url: Some(component_url.to_string()),
             directory: Some(client_end),
-            ..fresolution::Package::EMPTY
+            ..Default::default()
         });
 
         let package_dir_for_config = match config_override_policy {
@@ -278,7 +278,7 @@ impl Registry {
             config_values,
             resolution_context: None,
             abi_revision,
-            ..fresolution::Component::EMPTY
+            ..Default::default()
         })
     }
 
@@ -354,11 +354,11 @@ impl Registry {
             package: Some(fresolution::Package {
                 url: Some(component_url),
                 directory: Some(client_end),
-                ..fresolution::Package::EMPTY
+                ..Default::default()
             }),
             config_values,
             abi_revision,
-            ..fresolution::Component::EMPTY
+            ..Default::default()
         })
     }
 }

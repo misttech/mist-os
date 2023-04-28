@@ -73,7 +73,7 @@ impl FocusChainExt for FocusChain {
                 v.iter().map(|vr| scenic::duplicate_view_ref(vr)).collect::<Result<Vec<_>, _>>()?,
             ),
         };
-        let output = FocusChain { focus_chain: v, ..FocusChain::EMPTY };
+        let output = FocusChain { focus_chain: v, ..Default::default() };
         Ok(output)
     }
 
@@ -93,7 +93,7 @@ impl FocusChainExt for FocusChain {
                     .collect::<Result<Vec<_>, _>>()?,
             ),
         };
-        Ok(FocusKoidChain { focus_chain: raw_koids, ..FocusKoidChain::EMPTY })
+        Ok(FocusKoidChain { focus_chain: raw_koids, ..Default::default() })
     }
 }
 
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn focus_chain_duplicate_empty() {
-        let source = FocusChain::EMPTY;
+        let source = FocusChain::default();
         let target = source.duplicate().expect("error in duplicate()");
 
         assert_eq!(target.focus_chain, None);
@@ -148,8 +148,8 @@ mod tests {
 
     #[test]
     fn focus_chain_equivalent_empty() {
-        let a = FocusChain::EMPTY;
-        let b = FocusChain::EMPTY;
+        let a = FocusChain::default();
+        let b = FocusChain::default();
         assert!(a.equivalent(&b).unwrap());
 
         let (a, _) = make_focus_chain(0);
@@ -186,7 +186,7 @@ mod tests {
             focus_chain.focus_chain.as_ref().unwrap()[1].get_koid().unwrap().raw_koid(),
         ];
 
-        let expected = FocusKoidChain { focus_chain: Some(raw_koids), ..FocusKoidChain::EMPTY };
+        let expected = FocusKoidChain { focus_chain: Some(raw_koids), ..Default::default() };
 
         let actual = focus_chain.to_focus_koid_chain().unwrap();
 

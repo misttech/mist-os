@@ -66,7 +66,7 @@ fn server_runner(mut expected_str: &'static str, server_end: Channel) {
                             assert_eq!(&str, &expected_str);
 
                             responder
-                                .send(OverflowingProtocolTwoWayRequestOnlyResponse::EMPTY)
+                                .send(OverflowingProtocolTwoWayRequestOnlyResponse::default())
                                 .unwrap();
                         }
                         LargeMessageUnionUnknown!() => panic!("unknown data"),
@@ -76,7 +76,7 @@ fn server_runner(mut expected_str: &'static str, server_end: Channel) {
                     responder
                         .send(LargeMessageTable {
                             str: Some(expected_str.to_string()),
-                            ..LargeMessageTable::EMPTY
+                            ..Default::default()
                         })
                         .unwrap();
                 }
@@ -190,7 +190,7 @@ fn overflowing_two_way_response_only_large_sync() {
     run_client_sync(LARGE_STR, |client| {
         let payload = client
             .two_way_response_only(
-                OverflowingProtocolTwoWayResponseOnlyRequest::EMPTY,
+                OverflowingProtocolTwoWayResponseOnlyRequest::default(),
                 Time::INFINITE,
             )
             .unwrap();
@@ -204,7 +204,7 @@ fn overflowing_two_way_response_only_small_sync() {
     run_client_sync(SMALL_STR, |client| {
         let payload = client
             .two_way_response_only(
-                OverflowingProtocolTwoWayResponseOnlyRequest::EMPTY,
+                OverflowingProtocolTwoWayResponseOnlyRequest::default(),
                 Time::INFINITE,
             )
             .unwrap();
@@ -217,7 +217,7 @@ fn overflowing_two_way_response_only_small_sync() {
 async fn overflowing_two_way_response_only_large_async() {
     run_client_async(LARGE_STR, |client| async move {
         let payload = client
-            .two_way_response_only(OverflowingProtocolTwoWayResponseOnlyRequest::EMPTY)
+            .two_way_response_only(OverflowingProtocolTwoWayResponseOnlyRequest::default())
             .await
             .unwrap();
 
@@ -230,7 +230,7 @@ async fn overflowing_two_way_response_only_large_async() {
 async fn overflowing_two_way_response_only_small_async() {
     run_client_async(SMALL_STR, |client| async move {
         let payload = client
-            .two_way_response_only(OverflowingProtocolTwoWayResponseOnlyRequest::EMPTY)
+            .two_way_response_only(OverflowingProtocolTwoWayResponseOnlyRequest::default())
             .await
             .unwrap();
 
@@ -283,7 +283,7 @@ fn overflowing_one_way_large_sync() {
         client
             .one_way_call(LargeMessageTable {
                 str: Some(LARGE_STR.to_string()),
-                ..LargeMessageTable::EMPTY
+                ..Default::default()
             })
             .unwrap();
         let event = client
@@ -307,7 +307,7 @@ fn overflowing_one_way_small_sync() {
         client
             .one_way_call(LargeMessageTable {
                 str: Some(SMALL_STR.to_string()),
-                ..LargeMessageTable::EMPTY
+                ..Default::default()
             })
             .unwrap();
         let event = client
@@ -331,7 +331,7 @@ async fn overflowing_one_way_large_async() {
         client
             .one_way_call(LargeMessageTable {
                 str: Some(LARGE_STR.to_string()),
-                ..LargeMessageTable::EMPTY
+                ..Default::default()
             })
             .unwrap();
         let OverflowingProtocolEvent::OnOneWayReplyEvent { payload } =
@@ -353,7 +353,7 @@ async fn overflowing_one_way_small_async() {
         client
             .one_way_call(LargeMessageTable {
                 str: Some(SMALL_STR.to_string()),
-                ..LargeMessageTable::EMPTY
+                ..Default::default()
             })
             .unwrap();
         let OverflowingProtocolEvent::OnOneWayReplyEvent { payload } =

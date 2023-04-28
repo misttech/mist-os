@@ -621,7 +621,7 @@ mod tests {
             .clone()
             .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
         proxy
-            .unlink("test", fio::UnlinkOptions::EMPTY)
+            .unlink("test", fio::UnlinkOptions::default())
             .await
             .expect("fidl call failed")
             .expect("unlink failed");

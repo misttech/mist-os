@@ -166,10 +166,8 @@ impl Connection {
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
                 let rights = fio::Operations::GET_ATTRIBUTES;
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(rights),
-                    ..fio::ConnectionInfo::EMPTY
-                })?;
+                responder
+                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
             }
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(&mut Ok(()))?;
@@ -190,7 +188,7 @@ impl Connection {
             }
             fio::SymlinkRequest::Describe { responder } => match self.symlink.read_target().await {
                 Ok(target) => responder
-                    .send(fio::SymlinkInfo { target: Some(target), ..fio::SymlinkInfo::EMPTY })?,
+                    .send(fio::SymlinkInfo { target: Some(target), ..Default::default() })?,
                 Err(status) => {
                     self.control_handle.shutdown_with_epitaph(status);
                     return Ok(true);

@@ -491,7 +491,7 @@ mod tests {
         fn create_component_selector(
             component_moniker: &Vec<&str>,
         ) -> fdiagnostics::ComponentSelector {
-            let mut component_selector = fdiagnostics::ComponentSelector::EMPTY;
+            let mut component_selector = fdiagnostics::ComponentSelector::default();
             component_selector.moniker_segments = Some(
                 component_moniker
                     .into_iter()

@@ -21,6 +21,6 @@ pub fn make_focus_chain(length: usize) -> (FocusChain, Vec<ViewRefControl>) {
         view_refs.push(view_ref);
         control_refs.push(control_ref);
     }
-    let focus_chain = FocusChain { focus_chain: Some(view_refs), ..FocusChain::EMPTY };
+    let focus_chain = FocusChain { focus_chain: Some(view_refs), ..Default::default() };
     (focus_chain, control_refs)
 }

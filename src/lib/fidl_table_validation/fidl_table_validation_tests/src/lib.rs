@@ -19,12 +19,12 @@ fn rejects_missing_fields() {
     }
 
     assert_matches!(
-        Valid::try_from(Example { num: Some(10), ..Example::EMPTY }),
+        Valid::try_from(Example { num: Some(10), ..Default::default() }),
         Ok(Valid { num: 10 })
     );
 
     assert_matches!(
-        Valid::try_from(Example { num: None, ..Example::EMPTY }),
+        Valid::try_from(Example { num: None, ..Default::default() }),
         Err(ExampleValidationError::MissingField(ExampleMissingFieldError::Num))
     );
 }
@@ -38,7 +38,7 @@ fn sets_default_fields() {
         num: u32,
     }
 
-    assert_matches!(Valid::try_from(Example::EMPTY), Ok(Valid { num: 22 }));
+    assert_matches!(Valid::try_from(Example::default()), Ok(Valid { num: 22 }));
 }
 
 #[test]
@@ -50,10 +50,10 @@ fn accepts_optional_fields() {
         num: Option<u32>,
     }
 
-    assert_matches!(Valid::try_from(Example::EMPTY), Ok(Valid { num: None }));
+    assert_matches!(Valid::try_from(Example::default()), Ok(Valid { num: None }));
 
     assert_matches!(
-        Valid::try_from(Example { num: Some(15), ..Example::EMPTY }),
+        Valid::try_from(Example { num: Some(15), ..Default::default() }),
         Ok(Valid { num: Some(15) })
     );
 }
@@ -80,12 +80,12 @@ fn runs_custom_validator() {
     }
 
     assert_matches!(
-        Valid::try_from(Example { num: Some(10), ..Example::EMPTY }),
+        Valid::try_from(Example { num: Some(10), ..Default::default() }),
         Ok(Valid { num: 10 })
     );
 
     assert_matches!(
-        Valid::try_from(Example { num: Some(12), ..Example::EMPTY }),
+        Valid::try_from(Example { num: Some(12), ..Default::default() }),
         Err(ExampleValidationError::Logical(()))
     );
 }
@@ -106,14 +106,14 @@ fn validates_nested_tables() {
 
     assert_matches!(
         WrapValid::try_from(WrapExample {
-            inner: Some(Example { num: Some(10), ..Example::EMPTY }),
-            ..WrapExample::EMPTY
+            inner: Some(Example { num: Some(10), ..Default::default() }),
+            ..Default::default()
         }),
         Ok(WrapValid { inner: Valid { num: 10 } })
     );
 
     assert_matches!(
-        WrapValid::try_from(WrapExample { inner: Some(Example::EMPTY), ..WrapExample::EMPTY }),
+        WrapValid::try_from(WrapExample { inner: Some(Example::default()), ..Default::default() }),
         Err(WrapExampleValidationError::InvalidField(_))
     );
 
@@ -121,8 +121,8 @@ fn validates_nested_tables() {
     assert_eq!(
         WrapExample::from(WrapValid { inner: Valid { num: 10 } }),
         WrapExample {
-            inner: Some(Example { num: Some(10), ..Example::EMPTY }),
-            ..WrapExample::EMPTY
+            inner: Some(Example { num: Some(10), ..Default::default() }),
+            ..Default::default()
         }
     );
 }
@@ -136,7 +136,7 @@ fn works_with_qualified_type_names() {
     }
 
     assert_matches!(
-        Valid::try_from(Example { num: Some(7), ..Example::EMPTY }),
+        Valid::try_from(Example { num: Some(7), ..Default::default() }),
         Ok(Valid { num: 7 })
     );
 }
@@ -158,8 +158,8 @@ fn works_with_option_wrapped_nested_fields() {
 
     assert_matches!(
         WrapValid::try_from(WrapExample {
-            inner: Some(Example { num: Some(5), ..Example::EMPTY }),
-            ..WrapExample::EMPTY
+            inner: Some(Example { num: Some(5), ..Default::default() }),
+            ..Default::default()
         }),
         Ok(WrapValid { inner: Some(Valid { num: 5 }) })
     );
@@ -182,10 +182,10 @@ fn works_with_vec_wrapped_nested_fields() {
     assert_matches!(
         VecOfValid::try_from(VecOfExample {
             vec: Some(vec![
-                Example { num: Some(5), ..Example::EMPTY },
-                Example { num: Some(6), ..Example::EMPTY }
+                Example { num: Some(5), ..Default::default() },
+                Example { num: Some(6), ..Default::default() }
             ]),
-            ..VecOfExample::EMPTY
+            ..Default::default()
         }),
         Ok(VecOfValid { vec }) if vec == [Valid { num: 5 }, Valid { num: 6 }]
     );
@@ -209,10 +209,10 @@ fn works_with_optional_vec_wrapped_nested_fields() {
     assert_matches!(
         VecOfValid::try_from(VecOfExample {
             vec: Some(vec![
-                Example { num: Some(5), ..Example::EMPTY },
-                Example { num: Some(6), ..Example::EMPTY }
+                Example { num: Some(5), ..Default::default() },
+                Example { num: Some(6), ..Default::default() }
             ]),
-            ..VecOfExample::EMPTY
+            ..Default::default()
         }),
         Ok(VecOfValid { vec: Some(vec) }) if vec == [Valid { num: 5 }, Valid { num: 6 }]
     );
@@ -229,7 +229,7 @@ fn works_with_identifier_defaults() {
         num: u32,
     }
 
-    assert_matches!(Valid::try_from(Example::EMPTY), Ok(Valid { num: DEFAULT }));
+    assert_matches!(Valid::try_from(Example::default()), Ok(Valid { num: DEFAULT }));
 }
 
 #[test]
@@ -242,12 +242,12 @@ fn works_with_default_impls() {
     }
 
     assert_matches!(
-        VecOfValid::try_from(VecOfExample::EMPTY),
+        VecOfValid::try_from(VecOfExample::default()),
         Ok(VecOfValid { vec }) if vec.is_empty()
     );
 
     assert_matches!(
-        VecOfValid::try_from(VecOfExample { vec: Some(vec![Example::EMPTY]), ..VecOfExample::EMPTY }),
-        Ok(VecOfValid { vec }) if vec == [Example::EMPTY]
+        VecOfValid::try_from(VecOfExample { vec: Some(vec![Example::default()]), ..Default::default() }),
+        Ok(VecOfValid { vec }) if vec == [Example::default()]
     );
 }

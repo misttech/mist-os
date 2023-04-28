@@ -101,7 +101,7 @@ impl Session {
             requested_prediction_span: Some(requested_prediction_span),
             acquire_fences: Some(std::mem::take(&mut self.acquire_fences)),
             release_fences: Some(std::mem::take(&mut self.release_fences)),
-            ..Present2Args::EMPTY
+            ..Default::default()
         };
         self.session.present2(args)
     }

@@ -1352,7 +1352,7 @@ mod tests {
                 MouseInputReport {
                     movement_x: Some(10),
                     movement_y: Some(15),
-                    ..MouseInputReport::EMPTY
+                    ..Default::default()
                 },
                 monotonic_nanos()?,
             )?;

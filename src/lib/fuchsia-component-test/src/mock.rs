@@ -332,7 +332,7 @@ mod tests {
                 ftest::MockComponentStartInfo {
                     ns: Some(vec![]),
                     outgoing_dir: Some(outgoing_dir),
-                    ..ftest::MockComponentStartInfo::EMPTY
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -349,7 +349,7 @@ mod tests {
                 ftest::MockComponentStartInfo {
                     ns: Some(vec![]),
                     outgoing_dir: Some(outgoing_dir),
-                    ..ftest::MockComponentStartInfo::EMPTY
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -366,10 +366,10 @@ mod tests {
             ns: Some(vec![fcrunner::ComponentNamespaceEntry {
                 path: Some("/svc".to_string()),
                 directory: Some(svc_client_end),
-                ..fcrunner::ComponentNamespaceEntry::EMPTY
+                ..Default::default()
             }]),
             outgoing_dir: Some(outgoing_dir),
-            ..ftest::MockComponentStartInfo::EMPTY
+            ..Default::default()
         };
 
         let mock_handles = MockHandles::from(fidl_mock_handles);

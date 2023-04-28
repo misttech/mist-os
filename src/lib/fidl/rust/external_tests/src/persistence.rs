@@ -35,7 +35,7 @@ fn persist_unpersist() {
 
 #[test]
 fn persist_unpersist_presence() {
-    let body = ValueRecord { name: Some("testing".to_string()), ..ValueRecord::EMPTY };
+    let body = ValueRecord { name: Some("testing".to_string()), ..Default::default() };
     let buf = persist(&body).expect("encoding failed");
     let body_out = unpersist(&buf).expect("decoding failed");
     assert_eq!(body, body_out);

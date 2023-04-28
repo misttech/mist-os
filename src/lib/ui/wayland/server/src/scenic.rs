@@ -67,7 +67,7 @@ impl Flatland {
                 release_fences: Some(release_fences),
                 // Allow frames to be skipped when commit rate is too high.
                 unsquashable: Some(false),
-                ..PresentArgs::EMPTY
+                ..Default::default()
             })
             .unwrap_or_else(|e| eprintln!("present error: {:?}", e));
     }

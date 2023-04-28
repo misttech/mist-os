@@ -339,7 +339,7 @@ impl Into<ftest::Capability> for ProtocolCapability {
             type_: Some(self.type_),
             path: self.path,
             availability: self.availability,
-            ..ftest::Protocol::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -415,7 +415,7 @@ impl Into<ftest::Capability> for DirectoryCapability {
             subdir: self.subdir,
             path: self.path,
             availability: self.availability,
-            ..ftest::Directory::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -466,7 +466,7 @@ impl Into<ftest::Capability> for StorageCapability {
             as_: self.as_,
             path: self.path,
             availability: self.availability,
-            ..ftest::Storage::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -518,7 +518,7 @@ impl Into<ftest::Capability> for ServiceCapability {
             as_: self.as_,
             path: self.path,
             availability: self.availability,
-            ..ftest::Service::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -530,7 +530,7 @@ impl Into<ftest::Capability> for EventStream {
             as_: self.rename,
             scope: self.scope.map(|scopes| scopes.into_iter().map(|scope| scope.into()).collect()),
             path: self.path,
-            ..ftest::EventStream::EMPTY
+            ..Default::default()
         })
     }
 }
@@ -1906,7 +1906,7 @@ impl Into<ftest::ChildOptions> for ChildOptions {
             startup: Some(self.startup),
             environment: self.environment,
             on_terminate: Some(self.on_terminate),
-            ..ftest::ChildOptions::EMPTY
+            ..Default::default()
         }
     }
 }
@@ -1967,12 +1967,10 @@ impl ScopedInstanceFactory {
             name: Some(child_name.clone()),
             url: Some(url.into()),
             startup: Some(fdecl::StartupMode::Lazy),
-            ..fdecl::Child::EMPTY
+            ..Default::default()
         };
-        let child_args = fcomponent::CreateChildArgs {
-            numbered_handles: None,
-            ..fcomponent::CreateChildArgs::EMPTY
-        };
+        let child_args =
+            fcomponent::CreateChildArgs { numbered_handles: None, ..Default::default() };
         let () = realm
             .create_child(&mut collection_ref, child_decl, child_args)
             .await
@@ -2196,7 +2194,7 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
-                ..ftest::ChildOptions::EMPTY
+                ..Default::default()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().eager().into();
@@ -2206,7 +2204,7 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Eager),
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::None),
-                ..ftest::ChildOptions::EMPTY
+                ..Default::default()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().environment("test_env").into();
@@ -2216,7 +2214,7 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: Some("test_env".to_string()),
                 on_terminate: Some(fdecl::OnTerminate::None),
-                ..ftest::ChildOptions::EMPTY
+                ..Default::default()
             },
         );
         let options: ftest::ChildOptions = ChildOptions::new().reboot_on_terminate().into();
@@ -2226,7 +2224,7 @@ mod tests {
                 startup: Some(fdecl::StartupMode::Lazy),
                 environment: None,
                 on_terminate: Some(fdecl::OnTerminate::Reboot),
-                ..ftest::ChildOptions::EMPTY
+                ..Default::default()
             },
         );
     }
@@ -2717,7 +2715,7 @@ mod tests {
                             .send(ServerRequest::GetComponentDecl { name })
                             .await
                             .unwrap();
-                        responder.send(&mut Ok(fdecl::Component::EMPTY)).unwrap();
+                        responder.send(&mut Ok(fdecl::Component::default())).unwrap();
                     }
                     ftest::RealmRequest::ReplaceComponentDecl {
                         responder,
@@ -2732,7 +2730,7 @@ mod tests {
                     }
                     ftest::RealmRequest::GetRealmDecl { responder } => {
                         report_requests.send(ServerRequest::GetRealmDecl).await.unwrap();
-                        responder.send(&mut Ok(fdecl::Component::EMPTY)).unwrap();
+                        responder.send(&mut Ok(fdecl::Component::default())).unwrap();
                     }
                     ftest::RealmRequest::ReplaceRealmDecl { responder, component_decl } => {
                         report_requests
@@ -2908,7 +2906,7 @@ mod tests {
             receive_server_requests.next().await,
             Some(ServerRequest::AddChildFromDecl { name, decl, options })
                 if &name == "a"
-                    && decl == fdecl::Component::EMPTY
+                    && decl == fdecl::Component::default()
                     && options == ChildOptions::new().into()
         );
         assert_matches!(receive_server_requests.next().now_or_never(), None);
@@ -2983,7 +2981,7 @@ mod tests {
         assert_matches!(
             receive_server_requests.next().await,
             Some(ServerRequest::ReplaceComponentDecl { name, component_decl })
-                if &name == "a" && component_decl == fdecl::Component::EMPTY
+                if &name == "a" && component_decl == fdecl::Component::default()
         );
         assert_matches!(receive_server_requests.next().now_or_never(), None);
     }
@@ -3007,7 +3005,7 @@ mod tests {
         assert_matches!(
             receive_server_requests.next().await,
             Some(ServerRequest::ReplaceRealmDecl { component_decl })
-                if component_decl == fdecl::Component::EMPTY
+                if component_decl == fdecl::Component::default()
         );
         assert_matches!(receive_server_requests.next().now_or_never(), None);
     }
@@ -3140,7 +3138,7 @@ mod tests {
             receive_sub_realm_requests.next().await,
             Some(ServerRequest::AddChildFromDecl { name, decl, options })
                 if &name == "a"
-                    && decl == fdecl::Component::EMPTY
+                    && decl == fdecl::Component::default()
                     && options == ChildOptions::new().into()
         );
         assert_matches!(receive_sub_realm_requests.next().now_or_never(), None);
@@ -3236,7 +3234,7 @@ mod tests {
         assert_matches!(
             receive_sub_realm_requests.next().await,
             Some(ServerRequest::ReplaceComponentDecl { name, component_decl })
-                if &name == "a" && component_decl == fdecl::Component::EMPTY
+                if &name == "a" && component_decl == fdecl::Component::default()
         );
         assert_matches!(receive_sub_realm_requests.next().now_or_never(), None);
         assert_matches!(receive_server_requests.next().now_or_never(), None);
@@ -3268,7 +3266,7 @@ mod tests {
         assert_matches!(
             receive_sub_realm_requests.next().await,
             Some(ServerRequest::ReplaceRealmDecl { component_decl })
-                if component_decl == fdecl::Component::EMPTY
+                if component_decl == fdecl::Component::default()
         );
         assert_matches!(receive_sub_realm_requests.next().now_or_never(), None);
         assert_matches!(receive_server_requests.next().now_or_never(), None);

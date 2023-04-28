@@ -134,16 +134,16 @@ pub(crate) mod internal {
                         properties: fnet_routes::RoutePropertiesV4 {
                             specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
                                 metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(seed)),
-                                ..fnet_routes::SpecifiedRouteProperties::EMPTY
+                                ..Default::default()
                             }),
-                            ..fnet_routes::RoutePropertiesV4::EMPTY
+                            ..Default::default()
                         },
                     }),
                     effective_properties: Some(fnet_routes::EffectiveRouteProperties {
                         metric: Some(seed),
-                        ..fnet_routes::EffectiveRouteProperties::EMPTY
+                        ..Default::default()
                     }),
-                    ..fnet_routes::InstalledRouteV4::EMPTY
+                    ..Default::default()
                 }))
             },
             |IpInvariant(seed)| {
@@ -157,16 +157,16 @@ pub(crate) mod internal {
                         properties: fnet_routes::RoutePropertiesV6 {
                             specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
                                 metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(seed)),
-                                ..fnet_routes::SpecifiedRouteProperties::EMPTY
+                                ..Default::default()
                             }),
-                            ..fnet_routes::RoutePropertiesV6::EMPTY
+                            ..Default::default()
                         },
                     }),
                     effective_properties: Some(fnet_routes::EffectiveRouteProperties {
                         metric: Some(seed),
-                        ..fnet_routes::EffectiveRouteProperties::EMPTY
+                        ..Default::default()
                     }),
-                    ..fnet_routes::InstalledRouteV6::EMPTY
+                    ..Default::default()
                 }))
             },
         );

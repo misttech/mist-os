@@ -74,7 +74,7 @@ impl Image {
                     self.import_token.value.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
                 let size =
                     fmath::SizeU { width: self.size.width as u32, height: self.size.height as u32 };
-                let image_props = ImageProperties { size: Some(size), ..ImageProperties::EMPTY };
+                let image_props = ImageProperties { size: Some(size), ..Default::default() };
                 let content_id = flatland.borrow_mut().alloc_content_id();
                 let mut import_token = BufferCollectionImportToken { value: raw_import_token };
                 flatland

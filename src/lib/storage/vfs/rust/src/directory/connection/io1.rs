@@ -197,10 +197,8 @@ where
                 if !self.options.node {
                     rights |= fio::Operations::ENUMERATE | fio::Operations::TRAVERSE;
                 }
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(rights),
-                    ..fio::ConnectionInfo::EMPTY
-                })?;
+                responder
+                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
             }
             fio::DirectoryRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttr");

@@ -139,7 +139,7 @@ impl Connection {
             }
             fio::NodeRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Fill in rights and available operations.
-                let info = fio::ConnectionInfo { ..fio::ConnectionInfo::EMPTY };
+                let info = fio::ConnectionInfo::default();
                 responder.send(info)?;
             }
             fio::NodeRequest::Sync { responder } => {

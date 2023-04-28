@@ -724,7 +724,7 @@ impl XdgSurface {
                                 response_type: event.pointer_sample.as_ref().and_then(|_| {
                                     Some(fidl_fuchsia_ui_pointer::TouchResponseType::Yes)
                                 }),
-                                ..fidl_fuchsia_ui_pointer::TouchResponse::EMPTY
+                                ..Default::default()
                             })
                             .collect();
                         let events = returned_events.clone();
@@ -1332,7 +1332,7 @@ impl XdgToplevel {
                                 view_ref_focused: Some(view_ref_focused_request),
                                 touch_source: Some(touch_source_request),
                                 mouse_source: Some(mouse_source_request),
-                                ..ViewBoundProtocols::EMPTY
+                                ..Default::default()
                             };
                             flatland
                                 .borrow()
@@ -1437,7 +1437,7 @@ impl XdgToplevel {
             viewport_creation_token: Some(creation_tokens.viewport_creation_token),
             view_ref: Some(view_ref_dup),
             annotations,
-            ..ViewSpec::EMPTY
+            ..Default::default()
         };
         let (parent_viewport_watcher, parent_viewport_watcher_request) =
             create_proxy::<ParentViewportWatcherMarker>()
@@ -1452,7 +1452,7 @@ impl XdgToplevel {
             view_ref_focused: Some(view_ref_focused_request),
             touch_source: Some(touch_source_request),
             mouse_source: Some(mouse_source_request),
-            ..ViewBoundProtocols::EMPTY
+            ..Default::default()
         };
         flatland
             .borrow()
@@ -1944,7 +1944,7 @@ impl XdgSurfaceView {
                 width: self.logical_size.width.round() as u32,
                 height: self.logical_size.height.round() as u32,
             }),
-            ..ViewportProperties::EMPTY
+            ..Default::default()
         };
         let mut child_transform = TransformId { value: id.into() };
         let mut link = ContentId { value: id.into() };
@@ -2003,7 +2003,7 @@ impl XdgSurfaceView {
                 width: self.logical_size.width.round() as u32,
                 height: self.logical_size.height.round() as u32,
             }),
-            ..ViewportProperties::EMPTY
+            ..Default::default()
         };
         let mut link = ContentId { value: id.into() };
         self.flatland

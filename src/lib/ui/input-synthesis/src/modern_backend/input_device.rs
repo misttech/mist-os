@@ -78,9 +78,9 @@ impl synthesizer::InputDevice for self::InputDevice {
                 event_time: Some(i64::try_from(time).context("converting time to i64")?),
                 consumer_control: Some(ConsumerControlInputReport {
                     pressed_buttons: Some(pressed_buttons.into_iter().map(Into::into).collect()),
-                    ..ConsumerControlInputReport::EMPTY
+                    ..Default::default()
                 }),
-                ..InputReport::EMPTY
+                ..Default::default()
             })
             .context("sending media button InputReport")
     }
@@ -129,12 +129,12 @@ impl synthesizer::InputDevice for self::InputDevice {
                             position_y: Some(i64::from(finger.y)),
                             contact_width: Some(i64::from(finger.width)),
                             contact_height: Some(i64::from(finger.height)),
-                            ..ContactInputReport::EMPTY
+                            ..Default::default()
                         })
                         .collect()
                 })),
                 pressed_buttons: Some(vec![]),
-                ..TouchInputReport::EMPTY
+                ..Default::default()
             },
             time,
         )
@@ -145,7 +145,7 @@ impl synthesizer::InputDevice for self::InputDevice {
             .unbounded_send(InputReport {
                 event_time: Some(i64::try_from(time).context("converting time to i64")?),
                 mouse: Some(report),
-                ..InputReport::EMPTY
+                ..Default::default()
             })
             .context("error sending mouse InputReport")
     }
@@ -263,9 +263,9 @@ impl InputDevice {
                 event_time: Some(i64::try_from(time).context("converting time to i64")?),
                 keyboard: Some(KeyboardInputReport {
                     pressed_keys3: Some(transform(&report)?),
-                    ..KeyboardInputReport::EMPTY
+                    ..Default::default()
                 }),
-                ..InputReport::EMPTY
+                ..Default::default()
             })
             .context("sending key press InputReport")
     }
@@ -279,7 +279,7 @@ impl InputDevice {
             .unbounded_send(InputReport {
                 event_time: Some(i64::try_from(time).context("converting time to i64")?),
                 touch: Some(touch),
-                ..InputReport::EMPTY
+                ..Default::default()
             })
             .context("sending touch InputReport")
     }
@@ -309,7 +309,7 @@ impl InputDevice {
                 }
             }
             Ok(InputDeviceRequest::GetFeatureReport { responder }) => {
-                let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::EMPTY);
+                let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::default());
                 match responder.send(&mut result) {
                     Ok(()) => None,
                     Err(e) => Some(Err(
@@ -390,13 +390,16 @@ mod tests {
             let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                 .context("creating InputDevice proxy and stream")?;
             let input_device_server_fut =
-                Box::new(InputDevice::new(request_stream, DeviceDescriptor::EMPTY)).flush();
+                Box::new(InputDevice::new(request_stream, DeviceDescriptor::default())).flush();
             let get_feature_report_fut = proxy.get_feature_report();
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
 
             let (_, get_feature_report_result) =
                 future::join(input_device_server_fut, get_feature_report_fut).await;
-            assert_eq!(get_feature_report_result.context("fidl error")?, Ok(FeatureReport::EMPTY));
+            assert_eq!(
+                get_feature_report_result.context("fidl error")?,
+                Ok(FeatureReport::default())
+            );
             Ok(())
         }
     }
@@ -515,9 +518,9 @@ mod tests {
                     ),
                     consumer_control: Some(ConsumerControlInputReport {
                         pressed_buttons: Some(vec![]),
-                        ..ConsumerControlInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -555,9 +558,9 @@ mod tests {
                             ConsumerControlButton::Pause,
                             ConsumerControlButton::CameraDisable,
                         ]),
-                        ..ConsumerControlInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -589,9 +592,9 @@ mod tests {
                             ConsumerControlButton::MicMute,
                             ConsumerControlButton::Pause,
                         ]),
-                        ..ConsumerControlInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -616,9 +619,9 @@ mod tests {
                     ),
                     keyboard: Some(KeyboardInputReport {
                         pressed_keys3: Some(vec![Key::A, Key::B]),
-                        ..KeyboardInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -640,9 +643,9 @@ mod tests {
                     ),
                     keyboard: Some(KeyboardInputReport {
                         pressed_keys3: Some(vec![Key::A]),
-                        ..KeyboardInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -663,9 +666,9 @@ mod tests {
                     ),
                     keyboard: Some(KeyboardInputReport {
                         pressed_keys3: Some(vec![]),
-                        ..KeyboardInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -711,9 +714,9 @@ mod tests {
                     ),
                     keyboard: Some(KeyboardInputReport {
                         pressed_keys3: Some(vec![Key::A, Key::B]),
-                        ..KeyboardInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -739,12 +742,12 @@ mod tests {
                             pressure: None,
                             contact_width: Some(0),
                             contact_height: Some(0),
-                            ..ContactInputReport::EMPTY
+                            ..Default::default()
                         }]),
                         pressed_buttons: Some(vec![]),
-                        ..TouchInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -765,9 +768,9 @@ mod tests {
                     touch: Some(TouchInputReport {
                         contacts: Some(vec![]),
                         pressed_buttons: Some(vec![]),
-                        ..TouchInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -796,12 +799,12 @@ mod tests {
                             pressure: None,
                             contact_width: Some(100),
                             contact_height: Some(200),
-                            ..ContactInputReport::EMPTY
+                            ..Default::default()
                         }]),
                         pressed_buttons: Some(vec![]),
-                        ..TouchInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -834,7 +837,7 @@ mod tests {
                                 pressure: None,
                                 contact_width: Some(100),
                                 contact_height: Some(200),
-                                ..ContactInputReport::EMPTY
+                                ..Default::default()
                             },
                             ContactInputReport {
                                 contact_id: Some(0),
@@ -843,13 +846,13 @@ mod tests {
                                 pressure: None,
                                 contact_width: Some(300),
                                 contact_height: Some(400),
-                                ..ContactInputReport::EMPTY
+                                ..Default::default()
                             }
                         ]),
                         pressed_buttons: Some(vec![]),
-                        ..TouchInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -871,9 +874,9 @@ mod tests {
                     touch: Some(TouchInputReport {
                         contacts: Some(vec![]),
                         pressed_buttons: Some(vec![]),
-                        ..TouchInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -894,9 +897,9 @@ mod tests {
                     touch: Some(TouchInputReport {
                         contacts: Some(vec![]),
                         pressed_buttons: Some(vec![]),
-                        ..TouchInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -927,7 +930,7 @@ mod tests {
         #[fasync::run_until_stalled(test)]
         async fn mouse_generates_empty_mouse_input_report() -> Result<(), Error> {
             let (input_device_proxy, mut input_device) = make_input_device_proxy_and_struct();
-            input_device.mouse(MouseInputReport::EMPTY, DEFAULT_REPORT_TIMESTAMP)?;
+            input_device.mouse(MouseInputReport::default(), DEFAULT_REPORT_TIMESTAMP)?;
 
             let input_reports = get_input_reports(input_device, input_device_proxy).await;
             assert_eq!(
@@ -936,8 +939,8 @@ mod tests {
                     event_time: Some(
                         DEFAULT_REPORT_TIMESTAMP.try_into().expect("converting to i64")
                     ),
-                    mouse: Some(MouseInputReport { ..MouseInputReport::EMPTY }),
-                    ..InputReport::EMPTY
+                    mouse: Some(MouseInputReport::default()),
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -953,7 +956,7 @@ mod tests {
                     pressed_buttons: Some(vec![1, 2, 3]),
                     scroll_v: Some(1),
                     scroll_h: Some(-1),
-                    ..MouseInputReport::EMPTY
+                    ..Default::default()
                 },
                 DEFAULT_REPORT_TIMESTAMP,
             )?;
@@ -971,9 +974,9 @@ mod tests {
                         pressed_buttons: Some(vec![1, 2, 3]),
                         scroll_v: Some(1),
                         scroll_h: Some(-1),
-                        ..MouseInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -987,7 +990,7 @@ mod tests {
                     movement_x: Some(10),
                     movement_y: Some(15),
                     pressed_buttons: Some(vec![]),
-                    ..MouseInputReport::EMPTY
+                    ..Default::default()
                 },
                 DEFAULT_REPORT_TIMESTAMP,
             )?;
@@ -1003,9 +1006,9 @@ mod tests {
                         movement_x: Some(10),
                         movement_y: Some(15),
                         pressed_buttons: Some(vec![]),
-                        ..MouseInputReport::EMPTY
+                        ..Default::default()
                     }),
-                    ..InputReport::EMPTY
+                    ..Default::default()
                 }]
             );
             Ok(())
@@ -1278,11 +1281,11 @@ mod tests {
                 keyboard: Some(KeyboardDescriptor {
                     input: Some(KeyboardInputDescriptor {
                         keys3: Some(keys),
-                        ..KeyboardInputDescriptor::EMPTY
+                        ..Default::default()
                     }),
-                    ..KeyboardDescriptor::EMPTY
+                    ..Default::default()
                 }),
-                ..DeviceDescriptor::EMPTY
+                ..Default::default()
             }
         }
 
@@ -1297,8 +1300,10 @@ mod tests {
             let (input_device_proxy, input_device_request_stream) =
                 endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                     .expect("creating InputDevice proxy and stream");
-            let input_device =
-                Box::new(InputDevice::new(input_device_request_stream, DeviceDescriptor::EMPTY));
+            let input_device = Box::new(InputDevice::new(
+                input_device_request_stream,
+                DeviceDescriptor::default(),
+            ));
             (input_device_proxy, input_device)
         }
 

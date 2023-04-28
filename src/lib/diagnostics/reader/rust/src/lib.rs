@@ -327,7 +327,7 @@ impl ArchiveReader {
         let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>()
             .map_err(Error::CreateIteratorProxy)?;
 
-        let mut stream_parameters = StreamParameters::EMPTY;
+        let mut stream_parameters = StreamParameters::default();
         stream_parameters.stream_mode = Some(mode);
         stream_parameters.data_type = Some(D::DATA_TYPE);
         stream_parameters.format = Some(format);
@@ -346,7 +346,7 @@ impl ArchiveReader {
         stream_parameters.performance_configuration = Some(PerformanceConfiguration {
             max_aggregate_content_size_bytes: self.max_aggregated_content_size_bytes,
             batch_retrieval_timeout_seconds: self.batch_retrieval_timeout_seconds,
-            ..PerformanceConfiguration::EMPTY
+            ..Default::default()
         });
 
         archive

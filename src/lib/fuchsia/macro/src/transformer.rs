@@ -153,42 +153,42 @@ impl Parse for Interest {
 impl quote::ToTokens for Interest {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self.min_severity {
-            None => quote! { ::fuchsia::Interest::EMPTY },
+            None => quote! { ::fuchsia::Interest::default() },
             Some(severity) => match severity {
                 Severity::Trace => quote! {
                     ::fuchsia::Interest {
                         min_severity: Some(::fuchsia::Severity::Trace),
-                        ..::fuchsia::Interest::EMPTY
+                        ..Default::default()
                     }
                 },
                 Severity::Debug => quote! {
                     ::fuchsia::Interest {
                         min_severity: Some(::fuchsia::Severity::Debug),
-                        ..::fuchsia::Interest::EMPTY
+                        ..Default::default()
                     }
                 },
                 Severity::Info => quote! {
                     ::fuchsia::Interest {
                         min_severity: Some(::fuchsia::Severity::Info),
-                        ..::fuchsia::Interest::EMPTY
+                        ..Default::default()
                     }
                 },
                 Severity::Warn => quote! {
                     ::fuchsia::Interest {
                         min_severity: Some(::fuchsia::Severity::Warn),
-                        ..::fuchsia::Interest::EMPTY
+                        ..Default::default()
                     }
                 },
                 Severity::Error => quote! {
                     ::fuchsia::Interest {
                         min_severity: Some(::fuchsia::Severity::Error),
-                        ..::fuchsia::Interest::EMPTY
+                        ..Default::default()
                     }
                 },
                 Severity::Fatal => quote! {
                     ::fuchsia::Interest {
                         min_severity: Some(::fuchsia::Severity::Fatal),
-                        ..::fuchsia::Interest::EMPTY
+                        ..Default::default()
                     }
                 },
             },

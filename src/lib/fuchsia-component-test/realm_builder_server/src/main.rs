@@ -777,7 +777,7 @@ impl Realm {
             true,
         );
         self.realm_node
-            .add_child(child_name.clone(), ftest::ChildOptions::EMPTY, child_realm_node)
+            .add_child(child_name.clone(), ftest::ChildOptions::default(), child_realm_node)
             .await?;
         let path = Some(format!("/{}", directory_name));
         self.realm_node
@@ -786,7 +786,7 @@ impl Realm {
                     name: Some(directory_name),
                     rights: Some(fio::R_STAR_DIR),
                     path,
-                    ..ftest::Directory::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef {
                     name: child_name.clone().into(),
@@ -812,7 +812,7 @@ fn new_decl_with_program_entries(entries: Vec<(String, String)>) -> cm_rust::Com
                         })
                         .collect(),
                 ),
-                ..fdata::Dictionary::EMPTY
+                ..Default::default()
             },
         }),
         ..cm_rust::ComponentDecl::default()
@@ -929,7 +929,7 @@ impl RealmNodeState {
                 name: Some(name.clone()),
                 url: Some("invalid://url".to_string()),
                 startup: Some(fcdecl::StartupMode::Lazy),
-                ..fcdecl::Child::EMPTY
+                ..Default::default()
             });
         decl.children.get_or_insert(vec![]).extend(child_decls);
         if let Err(e) = cm_fidl_validator::validate(&decl) {
@@ -1090,7 +1090,7 @@ impl RealmNode2 {
                             Some(fcdecl::OnTerminate::Reboot) => Some(fcdecl::OnTerminate::Reboot),
                             None => None,
                         },
-                        ..ftest::ChildOptions::EMPTY
+                        ..Default::default()
                     };
                     state_guard.mutable_children.insert(child.name, (child_options, child_node));
                 }
@@ -2006,7 +2006,7 @@ mod tests {
                                     }
                                     None => None,
                                 },
-                                ..ftest::ChildOptions::EMPTY
+                                ..Default::default()
                             };
                             self_.children.push((child.name, child_options, child_tree));
                         }
@@ -2377,7 +2377,7 @@ mod tests {
             },
             children: vec![(
                 "b".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         offers: vec![
@@ -2437,7 +2437,7 @@ mod tests {
                     },
                     children: vec![(
                         "b_child_dynamic".to_string(),
-                        ftest::ChildOptions::EMPTY,
+                        ftest::ChildOptions::default(),
                         ComponentTree {
                             decl: cm_rust::ComponentDecl { ..cm_rust::ComponentDecl::default() },
                             children: vec![],
@@ -2465,7 +2465,7 @@ mod tests {
             },
             children: vec![(
                 "b".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         offers: vec![],
@@ -2480,7 +2480,7 @@ mod tests {
                     },
                     children: vec![(
                         "b_child_dynamic".to_string(),
-                        ftest::ChildOptions::EMPTY,
+                        ftest::ChildOptions::default(),
                         ComponentTree {
                             decl: cm_rust::ComponentDecl { ..cm_rust::ComponentDecl::default() },
                             children: vec![],
@@ -2521,7 +2521,7 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
         };
@@ -2545,7 +2545,7 @@ mod tests {
             },
             children: vec![(
                 "b".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
         };
@@ -2560,12 +2560,12 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl::default(),
                     children: vec![(
                         "b".to_string(),
-                        ftest::ChildOptions::EMPTY,
+                        ftest::ChildOptions::default(),
                         ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
                     )],
                 },
@@ -2584,7 +2584,7 @@ mod tests {
                 "a".to_string(),
                 ftest::ChildOptions {
                     startup: Some(fcdecl::StartupMode::Eager),
-                    ..ftest::ChildOptions::EMPTY
+                    ..Default::default()
                 },
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
@@ -2616,7 +2616,7 @@ mod tests {
                 "a".to_string(),
                 ftest::ChildOptions {
                     environment: Some("new-env".to_string()),
-                    ..ftest::ChildOptions::EMPTY
+                    ..Default::default()
                 },
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
@@ -2634,7 +2634,7 @@ mod tests {
                 "a".to_string(),
                 ftest::ChildOptions {
                     on_terminate: Some(fcdecl::OnTerminate::Reboot),
-                    ..ftest::ChildOptions::EMPTY
+                    ..Default::default()
                 },
                 ComponentTree { decl: cm_rust::ComponentDecl::default(), children: vec![] },
             )],
@@ -2651,13 +2651,13 @@ mod tests {
         // Add two local children
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_local_child returned an error");
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("b", ftest::ChildOptions::EMPTY)
+            .add_local_child("b", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
@@ -2702,7 +2702,7 @@ mod tests {
                 key: "hippos".to_string(),
                 value: Some(Box::new(fdata::DictionaryValue::Str("rule!".to_string()))),
             }]),
-            ..fdata::Dictionary::EMPTY
+            ..Default::default()
         };
 
         let (_controller_client_end, controller_server_end) =
@@ -2713,7 +2713,7 @@ mod tests {
             .start(
                 fcrunner::ComponentStartInfo {
                     program: Some(example_program.clone()),
-                    ..fcrunner::ComponentStartInfo::EMPTY
+                    ..Default::default()
                 },
                 controller_server_end,
             )
@@ -2734,7 +2734,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -2761,13 +2761,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_child was supposed to return an error");
@@ -2779,13 +2779,17 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_child was supposed to return an error");
@@ -2797,13 +2801,17 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect_err("add_child was supposed to return an error");
@@ -2815,13 +2823,21 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect_err("add_child was supposed to return an error");
@@ -2833,7 +2849,11 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -2853,7 +2873,7 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
         };
@@ -2871,7 +2891,7 @@ mod tests {
                 "#meta/realm_with_child.cm",
                 ftest::ChildOptions {
                     startup: Some(fcdecl::StartupMode::Eager),
-                    ..ftest::ChildOptions::EMPTY
+                    ..Default::default()
                 },
             )
             .await
@@ -2934,13 +2954,13 @@ mod tests {
                 "realm_with_child".to_string(),
                 ftest::ChildOptions {
                     startup: Some(fcdecl::StartupMode::Eager),
-                    ..ftest::ChildOptions::EMPTY
+                    ..Default::default()
                 },
                 ComponentTree {
                     decl: realm_with_child_decl,
                     children: vec![(
                         "a".to_string(),
-                        ftest::ChildOptions::EMPTY,
+                        ftest::ChildOptions::default(),
                         ComponentTree { decl: a_decl, children: vec![] },
                     )],
                 },
@@ -2956,7 +2976,7 @@ mod tests {
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
                 runner: Some("hippo".try_into().unwrap()),
-                info: fdata::Dictionary::EMPTY,
+                info: fdata::Dictionary::default(),
             }),
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
@@ -2971,7 +2991,11 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", a_decl.clone().native_into_fidl(), ftest::ChildOptions::EMPTY)
+            .add_child_from_decl(
+                "a",
+                a_decl.clone().native_into_fidl(),
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect("add_child_from_decl returned an error");
@@ -2980,7 +3004,7 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
         };
@@ -2993,13 +3017,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", fcdecl::Component::EMPTY, ftest::ChildOptions::EMPTY)
+            .add_child_from_decl("a", fcdecl::Component::default(), ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_child_from_decl was supposed to error");
@@ -3011,13 +3035,17 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", fcdecl::Component::EMPTY, ftest::ChildOptions::EMPTY)
+            .add_child_from_decl("a", fcdecl::Component::default(), ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_child_from_decl was supposed to error");
@@ -3029,7 +3057,7 @@ mod tests {
         let a_decl = cm_rust::ComponentDecl {
             program: Some(cm_rust::ProgramDecl {
                 runner: Some("hippo".try_into().unwrap()),
-                info: fdata::Dictionary::EMPTY,
+                info: fdata::Dictionary::default(),
             }),
             uses: vec![cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
                 source: cm_rust::UseSource::Parent,
@@ -3045,7 +3073,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child_from_decl("a", a_decl.clone(), ftest::ChildOptions::EMPTY)
+            .add_child_from_decl("a", a_decl.clone(), ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child_from_decl returned an error");
@@ -3054,7 +3082,7 @@ mod tests {
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("example.Hippo".to_owned()),
                     type_: Some(fcdecl::DependencyType::Strong),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
                 vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
@@ -3074,7 +3102,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -3093,7 +3121,7 @@ mod tests {
                             value: Some(Box::new(fdata::DictionaryValue::Str("a".to_string()))),
                         },
                     ]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 },
             }),
             ..cm_rust::ComponentDecl::default()
@@ -3102,7 +3130,7 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
         };
@@ -3120,13 +3148,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_local_child was supposed to error");
@@ -3138,13 +3166,17 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "#meta/realm_builder_server_unit_tests.cm", ftest::ChildOptions::EMPTY)
+            .add_child(
+                "a",
+                "#meta/realm_builder_server_unit_tests.cm",
+                ftest::ChildOptions::default(),
+            )
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect_err("add_local_child was supposed to error");
@@ -3155,10 +3187,10 @@ mod tests {
     async fn add_route() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
-            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::default())
             .await;
         realm_and_builder_task
-            .add_child_or_panic("b", "test:///b", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("b", "test:///b", ftest::ChildOptions::default())
             .await;
 
         // Assert that parent -> child capabilities generate proper offer decls.
@@ -3169,28 +3201,28 @@ mod tests {
                         name: Some("fuchsia.examples.Hippo".to_owned()),
                         as_: Some("fuchsia.examples.Elephant".to_owned()),
                         type_: Some(fcdecl::DependencyType::Strong),
-                        ..ftest::Protocol::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Directory(ftest::Directory {
                         name: Some("config-data".to_owned()),
                         rights: Some(fio::RW_STAR_DIR),
                         subdir: Some("component".to_owned()),
-                        ..ftest::Directory::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Storage(ftest::Storage {
                         name: Some("temp".to_string()),
                         as_: Some("data".to_string()),
-                        ..ftest::Storage::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Service(ftest::Service {
                         name: Some("fuchsia.examples.Whale".to_string()),
                         as_: Some("fuchsia.examples.Orca".to_string()),
-                        ..ftest::Service::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::EventStream(ftest::EventStream {
                         name: Some("started".to_string()),
                         as_: Some("started_event".to_string()),
-                        ..ftest::EventStream::EMPTY
+                        ..Default::default()
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
@@ -3203,7 +3235,7 @@ mod tests {
             .add_route_or_panic(
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.Echo".to_owned()),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
                 vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
@@ -3216,7 +3248,7 @@ mod tests {
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.Echo".to_owned()),
                     type_: Some(fcdecl::DependencyType::Weak),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
                 vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
@@ -3314,11 +3346,11 @@ mod tests {
     async fn add_optional_route() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
-            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::default())
             .await;
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("b", ftest::ChildOptions::EMPTY)
+            .add_local_child("b", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
@@ -3332,7 +3364,7 @@ mod tests {
                         as_: Some("fuchsia.examples.Elephant".to_owned()),
                         type_: Some(fcdecl::DependencyType::Strong),
                         availability: Some(fcdecl::Availability::Optional),
-                        ..ftest::Protocol::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Directory(ftest::Directory {
                         name: Some("config-data".to_owned()),
@@ -3340,20 +3372,20 @@ mod tests {
                         path: Some("/config-data".to_owned()),
                         subdir: Some("component".to_owned()),
                         availability: Some(fcdecl::Availability::Optional),
-                        ..ftest::Directory::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Storage(ftest::Storage {
                         name: Some("temp".to_string()),
                         as_: Some("data".to_string()),
                         path: Some("/data".to_string()),
                         availability: Some(fcdecl::Availability::Optional),
-                        ..ftest::Storage::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Service(ftest::Service {
                         name: Some("fuchsia.examples.Whale".to_string()),
                         as_: Some("fuchsia.examples.Orca".to_string()),
                         availability: Some(fcdecl::Availability::Optional),
-                        ..ftest::Service::EMPTY
+                        ..Default::default()
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
@@ -3379,7 +3411,7 @@ mod tests {
                             value: Some(Box::new(fdata::DictionaryValue::Str("b".to_string()))),
                         },
                     ]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 },
             }),
             uses: vec![
@@ -3497,7 +3529,7 @@ mod tests {
             },
             children: vec![(
                 "b".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: b_decl, children: vec![] },
             )],
         };
@@ -3509,7 +3541,7 @@ mod tests {
     async fn add_same_as_target_route() {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
-            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::default())
             .await;
 
         // Assert that parent -> child optional capabilities generate proper offer decls.
@@ -3521,7 +3553,7 @@ mod tests {
                         as_: Some("fuchsia.examples.Elephant".to_owned()),
                         type_: Some(fcdecl::DependencyType::Strong),
                         availability: Some(fcdecl::Availability::SameAsTarget),
-                        ..ftest::Protocol::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Directory(ftest::Directory {
                         name: Some("config-data".to_owned()),
@@ -3529,20 +3561,20 @@ mod tests {
                         path: Some("/config-data".to_owned()),
                         subdir: Some("component".to_owned()),
                         availability: Some(fcdecl::Availability::SameAsTarget),
-                        ..ftest::Directory::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Storage(ftest::Storage {
                         name: Some("temp".to_string()),
                         as_: Some("data".to_string()),
                         path: Some("/data".to_string()),
                         availability: Some(fcdecl::Availability::SameAsTarget),
-                        ..ftest::Storage::EMPTY
+                        ..Default::default()
                     }),
                     ftest::Capability::Service(ftest::Service {
                         name: Some("fuchsia.examples.Whale".to_string()),
                         as_: Some("fuchsia.examples.Orca".to_string()),
                         availability: Some(fcdecl::Availability::SameAsTarget),
-                        ..ftest::Service::EMPTY
+                        ..Default::default()
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
@@ -3609,7 +3641,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
@@ -3621,7 +3653,7 @@ mod tests {
                     as_: Some("fuchsia.examples.Elephant".to_owned()),
                     type_: Some(fcdecl::DependencyType::Strong),
                     availability: Some(fcdecl::Availability::SameAsTarget),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })]
                 .iter_mut(),
                 &mut fcdecl::Ref::Parent(fcdecl::ParentRef {}),
@@ -3642,15 +3674,15 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
         realm_and_builder_task
-            .add_child_or_panic("b", "test:///b", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("b", "test:///b", ftest::ChildOptions::default())
             .await;
         realm_and_builder_task
-            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::default())
             .await;
 
         // Routing protocol from `a` should yield one and only one ExposeDecl.
@@ -3658,7 +3690,7 @@ mod tests {
             .add_route_or_panic(
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
                 vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
@@ -3668,7 +3700,7 @@ mod tests {
             .add_route_or_panic(
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
                 vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "c".into(), collection: None })],
@@ -3728,7 +3760,7 @@ mod tests {
             },
             children: vec![(
                 "a".to_owned(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         program: Some(cm_rust::ProgramDecl {
@@ -3748,7 +3780,7 @@ mod tests {
                                         ))),
                                     },
                                 ]),
-                                ..fdata::Dictionary::EMPTY
+                                ..Default::default()
                             },
                         }),
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
@@ -3782,7 +3814,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3798,7 +3830,7 @@ mod tests {
         assert_eq!(0, realm_and_builder_task.realm_contents.lock().await.local_component_ids.len());
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3819,7 +3851,7 @@ mod tests {
 
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
@@ -3827,11 +3859,11 @@ mod tests {
             .add_child_or_panic(
                 "b",
                 "#meta/realm_builder_server_unit_tests.cm",
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
             )
             .await;
         realm_and_builder_task
-            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::default())
             .await;
 
         let runner = realm_and_builder_task.runner.clone();
@@ -3864,21 +3896,21 @@ mod tests {
 
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call AddChildFromDecl")
             .expect("call failed");
         realm_and_builder_task
-            .add_child_or_panic("b", "test:///b", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("b", "test:///b", ftest::ChildOptions::default())
             .await;
         realm_and_builder_task
-            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("c", "test:///c", ftest::ChildOptions::default())
             .await;
         realm_and_builder_task
             .add_route_or_panic(
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.Echo".to_owned()),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
                 vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
@@ -3888,7 +3920,7 @@ mod tests {
             .add_route_or_panic(
                 vec![ftest::Capability::Protocol(ftest::Protocol {
                     name: Some("fuchsia.examples.RandonNumberGenerator".to_owned()),
-                    ..ftest::Protocol::EMPTY
+                    ..Default::default()
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "c".to_owned(), collection: None }),
                 vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
@@ -3948,7 +3980,7 @@ mod tests {
             },
             children: vec![(
                 "a".to_owned(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         program: Some(cm_rust::ProgramDecl {
@@ -3968,7 +4000,7 @@ mod tests {
                                         ))),
                                     },
                                 ]),
-                                ..fdata::Dictionary::EMPTY
+                                ..Default::default()
                             },
                         }),
                         capabilities: vec![cm_rust::CapabilityDecl::Protocol(
@@ -4014,12 +4046,12 @@ mod tests {
             create_proxy::<ftest::RealmMarker>().unwrap();
         realm_and_builder_task
             .realm_proxy
-            .add_child_realm("a", ftest::ChildOptions::EMPTY, child_realm_server_end)
+            .add_child_realm("a", ftest::ChildOptions::default(), child_realm_server_end)
             .await
             .expect("failed to call add_child_realm")
             .expect("add_child_realm returned an error");
         child_realm_proxy
-            .add_child("b", "test:///b", ftest::ChildOptions::EMPTY)
+            .add_child("b", "test:///b", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4028,7 +4060,7 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl {
                         children: vec![cm_rust::ChildDecl {
@@ -4053,7 +4085,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4079,7 +4111,7 @@ mod tests {
                                 value: Some(Box::new(fdata::DictionaryValue::Str("a".to_string()))),
                             },
                         ]),
-                        ..fdata::Dictionary::EMPTY
+                        ..Default::default()
                     },
                 }),
                 ..cm_rust::ComponentDecl::default()
@@ -4105,7 +4137,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4123,7 +4155,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4151,7 +4183,7 @@ mod tests {
         let mut expected_tree = ComponentTree {
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: a_decl, children: vec![] },
             )],
             decl: cm_rust::ComponentDecl::default(),
@@ -4210,7 +4242,7 @@ mod tests {
     ) {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
-            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child_or_panic("a", "test:///a", ftest::ChildOptions::default())
             .await;
 
         let err = realm_and_builder_task
@@ -4228,7 +4260,7 @@ mod tests {
             name: Some("fuchsia.examples.Hippo".to_owned()),
             as_: None,
             type_: None,
-            ..ftest::Protocol::EMPTY
+            ..Default::default()
         })
     }
 
@@ -4239,12 +4271,12 @@ mod tests {
             create_proxy::<ftest::RealmMarker>().unwrap();
         realm_and_builder_task
             .realm_proxy
-            .add_child_realm("a", ftest::ChildOptions::EMPTY, child_realm_server_end)
+            .add_child_realm("a", ftest::ChildOptions::default(), child_realm_server_end)
             .await
             .expect("failed to call add_child_realm")
             .expect("add_child_realm returned an error");
         child_realm_proxy
-            .add_local_child("b", ftest::ChildOptions::EMPTY)
+            .add_local_child("b", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4263,7 +4295,7 @@ mod tests {
                             value: Some(Box::new(fdata::DictionaryValue::Str("a/b".to_string()))),
                         },
                     ]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 },
             }),
             ..cm_rust::ComponentDecl::default()
@@ -4272,12 +4304,12 @@ mod tests {
             decl: cm_rust::ComponentDecl::default(),
             children: vec![(
                 "a".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree {
                     decl: cm_rust::ComponentDecl::default(),
                     children: vec![(
                         "b".to_string(),
-                        ftest::ChildOptions::EMPTY,
+                        ftest::ChildOptions::default(),
                         ComponentTree { decl: b_decl, children: vec![] },
                     )],
                 },
@@ -4292,13 +4324,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", fcdecl::Component::EMPTY)
+            .replace_component_decl("a", fcdecl::Component::default())
             .await
             .expect("failed to call replace_component_decl")
             .expect_err("replace_component_decl did not return an error");
@@ -4310,7 +4342,7 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", fcdecl::Component::EMPTY)
+            .replace_component_decl("a", fcdecl::Component::default())
             .await
             .expect("failed to call replace_component_decl")
             .expect_err("replace_component_decl did not return an error");
@@ -4322,13 +4354,13 @@ mod tests {
         let realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test:///a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test:///a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
         let err = realm_and_builder_task
             .realm_proxy
-            .replace_component_decl("a", fcdecl::Component::EMPTY)
+            .replace_component_decl("a", fcdecl::Component::default())
             .await
             .expect("failed to call replace_component_decl")
             .expect_err("replace_component_decl did not return an error");
@@ -4348,7 +4380,7 @@ mod tests {
             name: Some("example-child".to_string()),
             url: Some("example://url".to_string()),
             startup: Some(fcdecl::StartupMode::Eager),
-            ..fcdecl::Child::EMPTY
+            ..Default::default()
         }]);
         realm_and_builder_task
             .realm_proxy
@@ -4376,9 +4408,9 @@ mod tests {
                 url: Some("example://url".to_string()),
                 startup: Some(fcdecl::StartupMode::Eager),
                 environment: Some("i-dont-exist".to_string()),
-                ..fcdecl::Child::EMPTY
+                ..Default::default()
             }]),
-            ..fcdecl::Component::EMPTY
+            ..Default::default()
         };
         let err = realm_and_builder_task
             .realm_proxy
@@ -4395,12 +4427,12 @@ mod tests {
         let (child_realm_proxy, child_realm_server_end) =
             create_proxy::<ftest::RealmMarker>().unwrap();
         rabt.realm_proxy
-            .add_child_realm("a", ftest::ChildOptions::EMPTY, child_realm_server_end)
+            .add_child_realm("a", ftest::ChildOptions::default(), child_realm_server_end)
             .await
             .expect("failed to call add_child_realm")
             .expect("add_child_realm returned an error");
         child_realm_proxy
-            .add_local_child("b", ftest::ChildOptions::EMPTY)
+            .add_local_child("b", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4414,8 +4446,8 @@ mod tests {
                 fut.await.expect("failed to call function").expect_err("expected an error"),
             );
         }
-        let empty_opts = || ftest::ChildOptions::EMPTY;
-        let empty_decl = || fcdecl::Component::EMPTY;
+        let empty_opts = || ftest::ChildOptions::default();
+        let empty_decl = || fcdecl::Component::default();
 
         assert_err(rabt.realm_proxy.add_child("a", "test:///a", empty_opts())).await;
         assert_err(rabt.realm_proxy.add_child_from_decl("a", empty_decl(), empty_opts())).await;
@@ -4453,7 +4485,7 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_child("a", "test://a", ftest::ChildOptions::EMPTY)
+            .add_child("a", "test://a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_child")
             .expect("add_child returned an error");
@@ -4491,7 +4523,7 @@ mod tests {
                         key: runner::LOCAL_COMPONENT_ID_KEY.to_string(),
                         value: Some(Box::new(fdata::DictionaryValue::Str("0".to_string()))),
                     }]),
-                    ..fdata::Dictionary::EMPTY
+                    ..Default::default()
                 },
             }),
             capabilities: vec![cm_rust::CapabilityDecl::Directory(cm_rust::DirectoryDecl {
@@ -4539,7 +4571,7 @@ mod tests {
             },
             children: vec![(
                 "read-only-directory-0".to_string(),
-                ftest::ChildOptions::EMPTY,
+                ftest::ChildOptions::default(),
                 ComponentTree { decl: read_only_dir_decl, children: vec![] },
             )],
         };
@@ -4559,13 +4591,13 @@ mod tests {
         let mut realm_and_builder_task = RealmAndBuilderTask::new();
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("a", ftest::ChildOptions::EMPTY)
+            .add_local_child("a", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_child_local returned an error");
         realm_and_builder_task
             .realm_proxy
-            .add_local_child("b", ftest::ChildOptions::EMPTY)
+            .add_local_child("b", ftest::ChildOptions::default())
             .await
             .expect("failed to call add_local_child")
             .expect("add_local_child returned an error");
