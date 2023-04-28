@@ -1245,6 +1245,7 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: src_repo_path.join("repository"),
                 blobs_path: src_repo_path.join("repository").join("blobs"),
+                delivery_blob_type: None,
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,

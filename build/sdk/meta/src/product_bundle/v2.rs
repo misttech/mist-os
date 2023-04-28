@@ -86,6 +86,13 @@ pub struct Repository {
     /// directory.
     pub blobs_path: Utf8PathBuf,
 
+    /// Specify the delivery blob type of each blob, None means the blobs are
+    /// uncompressed and not delivery blobs.
+    /// This is used by the repo server, not the product bundle per se.
+    /// See //src/storage/blobfs/delivery_blob.h for the list of types.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_blob_type: Option<u32>,
+
     /// The path to the file containing all the root metadata private keys.
     pub root_private_key_path: Option<Utf8PathBuf>,
 
@@ -460,6 +467,7 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: dir.join("repository"),
                 blobs_path: dir.join("repository").join("blobs"),
+                delivery_blob_type: None,
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,
@@ -496,6 +504,7 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: "repository".into(),
                 blobs_path: "blobs".into(),
+                delivery_blob_type: None,
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,

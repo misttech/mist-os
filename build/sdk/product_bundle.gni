@@ -84,6 +84,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [bool] Whether to skip running scrutiny verifiers on a particular slot.
 #     These should not be true if the corresponding scrutiny args are supplied.
 #
+#   delivery_blob_type (optional)
+#     [int] The type of delivery blob the product needs.
+#
 template("product_bundle") {
   assert(defined(invoker.partitions), "Need to define partitions")
 
@@ -321,6 +324,14 @@ template("product_bundle") {
       args += [
         "--recommended-device",
         invoker.default_virtual_device,
+      ]
+    }
+
+    if (defined(invoker.delivery_blob_type) &&
+        invoker.delivery_blob_type != false) {
+      args += [
+        "--delivery-blob-type",
+        "${invoker.delivery_blob_type}",
       ]
     }
   }

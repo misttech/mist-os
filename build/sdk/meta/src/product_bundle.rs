@@ -132,7 +132,8 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
                 .with_context(|| format!("failed to canonicalize {:?}", repo.blobs_path))?
                 .try_into()?,
         )
-        .alias(repo.name);
+        .alias(repo.name)
+        .delivery_blob_type(repo.delivery_blob_type);
         repos.push(repo_builder.build());
     }
     Ok(repos)

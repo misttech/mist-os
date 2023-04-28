@@ -462,6 +462,10 @@ if (is_fuchsia) {
             fuchsia_base.product_assembly_config_label
       }
     }
+
+    if (delivery_blob_type != false) {
+      delivery_blob_type = delivery_blob_type
+    }
   }
   product_bundle_out_dir =
       get_label_info(":${product_bundle_label}", "target_out_dir") + "/" +

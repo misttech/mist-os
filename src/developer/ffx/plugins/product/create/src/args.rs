@@ -63,4 +63,8 @@ pub struct CreateCommand {
     /// directory to write the product bundle.
     #[argh(option)]
     pub out_dir: Utf8PathBuf,
+
+    /// the type of delivery blob the product needs.
+    #[argh(option)]
+    pub delivery_blob_type: Option<u32>,
 }
