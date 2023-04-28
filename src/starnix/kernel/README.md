@@ -116,18 +116,11 @@ the moniker `/core/starnix_runner/playground:<container-name>`, you can use the
 following command to attach a shell:
 
 ```sh
-ffx starnix console -m /core/starnix_runner/playground:<container-name>
+ffx starnix console -m /core/starnix_runner/playground:<container-name> /bin/bash
 ```
 
-This command assumes the container has a shell binary at `/bin/sh`. If you wish
-to run another binary or if the shell is located at a different path, you can
-specify the command to run in the console:
-
-```sh
-ffx starnix console \
-    -m /core/starnix_runner/playground:<container-name> \
-    /system/bin/sh
-```
+This command assumes the container has a shell binary at `/bin/bash`. If you wish
+to run another binary, you have to specify the full path.
 
 If you omit the `-m` argument, `ffx starnix console` will look for a Starnix
 container in the Fuchsia session.
