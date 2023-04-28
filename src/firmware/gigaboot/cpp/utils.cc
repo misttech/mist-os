@@ -97,9 +97,9 @@ uint32_t EfiToZbiMemRangeType(uint32_t efi_mem_type) {
     case EfiBootServicesCode:
     case EfiBootServicesData:
     case EfiConventionalMemory:
-      return ZBI_MEM_RANGE_RAM;
+      return ZBI_MEM_TYPE_RAM;
   }
-  return ZBI_MEM_RANGE_RESERVED;
+  return ZBI_MEM_TYPE_RESERVED;
 }
 
 uint64_t ToBigEndian(uint64_t val) {

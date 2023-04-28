@@ -77,8 +77,8 @@ zbi_mem_range_t ToMemRange(const E820Entry& range) {
   return zbi_mem_range_t{
       .paddr = range.addr,
       .length = range.size,
-      .type = range.type == E820Type::kRam ? static_cast<uint32_t>(ZBI_MEM_RANGE_RAM)
-                                           : static_cast<uint32_t>(ZBI_MEM_RANGE_RESERVED),
+      .type = range.type == E820Type::kRam ? static_cast<uint32_t>(ZBI_MEM_TYPE_RAM)
+                                           : static_cast<uint32_t>(ZBI_MEM_TYPE_RESERVED),
       .reserved = 0,
   };
 }
@@ -91,9 +91,9 @@ zbi_mem_range_t ToMemRange(const efi_memory_descriptor& range) {
       case EfiBootServicesCode:
       case EfiBootServicesData:
       case EfiConventionalMemory:
-        return ZBI_MEM_RANGE_RAM;
+        return ZBI_MEM_TYPE_RAM;
       default:
-        return ZBI_MEM_RANGE_RESERVED;
+        return ZBI_MEM_TYPE_RESERVED;
     }
   }();
   return zbi_mem_range_t{

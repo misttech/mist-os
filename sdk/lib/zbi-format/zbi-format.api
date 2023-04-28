@@ -4,7 +4,7 @@
   "pkg/zbi-format/include/lib/zbi-format/driver-config.h": "4f369e61f82291792a72dd4fa7ca87f3",
   "pkg/zbi-format/include/lib/zbi-format/graphics.h": "4398e93456176f04e7c4fa58b7b6f580",
   "pkg/zbi-format/include/lib/zbi-format/kernel.h": "f1241e71dade5c2480323318bf4bd4d5",
-  "pkg/zbi-format/include/lib/zbi-format/memory.h": "a757e0f0aa80354594ba12ea6e7a761b",
+  "pkg/zbi-format/include/lib/zbi-format/memory.h": "946aa3a9cfa88280ab3b06047442395b",
   "pkg/zbi-format/include/lib/zbi-format/partition.h": "73af11072112273c812594690829e811",
   "pkg/zbi-format/include/lib/zbi-format/reboot.h": "43ab297770d9d76a75d8ef16950eee34",
   "pkg/zbi-format/include/lib/zbi-format/zbi.h": "9e660c2a9e4c439548e05e889bee3870",

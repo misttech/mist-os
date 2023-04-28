@@ -17,28 +17,28 @@
 static const zbi_mem_range_t mem_config[] = {
     // TODO: read this from device tree
     {
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
         .paddr = 0x80000000,
         .length = 0x37600000,
     },
     {
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
         .paddr = 0xc0000000,
         .length = 0x20000000,
     },
     {
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
         .paddr = 0xe2500000,
         .length = 0x1db00000,
     },
     {
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
         .paddr = 0x880000000,
         .length = 0x100000000,
     },
     // TODO: find any reserve regions
     {
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
         .paddr = 0x10000000,
         .length = 0x40000000,
     },

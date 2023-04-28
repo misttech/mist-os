@@ -82,17 +82,17 @@ TEST(BootShimTests, PoolMemConfigItem) {
       {
           .paddr = 0,
           .length = kChunkSize * 50,
-          .type = ZBI_MEM_RANGE_RAM,
+          .type = ZBI_MEM_TYPE_RAM,
       },
       {
           .paddr = kChunkSize * 50,
           .length = kChunkSize * 2,
-          .type = ZBI_MEM_RANGE_PERIPHERAL,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
       },
       {
           .paddr = kChunkSize * 52,
           .length = kChunkSize * 948,
-          .type = ZBI_MEM_RANGE_RAM,
+          .type = ZBI_MEM_TYPE_RAM,
       },
   };
 

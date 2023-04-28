@@ -13,12 +13,12 @@ static const zbi_mem_range_t mem_config[] = {
     {
         .paddr = 0x02000000,
         .length = 0x20000000,  // 512M
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
     },
     {
         .paddr = 0xf0000000,
         .length = 0x10000000,
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
     },
 };
 

@@ -14,7 +14,7 @@ std::vector<zbi_mem_range_t> ZbiMemoryRanges(const DevMem& dev_mem,
     ranges.emplace_back(zbi_mem_range_t{
         .paddr = addr,
         .length = size,
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
     });
   };
 
@@ -29,13 +29,13 @@ std::vector<zbi_mem_range_t> ZbiMemoryRanges(const DevMem& dev_mem,
   // Zircon only supports a limited number of peripheral ranges so for any
   // dev_mem ranges that are not in the RAM range we will build a single
   // peripheral range to cover all of them.
-  zbi_mem_range_t periph_range = {.paddr = 0, .length = 0, .type = ZBI_MEM_RANGE_PERIPHERAL};
+  zbi_mem_range_t periph_range = {.paddr = 0, .length = 0, .type = ZBI_MEM_TYPE_PERIPHERAL};
   for (const auto& range : dev_mem) {
     if (range.addr < mem_size) {
       ranges.emplace_back(zbi_mem_range_t{
           .paddr = range.addr,
           .length = range.size,
-          .type = ZBI_MEM_RANGE_PERIPHERAL,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
       });
     } else {
       if (periph_range.length == 0) {

@@ -343,7 +343,7 @@ static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {
   // regions first, then we might add a pmm arena and have it carve out its vm_page_t array from
   // what we will later learn is reserved memory.
   for (const zbi_mem_range_t& mem_range : ranges) {
-    if (mem_range.type == ZBI_MEM_RANGE_RESERVED) {
+    if (mem_range.type == ZBI_MEM_TYPE_RESERVED) {
       dprintf(INFO, "ZBI: reserve mem range base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
               mem_range.length);
       boot_reserve_add_range(mem_range.paddr, mem_range.length);
@@ -351,7 +351,7 @@ static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {
   }
   for (const zbi_mem_range_t& mem_range : ranges) {
     switch (mem_range.type) {
-      case ZBI_MEM_RANGE_RAM:
+      case ZBI_MEM_TYPE_RAM:
         dprintf(INFO, "ZBI: mem arena base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
                 mem_range.length);
         if (arena_count >= kNumArenas) {
@@ -361,12 +361,12 @@ static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {
         mem_arena[arena_count] = pmm_arena_info_t{"ram", 0, mem_range.paddr, mem_range.length};
         arena_count++;
         break;
-      case ZBI_MEM_RANGE_PERIPHERAL: {
+      case ZBI_MEM_TYPE_PERIPHERAL: {
         // We shouldn't be dealing with peripheral mappings on riscv.
         PANIC_UNIMPLEMENTED;
         break;
       }
-      case ZBI_MEM_RANGE_RESERVED:
+      case ZBI_MEM_TYPE_RESERVED:
         // Already handled the reserved ranges.
         break;
       default:

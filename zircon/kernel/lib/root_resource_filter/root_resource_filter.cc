@@ -50,7 +50,7 @@ void RootResourceFilter::Finalize() {
   }
 
   for (const zbi_mem_range_t& mem_range : gPhysHandoff->mem_config.get()) {
-    if (mem_range.type == ZBI_MEM_RANGE_RESERVED) {
+    if (mem_range.type == ZBI_MEM_TYPE_RESERVED) {
       mmio_deny_.SubtractRegion({.base = mem_range.paddr, .size = mem_range.length},
                                 RegionAllocator::AllowIncomplete::Yes);
     }

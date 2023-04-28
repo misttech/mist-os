@@ -64,9 +64,9 @@ uint32_t to_mem_range_type(uint32_t efi_mem_type) {
     case EfiBootServicesCode:
     case EfiBootServicesData:
     case EfiConventionalMemory:
-      return ZBI_MEM_RANGE_RAM;
+      return ZBI_MEM_TYPE_RAM;
   }
-  return ZBI_MEM_RANGE_RESERVED;
+  return ZBI_MEM_TYPE_RESERVED;
 }
 
 static unsigned char scratch[32768] __attribute__((aligned(8)));
@@ -633,7 +633,7 @@ int boot_zircon(efi_handle img, efi_system_table* sys, void* image, size_t isz, 
     const zbi_mem_range_t range = {
         .paddr = uart_driver.mmio_phys,
         .length = ZX_PAGE_SIZE,
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
     };
     ranges[num_ranges] = range;
     num_ranges += 1;
@@ -648,20 +648,20 @@ int boot_zircon(efi_handle img, efi_system_table* sys, void* image, size_t isz, 
     ranges[num_ranges] = (zbi_mem_range_t){
         .paddr = v2_gic_cfg.mmio_phys,
         .length = 16 * ZX_PAGE_SIZE,
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
     };
     num_ranges += 1;
     ranges[num_ranges] = (zbi_mem_range_t){
         .paddr = v2_gic_cfg.mmio_phys + v2_gic_cfg.gicd_offset + v2_gic_cfg.gicc_offset,
         .length = 16 * ZX_PAGE_SIZE,
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
     };
     num_ranges += 1;
     if (v2_gic_cfg.use_msi) {
       ranges[num_ranges] = (zbi_mem_range_t){
           .paddr = v2_gic_cfg.msi_frame_phys,
           .length = 16 * ZX_PAGE_SIZE,
-          .type = ZBI_MEM_RANGE_PERIPHERAL,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
       };
       num_ranges += 1;
     }
@@ -680,7 +680,7 @@ int boot_zircon(efi_handle img, efi_system_table* sys, void* image, size_t isz, 
     ranges[num_ranges] = (zbi_mem_range_t){
         .paddr = v3_gic_cfg.mmio_phys,
         .length = gic_mem_size,
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
     };
     num_ranges += 1;
   }

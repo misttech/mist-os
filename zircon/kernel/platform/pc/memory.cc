@@ -93,15 +93,15 @@ static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
   // what we will later learn is reserved memory.
   for (const zbi_mem_range_t& range : merged_ranges) {
     LTRACEF("Range at %#" PRIx64 " of %#" PRIx64 " bytes is %sreserved.\n", range.paddr,
-            range.length, range.type == ZBI_MEM_RANGE_RESERVED ? "" : "not ");
-    if (range.type == ZBI_MEM_RANGE_RESERVED) {
+            range.length, range.type == ZBI_MEM_TYPE_RESERVED ? "" : "not ");
+    if (range.type == ZBI_MEM_TYPE_RESERVED) {
       boot_reserve_add_range(range.paddr, range.length);
     }
   }
   for (const zbi_mem_range_t& range : merged_ranges) {
     LTRACEF("Range at %#" PRIx64 " of %#" PRIx64 " bytes is %smemory.\n", range.paddr, range.length,
-            range.type == ZBI_MEM_RANGE_RAM ? "" : "not ");
-    if (range.type != ZBI_MEM_RANGE_RAM) {
+            range.type == ZBI_MEM_TYPE_RAM ? "" : "not ");
+    if (range.type != ZBI_MEM_TYPE_RAM) {
       continue;
     }
 
@@ -159,7 +159,7 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
     static zbi_mem_range_t entry = {};
     entry.paddr = 0;
     entry.length = DEFAULT_MEMEND;
-    entry.type = ZBI_MEM_RANGE_RAM;
+    entry.type = ZBI_MEM_TYPE_RAM;
     ranges = ktl::span<zbi_mem_range_t>(&entry, 1);
   }
 
@@ -174,7 +174,7 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
   constexpr uint64_t kMinBase = 2UL * PAGE_SIZE;
   for (const auto& range : ranges) {
     // Ignore ranges that are not normal RAM.
-    if (range.type != ZBI_MEM_RANGE_RAM) {
+    if (range.type != ZBI_MEM_TYPE_RAM) {
       continue;
     }
 

@@ -4,18 +4,21 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#ifndef ZIRCON_KERNEL_TARGET_ARM64_BOARD_PINECREST_BOOT_SHIM_CONFIG_H_
+#define ZIRCON_KERNEL_TARGET_ARM64_BOARD_PINECREST_BOOT_SHIM_CONFIG_H_
+
 #define HAS_DEVICE_TREE 0
 
 static const zbi_mem_range_t mem_config[] = {
     {
         .paddr = 0x02000000,
         .length = 0x40000000,  // 1G
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
     },
     {
         .paddr = 0xf0000000,
         .length = 0x10000000,
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
     },
 };
 
@@ -104,3 +107,5 @@ static void append_board_boot_item(zbi_header_t* bootdata) {
   // add platform ID
   append_boot_item(bootdata, ZBI_TYPE_PLATFORM_ID, 0, &platform_id, sizeof(platform_id));
 }
+
+#endif  // ZIRCON_KERNEL_TARGET_ARM64_BOARD_PINECREST_BOOT_SHIM_CONFIG_H_

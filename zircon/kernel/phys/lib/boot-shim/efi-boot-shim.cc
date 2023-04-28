@@ -22,12 +22,12 @@ constexpr uint32_t EfiMemoryTypeToZbiMemRangeType(efi_memory_type type) {
     case EfiBootServicesCode:
     case EfiBootServicesData:
     case EfiConventionalMemory:
-      return ZBI_MEM_RANGE_RAM;
+      return ZBI_MEM_TYPE_RAM;
     case EfiMemoryMappedIO:
     case EfiMemoryMappedIOPortSpace:
-      return ZBI_MEM_RANGE_PERIPHERAL;
+      return ZBI_MEM_TYPE_PERIPHERAL;
     default:
-      return ZBI_MEM_RANGE_RESERVED;
+      return ZBI_MEM_TYPE_RESERVED;
   }
 }
 

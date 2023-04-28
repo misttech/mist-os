@@ -26,14 +26,14 @@ zbi_mem_range_t FromE820(const E820Entry& in) {
 
   switch (in.type) {
     case E820Type::kRam:
-      out.type = ZBI_MEM_RANGE_RAM;
+      out.type = ZBI_MEM_TYPE_RAM;
       break;
 
     case E820Type::kReserved:
     default:
       // There are other E820Type values but none indicates usable RAM and
-      // none corresponds to ZBI_MEM_RANGE_PERIPHERAL.
-      out.type = ZBI_MEM_RANGE_RESERVED;
+      // none corresponds to ZBI_MEM_TYPE_PERIPHERAL.
+      out.type = ZBI_MEM_TYPE_RESERVED;
       break;
   }
 

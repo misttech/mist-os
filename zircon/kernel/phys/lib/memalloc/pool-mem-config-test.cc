@@ -68,22 +68,22 @@ TEST(MemallocPoolMemConfigTests, Ranges) {
       {
           .paddr = 0,
           .length = kChunkSize * 50,
-          .type = ZBI_MEM_RANGE_RAM,
+          .type = ZBI_MEM_TYPE_RAM,
       },
       {
           .paddr = kChunkSize * 52,
           .length = kChunkSize * 48,
-          .type = ZBI_MEM_RANGE_RAM,
+          .type = ZBI_MEM_TYPE_RAM,
       },
       {
           .paddr = kChunkSize * 100,
           .length = kChunkSize * 5,
-          .type = ZBI_MEM_RANGE_PERIPHERAL,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
       },
       {
           .paddr = kChunkSize * 105,
           .length = kChunkSize * 895,
-          .type = ZBI_MEM_RANGE_RAM,
+          .type = ZBI_MEM_TYPE_RAM,
       },
   };
 

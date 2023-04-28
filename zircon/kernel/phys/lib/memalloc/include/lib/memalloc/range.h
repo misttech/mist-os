@@ -34,9 +34,9 @@ enum class Type : uint64_t {
   // ZBI memory range types:
   //
 
-  kFreeRam = ZBI_MEM_RANGE_RAM,
-  kPeripheral = ZBI_MEM_RANGE_PERIPHERAL,
-  kReserved = ZBI_MEM_RANGE_RESERVED,
+  kFreeRam = ZBI_MEM_TYPE_RAM,
+  kPeripheral = ZBI_MEM_TYPE_PERIPHERAL,
+  kReserved = ZBI_MEM_TYPE_RESERVED,
 
   //
   // Extended types:

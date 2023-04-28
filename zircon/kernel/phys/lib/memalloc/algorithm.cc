@@ -119,11 +119,11 @@ class ActiveRanges {
   size_t& operator[](Type type) {
     uint64_t type_val = static_cast<uint64_t>(type);
     switch (type_val) {
-      case ZBI_MEM_RANGE_RAM:
+      case ZBI_MEM_TYPE_RAM:
         return values_[0];
-      case ZBI_MEM_RANGE_PERIPHERAL:
+      case ZBI_MEM_TYPE_PERIPHERAL:
         return values_[1];
-      case ZBI_MEM_RANGE_RESERVED:
+      case ZBI_MEM_TYPE_RESERVED:
         return values_[2];
       case kMinExtendedTypeValue ... kMaxExtendedTypeValue - 1:
         static_assert(kNumBaseTypes == 3);

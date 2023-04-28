@@ -10,17 +10,17 @@
 
 static const zbi_mem_range_t mem_config[] = {
     {
-        .type = ZBI_MEM_RANGE_RAM,
+        .type = ZBI_MEM_TYPE_RAM,
         .paddr = 0x40000000,
         .length = 0x7E000000,  // 2GB - 32MB for optee
     },
     {
-        .type = ZBI_MEM_RANGE_RESERVED,
+        .type = ZBI_MEM_TYPE_RESERVED,
         .paddr = 0xBE000000,
         .length = 0x2000000,  // 32MB for optee
     },
     {
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
         .paddr = 0,
         .length = 0x40000000,
     },

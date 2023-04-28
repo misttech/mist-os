@@ -20,9 +20,9 @@
 static size_t cpu_count = 0;
 
 static const zbi_mem_range_t mem_config[] = {
-    // ZBI_MEM_RANGE_RAM will come from device tree
+    // ZBI_MEM_TYPE_RAM will come from device tree
     {
-        .type = ZBI_MEM_RANGE_PERIPHERAL,
+        .type = ZBI_MEM_TYPE_PERIPHERAL,
         .paddr = 0,
         .length = 0x40000000,
     },

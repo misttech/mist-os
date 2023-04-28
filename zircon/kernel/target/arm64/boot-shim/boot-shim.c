@@ -225,7 +225,7 @@ static bool device_tree_memory_range(device_tree_context_t* ctx, zbi_mem_range_t
 
   range->paddr = ctx->memory_base;
   range->length = ctx->memory_size;
-  range->type = ZBI_MEM_RANGE_RAM;
+  range->type = ZBI_MEM_TYPE_RAM;
   return true;
 }
 

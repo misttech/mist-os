@@ -53,7 +53,7 @@ TEST(ToMemRange, Efi) {
   constexpr zbi_mem_range_t expected{
       .paddr = 0x1234'abcd'ffff'0000,
       .length = 409600,  // $EFI_PAFE_SIZE * 100
-      .type = ZBI_MEM_RANGE_RAM,
+      .type = ZBI_MEM_TYPE_RAM,
   };
   EXPECT_TRUE(MemRangeEqual(internal::ToMemRange(efi), expected));
 }
@@ -66,7 +66,7 @@ TEST(ToMemRange, EfiReservedMemory) {
       .NumberOfPages = 1,
       .Attribute = 0,
   };
-  EXPECT_EQ(internal::ToMemRange(efi).type, static_cast<uint32_t>(ZBI_MEM_RANGE_RESERVED));
+  EXPECT_EQ(internal::ToMemRange(efi).type, static_cast<uint32_t>(ZBI_MEM_TYPE_RESERVED));
 }
 
 TEST(ToMemRange, E820) {
@@ -78,7 +78,7 @@ TEST(ToMemRange, E820) {
   auto expected = zbi_mem_range_t{
       .paddr = 0x1234'abcd'ffff'0000,
       .length = 0x10'0000,
-      .type = ZBI_MEM_RANGE_RAM,
+      .type = ZBI_MEM_TYPE_RAM,
   };
   EXPECT_TRUE(MemRangeEqual(internal::ToMemRange(input), expected));
 }
@@ -313,14 +313,14 @@ TEST(MemRangeIterator, EfiRealData) {
       zbi_mem_range_t{
           .paddr = 0,
           .length = 4096,
-          .type = ZBI_MEM_RANGE_RAM,
+          .type = ZBI_MEM_TYPE_RAM,
       },
       ranges.front()));
   EXPECT_TRUE(MemRangeEqual(
       zbi_mem_range_t{
           .paddr = 0xffc00000,
           .length = 0x400000,
-          .type = ZBI_MEM_RANGE_RESERVED,
+          .type = ZBI_MEM_TYPE_RESERVED,
       },
       ranges.back()));
 }

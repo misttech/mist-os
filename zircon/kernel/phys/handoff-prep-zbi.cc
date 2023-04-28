@@ -108,7 +108,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
           test_ram_reserve = {
               .paddr = *gBootOptions->test_ram_reserve->paddr,
               .length = gBootOptions->test_ram_reserve->size,
-              .type = ZBI_MEM_RANGE_RESERVED,
+              .type = ZBI_MEM_TYPE_RESERVED,
           };
         }
 

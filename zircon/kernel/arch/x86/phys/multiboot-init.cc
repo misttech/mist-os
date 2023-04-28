@@ -54,14 +54,14 @@ void InitMemory(void* bootloader_data) {
 
       switch (m->type) {
         case MB_MMAP_TYPE_AVAILABLE:
-          entry.type = ZBI_MEM_RANGE_RAM;
+          entry.type = ZBI_MEM_TYPE_RAM;
           break;
 
         case MB_MMAP_TYPE_RESERVED:
         default:
           // There are other MB_MMAP_TYPE_* types but none indicates usable RAM
-          // and none corresponds to ZBI_MEM_RANGE_PERIPHERAL.
-          entry.type = ZBI_MEM_RANGE_RESERVED;
+          // and none corresponds to ZBI_MEM_TYPE_PERIPHERAL.
+          entry.type = ZBI_MEM_TYPE_RESERVED;
           break;
       }
 
@@ -84,14 +84,14 @@ void InitMemory(void* bootloader_data) {
         {
             .paddr = 0,
             .length = info.mem_lower << 10,
-            .type = ZBI_MEM_RANGE_RAM,
+            .type = ZBI_MEM_TYPE_RAM,
         },
 
         // Upper memory is above 1M.
         {
             .paddr = 1 << 20,
             .length = info.mem_upper << 10,
-            .type = ZBI_MEM_RANGE_RAM,
+            .type = ZBI_MEM_TYPE_RAM,
         },
     };
     gLegacyBoot.mem_config = low_ranges;

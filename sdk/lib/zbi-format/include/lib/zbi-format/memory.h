@@ -7,34 +7,32 @@
 
 #include <stdint.h>
 
-#define ZBI_MEM_RANGE_RAM (1)
-#define ZBI_MEM_RANGE_PERIPHERAL (2)
-#define ZBI_MEM_RANGE_RESERVED (3)
+// Unknown values should be treated as UNKNOWN to allow forwards compatibility.
+typedef uint32_t zbi_mem_type_t;
+
+// Standard RAM.
+#define ZBI_MEM_TYPE_RAM ((zbi_mem_type_t)1)
+
+// Device memory.
+#define ZBI_MEM_TYPE_PERIPHERAL ((zbi_mem_type_t)2)
+
+// Represents memory that should not be used by the system. Reserved ranges may
+// overlap other RAM or PERIPHERAL regions, in which case the reserved range
+// should take precedence.
+#define ZBI_MEM_TYPE_RESERVED ((zbi_mem_type_t)3)
 
 // The ZBI_TYPE_MEM_CONFIG payload consist of one or more `zbi_mem_range_t`
 // entries.
 //
 // The length of the item is `sizeof(zbi_mem_range_t)` times the number of
-// entries. Each entry describes a contiguous range of memory:
-//
-//   * ZBI_MEM_RANGE_RAM ranges are standard RAM.
-//
-//   * ZBI_MEM_RANGE_PERIPHERAL are ranges that cover one or more devices.
-//
-//   * ZBI_MEM_RANGE_RESERVED are reserved ranges that should not be used by
-//     the system. Reserved ranges may overlap previous or later
-//     ZBI_MEM_RANGE_RAM or ZBI_MEM_RANGE_PERIPHERAL regions, in which case the
-//     reserved range takes precedence.
-//
-//   * Any other `type` should be treated as `ZBI_MEM_RANGE_RESERVED` to allow
-//     forwards compatibility.
+// entries. Each entry describes a contiguous range of memory
 //
 // Entries in the table may be in any order, and only a single item of type
 // ZBI_TYPE_MEM_CONFIG should be present in the ZBI.
 typedef struct {
   uint64_t paddr;
   uint64_t length;
-  uint32_t type;
+  zbi_mem_type_t type;
   uint32_t reserved;
 } zbi_mem_range_t;
 

@@ -32,7 +32,7 @@ void Append(std::vector<Format>& ranges, uint64_t addr, uint64_t size, Type type
         .paddr = addr,
         .length = size,
         .type =
-            static_cast<uint32_t>(type == Type::kRam ? ZBI_MEM_RANGE_RAM : ZBI_MEM_RANGE_RESERVED),
+            static_cast<uint32_t>(type == Type::kRam ? ZBI_MEM_TYPE_RAM : ZBI_MEM_TYPE_RESERVED),
     });
   } else {
     static_assert(std::is_same_v<Format, E820Entry>, "unrecognized memory format");
